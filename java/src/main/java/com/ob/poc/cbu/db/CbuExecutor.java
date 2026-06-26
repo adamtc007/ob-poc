@@ -28,9 +28,15 @@ public final class CbuExecutor {
 
             if (command instanceof CbuCommand.Create cmd) {
                 status = CbuRepository.recoverByNameAndJurisdiction(conn, cmd.name(), cmd.jurisdiction());
-                boolean isLinked = cmd.fundEntityId() != null 
-                    && CbuRepository.isFundLinkedAlready(conn, cmd.fundEntityId());
-                context = new CbuDecide.DecisionContext(isLinked);
+                UUID existingFundCbuId = null;
+                boolean isLinked = false;
+                if (cmd.fundEntityId() != null) {
+                    existingFundCbuId = CbuRepository.getLinkedCbuIdForFund(conn, cmd.fundEntityId());
+                    isLinked = (existingFundCbuId != null);
+                }
+                context = new CbuDecide.DecisionContext(isLinked, existingFundCbuId);
+            } else if (command instanceof CbuCommand.Ensure cmd) {
+                status = CbuRepository.recoverByNameAndJurisdiction(conn, cmd.name(), cmd.jurisdiction());
             } else if (command instanceof CbuCommand.LinkStructure cmd) {
                 boolean parentExists = CbuRepository.recover(conn, cmd.parentCbuId()) != null;
                 boolean childExists = CbuRepository.recover(conn, cmd.childCbuId()) != null;
@@ -40,6 +46,33 @@ public final class CbuExecutor {
                 }
                 context = new CbuDecide.DecisionContext(parentExists, childExists, existingLinkId);
                 status = CbuRepository.recover(conn, cmd.parentCbuId());
+            } else if (command instanceof CbuCommand.UnlinkStructure cmd) {
+                boolean activeOnly = cmd.hardDelete() == null || !cmd.hardDelete();
+                boolean exists = CbuRepository.linkExists(conn, cmd.linkId(), activeOnly);
+                context = CbuDecide.DecisionContext.forUnlink(exists);
+                status = null;
+            } else if (command instanceof CbuCommand.TerminateRole cmd) {
+                boolean activeOnly = cmd.hardDelete() == null || !cmd.hardDelete();
+                boolean exists = CbuRepository.roleExists(conn, cmd.cbuId(), activeOnly);
+                context = CbuDecide.DecisionContext.forRole(exists);
+                status = CbuRepository.recover(conn, cmd.cbuId());
+            } else if (command instanceof CbuCommand.RemoveMember cmd) {
+                boolean activeOnly = cmd.hardDelete() == null || !cmd.hardDelete();
+                boolean exists = CbuRepository.memberExists(conn, cmd.cbuId(), activeOnly);
+                context = CbuDecide.DecisionContext.forMember(exists);
+                status = CbuRepository.recover(conn, cmd.cbuId());
+            } else if (command instanceof CbuCommand.SubmitForReview 
+                       || command instanceof CbuCommand.ApproveCa 
+                       || command instanceof CbuCommand.RejectCa 
+                       || command instanceof CbuCommand.WithdrawCa 
+                       || command instanceof CbuCommand.MarkImplementedCa) {
+                String caStatus = CbuRepository.recoverCaStatus(conn, command.id());
+                context = CbuDecide.DecisionContext.forCa(caStatus);
+            } else if (command instanceof CbuCommand.VerifyEvidence cmd) {
+                // Evidence verify
+                status = null;
+            } else if (command instanceof CbuCommand.CreateFromClientGroup cmd) {
+                status = null;
             } else {
                 status = CbuRepository.recover(conn, command.id());
             }
@@ -56,10 +89,25 @@ public final class CbuExecutor {
             DecisionOutcome.Accept accept = (DecisionOutcome.Accept) outcome;
             List<Object> outEvents = new ArrayList<>();
             UUID cbuId = command.id();
+            if (command instanceof CbuCommand.Create cmd) {
+                if (status != null) {
+                    cbuId = status.id();
+                } else if (context != null && context.isFundLinkedAlready() && context.existingFundCbuId() != null) {
+                    cbuId = context.existingFundCbuId();
+                }
+            }
             boolean created = false;
 
             for (Effect effect : accept.effects()) {
-                CbuRepository.applyEffect(conn, effect, outEvents);
+                int affectedRows = CbuRepository.applyEffect(conn, effect, outEvents);
+                if (effect instanceof Effect.UpdateOperationalStatus 
+                    || effect instanceof Effect.UpdateValidationStatus 
+                    || effect instanceof Effect.UpdateDispositionStatus) {
+                    if (affectedRows == 0) {
+                        conn.rollback();
+                        return new CbuExecutionResult.Failure("concurrent modification / precondition no longer holds");
+                    }
+                }
             }
 
             // Extract insert result if present

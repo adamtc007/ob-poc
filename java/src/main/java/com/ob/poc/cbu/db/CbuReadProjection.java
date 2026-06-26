@@ -536,6 +536,211 @@ public final class CbuReadProjection {
         return new CbuOptionCoverageDto(cbuId, finalServiceId, status, gaps);
     }
 
+    public static CbuRoleValidationDto validateRoles(Connection conn, UUID cbuId) throws SQLException {
+        String cbuSql = "SELECT cbu_category, client_type FROM \"ob-poc\".cbus WHERE cbu_id = ? AND deleted_at IS NULL";
+        String cbuCategory = null;
+        String clientType = null;
+        try (PreparedStatement ps = conn.prepareStatement(cbuSql)) {
+            ps.setObject(1, cbuId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    cbuCategory = rs.getString("cbu_category");
+                    clientType = rs.getString("client_type");
+                } else {
+                    throw new SQLException("CBU not found: " + cbuId);
+                }
+            }
+        }
+
+        List<String> issues = new ArrayList<>();
+
+        String controlRoleSql = "SELECT EXISTS(" +
+                                "  SELECT 1 FROM \"ob-poc\".cbu_entity_roles cer " +
+                                "  JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id " +
+                                "  WHERE cer.cbu_id = ? AND r.role_category = 'CONTROL_CHAIN'" +
+                                ")";
+        boolean hasDirector = false;
+        try (PreparedStatement ps = conn.prepareStatement(controlRoleSql)) {
+            ps.setObject(1, cbuId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    hasDirector = rs.getBoolean(1);
+                }
+            }
+        }
+        if (!hasDirector) {
+            issues.add("No control role (DIRECTOR, MANAGER, etc.) assigned");
+        }
+
+        if ("FUND".equals(clientType)) {
+            String mancoSql = "SELECT EXISTS(" +
+                              "  SELECT 1 FROM \"ob-poc\".cbu_entity_roles cer " +
+                              "  JOIN \"ob-poc\".roles r ON cer.role_id = r.role_id " +
+                              "  WHERE cer.cbu_id = ? AND r.name IN ('MANAGEMENT_COMPANY', 'INVESTMENT_MANAGER')" +
+                              ")";
+            boolean hasManco = false;
+            try (PreparedStatement ps = conn.prepareStatement(mancoSql)) {
+                ps.setObject(1, cbuId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        hasManco = rs.getBoolean(1);
+                    }
+                }
+            }
+            if (!hasManco) {
+                issues.add("Fund CBU requires MANAGEMENT_COMPANY or INVESTMENT_MANAGER");
+            }
+        }
+
+        String orphanSql = "SELECT COUNT(*) " +
+                           "FROM \"ob-poc\".entity_relationships er " +
+                           "WHERE er.relationship_type = 'ownership' " +
+                           "AND NOT EXISTS ( " +
+                           "  SELECT 1 FROM \"ob-poc\".cbu_entity_roles cer " +
+                           "  WHERE cer.entity_id = er.from_entity_id " +
+                           "  AND cer.cbu_id = ? " +
+                           ")";
+        long orphanCount = 0;
+        try (PreparedStatement ps = conn.prepareStatement(orphanSql)) {
+            ps.setObject(1, cbuId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    orphanCount = rs.getLong(1);
+                }
+            }
+        }
+        if (orphanCount > 0) {
+            issues.add(orphanCount + " ownership relationships without corresponding role assignments");
+        }
+
+        boolean valid = issues.isEmpty();
+        return new CbuRoleValidationDto(cbuId, valid, issues, cbuCategory, clientType);
+    }
+
+    public static List<CbuResourceFanoutDto> computeResourceFanout(
+        Connection conn,
+        UUID cbuId,
+        UUID serviceId,
+        String serviceCode
+    ) throws SQLException {
+        UUID resolvedServiceId = serviceId;
+        if (resolvedServiceId == null) {
+            if (serviceCode == null) {
+                throw new IllegalArgumentException("serviceId or serviceCode is required");
+            }
+            String query = "SELECT service_id FROM \"ob-poc\".services WHERE service_code = ?";
+            try (PreparedStatement ps = conn.prepareStatement(query)) {
+                ps.setString(1, serviceCode);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        resolvedServiceId = (UUID) rs.getObject("service_id");
+                    } else {
+                        throw new SQLException("Unknown service: " + serviceCode);
+                    }
+                }
+            }
+        }
+
+        // 1. Fetch active fanout rules
+        class FanoutRule {
+            UUID fanoutRuleId;
+            UUID serviceId;
+            UUID resourceId;
+            UUID serviceOptionDefId;
+            String fanoutAxis;
+            String fanoutMode;
+            boolean sharedWhenNull;
+        }
+        List<FanoutRule> rules = new ArrayList<>();
+        String rulesSql = "SELECT fanout_rule_id, service_id, resource_id, service_option_def_id, " +
+                          "fanout_axis, fanout_mode, shared_when_null " +
+                          "FROM \"ob-poc\".service_resource_fanout_rules " +
+                          "WHERE service_id = ? AND is_active " +
+                          "ORDER BY priority, resource_id";
+        try (PreparedStatement ps = conn.prepareStatement(rulesSql)) {
+            ps.setObject(1, resolvedServiceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    FanoutRule rule = new FanoutRule();
+                    rule.fanoutRuleId = (UUID) rs.getObject("fanout_rule_id");
+                    rule.serviceId = (UUID) rs.getObject("service_id");
+                    rule.resourceId = (UUID) rs.getObject("resource_id");
+                    rule.serviceOptionDefId = (UUID) rs.getObject("service_option_def_id");
+                    rule.fanoutAxis = rs.getString("fanout_axis");
+                    rule.fanoutMode = rs.getString("fanout_mode");
+                    rule.sharedWhenNull = rs.getBoolean("shared_when_null");
+                    rules.add(rule);
+                }
+            }
+        }
+
+        // 2. Fetch resolved bindings
+        java.util.Map<UUID, String> bindingValues = new java.util.HashMap<>();
+        String bindingsSql = "SELECT service_option_def_id, value " +
+                             "FROM \"ob-poc\".cbu_service_option_bindings " +
+                             "WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL";
+        try (PreparedStatement ps = conn.prepareStatement(bindingsSql)) {
+            ps.setObject(1, cbuId);
+            ps.setObject(2, resolvedServiceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    UUID defId = (UUID) rs.getObject("service_option_def_id");
+                    String valueStr = rs.getString("value");
+                    bindingValues.put(defId, valueStr);
+                }
+            }
+        }
+
+        // 3. Plan resource instances
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        List<CbuResourceFanoutDto> planned = new ArrayList<>();
+
+        for (FanoutRule rule : rules) {
+            String mode = rule.fanoutMode;
+            if ("shared".equals(mode)) {
+                planned.add(new CbuResourceFanoutDto(rule.serviceId, rule.resourceId, rule.fanoutAxis, null));
+            } else if ("per_value".equals(mode)) {
+                if (rule.serviceOptionDefId == null) {
+                    throw new SQLException("per_value fanout rule requires service_option_def_id");
+                }
+                String bindingValStr = bindingValues.get(rule.serviceOptionDefId);
+                if (bindingValStr == null) {
+                    throw new SQLException("missing binding for fanout rule " + rule.fanoutRuleId);
+                }
+                
+                com.fasterxml.jackson.databind.JsonNode node;
+                try {
+                    node = mapper.readTree(bindingValStr);
+                } catch (Exception ex) {
+                    throw new SQLException("failed to parse binding value JSON", ex);
+                }
+
+                List<String> values = new ArrayList<>();
+                if (node == null || node.isNull()) {
+                    if (rule.sharedWhenNull) {
+                        values.add(null);
+                    }
+                } else if (node.isArray()) {
+                    for (com.fasterxml.jackson.databind.JsonNode elem : node) {
+                        values.add(elem.toString());
+                    }
+                } else {
+                    values.add(node.toString());
+                }
+
+                for (String val : values) {
+                    planned.add(new CbuResourceFanoutDto(rule.serviceId, rule.resourceId, rule.fanoutAxis, val));
+                }
+            } else if ("grouped".equals(mode) || "conditional".equals(mode)) {
+                throw new SQLException(mode + " fanout requires policy execution and is not implemented in the pure v1 planner");
+            } else {
+                throw new SQLException("unknown fanout mode: " + mode);
+            }
+        }
+
+        return planned;
+    }
+
     private static CbuDto mapRow(ResultSet rs) throws SQLException {
         UUID cbuId = (UUID) rs.getObject("cbu_id");
         String name = rs.getString("name");

@@ -1177,6 +1177,7 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            maps_to: cbu_id
             lookup:
               table: cbus
               entity_type: cbu
@@ -1186,6 +1187,7 @@ domains:
           - name: entity-id
             type: uuid
             required: true
+            maps_to: entity_id
             lookup:
               table: entities
               entity_type: entity

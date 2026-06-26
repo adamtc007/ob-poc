@@ -796,6 +796,25 @@ These files are transitory historical notes. Use them for implementation backgro
 | Lexicon service | `ai-thoughts/072-lexicon-service-implementation-plan.md` |
 | Entity linking | `ai-thoughts/073-entity-linking-implementation-plan.md` |
 
+## Java 25 DOP CBU Port Strategy
+
+The Client Business Unit (CBU) status transition and validation engine has been ported from Rust to a Java 25 Data-Oriented Programming (DOP) architecture.
+
+### Architectural Rules
+1. **Purity Bound:** The `com.ob.poc.cbu.model` package contains pure functional business logic. No database access, Spring Framework annotations, Hibernate, or ORM frameworks are permitted within this package.
+2. **Compile-Time Exhaustiveness:**
+   - Transition guards switching over sealed status types (`ValidationState`, `OperationalState`, `DispositionState`) **must be default-free** (no `default ->` or `case ... default` branches).
+   - Every switch expression must explicitly list every permitted sub-record type and include a `case null ->` branch.
+   - Adding a new record to any sealed state interface must immediately break compilation at all switch locations that check that state.
+3. **State Machines:**
+   - `ValidationState`: `ValidationPending`, `Validated`, `ValidationFailed`, `UpdatePendingProof`, `Evidenced`.
+   - `OperationalState`: `PreValidated`, `OperationallyActive`, `Suspended`, `Restricted`, `WindingDown`, `Offboarded`, `Dormant`, `Archived`.
+   - `DispositionState`: `Active`, `UnderRemediation`, `SoftDeleted`, `HardDeleted`.
+4. **Optimistic Guarding:**
+   - Database status updates in `CbuExecutor` must capture the rowcount of the update effect.
+   - If a guarded update affects 0 rows (due to a concurrent modification or stale state), the transaction must be rolled back and a `Failure` outcome returned.
+5. **Differential Verification:** All updates, queries, and status transitions are validated via `CbuPortTest` through differential testing against the Rust reference implementation.
+
 ---
 
 ## Trigger Phrases

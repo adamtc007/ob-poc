@@ -826,12 +826,13 @@ public class CbuPortTest {
 
                 // --- TRANSITION 17: hard-delete ---
                 // Rust
+                executeRustDsl("(cbu.soft-delete :cbu-id \"" + cbuId + "\" :reason \"prepare\")");
                 executeRustDsl("(cbu.hard-delete :cbu-id \"" + cbuId + "\")");
                 CbuStatus rustHardDeleted = CbuRepository.recover(conn, cbuId);
                 assertEquals("hard_deleted", rustHardDeleted.rawDispStatus());
 
-                // Reset Java side disposition_status back to active
-                try (var ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET disposition_status = 'active' WHERE cbu_id = ?")) {
+                // Reset Java side disposition_status back to soft_deleted
+                try (var ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET disposition_status = 'soft_deleted' WHERE cbu_id = ?")) {
                     ps.setObject(1, cbuId);
                     ps.executeUpdate();
                 }
@@ -1577,4 +1578,1163 @@ public class CbuPortTest {
             }
         }
     }
+
+    @Test
+    public void testStaleStatusTransitionGuard() throws Exception {
+        UUID cbuId = UUID.randomUUID();
+        String cbuName = "Stale Guard CBU " + cbuId;
+        CbuCommand.Principal actor = new CbuCommand.Principal("test-user", Set.of("compliance_officer"));
+
+        try (Connection conn = getDbConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1. Create a CBU and set status to VALIDATION_PENDING
+                CbuCommand.Create createCmd = new CbuCommand.Create(
+                    cbuId, actor, cbuName, "LU", null, null, "FUND", null, null, null
+                );
+                CbuExecutor.execute(conn, createCmd);
+
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET status = 'VALIDATION_PENDING' WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // 2. Wrap Connection in a dynamic proxy to simulate concurrent modification right before the update statement
+                Connection proxyConn = (Connection) java.lang.reflect.Proxy.newProxyInstance(
+                    Connection.class.getClassLoader(),
+                    new Class<?>[] { Connection.class },
+                    (proxy, method, methodArgs) -> {
+                        if ("prepareStatement".equals(method.getName()) && methodArgs.length > 0 && methodArgs[0] instanceof String sql) {
+                            if (sql.contains("UPDATE") && (sql.contains("status") || sql.contains("validation"))) {
+                                // This is the status update query! Modify the state concurrently on a separate connection
+                                try (Connection other = getDbConnection()) {
+                                    try (PreparedStatement ps = other.prepareStatement("UPDATE \"ob-poc\".cbus SET status = 'VALIDATED' WHERE cbu_id = ?")) {
+                                        ps.setObject(1, cbuId);
+                                        ps.executeUpdate();
+                                    }
+                                }
+                            }
+                        }
+                        try {
+                            return method.invoke(conn, methodArgs);
+                        } catch (java.lang.reflect.InvocationTargetException e) {
+                            throw e.getTargetException();
+                        }
+                    }
+                );
+
+                // 3. Execute Java Confirm via proxy connection. It should fail because the status was changed to VALIDATED concurrently.
+                CbuCommand.Confirm confirmCmd = new CbuCommand.Confirm(cbuId, actor);
+                CbuExecutionResult result = CbuExecutor.execute(proxyConn, confirmCmd);
+
+                assertTrue(result instanceof CbuExecutionResult.Failure);
+                CbuExecutionResult.Failure failure = (CbuExecutionResult.Failure) result;
+                assertTrue(failure.reason().toLowerCase().contains("concurrent modification") || failure.reason().toLowerCase().contains("precondition"));
+
+            } finally {
+                // Cleanup
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            }
+        }
+    }
+
+    @Test
+    public void testIdempotentCreateIdDifferentialConformance() throws Exception {
+        UUID id2 = UUID.randomUUID();
+        String cbuName = "Idempotent Create ID CBU " + UUID.randomUUID();
+        CbuCommand.Principal actor = new CbuCommand.Principal("test-user", Set.of("compliance_officer"));
+
+        try (Connection conn = getDbConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // First call: create via Rust (so we establish the first ID/Rust ID)
+                String rustDsl = String.format(
+                    "(cbu.create :name \"%s\" :jurisdiction \"LU\" :client-type \"FUND\" :nature-purpose \"test\" :description \"desc\")",
+                    cbuName
+                );
+                executeRustDsl(rustDsl);
+
+                // Recover actual ID created by Rust
+                CbuStatus statusAfterRust = CbuRepository.recoverByNameAndJurisdiction(conn, cbuName, "LU");
+                assertNotNull(statusAfterRust);
+                UUID rustCbuId = statusAfterRust.id();
+
+                // Second call: call Java create twice, but with id2 as requested ID on the second call
+                CbuCommand.Create createJava2 = new CbuCommand.Create(
+                    id2, actor, cbuName, "LU", null, null, "FUND", "test", "desc", null
+                );
+
+                CbuExecutionResult res = CbuExecutor.execute(conn, createJava2);
+                assertTrue(res instanceof CbuExecutionResult.Success);
+                CbuExecutionResult.Success success = (CbuExecutionResult.Success) res;
+
+                // The returned ID must match the first ID (rustCbuId), not the requested ID (id2)
+                assertEquals(rustCbuId, success.cbuId());
+                assertFalse(success.created()); // should be false since it was already created
+
+            } finally {
+                // Cleanup
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE name = ?")) {
+                    ps.setString(1, cbuName);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            }
+        }
+    }
+
+    @Test
+    public void testSettersDifferentialConformance() throws Exception {
+        UUID cbuId = UUID.randomUUID();
+        String cbuName = "Setter Test CBU " + cbuId;
+        CbuCommand.Principal actor = new CbuCommand.Principal("test-user", Set.of("compliance_officer", "compliance_admin"));
+
+        try (Connection conn = getDbConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Initialize CBU in Java (Discovered/Active)
+                CbuCommand.Create createCmd = new CbuCommand.Create(
+                    cbuId, actor, cbuName, "LU", null, null, "FUND", "nature", "desc", null
+                );
+                CbuExecutor.execute(conn, createCmd);
+                conn.commit();
+
+                // 1. Rename
+                String newName = "Renamed " + cbuName;
+                executeRustDsl(String.format("(cbu.rename :cbu-id \"%s\" :name \"%s\")", cbuId, newName));
+                CbuStatus rustRenamed = CbuRepository.recover(conn, cbuId);
+                assertEquals(newName, rustRenamed.name());
+
+                // Reset
+                try (var ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET name = ? WHERE cbu_id = ?")) {
+                    ps.setString(1, cbuName);
+                    ps.setObject(2, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Rename
+                CbuExecutionResult renameRes = CbuExecutor.execute(conn, new CbuCommand.Rename(cbuId, actor, newName));
+                assertTrue(renameRes instanceof CbuExecutionResult.Success);
+                CbuStatus javaRenamed = CbuRepository.recover(conn, cbuId);
+                assertEquals(rustRenamed.name(), javaRenamed.name());
+
+                // 2. SetJurisdiction
+                executeRustDsl(String.format("(cbu.set-jurisdiction :cbu-id \"%s\" :jurisdiction \"US\")", cbuId));
+                CbuStatus rustJurisdiction = CbuRepository.recover(conn, cbuId);
+                assertEquals("US", rustJurisdiction.jurisdiction());
+
+                // Reset
+                try (var ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET jurisdiction = 'LU' WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java SetJurisdiction
+                CbuExecutionResult jurRes = CbuExecutor.execute(conn, new CbuCommand.SetJurisdiction(cbuId, actor, "US"));
+                assertTrue(jurRes instanceof CbuExecutionResult.Success);
+                CbuStatus javaJurisdiction = CbuRepository.recover(conn, cbuId);
+                assertEquals(rustJurisdiction.jurisdiction(), javaJurisdiction.jurisdiction());
+
+                // 3. SetClientType
+                executeRustDsl(String.format("(cbu.set-client-type :cbu-id \"%s\" :client-type \"CORPORATE\")", cbuId));
+                CbuStatus rustClientType = CbuRepository.recover(conn, cbuId);
+                assertEquals("CORPORATE", rustClientType.clientType());
+
+                // Reset
+                try (var ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET client_type = 'FUND' WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java SetClientType
+                CbuExecutionResult ctRes = CbuExecutor.execute(conn, new CbuCommand.SetClientType(cbuId, actor, "CORPORATE"));
+                assertTrue(ctRes instanceof CbuExecutionResult.Success);
+                CbuStatus javaClientType = CbuRepository.recover(conn, cbuId);
+                assertEquals(rustClientType.clientType(), javaClientType.clientType());
+
+            } finally {
+                // Cleanup
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            }
+        }
+    }
+
+    @Test
+    public void testPhase5WriteVerbsDifferentialConformance() throws Exception {
+        UUID cbuId = UUID.randomUUID();
+        UUID childCbuId = UUID.randomUUID();
+        UUID entityId1 = UUID.randomUUID();
+        UUID entityId2 = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        UUID mancoEntityId = UUID.randomUUID();
+        UUID caEventId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        UUID evidenceId = UUID.randomUUID();
+        UUID optServiceId = UUID.randomUUID();
+        UUID optVersionId = UUID.randomUUID();
+        UUID optDefId = UUID.randomUUID();
+
+        String cbuName = "Phase5 Test CBU " + cbuId;
+        String childName = "Phase5 Child CBU " + childCbuId;
+        CbuCommand.Principal actor = new CbuCommand.Principal("test-user", Set.of("compliance_officer", "compliance_admin"));
+
+        try (Connection conn = getDbConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // Initialize CBU in Java
+                CbuCommand.Create createParent = new CbuCommand.Create(
+                    cbuId, actor, cbuName, "LU", null, null, "FUND", "nature", "desc", null
+                );
+                CbuExecutor.execute(conn, createParent);
+
+                CbuCommand.Create createChild = new CbuCommand.Create(
+                    childCbuId, actor, childName, "LU", null, null, "FUND", "nature", "desc", null
+                );
+                CbuExecutor.execute(conn, createChild);
+
+                // Insert entities
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".entities (entity_id, entity_type_id, name, name_norm, row_version) VALUES (?, ?, ?, ?, 1)")) {
+                    ps.setObject(1, entityId1);
+                    ps.setObject(2, UUID.fromString("6f7b4e87-363e-4ee3-a717-d4b456d4eec4")); 
+                    ps.setString(3, "John Person " + entityId1.toString().substring(0, 8));
+                    ps.setString(4, ("John Person " + entityId1.toString().substring(0, 8)).toLowerCase());
+                    ps.executeUpdate();
+
+                    ps.setObject(1, entityId2);
+                    ps.setObject(2, UUID.fromString("7803ffb7-935e-4cba-aa70-c9bb4cb43509"));
+                    ps.setString(3, "Acme Entity " + entityId2.toString().substring(0, 8));
+                    ps.setString(4, ("Acme Entity " + entityId2.toString().substring(0, 8)).toLowerCase());
+                    ps.executeUpdate();
+
+                    ps.setObject(1, mancoEntityId);
+                    ps.setObject(2, UUID.fromString("7803ffb7-935e-4cba-aa70-c9bb4cb43509"));
+                    ps.setString(3, "ManCo Entity " + mancoEntityId.toString().substring(0, 8));
+                    ps.setString(4, ("ManCo Entity " + mancoEntityId.toString().substring(0, 8)).toLowerCase());
+                    ps.executeUpdate();
+                }
+
+                // Insert group
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".cbu_groups (group_id, manco_entity_id, group_name) VALUES (?, ?, ?)")) {
+                    ps.setObject(1, groupId);
+                    ps.setObject(2, mancoEntityId);
+                    ps.setString(3, "Test Group " + groupId);
+                    ps.executeUpdate();
+                }
+
+                // Insert client group
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".client_group (id, canonical_name) VALUES (?, ?)")) {
+                    ps.setObject(1, groupId);
+                    ps.setString(2, "Test Group " + groupId);
+                    ps.executeUpdate();
+                }
+
+                // Insert document
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".document_catalog (doc_id, cbu_id, document_type_id, document_name, status, document_id) VALUES (?, ?, ?, ?, 'active', ?)")) {
+                    ps.setObject(1, docId);
+                    ps.setObject(2, cbuId);
+                    ps.setObject(3, UUID.fromString("f14f4808-9181-4223-bdd9-e75b0d2566fe")); // CBU.MODEL
+                    ps.setString(4, "Test Doc");
+                    ps.setObject(5, UUID.randomUUID());
+                    ps.executeUpdate();
+                }
+
+                // Insert Proposed CA
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".cbu_corporate_action_events (event_id, cbu_id, event_type, ca_status) VALUES (?, ?, 'rename', 'proposed')")) {
+                    ps.setObject(1, caEventId);
+                    ps.setObject(2, cbuId);
+                    ps.executeUpdate();
+                }
+
+                // Insert client group entity
+                UUID cgeId = UUID.randomUUID();
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".client_group_entity (id, group_id, entity_id, membership_type) VALUES (?, ?, ?, 'confirmed')")) {
+                    ps.setObject(1, cgeId);
+                    ps.setObject(2, groupId);
+                    ps.setObject(3, entityId1);
+                    ps.executeUpdate();
+                }
+
+                // Insert option service framework components
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".services (service_id, service_code, name) VALUES (?, ?, ?)")) {
+                    ps.setObject(1, optServiceId);
+                    ps.setString(2, "OPT_SERVICE_" + optServiceId.toString().substring(0,8));
+                    ps.setString(3, "Options test service");
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".service_versions (id, service_id, version, lifecycle_status) VALUES (?, ?, 'v1', 'published')")) {
+                    ps.setObject(1, optVersionId);
+                    ps.setObject(2, optServiceId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".service_option_defs (service_option_def_id, service_id, service_version_id, option_key, option_kind, is_required, lifecycle_status, default_source_kind) VALUES (?, ?, ?, ?, 'string', true, 'active', 'manual')")) {
+                    ps.setObject(1, optDefId);
+                    ps.setObject(2, optServiceId);
+                    ps.setObject(3, optVersionId);
+                    ps.setString(4, "opt_key");
+                    ps.executeUpdate();
+                }
+
+                conn.commit();
+
+                // ------------------ 1. cbu-ca.submit-for-review ------------------
+                executeRustDsl("(cbu-ca.submit-for-review :event-id \"" + caEventId + "\")");
+                String rustCaStatus1 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals("under_review", rustCaStatus1);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'proposed' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java SubmitForReview
+                CbuExecutor.execute(conn, new CbuCommand.SubmitForReview(caEventId, actor));
+                String javaCaStatus1 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals(rustCaStatus1, javaCaStatus1);
+
+                // ------------------ 2. cbu-ca.reject ------------------
+                executeRustDsl("(cbu-ca.submit-for-review :event-id \"" + caEventId + "\")");
+                executeRustDsl("(cbu-ca.reject :event-id \"" + caEventId + "\" :reason \"No way\")");
+                String rustCaStatus2 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals("rejected", rustCaStatus2);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'under_review', rejected_reason = null WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Reject
+                CbuExecutor.execute(conn, new CbuCommand.RejectCa(caEventId, actor, "No way"));
+                String javaCaStatus2 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals(rustCaStatus2, javaCaStatus2);
+
+                // ------------------ 3. cbu-ca.withdraw ------------------
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'proposed' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                executeRustDsl("(cbu-ca.withdraw :event-id \"" + caEventId + "\")");
+                String rustCaStatus3 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals("withdrawn", rustCaStatus3);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'proposed' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Withdraw
+                CbuExecutor.execute(conn, new CbuCommand.WithdrawCa(caEventId, actor));
+                String javaCaStatus3 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals(rustCaStatus3, javaCaStatus3);
+
+                // ------------------ 4. cbu-ca.approve ------------------
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'under_review' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                executeRustDsl("(cbu-ca.approve :event-id \"" + caEventId + "\")");
+                String rustCaStatus4 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals("approved", rustCaStatus4);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'under_review' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Approve
+                CbuExecutor.execute(conn, new CbuCommand.ApproveCa(caEventId, actor));
+                String javaCaStatus4 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals(rustCaStatus4, javaCaStatus4);
+
+                // ------------------ 5. cbu-ca.mark-implemented ------------------
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'effective' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                executeRustDsl("(cbu-ca.mark-implemented :event-id \"" + caEventId + "\")");
+                String rustCaStatus5 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals("implemented", rustCaStatus5);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_corporate_action_events SET ca_status = 'effective' WHERE event_id = ?")) {
+                    ps.setObject(1, caEventId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java MarkImplemented
+                CbuExecutor.execute(conn, new CbuCommand.MarkImplementedCa(caEventId, actor));
+                String javaCaStatus5 = CbuRepository.recoverCaStatus(conn, caEventId);
+                assertEquals(rustCaStatus5, javaCaStatus5);
+
+                // ------------------ 6. cbu.assign-role (OWNERSHIP) ------------------
+                executeRustDsl(String.format(
+                    "(cbu.assign-role :cbu-id \"%s\" :role-type \"ownership\" :role \"SHAREHOLDER\" :owner-entity-id \"%s\" :owned-entity-id \"%s\" :percentage \"45.5\" :effective-from \"2026-01-01\" :ownership-type \"beneficial\")",
+                    cbuId, entityId1, entityId2
+                ));
+                // Fetch Rust roles count
+                long rustRoleCount = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustRoleCount = rs.getLong(1);
+                    }
+                }
+                assertEquals(1, rustRoleCount);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".entity_relationships WHERE from_entity_id = ? AND to_entity_id = ?")) {
+                    ps.setObject(1, entityId1);
+                    ps.setObject(2, entityId2);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java AssignRole
+                CbuCommand.AssignRole assignOwnership = new CbuCommand.AssignRole(
+                    cbuId, actor, "ownership", "SHAREHOLDER", entityId1, entityId2,
+                    null, null, null, null, null, null, null, null, null, null,
+                    "45.5", "beneficial", "2026-01-01", null, null, null, null, null,
+                    null, null, null, null, null, null, null, null
+                );
+                CbuExecutor.execute(conn, assignOwnership);
+                
+                long javaRoleCount = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaRoleCount = rs.getLong(1);
+                    }
+                }
+                assertEquals(rustRoleCount, javaRoleCount);
+
+                // ------------------ 7. cbu.remove-role ------------------
+                // Rust remove role
+                executeRustDsl(String.format(
+                    "(cbu.remove-role :cbu-id \"%s\" :entity-id \"%s\" :role \"SHAREHOLDER\")",
+                    cbuId, entityId1
+                ));
+                long rustRoleCountAfterRemove = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustRoleCountAfterRemove = rs.getLong(1);
+                    }
+                }
+                assertEquals(0, rustRoleCountAfterRemove);
+
+                // Reset (Re-assign via Java)
+                CbuExecutor.execute(conn, assignOwnership);
+                conn.commit();
+
+                // Java RemoveRole
+                CbuCommand.RemoveRole removeCmd = new CbuCommand.RemoveRole(cbuId, actor, entityId1, "SHAREHOLDER");
+                CbuExecutor.execute(conn, removeCmd);
+
+                long javaRoleCountAfterRemove = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaRoleCountAfterRemove = rs.getLong(1);
+                    }
+                }
+                assertEquals(rustRoleCountAfterRemove, javaRoleCountAfterRemove);
+
+                // ------------------ 8. cbu.attach-evidence ------------------
+                executeRustDsl(String.format(
+                    "(cbu.attach-evidence :cbu-id \"%s\" :document-id \"%s\" :evidence-id \"%s\" :attestation-ref \"ATT-999\" :evidence-type \"DOCUMENT\" :evidence-category \"KYC\" :description \"KYC proof\")",
+                    cbuId, docId, evidenceId
+                ));
+                UUID rustEvidenceId = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT evidence_id FROM \"ob-poc\".cbu_evidence WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustEvidenceId = (UUID) rs.getObject(1);
+                    }
+                }
+                assertNotNull(rustEvidenceId);
+
+                long rustEvidenceCount = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_evidence WHERE evidence_id = ?")) {
+                    ps.setObject(1, rustEvidenceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustEvidenceCount = rs.getLong(1);
+                    }
+                }
+                assertEquals(1, rustEvidenceCount);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_evidence WHERE evidence_id = ?")) {
+                    ps.setObject(1, rustEvidenceId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Attach
+                CbuCommand.AttachEvidence attachCmd = new CbuCommand.AttachEvidence(
+                    cbuId, actor, docId, "ATT-999", "DOCUMENT", "KYC", "KYC proof", "test-user"
+                );
+                CbuExecutionResult attachRes = CbuExecutor.execute(conn, attachCmd);
+                assertTrue(attachRes instanceof CbuExecutionResult.Success);
+                UUID javaEvidenceId = null;
+                for (Object evt : ((CbuExecutionResult.Success) attachRes).events()) {
+                    if (evt instanceof CbuRepository.AttachEvidenceResult aer) {
+                        javaEvidenceId = aer.evidenceId();
+                    }
+                }
+                assertNotNull(javaEvidenceId);
+
+                long javaEvidenceCount = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_evidence WHERE evidence_id = ?")) {
+                    ps.setObject(1, javaEvidenceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaEvidenceCount = rs.getLong(1);
+                    }
+                }
+                assertEquals(rustEvidenceCount, javaEvidenceCount);
+
+                // ------------------ 9. cbu.verify-evidence ------------------
+                executeRustDsl(String.format(
+                    "(cbu.attach-evidence :cbu-id \"%s\" :document-id \"%s\" :evidence-id \"%s\" :attestation-ref \"ATT-999\" :evidence-type \"DOCUMENT\" :evidence-category \"KYC\" :description \"KYC proof\")",
+                    cbuId, docId, evidenceId
+                ));
+                UUID rustEvidenceIdForVerify = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT evidence_id FROM \"ob-poc\".cbu_evidence WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustEvidenceIdForVerify = (UUID) rs.getObject(1);
+                    }
+                }
+                assertNotNull(rustEvidenceIdForVerify);
+
+                executeRustDsl(String.format(
+                    "(cbu.verify-evidence :cbu-id \"%s\" :evidence-id \"%s\" :verification-status \"VERIFIED\" :verified-by \"test-user\" :verification-notes \"All good\")",
+                    cbuId, rustEvidenceIdForVerify
+                ));
+                String rustVerificationStatus = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT verification_status FROM \"ob-poc\".cbu_evidence WHERE evidence_id = ?")) {
+                    ps.setObject(1, rustEvidenceIdForVerify);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustVerificationStatus = rs.getString(1);
+                    }
+                }
+                assertEquals("VERIFIED", rustVerificationStatus);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_evidence WHERE evidence_id = ?")) {
+                    ps.setObject(1, rustEvidenceIdForVerify);
+                    ps.executeUpdate();
+                }
+                // Attach via Java to verify
+                CbuExecutionResult attachRes2 = CbuExecutor.execute(conn, attachCmd);
+                assertTrue(attachRes2 instanceof CbuExecutionResult.Success);
+                UUID javaEvidenceId2 = null;
+                for (Object evt : ((CbuExecutionResult.Success) attachRes2).events()) {
+                    if (evt instanceof CbuRepository.AttachEvidenceResult aer) {
+                        javaEvidenceId2 = aer.evidenceId();
+                    }
+                }
+                assertNotNull(javaEvidenceId2);
+                conn.commit();
+
+                // Java Verify
+                CbuCommand.VerifyEvidence verifyCmd = new CbuCommand.VerifyEvidence(
+                    javaEvidenceId2, actor, "VERIFIED", "test-user", "All good"
+                );
+                CbuExecutor.execute(conn, verifyCmd);
+                String javaVerificationStatus = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT verification_status FROM \"ob-poc\".cbu_evidence WHERE evidence_id = ?")) {
+                    ps.setObject(1, javaEvidenceId2);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaVerificationStatus = rs.getString(1);
+                    }
+                }
+                assertEquals(rustVerificationStatus, javaVerificationStatus);
+
+                // ------------------ 10. cbu.ensure ------------------
+                UUID ensureId = UUID.randomUUID();
+                String ensureName = "Ensure Test CBU " + ensureId;
+                executeRustDsl(String.format(
+                    "(cbu.ensure :cbu-id \"%s\" :name \"%s\" :jurisdiction \"LU\" :client-type \"FUND\" :nature-purpose \"ensured nature\")",
+                    ensureId, ensureName
+                ));
+                CbuStatus rustEnsured = CbuRepository.recoverByNameAndJurisdiction(conn, ensureName, "LU");
+                assertNotNull(rustEnsured);
+                assertEquals("FUND", rustEnsured.clientType());
+                UUID rustEnsureCbuId = rustEnsured.id();
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, rustEnsureCbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Ensure
+                CbuCommand.Ensure ensureCmd = new CbuCommand.Ensure(
+                    ensureId, actor, ensureName, "LU", "FUND", "ensured nature", null
+                );
+                CbuExecutor.execute(conn, ensureCmd);
+                CbuStatus javaEnsured = CbuRepository.recover(conn, ensureId);
+                assertNotNull(javaEnsured);
+                assertEquals("FUND", javaEnsured.clientType());
+
+                // Cleanup ensure CBU
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, ensureId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // ------------------ 11. cbu.create-from-client-group ------------------
+                JsonNode rustCg = runRustQueryJson(String.format(
+                    "(cbu.create-from-client-group :group-id \"%s\" :default-jurisdiction \"LU\" :limit 10)",
+                    groupId
+                ));
+                CbuCommand.CreateFromClientGroup cgCmd = new CbuCommand.CreateFromClientGroup(
+                    groupId, actor, null, null, null, "LU", null, 10, false
+                );
+                CbuExecutionResult cgRes = CbuExecutor.execute(conn, cgCmd);
+                assertTrue(cgRes instanceof CbuExecutionResult.Success);
+                List<Object> cgEvents = ((CbuExecutionResult.Success) cgRes).events();
+                assertEquals(1, cgEvents.size());
+                CbuRepository.CreateFromClientGroupResult cgResult = (CbuRepository.CreateFromClientGroupResult) cgEvents.get(0);
+                assertEquals(rustCg.get("entities_found").asInt(), cgResult.entitiesFound());
+                assertEquals(rustCg.get("dsl_batch").get(0).asText(), cgResult.dslBatch().get(0));
+
+                // ------------------ 12. cbu.bind-service-options ------------------
+                executeRustDsl(String.format(
+                    "(cbu.bind-service-options :cbu-id \"%s\" :product-id \"15244192-0e29-4cd4-8d3b-ec19488ad814\" :service-id \"%s\" :options {:opt_key \"val1\"})",
+                    cbuId, optServiceId
+                ));
+                long rustBindingCount = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustBindingCount = rs.getLong(1);
+                    }
+                }
+                assertEquals(1, rustBindingCount);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Bind
+                CbuCommand.BindServiceOptions bindCmd = new CbuCommand.BindServiceOptions(
+                    cbuId, actor, UUID.fromString("15244192-0e29-4cd4-8d3b-ec19488ad814"), optServiceId, null, optVersionId, null,
+                    "{\"opt_key\": \"val1\"}", null, null, null
+                );
+                CbuExecutor.execute(conn, bindCmd);
+                long javaBindingCount = 0;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaBindingCount = rs.getLong(1);
+                    }
+                }
+                assertEquals(rustBindingCount, javaBindingCount);
+
+                // ------------------ 13. cbu.override-option-binding ------------------
+                executeRustDsl(String.format(
+                    "(cbu.override-option-binding :cbu-id \"%s\" :service-id \"%s\" :service-option-def-id \"%s\" :value \"val2\")",
+                    cbuId, optServiceId, optDefId
+                ));
+                String rustVal = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT value::text FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustVal = rs.getString(1);
+                    }
+                }
+                assertEquals("\"val2\"", rustVal);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+                CbuExecutor.execute(conn, bindCmd);
+                conn.commit();
+
+                // Java Override
+                CbuCommand.OverrideOptionBinding overrideCmd = new CbuCommand.OverrideOptionBinding(
+                    cbuId, actor, optServiceId, null, optDefId, null, "\"val2\"", null, null, null, null
+                );
+                CbuExecutor.execute(conn, overrideCmd);
+                String javaVal = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT value::text FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaVal = rs.getString(1);
+                    }
+                }
+                assertEquals(rustVal, javaVal);
+
+                // ------------------ 14. cbu.dirty-flag-bindings ------------------
+                executeRustDsl(String.format(
+                    "(cbu.dirty-flag-bindings :cbu-id \"%s\" :service-id \"%s\")",
+                    cbuId, optServiceId
+                ));
+                String rustCoherence = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT coherence_status FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustCoherence = rs.getString(1);
+                    }
+                }
+                assertEquals("dirty", rustCoherence);
+
+                // Reset
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_service_option_bindings SET coherence_status = 'clean' WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Dirty Flag
+                CbuCommand.DirtyFlagBindings dirtyCmd = new CbuCommand.DirtyFlagBindings(cbuId, actor, optServiceId, "manual");
+                CbuExecutor.execute(conn, dirtyCmd);
+                String javaCoherence = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT coherence_status FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaCoherence = rs.getString(1);
+                    }
+                }
+                assertEquals(rustCoherence, javaCoherence);
+
+                // ------------------ 15. cbu.recompute-bindings ------------------
+                // Make dirty first
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_service_option_bindings SET coherence_status = 'dirty' WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                executeRustDsl(String.format(
+                    "(cbu.recompute-bindings :cbu-id \"%s\" :service-id \"%s\")",
+                    cbuId, optServiceId
+                ));
+                String rustCoherence2 = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT coherence_status FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustCoherence2 = rs.getString(1);
+                    }
+                }
+                assertEquals("clean", rustCoherence2);
+
+                // Make dirty again
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_service_option_bindings SET coherence_status = 'dirty' WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java Recompute
+                CbuCommand.RecomputeBindings recomputeCmd = new CbuCommand.RecomputeBindings(cbuId, actor, optServiceId);
+                CbuExecutor.execute(conn, recomputeCmd);
+                String javaCoherence2 = null;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT coherence_status FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ? AND service_id = ? AND valid_to IS NULL")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, optServiceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaCoherence2 = rs.getString(1);
+                    }
+                }
+                assertEquals(rustCoherence2, javaCoherence2);
+
+                // ------------------ 16. cbu.delete-cascade ------------------
+                // Re-assign role so we have roles to delete-cascade
+                CbuExecutor.execute(conn, assignOwnership);
+                // Add structure link to cascade delete
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".cbu_structure_links (link_id, parent_cbu_id, child_cbu_id, relationship_type, relationship_selector, status) VALUES (?, ?, ?, 'FEEDER', 'feeder:us', 'ACTIVE')")) {
+                    ps.setObject(1, UUID.randomUUID());
+                    ps.setObject(2, cbuId);
+                    ps.setObject(3, childCbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                executeRustDsl(String.format(
+                    "(cbu.delete-cascade :cbu-id \"%s\" :delete-entities true :hard-delete false)",
+                    cbuId
+                ));
+                // Verify deleted
+                long rustActiveLinks = 1;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_structure_links WHERE parent_cbu_id = ? AND status = 'ACTIVE'")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustActiveLinks = rs.getLong(1);
+                    }
+                }
+                assertEquals(0, rustActiveLinks);
+
+                // Assert scope of Rust delete-cascade:
+                // 1. Child CBU must NOT be deleted
+                CbuStatus rustChild = CbuRepository.recover(conn, childCbuId);
+                assertNotNull(rustChild);
+                // 2. Parent CBU itself IS deleted (deleted_at is NOT null)
+                boolean rustParentIsDeleted = false;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT deleted_at IS NOT NULL FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) rustParentIsDeleted = rs.getBoolean(1);
+                    }
+                }
+                assertTrue(rustParentIsDeleted);
+
+                // Reset CBU and links and roles back to active
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbus SET deleted_at = null WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_structure_links SET status = 'ACTIVE', terminated_at = null, terminated_reason = null WHERE parent_cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE \"ob-poc\".cbu_entity_roles SET effective_to = null WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Java DeleteCascade
+                CbuCommand.DeleteCascade deleteCascadeCmd = new CbuCommand.DeleteCascade(
+                    cbuId, actor, true, false
+                );
+                CbuExecutor.execute(conn, deleteCascadeCmd);
+
+                long javaActiveLinks = 1;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM \"ob-poc\".cbu_structure_links WHERE parent_cbu_id = ? AND status = 'ACTIVE'")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaActiveLinks = rs.getLong(1);
+                    }
+                }
+                assertEquals(rustActiveLinks, javaActiveLinks);
+                assertEquals(0, javaActiveLinks);
+
+                // Assert scope of Java delete-cascade:
+                // 1. Child CBU must NOT be deleted
+                CbuStatus javaChild = CbuRepository.recover(conn, childCbuId);
+                assertNotNull(javaChild);
+                // 2. Parent CBU itself IS deleted (deleted_at is NOT null)
+                boolean javaParentIsDeleted = false;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT deleted_at IS NOT NULL FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) javaParentIsDeleted = rs.getBoolean(1);
+                    }
+                }
+                assertTrue(javaParentIsDeleted);
+
+            } finally {
+                try {
+                    conn.rollback();
+                } catch (Exception ignored) {}
+                // Cleanup
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_corporate_action_events WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".service_option_defs WHERE option_key = 'opt_key'")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".service_versions WHERE version = 'v1' AND service_id IN (SELECT service_id FROM \"ob-poc\".services WHERE name = 'Options test service')")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".services WHERE name = 'Options test service'")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_evidence WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".document_catalog WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".client_group_entity WHERE group_id = ?")) {
+                    ps.setObject(1, groupId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_group_members WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_groups WHERE group_id = ?")) {
+                    ps.setObject(1, groupId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".client_group WHERE id = ?")) {
+                    ps.setObject(1, groupId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id IN (?, ?)")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, childCbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".entity_relationships WHERE from_entity_id IN (?, ?, ?) OR to_entity_id IN (?, ?, ?)")) {
+                    ps.setObject(1, entityId1);
+                    ps.setObject(2, entityId2);
+                    ps.setObject(3, mancoEntityId);
+                    ps.setObject(4, entityId1);
+                    ps.setObject(5, entityId2);
+                    ps.setObject(6, mancoEntityId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".entities WHERE entity_id IN (?, ?, ?)")) {
+                    ps.setObject(1, entityId1);
+                    ps.setObject(2, entityId2);
+                    ps.setObject(3, mancoEntityId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_structure_links WHERE parent_cbu_id = ? OR child_cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, childCbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE cbu_id IN (?, ?)")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, childCbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            }
+        }
+    }
+
+    @Test
+    public void testPhase5ReadProjectionsDifferentialConformance() throws Exception {
+        UUID cbuId = UUID.randomUUID();
+        UUID childCbuId = UUID.randomUUID();
+        UUID entityId1 = UUID.randomUUID();
+        UUID entityId2 = UUID.randomUUID();
+        String cbuName = "Test Phase5 Proj CBU " + cbuId;
+        CbuCommand.Principal actor = new CbuCommand.Principal("test-user", Set.of("compliance_officer"));
+
+        try (Connection conn = getDbConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                // 1. Create a Fund CBU
+                CbuCommand.Create createParent = new CbuCommand.Create(
+                    cbuId, actor, cbuName, "LU", null, null, "FUND", null, null, null
+                );
+                CbuExecutor.execute(conn, createParent);
+
+                // --- TEST validate-roles ---
+                // Without control role or MANCO, it should have issues
+                CbuRoleValidationDto javaVal1 = CbuReadProjection.validateRoles(conn, cbuId);
+                JsonNode rustVal1 = runRustQueryJson("(cbu.validate-roles :cbu-id \"" + cbuId + "\")");
+                
+                assertNotNull(javaVal1);
+                assertEquals(rustVal1.get("valid").asBoolean(), javaVal1.valid());
+                assertEquals(rustVal1.get("issues").size(), javaVal1.issues().size());
+                String rustCategory1 = (rustVal1.get("cbu_category") == null || rustVal1.get("cbu_category").isNull()) ? null : rustVal1.get("cbu_category").asText();
+                String rustClientType1 = (rustVal1.get("client_type") == null || rustVal1.get("client_type").isNull()) ? null : rustVal1.get("client_type").asText();
+                assertEquals(rustCategory1, javaVal1.cbuCategory());
+                assertEquals(rustClientType1, javaVal1.clientType());
+
+                // Now insert director and ManCo role to satisfy the validator
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".entities (entity_id, entity_type_id, name, name_norm, row_version) VALUES (?, ?, ?, ?, 1)")) {
+                    ps.setObject(1, entityId1);
+                    ps.setObject(2, UUID.fromString("6f7b4e87-363e-4ee3-a717-d4b456d4eec4")); // NAT_PERSON
+                    ps.setString(3, "Director Jane " + entityId1.toString().substring(0,8));
+                    ps.setString(4, ("Director Jane " + entityId1.toString().substring(0,8)).toLowerCase());
+                    ps.executeUpdate();
+                    
+                    ps.setObject(1, entityId2);
+                    ps.setObject(2, UUID.fromString("7803ffb7-935e-4cba-aa70-c9bb4cb43509")); // LIMITED_COMPANY_PRIVATE
+                    ps.setString(3, "Manco Entity " + entityId2.toString().substring(0,8));
+                    ps.setString(4, ("Manco Entity " + entityId2.toString().substring(0,8)).toLowerCase());
+                    ps.executeUpdate();
+                }
+
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".cbu_entity_roles (cbu_entity_role_id, cbu_id, entity_id, role_id, version) VALUES (?, ?, ?, ?, 1)")) {
+                    // Control role (DIRECTOR)
+                    ps.setObject(1, UUID.randomUUID());
+                    ps.setObject(2, cbuId);
+                    ps.setObject(3, entityId1);
+                    ps.setObject(4, UUID.fromString("58e094e8-1531-42fb-9b70-8c936448d27c")); // DIRECTOR (CONTROL category)
+                    ps.executeUpdate();
+
+                    // MANAGEMENT_COMPANY
+                    ps.setObject(1, UUID.randomUUID());
+                    ps.setObject(2, cbuId);
+                    ps.setObject(3, entityId2);
+                    ps.setObject(4, UUID.fromString("bd2a47cb-d961-4744-9985-1dd580957dbd")); // MANAGEMENT_COMPANY
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Re-test validate-roles: should match Rust exactly
+                CbuRoleValidationDto javaVal2 = CbuReadProjection.validateRoles(conn, cbuId);
+                JsonNode rustVal2 = runRustQueryJson("(cbu.validate-roles :cbu-id \"" + cbuId + "\")");
+                assertEquals(rustVal2.get("valid").asBoolean(), javaVal2.valid());
+                assertEquals(rustVal2.get("issues").size(), javaVal2.issues().size());
+                
+                // Assert that the issues decreased by exactly 2 (the two roles we satisfied)
+                assertEquals(javaVal1.issues().size() - 2, javaVal2.issues().size());
+                
+                String rustCategory2 = (rustVal2.get("cbu_category") == null || rustVal2.get("cbu_category").isNull()) ? null : rustVal2.get("cbu_category").asText();
+                String rustClientType2 = (rustVal2.get("client_type") == null || rustVal2.get("client_type").isNull()) ? null : rustVal2.get("client_type").asText();
+                assertEquals(rustCategory2, javaVal2.cbuCategory());
+                assertEquals(rustClientType2, javaVal2.clientType());
+
+                // --- TEST compute-resource-fanout ---
+                // Let's seed a custom service-options rule and binding.
+                UUID dummyServiceId = UUID.randomUUID();
+                UUID dummyVersionId = UUID.randomUUID();
+                UUID dummyDefId = UUID.randomUUID();
+                UUID dummyRuleId = UUID.randomUUID();
+                UUID dummyResourceId = UUID.fromString("4fd204b4-1c8f-4284-a61c-55618aedc522"); // DTCC Settlement System
+
+                // Insert dummy service and components
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".services (service_id, service_code, name) VALUES (?, ?, ?)")) {
+                    ps.setObject(1, dummyServiceId);
+                    ps.setString(2, "DUMMY_SERVICE_" + dummyServiceId.toString().substring(0,8));
+                    ps.setString(3, "Dummy service description");
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".service_versions (id, service_id, version, lifecycle_status) VALUES (?, ?, 'v1', 'published')")) {
+                    ps.setObject(1, dummyVersionId);
+                    ps.setObject(2, dummyServiceId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".service_option_defs (service_option_def_id, service_id, service_version_id, option_key, option_kind, is_required, lifecycle_status, default_source_kind) VALUES (?, ?, ?, ?, 'string', true, 'active', 'manual')")) {
+                    ps.setObject(1, dummyDefId);
+                    ps.setObject(2, dummyServiceId);
+                    ps.setObject(3, dummyVersionId);
+                    ps.setString(4, "dummy_option_key");
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".service_resource_fanout_rules (fanout_rule_id, service_id, resource_id, service_option_def_id, fanout_axis, fanout_mode, shared_when_null, priority, is_active) VALUES (?, ?, ?, ?, 'currency', 'per_value', false, 10, true)")) {
+                    ps.setObject(1, dummyRuleId);
+                    ps.setObject(2, dummyServiceId);
+                    ps.setObject(3, dummyResourceId);
+                    ps.setObject(4, dummyDefId);
+                    ps.executeUpdate();
+                }
+                // Insert a binding for this option key: value is a JSON array ["USD", "EUR"]
+                try (PreparedStatement ps = conn.prepareStatement("INSERT INTO \"ob-poc\".cbu_service_option_bindings (cbu_id, product_id, service_id, service_version_id, service_option_def_id, option_key, value, source_kind, value_hash, coherence_status) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, 'manual', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', 'clean')")) {
+                    ps.setObject(1, cbuId);
+                    ps.setObject(2, UUID.fromString("15244192-0e29-4cd4-8d3b-ec19488ad814")); // dummy product ID
+                    ps.setObject(3, dummyServiceId);
+                    ps.setObject(4, dummyVersionId);
+                    ps.setObject(5, dummyDefId);
+                    ps.setString(6, "dummy_option_key");
+                    ps.setString(7, "[\"USD\",\"EUR\"]");
+                    ps.executeUpdate();
+                }
+                conn.commit();
+
+                // Compute fanout in Java
+                List<CbuResourceFanoutDto> javaFanout = CbuReadProjection.computeResourceFanout(conn, cbuId, dummyServiceId, null);
+                
+                // Compute fanout in Rust
+                JsonNode rustFanout = runRustQueryJson(String.format(
+                    "(cbu.compute-resource-fanout :cbu-id \"%s\" :service-id \"%s\")",
+                    cbuId, dummyServiceId
+                ));
+
+                assertNotNull(javaFanout);
+                assertEquals(2, javaFanout.size());
+                assertEquals(rustFanout.size(), javaFanout.size());
+
+                for (int i = 0; i < javaFanout.size(); i++) {
+                    CbuResourceFanoutDto jf = javaFanout.get(i);
+                    JsonNode rf = rustFanout.get(i);
+                    assertEquals(rf.get("service_id").asText(), jf.serviceId().toString());
+                    assertEquals(rf.get("resource_id").asText(), jf.resourceId().toString());
+                    assertEquals(rf.get("fanout_axis").asText(), jf.fanoutAxis());
+                    String expectedVal = rf.get("fanout_value").toString();
+                    assertEquals(expectedVal, jf.fanoutValue());
+                }
+
+            } finally {
+                // Cleanup
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_service_option_bindings WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".service_resource_fanout_rules WHERE service_id IN (SELECT service_id FROM \"ob-poc\".services WHERE name = 'Dummy service description')")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".service_option_defs WHERE service_id IN (SELECT service_id FROM \"ob-poc\".services WHERE name = 'Dummy service description')")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".service_versions WHERE service_id IN (SELECT service_id FROM \"ob-poc\".services WHERE name = 'Dummy service description')")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".services WHERE name = 'Dummy service description'")) {
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".entities WHERE entity_id IN (?, ?)")) {
+                    ps.setObject(1, entityId1);
+                    ps.setObject(2, entityId2);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = conn.prepareStatement("DELETE FROM \"ob-poc\".cbus WHERE cbu_id = ?")) {
+                    ps.setObject(1, cbuId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+            }
+        }
+    }
 }
+

@@ -96,4 +96,329 @@ public sealed interface CbuCommand {
             return cbuId;
         }
     }
+
+    record Rename(
+        UUID cbuId,
+        Principal actor,
+        String name
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record Update(
+        UUID cbuId,
+        Principal actor,
+        String description,
+        String naturePurpose,
+        String category
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record SetJurisdiction(
+        UUID cbuId,
+        Principal actor,
+        String jurisdiction
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record SetClientType(
+        UUID cbuId,
+        Principal actor,
+        String clientType
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record SetCommercialClient(
+        UUID cbuId,
+        Principal actor,
+        UUID commercialClientEntityId
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record SetCategory(
+        UUID cbuId,
+        Principal actor,
+        String category
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record AddProduct(
+        UUID cbuId,
+        Principal actor,
+        String product,
+        String configJson,
+        String optionsJson
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record RemoveProduct(
+        UUID cbuId,
+        Principal actor,
+        String product
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record SubmitForReview(
+        UUID eventId,
+        Principal actor
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return eventId;
+        }
+    }
+
+    record ApproveCa(
+        UUID eventId,
+        Principal actor
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return eventId;
+        }
+    }
+
+    record RejectCa(
+        UUID eventId,
+        Principal actor,
+        String reason
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return eventId;
+        }
+    }
+
+    record WithdrawCa(
+        UUID eventId,
+        Principal actor
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return eventId;
+        }
+    }
+
+    record MarkImplementedCa(
+        UUID eventId,
+        Principal actor
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return eventId;
+        }
+    }
+
+    record AssignRole(
+        UUID cbuId,
+        Principal actor,
+        String roleType,
+        String role,
+        UUID ownerEntityId,
+        UUID ownedEntityId,
+        UUID controllerEntityId,
+        UUID controlledEntityId,
+        UUID trustEntityId,
+        UUID participantEntityId,
+        UUID entityId,
+        UUID fundEntityId,
+        UUID providerEntityId,
+        UUID clientEntityId,
+        UUID personEntityId,
+        UUID forEntityId,
+        String percentage,
+        String ownershipType,
+        String effectiveFrom,
+        String controlType,
+        String appointmentDate,
+        String interestPercentage,
+        String interestType,
+        String classDescription,
+        String investmentPercentage,
+        Boolean isRegulated,
+        String regulatoryJurisdiction,
+        String serviceAgreementDate,
+        String authorityLimit,
+        String authorityCurrency,
+        Boolean requiresCoSignatory,
+        Long expectedVersion
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record RemoveRole(
+        UUID cbuId,
+        Principal actor,
+        UUID entityId,
+        String role
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record AttachEvidence(
+        UUID cbuId,
+        Principal actor,
+        UUID documentId,
+        String attestationRef,
+        String evidenceType,
+        String evidenceCategory,
+        String description,
+        String attachedBy
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record VerifyEvidence(
+        UUID evidenceId,
+        Principal actor,
+        String verificationStatus,
+        String verifiedBy,
+        String verificationNotes
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return evidenceId;
+        }
+    }
+
+    record BindServiceOptions(
+        UUID cbuId,
+        Principal actor,
+        UUID productId,
+        UUID serviceId,
+        String service,
+        UUID serviceVersionId,
+        String serviceVersion,
+        String optionsJson,
+        String sourceRef,
+        String sourceVersion,
+        UUID activationRunId
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record OverrideOptionBinding(
+        UUID cbuId,
+        Principal actor,
+        UUID serviceId,
+        String service,
+        UUID optionDefId,
+        String optionKey,
+        String value,
+        UUID productId,
+        String sourceRef,
+        String sourceVersion,
+        UUID activationRunId
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record DirtyFlagBindings(
+        UUID cbuId,
+        Principal actor,
+        UUID serviceId,
+        String sourceKind
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record RecomputeBindings(
+        UUID cbuId,
+        Principal actor,
+        UUID serviceId
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record CreateFromClientGroup(
+        UUID groupId,
+        Principal actor,
+        String gleifCategory,
+        String roleFilter,
+        String jurisdictionFilter,
+        String defaultJurisdiction,
+        UUID mancoEntityId,
+        Integer limit,
+        Boolean dryRun
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return groupId;
+        }
+    }
+
+    record DeleteCascade(
+        UUID cbuId,
+        Principal actor,
+        Boolean deleteEntities,
+        Boolean hardDelete
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record Ensure(
+        UUID id,
+        Principal actor,
+        String name,
+        String jurisdiction,
+        String clientType,
+        String naturePurpose,
+        UUID commercialClientEntityId
+    ) implements CbuCommand {}
 }
+

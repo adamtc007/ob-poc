@@ -765,7 +765,7 @@ impl SemOsVerbOp for ValidateRoles {
             r#"SELECT EXISTS(
                 SELECT 1 FROM "ob-poc".cbu_entity_roles cer
                 JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-                WHERE cer.cbu_id = $1 AND r.role_category = 'CONTROL'
+                WHERE cer.cbu_id = $1 AND r.role_category = 'CONTROL_CHAIN'
             )"#,
         )
         .bind(cbu_id)
