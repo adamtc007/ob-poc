@@ -10,8 +10,18 @@ public final class CbuDecide {
     private CbuDecide() {}
 
     public record DecisionContext(
-        boolean isFundLinkedAlready
-    ) {}
+        boolean isFundLinkedAlready,
+        boolean parentExists,
+        boolean childExists,
+        UUID existingLinkId
+    ) {
+        public DecisionContext(boolean isFundLinkedAlready) {
+            this(isFundLinkedAlready, false, false, null);
+        }
+        public DecisionContext(boolean parentExists, boolean childExists, UUID existingLinkId) {
+            this(false, parentExists, childExists, existingLinkId);
+        }
+    }
 
     public static DecisionOutcome decide(
         CbuCommand command,
@@ -37,6 +47,10 @@ public final class CbuDecide {
             case CbuCommand.SoftDelete cmd -> decideSoftDelete(cmd, currentStatus);
             case CbuCommand.Restore cmd -> decideRestore(cmd, currentStatus);
             case CbuCommand.HardDelete cmd -> decideHardDelete(cmd, currentStatus);
+            case CbuCommand.LinkStructure cmd -> decideLinkStructure(cmd, currentStatus, context);
+            case CbuCommand.UnlinkStructure cmd -> decideUnlinkStructure(cmd, currentStatus);
+            case CbuCommand.TerminateRole cmd -> decideTerminateRole(cmd, currentStatus);
+            case CbuCommand.RemoveMember cmd -> decideRemoveMember(cmd, currentStatus);
         };
     }
 
@@ -338,5 +352,100 @@ public final class CbuDecide {
         return new DecisionOutcome.Accept(List.of(
             new Effect.UpdateDispositionStatus(cmd.id(), dispStatusStr, "hard_deleted", null)
         ));
+    }
+
+    private static DecisionOutcome decideLinkStructure(
+        CbuCommand.LinkStructure cmd,
+        CbuStatus status,
+        DecisionContext context
+    ) {
+        if (context == null || !context.parentExists()) {
+            return new DecisionOutcome.Refuse("cbu.link-structure: parent CBU not found: " + cmd.parentCbuId());
+        }
+        if (!context.childExists()) {
+            return new DecisionOutcome.Refuse("cbu.link-structure: child CBU not found: " + cmd.childCbuId());
+        }
+
+        String relationshipType = cmd.relationshipType().replace('-', '_').toUpperCase();
+        List<String> allowedTypes = List.of("FEEDER", "PARALLEL", "AGGREGATOR", "MASTER", "CO_INVEST_VEHICLE");
+        if (!allowedTypes.contains(relationshipType)) {
+            return new DecisionOutcome.Refuse("cbu.link-structure: unsupported relationship-type '" + cmd.relationshipType() + "'");
+        }
+
+        String capitalFlow = null;
+        if (cmd.capitalFlow() != null) {
+            capitalFlow = cmd.capitalFlow().replace('-', '_').toUpperCase();
+            List<String> allowedFlows = List.of("UPSTREAM", "DOWNSTREAM", "CO_INVEST");
+            if (!allowedFlows.contains(capitalFlow)) {
+                return new DecisionOutcome.Refuse("cbu.link-structure: unsupported capital-flow '" + cmd.capitalFlow() + "'");
+            }
+        }
+
+        String selector = cmd.relationshipSelector();
+        if (selector == null || selector.trim().isEmpty()) {
+            selector = cmd.relationshipType().replace('-', '_').toLowerCase();
+        }
+
+        return new DecisionOutcome.Accept(List.of(
+            new Effect.LinkStructure(
+                cmd.parentCbuId(),
+                cmd.childCbuId(),
+                relationshipType,
+                selector,
+                capitalFlow,
+                cmd.effectiveFrom(),
+                cmd.effectiveTo(),
+                context.existingLinkId()
+            )
+        ));
+    }
+
+    private static DecisionOutcome decideUnlinkStructure(
+        CbuCommand.UnlinkStructure cmd,
+        CbuStatus status
+    ) {
+        return new DecisionOutcome.Accept(List.of(
+            new Effect.UnlinkStructure(
+                cmd.linkId(),
+                cmd.reason(),
+                cmd.hardDelete() != null ? cmd.hardDelete() : false
+            )
+        ));
+    }
+
+    private static DecisionOutcome decideTerminateRole(
+        CbuCommand.TerminateRole cmd,
+        CbuStatus status
+    ) {
+        List<Effect> effects = new java.util.ArrayList<>();
+        effects.add(new Effect.TerminateRole(
+            cmd.cbuId(),
+            cmd.hardDelete() != null ? cmd.hardDelete() : false
+        ));
+        effects.add(new Effect.EmitPendingStateAdvance(
+            cmd.cbuId(),
+            "cbu-role:terminated",
+            "cbu/role-graph",
+            "cbu-role.terminate"
+        ));
+        return new DecisionOutcome.Accept(List.copyOf(effects));
+    }
+
+    private static DecisionOutcome decideRemoveMember(
+        CbuCommand.RemoveMember cmd,
+        CbuStatus status
+    ) {
+        List<Effect> effects = new java.util.ArrayList<>();
+        effects.add(new Effect.RemoveMember(
+            cmd.cbuId(),
+            cmd.hardDelete() != null ? cmd.hardDelete() : false
+        ));
+        effects.add(new Effect.EmitPendingStateAdvance(
+            cmd.cbuId(),
+            "cbu-group-member:removed",
+            "cbu/group-membership",
+            "cbu-group.remove-member"
+        ));
+        return new DecisionOutcome.Accept(List.copyOf(effects));
     }
 }

@@ -50,4 +50,31 @@ public sealed interface Effect {
         String toStatus,
         String reason
     ) implements Effect {}
+
+    record LinkStructure(
+        UUID parentCbuId,
+        UUID childCbuId,
+        String relationshipType,
+        String relationshipSelector,
+        String capitalFlow,
+        java.time.LocalDate effectiveFrom,
+        java.time.LocalDate effectiveTo,
+        UUID existingLinkId
+    ) implements Effect {}
+
+    record UnlinkStructure(
+        UUID linkId,
+        String reason,
+        Boolean hardDelete
+    ) implements Effect {}
+
+    record TerminateRole(
+        UUID cbuId,
+        Boolean hardDelete
+    ) implements Effect {}
+
+    record RemoveMember(
+        UUID cbuId,
+        Boolean hardDelete
+    ) implements Effect {}
 }

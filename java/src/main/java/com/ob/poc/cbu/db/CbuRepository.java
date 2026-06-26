@@ -71,6 +71,10 @@ public final class CbuRepository {
             }
             case Effect.UpdateValidationStatus e -> applyUpdateValidationStatus(conn, e);
             case Effect.UpdateDispositionStatus e -> applyUpdateDispositionStatus(conn, e);
+            case Effect.LinkStructure e -> applyLinkStructure(conn, e);
+            case Effect.UnlinkStructure e -> applyUnlinkStructure(conn, e);
+            case Effect.TerminateRole e -> applyTerminateRole(conn, e);
+            case Effect.RemoveMember e -> applyRemoveMember(conn, e);
         };
     }
 
@@ -241,5 +245,105 @@ public final class CbuRepository {
         }
 
         return new CbuStatus(id, name, op, val, struct, disposition, clientType, jurisdiction, statusStr, opStatusStr, dispStatusStr);
+    }
+
+    private static int applyLinkStructure(Connection conn, Effect.LinkStructure e) throws SQLException {
+        if (e.existingLinkId() != null) {
+            String sql = "UPDATE \"ob-poc\".cbu_structure_links " +
+                         "SET relationship_selector = ?, capital_flow = ?, effective_from = ?, effective_to = ?, status = 'ACTIVE', updated_at = NOW() " +
+                         "WHERE link_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, e.relationshipSelector());
+                ps.setString(2, e.capitalFlow());
+                ps.setObject(3, e.effectiveFrom() != null ? java.sql.Date.valueOf(e.effectiveFrom()) : null);
+                ps.setObject(4, e.effectiveTo() != null ? java.sql.Date.valueOf(e.effectiveTo()) : null);
+                ps.setObject(5, e.existingLinkId());
+                return ps.executeUpdate();
+            }
+        } else {
+            String sql = "INSERT INTO \"ob-poc\".cbu_structure_links (parent_cbu_id, child_cbu_id, relationship_type, relationship_selector, status, capital_flow, effective_from, effective_to) " +
+                         "VALUES (?, ?, ?, ?, 'ACTIVE', ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, e.parentCbuId());
+                ps.setObject(2, e.childCbuId());
+                ps.setString(3, e.relationshipType());
+                ps.setString(4, e.relationshipSelector());
+                ps.setString(5, e.capitalFlow());
+                ps.setObject(6, e.effectiveFrom() != null ? java.sql.Date.valueOf(e.effectiveFrom()) : null);
+                ps.setObject(7, e.effectiveTo() != null ? java.sql.Date.valueOf(e.effectiveTo()) : null);
+                return ps.executeUpdate();
+            }
+        }
+    }
+
+    private static int applyUnlinkStructure(Connection conn, Effect.UnlinkStructure e) throws SQLException {
+        if (e.hardDelete()) {
+            String sql = "DELETE FROM \"ob-poc\".cbu_structure_links WHERE link_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, e.linkId());
+                return ps.executeUpdate();
+            }
+        } else {
+            String sql = "UPDATE \"ob-poc\".cbu_structure_links " +
+                         "SET status = 'TERMINATED', terminated_at = NOW(), terminated_reason = ?, updated_at = NOW() " +
+                         "WHERE link_id = ? AND status = 'ACTIVE'";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, e.reason());
+                ps.setObject(2, e.linkId());
+                return ps.executeUpdate();
+            }
+        }
+    }
+
+    private static int applyTerminateRole(Connection conn, Effect.TerminateRole e) throws SQLException {
+        if (e.hardDelete()) {
+            String sql = "DELETE FROM \"ob-poc\".cbu_entity_roles WHERE cbu_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, e.cbuId());
+                return ps.executeUpdate();
+            }
+        } else {
+            String sql = "UPDATE \"ob-poc\".cbu_entity_roles " +
+                         "SET effective_to = CURRENT_DATE, updated_at = NOW() " +
+                         "WHERE cbu_id = ? AND effective_to IS NULL";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, e.cbuId());
+                return ps.executeUpdate();
+            }
+        }
+    }
+
+    private static int applyRemoveMember(Connection conn, Effect.RemoveMember e) throws SQLException {
+        if (e.hardDelete()) {
+            String sql = "DELETE FROM \"ob-poc\".cbu_group_members WHERE cbu_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, e.cbuId());
+                return ps.executeUpdate();
+            }
+        } else {
+            String sql = "UPDATE \"ob-poc\".cbu_group_members " +
+                         "SET effective_to = CURRENT_DATE " +
+                         "WHERE cbu_id = ? AND effective_to IS NULL";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, e.cbuId());
+                return ps.executeUpdate();
+            }
+        }
+    }
+
+    public static UUID existingLinkId(Connection conn, UUID parentCbuId, UUID childCbuId, String relationshipType) throws SQLException {
+        String sql = "SELECT link_id FROM \"ob-poc\".cbu_structure_links " +
+                     "WHERE parent_cbu_id = ? AND child_cbu_id = ? AND relationship_type = ? AND status = 'ACTIVE' LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, parentCbuId);
+            ps.setObject(2, childCbuId);
+            ps.setString(3, relationshipType);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return (UUID) rs.getObject("link_id");
+                }
+            }
+        }
+        return null;
     }
 }

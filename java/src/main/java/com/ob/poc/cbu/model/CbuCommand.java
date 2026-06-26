@@ -46,4 +46,54 @@ public sealed interface CbuCommand {
     record SoftDelete(UUID id, Principal actor, String reason) implements CbuCommand {}
     record Restore(UUID id, Principal actor) implements CbuCommand {}
     record HardDelete(UUID id, Principal actor) implements CbuCommand {}
+
+    record LinkStructure(
+        UUID parentCbuId,
+        Principal actor,
+        UUID childCbuId,
+        String relationshipType,
+        String relationshipSelector,
+        String capitalFlow,
+        java.time.LocalDate effectiveFrom,
+        java.time.LocalDate effectiveTo
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return parentCbuId;
+        }
+    }
+
+    record UnlinkStructure(
+        UUID linkId,
+        Principal actor,
+        String reason,
+        Boolean hardDelete
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return linkId;
+        }
+    }
+
+    record TerminateRole(
+        UUID cbuId,
+        Principal actor,
+        Boolean hardDelete
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
+
+    record RemoveMember(
+        UUID cbuId,
+        Principal actor,
+        Boolean hardDelete
+    ) implements CbuCommand {
+        @Override
+        public UUID id() {
+            return cbuId;
+        }
+    }
 }

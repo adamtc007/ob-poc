@@ -31,6 +31,15 @@ public final class CbuExecutor {
                 boolean isLinked = cmd.fundEntityId() != null 
                     && CbuRepository.isFundLinkedAlready(conn, cmd.fundEntityId());
                 context = new CbuDecide.DecisionContext(isLinked);
+            } else if (command instanceof CbuCommand.LinkStructure cmd) {
+                boolean parentExists = CbuRepository.recover(conn, cmd.parentCbuId()) != null;
+                boolean childExists = CbuRepository.recover(conn, cmd.childCbuId()) != null;
+                UUID existingLinkId = null;
+                if (parentExists && childExists) {
+                    existingLinkId = CbuRepository.existingLinkId(conn, cmd.parentCbuId(), cmd.childCbuId(), cmd.relationshipType());
+                }
+                context = new CbuDecide.DecisionContext(parentExists, childExists, existingLinkId);
+                status = CbuRepository.recover(conn, cmd.parentCbuId());
             } else {
                 status = CbuRepository.recover(conn, command.id());
             }
