@@ -1,0 +1,53 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.ob.poc'
+version = '0.1.0'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // jOOQ
+    implementation 'org.jooq:jooq:3.20.1'
+    implementation 'org.jooq:jooq-meta:3.20.1'
+    implementation 'org.jooq:jooq-codegen:3.20.1'
+    
+    // Database
+    implementation 'org.postgresql:postgresql:42.7.2'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    implementation 'org.slf4j:slf4j-simple:2.0.12'
+    
+    // Reactive dependencies needed by recent jOOQ versions
+    implementation 'org.reactivestreams:reactive-streams:1.0.4'
+    implementation 'io.r2dbc:r2dbc-spi:1.0.0.RELEASE'
+    
+    // JAXB for XML parsing (used by jOOQ codegen under the hood)
+    implementation 'jakarta.xml.bind:jakarta.xml.bind-api:3.0.1'
+    implementation 'org.glassfish.jaxb:jaxb-runtime:3.0.2'
+    
+    // Testing
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        showStandardStreams = true
+    }
+}
