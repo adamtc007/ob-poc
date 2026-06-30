@@ -18,5 +18,7 @@ pub mod projection;
 pub mod store;
 
 pub use error::StoreError;
-pub use projection::{PgKycProjector, ProjectionStats};
+pub use projection::{
+    PgKycProjectionDrainer, PgKycProjector, ProjectionStats, CONTROL_EDGE_PROJECTION_EFFECT,
+};
 pub use store::{AppendOutcome, PgKycEventStore};

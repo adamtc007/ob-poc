@@ -100,6 +100,10 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
         .bind(subject.0)
         .execute(pool)
         .await;
+    let _ = sqlx::query(r#"DELETE FROM "public".outbox WHERE effect_kind = 'kyc.projection.control_edges' AND idempotency_key LIKE $1"#)
+        .bind(format!("{}:%", subject.0))
+        .execute(pool)
+        .await;
 }
 
 #[tokio::test]
