@@ -20,13 +20,18 @@ use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
     check_control_preconditions, fold_control, fold_obligations, freeze_determination,
+    fold_control_versioned, fold_obligations_versioned,
     phase1_lexicon, reconciled_economic_edges,
     recover_determination_at, AuthorityRef, DeterminationInProgress,
     EdgeId, EntityId, EventId, Hash, IdemKey, IntentEvent,
+    FoldImpl, FoldRegistry, V1FoldImpl,
     ObligationId, OwnershipProngStrategy, PersonId, Prong, Principal, RecoveryPin,
     SmoResult, SubjectId, TargetBinding,
 };
 use ob_poc_kyc_substrate::determination::DeterminationStrategy;
+use ob_poc_kyc_substrate::fold::control::ControlState;
+use ob_poc_kyc_substrate::fold::obligation::ObligationState;
+use std::sync::Arc;
 
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 
@@ -1080,4 +1085,202 @@ fn phase1_fold_determinism_stress_determination_hash() {
             "fold run {i} produced a different determination hash — determinism broken (Q6, K-16/18/33)",
         );
     }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// D2 — FoldRegistry version-dispatch tests (EOP-DD-KYCUBO-002 §3.5)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Phase 2: TOTAL dispatch — unregistered hash is a hard error ───────────────
+//
+// The single most important test.  The temptation is to fall back to
+// "latest registered version" when a hash isn't found — that single "helpful"
+// default silently destroys replay-faithfulness.  This test proves the contract:
+// an unknown `lexicon_hash` is `KycError::UnregisteredLexiconHash`, not a fold.
+
+#[test]
+fn d2_phase2_unregistered_hash_is_hard_error_not_silent_fold() {
+    let subject = fixture_subject_id();
+    let a = entity_subject();
+    let t = ts(2026, 1, 1);
+
+    // An unrecognised hash — not in any registry.
+    let unknown_hash = Hash::of(b"this-version-was-never-registered");
+
+    let event = te(
+        0, subject, "kyc.subject.register", unknown_hash,
+        analyst(), authority(),
+        TargetBinding::for_subject(subject),
+        serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
+        idem("reg"), t,
+    );
+
+    // Empty registry — nothing registered.
+    let registry = FoldRegistry::new();
+    let events = vec![&event as &IntentEvent];
+
+    let result = fold_control_versioned(&events, &registry);
+    assert!(
+        result.is_err(),
+        "fold_control_versioned with an unregistered hash must return Err, not silently succeed",
+    );
+
+    // The error must be the specific replay-integrity variant, not a generic error.
+    match result.unwrap_err() {
+        ob_poc_kyc_substrate::KycError::UnregisteredLexiconHash(h) => {
+            assert_eq!(h, unknown_hash, "error must name the offending hash");
+        }
+        other => panic!("expected UnregisteredLexiconHash, got: {other:?}"),
+    }
+}
+
+#[test]
+fn d2_phase2_obligation_unregistered_hash_is_hard_error() {
+    let subject = fixture_subject_id();
+    let t = ts(2026, 1, 1);
+    let unknown_hash = Hash::of(b"obligation-unknown-version");
+
+    let event = te(
+        0, subject, "kyc.subject.register", unknown_hash,
+        analyst(), authority(),
+        TargetBinding::for_subject(subject),
+        serde_json::json!({"entity_id": Uuid::new_v4()}),
+        idem("reg"), t,
+    );
+
+    let registry = FoldRegistry::new();
+    let events = vec![&event as &IntentEvent];
+
+    let result = fold_obligations_versioned(&events, &registry);
+    assert!(result.is_err(), "fold_obligations_versioned must reject unregistered hash");
+    assert!(
+        matches!(result.unwrap_err(), ob_poc_kyc_substrate::KycError::UnregisteredLexiconHash(_)),
+        "must be UnregisteredLexiconHash",
+    );
+}
+
+// ── Phase 3 Test A: Two versions actually dispatch differently ─────────────────
+//
+// Registers v1 (the real FoldImpl) and v2 (a no-op that ignores all events).
+// Events tagged with v1's hash produce real state; events tagged with v2's hash
+// produce empty state — proving dispatch IS by hash, not always-latest.
+
+/// A no-op FoldImpl for testing.  Ignores every event; state is always the
+/// default.  If this were the fallback it would hide the version-dispatch bug;
+/// as an explicit registration it proves dispatch is by hash.
+struct NoopFoldImpl;
+
+impl FoldImpl for NoopFoldImpl {
+    fn apply_control(&self, state: ControlState, _event: &IntentEvent) -> ControlState {
+        state // intentionally ignore
+    }
+    fn apply_obligation(&self, state: ObligationState, _event: &IntentEvent) -> ObligationState {
+        state // intentionally ignore
+    }
+}
+
+#[test]
+fn d2_phase3a_two_versions_dispatch_to_different_impls() {
+    let subject = fixture_subject_id();
+    let a = entity_subject();
+    let b = entity_b();
+    let t = ts(2026, 1, 1);
+
+    // v1 hash = real phase1 lexicon manifest hash.
+    let v1_hash = phase1_lexicon().hash;
+    // v2 hash = a different content-addressed hash for a "second version".
+    let v2_hash = Hash::of(b"v2-noop-lexicon-different-hash");
+
+    let mut registry = FoldRegistry::new();
+    registry.register(v1_hash, Arc::new(V1FoldImpl));
+    registry.register(v2_hash, Arc::new(NoopFoldImpl));
+
+    assert_eq!(registry.len(), 2, "both versions registered");
+
+    // Build an event tagged with v1 that asserts a real economic edge.
+    let v1_event = te(
+        0, subject, "ubo.edge.assert-economic-interest", v1_hash,
+        analyst(), authority(),
+        TargetBinding::for_subject(subject),
+        serde_json::json!({
+            "edge_id": eid("b_a").0,
+            "from_entity_id": b.0,
+            "to_entity_id": a.0,
+            "percentage": 60.0,
+        }),
+        idem("edge-v1"), t,
+    );
+
+    // Build the same event but tagged with v2 (the no-op version).
+    let v2_event = te(
+        0, subject, "ubo.edge.assert-economic-interest", v2_hash,
+        analyst(), authority(),
+        TargetBinding::for_subject(subject),
+        serde_json::json!({
+            "edge_id": eid("b_a").0,
+            "from_entity_id": b.0,
+            "to_entity_id": a.0,
+            "percentage": 60.0,
+        }),
+        idem("edge-v2"), t,
+    );
+
+    // v1 stream → V1FoldImpl → edge is asserted in the state.
+    let v1_refs = vec![&v1_event as &IntentEvent];
+    let v1_state = fold_control_versioned(&v1_refs, &registry)
+        .expect("v1 stream must fold successfully");
+    assert_eq!(v1_state.edges.len(), 1, "v1 fold must record the edge");
+
+    // v2 stream → NoopFoldImpl → event is ignored → no edges.
+    let v2_refs = vec![&v2_event as &IntentEvent];
+    let v2_state = fold_control_versioned(&v2_refs, &registry)
+        .expect("v2 stream must fold successfully");
+    assert_eq!(
+        v2_state.edges.len(), 0,
+        "v2 (no-op) fold must produce no edges — dispatch is by hash, not always-v1",
+    );
+}
+
+// ── Phase 3 Test B: Replay determinism through the registry ───────────────────
+//
+// The ec5 class, now through the FoldRegistry: fold the same v1 stream twice
+// and assert the resulting ControlState's graph-hash is bit-identical.
+// This proves the registry doesn't introduce non-determinism.
+
+#[test]
+fn d2_phase3b_registry_replay_is_bit_identical() {
+    let subject = fixture_subject_id();
+    let events = build_fixture_events(subject); // build once, fold twice
+
+    let v1_hash = phase1_lexicon().hash;
+    let mut registry = FoldRegistry::new();
+    registry.register(v1_hash, Arc::new(V1FoldImpl));
+
+    // Tag every event in the fixture with v1_hash.
+    let tagged: Vec<IntentEvent> = events.into_iter()
+        .map(|mut e| { e.lexicon_hash = v1_hash; e })
+        .collect();
+
+    let refs: Vec<&IntentEvent> = tagged.iter().collect();
+
+    let state1 = fold_control_versioned(&refs, &registry)
+        .expect("first fold must succeed");
+    let state2 = fold_control_versioned(&refs, &registry)
+        .expect("second fold must succeed");
+
+    // Compare via the deterministic graph-hash.
+    use ob_poc_kyc_substrate::determination::DeterminationPin;
+    use ob_poc_kyc_substrate::fold::control::reconciled_economic_edges;
+
+    let edges1 = reconciled_economic_edges(&state1);
+    let edges2 = reconciled_economic_edges(&state2);
+
+    let hash1 = DeterminationPin::compute_graph_hash(&edges1);
+    let hash2 = DeterminationPin::compute_graph_hash(&edges2);
+
+    assert_eq!(
+        hash1, hash2,
+        "registry fold must produce bit-identical graph-hash on two runs (Q6, K-16/18/33)",
+    );
+    assert_eq!(state1.edges.len(), state2.edges.len(), "same edge count");
 }

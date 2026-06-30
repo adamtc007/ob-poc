@@ -4,3 +4,4 @@
 
 pub mod control;
 pub mod obligation;
+pub mod registry;

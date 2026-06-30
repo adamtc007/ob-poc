@@ -193,6 +193,124 @@ fn track_state_from_event(event_id: EventId, payload: &serde_json::Value) -> Tra
     }
 }
 
+/// Apply a single event to `ObligationState` — the inner step of the v1 fold.
+///
+/// Extracted so `fold/registry.rs` can compose it without duplicating the match.
+/// `pub(crate)`: visible to the registry, not to crate consumers.
+///
+/// `continue` arms from the loop become early `return state` (semantically identical
+/// since they skip the rest of the match arm and move to the next event).
+pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &IntentEvent) -> ObligationState {
+    let p = &event.payload;
+    match event.verb_fqn.as_str() {
+        "kyc.subject.register" => {
+            if let Some(sid) = subject_id_from_event(event) {
+                state.subjects.entry(sid).or_insert_with(|| SubjectRollup {
+                    subject_id: sid,
+                    obligations: vec![],
+                    overall_state: SubjectOverallState::InProgress,
+                    decision_event_id: None,
+                });
+            }
+        }
+
+        "kyc.obligation.create" => {
+            let Some(sid) = subject_id_from_event(event) else { return state };
+            let Some(oid) = obligation_id_from_payload(p) else { return state };
+
+            let basis = ObligationBasis {
+                role: str_field(p, "role").unwrap_or_else(|| "unknown".into()),
+                jurisdiction: str_field(p, "jurisdiction"),
+                cbu_role: str_field(p, "cbu_role"),
+                source_event_id: event.id,
+            };
+
+            state.obligations.insert(oid, ObligationTracks {
+                obligation_id: oid,
+                basis,
+                identity: TrackState::Pending,
+                screening: TrackState::Pending,
+                risk: TrackState::Pending,
+                originating_event_id: event.id,
+            });
+
+            state.subjects.entry(sid).or_insert_with(|| SubjectRollup {
+                subject_id: sid,
+                obligations: vec![],
+                overall_state: SubjectOverallState::InProgress,
+                decision_event_id: None,
+            }).obligations.push(oid);
+        }
+
+        "ubo.determination.freeze" => {}
+
+        "kyc.obligation.update-identity" => {
+            if let Some(oid) = obligation_id_from_payload(p) {
+                if let Some(tracks) = state.obligations.get_mut(&oid) {
+                    tracks.identity = track_state_from_event(event.id, p);
+                }
+            }
+        }
+        "kyc.obligation.update-screening" => {
+            if let Some(oid) = obligation_id_from_payload(p) {
+                if let Some(tracks) = state.obligations.get_mut(&oid) {
+                    tracks.screening = track_state_from_event(event.id, p);
+                }
+            }
+        }
+        "kyc.obligation.update-risk" => {
+            if let Some(oid) = obligation_id_from_payload(p) {
+                if let Some(tracks) = state.obligations.get_mut(&oid) {
+                    tracks.risk = track_state_from_event(event.id, p);
+                }
+            }
+        }
+
+        "kyc.obligation.satisfy" => {
+            if let Some(oid) = obligation_id_from_payload(p) {
+                if let Some(tracks) = state.obligations.get_mut(&oid) {
+                    tracks.identity = TrackState::Satisfied { by_event: event.id };
+                    tracks.screening = TrackState::Satisfied { by_event: event.id };
+                    tracks.risk = TrackState::Satisfied { by_event: event.id };
+                }
+            }
+        }
+        "kyc.obligation.waive" => {
+            let reason = str_field(p, "reason").unwrap_or_default();
+            if let Some(oid) = obligation_id_from_payload(p) {
+                if let Some(tracks) = state.obligations.get_mut(&oid) {
+                    let s = TrackState::Waived { by_event: event.id, reason };
+                    tracks.identity = s.clone();
+                    tracks.screening = s.clone();
+                    tracks.risk = s;
+                }
+            }
+        }
+
+        "kyc.person.approve" => {
+            if let Some(sid) = subject_id_from_event(event) {
+                if let Some(rollup) = state.subjects.get_mut(&sid) {
+                    rollup.overall_state =
+                        SubjectOverallState::Approved { by_event: event.id };
+                    rollup.decision_event_id = Some(event.id);
+                }
+            }
+        }
+        "kyc.person.reject" => {
+            if let Some(sid) = subject_id_from_event(event) {
+                if let Some(rollup) = state.subjects.get_mut(&sid) {
+                    rollup.overall_state =
+                        SubjectOverallState::Rejected { by_event: event.id };
+                    rollup.decision_event_id = Some(event.id);
+                }
+            }
+        }
+
+        _ => {}
+    }
+    state
+}
+
 /// Pure fold of the ordered event stream onto `ObligationState`.
 ///
 /// Obligations are emitted by:
@@ -202,133 +320,9 @@ fn track_state_from_event(event_id: EventId, payload: &serde_json::Value) -> Tra
 ///
 /// The same person under multiple bases gets distinct `ObligationId`s but
 /// shares one `SubjectId` (K-21/22).
+///
+/// For version-dispatched replay (D2), use `fold_obligations_versioned` in
+/// `fold::registry`.
 pub fn fold_obligations(events: &[&IntentEvent]) -> ObligationState {
-    let mut state = ObligationState::default();
-
-    for event in events {
-        let p = &event.payload;
-        match event.verb_fqn.as_str() {
-            // Subject registration opens the subject rollup.
-            "kyc.subject.register" => {
-                if let Some(sid) = subject_id_from_event(event) {
-                    state.subjects.entry(sid).or_insert_with(|| SubjectRollup {
-                        subject_id: sid,
-                        obligations: vec![],
-                        overall_state: SubjectOverallState::InProgress,
-                        decision_event_id: None,
-                    });
-                }
-            }
-
-            // Explicit obligation creation (kyc.obligation.create or
-            // emitted by determination.freeze).
-            "kyc.obligation.create" => {
-                let Some(sid) = subject_id_from_event(event) else { continue };
-                let Some(oid) = obligation_id_from_payload(p) else { continue };
-
-                let basis = ObligationBasis {
-                    role: str_field(p, "role").unwrap_or_else(|| "unknown".into()),
-                    jurisdiction: str_field(p, "jurisdiction"),
-                    cbu_role: str_field(p, "cbu_role"),
-                    source_event_id: event.id,
-                };
-
-                state.obligations.insert(oid, ObligationTracks {
-                    obligation_id: oid,
-                    basis,
-                    identity: TrackState::Pending,
-                    screening: TrackState::Pending,
-                    risk: TrackState::Pending,
-                    originating_event_id: event.id,
-                });
-
-                // Link obligation to subject.
-                state.subjects.entry(sid).or_insert_with(|| SubjectRollup {
-                    subject_id: sid,
-                    obligations: vec![],
-                    overall_state: SubjectOverallState::InProgress,
-                    decision_event_id: None,
-                }).obligations.push(oid);
-            }
-
-            // freeze emits obligations for each resolved person — those arrive
-            // as kyc.obligation.create events via the outbox.  The freeze event
-            // itself records completion of the determination.
-            "ubo.determination.freeze" => {
-                // freeze is recorded in the control fold; the obligation fold sees
-                // the obligation.create events it emits (dispatched via outbox,
-                // H5: replay never re-dispatches, so they appear in the stream only
-                // once). Nothing additional to do here.
-            }
-
-            // Track updates.
-            "kyc.obligation.update-identity" => {
-                if let Some(oid) = obligation_id_from_payload(p) {
-                    if let Some(tracks) = state.obligations.get_mut(&oid) {
-                        tracks.identity = track_state_from_event(event.id, p);
-                    }
-                }
-            }
-            "kyc.obligation.update-screening" => {
-                if let Some(oid) = obligation_id_from_payload(p) {
-                    if let Some(tracks) = state.obligations.get_mut(&oid) {
-                        tracks.screening = track_state_from_event(event.id, p);
-                    }
-                }
-            }
-            "kyc.obligation.update-risk" => {
-                if let Some(oid) = obligation_id_from_payload(p) {
-                    if let Some(tracks) = state.obligations.get_mut(&oid) {
-                        tracks.risk = track_state_from_event(event.id, p);
-                    }
-                }
-            }
-
-            // Satisfy / defer / waive / expire / reopen whole obligation.
-            "kyc.obligation.satisfy" => {
-                if let Some(oid) = obligation_id_from_payload(p) {
-                    if let Some(tracks) = state.obligations.get_mut(&oid) {
-                        tracks.identity = TrackState::Satisfied { by_event: event.id };
-                        tracks.screening = TrackState::Satisfied { by_event: event.id };
-                        tracks.risk = TrackState::Satisfied { by_event: event.id };
-                    }
-                }
-            }
-            "kyc.obligation.waive" => {
-                let reason = str_field(p, "reason").unwrap_or_default();
-                if let Some(oid) = obligation_id_from_payload(p) {
-                    if let Some(tracks) = state.obligations.get_mut(&oid) {
-                        let s = TrackState::Waived { by_event: event.id, reason };
-                        tracks.identity = s.clone();
-                        tracks.screening = s.clone();
-                        tracks.risk = s;
-                    }
-                }
-            }
-
-            // Subject-level decision (gates on all-required-terminal, K-23).
-            "kyc.person.approve" => {
-                if let Some(sid) = subject_id_from_event(event) {
-                    if let Some(rollup) = state.subjects.get_mut(&sid) {
-                        rollup.overall_state =
-                            SubjectOverallState::Approved { by_event: event.id };
-                        rollup.decision_event_id = Some(event.id);
-                    }
-                }
-            }
-            "kyc.person.reject" => {
-                if let Some(sid) = subject_id_from_event(event) {
-                    if let Some(rollup) = state.subjects.get_mut(&sid) {
-                        rollup.overall_state =
-                            SubjectOverallState::Rejected { by_event: event.id };
-                        rollup.decision_event_id = Some(event.id);
-                    }
-                }
-            }
-
-            _ => {}
-        }
-    }
-
-    state
+    events.iter().fold(ObligationState::default(), |st, e| apply_one_obligation_event(st, e))
 }

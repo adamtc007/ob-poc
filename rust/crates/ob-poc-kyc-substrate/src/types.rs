@@ -88,6 +88,23 @@ impl Hash {
     pub fn of_json(v: &serde_json::Value) -> Self {
         Self::of(v.to_string().as_bytes())
     }
+
+    /// Hex representation (lowercase, 64 chars) — the on-the-wire / DB-column form.
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
+
+    /// Parse a 64-char lowercase hex string back into a `Hash`.
+    ///
+    /// Round-trips with [`Self::to_hex`] / [`std::fmt::Display`]. Used by the
+    /// durable store to rehydrate `lexicon_hash` / `payload_hash` text columns.
+    pub fn from_hex(s: &str) -> Result<Self, String> {
+        let bytes = hex::decode(s).map_err(|e| format!("invalid hex: {e}"))?;
+        let arr: [u8; 32] = bytes
+            .try_into()
+            .map_err(|v: Vec<u8>| format!("expected 32 bytes, got {}", v.len()))?;
+        Ok(Self(arr))
+    }
 }
 
 impl std::fmt::Debug for Hash {
