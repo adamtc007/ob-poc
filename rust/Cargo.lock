@@ -4424,6 +4424,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ob-poc-kyc-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "ob-poc-kyc-substrate",
+ "serde_json",
+ "sqlx",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "ob-poc-kyc-substrate"
 version = "0.1.0"
 dependencies = [

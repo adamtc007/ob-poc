@@ -306,6 +306,8 @@ members = [
     "crates/ob-poc-authoring",
     # KYC/UBO W1 substrate — EOP-DD-KYCUBO-001 (in-memory slice; no DB dep)
     "crates/ob-poc-kyc-substrate",
+    # KYC/UBO durable store (membrane) — EOP-DD-KYCUBO-002 (the only sqlx crate in the stack)
+    "crates/ob-poc-kyc-store",
     "crates/ob-poc-agent",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",

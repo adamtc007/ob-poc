@@ -1,0 +1,22 @@
+[package]
+name = "ob-poc-kyc-store"
+version = "0.1.0"
+edition = "2021"
+description = "KYC/UBO durable verb-stream store (membrane). The ONLY sqlx crate in the KYC stack; implements the §3 append protocol over Postgres. EOP-DD-KYCUBO-002."
+
+# Membrane crate: ob-poc-kyc-substrate (engine, pure) + sqlx. The substrate
+# never learns about Postgres; this crate is where I/O lives.
+[dependencies]
+ob-poc-kyc-substrate = { path = "../ob-poc-kyc-substrate" }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+uuid = { version = "1.4", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = "1.0"
+async-trait = "0.1"
+thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[lints.rust]
+unreachable_pub = "deny"
