@@ -1,0 +1,575 @@
+# dsl.kyc — the V&S determination vocabulary (EOP-VS-KYCUBO-001 / EOP-DD-KYCUBO-002).
+#
+# These are the REPLACEMENT verbs for the legacy ubo.*/control.*/ownership.*/board.* write
+# verbs. Every verb here is STREAM-BACKED: it appends an IntentEvent to the durable
+# kyc_intent_events stream; current state is a fold/projection of that stream — never a
+# direct table write. Ops live in domain_ops::kyc_stream_ops.
+#
+# The domain split: ubo.edge.* (6 edge lifecycle), ubo.determination.* (4 fold/freeze),
+# kyc.subject.* (2 subject registration). All are covered by phase1_lexicon() in the
+# ob-poc-kyc-substrate crate.
+
+domains:
+  ubo:
+    description: "UBO determination — durable stream-backed verb primitives (dsl.kyc lexicon)"
+
+    verbs:
+      edge.assert-control:
+        flavour: instance_adding
+        description: Claim a control edge (voting rights, board appointment, GP statutory, trust role, etc.)
+        effect_class: append_fact
+        invocation_phrases:
+          - "assert control"
+          - "claim control edge"
+          - "add control relationship"
+          - "record control edge"
+          - "assert voting control"
+          - "declare board appointment control"
+          - "record control over entity"
+          - "assert this entity controls that one"
+          - "add ownership and control edge"
+          - "record a control relationship"
+          - "assert controlling interest"
+          - "claim a control relationship"
+          - "add a control assertion"
+          - "assert dominant influence"
+          - "record GP statutory control"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: control_edge
+          tags: [ubo, control, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root (the subject stream)
+          - name: from_entity_id
+            type: uuid
+            required: true
+            description: Controlling entity
+          - name: to_entity_id
+            type: uuid
+            required: true
+            description: Controlled entity
+          - name: edge_kind
+            type: string
+            required: true
+            description: "One of: voting_rights, board_appointment, gp_statutory, designated_member, trust_role, nominee, dominant_influence, economic_interest"
+          - name: edge-id
+            type: uuid
+            required: false
+            description: Stable edge identity (generated if omitted)
+          - name: percentage
+            type: decimal
+            required: false
+            description: Percentage (for economic_interest edges)
+        returns:
+          type: record
+          fields:
+            - name: edge_id
+              type: uuid
+            - name: seq
+              type: integer
+            - name: deduped
+              type: boolean
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      edge.assert-economic-interest:
+        flavour: instance_adding
+        description: Claim an economic-interest edge (shareholding percentage)
+        effect_class: append_fact
+        invocation_phrases:
+          - "assert economic interest"
+          - "record shareholding"
+          - "add economic interest edge"
+          - "claim economic interest"
+          - "record ownership percentage"
+          - "assert shareholding interest"
+          - "add a shareholding"
+          - "record economic stake"
+          - "add ownership stake"
+          - "assert beneficial interest"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: economic_edge
+          tags: [ubo, economic, ownership, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: from_entity_id
+            type: uuid
+            required: true
+            description: Owning entity
+          - name: to_entity_id
+            type: uuid
+            required: true
+            description: Owned entity
+          - name: percentage
+            type: decimal
+            required: false
+            description: Economic interest percentage
+          - name: edge-id
+            type: uuid
+            required: false
+            description: Stable edge identity (generated if omitted)
+        returns:
+          type: record
+          fields:
+            - name: edge_id
+              type: uuid
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      edge.attach-evidence:
+        flavour: attribute_mutating
+        description: Cite evidence for an asserted edge (moves edge from Asserted → Evidenced)
+        effect_class: append_fact
+        invocation_phrases:
+          - "attach evidence"
+          - "cite evidence for edge"
+          - "add evidence to edge"
+          - "record evidence for ownership"
+          - "attach document evidence"
+          - "evidence this control edge"
+          - "add proof to ownership"
+          - "attach supporting evidence"
+          - "cite evidence for this relationship"
+          - "record evidence for control"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: control_edge
+          tags: [ubo, evidence, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: edge-id
+            type: uuid
+            required: true
+            description: The edge to evidence
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      edge.verify:
+        flavour: attribute_mutating
+        description: Verify an evidenced edge (moves Evidenced → Verified; requires evidence first)
+        effect_class: append_fact
+        invocation_phrases:
+          - "verify edge"
+          - "verify control edge"
+          - "verify ownership"
+          - "verify this edge"
+          - "mark edge as verified"
+          - "verify the control relationship"
+          - "verify this ownership"
+          - "verify economic interest"
+          - "confirm and verify edge"
+          - "verify the assertion"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: control_edge
+          tags: [ubo, verification, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: edge-id
+            type: uuid
+            required: true
+            description: The evidenced edge to verify
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      edge.supersede:
+        flavour: attribute_mutating
+        description: Supersede an edge (K-13 supersede-never-delete — edge stays, status flips)
+        effect_class: append_fact
+        invocation_phrases:
+          - "supersede edge"
+          - "supersede control edge"
+          - "supersede this relationship"
+          - "mark edge superseded"
+          - "replace this edge"
+          - "supersede ownership edge"
+          - "retire this control edge"
+          - "supersede the assertion"
+          - "mark as superseded"
+          - "this edge is superseded"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: control_edge
+          tags: [ubo, supersede, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: edge-id
+            type: uuid
+            required: true
+            description: The edge to supersede (cannot be deleted per K-13)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      edge.reconcile-conflict:
+        flavour: attribute_mutating
+        description: Record a conflict-reconciliation event on the subject stream
+        effect_class: append_fact
+        invocation_phrases:
+          - "reconcile conflict"
+          - "resolve edge conflict"
+          - "reconcile ownership conflict"
+          - "resolve conflicting assertions"
+          - "record reconciliation"
+          - "reconcile determination conflict"
+          - "resolve this conflict"
+          - "mark conflict reconciled"
+          - "record conflict resolution"
+          - "reconcile the contradicting edges"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: control_edge
+          tags: [ubo, reconcile, conflict, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: resolution
+            type: string
+            required: false
+            description: Free-text resolution note (captured in payload)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      determination.select-strategy:
+        flavour: attribute_mutating
+        description: Select the determination strategy for a subject (e.g. OwnershipProng, SmoFallback)
+        effect_class: append_fact
+        invocation_phrases:
+          - "select determination strategy"
+          - "set determination strategy"
+          - "choose ubo strategy"
+          - "select ownership prong"
+          - "set UBO determination method"
+          - "configure determination strategy"
+          - "select the strategy for determination"
+          - "set determination approach"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: determination
+          tags: [ubo, strategy, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: strategy
+            type: string
+            required: true
+            description: "Strategy name: ownership_prong or smo_fallback"
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      determination.compute-fold:
+        flavour: attribute_mutating
+        description: Trigger a fold computation — projects current state from the stream
+        effect_class: read_snapshot
+        invocation_phrases:
+          - "compute fold"
+          - "run determination fold"
+          - "fold the stream"
+          - "compute current determination state"
+          - "run the fold"
+          - "project determination from stream"
+          - "recompute determination"
+          - "fold and project"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: determination
+          tags: [ubo, fold, computation, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root to fold
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: benign
+
+      determination.apply-smo-fallback:
+        flavour: attribute_mutating
+        description: Record an SMO fallback determination (senior managing official)
+        effect_class: append_fact
+        invocation_phrases:
+          - "apply SMO fallback"
+          - "record SMO determination"
+          - "use SMO fallback"
+          - "apply senior managing official rule"
+          - "fall back to SMO"
+          - "record senior managing official"
+          - "SMO fallback determination"
+          - "apply the SMO rule"
+          - "use the SMO route"
+          - "apply fallback determination"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: determination
+          tags: [ubo, smo, fallback, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: smo-person-id
+            type: uuid
+            required: true
+            description: The person designated as senior managing official
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      determination.freeze:
+        flavour: attribute_mutating
+        description: Freeze (pin) the current determination — seals the K-18 DeterminationPin
+        effect_class: append_fact
+        invocation_phrases:
+          - "freeze determination"
+          - "pin determination"
+          - "seal determination"
+          - "freeze the UBO determination"
+          - "pin the ownership determination"
+          - "lock the determination"
+          - "freeze and seal"
+          - "commit determination"
+          - "seal the UBO pin"
+          - "freeze the result"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: determination
+          tags: [ubo, freeze, pin, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root to freeze
+          - name: policy-version
+            type: string
+            required: true
+            description: Policy version at freeze time
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+  kyc:
+    description: "KYC subject stream operations (dsl.kyc lexicon)"
+
+    verbs:
+      subject.register:
+        flavour: instance_adding
+        description: Register a subject on the KYC determination stream
+        effect_class: append_fact
+        invocation_phrases:
+          - "register kyc subject"
+          - "create determination subject"
+          - "register subject for KYC"
+          - "open a subject stream"
+          - "register entity for determination"
+          - "start subject stream"
+          - "create KYC subject"
+          - "register for UBO determination"
+          - "open determination stream"
+          - "register this entity as a KYC subject"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: kyc_subject
+          tags: [kyc, subject, registration, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: The UUID that anchors the subject's stream
+          - name: is_natural_person
+            type: boolean
+            required: false
+            description: Whether the subject is a natural person
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential
+
+      subject.classify-structure:
+        flavour: attribute_mutating
+        description: Classify the entity structure for determination purposes (simple, complex, fund, etc.)
+        effect_class: append_fact
+        invocation_phrases:
+          - "classify structure"
+          - "classify subject structure"
+          - "set entity structure"
+          - "classify this entity"
+          - "classify for KYC"
+          - "set structure classification"
+          - "classify the ownership structure"
+          - "set entity type for determination"
+          - "classify structure type"
+          - "set the structure class"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: kyc_subject
+          tags: [kyc, subject, classification, structure, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: structure-class
+            type: string
+            required: true
+            description: "Structure class (e.g. simple, complex, fund, trust)"
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: extending
+          external_effects: []
+          consequence:
+            baseline: consequential

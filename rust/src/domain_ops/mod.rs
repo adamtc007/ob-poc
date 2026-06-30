@@ -414,6 +414,22 @@ pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
     use std::sync::Arc;
 
+    // dsl.kyc stream-backed determination verbs (EOP-DD-KYCUBO-002 rip-and-replace R1/R2).
+    // Domain: ubo.edge.* (6), ubo.determination.* (4), kyc.subject.* (2).
+    // YAML: config/verbs/kyc/dsl-kyc.yaml.
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertControl));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertEconomicInterest));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeAttachEvidence));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeVerify));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeSupersede));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeReconcileConflict));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationSelectStrategy));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationComputeFold));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationApplySmoFallback));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
+
     // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
     // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry
     // + crate::dsl_v2::executor::DslExecutor).
