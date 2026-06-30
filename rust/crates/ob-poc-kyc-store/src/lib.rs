@@ -14,7 +14,9 @@
 //! logic, which is source-agnostic over `&[&IntentEvent]`.
 
 pub mod error;
+pub mod projection;
 pub mod store;
 
 pub use error::StoreError;
+pub use projection::{PgKycProjector, ProjectionStats};
 pub use store::{AppendOutcome, PgKycEventStore};
