@@ -335,3 +335,149 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
         Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
     }
 }
+
+
+/// Normalize YAML-style arg names (kebab-case) to the fold's expected payload keys (snake_case).
+/// The obligation fold reads "obligation_id" (underscore), not "obligation-id" (hyphen).
+fn normalize_obligation_payload(args: &serde_json::Value) -> serde_json::Value {
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        if let Some(v) = obj.remove("obligation-id") {
+            obj.insert("obligation_id".to_string(), v);
+        }
+        if let Some(v) = obj.remove("subject-id") {
+            obj.insert("subject_id".to_string(), v);
+        }
+    }
+    p
+}
+
+// ── W3: Role-basis recording ──────────────────────────────────────────────────
+
+pub struct KycRoleAssign;
+
+#[async_trait]
+impl SemOsVerbOp for KycRoleAssign {
+    fn fqn(&self) -> &str { "kyc.role.assign" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let _role = json_extract_string(args, "role")?;
+        let outcome = stream_append("kyc.role.assign", subject, TargetBinding::for_subject(subject), args.clone(), "analyst.role-assign", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycRoleWithdraw;
+
+#[async_trait]
+impl SemOsVerbOp for KycRoleWithdraw {
+    fn fqn(&self) -> &str { "kyc.role.withdraw" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let outcome = stream_append("kyc.role.withdraw", subject, TargetBinding::for_subject(subject), args.clone(), "analyst.role-withdraw", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+// ── W5: Obligation lifecycle ──────────────────────────────────────────────────
+
+pub struct KycObligationCreate;
+
+#[async_trait]
+impl SemOsVerbOp for KycObligationCreate {
+    fn fqn(&self) -> &str { "kyc.obligation.create" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let obligation_id = json_extract_uuid_opt(args, ctx, "obligation-id").unwrap_or_else(Uuid::new_v4);
+        let _role = json_extract_string(args, "role")?;
+        let mut payload = args.clone();
+        payload["obligation_id"] = serde_json::Value::String(obligation_id.to_string());
+        let outcome = stream_append("kyc.obligation.create", subject, TargetBinding::for_subject(subject), payload, "analyst.obligation-create", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "obligation_id": obligation_id, "seq": outcome.seq })))
+    }
+}
+
+pub struct KycObligationUpdateIdentity;
+
+#[async_trait]
+impl SemOsVerbOp for KycObligationUpdateIdentity {
+    fn fqn(&self) -> &str { "kyc.obligation.update-identity" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let outcome = stream_append("kyc.obligation.update-identity", subject, TargetBinding::for_subject(subject), normalize_obligation_payload(args), "analyst.obligation-update", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycObligationUpdateScreening;
+
+#[async_trait]
+impl SemOsVerbOp for KycObligationUpdateScreening {
+    fn fqn(&self) -> &str { "kyc.obligation.update-screening" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let outcome = stream_append("kyc.obligation.update-screening", subject, TargetBinding::for_subject(subject), normalize_obligation_payload(args), "analyst.obligation-update", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycObligationUpdateRisk;
+
+#[async_trait]
+impl SemOsVerbOp for KycObligationUpdateRisk {
+    fn fqn(&self) -> &str { "kyc.obligation.update-risk" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let outcome = stream_append("kyc.obligation.update-risk", subject, TargetBinding::for_subject(subject), normalize_obligation_payload(args), "analyst.obligation-update", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycObligationSatisfy;
+
+#[async_trait]
+impl SemOsVerbOp for KycObligationSatisfy {
+    fn fqn(&self) -> &str { "kyc.obligation.satisfy" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let outcome = stream_append("kyc.obligation.satisfy", subject, TargetBinding::for_subject(subject), normalize_obligation_payload(args), "analyst.obligation-satisfy", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycObligationWaive;
+
+#[async_trait]
+impl SemOsVerbOp for KycObligationWaive {
+    fn fqn(&self) -> &str { "kyc.obligation.waive" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let _reason = json_extract_string(args, "reason")?;
+        let outcome = stream_append("kyc.obligation.waive", subject, TargetBinding::for_subject(subject), normalize_obligation_payload(args), "analyst.obligation-waive", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycPersonApprove;
+
+#[async_trait]
+impl SemOsVerbOp for KycPersonApprove {
+    fn fqn(&self) -> &str { "kyc.person.approve" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let outcome = stream_append("kyc.person.approve", subject, TargetBinding::for_subject(subject), args.clone(), "senior-analyst.approve", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}
+
+pub struct KycPersonReject;
+
+#[async_trait]
+impl SemOsVerbOp for KycPersonReject {
+    fn fqn(&self) -> &str { "kyc.person.reject" }
+    async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let outcome = stream_append("kyc.person.reject", subject, TargetBinding::for_subject(subject), args.clone(), "senior-analyst.reject", None, ctx, scope).await?;
+        Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
+    }
+}

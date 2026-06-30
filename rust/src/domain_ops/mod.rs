@@ -429,6 +429,18 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
+    // W3: role-basis recording
+    registry.register(Arc::new(kyc_stream_ops::KycRoleAssign));
+    registry.register(Arc::new(kyc_stream_ops::KycRoleWithdraw));
+    // W5: obligation lifecycle
+    registry.register(Arc::new(kyc_stream_ops::KycObligationCreate));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateIdentity));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateScreening));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateRisk));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationSatisfy));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationWaive));
+    registry.register(Arc::new(kyc_stream_ops::KycPersonApprove));
+    registry.register(Arc::new(kyc_stream_ops::KycPersonReject));
 
     // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
     // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry

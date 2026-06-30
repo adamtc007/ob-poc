@@ -54,6 +54,19 @@ impl TrackState {
                 | TrackState::Rejected { .. }
         )
     }
+
+    /// Text name for projection storage (round-trips with `Display`).
+    pub fn state_name(&self) -> &'static str {
+        match self {
+            TrackState::Pending => "Pending",
+            TrackState::InProgress => "InProgress",
+            TrackState::Satisfied { .. } => "Satisfied",
+            TrackState::Waived { .. } => "Waived",
+            TrackState::Deferred { .. } => "Deferred",
+            TrackState::Expired { .. } => "Expired",
+            TrackState::Rejected { .. } => "Rejected",
+        }
+    }
 }
 
 /// Parallel per-obligation tracks for one subject (Q4).

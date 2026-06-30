@@ -6,20 +6,24 @@
 use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
 
-use ob_poc_kyc_substrate::{fold_control_versioned, FoldRegistry, IntentEvent, SubjectId};
+use ob_poc_kyc_substrate::{
+    fold_control_versioned, fold_obligations_versioned, FoldRegistry, IntentEvent, SubjectId,
+    fold::obligation::SubjectOverallState,
+};
 
 use crate::error::StoreError;
 use crate::store::PgKycEventStore;
 
-/// Outbox effect-kind for the control-edge projection (the one stream
-/// projection so far). `append` enqueues one row of this kind per event;
-/// [`PgKycProjectionDrainer`] claims them.
+/// Outbox effect-kind for the control-edge projection.
 pub const CONTROL_EDGE_PROJECTION_EFFECT: &str = "kyc.projection.control_edges";
 
+/// Outbox effect-kind for the obligation-graph projection (W6).
+pub const OBLIGATION_PROJECTION_EFFECT: &str = "kyc.projection.obligations";
+
 /// Every projection effect-kind `append` fans out to. Each kind has its own
-/// drainer claiming its own rows (so a future projection adds a kind here +
-/// its own drainer, with no multi-consumer contention on a shared kind).
-pub const PROJECTION_EFFECT_KINDS: &[&str] = &[CONTROL_EDGE_PROJECTION_EFFECT];
+/// drainer so there is no multi-consumer contention.
+pub const PROJECTION_EFFECT_KINDS: &[&str] =
+    &[CONTROL_EDGE_PROJECTION_EFFECT, OBLIGATION_PROJECTION_EFFECT];
 
 /// Outcome of a projection rebuild.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,5 +167,132 @@ impl PgKycProjectionDrainer {
             processed += 1;
         }
         Ok(processed)
+    }
+}
+
+// ── W6: Obligation-graph projection ──────────────────────────────────────────
+
+/// Rebuild stats for the obligation projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ObligationProjectionStats {
+    pub obligations_written: usize,
+    pub subjects_written: usize,
+}
+
+/// Rebuilds the obligation-graph projection for a subject by folding the stream.
+/// Idempotent + convergent by construction (full replace from a deterministic fold).
+pub struct PgKycObligationProjector;
+
+impl PgKycObligationProjector {
+    pub async fn rebuild_obligations(
+        conn: &mut PgConnection,
+        registry: &FoldRegistry,
+        subject_root: SubjectId,
+    ) -> Result<ObligationProjectionStats, StoreError> {
+        let events = PgKycEventStore::load_events(conn, subject_root).await?;
+        let refs: Vec<&IntentEvent> = events.iter().collect();
+        let state = fold_obligations_versioned(&refs, registry)?;
+
+        // Full replace (idempotent).
+        sqlx::query(r#"DELETE FROM "ob-poc".kyc_obligation_projection WHERE subject_root = $1"#)
+            .bind(subject_root.0).execute(&mut *conn).await?;
+        sqlx::query(r#"DELETE FROM "ob-poc".kyc_subject_rollup_projection WHERE subject_root = $1"#)
+            .bind(subject_root.0).execute(&mut *conn).await?;
+
+        let mut obl_count = 0usize;
+        for (oid, tracks) in &state.obligations {
+            let identity = tracks.identity.state_name();
+            let screening = tracks.screening.state_name();
+            let risk = tracks.risk.state_name();
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".kyc_obligation_projection
+                   (subject_root, obligation_id, basis_role, basis_jurisdiction, basis_cbu_role,
+                    basis_source_event_id, identity_state, screening_state, risk_state, originating_event_id)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)"#,
+            )
+            .bind(subject_root.0).bind(oid.0)
+            .bind(&tracks.basis.role)
+            .bind(&tracks.basis.jurisdiction)
+            .bind(&tracks.basis.cbu_role)
+            .bind(tracks.basis.source_event_id.0)
+            .bind(identity).bind(screening).bind(risk)
+            .bind(tracks.originating_event_id.0)
+            .execute(&mut *conn).await?;
+            obl_count += 1;
+        }
+
+        let mut subj_count = 0usize;
+        for (sid, rollup) in &state.subjects {
+            let (overall, decision_event_id) = match &rollup.overall_state {
+                SubjectOverallState::Approved { by_event } =>
+                    ("Approved", Some(by_event.0)),
+                SubjectOverallState::Rejected { by_event } =>
+                    ("Rejected", Some(by_event.0)),
+                SubjectOverallState::AllTerminal => ("AllTerminal", None),
+                SubjectOverallState::InProgress => ("InProgress", None),
+            };
+            let all_terminal = matches!(
+                rollup.overall_state,
+                SubjectOverallState::AllTerminal
+                | SubjectOverallState::Approved { .. }
+            );
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".kyc_subject_rollup_projection
+                   (subject_root, overall_state, obligation_count, all_terminal, decision_event_id)
+                   VALUES ($1,$2,$3,$4,$5)"#,
+            )
+            .bind(sid.0).bind(overall)
+            .bind(rollup.obligations.len() as i32)
+            .bind(all_terminal)
+            .bind(decision_event_id)
+            .execute(&mut *conn).await?;
+            subj_count += 1;
+        }
+
+        Ok(ObligationProjectionStats {
+            obligations_written: obl_count,
+            subjects_written: subj_count,
+        })
+    }
+}
+
+/// Self-contained outbox drainer for the obligation-graph projection.
+pub struct PgKycObligationDrainer;
+
+impl PgKycObligationDrainer {
+    pub async fn drain_once(
+        pool: &PgPool,
+        registry: &FoldRegistry,
+    ) -> Result<Option<SubjectId>, StoreError> {
+        let mut tx = pool.begin().await?;
+        let claimed = sqlx::query(
+            r#"SELECT id, payload FROM "public".outbox
+               WHERE effect_kind = $1 AND status = 'pending'
+               ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1"#,
+        )
+        .bind(OBLIGATION_PROJECTION_EFFECT)
+        .fetch_optional(&mut *tx).await?;
+
+        let Some(row) = claimed else { tx.rollback().await?; return Ok(None); };
+        let id: Uuid = row.get("id");
+        let payload: serde_json::Value = row.get("payload");
+        let subject = payload.get("subject_root")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .map(SubjectId)
+            .ok_or_else(|| StoreError::Db(sqlx::Error::Decode(
+                "outbox payload missing/invalid subject_root".into())))?;
+
+        PgKycObligationProjector::rebuild_obligations(&mut tx, registry, subject).await?;
+        sqlx::query(r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#)
+            .bind(id).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(Some(subject))
+    }
+
+    pub async fn drain_all(pool: &PgPool, registry: &FoldRegistry, max: usize) -> Result<usize, StoreError> {
+        let mut n = 0;
+        while n < max { if Self::drain_once(pool, registry).await?.is_none() { break; } n += 1; }
+        Ok(n)
     }
 }

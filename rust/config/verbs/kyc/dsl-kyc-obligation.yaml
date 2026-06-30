@@ -1,0 +1,479 @@
+# dsl.kyc obligation graph (EOP-DD-KYCUBO-001 §4.2 / W3 + W5).
+#
+# W3: kyc.role.* — role-basis recording, linking a subject to a CBU/Deal role.
+#   A subject without a recorded basis has no obligation (K-21). Role assignment
+#   IS the act of recording why this subject is in KYC scope.
+#
+# W5: kyc.obligation.* + kyc.person.* — the obligation lifecycle as first-class
+#   objects with parallel identity/screening/risk tracks (Q4, K-22, K-23).
+#   These verbs advance the obligation fold; the fold is the system of record.
+#   Existing screening.* / tollgate verbs are consumed as inputs to track updates;
+#   they are NOT replaced (V&S §9.2 explicit).
+
+domains:
+  kyc:
+    description: "KYC obligation graph — role-basis recording (W3) and obligation lifecycle (W5)"
+
+    verbs:
+      # ── W3: Role-basis recording ─────────────────────────────────────────────
+
+      role.assign:
+        flavour: instance_adding
+        description: Assign a KYC role to a subject, recording the basis for obligation (K-21, K-24)
+        effect_class: append_fact
+        invocation_phrases:
+          - "assign KYC role"
+          - "assign role to subject"
+          - "record role basis"
+          - "assign beneficial owner role"
+          - "assign controller role"
+          - "assign signatory role"
+          - "record subject role"
+          - "assign KYC obligation basis"
+          - "assign subject to role"
+          - "record the basis for KYC obligation"
+          - "assign this entity a KYC role"
+          - "mark as beneficial owner"
+          - "record controller basis"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_subject
+          tags: [kyc, role, obligation-basis, w3, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: The KYC subject receiving the role
+          - name: role
+            type: string
+            required: true
+            description: "Role name e.g. beneficial_owner, controller, signatory, investor"
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Jurisdiction driving the obligation (ISO 3166-1 alpha-2)
+          - name: cbu-role
+            type: string
+            required: false
+            description: CBU/Deal role linking obligation to commercial exposure (K-24)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      role.withdraw:
+        flavour: attribute_mutating
+        description: Withdraw a previously assigned role from a subject (K-13 style — event recorded, not deleted)
+        effect_class: append_fact
+        invocation_phrases:
+          - "withdraw role"
+          - "remove role from subject"
+          - "withdraw KYC role"
+          - "revoke role assignment"
+          - "withdraw role basis"
+          - "remove obligation basis"
+          - "withdraw this subject's role"
+          - "remove KYC role"
+          - "retract role assignment"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_subject
+          tags: [kyc, role, obligation-basis, w3, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: The KYC subject
+          - name: role
+            type: string
+            required: true
+            description: Role to withdraw
+          - name: reason
+            type: string
+            required: false
+            description: Reason for withdrawal
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      # ── W5: Obligation lifecycle ──────────────────────────────────────────────
+
+      obligation.create:
+        flavour: instance_adding
+        description: Create an obligation for a subject under a stated role basis (K-21, K-35)
+        effect_class: append_fact
+        invocation_phrases:
+          - "create obligation"
+          - "create KYC obligation"
+          - "open obligation"
+          - "raise obligation"
+          - "create a KYC obligation for this subject"
+          - "open an obligation track"
+          - "record new obligation"
+          - "raise a KYC obligation"
+          - "create identity obligation"
+          - "open an obligation for this person"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags: [kyc, obligation, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Subject for whom the obligation is raised
+          - name: obligation-id
+            type: uuid
+            required: false
+            description: Stable obligation identity (generated if omitted)
+          - name: role
+            type: string
+            required: true
+            description: Role that triggered this obligation (K-21)
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Jurisdiction driving the requirement
+          - name: cbu-role
+            type: string
+            required: false
+            description: CBU/Deal role linking to exposure (K-24)
+        returns:
+          type: record
+          fields:
+            - name: obligation_id
+              type: uuid
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      obligation.update-identity:
+        flavour: attribute_mutating
+        description: Advance the identity verification track of an obligation
+        effect_class: append_fact
+        invocation_phrases:
+          - "update identity track"
+          - "advance identity verification"
+          - "record identity outcome"
+          - "mark identity verified"
+          - "update identity verification"
+          - "record identity verification result"
+          - "advance identity track"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags: [kyc, obligation, identity, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: obligation-id
+            type: uuid
+            required: true
+            description: The obligation whose identity track to advance
+          - name: state
+            type: string
+            required: true
+            description: "One of: in_progress, satisfied, waived, deferred, expired, rejected"
+          - name: reason
+            type: string
+            required: false
+            description: Reason (required if state=waived)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      obligation.update-screening:
+        flavour: attribute_mutating
+        description: Advance the screening track of an obligation (K-26 — screening gates approval, not determination)
+        effect_class: append_fact
+        invocation_phrases:
+          - "update screening track"
+          - "record screening outcome"
+          - "advance screening track"
+          - "mark screening complete"
+          - "update obligation screening"
+          - "record screening result for obligation"
+          - "advance the screening track"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags: [kyc, obligation, screening, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: obligation-id
+            type: uuid
+            required: true
+            description: The obligation whose screening track to advance
+          - name: state
+            type: string
+            required: true
+            description: "One of: in_progress, satisfied, waived, deferred, expired, rejected"
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      obligation.update-risk:
+        flavour: attribute_mutating
+        description: Advance the risk-assessment track of an obligation
+        effect_class: append_fact
+        invocation_phrases:
+          - "update risk track"
+          - "record risk outcome"
+          - "advance risk assessment"
+          - "mark risk assessment complete"
+          - "update obligation risk"
+          - "record risk assessment result"
+          - "advance the risk track"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags: [kyc, obligation, risk, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: obligation-id
+            type: uuid
+            required: true
+            description: The obligation whose risk track to advance
+          - name: state
+            type: string
+            required: true
+            description: "One of: in_progress, satisfied, waived, deferred, expired, rejected"
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      obligation.satisfy:
+        flavour: attribute_mutating
+        description: Mark all tracks on an obligation as satisfied (full KYC clearance)
+        effect_class: append_fact
+        invocation_phrases:
+          - "satisfy obligation"
+          - "mark obligation satisfied"
+          - "complete obligation"
+          - "satisfy all tracks"
+          - "clear obligation"
+          - "mark this obligation as satisfied"
+          - "complete KYC obligation"
+          - "satisfy the obligation tracks"
+          - "all tracks satisfied"
+          - "close obligation as satisfied"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags: [kyc, obligation, satisfy, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: obligation-id
+            type: uuid
+            required: true
+            description: The obligation to satisfy
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      obligation.waive:
+        flavour: attribute_mutating
+        description: Waive an obligation (all tracks set to Waived with a recorded reason)
+        effect_class: append_fact
+        invocation_phrases:
+          - "waive obligation"
+          - "waive KYC obligation"
+          - "grant obligation waiver"
+          - "waive all tracks"
+          - "waive this obligation"
+          - "grant a waiver for this obligation"
+          - "record obligation waiver"
+          - "waive the obligation tracks"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_obligation
+          tags: [kyc, obligation, waive, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: obligation-id
+            type: uuid
+            required: true
+            description: The obligation to waive
+          - name: reason
+            type: string
+            required: true
+            description: Reason for the waiver (K-35 traceability)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      person.approve:
+        flavour: attribute_mutating
+        description: Approve a subject once all obligations are terminal (K-23 gate)
+        effect_class: append_fact
+        invocation_phrases:
+          - "approve person"
+          - "approve subject"
+          - "approve KYC subject"
+          - "grant KYC approval"
+          - "approve this person for KYC"
+          - "approve the subject"
+          - "KYC approve"
+          - "mark subject approved"
+          - "grant approval for this subject"
+          - "approve KYC"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_subject
+          tags: [kyc, person, approval, decision, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: The subject to approve
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      person.reject:
+        flavour: attribute_mutating
+        description: Reject a subject (K-23 — decision recorded on the stream, never erased)
+        effect_class: append_fact
+        invocation_phrases:
+          - "reject person"
+          - "reject subject"
+          - "reject KYC subject"
+          - "refuse KYC approval"
+          - "reject this person"
+          - "KYC reject"
+          - "mark subject rejected"
+          - "record KYC rejection"
+          - "reject the KYC application"
+          - "decline KYC approval"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: kyc_subject
+          tags: [kyc, person, rejection, decision, w5, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: The subject to reject
+          - name: reason
+            type: string
+            required: false
+            description: Reason for rejection
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
