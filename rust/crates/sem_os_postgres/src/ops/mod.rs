@@ -34,7 +34,6 @@ pub mod attribute;
 pub mod audit;
 pub mod batch_control;
 pub mod billing;
-pub mod board;
 pub mod bods;
 pub mod capital;
 pub mod cbu;
@@ -44,8 +43,6 @@ pub mod changeset;
 pub mod child_dispatcher;
 pub mod client_group;
 pub mod constellation;
-pub mod control;
-pub mod control_compute;
 pub mod coverage_compute;
 pub mod custody;
 pub mod deal;
@@ -75,7 +72,6 @@ pub mod nav;
 pub mod observation;
 pub mod outreach;
 pub mod outreach_plan;
-pub mod ownership;
 pub mod pack_answer;
 pub mod pack_select;
 pub mod partnership;
@@ -108,9 +104,6 @@ pub mod tollgate_evaluate;
 pub mod trading_matrix;
 pub mod trading_profile_ca;
 pub mod trust;
-pub mod ubo_analysis;
-pub mod ubo_compute;
-pub mod ubo_graph;
 pub mod ubo_registry;
 pub mod verify;
 pub mod view;
@@ -351,7 +344,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
 
     // Phase B slice #17: board domain (direct-sqlx, 1 plugin verb —
     // analyze-control).
-    registry.register(Arc::new(board::AnalyzeControl));
 
     // Phase B slice #18: regulatory domain (ex-`sqlx::query!` macro,
     // rewritten as runtime `sqlx::query_as` — 2 plugin verbs).
@@ -486,19 +478,9 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
 
     // Phase B slice #33: control domain (11 plugin verbs — graph-level
     // analysis + board-controller lifecycle + import stubs).
-    registry.register(Arc::new(control::ControlAnalyze));
-    registry.register(Arc::new(control::ControlBuildGraph));
-    registry.register(Arc::new(control::ControlIdentifyUbos));
-    registry.register(Arc::new(control::ShowBoardController));
-    registry.register(Arc::new(control::RecomputeBoardController));
-    registry.register(Arc::new(control::SetBoardController));
-    registry.register(Arc::new(control::ClearBoardControllerOverride));
-    registry.register(Arc::new(control::ImportPscRegister));
-    registry.register(Arc::new(control::ImportGleifControl));
 
     // Phase B slice #34: control.compute-controllers (remaining
     // legacy control op — KYC case controller aggregation).
-    registry.register(Arc::new(control_compute::ComputeControllers));
 
     // Phase B slice #35: coverage.compute (per-prong UBO evidence
     // coverage + gap ID generation + tollgate-blocking annotation).
@@ -531,8 +513,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #39: ubo.trace-chains / list-owners (the canonical
     // `ubo.calculate` registration was a Rust-only orphan; YAML masters
     // ubo.trace-chains + ubo.list-owners only).
-    registry.register(Arc::new(ubo_analysis::TraceChains));
-    registry.register(Arc::new(ubo_analysis::ListOwners));
 
     // Phase B slice #40: evidence state machine. Only the YAML-mastered
     // alias FQNs (`evidence.create-requirement`, `attach-document`,
@@ -607,16 +587,9 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #48: ubo.compute-chains / snapshot.capture /
     // snapshot.diff — in-memory ownership graph + JSONB snapshot
     // persistence with SHA-256 code hash.
-    registry.register(Arc::new(ubo_compute::ComputeChains));
-    registry.register(Arc::new(ubo_compute::SnapshotCapture));
-    registry.register(Arc::new(ubo_compute::SnapshotDiff));
 
     // Phase B slice #49: ubo graph-lifecycle (mark-deceased,
     // convergence-supersede, transfer-control, waive-verification).
-    registry.register(Arc::new(ubo_graph::MarkDeceased));
-    registry.register(Arc::new(ubo_graph::ConvergenceSupersede));
-    registry.register(Arc::new(ubo_graph::TransferControl));
-    registry.register(Arc::new(ubo_graph::WaiveVerification));
 
     // Phase B slice #50: custody (5 plugin verbs across
     // `subcustodian` + `cbu-custody` domains).
@@ -919,14 +892,6 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     // Phase B slice #55: ownership.* (8 plugin verbs — snapshot derive/list,
     // control positions, controller finder, reconciliation run/findings,
     // gap analysis, recursive chain trace).
-    registry.register(Arc::new(ownership::Compute));
-    registry.register(Arc::new(ownership::SnapshotList));
-    registry.register(Arc::new(ownership::ListControlPositions));
-    registry.register(Arc::new(ownership::FindController));
-    registry.register(Arc::new(ownership::Reconcile));
-    registry.register(Arc::new(ownership::ReconcileFindings));
-    registry.register(Arc::new(ownership::AnalyzeGaps));
-    registry.register(Arc::new(ownership::TraceChain));
 
     // Phase B slice #54: graph.validate (1 plugin verb — cycle detection +
     // terminus integrity + per-target supply + source conflict +
