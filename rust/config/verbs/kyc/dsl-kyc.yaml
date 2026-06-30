@@ -37,7 +37,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: control_edge
           tags: [ubo, control, determination, stream-backed, dsl-kyc]
@@ -78,10 +78,10 @@ domains:
             - name: deduped
               type: boolean
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       edge.assert-economic-interest:
         flavour: instance_adding
@@ -101,7 +101,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: economic_edge
           tags: [ubo, economic, ownership, determination, stream-backed, dsl-kyc]
@@ -136,10 +136,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       edge.attach-evidence:
         flavour: attribute_mutating
@@ -159,7 +159,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: control_edge
           tags: [ubo, evidence, determination, stream-backed, dsl-kyc]
@@ -180,10 +180,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       edge.verify:
         flavour: attribute_mutating
@@ -203,7 +203,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: control_edge
           tags: [ubo, verification, determination, stream-backed, dsl-kyc]
@@ -224,10 +224,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       edge.supersede:
         flavour: attribute_mutating
@@ -247,7 +247,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: control_edge
           tags: [ubo, supersede, determination, stream-backed, dsl-kyc]
@@ -268,10 +268,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       edge.reconcile-conflict:
         flavour: attribute_mutating
@@ -291,7 +291,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: control_edge
           tags: [ubo, reconcile, conflict, determination, stream-backed, dsl-kyc]
@@ -312,10 +312,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       determination.select-strategy:
         flavour: attribute_mutating
@@ -333,7 +333,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: determination
           tags: [ubo, strategy, determination, stream-backed, dsl-kyc]
@@ -354,10 +354,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       determination.compute-fold:
         flavour: attribute_mutating
@@ -375,7 +375,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: determination
           tags: [ubo, fold, computation, determination, stream-backed, dsl-kyc]
@@ -412,7 +412,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: determination
           tags: [ubo, smo, fallback, determination, stream-backed, dsl-kyc]
@@ -433,10 +433,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       determination.freeze:
         flavour: attribute_mutating
@@ -456,7 +456,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: determination
           tags: [ubo, freeze, pin, determination, stream-backed, dsl-kyc]
@@ -477,10 +477,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
   kyc:
     description: "KYC subject stream operations (dsl.kyc lexicon)"
@@ -504,7 +504,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: kyc_subject
           tags: [kyc, subject, registration, stream-backed, dsl-kyc]
@@ -525,10 +525,10 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable
 
       subject.classify-structure:
         flavour: attribute_mutating
@@ -548,7 +548,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: kyc_stream
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
           scope: global
           noun: kyc_subject
           tags: [kyc, subject, classification, structure, stream-backed, dsl-kyc]
@@ -569,7 +569,7 @@ domains:
             - name: seq
               type: integer
         three_axis:
-          state_effect: extending
+          state_effect: preserving
           external_effects: []
           consequence:
-            baseline: consequential
+            baseline: reviewable

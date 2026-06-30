@@ -14,10 +14,12 @@
 //! logic, which is source-agnostic over `&[&IntentEvent]`.
 
 pub mod error;
+pub mod manifest;
 pub mod projection;
 pub mod store;
 
 pub use error::StoreError;
+pub use manifest::{publish_manifest, ManifestPublishOutcome};
 pub use projection::{
     PgKycProjectionDrainer, PgKycProjector, ProjectionStats, CONTROL_EDGE_PROJECTION_EFFECT,
 };
