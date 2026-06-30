@@ -4424,6 +4424,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ob-poc-kyc-seam"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dsl-runtime",
+ "ob-poc-kyc-store",
+ "ob-poc-kyc-substrate",
+ "ob-poc-types",
+ "sem_os_core",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "ob-poc-kyc-store"
 version = "0.1.0"
 dependencies = [

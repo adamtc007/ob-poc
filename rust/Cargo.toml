@@ -308,6 +308,8 @@ members = [
     "crates/ob-poc-kyc-substrate",
     # KYC/UBO durable store (membrane) — EOP-DD-KYCUBO-002 (the only sqlx crate in the stack)
     "crates/ob-poc-kyc-store",
+    # KYC/UBO runtime<->store seam — EOP-DD-KYCUBO-002 §4 (the only KYC crate touching dsl-runtime)
+    "crates/ob-poc-kyc-seam",
     "crates/ob-poc-agent",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
