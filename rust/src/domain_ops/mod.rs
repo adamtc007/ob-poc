@@ -427,6 +427,8 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationComputeFold));
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationApplySmoFallback));
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
+    // D3 (ratified): board-controller override is a stream verb, not a side-effecting table write
+    registry.register(Arc::new(kyc_stream_ops::UboBoardControllerOverride));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
     // W3: role-basis recording

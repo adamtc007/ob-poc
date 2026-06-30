@@ -13,11 +13,16 @@
 //! Postgres store; what is actually reused is the fold/determination/precondition
 //! logic, which is source-agnostic over `&[&IntentEvent]`.
 
+pub mod cross_stream;
 pub mod error;
 pub mod manifest;
 pub mod projection;
 pub mod store;
 
+pub use cross_stream::{
+    enqueue_cross_stream_obligations, prior_freeze_persons, cross_stream_idem_key,
+    CrossStreamEnqueueOutcome, CROSS_STREAM_OBLIGATION_CREATE, CROSS_STREAM_OBLIGATION_SUPERSEDE,
+};
 pub use error::StoreError;
 pub use manifest::{publish_manifest, ManifestPublishOutcome};
 pub use projection::{

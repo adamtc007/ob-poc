@@ -39,6 +39,8 @@ pub struct AppendOutcome {
     /// The `seq` of the event in its subject stream. For a deduped append this
     /// is the seq of the pre-existing event.
     pub seq: u64,
+    /// The event's UUID (the ID that was or would have been inserted).
+    pub event_id: ob_poc_kyc_substrate::EventId,
     /// True when the append was an idempotent no-op (the `idempotency_key`
     /// already existed for this subject) — the event was NOT re-inserted (F).
     pub deduped: bool,
@@ -164,7 +166,7 @@ impl PgKycEventStore {
         .fetch_optional(&mut *conn)
         .await?;
         if let Some(seq) = existing {
-            return Ok(AppendOutcome { seq: seq as u64, deduped: true });
+            return Ok(AppendOutcome { seq: seq as u64, event_id: event.id, deduped: true });
         }
 
         // 3. Fold existing events (from seq 0 — checkpoint optimization deferred)
@@ -189,7 +191,7 @@ impl PgKycEventStore {
         //    The drainer re-derives the subject's projections by folding the stream.
         Self::enqueue_projection_effects(conn, event, next_seq).await?;
 
-        Ok(AppendOutcome { seq: next_seq as u64, deduped: false })
+        Ok(AppendOutcome { seq: next_seq as u64, event_id: event.id, deduped: false })
     }
 
     /// Enqueue one outbox row per projection effect-kind for a freshly appended
