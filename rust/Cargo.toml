@@ -304,6 +304,8 @@ members = [
     "crates/ob-poc-derived-attributes",
     "crates/ob-poc-taxonomy",
     "crates/ob-poc-authoring",
+    # KYC/UBO W1 substrate — EOP-DD-KYCUBO-001 (in-memory slice; no DB dep)
+    "crates/ob-poc-kyc-substrate",
     "crates/ob-poc-agent",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",

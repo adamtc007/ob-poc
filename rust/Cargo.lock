@@ -4424,6 +4424,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ob-poc-kyc-substrate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "smallvec",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "ob-poc-macros"
 version = "0.1.0"
 dependencies = [
