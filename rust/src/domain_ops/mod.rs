@@ -154,6 +154,7 @@ pub mod helpers;
 // (multi-namespace UNION query over dictionary, registry, SemOS defs).
 // Registration flows through inventory; external ob-poc code does not
 // import these types directly.
+pub mod kyc_stream_ops;
 mod onboarding;
 mod onboarding_data_request;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`

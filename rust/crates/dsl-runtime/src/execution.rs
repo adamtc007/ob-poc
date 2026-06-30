@@ -24,6 +24,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use ob_poc_types::{OutboxDraft, PendingStateAdvance};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -62,6 +63,13 @@ pub struct VerbExecutionContext {
 
     /// Unique execution ID (for idempotency tracking).
     pub execution_id: Uuid,
+
+    /// **Frozen** wall-clock at verb entry (the valid-time `as_of` for any
+    /// event-sourced verb — EOP-DD-KYCUBO-002 §4 step 1). Set once when the
+    /// context is built at dispatch; never `now()` inside an op. Stream-backed
+    /// verbs stamp this onto their `IntentEvent`; other verbs ignore it.
+    #[serde(default = "Utc::now")]
+    pub as_of: DateTime<Utc>,
 
     /// Opaque platform extensions.
     ///
@@ -104,6 +112,7 @@ impl VerbExecutionContext {
             symbols: HashMap::new(),
             symbol_types: HashMap::new(),
             execution_id: Uuid::new_v4(),
+            as_of: Utc::now(),
             extensions: serde_json::Value::Null,
             services: default_service_registry(),
         }
@@ -163,6 +172,7 @@ impl Default for VerbExecutionContext {
             symbols: HashMap::new(),
             symbol_types: HashMap::new(),
             execution_id: Uuid::new_v4(),
+            as_of: Utc::now(),
             extensions: serde_json::Value::Null,
             services: default_service_registry(),
         }

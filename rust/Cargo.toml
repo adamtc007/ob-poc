@@ -51,6 +51,10 @@ sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
 dsl-runtime = { path = "crates/dsl-runtime" }
+# KYC/UBO durable verb-stream stack (EOP-DD-KYCUBO-002) — stream-backed verb ops live in domain_ops
+ob-poc-kyc-substrate = { path = "crates/ob-poc-kyc-substrate" }
+ob-poc-kyc-store = { path = "crates/ob-poc-kyc-store" }
+ob-poc-kyc-seam = { path = "crates/ob-poc-kyc-seam" }
 # dsl-runtime-split v1 Phase 11 (2026-05-14): ob-poc reaches the
 # analyser-tier directly through dsl_v2 re-exports + entity_kind callers
 # in mcp/verb_search, sage/verb_resolve, service_resources/discovery.
