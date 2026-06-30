@@ -16,6 +16,7 @@
 //! lock and bumped in the same transaction — never from a Postgres `SEQUENCE`.
 //! Gap-free dense `seq` under rollback depends on this.
 
+use chrono::{DateTime, Utc};
 use sqlx::{PgConnection, Row};
 use uuid::Uuid;
 
@@ -25,6 +26,12 @@ use ob_poc_kyc_substrate::{
 };
 
 use crate::error::StoreError;
+
+/// The `kyc_intent_events` column list, in the order `row_to_event` reads them.
+/// Single source of truth so every SELECT and the row mapper cannot drift.
+const EVENT_COLUMNS: &str = "subject_root, seq, event_id, verb_fqn, lexicon_hash, actor, \
+    authority, target, payload, payload_hash, idempotency_key, causation_id, correlation_id, \
+    as_of, captured_effects";
 
 /// Outcome of an append.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -50,19 +57,60 @@ impl PgKycEventStore {
         conn: &mut PgConnection,
         subject_root: SubjectId,
     ) -> Result<Vec<IntentEvent>, StoreError> {
-        let rows = sqlx::query(
-            r#"SELECT subject_root, seq, event_id, verb_fqn, lexicon_hash, actor, authority,
-                      target, payload, payload_hash, idempotency_key, causation_id,
-                      correlation_id, as_of, captured_effects
-               FROM "ob-poc".kyc_intent_events
-               WHERE subject_root = $1
-               ORDER BY seq ASC"#,
-        )
+        let rows = sqlx::query(&format!(
+            r#"SELECT {EVENT_COLUMNS} FROM "ob-poc".kyc_intent_events
+               WHERE subject_root = $1 ORDER BY seq ASC"#
+        ))
         .bind(subject_root.0)
         .fetch_all(&mut *conn)
         .await?;
 
         rows.iter().map(row_to_event).collect()
+    }
+
+    /// Load the **transaction-time prefix** for `subject_root`: the events that
+    /// had been committed at or before `as_of_tx`, as a TRUE seq-prefix (B1/D1/K-33).
+    ///
+    /// This is the recovery axis. The query is deliberately a seq-prefix —
+    /// `seq <` the first event whose `committed_at` exceeds the bound — not a
+    /// raw `committed_at <= T` filter. So even if `committed_at` were ever
+    /// non-monotonic with `seq` (a wall-clock regression), the result is always
+    /// a contiguous prefix and the fold is never holey. `as_of` (valid-time) is
+    /// **not** the filter — only `committed_at` (transaction-time) is (B1).
+    pub async fn load_events_up_to_committed(
+        conn: &mut PgConnection,
+        subject_root: SubjectId,
+        as_of_tx: DateTime<Utc>,
+    ) -> Result<Vec<IntentEvent>, StoreError> {
+        let rows = sqlx::query(&format!(
+            r#"SELECT {EVENT_COLUMNS} FROM "ob-poc".kyc_intent_events
+               WHERE subject_root = $1
+                 AND seq < COALESCE(
+                     (SELECT min(seq) FROM "ob-poc".kyc_intent_events
+                      WHERE subject_root = $1 AND committed_at > $2),
+                     9223372036854775807)
+               ORDER BY seq ASC"#
+        ))
+        .bind(subject_root.0)
+        .bind(as_of_tx)
+        .fetch_all(&mut *conn)
+        .await?;
+
+        rows.iter().map(row_to_event).collect()
+    }
+
+    /// Recover the control fold **as it stood at transaction-time `as_of_tx`**
+    /// (K-33). Loads the committed-prefix and folds it via the version registry.
+    /// `recover_control_at(subject, now)` equals folding the whole stream.
+    pub async fn recover_control_at(
+        conn: &mut PgConnection,
+        registry: &FoldRegistry,
+        subject_root: SubjectId,
+        as_of_tx: DateTime<Utc>,
+    ) -> Result<ControlState, StoreError> {
+        let events = Self::load_events_up_to_committed(conn, subject_root, as_of_tx).await?;
+        let refs: Vec<&IntentEvent> = events.iter().collect();
+        Ok(fold_control_versioned(&refs, registry)?)
     }
 
     /// The §3 append protocol. Runs inside the caller's transaction (`conn` is
