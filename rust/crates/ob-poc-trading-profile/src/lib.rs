@@ -18,6 +18,7 @@
 //! The document IS the AST - a tree structure stored as JSONB. DSL verbs build
 //! the AST incrementally using `ast_db::apply_and_save()`. No materialization
 //! to operational tables is needed - the document directly serves the UI.
+#![deny(unreachable_pub)]
 
 pub mod ast_builder;
 #[cfg(feature = "database")]
