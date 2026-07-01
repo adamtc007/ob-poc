@@ -11,6 +11,7 @@
 //!     // handle errors
 //! }
 //! ```
+#![deny(unreachable_pub)]
 
 pub(crate) mod lexer;
 pub(crate) mod parser;
