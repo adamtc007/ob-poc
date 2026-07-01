@@ -55,6 +55,7 @@
 //!
 //! All 13 analyser-tier modules from the ADR are now relocated.
 //! Compat re-exported from `dsl-runtime` until Phase 11 cleanup.
+#![deny(unreachable_pub)]
 
 pub mod catalogue_loader;
 pub mod entity_kind;
