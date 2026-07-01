@@ -10,6 +10,7 @@
 //!   POST /bootstrap/seed_bundle          — admin bootstrap (auth required)
 //!   POST /tools/call                     — invoke an MCP tool (auth required)
 //!   GET  /tools/list                     — list available MCP tools (auth required)
+#![deny(unreachable_pub)]
 
 mod dispatcher;
 mod error;
