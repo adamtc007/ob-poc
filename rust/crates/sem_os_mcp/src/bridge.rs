@@ -5,14 +5,14 @@
 //! owns governance, changeset publish, affinity-graph access, …).
 //! The MCP knowledge tools need only a narrow read surface, so we
 //! define [`SemOsBridge`] here and let the binary integrator
-//! adapt either an in-process `SemOsClient` or the spike stub
-//! ([`StubBridge`]).
+//! adapt either an in-process `SemOsClient` or the spike null
+//! object ([`NullBridge`]).
 //!
 //! Phase 4.2b ships:
 //!
 //! - [`SemOsBridge`] trait — five read-only methods, one per
 //!   knowledge tool.
-//! - [`StubBridge`] — returns empty / placeholder responses so
+//! - [`NullBridge`] — returns empty / placeholder responses so
 //!   `sem_os_mcp` can run hermetically (no DB, no
 //!   `sem_os_client`).
 //! - Phase 4.3 will introduce an `InProcessSemOsBridge` that
@@ -119,20 +119,20 @@ pub trait SemOsBridge: Send + Sync {
     }
 }
 
-/// Hermetic stub — returns empty responses for every query and
-/// records the call at debug level. Used by:
+/// Hermetic null-object bridge — returns empty responses for every
+/// query and records the call at debug level. Used by:
 /// - Unit tests in this crate.
 /// - The spike `sem_os_mcp` binary when no real `SemOsClient` is
 ///   wired (e.g. running without `DATABASE_URL`).
 #[derive(Debug, Default, Clone)]
-pub struct StubBridge {
+pub struct NullBridge {
     label: String,
 }
 
-impl StubBridge {
+impl NullBridge {
     pub fn new() -> Self {
         Self {
-            label: "stub".to_string(),
+            label: "null".to_string(),
         }
     }
 
@@ -144,7 +144,7 @@ impl StubBridge {
 }
 
 #[async_trait]
-impl SemOsBridge for StubBridge {
+impl SemOsBridge for NullBridge {
     async fn entity_resolve(
         &self,
         kind: Option<&str>,
@@ -152,7 +152,7 @@ impl SemOsBridge for StubBridge {
     ) -> Result<Vec<EntityMatch>, BridgeError> {
         tracing::debug!(
             target: "sem_os_mcp",
-            ?kind, text, "stub entity_resolve — returning []"
+            ?kind, text, "null bridge entity_resolve — returning []"
         );
         Ok(Vec::new())
     }
@@ -166,7 +166,7 @@ impl SemOsBridge for StubBridge {
         tracing::debug!(
             target: "sem_os_mcp",
             workspace, constellation_id, state_node,
-            "stub active_verb_surface_at_state — returning []"
+            "null bridge active_verb_surface_at_state — returning []"
         );
         Ok(Vec::new())
     }
@@ -174,7 +174,7 @@ impl SemOsBridge for StubBridge {
     async fn pack_catalogue(&self, workspace: &str) -> Result<Vec<PackEntry>, BridgeError> {
         tracing::debug!(
             target: "sem_os_mcp",
-            workspace, "stub pack_catalogue — returning []"
+            workspace, "null bridge pack_catalogue — returning []"
         );
         Ok(Vec::new())
     }
@@ -187,7 +187,7 @@ impl SemOsBridge for StubBridge {
         tracing::debug!(
             target: "sem_os_mcp",
             entity_kind, from_state,
-            "stub fsm_transitions — returning []"
+            "null bridge fsm_transitions — returning []"
         );
         Ok(Vec::new())
     }
@@ -200,7 +200,7 @@ impl SemOsBridge for StubBridge {
         tracing::debug!(
             target: "sem_os_mcp",
             workspace, constellation_id,
-            "stub constellation_walk — returning []"
+            "null bridge constellation_walk — returning []"
         );
         Ok(Vec::new())
     }
@@ -215,8 +215,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn stub_bridge_returns_empty_for_every_method() {
-        let bridge = StubBridge::new();
+    async fn null_bridge_returns_empty_for_every_method() {
+        let bridge = NullBridge::new();
         assert!(bridge
             .entity_resolve(Some("cbu"), "Allianz")
             .await
@@ -241,10 +241,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stub_bridge_label() {
-        assert_eq!(StubBridge::new().provider_label(), "stub");
+    async fn null_bridge_label() {
+        assert_eq!(NullBridge::new().provider_label(), "null");
         assert_eq!(
-            StubBridge::with_label("phase-4-spike").provider_label(),
+            NullBridge::with_label("phase-4-spike").provider_label(),
             "phase-4-spike"
         );
     }

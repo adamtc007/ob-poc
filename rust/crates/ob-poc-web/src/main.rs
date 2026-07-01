@@ -1494,7 +1494,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::agent::learning::warmup::LearningWarmup;
             use ob_poc::dsl_v2::{load_macro_registry_from_dir, ConfigLoader, MacroRegistry};
             use ob_poc_entity_linking::{
-                EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
+                EntityLinkingService, EntityLinkingServiceImpl, NullEntityLinkingService,
             };
             use ob_poc::lookup::LookupService;
             use ob_poc::mcp::macro_index::MacroIndex;
@@ -1678,7 +1678,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             tracing::info!(
                                 "V2 REPL entity snapshot not found. Entity linking disabled."
                             );
-                            Arc::new(StubEntityLinkingService::new())
+                            Arc::new(NullEntityLinkingService::new())
                         })
                     };
 

@@ -66,18 +66,18 @@ impl KnowledgeTool for PackCatalogueTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::StubBridge;
+    use crate::bridge::NullBridge;
 
     #[tokio::test]
     async fn stub_returns_empty_packs() {
-        let tool = PackCatalogueTool::new(Arc::new(StubBridge::new()));
+        let tool = PackCatalogueTool::new(Arc::new(NullBridge::new()));
         let out = tool.invoke(json!({"workspace": "cbu"})).await.unwrap();
         assert_eq!(out["packs"].as_array().unwrap().len(), 0);
     }
 
     #[tokio::test]
     async fn missing_workspace_returns_invalid_arguments() {
-        let tool = PackCatalogueTool::new(Arc::new(StubBridge::new()));
+        let tool = PackCatalogueTool::new(Arc::new(NullBridge::new()));
         let err = tool
             .invoke(json!({}))
             .await

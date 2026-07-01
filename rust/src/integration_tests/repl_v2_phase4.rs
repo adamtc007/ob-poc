@@ -62,7 +62,7 @@ use crate::repl::runbook::{EntryStatus, Runbook, RunbookEntry, RunbookEvent, Slo
 use crate::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{rebuild_dsl, ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{rebuild_dsl, ReplOrchestratorV2, NullDslExecutor};
 
 // ===========================================================================
 // Helpers (shared with Phase 3 test patterns)
@@ -221,7 +221,7 @@ fn build_orchestrator_with_engine(matcher: MockIntentMatcher) -> ReplOrchestrato
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)

@@ -4,12 +4,12 @@
 //! 1. Snapshot loading and deterministic hashing
 //! 2. Mention extraction from natural language
 //! 3. Entity resolution with kind constraints
-//! 4. Stub service graceful degradation
+//! 4. Null service graceful degradation
 //! 5. AgentService integration (extract_entity_mentions)
 
 use crate::{
     EntityLinkingService, EntityLinkingServiceImpl, EntitySnapshot, Evidence,
-    StubEntityLinkingService,
+    NullEntityLinkingService,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -265,27 +265,27 @@ fn test_resolve_no_matches() {
 }
 
 // ============================================================================
-// STUB SERVICE TESTS - Graceful degradation
+// NULL SERVICE TESTS - Graceful degradation
 // ============================================================================
 
 #[test]
-fn test_stub_returns_empty() {
-    let stub = StubEntityLinkingService;
+fn test_null_service_returns_empty() {
+    let svc = NullEntityLinkingService;
 
-    let results = stub.resolve_mentions("Goldman Sachs", None, None, 5);
-    assert!(results.is_empty(), "Stub should return empty results");
+    let results = svc.resolve_mentions("Goldman Sachs", None, None, 5);
+    assert!(results.is_empty(), "Null service should return empty results");
 }
 
 #[test]
-fn test_stub_entity_count_zero() {
-    let stub = StubEntityLinkingService;
-    assert_eq!(stub.entity_count(), 0);
+fn test_null_service_entity_count_zero() {
+    let svc = NullEntityLinkingService;
+    assert_eq!(svc.entity_count(), 0);
 }
 
 #[test]
-fn test_stub_snapshot_hash() {
-    let stub = StubEntityLinkingService;
-    assert_eq!(stub.snapshot_hash(), "stub-no-snapshot");
+fn test_null_service_snapshot_hash() {
+    let svc = NullEntityLinkingService;
+    assert_eq!(svc.snapshot_hash(), "no-snapshot");
 }
 
 // ============================================================================
@@ -382,11 +382,11 @@ fn test_trait_object_dispatch() {
 }
 
 #[test]
-fn test_stub_as_trait_object() {
-    let service: Arc<dyn EntityLinkingService> = Arc::new(StubEntityLinkingService);
+fn test_null_service_as_trait_object() {
+    let service: Arc<dyn EntityLinkingService> = Arc::new(NullEntityLinkingService);
 
     assert_eq!(service.entity_count(), 0);
-    assert_eq!(service.snapshot_hash(), "stub-no-snapshot");
+    assert_eq!(service.snapshot_hash(), "no-snapshot");
 
     let results = service.resolve_mentions("anything", None, None, 5);
     assert!(results.is_empty());

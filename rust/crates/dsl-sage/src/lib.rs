@@ -42,8 +42,10 @@ pub mod types;
 pub use context::context_from_session;
 pub use matcher::{
     match_packs, match_packs_embedding_only, BagOfWordsEmbedder, LlmClient, LlmRankEntry,
-    MockLlmClient, PackEmbedder, PackSummary,
+    PackEmbedder, PackSummary,
 };
+#[cfg(any(test, feature = "test-util"))]
+pub use matcher::MockLlmClient;
 // Tranche 2
 pub use confirmation::{ConfirmationSession, ConfirmationState, ParameterEdit};
 pub use extractor::{extract_parameters, HeuristicExtractor, LlmExtractor, PackSummaryWithParams};

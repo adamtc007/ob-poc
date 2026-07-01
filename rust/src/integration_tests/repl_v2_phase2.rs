@@ -24,7 +24,7 @@ use crate::repl::runbook::ConfirmPolicy;
 use crate::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use crate::repl::types_v2::{UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -403,7 +403,7 @@ async fn test_orchestrator_with_intent_service() {
     .unwrap();
     let router = PackRouter::new(vec![(Arc::new(packs.0), packs.1)]);
 
-    let orch = ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    let orch = ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_intent_matcher(matcher)
         .with_intent_service(intent_service);
 

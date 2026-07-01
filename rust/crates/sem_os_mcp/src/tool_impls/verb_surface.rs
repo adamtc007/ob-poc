@@ -86,11 +86,11 @@ impl KnowledgeTool for ActiveVerbSurfaceTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::StubBridge;
+    use crate::bridge::NullBridge;
 
     #[tokio::test]
     async fn spec_required_fields() {
-        let tool = ActiveVerbSurfaceTool::new(Arc::new(StubBridge::new()));
+        let tool = ActiveVerbSurfaceTool::new(Arc::new(NullBridge::new()));
         let spec = tool.spec();
         let required: Vec<&str> = spec.input_schema["required"]
             .as_array()
@@ -106,7 +106,7 @@ mod tests {
 
     #[tokio::test]
     async fn stub_bridge_returns_empty_verbs() {
-        let tool = ActiveVerbSurfaceTool::new(Arc::new(StubBridge::new()));
+        let tool = ActiveVerbSurfaceTool::new(Arc::new(NullBridge::new()));
         let out = tool
             .invoke(json!({
                 "workspace": "cbu",
@@ -120,7 +120,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_required_returns_invalid_arguments() {
-        let tool = ActiveVerbSurfaceTool::new(Arc::new(StubBridge::new()));
+        let tool = ActiveVerbSurfaceTool::new(Arc::new(NullBridge::new()));
         let err = tool
             .invoke(json!({"workspace": "cbu"}))
             .await

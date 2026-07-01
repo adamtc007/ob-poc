@@ -4693,7 +4693,7 @@ mod tests {
     async fn test_route_state() -> (ReplV2RouteState, Uuid) {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
+            std::sync::Arc::new(crate::sequencer::NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
         (ReplV2RouteState { orchestrator }, session_id)
@@ -6528,7 +6528,7 @@ mod tests {
     async fn test_acp_trace_append_records_context_assembly() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
+            std::sync::Arc::new(crate::sequencer::NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
         let state = ReplV2RouteState {
@@ -6969,7 +6969,7 @@ mod tests {
     async fn test_acp_gateway_session_prompt_persists_pending_question_trace() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
+            std::sync::Arc::new(crate::sequencer::NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
         let state = ReplV2RouteState {
@@ -7096,7 +7096,7 @@ mod tests {
     async fn test_acp_gateway_session_prompt_reuses_repl_cached_case_state_discovery() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
+            std::sync::Arc::new(crate::sequencer::NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
         let state = ReplV2RouteState {
@@ -7168,7 +7168,7 @@ mod tests {
     async fn test_acp_gateway_session_prompt_llm_mode_uses_repl_cached_state_behind_harness() {
         let orchestrator = std::sync::Arc::new(crate::sequencer::ReplOrchestratorV2::new(
             crate::journey::router::PackRouter::new(vec![]),
-            std::sync::Arc::new(crate::sequencer::StubExecutor),
+            std::sync::Arc::new(crate::sequencer::NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
         let state = ReplV2RouteState {

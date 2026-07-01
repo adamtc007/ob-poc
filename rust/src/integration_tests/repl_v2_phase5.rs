@@ -11,7 +11,7 @@
 //!  6. rebuild_invocation_index restores from entries
 //!
 //! DslExecutorV2 Tests (7-9):
-//!  7. StubExecutor adapts via blanket impl on DslExecutorV2
+//!  7. NullDslExecutor adapts via blanket impl on DslExecutorV2
 //!  8. ParkableStubExecutor parks on :park marker
 //!  9. ParkableStubExecutor completes on normal DSL
 //!
@@ -65,7 +65,7 @@ use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKi
 use crate::repl::verb_config_index::VerbConfigIndex;
 use crate::sequencer::{
     DslExecutionOutcome, DslExecutor, DslExecutorV2, ParkableStubExecutor, ReplOrchestratorV2,
-    StubExecutor,
+    NullDslExecutor,
 };
 
 // ===========================================================================
@@ -217,7 +217,7 @@ impl IntentMatcher for MockIntentMatcher {
     }
 }
 
-/// Build an orchestrator with proposal engine and StubExecutor (sync-only).
+/// Build an orchestrator with proposal engine and NullDslExecutor (sync-only).
 fn build_orchestrator_with_engine(matcher: MockIntentMatcher) -> ReplOrchestratorV2 {
     let index = Arc::new(build_real_index());
     let intent_matcher: Arc<dyn IntentMatcher> = Arc::new(matcher.clone());
@@ -227,7 +227,7 @@ fn build_orchestrator_with_engine(matcher: MockIntentMatcher) -> ReplOrchestrato
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -244,7 +244,7 @@ fn build_orchestrator_with_parkable_executor(matcher: MockIntentMatcher) -> Repl
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -640,12 +640,12 @@ fn test_rebuild_invocation_index_restores_from_entries() {
 }
 
 // ===========================================================================
-// TEST 7: StubExecutor adapts via blanket impl on DslExecutorV2
+// TEST 7: NullDslExecutor adapts via blanket impl on DslExecutorV2
 // ===========================================================================
 
 #[tokio::test]
 async fn test_stub_executor_adapts_via_blanket_impl() {
-    let exec = StubExecutor;
+    let exec = NullDslExecutor;
     let outcome = exec
         .execute_v2(
             "(cbu.create :name \"test\")",

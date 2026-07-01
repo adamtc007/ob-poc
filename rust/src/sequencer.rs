@@ -126,11 +126,18 @@ pub trait DslExecutor: Send + Sync {
     }
 }
 
-/// Stub executor that returns success for all DSL.
-pub struct StubExecutor;
+/// Executor that returns success for all DSL without dispatching it.
+///
+/// Real production null-object — `mcp/handlers/core.rs::dsl_generate`
+/// falls back to it when no orchestrator is configured — and also the
+/// standard executor for `rust/tests/bpmn_*.rs` and this crate's own
+/// test suite. Named off `Stub*` (charter-reconciliation-v1 §8):
+/// it's `pub`, not `pub(crate)`, because those external test harnesses
+/// need it, so it can't be hidden — only correctly named.
+pub struct NullDslExecutor;
 
 #[async_trait::async_trait]
-impl DslExecutor for StubExecutor {
+impl DslExecutor for NullDslExecutor {
     async fn execute(&self, _dsl: &str) -> Result<serde_json::Value, String> {
         Ok(serde_json::json!({"status": "stub_success"}))
     }
@@ -185,9 +192,10 @@ impl<T: DslExecutor> DslExecutorV2 for T {
     }
 }
 
-#[allow(dead_code)] // Used by integration tests (rust/tests/repl_v2_phase*.rs)
 /// Test executor that parks entries whose DSL contains ":park" or ":durable" markers.
-pub struct ParkableStubExecutor;
+/// Same-crate test-only (verified — no external crate consumer); `pub(crate)`
+/// keeps it off the public API surface.
+pub(crate) struct ParkableStubExecutor;
 
 #[async_trait::async_trait]
 impl DslExecutorV2 for ParkableStubExecutor {
@@ -9206,7 +9214,7 @@ definition_of_done:
         let (manifest, hash) = load_pack_from_bytes(onboarding_yaml().as_bytes()).unwrap();
         let packs = vec![(Arc::new(manifest), hash)];
         let router = PackRouter::new(packs);
-        ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+        ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
     }
 
     #[tokio::test]
@@ -10144,7 +10152,7 @@ definition_of_done:
 
     #[tokio::test]
     async fn test_stub_executor_adapts_to_v2() {
-        let stub = StubExecutor;
+        let stub = NullDslExecutor;
         let result = stub
             .execute_v2(
                 "(cbu.create :name \"test\")",
@@ -10218,7 +10226,7 @@ definition_of_done:
         let (manifest, hash) = load_pack_from_bytes(kyc_yaml()).unwrap();
         let packs = vec![(Arc::new(manifest), hash)];
         let router = PackRouter::new(packs);
-        ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+        ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
     }
 
     /// Phase H acceptance test: full KYC case flow.
@@ -10623,7 +10631,7 @@ definition_of_done:
 
     #[test]
     fn test_phase2_gate_response_uses_sem_os_deny_all_message() {
-        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
+        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(NullDslExecutor));
         let mut session = ReplSessionV2::new();
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
         envelope.grounded_action_surface = Some(
@@ -10671,7 +10679,7 @@ definition_of_done:
     #[test]
     fn test_phase2_gate_response_defers_lookup_ambiguity() {
         // Entity ambiguity is now deferred to downstream verb matching (not a hard block).
-        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
+        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(NullDslExecutor));
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
             entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {

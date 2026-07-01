@@ -21,7 +21,7 @@ use crate::repl::response_v2::ReplResponseKindV2;
 use crate::repl::runbook::{EntryStatus, RunbookStatus, SlotSource};
 use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
-use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,13 +52,13 @@ fn make_orchestrator_with_all_packs() -> ReplOrchestratorV2 {
         load_kyc_case_pack(),
     ];
     let router = PackRouter::new(packs);
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
 }
 
 fn make_orchestrator_with_onboarding() -> ReplOrchestratorV2 {
     let packs = vec![load_onboarding_pack()];
     let router = PackRouter::new(packs);
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
 }
 
 /// Helper: create session, pass scope gate and workspace selection.

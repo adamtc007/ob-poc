@@ -50,7 +50,7 @@ use ob_poc::repl::runbook::{
     RunbookStatus, SlotProvenance,
 };
 use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
-use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2, StubExecutor};
+use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2, NullDslExecutor};
 
 // ---------------------------------------------------------------------------
 // BPMN model
@@ -407,7 +407,7 @@ fn extract_parked(outcome: &DslExecutionOutcome) -> (Uuid, String) {
 #[ignore]
 async fn e2e_01_dispatcher_parks_on_orchestrated_verb() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -467,8 +467,8 @@ async fn e2e_01_dispatcher_parks_on_orchestrated_verb() {
 #[ignore]
 async fn e2e_02_job_worker_processes_service_tasks() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -521,8 +521,8 @@ async fn e2e_02_job_worker_processes_service_tasks() {
 #[ignore]
 async fn e2e_03_full_happy_path_choreography() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -685,8 +685,8 @@ async fn e2e_03_full_happy_path_choreography() {
 #[ignore]
 async fn e2e_04_runbook_park_and_resume() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
 
     let session_id = Uuid::new_v4();
     let mut runbook = Runbook::new(session_id);
@@ -823,7 +823,7 @@ async fn e2e_04_runbook_park_and_resume() {
 #[ignore]
 async fn e2e_05_job_worker_background_loop() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -841,7 +841,7 @@ async fn e2e_05_job_worker_background_loop() {
 
     // Spawn JobWorker in background
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
     let worker_handle = tokio::spawn(async move {
         worker.run(shutdown_rx).await;
     });
@@ -894,7 +894,7 @@ async fn e2e_05_job_worker_background_loop() {
 #[ignore]
 async fn e2e_06_cancellation_resolves_parked_token() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -969,7 +969,7 @@ async fn e2e_06_cancellation_resolves_parked_token() {
 #[ignore]
 async fn e2e_07_job_failure_marks_frame() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
     let worker = rig.worker(Arc::new(FailingStubExecutor));
 
     let entry_id = Uuid::new_v4();
@@ -1025,9 +1025,9 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
     let rig = BpmnTestRig::setup().await;
 
     // 1. Create orchestrator with dispatcher as executor_v2.
-    let dispatcher = Arc::new(rig.dispatcher(Arc::new(StubExecutor)));
+    let dispatcher = Arc::new(rig.dispatcher(Arc::new(NullDslExecutor)));
     let orchestrator = Arc::new(
-        ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor))
+        ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(NullDslExecutor))
             .with_executor_v2(dispatcher.clone()),
     );
 
@@ -1124,7 +1124,7 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
     let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
 
     // 5a. JobWorker — processes service tasks.
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
     let worker_shutdown = shutdown_rx.clone();
     let worker_handle = tokio::spawn(async move {
         worker.run(worker_shutdown).await;
@@ -1246,9 +1246,9 @@ async fn e2e_09_cancellation_bounces_to_orchestrator() {
     let rig = BpmnTestRig::setup().await;
 
     // 1. Create orchestrator with dispatcher as executor_v2.
-    let dispatcher = Arc::new(rig.dispatcher(Arc::new(StubExecutor)));
+    let dispatcher = Arc::new(rig.dispatcher(Arc::new(NullDslExecutor)));
     let orchestrator = Arc::new(
-        ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor))
+        ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(NullDslExecutor))
             .with_executor_v2(dispatcher.clone()),
     );
 
@@ -1438,7 +1438,7 @@ impl DslExecutorV2 for CountingExecutor {
 #[ignore]
 async fn e2e_10_idempotency_dual_dedupe() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
     let counting_executor = Arc::new(CountingExecutor::new());
     let worker = rig.worker(counting_executor.clone());
 
@@ -1524,7 +1524,7 @@ async fn e2e_10_idempotency_dual_dedupe() {
 #[ignore]
 async fn e2e_11_payload_integrity_corrupt_hash_rejected() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -1768,7 +1768,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
 
     // Create dispatcher and worker using FailingStubExecutor.
     let dispatcher = WorkflowDispatcher::new(
-        Arc::new(StubExecutor),
+        Arc::new(NullDslExecutor),
         dlq_config_arc.clone(),
         rig.client.clone(),
         CorrelationStore::new(rig.pool.clone()),
@@ -1865,8 +1865,8 @@ async fn e2e_13_dead_letter_queue_promotion() {
 #[ignore]
 async fn e2e_14_event_bridge_reconnect_dedup() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();
@@ -1974,8 +1974,8 @@ async fn e2e_14_event_bridge_reconnect_dedup() {
 #[ignore]
 async fn e2e_15_crash_recovery_event_log_replay() {
     let rig = BpmnTestRig::setup().await;
-    let dispatcher = rig.dispatcher(Arc::new(StubExecutor));
-    let worker = rig.worker(Arc::new(StubExecutor));
+    let dispatcher = rig.dispatcher(Arc::new(NullDslExecutor));
+    let worker = rig.worker(Arc::new(NullDslExecutor));
 
     let entry_id = Uuid::new_v4();
     let runbook_id = Uuid::new_v4();

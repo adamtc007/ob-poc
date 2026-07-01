@@ -73,7 +73,7 @@ pub mod tools;
 pub mod server;
 
 /// SemOS substrate bridge trait — narrow surface the knowledge
-/// tools delegate through. Spike ships `StubBridge`; Phase 4.3
+/// tools delegate through. Spike ships `NullBridge`; Phase 4.3
 /// adapts `sem_os_client::SemOsClient` to this surface.
 pub mod bridge;
 

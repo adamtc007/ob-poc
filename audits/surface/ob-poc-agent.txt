@@ -1,4 +1,4 @@
-# ob-poc-agent | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:38Z
+# ob-poc-agent | features=all | HEAD=217954a4313fb495ffedf04f9c7f97fd8faf1a80 | 2026-07-01T14:48:53Z
 pub mod ob_poc_agent
 pub mod ob_poc_agent::approval
 pub enum ob_poc_agent::approval::ApprovalReason
@@ -844,61 +844,9 @@ impl<T> tracing::instrument::Instrument for ob_poc_agent::constellation::Hydrati
 impl<T> tracing::instrument::WithSubscriber for ob_poc_agent::constellation::HydrationScope<'a>
 impl<T> typenum::type_operators::Same for ob_poc_agent::constellation::HydrationScope<'a>
 pub type ob_poc_agent::constellation::HydrationScope<'a>::Output = T
-pub struct ob_poc_agent::constellation::StubConstellationHydrator
-impl ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::new() -> Self
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::with_label(impl core::convert::Into<alloc::string::String>) -> Self
-impl core::clone::Clone for ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::clone(&self) -> ob_poc_agent::constellation::StubConstellationHydrator
-impl core::default::Default for ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::default() -> ob_poc_agent::constellation::StubConstellationHydrator
-impl core::fmt::Debug for ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl ob_poc_agent::constellation::ConstellationHydrator for ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::hydrate<'life0, 'life1, 'async_trait>(&'life0 self, ob_poc_agent::constellation::HydrationScope<'life1>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::constellation::ConstellationSnapshot, ob_poc_agent::constellation::HydrationError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::provider_label(&self) -> &str
-impl core::marker::Freeze for ob_poc_agent::constellation::StubConstellationHydrator
-impl core::marker::Send for ob_poc_agent::constellation::StubConstellationHydrator
-impl core::marker::Sync for ob_poc_agent::constellation::StubConstellationHydrator
-impl core::marker::Unpin for ob_poc_agent::constellation::StubConstellationHydrator
-impl core::marker::UnsafeUnpin for ob_poc_agent::constellation::StubConstellationHydrator
-impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_agent::constellation::StubConstellationHydrator
-impl core::panic::unwind_safe::UnwindSafe for ob_poc_agent::constellation::StubConstellationHydrator
-impl<T, U> core::convert::Into<U> for ob_poc_agent::constellation::StubConstellationHydrator where U: core::convert::From<T>
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_poc_agent::constellation::StubConstellationHydrator where U: core::convert::Into<T>
-pub type ob_poc_agent::constellation::StubConstellationHydrator::Error = core::convert::Infallible
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_poc_agent::constellation::StubConstellationHydrator where U: core::convert::TryFrom<T>
-pub type ob_poc_agent::constellation::StubConstellationHydrator::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_poc_agent::constellation::StubConstellationHydrator where T: core::clone::Clone
-pub type ob_poc_agent::constellation::StubConstellationHydrator::Owned = T
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::clone_into(&self, &mut T)
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::to_owned(&self) -> T
-impl<T> core::any::Any for ob_poc_agent::constellation::StubConstellationHydrator where T: 'static + ?core::marker::Sized
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_poc_agent::constellation::StubConstellationHydrator where T: ?core::marker::Sized
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_poc_agent::constellation::StubConstellationHydrator where T: ?core::marker::Sized
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_poc_agent::constellation::StubConstellationHydrator where T: core::clone::Clone
-pub unsafe fn ob_poc_agent::constellation::StubConstellationHydrator::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::from(T) -> T
-impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc_agent::constellation::StubConstellationHydrator where T: ?core::marker::Sized
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::and<P, B, E>(self, P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::or<P, B, E>(self, P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-impl<T> tracing::instrument::Instrument for ob_poc_agent::constellation::StubConstellationHydrator
-impl<T> tracing::instrument::WithSubscriber for ob_poc_agent::constellation::StubConstellationHydrator
-impl<T> typenum::type_operators::Same for ob_poc_agent::constellation::StubConstellationHydrator
-pub type ob_poc_agent::constellation::StubConstellationHydrator::Output = T
 pub trait ob_poc_agent::constellation::ConstellationHydrator: core::marker::Send + core::marker::Sync
 pub fn ob_poc_agent::constellation::ConstellationHydrator::hydrate<'life0, 'life1, 'async_trait>(&'life0 self, ob_poc_agent::constellation::HydrationScope<'life1>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::constellation::ConstellationSnapshot, ob_poc_agent::constellation::HydrationError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
 pub fn ob_poc_agent::constellation::ConstellationHydrator::provider_label(&self) -> &str
-impl ob_poc_agent::constellation::ConstellationHydrator for ob_poc_agent::constellation::StubConstellationHydrator
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::hydrate<'life0, 'life1, 'async_trait>(&'life0 self, ob_poc_agent::constellation::HydrationScope<'life1>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::constellation::ConstellationSnapshot, ob_poc_agent::constellation::HydrationError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
-pub fn ob_poc_agent::constellation::StubConstellationHydrator::provider_label(&self) -> &str
 impl ob_poc_agent::constellation::ConstellationHydrator for ob_poc_agent::mcp_client::McpConstellationHydrator
 pub fn ob_poc_agent::mcp_client::McpConstellationHydrator::hydrate<'life0, 'life1, 'async_trait>(&'life0 self, ob_poc_agent::constellation::HydrationScope<'life1>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::constellation::ConstellationSnapshot, ob_poc_agent::constellation::HydrationError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
 pub fn ob_poc_agent::mcp_client::McpConstellationHydrator::provider_label(&self) -> &str
@@ -1971,61 +1919,9 @@ impl<T> tracing::instrument::Instrument for ob_poc_agent::knowledge::PackSummary
 impl<T> tracing::instrument::WithSubscriber for ob_poc_agent::knowledge::PackSummary
 impl<T> typenum::type_operators::Same for ob_poc_agent::knowledge::PackSummary
 pub type ob_poc_agent::knowledge::PackSummary::Output = T
-pub struct ob_poc_agent::knowledge::StubKnowledgeClient
-impl ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::new() -> Self
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::with_label(impl core::convert::Into<alloc::string::String>) -> Self
-impl core::clone::Clone for ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::clone(&self) -> ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::default::Default for ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::default() -> ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::fmt::Debug for ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl ob_poc_agent::knowledge::SemOsKnowledgeClient for ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::provider_label(&self) -> &str
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::query<'life0, 'async_trait>(&'life0 self, ob_poc_agent::knowledge::KnowledgeQuery) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::knowledge::KnowledgeResponse, ob_poc_agent::knowledge::KnowledgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
-impl core::marker::Freeze for ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::marker::Send for ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::marker::Sync for ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::marker::Unpin for ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::marker::UnsafeUnpin for ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_agent::knowledge::StubKnowledgeClient
-impl core::panic::unwind_safe::UnwindSafe for ob_poc_agent::knowledge::StubKnowledgeClient
-impl<T, U> core::convert::Into<U> for ob_poc_agent::knowledge::StubKnowledgeClient where U: core::convert::From<T>
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_poc_agent::knowledge::StubKnowledgeClient where U: core::convert::Into<T>
-pub type ob_poc_agent::knowledge::StubKnowledgeClient::Error = core::convert::Infallible
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_poc_agent::knowledge::StubKnowledgeClient where U: core::convert::TryFrom<T>
-pub type ob_poc_agent::knowledge::StubKnowledgeClient::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_poc_agent::knowledge::StubKnowledgeClient where T: core::clone::Clone
-pub type ob_poc_agent::knowledge::StubKnowledgeClient::Owned = T
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::clone_into(&self, &mut T)
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::to_owned(&self) -> T
-impl<T> core::any::Any for ob_poc_agent::knowledge::StubKnowledgeClient where T: 'static + ?core::marker::Sized
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_poc_agent::knowledge::StubKnowledgeClient where T: ?core::marker::Sized
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_poc_agent::knowledge::StubKnowledgeClient where T: ?core::marker::Sized
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_poc_agent::knowledge::StubKnowledgeClient where T: core::clone::Clone
-pub unsafe fn ob_poc_agent::knowledge::StubKnowledgeClient::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::from(T) -> T
-impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc_agent::knowledge::StubKnowledgeClient where T: ?core::marker::Sized
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::and<P, B, E>(self, P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::or<P, B, E>(self, P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
-impl<T> tracing::instrument::Instrument for ob_poc_agent::knowledge::StubKnowledgeClient
-impl<T> tracing::instrument::WithSubscriber for ob_poc_agent::knowledge::StubKnowledgeClient
-impl<T> typenum::type_operators::Same for ob_poc_agent::knowledge::StubKnowledgeClient
-pub type ob_poc_agent::knowledge::StubKnowledgeClient::Output = T
 pub trait ob_poc_agent::knowledge::SemOsKnowledgeClient: core::marker::Send + core::marker::Sync
 pub fn ob_poc_agent::knowledge::SemOsKnowledgeClient::provider_label(&self) -> &str
 pub fn ob_poc_agent::knowledge::SemOsKnowledgeClient::query<'life0, 'async_trait>(&'life0 self, ob_poc_agent::knowledge::KnowledgeQuery) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::knowledge::KnowledgeResponse, ob_poc_agent::knowledge::KnowledgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
-impl ob_poc_agent::knowledge::SemOsKnowledgeClient for ob_poc_agent::knowledge::StubKnowledgeClient
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::provider_label(&self) -> &str
-pub fn ob_poc_agent::knowledge::StubKnowledgeClient::query<'life0, 'async_trait>(&'life0 self, ob_poc_agent::knowledge::KnowledgeQuery) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::knowledge::KnowledgeResponse, ob_poc_agent::knowledge::KnowledgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
 impl ob_poc_agent::knowledge::SemOsKnowledgeClient for ob_poc_agent::mcp_client::McpKnowledgeClient
 pub fn ob_poc_agent::mcp_client::McpKnowledgeClient::provider_label(&self) -> &str
 pub fn ob_poc_agent::mcp_client::McpKnowledgeClient::query<'life0, 'async_trait>(&'life0 self, ob_poc_agent::knowledge::KnowledgeQuery) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_agent::knowledge::KnowledgeResponse, ob_poc_agent::knowledge::KnowledgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait

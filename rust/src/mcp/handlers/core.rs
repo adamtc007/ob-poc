@@ -1659,7 +1659,7 @@ impl ToolHandlers {
             let searcher = self.get_verb_searcher().await?;
             let mut orchestrator = crate::sequencer::ReplOrchestratorV2::new(
                 crate::journey::router::PackRouter::new(vec![]),
-                Arc::new(crate::sequencer::StubExecutor),
+                Arc::new(crate::sequencer::NullDslExecutor),
             )
             .with_verb_searcher(std::sync::Arc::new(searcher))
             .with_nlci_compiler(crate::semtaxonomy_v2::build_minimal_cbu_compiler());

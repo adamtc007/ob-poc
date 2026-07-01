@@ -40,7 +40,7 @@ use crate::repl::runbook::{EntryStatus, ExecutionMode, RunbookEvent};
 use crate::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{ParkableStubExecutor, ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{ParkableStubExecutor, ReplOrchestratorV2, NullDslExecutor};
 
 // ===========================================================================
 // Helpers (replicated from Phase 5)
@@ -363,7 +363,7 @@ impl IntentMatcher for MockIntentMatcher {
 // Orchestrator builders
 // ---------------------------------------------------------------------------
 
-/// Build an orchestrator with freeform pack and StubExecutor.
+/// Build an orchestrator with freeform pack and NullDslExecutor.
 fn build_orchestrator_with_engine(matcher: MockIntentMatcher) -> ReplOrchestratorV2 {
     let index = Arc::new(build_real_index());
     let intent_matcher: Arc<dyn IntentMatcher> = Arc::new(matcher.clone());
@@ -373,7 +373,7 @@ fn build_orchestrator_with_engine(matcher: MockIntentMatcher) -> ReplOrchestrato
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -390,7 +390,7 @@ fn build_orchestrator_restricted(matcher: MockIntentMatcher) -> ReplOrchestrator
     let (pack, hash) = build_restricted_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -408,7 +408,7 @@ fn build_orchestrator_with_handoff(matcher: MockIntentMatcher) -> ReplOrchestrat
     let (target, target_hash) = build_target_pack();
     let router = PackRouter::new(vec![(source, source_hash), (target, target_hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -426,7 +426,7 @@ fn build_orchestrator_dangling_handoff(matcher: MockIntentMatcher) -> ReplOrches
     let (dangling, dangling_hash) = build_dangling_handoff_pack();
     let router = PackRouter::new(vec![(dangling, dangling_hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -443,7 +443,7 @@ fn build_orchestrator_with_parkable_executor(matcher: MockIntentMatcher) -> Repl
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)

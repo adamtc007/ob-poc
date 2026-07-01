@@ -1,4 +1,4 @@
-# sem_os_mcp | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:13Z
+# sem_os_mcp | features=all | HEAD=217954a4313fb495ffedf04f9c7f97fd8faf1a80 | 2026-07-01T14:48:56Z
 pub mod sem_os_mcp
 pub mod sem_os_mcp::bridge
 pub enum sem_os_mcp::bridge::BridgeError
@@ -214,6 +214,54 @@ pub fn sem_os_mcp::bridge::FsmTransition::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::FsmTransition where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::FsmTransition
 impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::FsmTransition
+pub struct sem_os_mcp::bridge::NullBridge
+impl sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::new() -> Self
+pub fn sem_os_mcp::bridge::NullBridge::with_label(impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::clone(&self) -> sem_os_mcp::bridge::NullBridge
+impl core::default::Default for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::default() -> sem_os_mcp::bridge::NullBridge
+impl core::fmt::Debug for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl sem_os_mcp::bridge::SemOsBridge for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::provider_label(&self) -> &str
+impl core::marker::Freeze for sem_os_mcp::bridge::NullBridge
+impl core::marker::Send for sem_os_mcp::bridge::NullBridge
+impl core::marker::Sync for sem_os_mcp::bridge::NullBridge
+impl core::marker::Unpin for sem_os_mcp::bridge::NullBridge
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::NullBridge
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::NullBridge
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::NullBridge
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::NullBridge where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::NullBridge::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::NullBridge where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::NullBridge::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::NullBridge::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::NullBridge where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::NullBridge::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::NullBridge::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::NullBridge where T: core::clone::Clone
+pub type sem_os_mcp::bridge::NullBridge::Owned = T
+pub fn sem_os_mcp::bridge::NullBridge::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::NullBridge::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::NullBridge where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::NullBridge::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::NullBridge where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::NullBridge::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::NullBridge where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::NullBridge::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::NullBridge where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::NullBridge::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::NullBridge
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::NullBridge
 pub struct sem_os_mcp::bridge::PackEntry
 pub sem_os_mcp::bridge::PackEntry::id: alloc::string::String
 pub sem_os_mcp::bridge::PackEntry::name: alloc::string::String
@@ -259,54 +307,6 @@ pub fn sem_os_mcp::bridge::PackEntry::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::PackEntry where T: for<'de> serde_core::de::Deserialize<'de>
 impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::PackEntry
 impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::PackEntry
-pub struct sem_os_mcp::bridge::StubBridge
-impl sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::new() -> Self
-pub fn sem_os_mcp::bridge::StubBridge::with_label(impl core::convert::Into<alloc::string::String>) -> Self
-impl core::clone::Clone for sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::clone(&self) -> sem_os_mcp::bridge::StubBridge
-impl core::default::Default for sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::default() -> sem_os_mcp::bridge::StubBridge
-impl core::fmt::Debug for sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl sem_os_mcp::bridge::SemOsBridge for sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::provider_label(&self) -> &str
-impl core::marker::Freeze for sem_os_mcp::bridge::StubBridge
-impl core::marker::Send for sem_os_mcp::bridge::StubBridge
-impl core::marker::Sync for sem_os_mcp::bridge::StubBridge
-impl core::marker::Unpin for sem_os_mcp::bridge::StubBridge
-impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::StubBridge
-impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::StubBridge
-impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::StubBridge
-impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::StubBridge where U: core::convert::From<T>
-pub fn sem_os_mcp::bridge::StubBridge::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::StubBridge where U: core::convert::Into<T>
-pub type sem_os_mcp::bridge::StubBridge::Error = core::convert::Infallible
-pub fn sem_os_mcp::bridge::StubBridge::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::StubBridge where U: core::convert::TryFrom<T>
-pub type sem_os_mcp::bridge::StubBridge::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn sem_os_mcp::bridge::StubBridge::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::StubBridge where T: core::clone::Clone
-pub type sem_os_mcp::bridge::StubBridge::Owned = T
-pub fn sem_os_mcp::bridge::StubBridge::clone_into(&self, &mut T)
-pub fn sem_os_mcp::bridge::StubBridge::to_owned(&self) -> T
-impl<T> core::any::Any for sem_os_mcp::bridge::StubBridge where T: 'static + ?core::marker::Sized
-pub fn sem_os_mcp::bridge::StubBridge::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::StubBridge where T: ?core::marker::Sized
-pub fn sem_os_mcp::bridge::StubBridge::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::StubBridge where T: ?core::marker::Sized
-pub fn sem_os_mcp::bridge::StubBridge::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::StubBridge where T: core::clone::Clone
-pub unsafe fn sem_os_mcp::bridge::StubBridge::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::from(T) -> T
-impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::StubBridge
-impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::StubBridge
 pub trait sem_os_mcp::bridge::SemOsBridge: core::marker::Send + core::marker::Sync
 pub fn sem_os_mcp::bridge::SemOsBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub fn sem_os_mcp::bridge::SemOsBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
@@ -314,13 +314,13 @@ pub fn sem_os_mcp::bridge::SemOsBridge::entity_resolve<'life0, 'life1, 'life2, '
 pub fn sem_os_mcp::bridge::SemOsBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
 pub fn sem_os_mcp::bridge::SemOsBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
 pub fn sem_os_mcp::bridge::SemOsBridge::provider_label(&self) -> &str
-impl sem_os_mcp::bridge::SemOsBridge for sem_os_mcp::bridge::StubBridge
-pub fn sem_os_mcp::bridge::StubBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
-pub fn sem_os_mcp::bridge::StubBridge::provider_label(&self) -> &str
+impl sem_os_mcp::bridge::SemOsBridge for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::provider_label(&self) -> &str
 pub mod sem_os_mcp::protocol
 pub struct sem_os_mcp::protocol::JsonRpcError
 pub sem_os_mcp::protocol::JsonRpcError::code: i64

@@ -3606,7 +3606,7 @@ async fn get_enriched_dsl(
 mod tests {
     use super::*;
     use crate::journey::router::PackRouter;
-    use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+    use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
     use std::sync::Arc;
 
     #[test]
@@ -3694,7 +3694,7 @@ mod tests {
     async fn test_supported_acp_prompt_routes_before_repl_on_normal_input() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
-            Arc::new(StubExecutor),
+            Arc::new(NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
 
@@ -3741,7 +3741,7 @@ mod tests {
     async fn test_live_llm_session_input_mode_is_task_bounded_for_deal_provider() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
-            Arc::new(StubExecutor),
+            Arc::new(NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
 
@@ -3766,7 +3766,7 @@ mod tests {
     async fn test_non_authored_prompt_still_falls_through_to_repl_input_path() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
-            Arc::new(StubExecutor),
+            Arc::new(NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
 

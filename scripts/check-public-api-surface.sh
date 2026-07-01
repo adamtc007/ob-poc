@@ -13,13 +13,19 @@
 #
 #   2. MEMBRANE (charter-reconciliation-v1.md §6.2) — the crates with an
 #      optional `database` feature must show zero sqlx/PgPool/PgConnection
-#      symbols in their DEFAULT-features surface. The membrane may exist;
-#      it must not be on by default.
+#      symbols at the `--no-default-features` floor. Measured at
+#      `--no-default-features`, not bare/no-flag invocation: a bare
+#      `cargo public-api -p <crate>` resolves whatever `[features].default`
+#      currently says (which can drift, silently, per crate — see the
+#      2026-06-25 divergence where 4 crates flipped `default = []` to
+#      `default = ["database"]` on this branch only) and can in principle
+#      pick up workspace-unification bleed from a sibling package. The
+#      floor is unambiguous and immune to both.
 #
-#   3. TEST-DOUBLE LEAK (§8) — no crate's DEFAULT-features surface may
-#      expose a Stub/Mock/Fake-prefixed type unconditionally. Test doubles
-#      belong behind `#[cfg(test)]` or a dedicated feature, not shipped in
-#      the crate's normal public API.
+#   3. TEST-DOUBLE LEAK (§8) — no crate's `--no-default-features` surface
+#      may expose a Stub/Mock/Fake-prefixed type unconditionally. Test
+#      doubles belong behind `#[cfg(test)]` or a dedicated feature, not
+#      shipped in the crate's normal public API.
 #
 # Failure in any of the three fails the gate (exit 1).
 set -uo pipefail
@@ -58,33 +64,37 @@ for pkg in $CRATES; do
 done
 
 echo ""
-echo "== 2. Membrane check (§6.2): default-features must carry no sqlx/PgPool =="
+echo "== 2. Membrane check (§6.2): --no-default-features floor must carry no sqlx/PgPool =="
 for pkg in $MEMBRANE_CRATES; do
-  now=$(cd rust && cargo +nightly public-api -p "$pkg" 2>/dev/null)
+  now=$(cd rust && cargo +nightly public-api -p "$pkg" --no-default-features 2>/dev/null)
   if [ -z "$now" ]; then
-    echo "  BUILD FAILED AT DEFAULT FEATURES: $pkg (crate does not compile in isolation with its own default feature set — a Cargo.toml feature-declaration gap, not a membrane leak)"
+    echo "  BUILD FAILED AT --no-default-features: $pkg (crate does not compile in isolation with zero features — a Cargo.toml feature-declaration gap, not a membrane leak)"
     fail=1
     continue
   fi
   hits=$(echo "$now" | grep -E "sqlx::|PgPool|PgConnection" || true)
   if [ -n "$hits" ]; then
-    echo "  MEMBRANE LEAK: $pkg default-features surface exposes DB types:"
+    echo "  MEMBRANE LEAK: $pkg --no-default-features floor exposes DB types:"
     echo "$hits" | sed 's/^/    /'
     fail=1
   fi
 done
 
 echo ""
-echo "== 3. Test-double leak check (§8): no Stub/Mock/Fake in default surface =="
+echo "== 3. Test-double leak check (§8 subset — name scan, not the tests/-dir inventory): no Stub/Mock/Fake at the --no-default-features floor =="
+ALLOWLIST_FILE="audits/surface/_test-double-allowlist.txt"
 for pkg in $CRATES; do
-  now=$(cd rust && cargo +nightly public-api -p "$pkg" 2>/dev/null)
+  now=$(cd rust && cargo +nightly public-api -p "$pkg" --no-default-features 2>/dev/null)
   [ -z "$now" ] && continue
   hits=$(echo "$now" | grep -E '(::|^pub (struct|enum|fn|use|trait) )(Stub|Mock|Fake)[A-Za-z0-9_]*\b' || true)
-  if [ -n "$hits" ]; then
-    echo "  TEST-DOUBLE LEAK: $pkg default-features surface exposes:"
-    echo "$hits" | sed 's/^/    /'
-    fail=1
+  [ -z "$hits" ] && continue
+  if [ -f "$ALLOWLIST_FILE" ] && grep -q "^${pkg}:" "$ALLOWLIST_FILE"; then
+    echo "  ALLOWLISTED: $pkg (see ${ALLOWLIST_FILE} for reason) — $(echo "$hits" | wc -l | tr -d ' ') matching lines suppressed"
+    continue
   fi
+  echo "  TEST-DOUBLE LEAK: $pkg --no-default-features floor exposes:"
+  echo "$hits" | sed 's/^/    /'
+  fail=1
 done
 
 echo ""

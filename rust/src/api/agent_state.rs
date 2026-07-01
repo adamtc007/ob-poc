@@ -13,7 +13,7 @@ use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::GenerationLogRepository;
 use crate::dsl_v2::execution::DslExecutor;
 use ob_poc_entity_linking::{
-    EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
+    EntityLinkingService, EntityLinkingServiceImpl, NullEntityLinkingService,
 };
 
 use axum::Router;
@@ -246,7 +246,7 @@ impl AgentState {
                     "Entity snapshot not found. Entity linking disabled. \
                      Run `cargo xtask entity compile` to generate."
                 );
-                Arc::new(StubEntityLinkingService::new())
+                Arc::new(NullEntityLinkingService::new())
             })
         };
 

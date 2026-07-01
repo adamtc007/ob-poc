@@ -1,12 +1,12 @@
 //! RealDslExecutor — Bridge to the existing DSL pipeline
 //!
-//! Replaces `StubExecutor` with a real implementation that parses, compiles,
+//! Replaces `NullDslExecutor` with a real implementation that parses, compiles,
 //! and executes DSL strings via the dsl_v2 pipeline.
 //!
 //! # Feature Gates
 //!
 //! This module requires both `vnext-repl` and `database` features.
-//! The `StubExecutor` (in orchestrator_v2.rs) remains available for tests.
+//! The `NullDslExecutor` (in orchestrator_v2.rs) remains available for tests.
 
 use serde_json::json;
 use sqlx::PgPool;

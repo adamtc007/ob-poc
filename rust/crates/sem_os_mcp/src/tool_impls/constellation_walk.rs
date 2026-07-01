@@ -75,11 +75,11 @@ impl KnowledgeTool for ConstellationWalkTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::StubBridge;
+    use crate::bridge::NullBridge;
 
     #[tokio::test]
     async fn stub_returns_empty_slots() {
-        let tool = ConstellationWalkTool::new(Arc::new(StubBridge::new()));
+        let tool = ConstellationWalkTool::new(Arc::new(NullBridge::new()));
         let out = tool
             .invoke(json!({"workspace": "cbu", "constellation_id": "struct.lux.ucits.sicav"}))
             .await
@@ -89,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_field_returns_invalid_arguments() {
-        let tool = ConstellationWalkTool::new(Arc::new(StubBridge::new()));
+        let tool = ConstellationWalkTool::new(Arc::new(NullBridge::new()));
         let err = tool
             .invoke(json!({"workspace": "cbu"}))
             .await

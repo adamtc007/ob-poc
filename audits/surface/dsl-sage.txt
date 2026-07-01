@@ -1,4 +1,4 @@
-# dsl-sage | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:22Z
+# dsl-sage | features=all | HEAD=217954a4313fb495ffedf04f9c7f97fd8faf1a80 | 2026-07-01T14:48:57Z
 pub mod dsl_sage
 pub mod dsl_sage::audit
 pub struct dsl_sage::audit::SageAuditEntry

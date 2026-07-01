@@ -76,11 +76,11 @@ impl KnowledgeTool for EntityResolveTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::StubBridge;
+    use crate::bridge::NullBridge;
 
     #[tokio::test]
     async fn spec_describes_text_as_required() {
-        let tool = EntityResolveTool::new(Arc::new(StubBridge::new()));
+        let tool = EntityResolveTool::new(Arc::new(NullBridge::new()));
         let spec = tool.spec();
         assert_eq!(spec.name, "entity_resolve");
         let required = spec.input_schema["required"].as_array().unwrap();
@@ -90,7 +90,7 @@ mod tests {
 
     #[tokio::test]
     async fn stub_bridge_returns_empty_matches() {
-        let tool = EntityResolveTool::new(Arc::new(StubBridge::new()));
+        let tool = EntityResolveTool::new(Arc::new(NullBridge::new()));
         let out = tool
             .invoke(json!({"entity_kind": "cbu", "text": "Allianz"}))
             .await
@@ -100,7 +100,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_text_returns_invalid_arguments() {
-        let tool = EntityResolveTool::new(Arc::new(StubBridge::new()));
+        let tool = EntityResolveTool::new(Arc::new(NullBridge::new()));
         let err = tool
             .invoke(json!({"entity_kind": "cbu"}))
             .await
@@ -110,7 +110,7 @@ mod tests {
 
     #[tokio::test]
     async fn entity_kind_is_optional() {
-        let tool = EntityResolveTool::new(Arc::new(StubBridge::new()));
+        let tool = EntityResolveTool::new(Arc::new(NullBridge::new()));
         let out = tool.invoke(json!({"text": "Allianz"})).await.unwrap();
         assert!(out["matches"].is_array());
     }

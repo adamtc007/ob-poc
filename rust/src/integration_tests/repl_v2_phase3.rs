@@ -35,7 +35,7 @@ use crate::repl::response_v2::ReplResponseKindV2;
 use crate::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use crate::repl::types_v2::{ReplStateV2, UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
 
 // ===========================================================================
 // Helpers
@@ -219,7 +219,7 @@ fn build_orchestrator_with_engine(matcher: MockIntentMatcher) -> ReplOrchestrato
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)
@@ -235,7 +235,7 @@ fn build_orchestrator_without_engine(matcher: MockIntentMatcher) -> ReplOrchestr
     let (pack, hash) = build_freeform_pack();
     let router = PackRouter::new(vec![(pack, hash)]);
 
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
         .with_verb_config_index(index)
         .with_intent_matcher(intent_matcher)
         .with_intent_service(intent_service)

@@ -21,7 +21,7 @@ use crate::repl::runbook::{ConfirmPolicy, EntryStatus, RunbookEntry};
 use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::types_v2::{ReplCommandV2, UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{DslExecutor, ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{DslExecutor, ReplOrchestratorV2, NullDslExecutor};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -435,7 +435,7 @@ async fn test_golden_loop_template_entries_no_audit() {
     // In the golden loop (template instantiation), entries should NOT have audit.
     let orch = ReplOrchestratorV2::new(
         PackRouter::new(vec![load_onboarding_pack()]),
-        Arc::new(StubExecutor),
+        Arc::new(NullDslExecutor),
     );
     let session_id = scope_and_select_pack(&orch, "onboarding-request").await;
 
@@ -563,7 +563,7 @@ fn test_quick_confirm_nav_verbs() {
 
 #[tokio::test]
 async fn test_scenario_d_onboard_allianz_lux() {
-    let orch = ReplOrchestratorV2::new(PackRouter::new(all_packs()), Arc::new(StubExecutor));
+    let orch = ReplOrchestratorV2::new(PackRouter::new(all_packs()), Arc::new(NullDslExecutor));
     let session_id = orch.create_session().await;
 
     // Set scope.

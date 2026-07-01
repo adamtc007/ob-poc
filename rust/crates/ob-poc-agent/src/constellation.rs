@@ -123,11 +123,13 @@ pub enum HydrationError {
 
 /// Spike hydrator. Returns an empty snapshot for every scope and
 /// records the call at debug level so the seam is observable.
+#[cfg(test)]
 #[derive(Debug, Default, Clone)]
 pub struct StubConstellationHydrator {
     label: String,
 }
 
+#[cfg(test)]
 impl StubConstellationHydrator {
     pub fn new() -> Self {
         Self {
@@ -142,6 +144,7 @@ impl StubConstellationHydrator {
     }
 }
 
+#[cfg(test)]
 #[async_trait]
 impl ConstellationHydrator for StubConstellationHydrator {
     async fn hydrate(

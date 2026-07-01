@@ -13,7 +13,7 @@ use crate::journey::pack::load_pack_from_bytes;
 use crate::journey::router::PackRouter;
 use crate::repl::response_v2::ReplResponseKindV2;
 use crate::repl::types_v2::{ReplStateV2, UserInputV2, WorkspaceKind};
-use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,7 +38,7 @@ fn make_orchestrator() -> ReplOrchestratorV2 {
         },
     ];
     let router = PackRouter::new(packs);
-    ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
 }
 
 // ---------------------------------------------------------------------------

@@ -316,8 +316,8 @@ impl LookupService {
 #[cfg(test)]
 /// Create a stub lookup service for testing
 pub fn stub_lookup_service() -> LookupService {
-    use ob_poc_entity_linking::StubEntityLinkingService;
-    LookupService::new(Arc::new(StubEntityLinkingService))
+    use ob_poc_entity_linking::NullEntityLinkingService;
+    LookupService::new(Arc::new(NullEntityLinkingService))
 }
 
 #[cfg(test)]

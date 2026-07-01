@@ -1,4 +1,4 @@
-# ob-agentic | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:26Z
+# ob-agentic | features=all | HEAD=217954a4313fb495ffedf04f9c7f97fd8faf1a80 | 2026-07-01T14:48:58Z
 pub mod ob_agentic
 pub mod ob_agentic::anthropic_client
 pub struct ob_agentic::anthropic_client::AnthropicClient
