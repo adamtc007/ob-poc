@@ -5,6 +5,7 @@
 //!
 //! These types define the replacement path for utterance grounding, discovery,
 //! and runbook composition without depending on the legacy Sage/Drafter structs.
+#![deny(unreachable_pub)]
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
