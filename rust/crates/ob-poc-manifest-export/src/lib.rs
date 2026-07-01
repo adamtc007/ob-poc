@@ -10,6 +10,7 @@
 //! logic is unit-testable. Only the YAML fields actually needed for
 //! §7 are deserialised — `dsl-core::VerbConfig` is a huge surface and
 //! out of scope for this build tool.
+#![deny(unreachable_pub)]
 
 #![forbid(unsafe_code)]
 
