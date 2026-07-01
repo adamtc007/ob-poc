@@ -17,15 +17,15 @@
 //! // Execute with DslExecutor
 //! ```
 
-pub mod acp_runtime_context;
+pub(crate) mod acp_runtime_context;
 // Phase 3 slice 2d.5 (2026-05-12): mixed-purity split — pure boundary types
 // (descriptors, registries, reports, outcomes, DealTransitionSpec) live in
 // ob-poc-boundary; Repl-coupled async drivers stay in src/ and re-export the
 // envelope surface at module top.
-pub mod acp_state_anchor;
+pub(crate) mod acp_state_anchor;
 
 // Domain handlers for business logic
-pub mod domains;
+pub(crate) mod domains;
 
 // Database integration (when enabled)
 #[cfg(feature = "database")]
@@ -71,7 +71,7 @@ pub mod session;
 pub mod templates;
 
 // Traceability - first-class utterance trace persistence
-pub mod traceability;
+pub(crate) mod traceability;
 
 // Transitional Sem OS runtime surfaces
 #[cfg(feature = "database")]
@@ -94,14 +94,14 @@ pub mod lookup;
 
 // GLEIF integration - LEI data enrichment and corporate tree traversal
 #[cfg(feature = "database")]
-pub mod gleif;
+pub(crate) mod gleif;
 
 // Phase 4 Slice B (Group 3) — `bods` module relocated to
 // `dsl-runtime::bods`; consumer `bods_ops` moved alongside it.
 
 // Research macros - LLM + web search for structured discovery with human review
 #[cfg(feature = "database")]
-pub mod research;
+pub(crate) mod research;
 
 // Agent learning infrastructure - continuous improvement from user interactions
 #[cfg(feature = "database")]
@@ -109,7 +109,7 @@ pub mod agent;
 
 // Service Resources Pipeline - CBU Service → Resource Discovery → Provisioning
 #[cfg(feature = "database")]
-pub mod service_resources;
+pub(crate) mod service_resources;
 
 // Compiled Runbook — sole executable truth (types + execution gate)
 pub mod runbook;
@@ -140,7 +140,7 @@ pub mod sequencer_tx;
 // tollgate handlers into per-stage typed functions lands one stage
 // at a time as `5b-deep-stage-N` slices. See `sequencer_stages.rs`
 // header for the rationale.
-pub mod sequencer_stages;
+pub(crate) mod sequencer_stages;
 
 // Phase 5e — outbox drainer. Polls `public.outbox` for post-commit
 // effects (maintenance subprocess spawn, narration synthesis, UI push,
@@ -160,7 +160,7 @@ pub mod bpmn_integration;
 pub mod journey;
 
 // Plan Builder — compilation pipeline decomposition (verb classifier, constraint gate, plan assembler)
-pub mod plan_builder;
+pub(crate) mod plan_builder;
 
 // Phase 4 Slice B (Group 4) — `document_bundles` module relocated to
 // `dsl-runtime::document_bundles`; consumer `docs_bundle_ops` moved alongside it.
@@ -181,7 +181,7 @@ pub mod sem_reg;
 pub mod semtaxonomy_v2;
 
 // Sage — intent understanding layer (plane, polarity, domain — no verb FQNs)
-pub mod sage;
+pub(crate) mod sage;
 
 // Core domain capabilities
 pub use domains::{DomainHandler, DomainRegistry, DomainResult};
