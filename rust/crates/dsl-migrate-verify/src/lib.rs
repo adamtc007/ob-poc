@@ -6,6 +6,7 @@
 //! Validates **structure and reachability only**. The `:condition` strings on
 //! flow atoms are opaque to the local runtime (ScriptedAdaptor ignores them);
 //! condition executability is the external dmn-lite peer's responsibility.
+#![deny(unreachable_pub)]
 
 use bpmn_runtime::{
     InMemoryJourneyStore, JourneyStore, RuntimeEngine, ScriptedAdaptor, VerbRegistry,
