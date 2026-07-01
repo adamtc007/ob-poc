@@ -40,7 +40,7 @@ use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::{
     HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult, VerbSearchSource,
 };
-use crate::policy::{gate::PolicySnapshot, PolicyGate};
+use ob_poc_boundary::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sage::{
     drafter::DraftResolution, DraftResult, ObservationPlane, OutcomeStep, PendingMutation,
     SageConfidence, SageEngine, UtteranceDisposition,
@@ -3484,7 +3484,7 @@ mod tests {
             dsl_source: None,
             sem_reg_mode: "strict".into(),
             sem_reg_denied_all: false,
-            policy_gate_snapshot: crate::policy::PolicyGate::strict().snapshot(),
+            policy_gate_snapshot: ob_poc_boundary::policy::PolicyGate::strict().snapshot(),
             forced_verb: None,
             blocked_reason: None,
             chosen_verb_pre_semreg: None,
@@ -3862,7 +3862,7 @@ mod tests {
             pool: sqlx::PgPool::connect_lazy("postgres://localhost/test").expect("lazy pool"),
             verb_searcher: std::sync::Arc::new(HybridVerbSearcher::minimal()),
             lookup_service: None,
-            policy_gate: std::sync::Arc::new(crate::policy::PolicyGate::strict()),
+            policy_gate: std::sync::Arc::new(ob_poc_boundary::policy::PolicyGate::strict()),
             source: UtteranceSource::Chat,
             sem_os_client: None,
             agent_mode: sem_os_types::agent_mode::AgentMode::default(),

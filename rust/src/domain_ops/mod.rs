@@ -295,7 +295,7 @@ mod trading_profile;
 // `dsl-runtime::domain_ops::trading_profile_ca_ops` consuming the new
 // `dyn TradingProfileDocument` trait via the ServiceRegistry.
 // `ObPocTradingProfileDocument` in ob-poc bridges to
-// `crate::trading_profile::ast_db::{load_document, save_document}`.
+// `ob_poc_trading_profile::ast_db::{load_document, save_document}`.
 // `TradingMatrixDocument` already lives in `ob_poc_types::trading_matrix`
 // (boundary crate), so the trait can use it directly without
 // types-extraction. Registration flows through inventory; external
@@ -312,7 +312,7 @@ mod trading_profile;
 // (`config/verbs/view.yaml`, 15 verbs). Single-method `dyn ViewService`
 // trait dispatches all 15 verbs through the bridge in
 // `crate::services::view_service_impl`, which keeps the heavy
-// `crate::session::ViewState` + `crate::taxonomy::*` modules in
+// `crate::session::ViewState` + `ob_poc_taxonomy::taxonomy::*` modules in
 // ob-poc (both are 5000+ LOC multi-consumer mega-modules).
 
 // Re-export DSL types for use by operation implementations
@@ -550,7 +550,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // Phase B Pattern B slice #79: trading-profile.* (36 verbs — full
     // draft→submit→approve→activate→materialize→archive lifecycle,
     // component CRUD dispatchers, ISDA/CSA/SSI/IM config, validation).
-    // Bridges to crate::trading_profile::{ast_db, document_ops}.
+    // Bridges to ob_poc_trading_profile::{ast_db, document_ops}.
     registry.register(Arc::new(trading_profile::TradingProfileImportVerb));
     registry.register(Arc::new(trading_profile::TradingProfileGetActive));
     registry.register(Arc::new(trading_profile::TradingProfileActivate));

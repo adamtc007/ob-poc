@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
 
-use crate::taxonomy::{Filter, TaxonomyContext, TaxonomyNode, TaxonomyStack};
+use ob_poc_taxonomy::taxonomy::{Filter, TaxonomyContext, TaxonomyNode, TaxonomyStack};
 
 // =============================================================================
 // VIEW STATE - The complete visual state
@@ -436,12 +436,12 @@ impl ViewState {
     }
 
     /// Get taxonomy metaphor
-    pub fn metaphor(&self) -> crate::taxonomy::Metaphor {
+    pub fn metaphor(&self) -> ob_poc_taxonomy::taxonomy::Metaphor {
         self.taxonomy.metaphor()
     }
 
     /// Get taxonomy astro level
-    pub fn astro_level(&self) -> crate::taxonomy::AstroLevel {
+    pub fn astro_level(&self) -> ob_poc_taxonomy::taxonomy::AstroLevel {
         self.taxonomy.astro_level()
     }
 
@@ -456,7 +456,7 @@ impl ViewState {
     ///
     /// Returns Ok(true) if zoom succeeded, Ok(false) if node not expandable.
     pub async fn zoom_in(&mut self, node_id: Uuid) -> Result<bool> {
-        use crate::taxonomy::{ExpansionRule, TaxonomyFrame};
+        use ob_poc_taxonomy::taxonomy::{ExpansionRule, TaxonomyFrame};
 
         // Find the node in current taxonomy
         let node = self
@@ -590,7 +590,7 @@ impl ViewState {
 
     /// Check if a node can be zoomed into.
     pub fn can_zoom_in(&self, node_id: Uuid) -> bool {
-        use crate::taxonomy::ExpansionRule;
+        use ob_poc_taxonomy::taxonomy::ExpansionRule;
 
         self.taxonomy
             .find(node_id)
@@ -656,7 +656,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::taxonomy::{DimensionValues, NodeType, Status};
+    use ob_poc_taxonomy::taxonomy::{DimensionValues, NodeType, Status};
 
     fn make_test_taxonomy() -> TaxonomyNode {
         // Create a small test taxonomy

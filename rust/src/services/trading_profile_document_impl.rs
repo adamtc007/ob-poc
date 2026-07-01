@@ -1,7 +1,7 @@
 //! ob-poc impl of [`TradingProfileDocument`].
 //!
 //! Bridges the plane-crossing trait (defined in `dsl-runtime`) to
-//! [`crate::trading_profile::ast_db`]'s `load_document` /
+//! [`ob_poc_trading_profile::ast_db`]'s `load_document` /
 //! `save_document` pair. The `AstDbError` raised by the in-crate
 //! functions is converted to `anyhow::Error` at the boundary so the
 //! trait surface stays free of ob-poc-internal error types.
@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 use dsl_runtime::TradingProfileDocument;
 
-use crate::trading_profile::ast_db;
+use ob_poc_trading_profile::ast_db;
 
 pub struct ObPocTradingProfileDocument {
     pool: PgPool,

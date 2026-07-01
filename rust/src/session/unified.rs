@@ -99,7 +99,7 @@ pub struct UnifiedSession {
 
     /// Replacement SemTaxonomy session state for discovery/composition flows.
     #[serde(default)]
-    pub semtaxonomy_session: Option<crate::semtaxonomy::SageSession>,
+    pub semtaxonomy_session: Option<ob_poc_semtaxonomy::SageSession>,
 
     // === Conversation ===
     pub messages: Vec<ChatMessage>,

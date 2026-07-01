@@ -16,7 +16,7 @@
 //! Phase 5c-migrate Phase B Pattern B slice #79: ported from
 //! `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`. Stays in
 //! `ob-poc::domain_ops::trading_profile` because the ops bridge to
-//! `crate::trading_profile::{ast_db, document_ops, resolve, ...}` (upstream of
+//! `ob_poc_trading_profile::{ast_db, document_ops, resolve, ...}` (upstream of
 //! `sem_os_postgres`) and depend on `ob_poc_types::trading_matrix::*`.
 
 use anyhow::Result;
@@ -34,7 +34,7 @@ use dsl_runtime::{
 };
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
-use crate::trading_profile::{
+use ob_poc_trading_profile::{
     ast_db, document_ops, resolve::resolve_entity_ref, BookingRule, EntityRefType,
     InvestmentManagerMandate, IsdaAgreementConfig, MaterializationResult, StandingInstruction,
     TradingProfileDocument, TradingProfileImport,
@@ -71,7 +71,7 @@ fn forward_component_args(args: &serde_json::Value, strip_key: &str) -> serde_js
 /// document validation before storing to database.
 ///
 /// Named `TradingProfileImportVerb` (not `TradingProfileImport`) because the
-/// module path `crate::trading_profile::TradingProfileImport` already names a
+/// module path `ob_poc_trading_profile::TradingProfileImport` already names a
 /// YAML-deserializable import-document type, and we want to avoid shadowing.
 pub(super) struct TradingProfileImportVerb;
 
@@ -689,7 +689,7 @@ async fn materialize_ssi(
 async fn materialize_universe(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     cbu_id: Uuid,
-    universe: &crate::trading_profile::Universe,
+    universe: &ob_poc_trading_profile::Universe,
     refs: &ReferenceMaps,
     _opts: &MaterializationOptions,
 ) -> Result<i32> {
@@ -1384,7 +1384,7 @@ impl SemOsVerbOp for TradingProfileCreateDraft {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        use crate::trading_profile::ast_db;
+        use ob_poc_trading_profile::ast_db;
 
         let pool = scope.pool().clone();
 

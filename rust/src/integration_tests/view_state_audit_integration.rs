@@ -26,7 +26,7 @@ mod view_state_audit_tests {
     use crate::dsl_v2::planning::compile;
     use crate::dsl_v2::syntax::parse_program;
     use crate::session::ViewState;
-    use crate::taxonomy::{TaxonomyContext, TaxonomyNode};
+    use ob_poc_taxonomy::taxonomy::{TaxonomyContext, TaxonomyNode};
 
     // =========================================================================
     // TEST INFRASTRUCTURE

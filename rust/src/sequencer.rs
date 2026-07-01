@@ -1212,8 +1212,8 @@ impl ReplOrchestratorV2 {
         session_id: Option<Uuid>,
         input: &str,
     ) -> Result<crate::mcp::intent_pipeline::PipelineResult, OrchestratorError> {
-        let actor = crate::policy::ActorResolver::from_env();
-        let policy_gate = Arc::new(crate::policy::PolicyGate::from_env());
+        let actor = ob_poc_boundary::policy::ActorResolver::from_env();
+        let policy_gate = Arc::new(ob_poc_boundary::policy::PolicyGate::from_env());
 
         let searcher = self.verb_searcher.clone().ok_or_else(|| {
             OrchestratorError::Configuration("verb_searcher is not configured".to_string())
@@ -4766,7 +4766,7 @@ impl ReplOrchestratorV2 {
         let constellation_family = tos.map(|f| f.constellation_family.clone());
         let constellation_map = tos.map(|f| f.constellation_map.clone());
         let allowed_verbs = if let Some(ref client) = self.sem_os_client {
-            let actor = crate::policy::ActorResolver::from_env();
+            let actor = ob_poc_boundary::policy::ActorResolver::from_env();
             let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
                 client.as_ref(),
                 &actor,
@@ -5010,17 +5010,17 @@ impl ReplOrchestratorV2 {
                     .dsl
                     .clone();
                 let summary = format!("Auto-confirmed (quick): {}", sentence);
-                let acp_dag_semantic = Some(crate::acp_dag_semantic::AcpDagSemanticResolution {
-                    status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+                let acp_dag_semantic = Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+                    status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
                     utterance: sentence.clone(),
                     selected_dispatch: Some(
-                        crate::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
+                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
                             dispatch_kind:
-                                crate::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
                             fqn: verb.clone(),
                             confidence: 1.0,
                             confidence_band:
-                                crate::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
                             matched_phrase: Some(sentence.clone()),
                             description: None,
                         },
@@ -5275,7 +5275,7 @@ impl ReplOrchestratorV2 {
         // deterministic output construction.
         let composition: crate::sequencer_stages::VerbSurfaceComposition =
             if let Some(ref client) = self.sem_os_client {
-                let actor = crate::policy::ActorResolver::from_env();
+                let actor = ob_poc_boundary::policy::ActorResolver::from_env();
                 let tos = session.workspace_stack.last();
                 let constellation_family = tos.map(|f| f.constellation_family.clone());
                 let constellation_map = tos.map(|f| f.constellation_map.clone());
@@ -5706,17 +5706,17 @@ impl ReplOrchestratorV2 {
 
                     let summary = format!("Auto-confirmed (quick): {}", sentence);
                     let acp_dag_semantic =
-                        Some(crate::acp_dag_semantic::AcpDagSemanticResolution {
-                            status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+                        Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+                            status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
                             utterance: sentence.clone(),
                             selected_dispatch: Some(
-                                crate::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
                                     dispatch_kind:
-                                        crate::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
                                     fqn: verb.clone(),
                                     confidence: 1.0,
                                     confidence_band:
-                                        crate::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
                                     matched_phrase: Some(sentence.clone()),
                                     description: None,
                                 },
@@ -6071,17 +6071,17 @@ impl ReplOrchestratorV2 {
 
                     let summary = format!("Auto-confirmed (quick): {}", sentence);
                     let acp_dag_semantic =
-                        Some(crate::acp_dag_semantic::AcpDagSemanticResolution {
-                            status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+                        Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+                            status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
                             utterance: sentence.clone(),
                             selected_dispatch: Some(
-                                crate::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
                                     dispatch_kind:
-                                        crate::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
                                     fqn: verb.clone(),
                                     confidence: 1.0,
                                     confidence_band:
-                                        crate::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
                                     matched_phrase: Some(sentence.clone()),
                                     description: None,
                                 },
@@ -7690,7 +7690,7 @@ impl ReplOrchestratorV2 {
         let tos = session.workspace_stack.last();
         let constellation_family = tos.map(|f| f.constellation_family.clone());
         let constellation_map = tos.map(|f| f.constellation_map.clone());
-        let actor = crate::policy::ActorResolver::from_env();
+        let actor = ob_poc_boundary::policy::ActorResolver::from_env();
         let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
             client.as_ref(),
             &actor,
@@ -7714,8 +7714,8 @@ impl ReplOrchestratorV2 {
         // spec says stage 6 produces. Shadow-only — does not gate dispatch.
         // Phase B (F6) replaces the existing recheck-returns-failure path
         // with envelope-primary dispatch.
-        let shadow_envelope = crate::envelope_builder::build_shadow_envelope(
-            &crate::envelope_builder::EnvelopeInputs {
+        let shadow_envelope = ob_poc_boundary::envelope_builder::build_shadow_envelope(
+            &ob_poc_boundary::envelope_builder::EnvelopeInputs {
                 session_id: session.id,
                 verb_fqn: &entry.verb,
                 args: serde_json::json!({

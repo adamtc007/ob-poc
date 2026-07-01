@@ -495,7 +495,7 @@ impl ToolHandlers {
     // =========================================================================
 
     pub(crate) async fn taxonomy_get(&self, args: Value) -> Result<Value> {
-        use crate::taxonomy::{TaxonomyNode, TaxonomyService};
+        use ob_poc_taxonomy::taxonomy::{TaxonomyNode, TaxonomyService};
 
         let pool = self.require_pool()?;
         let include_counts = args["include_counts"].as_bool().unwrap_or(true);
@@ -524,7 +524,7 @@ impl ToolHandlers {
 
     /// Drill into a taxonomy node
     pub(crate) async fn taxonomy_drill_in(&self, args: Value) -> Result<Value> {
-        use crate::taxonomy::{TaxonomyFrame, TaxonomyService};
+        use ob_poc_taxonomy::taxonomy::{TaxonomyFrame, TaxonomyService};
 
         let sessions = self.require_sessions()?;
         let pool = self.require_pool()?;
@@ -703,7 +703,7 @@ impl ToolHandlers {
 
     /// List entities of the currently focused type
     pub(crate) async fn taxonomy_entities(&self, args: Value) -> Result<Value> {
-        use crate::taxonomy::TaxonomyService;
+        use ob_poc_taxonomy::taxonomy::TaxonomyService;
 
         let sessions = self.require_sessions()?;
         let pool = self.require_pool()?;
@@ -959,7 +959,7 @@ impl ToolHandlers {
     // =========================================================================
 
     pub(crate) async fn feedback_analyze(&self, args: Value) -> Result<Value> {
-        use crate::feedback::FeedbackInspector;
+        use ob_poc_authoring::feedback::FeedbackInspector;
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -989,7 +989,7 @@ impl ToolHandlers {
     }
 
     pub(crate) async fn feedback_list(&self, args: Value) -> Result<Value> {
-        use crate::feedback::{FeedbackInspector, IssueFilter};
+        use ob_poc_authoring::feedback::{FeedbackInspector, IssueFilter};
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -1034,7 +1034,7 @@ impl ToolHandlers {
     }
 
     pub(crate) async fn feedback_get(&self, args: Value) -> Result<Value> {
-        use crate::feedback::FeedbackInspector;
+        use ob_poc_authoring::feedback::FeedbackInspector;
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -1096,7 +1096,7 @@ impl ToolHandlers {
     }
 
     pub(crate) async fn feedback_repro(&self, args: Value) -> Result<Value> {
-        use crate::feedback::{FeedbackInspector, ReproGenerator};
+        use ob_poc_authoring::feedback::{FeedbackInspector, ReproGenerator};
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -1124,7 +1124,7 @@ impl ToolHandlers {
     }
 
     pub(crate) async fn feedback_todo(&self, args: Value) -> Result<Value> {
-        use crate::feedback::{FeedbackInspector, TodoGenerator};
+        use ob_poc_authoring::feedback::{FeedbackInspector, TodoGenerator};
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -1152,7 +1152,7 @@ impl ToolHandlers {
     }
 
     pub(crate) async fn feedback_audit(&self, args: Value) -> Result<Value> {
-        use crate::feedback::FeedbackInspector;
+        use ob_poc_authoring::feedback::FeedbackInspector;
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -1188,8 +1188,8 @@ impl ToolHandlers {
 // Helper functions for parsing enum strings
 // =========================================================================
 
-pub(crate) fn parse_issue_status(s: &str) -> Option<crate::feedback::IssueStatus> {
-    use crate::feedback::IssueStatus;
+pub(crate) fn parse_issue_status(s: &str) -> Option<ob_poc_authoring::feedback::IssueStatus> {
+    use ob_poc_authoring::feedback::IssueStatus;
     match s.to_uppercase().as_str() {
         "NEW" => Some(IssueStatus::New),
         "REPRO_GENERATED" => Some(IssueStatus::ReproGenerated),
@@ -1203,8 +1203,8 @@ pub(crate) fn parse_issue_status(s: &str) -> Option<crate::feedback::IssueStatus
     }
 }
 
-pub(crate) fn parse_error_type(s: &str) -> Option<crate::feedback::ErrorType> {
-    use crate::feedback::ErrorType;
+pub(crate) fn parse_error_type(s: &str) -> Option<ob_poc_authoring::feedback::ErrorType> {
+    use ob_poc_authoring::feedback::ErrorType;
     match s.to_uppercase().as_str() {
         "TIMEOUT" => Some(ErrorType::Timeout),
         "RATE_LIMITED" => Some(ErrorType::RateLimited),

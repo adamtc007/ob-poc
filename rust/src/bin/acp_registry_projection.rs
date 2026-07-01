@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use ob_poc::acp_registry_projection::build_slice1_acp_registry_projection;
+use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 use std::io::Write;
 use std::path::PathBuf;
 

@@ -14,7 +14,7 @@ use super::resources_sem_reg;
 use super::tools::get_tools;
 use super::tools_sem_reg;
 use crate::agent::learning::embedder::SharedEmbedder;
-use crate::policy::ActorResolver;
+use ob_poc_boundary::policy::ActorResolver;
 
 use sem_os_client::SemOsClient;
 

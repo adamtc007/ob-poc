@@ -49,7 +49,7 @@ use sem_os_postgres::ops::SemOsVerbOpRegistry;
 use sqlx::PgPool;
 
 // Event infrastructure for observability
-use crate::events::SharedEmitter;
+use ob_poc_diagnostics::events::SharedEmitter;
 
 // Error aggregation for best-effort execution
 #[cfg(feature = "database")]
@@ -1349,14 +1349,14 @@ impl DslExecutor {
 
             match &result {
                 Ok(_) => {
-                    events.emit(crate::events::DslEvent::succeeded(
+                    events.emit(ob_poc_diagnostics::events::DslEvent::succeeded(
                         session_id,
                         verb_name,
                         duration_ms,
                     ));
                 }
                 Err(e) => {
-                    events.emit(crate::events::DslEvent::failed(
+                    events.emit(ob_poc_diagnostics::events::DslEvent::failed(
                         session_id,
                         verb_name,
                         duration_ms,
@@ -2236,12 +2236,12 @@ impl DslExecutor {
             if let Some(ref events) = self.events {
                 let duration_ms = step_start.elapsed().as_millis() as u64;
                 match &verb_result {
-                    Ok(_) => events.emit(crate::events::DslEvent::succeeded(
+                    Ok(_) => events.emit(ob_poc_diagnostics::events::DslEvent::succeeded(
                         ctx.session_id,
                         verb_name.clone(),
                         duration_ms,
                     )),
-                    Err(e) => events.emit(crate::events::DslEvent::failed(
+                    Err(e) => events.emit(ob_poc_diagnostics::events::DslEvent::failed(
                         ctx.session_id,
                         verb_name.clone(),
                         duration_ms,

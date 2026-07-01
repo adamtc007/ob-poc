@@ -52,7 +52,7 @@ pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResp
         acp_trace: resp
             .acp_dag_semantic
             .as_ref()
-            .map(crate::acp_dag_semantic::acp_chat_trace_summary_typed),
+            .map(ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed),
         // Phase A.2 (F5 follow-on): forward the turn-level correlation id.
         trace_id: resp.trace_id,
         bpmn_form: resp.bpmn_form.clone(),

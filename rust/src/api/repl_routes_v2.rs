@@ -51,7 +51,7 @@ pub struct ReplV2RouteState {
 }
 
 static REPL_ACP_AGENTS: LazyLock<
-    tokio::sync::Mutex<std::collections::BTreeMap<Uuid, crate::acp_protocol::AcpJsonRpcAgent>>,
+    tokio::sync::Mutex<std::collections::BTreeMap<Uuid, ob_poc_boundary::acp_protocol::AcpJsonRpcAgent>>,
 > = LazyLock::new(|| tokio::sync::Mutex::new(std::collections::BTreeMap::new()));
 
 // ============================================================================
@@ -321,16 +321,16 @@ fn default_kyc_update_status_transition_ref() -> String {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AcpOpenSessionRequest {
     #[serde(default = "default_acp_adapter")]
-    pub adapter: crate::acp::AcpAdapterKind,
+    pub adapter: ob_poc_boundary::acp::AcpAdapterKind,
     #[serde(default)]
-    pub persona: Option<crate::acp::AcpPersonaMode>,
+    pub persona: Option<ob_poc_boundary::acp::AcpPersonaMode>,
 }
 
 /// Request to assemble redacted Sage context for an ACP session.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AcpContextAssemblyRequest {
     #[serde(default = "default_acp_adapter")]
-    pub adapter: crate::acp::AcpAdapterKind,
+    pub adapter: ob_poc_boundary::acp::AcpAdapterKind,
     pub probe_id: String,
     pub subject_kind: String,
     pub subject_id: String,
@@ -354,7 +354,7 @@ pub struct AcpGatewayRouteRequest {
 
 #[derive(Debug, Clone)]
 struct KycUpdateStatusLlmDraftInput {
-    adapter: crate::acp::AcpAdapterKind,
+    adapter: ob_poc_boundary::acp::AcpAdapterKind,
     subject_id: Uuid,
     current_state: String,
     configuration_version: String,
@@ -365,8 +365,8 @@ struct KycUpdateStatusLlmDraftInput {
     actor_roles: Vec<String>,
 }
 
-fn default_acp_adapter() -> crate::acp::AcpAdapterKind {
-    crate::acp::AcpAdapterKind::Zed
+fn default_acp_adapter() -> ob_poc_boundary::acp::AcpAdapterKind {
+    ob_poc_boundary::acp::AcpAdapterKind::Zed
 }
 
 impl From<ReplSessionV2> for SessionStateResponseV2 {
@@ -1080,8 +1080,8 @@ async fn get_acp_policy_route(
         .map_err(acp_json_error)
 }
 
-fn acp_policy_value(session_id: Uuid) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+fn acp_policy_value(session_id: Uuid) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
     let policy = facade.policy(session_id)?;
 
     Ok(serde_json::json!({
@@ -1101,8 +1101,8 @@ async fn list_acp_projections_route(
 
 fn list_acp_projections_value(
     session_id: Uuid,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
     let pack_id = facade.manifest().pack_id.clone();
     let projections = facade.projections_list(session_id)?;
 
@@ -1189,17 +1189,17 @@ async fn get_acp_projection_value_for_state(
     state: &ReplV2RouteState,
     session_id: Uuid,
     kind: &str,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
     let parsed_kind = kind.parse::<AcpProjectionKind>().map_err(|_| {
-        crate::acp::AcpAdapterError::ProjectionUnknown {
+        ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.to_string(),
         }
     })?;
 
     if let Some(repl_session) = state.orchestrator.get_session(session_id).await {
         let session =
-            facade.open_session_with_persona(session_id, crate::acp::AcpPersonaMode::SagePlanning);
+            facade.open_session_with_persona(session_id, ob_poc_boundary::acp::AcpPersonaMode::SagePlanning);
         if let Some(projection) =
             build_live_acp_projection(&session, facade.manifest(), &repl_session, parsed_kind)?
         {
@@ -1216,16 +1216,16 @@ async fn get_acp_projection_value_for_state(
 fn get_acp_projection_value(
     session_id: Uuid,
     kind: &str,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let facade = crate::acp_facade::AcpFacade::for_default_pack(crate::acp::AcpAdapterKind::Zed)?;
+) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
     let kind = kind
         .parse::<sem_os_policy::acp_projection::AcpProjectionKind>()
-        .map_err(|_| crate::acp::AcpAdapterError::ProjectionUnknown {
+        .map_err(|_| ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.to_string(),
         })?;
     let projection = facade.projection_get(
         session_id,
-        crate::acp::AcpProjectionRequest {
+        ob_poc_boundary::acp::AcpProjectionRequest {
             kind,
             subject: None,
             language_pack_request: None,
@@ -1305,17 +1305,17 @@ fn live_affinity_edges(repl_session: &ReplSessionV2) -> Vec<serde_json::Value> {
 /// shared by REST and stdio. See `acp::build_acp_projection` for the
 /// canonical declared-source contract.
 fn build_live_acp_projection(
-    session: &crate::acp::AcpSession,
+    session: &ob_poc_boundary::acp::AcpSession,
     manifest: &DomainPackManifest,
     repl_session: &ReplSessionV2,
     kind: AcpProjectionKind,
-) -> Result<Option<AcpProjectionEnvelope>, crate::acp::AcpAdapterError> {
+) -> Result<Option<AcpProjectionEnvelope>, ob_poc_boundary::acp::AcpAdapterError> {
     let Some(catalog_entry) = manifest
         .projection_catalog
         .iter()
         .find(|entry| entry.kind == kind)
     else {
-        return Err(crate::acp::AcpAdapterError::ProjectionUnknown {
+        return Err(ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.as_str().to_string(),
         });
     };
@@ -1502,11 +1502,11 @@ fn open_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde
     // open_session_with_persona is a transport convenience; manifest is not
     // needed for session-only operations so we construct the facade lazily
     // only when domain calls are required.
-    let session = crate::acp::open_acp_session_with_persona(
+    let session = ob_poc_boundary::acp::open_acp_session_with_persona(
         session_id,
         req.adapter,
         req.persona
-            .unwrap_or(crate::acp::AcpPersonaMode::SagePlanning),
+            .unwrap_or(ob_poc_boundary::acp::AcpPersonaMode::SagePlanning),
     );
     serde_json::json!({
         "status": "acp_session_open",
@@ -1524,13 +1524,13 @@ async fn close_acp_session_route(
 }
 
 fn close_acp_session_value(session_id: Uuid, req: AcpOpenSessionRequest) -> serde_json::Value {
-    let mut session = crate::acp::open_acp_session_with_persona(
+    let mut session = ob_poc_boundary::acp::open_acp_session_with_persona(
         session_id,
         req.adapter,
         req.persona
-            .unwrap_or(crate::acp::AcpPersonaMode::SagePlanning),
+            .unwrap_or(ob_poc_boundary::acp::AcpPersonaMode::SagePlanning),
     );
-    crate::acp::close_acp_session(&mut session);
+    ob_poc_boundary::acp::close_acp_session(&mut session);
     serde_json::json!({
         "status": "acp_session_closed",
         "session": session,
@@ -1573,8 +1573,8 @@ async fn assemble_acp_context_route(
 fn assemble_acp_context_value(
     session_id: Uuid,
     req: AcpContextAssemblyRequest,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let facade = crate::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
+) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
     let subject = sem_os_policy::domain_pack::DiscoverySubject {
         subject_kind: req.subject_kind,
         subject_id: req.subject_id,
@@ -1604,32 +1604,32 @@ fn assemble_acp_context_value(
 
 pub(crate) async fn handle_repl_acp_request(
     session_id: Uuid,
-    request: crate::acp_protocol::JsonRpcRequest,
-) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
+    request: ob_poc_boundary::acp_protocol::JsonRpcRequest,
+) -> Vec<ob_poc_boundary::acp_protocol::JsonRpcOutgoing> {
     let mut agents = REPL_ACP_AGENTS.lock().await;
     let agent = agents
         .entry(session_id)
-        .or_insert_with(crate::acp_protocol::AcpJsonRpcAgent::new);
+        .or_insert_with(ob_poc_boundary::acp_protocol::AcpJsonRpcAgent::new);
     agent.handle_request(request)
 }
 
 fn json_rpc_outgoing_result(
-    outgoing: &[crate::acp_protocol::JsonRpcOutgoing],
+    outgoing: &[ob_poc_boundary::acp_protocol::JsonRpcOutgoing],
 ) -> Option<serde_json::Value> {
     outgoing.iter().rev().find_map(|item| match item {
-        crate::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
-        crate::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
     })
 }
 
 async fn resolve_acp_prompt_language_loop_request(
     session_id: Uuid,
-    prompt: &[crate::acp_protocol::AcpContentBlock],
-) -> Result<crate::acp_protocol::AcpKycLanguageLoopRequest, Vec<&'static str>> {
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Result<ob_poc_boundary::acp_protocol::AcpKycLanguageLoopRequest, Vec<&'static str>> {
     let mut agents = REPL_ACP_AGENTS.lock().await;
     let agent = agents
         .entry(session_id)
-        .or_insert_with(crate::acp_protocol::AcpJsonRpcAgent::new);
+        .or_insert_with(ob_poc_boundary::acp_protocol::AcpJsonRpcAgent::new);
     agent.kyc_update_status_language_loop_request_from_prompt(session_id, prompt)
 }
 
@@ -1682,7 +1682,7 @@ async fn acp_gateway_route_with_llm_client(
 
     let outgoing = handle_repl_acp_request(
         session_id,
-        crate::acp_protocol::JsonRpcRequest {
+        ob_poc_boundary::acp_protocol::JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: Some(serde_json::json!("repl-acp-gateway")),
             method: req.method.clone(),
@@ -1766,7 +1766,7 @@ fn acp_prompt_params_request_llm_draft(
 pub(crate) async fn process_acp_prompt_deterministic_envelope(
     state: &ReplV2RouteState,
     session_id: Uuid,
-    prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+    prompt: Vec<ob_poc_boundary::acp_protocol::AcpContentBlock>,
     response_id: serde_json::Value,
     envelope_status: &'static str,
 ) -> serde_json::Value {
@@ -1795,7 +1795,7 @@ pub(crate) async fn process_acp_prompt_deterministic_envelope(
     };
     let prompt_outgoing = handle_repl_acp_request(
         session_id,
-        crate::acp_protocol::JsonRpcRequest {
+        ob_poc_boundary::acp_protocol::JsonRpcRequest {
             jsonrpc: "2.0".to_string(),
             id: Some(response_id),
             method: "session/prompt".to_string(),
@@ -1839,9 +1839,9 @@ pub(crate) async fn process_acp_prompt_deterministic_envelope(
 /// (below) serializes it back into the JSON envelope for non-typed
 /// consumers (ACP JSON-RPC server, envelope byte-equality baseline).
 pub(crate) fn compute_session_aware_runtime_trace_typed(
-    resolution: &crate::acp_dag_semantic::AcpDagSemanticResolution,
+    resolution: &ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution,
     session: &ReplSessionV2,
-) -> Option<crate::acp_dag_semantic::AcpDagSemanticRuntimeTrace> {
+) -> Option<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticRuntimeTrace> {
     let pack_id = resolution.pack.as_ref()?.pack_id.clone();
     let static_envelope_hash = resolution
         .envelope_trace
@@ -1868,7 +1868,7 @@ pub(crate) fn compute_session_aware_runtime_trace_typed(
         },
     );
     let projection = crate::acp_runtime_context::build_acp_runtime_context_projection(source);
-    Some(crate::acp_dag_semantic::AcpDagSemanticRuntimeTrace {
+    Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticRuntimeTrace {
         schema_version: projection.schema_version,
         pack_id: projection.pack_id,
         snapshot_id: projection.snapshot_id,
@@ -1892,7 +1892,7 @@ pub(crate) fn compute_session_aware_runtime_trace_typed(
 /// source of truth.
 fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, session: &ReplSessionV2) {
     let Some(resolution) = result.get("dag_semantic").and_then(|v| {
-        serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+        serde_json::from_value::<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
     }) else {
         return;
     };
@@ -1919,7 +1919,7 @@ fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, sessio
 pub(crate) async fn process_acp_prompt_llm_envelope(
     state: &ReplV2RouteState,
     session_id: Uuid,
-    prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+    prompt: Vec<ob_poc_boundary::acp_protocol::AcpContentBlock>,
     response_id: serde_json::Value,
     envelope_status: &'static str,
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
@@ -2009,9 +2009,9 @@ async fn run_acp_prompt_llm_draft_value_with_client(
     session_id: Uuid,
     req: KycUpdateStatusLlmDraftInput,
     client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
-) -> Result<serde_json::Value, crate::acp::AcpAdapterError> {
-    let facade = crate::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
-    let session = crate::acp::open_acp_session(session_id, req.adapter);
+) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(req.adapter)?;
+    let session = ob_poc_boundary::acp::open_acp_session(session_id, req.adapter);
     let total_started_at = Instant::now();
     let actor_id = req
         .actor_id
@@ -2023,7 +2023,7 @@ async fn run_acp_prompt_llm_draft_value_with_client(
         req.actor_roles.clone()
     };
 
-    let case_state = crate::acp::AcpKycCaseStateSnapshot {
+    let case_state = ob_poc_boundary::acp::AcpKycCaseStateSnapshot {
         session_id,
         pack_id: facade.manifest().pack_id.clone(),
         subject_kind: "kyc_case".to_string(),
@@ -2114,8 +2114,8 @@ async fn run_acp_prompt_llm_draft_value_with_client(
 #[allow(clippy::too_many_arguments)]
 fn acp_llm_harness_completed_value(
     language_pack: crate::runbook::SemOsLanguagePack,
-    case_state: crate::acp::AcpKycCaseStateSnapshot,
-    llm_trace: crate::llm_trace::LlmInferenceTrace,
+    case_state: ob_poc_boundary::acp::AcpKycCaseStateSnapshot,
+    llm_trace: ob_poc_boundary::llm_trace::LlmInferenceTrace,
     draft: crate::runbook::KycUpdateStatusWorkbookDraft,
     adapter_diagnostics: Vec<crate::runbook::WorkbookDiagnostic>,
     outcome: crate::runbook::WorkbookRevisionOutcome,
@@ -2287,11 +2287,11 @@ fn adapter_trace_events(
 #[allow(clippy::too_many_arguments)]
 fn acp_llm_adapter_structured_refusal_value(
     language_pack: &crate::runbook::SemOsLanguagePack,
-    case_state: crate::acp::AcpKycCaseStateSnapshot,
+    case_state: ob_poc_boundary::acp::AcpKycCaseStateSnapshot,
     refusal_code: impl Into<String>,
     message: impl Into<String>,
     diagnostics: Vec<crate::runbook::WorkbookDiagnostic>,
-    llm_trace: Option<crate::llm_trace::LlmInferenceTrace>,
+    llm_trace: Option<ob_poc_boundary::llm_trace::LlmInferenceTrace>,
     language_pack_us: u64,
     adapter_us: u64,
     total_us: u64,
@@ -3621,22 +3621,22 @@ fn compilation_json_error(
 }
 
 pub(crate) fn load_ob_poc_kyc_domain_pack(
-) -> Result<sem_os_policy::domain_pack::DomainPackManifest, crate::acp::AcpAdapterError> {
-    crate::acp_facade::load_ob_poc_kyc_domain_pack()
+) -> Result<sem_os_policy::domain_pack::DomainPackManifest, ob_poc_boundary::acp::AcpAdapterError> {
+    ob_poc_boundary::acp_facade::load_ob_poc_kyc_domain_pack()
 }
 
-fn acp_json_error(error: crate::acp::AcpAdapterError) -> (StatusCode, Json<ErrorResponseV2>) {
+fn acp_json_error(error: ob_poc_boundary::acp::AcpAdapterError) -> (StatusCode, Json<ErrorResponseV2>) {
     let status = match error {
-        crate::acp::AcpAdapterError::DiscoveryRefused { .. }
-        | crate::acp::AcpAdapterError::DiscoveryMutatedState
-        | crate::acp::AcpAdapterError::MutationNotSupported
-        | crate::acp::AcpAdapterError::ProjectionUnknown { .. }
-        | crate::acp::AcpAdapterError::ProjectionSubjectRefused { .. }
-        | crate::acp::AcpAdapterError::LanguagePackRefused { .. }
-        | crate::acp::AcpAdapterError::CaseStateDiscoveryRefused { .. }
-        | crate::acp::AcpAdapterError::DryRunRefused { .. } => StatusCode::CONFLICT,
-        crate::acp::AcpAdapterError::SessionClosed
-        | crate::acp::AcpAdapterError::PackInvalid { .. } => StatusCode::BAD_REQUEST,
+        ob_poc_boundary::acp::AcpAdapterError::DiscoveryRefused { .. }
+        | ob_poc_boundary::acp::AcpAdapterError::DiscoveryMutatedState
+        | ob_poc_boundary::acp::AcpAdapterError::MutationNotSupported
+        | ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown { .. }
+        | ob_poc_boundary::acp::AcpAdapterError::ProjectionSubjectRefused { .. }
+        | ob_poc_boundary::acp::AcpAdapterError::LanguagePackRefused { .. }
+        | ob_poc_boundary::acp::AcpAdapterError::CaseStateDiscoveryRefused { .. }
+        | ob_poc_boundary::acp::AcpAdapterError::DryRunRefused { .. } => StatusCode::CONFLICT,
+        ob_poc_boundary::acp::AcpAdapterError::SessionClosed
+        | ob_poc_boundary::acp::AcpAdapterError::PackInvalid { .. } => StatusCode::BAD_REQUEST,
     };
 
     (
@@ -4527,7 +4527,7 @@ mod tests {
     /// `/session/:id/input`; ACP clients enter through `/session/:id/acp/gateway`.
     #[derive(Debug, Clone)]
     struct AcpPromptEnvelopeRequest {
-        pub prompt: Vec<crate::acp_protocol::AcpContentBlock>,
+        pub prompt: Vec<ob_poc_boundary::acp_protocol::AcpContentBlock>,
     }
 
     fn test_session_id() -> Uuid {
@@ -4607,8 +4607,8 @@ mod tests {
         current_state: &str,
         configuration_version: &str,
         state_snapshot_id: &str,
-    ) -> crate::acp_protocol::AcpContentBlock {
-        crate::acp_protocol::AcpContentBlock::EmbeddedResource {
+    ) -> ob_poc_boundary::acp_protocol::AcpContentBlock {
+        ob_poc_boundary::acp_protocol::AcpContentBlock::EmbeddedResource {
             uri: format!("semos://entity/{}", test_case_id()),
             name: Some("KYC read-state probe".to_string()),
             mime_type: Some("application/json".to_string()),
@@ -4642,7 +4642,7 @@ mod tests {
         AcpGatewayRouteRequest {
             method: "obpoc/kyc_case_state/discover".to_string(),
             params: serde_json::json!({
-                "adapter": crate::acp::AcpAdapterKind::TestHarness,
+                "adapter": ob_poc_boundary::acp::AcpAdapterKind::TestHarness,
                 "subject_id": test_case_id(),
                 "observations": [
                     {"key": "case.status", "value": current_state, "classification": "internal"},
@@ -4670,7 +4670,7 @@ mod tests {
         };
         AcpPromptEnvelopeRequest {
             prompt: vec![
-                crate::acp_protocol::AcpContentBlock::Text { text },
+                ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text },
                 discovery_resource(current_state, "config-1", "snapshot-1"),
             ],
         }
@@ -4686,7 +4686,7 @@ mod tests {
             text.push_str(evidence_digest);
         }
         AcpPromptEnvelopeRequest {
-            prompt: vec![crate::acp_protocol::AcpContentBlock::Text { text }],
+            prompt: vec![ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text }],
         }
     }
 
@@ -4754,13 +4754,13 @@ mod tests {
     #[test]
     fn test_json_rpc_result_prefers_prompt_response_after_seeded_discovery() {
         let outgoing = vec![
-            crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(ob_poc_boundary::acp_protocol::JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
                 id: Some(serde_json::json!("live-case-state-discovery")),
                 result: Some(serde_json::json!({"status": "kyc_case_state_discovered"})),
                 error: None,
             }),
-            crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(ob_poc_boundary::acp_protocol::JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
                 id: Some(serde_json::json!("prompt")),
                 result: Some(serde_json::json!({"status": "dry_run_validated"})),
@@ -5657,15 +5657,15 @@ mod tests {
         req: AcpPromptEnvelopeRequest,
         variant: LiveAblationVariant,
         client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
-    ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), crate::acp::AcpAdapterError>
+    ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), ob_poc_boundary::acp::AcpAdapterError>
     {
-        let prompt_request = crate::acp_protocol::AcpJsonRpcAgent::new()
+        let prompt_request = ob_poc_boundary::acp_protocol::AcpJsonRpcAgent::new()
             .kyc_update_status_language_loop_request_from_prompt(session_id, &req.prompt)
-            .map_err(|missing| crate::acp::AcpAdapterError::LanguagePackRefused {
+            .map_err(|missing| ob_poc_boundary::acp::AcpAdapterError::LanguagePackRefused {
                 reason: format!("prompt missing {}", missing.join(", ")),
             })?;
-        let facade = crate::acp_facade::AcpFacade::for_default_pack(prompt_request.adapter)?;
-        let session = crate::acp::open_acp_session(session_id, prompt_request.adapter);
+        let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(prompt_request.adapter)?;
+        let session = ob_poc_boundary::acp::open_acp_session(session_id, prompt_request.adapter);
         let total_started_at = Instant::now();
         let actor_id = prompt_request.draft.actor_id.clone();
         let actor_roles = if prompt_request.draft.actor_roles.is_empty() {
@@ -5673,7 +5673,7 @@ mod tests {
         } else {
             prompt_request.draft.actor_roles.clone()
         };
-        let case_state = crate::acp::AcpKycCaseStateSnapshot {
+        let case_state = ob_poc_boundary::acp::AcpKycCaseStateSnapshot {
             session_id,
             pack_id: facade.manifest().pack_id.clone(),
             subject_kind: "kyc_case".to_string(),
@@ -6518,7 +6518,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            crate::acp::AcpAdapterError::DiscoveryRefused { .. }
+            ob_poc_boundary::acp::AcpAdapterError::DiscoveryRefused { .. }
         ));
         let (status, _) = acp_json_error(err);
         assert_eq!(status, StatusCode::CONFLICT);
@@ -6609,7 +6609,7 @@ mod tests {
             AcpGatewayRouteRequest {
                 method: "obpoc/language_pack/get".to_string(),
                 params: serde_json::json!({
-                    "adapter": crate::acp::AcpAdapterKind::TestHarness,
+                    "adapter": ob_poc_boundary::acp::AcpAdapterKind::TestHarness,
                     "subject_id": test_case_id(),
                     "subject_kind": "kyc_case",
                     "verb": "kyc-case.update-status",

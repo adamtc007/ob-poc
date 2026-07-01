@@ -20,7 +20,7 @@ use axum::Router;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use crate::policy::PolicyGate;
+use ob_poc_boundary::policy::PolicyGate;
 use crate::sage::{DeterministicSage, LlmSage, SageEngine};
 
 // ============================================================================

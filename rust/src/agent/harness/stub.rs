@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::agent::orchestrator::{OrchestratorContext, UtteranceSource};
 use crate::mcp::verb_search::HybridVerbSearcher;
-use crate::policy::PolicyGate;
+use ob_poc_boundary::policy::PolicyGate;
 use crate::sem_reg::abac::ActorContext;
 
 use super::semos_stub::HarnessSemOsClient;

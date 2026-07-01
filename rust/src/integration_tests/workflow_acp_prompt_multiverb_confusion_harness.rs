@@ -1,6 +1,6 @@
 //! ACP prompt harness for KYC-adjacent multi-verb confusion.
 
-use crate::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
+use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
 use serde_json::{json, Value};
 use uuid::{uuid, Uuid};
 

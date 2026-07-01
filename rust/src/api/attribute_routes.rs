@@ -2,7 +2,7 @@
 //!
 //! All database access goes through VisualizationRepository or DictionaryServiceImpl.
 
-use crate::data_dictionary::DictionaryService;
+use ob_poc_authoring::data_dictionary::DictionaryService;
 use crate::database::VisualizationRepository;
 use crate::services::DictionaryServiceImpl;
 use axum::{

@@ -74,7 +74,7 @@ pub struct ReplResponseV2 {
     /// a Slice 1 pack-bound utterance. Adapter projects via
     /// `acp_chat_trace_summary_typed` into `ChatResponse.acp_trace`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub acp_dag_semantic: Option<crate::acp_dag_semantic::AcpDagSemanticResolution>,
+    pub acp_dag_semantic: Option<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>,
 
     /// Present when a dsl.form verb parked a BPMN fiber during this turn.
     /// Forwarded by the response adapter to ChatResponse.bpmn_form.
