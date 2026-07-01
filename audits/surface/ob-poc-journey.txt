@@ -1,0 +1,314 @@
+# ob-poc-journey | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:41:08Z
+pub mod ob_poc_journey
+pub mod ob_poc_journey::handoff
+pub struct ob_poc_journey::handoff::PackHandoff
+pub ob_poc_journey::handoff::PackHandoff::forwarded_context: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub ob_poc_journey::handoff::PackHandoff::forwarded_outcomes: alloc::vec::Vec<uuid::Uuid>
+pub ob_poc_journey::handoff::PackHandoff::source_runbook_id: uuid::Uuid
+pub ob_poc_journey::handoff::PackHandoff::target_pack_id: alloc::string::String
+impl core::clone::Clone for ob_poc_journey::handoff::PackHandoff
+pub fn ob_poc_journey::handoff::PackHandoff::clone(&self) -> ob_poc_journey::handoff::PackHandoff
+impl core::fmt::Debug for ob_poc_journey::handoff::PackHandoff
+pub fn ob_poc_journey::handoff::PackHandoff::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_journey::handoff::PackHandoff
+pub fn ob_poc_journey::handoff::PackHandoff::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_journey::handoff::PackHandoff
+pub fn ob_poc_journey::handoff::PackHandoff::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_journey::handoff::PackHandoff
+impl core::marker::Send for ob_poc_journey::handoff::PackHandoff
+impl core::marker::Sync for ob_poc_journey::handoff::PackHandoff
+impl core::marker::Unpin for ob_poc_journey::handoff::PackHandoff
+impl core::marker::UnsafeUnpin for ob_poc_journey::handoff::PackHandoff
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_journey::handoff::PackHandoff
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_journey::handoff::PackHandoff
+impl<T, U> core::convert::Into<U> for ob_poc_journey::handoff::PackHandoff where U: core::convert::From<T>
+pub fn ob_poc_journey::handoff::PackHandoff::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_journey::handoff::PackHandoff where U: core::convert::Into<T>
+pub type ob_poc_journey::handoff::PackHandoff::Error = core::convert::Infallible
+pub fn ob_poc_journey::handoff::PackHandoff::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_journey::handoff::PackHandoff where U: core::convert::TryFrom<T>
+pub type ob_poc_journey::handoff::PackHandoff::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_journey::handoff::PackHandoff::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_journey::handoff::PackHandoff where T: core::clone::Clone
+pub type ob_poc_journey::handoff::PackHandoff::Owned = T
+pub fn ob_poc_journey::handoff::PackHandoff::clone_into(&self, &mut T)
+pub fn ob_poc_journey::handoff::PackHandoff::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_journey::handoff::PackHandoff where T: 'static + ?core::marker::Sized
+pub fn ob_poc_journey::handoff::PackHandoff::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_journey::handoff::PackHandoff where T: ?core::marker::Sized
+pub fn ob_poc_journey::handoff::PackHandoff::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_journey::handoff::PackHandoff where T: ?core::marker::Sized
+pub fn ob_poc_journey::handoff::PackHandoff::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_journey::handoff::PackHandoff where T: core::clone::Clone
+pub unsafe fn ob_poc_journey::handoff::PackHandoff::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_journey::handoff::PackHandoff
+pub fn ob_poc_journey::handoff::PackHandoff::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_journey::handoff::PackHandoff where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_journey::handoff::PackHandoff
+pub type ob_poc_journey::handoff::PackHandoff::Output = T
+pub mod ob_poc_journey::pack
+pub use ob_poc_journey::pack::AnswerKind
+pub use ob_poc_journey::pack::PackManifest
+pub use ob_poc_journey::pack::PackQuestion
+pub use ob_poc_journey::pack::PackTemplate
+pub use ob_poc_journey::pack::ProgressSignal
+pub use ob_poc_journey::pack::RiskPolicy
+pub use ob_poc_journey::pack::SectionLayout
+pub use ob_poc_journey::pack::TemplateStep
+pub enum ob_poc_journey::pack::PackLoadError
+pub ob_poc_journey::pack::PackLoadError::Io
+pub ob_poc_journey::pack::PackLoadError::Io::path: alloc::string::String
+pub ob_poc_journey::pack::PackLoadError::Io::source: core::io::error::Error
+pub ob_poc_journey::pack::PackLoadError::Parse
+pub ob_poc_journey::pack::PackLoadError::Parse::path: alloc::string::String
+pub ob_poc_journey::pack::PackLoadError::Parse::source: serde_yaml::error::Error
+impl core::error::Error for ob_poc_journey::pack::PackLoadError
+pub fn ob_poc_journey::pack::PackLoadError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for ob_poc_journey::pack::PackLoadError
+pub fn ob_poc_journey::pack::PackLoadError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_journey::pack::PackLoadError
+pub fn ob_poc_journey::pack::PackLoadError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_journey::pack::PackLoadError
+impl core::marker::Send for ob_poc_journey::pack::PackLoadError
+impl core::marker::Sync for ob_poc_journey::pack::PackLoadError
+impl core::marker::Unpin for ob_poc_journey::pack::PackLoadError
+impl core::marker::UnsafeUnpin for ob_poc_journey::pack::PackLoadError
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_poc_journey::pack::PackLoadError
+impl !core::panic::unwind_safe::UnwindSafe for ob_poc_journey::pack::PackLoadError
+impl<T, U> core::convert::Into<U> for ob_poc_journey::pack::PackLoadError where U: core::convert::From<T>
+pub fn ob_poc_journey::pack::PackLoadError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_journey::pack::PackLoadError where U: core::convert::Into<T>
+pub type ob_poc_journey::pack::PackLoadError::Error = core::convert::Infallible
+pub fn ob_poc_journey::pack::PackLoadError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_journey::pack::PackLoadError where U: core::convert::TryFrom<T>
+pub type ob_poc_journey::pack::PackLoadError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_journey::pack::PackLoadError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_poc_journey::pack::PackLoadError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_journey::pack::PackLoadError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_journey::pack::PackLoadError where T: 'static + ?core::marker::Sized
+pub fn ob_poc_journey::pack::PackLoadError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_journey::pack::PackLoadError where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack::PackLoadError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_journey::pack::PackLoadError where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack::PackLoadError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_journey::pack::PackLoadError
+pub fn ob_poc_journey::pack::PackLoadError::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_journey::pack::PackLoadError
+pub type ob_poc_journey::pack::PackLoadError::Output = T
+pub fn ob_poc_journey::pack::load_pack_from_bytes(&[u8]) -> core::result::Result<(ob_poc_types::journey::pack_types::PackManifest, alloc::string::String), ob_poc_journey::pack::PackLoadError>
+pub fn ob_poc_journey::pack::load_pack_from_file(&std::path::Path) -> core::result::Result<(ob_poc_types::journey::pack_types::PackManifest, alloc::string::String), ob_poc_journey::pack::PackLoadError>
+pub fn ob_poc_journey::pack::load_packs_from_dir(&std::path::Path) -> core::result::Result<alloc::vec::Vec<(ob_poc_types::journey::pack_types::PackManifest, alloc::string::String)>, ob_poc_journey::pack::PackLoadError>
+pub fn ob_poc_journey::pack::manifest_hash(&[u8]) -> alloc::string::String
+pub mod ob_poc_journey::pack_state
+pub enum ob_poc_journey::pack_state::PackState
+pub ob_poc_journey::pack_state::PackState::Active
+pub ob_poc_journey::pack_state::PackState::Active::activated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_journey::pack_state::PackState::Active::progress: ob_poc_journey::pack_state::PackProgress
+pub ob_poc_journey::pack_state::PackState::Completed
+pub ob_poc_journey::pack_state::PackState::Completed::completed_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_journey::pack_state::PackState::Completed::final_progress: ob_poc_journey::pack_state::PackProgress
+pub ob_poc_journey::pack_state::PackState::Dormant
+pub ob_poc_journey::pack_state::PackState::Suspended
+pub ob_poc_journey::pack_state::PackState::Suspended::preserved_progress: ob_poc_journey::pack_state::PackProgress
+pub ob_poc_journey::pack_state::PackState::Suspended::reason: ob_poc_journey::pack_state::SuspendReason
+pub ob_poc_journey::pack_state::PackState::Suspended::suspended_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+impl ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::activate(&self) -> core::result::Result<Self, ob_poc_journey::pack_state::PackTransitionError>
+pub fn ob_poc_journey::pack_state::PackState::complete(&self) -> core::result::Result<Self, ob_poc_journey::pack_state::PackTransitionError>
+pub fn ob_poc_journey::pack_state::PackState::dormant() -> Self
+pub fn ob_poc_journey::pack_state::PackState::is_active(&self) -> bool
+pub fn ob_poc_journey::pack_state::PackState::is_dormant(&self) -> bool
+pub fn ob_poc_journey::pack_state::PackState::is_terminal(&self) -> bool
+pub fn ob_poc_journey::pack_state::PackState::progress(&self) -> core::option::Option<&ob_poc_journey::pack_state::PackProgress>
+pub fn ob_poc_journey::pack_state::PackState::progress_mut(&mut self) -> core::option::Option<&mut ob_poc_journey::pack_state::PackProgress>
+pub fn ob_poc_journey::pack_state::PackState::resume(&self) -> core::result::Result<Self, ob_poc_journey::pack_state::PackTransitionError>
+pub fn ob_poc_journey::pack_state::PackState::suspend(&self, ob_poc_journey::pack_state::SuspendReason) -> core::result::Result<Self, ob_poc_journey::pack_state::PackTransitionError>
+impl core::clone::Clone for ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::clone(&self) -> ob_poc_journey::pack_state::PackState
+impl core::cmp::PartialEq for ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::eq(&self, &ob_poc_journey::pack_state::PackState) -> bool
+impl core::fmt::Debug for ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_journey::pack_state::PackState
+impl serde_core::ser::Serialize for ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_journey::pack_state::PackState
+impl core::marker::Send for ob_poc_journey::pack_state::PackState
+impl core::marker::Sync for ob_poc_journey::pack_state::PackState
+impl core::marker::Unpin for ob_poc_journey::pack_state::PackState
+impl core::marker::UnsafeUnpin for ob_poc_journey::pack_state::PackState
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_journey::pack_state::PackState
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_journey::pack_state::PackState
+impl<T, U> core::convert::Into<U> for ob_poc_journey::pack_state::PackState where U: core::convert::From<T>
+pub fn ob_poc_journey::pack_state::PackState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_journey::pack_state::PackState where U: core::convert::Into<T>
+pub type ob_poc_journey::pack_state::PackState::Error = core::convert::Infallible
+pub fn ob_poc_journey::pack_state::PackState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_journey::pack_state::PackState where U: core::convert::TryFrom<T>
+pub type ob_poc_journey::pack_state::PackState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_journey::pack_state::PackState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_journey::pack_state::PackState where T: core::clone::Clone
+pub type ob_poc_journey::pack_state::PackState::Owned = T
+pub fn ob_poc_journey::pack_state::PackState::clone_into(&self, &mut T)
+pub fn ob_poc_journey::pack_state::PackState::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_journey::pack_state::PackState where T: 'static + ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_journey::pack_state::PackState where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_journey::pack_state::PackState where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_journey::pack_state::PackState where T: core::clone::Clone
+pub unsafe fn ob_poc_journey::pack_state::PackState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_journey::pack_state::PackState
+pub fn ob_poc_journey::pack_state::PackState::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_journey::pack_state::PackState where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_journey::pack_state::PackState
+pub type ob_poc_journey::pack_state::PackState::Output = T
+pub enum ob_poc_journey::pack_state::PackTransitionError
+pub ob_poc_journey::pack_state::PackTransitionError::InvalidTransition
+pub ob_poc_journey::pack_state::PackTransitionError::InvalidTransition::from: alloc::string::String
+pub ob_poc_journey::pack_state::PackTransitionError::InvalidTransition::to: alloc::string::String
+impl core::clone::Clone for ob_poc_journey::pack_state::PackTransitionError
+pub fn ob_poc_journey::pack_state::PackTransitionError::clone(&self) -> ob_poc_journey::pack_state::PackTransitionError
+impl core::error::Error for ob_poc_journey::pack_state::PackTransitionError
+impl core::fmt::Debug for ob_poc_journey::pack_state::PackTransitionError
+pub fn ob_poc_journey::pack_state::PackTransitionError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_journey::pack_state::PackTransitionError
+pub fn ob_poc_journey::pack_state::PackTransitionError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_journey::pack_state::PackTransitionError
+impl core::marker::Send for ob_poc_journey::pack_state::PackTransitionError
+impl core::marker::Sync for ob_poc_journey::pack_state::PackTransitionError
+impl core::marker::Unpin for ob_poc_journey::pack_state::PackTransitionError
+impl core::marker::UnsafeUnpin for ob_poc_journey::pack_state::PackTransitionError
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_journey::pack_state::PackTransitionError
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_journey::pack_state::PackTransitionError
+impl<T, U> core::convert::Into<U> for ob_poc_journey::pack_state::PackTransitionError where U: core::convert::From<T>
+pub fn ob_poc_journey::pack_state::PackTransitionError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_journey::pack_state::PackTransitionError where U: core::convert::Into<T>
+pub type ob_poc_journey::pack_state::PackTransitionError::Error = core::convert::Infallible
+pub fn ob_poc_journey::pack_state::PackTransitionError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_journey::pack_state::PackTransitionError where U: core::convert::TryFrom<T>
+pub type ob_poc_journey::pack_state::PackTransitionError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_journey::pack_state::PackTransitionError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_journey::pack_state::PackTransitionError where T: core::clone::Clone
+pub type ob_poc_journey::pack_state::PackTransitionError::Owned = T
+pub fn ob_poc_journey::pack_state::PackTransitionError::clone_into(&self, &mut T)
+pub fn ob_poc_journey::pack_state::PackTransitionError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_journey::pack_state::PackTransitionError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackTransitionError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_journey::pack_state::PackTransitionError where T: 'static + ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackTransitionError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_journey::pack_state::PackTransitionError where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackTransitionError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_journey::pack_state::PackTransitionError where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackTransitionError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_journey::pack_state::PackTransitionError where T: core::clone::Clone
+pub unsafe fn ob_poc_journey::pack_state::PackTransitionError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_journey::pack_state::PackTransitionError
+pub fn ob_poc_journey::pack_state::PackTransitionError::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_journey::pack_state::PackTransitionError
+pub type ob_poc_journey::pack_state::PackTransitionError::Output = T
+pub enum ob_poc_journey::pack_state::SuspendReason
+pub ob_poc_journey::pack_state::SuspendReason::AwaitingCallback
+pub ob_poc_journey::pack_state::SuspendReason::AwaitingCallback::callback_type: alloc::string::String
+pub ob_poc_journey::pack_state::SuspendReason::SystemSuspended
+pub ob_poc_journey::pack_state::SuspendReason::SystemSuspended::explanation: alloc::string::String
+pub ob_poc_journey::pack_state::SuspendReason::UserPaused
+impl core::clone::Clone for ob_poc_journey::pack_state::SuspendReason
+pub fn ob_poc_journey::pack_state::SuspendReason::clone(&self) -> ob_poc_journey::pack_state::SuspendReason
+impl core::cmp::PartialEq for ob_poc_journey::pack_state::SuspendReason
+pub fn ob_poc_journey::pack_state::SuspendReason::eq(&self, &ob_poc_journey::pack_state::SuspendReason) -> bool
+impl core::fmt::Debug for ob_poc_journey::pack_state::SuspendReason
+pub fn ob_poc_journey::pack_state::SuspendReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_journey::pack_state::SuspendReason
+impl serde_core::ser::Serialize for ob_poc_journey::pack_state::SuspendReason
+pub fn ob_poc_journey::pack_state::SuspendReason::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_journey::pack_state::SuspendReason
+pub fn ob_poc_journey::pack_state::SuspendReason::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_journey::pack_state::SuspendReason
+impl core::marker::Send for ob_poc_journey::pack_state::SuspendReason
+impl core::marker::Sync for ob_poc_journey::pack_state::SuspendReason
+impl core::marker::Unpin for ob_poc_journey::pack_state::SuspendReason
+impl core::marker::UnsafeUnpin for ob_poc_journey::pack_state::SuspendReason
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_journey::pack_state::SuspendReason
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_journey::pack_state::SuspendReason
+impl<T, U> core::convert::Into<U> for ob_poc_journey::pack_state::SuspendReason where U: core::convert::From<T>
+pub fn ob_poc_journey::pack_state::SuspendReason::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_journey::pack_state::SuspendReason where U: core::convert::Into<T>
+pub type ob_poc_journey::pack_state::SuspendReason::Error = core::convert::Infallible
+pub fn ob_poc_journey::pack_state::SuspendReason::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_journey::pack_state::SuspendReason where U: core::convert::TryFrom<T>
+pub type ob_poc_journey::pack_state::SuspendReason::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_journey::pack_state::SuspendReason::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_journey::pack_state::SuspendReason where T: core::clone::Clone
+pub type ob_poc_journey::pack_state::SuspendReason::Owned = T
+pub fn ob_poc_journey::pack_state::SuspendReason::clone_into(&self, &mut T)
+pub fn ob_poc_journey::pack_state::SuspendReason::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_journey::pack_state::SuspendReason where T: 'static + ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::SuspendReason::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_journey::pack_state::SuspendReason where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::SuspendReason::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_journey::pack_state::SuspendReason where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::SuspendReason::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_journey::pack_state::SuspendReason where T: core::clone::Clone
+pub unsafe fn ob_poc_journey::pack_state::SuspendReason::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_journey::pack_state::SuspendReason
+pub fn ob_poc_journey::pack_state::SuspendReason::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_journey::pack_state::SuspendReason where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_journey::pack_state::SuspendReason
+pub type ob_poc_journey::pack_state::SuspendReason::Output = T
+pub struct ob_poc_journey::pack_state::PackProgress
+pub ob_poc_journey::pack_state::PackProgress::executed_verbs: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_journey::pack_state::PackProgress::signals_emitted: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_journey::pack_state::PackProgress::steps_completed: u32
+impl ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::emit_signal(&mut self, &str)
+pub fn ob_poc_journey::pack_state::PackProgress::new() -> Self
+pub fn ob_poc_journey::pack_state::PackProgress::record_verb_execution(&mut self, &str)
+impl core::clone::Clone for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::clone(&self) -> ob_poc_journey::pack_state::PackProgress
+impl core::cmp::PartialEq for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::eq(&self, &ob_poc_journey::pack_state::PackProgress) -> bool
+impl core::default::Default for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::default() -> ob_poc_journey::pack_state::PackProgress
+impl core::fmt::Debug for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_journey::pack_state::PackProgress
+impl serde_core::ser::Serialize for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_journey::pack_state::PackProgress
+impl core::marker::Send for ob_poc_journey::pack_state::PackProgress
+impl core::marker::Sync for ob_poc_journey::pack_state::PackProgress
+impl core::marker::Unpin for ob_poc_journey::pack_state::PackProgress
+impl core::marker::UnsafeUnpin for ob_poc_journey::pack_state::PackProgress
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_journey::pack_state::PackProgress
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_journey::pack_state::PackProgress
+impl<T, U> core::convert::Into<U> for ob_poc_journey::pack_state::PackProgress where U: core::convert::From<T>
+pub fn ob_poc_journey::pack_state::PackProgress::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_journey::pack_state::PackProgress where U: core::convert::Into<T>
+pub type ob_poc_journey::pack_state::PackProgress::Error = core::convert::Infallible
+pub fn ob_poc_journey::pack_state::PackProgress::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_journey::pack_state::PackProgress where U: core::convert::TryFrom<T>
+pub type ob_poc_journey::pack_state::PackProgress::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_journey::pack_state::PackProgress::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_journey::pack_state::PackProgress where T: core::clone::Clone
+pub type ob_poc_journey::pack_state::PackProgress::Owned = T
+pub fn ob_poc_journey::pack_state::PackProgress::clone_into(&self, &mut T)
+pub fn ob_poc_journey::pack_state::PackProgress::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_journey::pack_state::PackProgress where T: 'static + ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackProgress::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_journey::pack_state::PackProgress where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackProgress::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_journey::pack_state::PackProgress where T: ?core::marker::Sized
+pub fn ob_poc_journey::pack_state::PackProgress::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_journey::pack_state::PackProgress where T: core::clone::Clone
+pub unsafe fn ob_poc_journey::pack_state::PackProgress::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_journey::pack_state::PackProgress
+pub fn ob_poc_journey::pack_state::PackProgress::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_journey::pack_state::PackProgress where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_journey::pack_state::PackProgress
+pub type ob_poc_journey::pack_state::PackProgress::Output = T

@@ -1,0 +1,984 @@
+# ob-poc-kyc-store | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:41:12Z
+pub mod ob_poc_kyc_store
+pub mod ob_poc_kyc_store::cross_stream
+pub struct ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::creates: u32
+pub ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::supersedes: u32
+impl core::clone::Clone for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::clone(&self) -> ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::cmp::Eq for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::cmp::PartialEq for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::eq(&self, &ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Freeze for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Send for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Sync for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Unpin for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: core::clone::Clone
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Owned = T
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::vzip(self) -> V
+pub const ob_poc_kyc_store::cross_stream::CROSS_STREAM_OBLIGATION_CREATE: &str
+pub const ob_poc_kyc_store::cross_stream::CROSS_STREAM_OBLIGATION_SUPERSEDE: &str
+pub fn ob_poc_kyc_store::cross_stream::cross_stream_idem_key(ob_poc_kyc_substrate::types::EventId, ob_poc_kyc_substrate::types::SubjectId, &str) -> alloc::string::String
+pub async fn ob_poc_kyc_store::cross_stream::enqueue_cross_stream_obligations(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::EventId, ob_poc_kyc_substrate::types::SubjectId, &[ob_poc_kyc_substrate::types::PersonId], &[ob_poc_kyc_substrate::types::PersonId], &str, uuid::Uuid) -> core::result::Result<ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::cross_stream::prior_freeze_persons(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<alloc::vec::Vec<ob_poc_kyc_substrate::types::PersonId>, ob_poc_kyc_store::error::StoreError>
+pub mod ob_poc_kyc_store::error
+pub enum ob_poc_kyc_store::error::StoreError
+pub ob_poc_kyc_store::error::StoreError::Db(sqlx_core::error::Error)
+pub ob_poc_kyc_store::error::StoreError::Rehydrate
+pub ob_poc_kyc_store::error::StoreError::Rehydrate::reason: alloc::string::String
+pub ob_poc_kyc_store::error::StoreError::Rehydrate::seq: i64
+pub ob_poc_kyc_store::error::StoreError::Rehydrate::subject: uuid::Uuid
+pub ob_poc_kyc_store::error::StoreError::Rejected(ob_poc_kyc_substrate::error::KycError)
+impl core::convert::From<ob_poc_kyc_substrate::error::KycError> for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::from(ob_poc_kyc_substrate::error::KycError) -> Self
+impl core::convert::From<sqlx_core::error::Error> for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::from(sqlx_core::error::Error) -> Self
+impl core::error::Error for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_kyc_store::error::StoreError
+impl core::marker::Send for ob_poc_kyc_store::error::StoreError
+impl core::marker::Sync for ob_poc_kyc_store::error::StoreError
+impl core::marker::Unpin for ob_poc_kyc_store::error::StoreError
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::error::StoreError
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::error::StoreError
+impl !core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::error::StoreError
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::error::StoreError where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::error::StoreError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::error::StoreError where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::error::StoreError::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::error::StoreError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::error::StoreError where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::error::StoreError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::error::StoreError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_poc_kyc_store::error::StoreError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_kyc_store::error::StoreError where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::error::StoreError where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::error::StoreError where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::error::StoreError
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::error::StoreError
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::error::StoreError
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::error::StoreError
+pub type ob_poc_kyc_store::error::StoreError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::error::StoreError where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::error::StoreError::vzip(self) -> V
+pub mod ob_poc_kyc_store::manifest
+pub struct ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub ob_poc_kyc_store::manifest::ManifestPublishOutcome::already_existed: bool
+pub ob_poc_kyc_store::manifest::ManifestPublishOutcome::entry_count: usize
+pub ob_poc_kyc_store::manifest::ManifestPublishOutcome::manifest_hash: alloc::string::String
+pub ob_poc_kyc_store::manifest::ManifestPublishOutcome::verb_rows_updated: u64
+impl core::clone::Clone for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::clone(&self) -> ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::cmp::Eq for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::cmp::PartialEq for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::eq(&self, &ob_poc_kyc_store::manifest::ManifestPublishOutcome) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Freeze for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Send for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Sync for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Unpin for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: core::clone::Clone
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Owned = T
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::vzip(self) -> V
+pub async fn ob_poc_kyc_store::manifest::publish_manifest(&mut sqlx_postgres::connection::PgConnection, core::option::Option<&str>) -> core::result::Result<ob_poc_kyc_store::manifest::ManifestPublishOutcome, ob_poc_kyc_store::error::StoreError>
+pub mod ob_poc_kyc_store::projection
+pub struct ob_poc_kyc_store::projection::ObligationProjectionStats
+pub ob_poc_kyc_store::projection::ObligationProjectionStats::obligations_written: usize
+pub ob_poc_kyc_store::projection::ObligationProjectionStats::subjects_written: usize
+impl core::clone::Clone for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::clone(&self) -> ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::cmp::Eq for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::cmp::PartialEq for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::eq(&self, &ob_poc_kyc_store::projection::ObligationProjectionStats) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Freeze for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Send for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Sync for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Unpin for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::projection::ObligationProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::projection::ObligationProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::ObligationProjectionStats where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::ObligationProjectionStats where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::ObligationProjectionStats where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::projection::ObligationProjectionStats where T: core::clone::Clone
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Owned = T
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::projection::ObligationProjectionStats where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::ObligationProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::ObligationProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::projection::ObligationProjectionStats where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::projection::ObligationProjectionStats::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::ObligationProjectionStats where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::vzip(self) -> V
+pub struct ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl ob_poc_kyc_store::projection::PgKycObligationDrainer
+pub async fn ob_poc_kyc_store::projection::PgKycObligationDrainer::drain_all(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, usize) -> core::result::Result<usize, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::projection::PgKycObligationDrainer::drain_once(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry) -> core::result::Result<core::option::Option<ob_poc_kyc_substrate::types::SubjectId>, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycObligationDrainer where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycObligationDrainer where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationDrainer::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycObligationDrainer where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationDrainer::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycObligationDrainer where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycObligationDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycObligationDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycObligationDrainer
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycObligationDrainer
+pub type ob_poc_kyc_store::projection::PgKycObligationDrainer::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycObligationDrainer where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::vzip(self) -> V
+pub struct ob_poc_kyc_store::projection::PgKycObligationProjector
+impl ob_poc_kyc_store::projection::PgKycObligationProjector
+pub async fn ob_poc_kyc_store::projection::PgKycObligationProjector::rebuild_obligations(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<ob_poc_kyc_store::projection::ObligationProjectionStats, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycObligationProjector where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycObligationProjector where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationProjector::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycObligationProjector where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationProjector::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycObligationProjector where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycObligationProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycObligationProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycObligationProjector
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycObligationProjector
+pub type ob_poc_kyc_store::projection::PgKycObligationProjector::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycObligationProjector where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::vzip(self) -> V
+pub struct ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl ob_poc_kyc_store::projection::PgKycProjectionDrainer
+pub async fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::drain_all(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, usize) -> core::result::Result<usize, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::drain_once(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry) -> core::result::Result<core::option::Option<ob_poc_kyc_substrate::types::SubjectId>, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycProjectionDrainer::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycProjectionDrainer::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycProjectionDrainer where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+pub type ob_poc_kyc_store::projection::PgKycProjectionDrainer::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::vzip(self) -> V
+pub struct ob_poc_kyc_store::projection::PgKycProjector
+impl ob_poc_kyc_store::projection::PgKycProjector
+pub async fn ob_poc_kyc_store::projection::PgKycProjector::rebuild_control_edges(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<ob_poc_kyc_store::projection::ProjectionStats, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycProjector
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycProjector
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycProjector
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycProjector where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjector::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycProjector where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycProjector::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycProjector::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycProjector where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycProjector::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycProjector::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycProjector where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjector::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjector::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjector::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycProjector
+pub fn ob_poc_kyc_store::projection::PgKycProjector::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycProjector
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycProjector
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycProjector
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycProjector
+pub type ob_poc_kyc_store::projection::PgKycProjector::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycProjector where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjector::vzip(self) -> V
+pub struct ob_poc_kyc_store::projection::ProjectionStats
+pub ob_poc_kyc_store::projection::ProjectionStats::edges_written: usize
+impl core::clone::Clone for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::clone(&self) -> ob_poc_kyc_store::projection::ProjectionStats
+impl core::cmp::Eq for ob_poc_kyc_store::projection::ProjectionStats
+impl core::cmp::PartialEq for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::eq(&self, &ob_poc_kyc_store::projection::ProjectionStats) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Freeze for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Send for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Sync for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Unpin for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::ProjectionStats
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::ProjectionStats
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::ProjectionStats
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::projection::ProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::projection::ProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::ProjectionStats where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::ProjectionStats::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::ProjectionStats where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::ProjectionStats::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::ProjectionStats::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::ProjectionStats where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::ProjectionStats::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::ProjectionStats::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::projection::ProjectionStats where T: core::clone::Clone
+pub type ob_poc_kyc_store::projection::ProjectionStats::Owned = T
+pub fn ob_poc_kyc_store::projection::ProjectionStats::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::projection::ProjectionStats::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::projection::ProjectionStats where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::ProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::ProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::projection::ProjectionStats where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::projection::ProjectionStats::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::ProjectionStats
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::ProjectionStats
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::ProjectionStats
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::ProjectionStats
+pub type ob_poc_kyc_store::projection::ProjectionStats::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::ProjectionStats where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::ProjectionStats::vzip(self) -> V
+pub const ob_poc_kyc_store::projection::CONTROL_EDGE_PROJECTION_EFFECT: &str
+pub const ob_poc_kyc_store::projection::OBLIGATION_PROJECTION_EFFECT: &str
+pub const ob_poc_kyc_store::projection::PROJECTION_EFFECT_KINDS: &[&str]
+pub mod ob_poc_kyc_store::store
+pub struct ob_poc_kyc_store::store::AppendOutcome
+pub ob_poc_kyc_store::store::AppendOutcome::deduped: bool
+pub ob_poc_kyc_store::store::AppendOutcome::event_id: ob_poc_kyc_substrate::types::EventId
+pub ob_poc_kyc_store::store::AppendOutcome::seq: u64
+impl core::clone::Clone for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::clone(&self) -> ob_poc_kyc_store::store::AppendOutcome
+impl core::cmp::Eq for ob_poc_kyc_store::store::AppendOutcome
+impl core::cmp::PartialEq for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::eq(&self, &ob_poc_kyc_store::store::AppendOutcome) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Freeze for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Send for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Sync for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Unpin for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::store::AppendOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::store::AppendOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::store::AppendOutcome
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::store::AppendOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::store::AppendOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::store::AppendOutcome where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::store::AppendOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::store::AppendOutcome where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::store::AppendOutcome::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::store::AppendOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::store::AppendOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::store::AppendOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::store::AppendOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::store::AppendOutcome where T: core::clone::Clone
+pub type ob_poc_kyc_store::store::AppendOutcome::Owned = T
+pub fn ob_poc_kyc_store::store::AppendOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::store::AppendOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::store::AppendOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::store::AppendOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::store::AppendOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::store::AppendOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::store::AppendOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::store::AppendOutcome
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::store::AppendOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::store::AppendOutcome
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::store::AppendOutcome
+pub type ob_poc_kyc_store::store::AppendOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::store::AppendOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::store::AppendOutcome::vzip(self) -> V
+pub struct ob_poc_kyc_store::store::PgKycEventStore
+impl ob_poc_kyc_store::store::PgKycEventStore
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::append<V>(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, &ob_poc_kyc_substrate::event::IntentEvent, V) -> core::result::Result<ob_poc_kyc_store::store::AppendOutcome, ob_poc_kyc_store::error::StoreError> where V: core::ops::function::FnOnce(&ob_poc_kyc_substrate::fold::control::ControlState) -> core::result::Result<(), ob_poc_kyc_substrate::error::KycError>
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::load_events(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<alloc::vec::Vec<ob_poc_kyc_substrate::event::IntentEvent>, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::load_events_up_to_committed(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::SubjectId, chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> core::result::Result<alloc::vec::Vec<ob_poc_kyc_substrate::event::IntentEvent>, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::recover_control_at(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, ob_poc_kyc_substrate::types::SubjectId, chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> core::result::Result<ob_poc_kyc_substrate::fold::control::ControlState, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::Send for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::Sync for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::Unpin for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::store::PgKycEventStore
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::store::PgKycEventStore
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::store::PgKycEventStore
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::store::PgKycEventStore where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::store::PgKycEventStore::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::store::PgKycEventStore where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::store::PgKycEventStore::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::store::PgKycEventStore::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::store::PgKycEventStore where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::store::PgKycEventStore::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::store::PgKycEventStore::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::store::PgKycEventStore where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::PgKycEventStore::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::store::PgKycEventStore where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::PgKycEventStore::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::store::PgKycEventStore where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::PgKycEventStore::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::store::PgKycEventStore
+pub fn ob_poc_kyc_store::store::PgKycEventStore::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::store::PgKycEventStore
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::store::PgKycEventStore
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::store::PgKycEventStore
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::store::PgKycEventStore
+pub type ob_poc_kyc_store::store::PgKycEventStore::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::store::PgKycEventStore where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::store::PgKycEventStore::vzip(self) -> V
+pub enum ob_poc_kyc_store::StoreError
+pub ob_poc_kyc_store::StoreError::Db(sqlx_core::error::Error)
+pub ob_poc_kyc_store::StoreError::Rehydrate
+pub ob_poc_kyc_store::StoreError::Rehydrate::reason: alloc::string::String
+pub ob_poc_kyc_store::StoreError::Rehydrate::seq: i64
+pub ob_poc_kyc_store::StoreError::Rehydrate::subject: uuid::Uuid
+pub ob_poc_kyc_store::StoreError::Rejected(ob_poc_kyc_substrate::error::KycError)
+impl core::convert::From<ob_poc_kyc_substrate::error::KycError> for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::from(ob_poc_kyc_substrate::error::KycError) -> Self
+impl core::convert::From<sqlx_core::error::Error> for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::from(sqlx_core::error::Error) -> Self
+impl core::error::Error for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_kyc_store::error::StoreError
+impl core::marker::Send for ob_poc_kyc_store::error::StoreError
+impl core::marker::Sync for ob_poc_kyc_store::error::StoreError
+impl core::marker::Unpin for ob_poc_kyc_store::error::StoreError
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::error::StoreError
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::error::StoreError
+impl !core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::error::StoreError
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::error::StoreError where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::error::StoreError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::error::StoreError where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::error::StoreError::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::error::StoreError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::error::StoreError where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::error::StoreError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::error::StoreError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_poc_kyc_store::error::StoreError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_kyc_store::error::StoreError where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::error::StoreError where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::error::StoreError where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::error::StoreError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::error::StoreError
+pub fn ob_poc_kyc_store::error::StoreError::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::error::StoreError
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::error::StoreError
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::error::StoreError
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::error::StoreError
+pub type ob_poc_kyc_store::error::StoreError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::error::StoreError where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::error::StoreError::vzip(self) -> V
+pub struct ob_poc_kyc_store::AppendOutcome
+pub ob_poc_kyc_store::AppendOutcome::deduped: bool
+pub ob_poc_kyc_store::AppendOutcome::event_id: ob_poc_kyc_substrate::types::EventId
+pub ob_poc_kyc_store::AppendOutcome::seq: u64
+impl core::clone::Clone for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::clone(&self) -> ob_poc_kyc_store::store::AppendOutcome
+impl core::cmp::Eq for ob_poc_kyc_store::store::AppendOutcome
+impl core::cmp::PartialEq for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::eq(&self, &ob_poc_kyc_store::store::AppendOutcome) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Freeze for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Send for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Sync for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::Unpin for ob_poc_kyc_store::store::AppendOutcome
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::store::AppendOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::store::AppendOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::store::AppendOutcome
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::store::AppendOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::store::AppendOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::store::AppendOutcome where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::store::AppendOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::store::AppendOutcome where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::store::AppendOutcome::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::store::AppendOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::store::AppendOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::store::AppendOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::store::AppendOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::store::AppendOutcome where T: core::clone::Clone
+pub type ob_poc_kyc_store::store::AppendOutcome::Owned = T
+pub fn ob_poc_kyc_store::store::AppendOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::store::AppendOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::store::AppendOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::store::AppendOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::store::AppendOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::AppendOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::store::AppendOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::store::AppendOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::store::AppendOutcome
+pub fn ob_poc_kyc_store::store::AppendOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::store::AppendOutcome
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::store::AppendOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::store::AppendOutcome
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::store::AppendOutcome
+pub type ob_poc_kyc_store::store::AppendOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::store::AppendOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::store::AppendOutcome::vzip(self) -> V
+pub struct ob_poc_kyc_store::CrossStreamEnqueueOutcome
+pub ob_poc_kyc_store::CrossStreamEnqueueOutcome::creates: u32
+pub ob_poc_kyc_store::CrossStreamEnqueueOutcome::supersedes: u32
+impl core::clone::Clone for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::clone(&self) -> ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::cmp::Eq for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::cmp::PartialEq for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::eq(&self, &ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Freeze for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Send for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Sync for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::Unpin for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: core::clone::Clone
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Owned = T
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome
+pub type ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome::vzip(self) -> V
+pub struct ob_poc_kyc_store::ManifestPublishOutcome
+pub ob_poc_kyc_store::ManifestPublishOutcome::already_existed: bool
+pub ob_poc_kyc_store::ManifestPublishOutcome::entry_count: usize
+pub ob_poc_kyc_store::ManifestPublishOutcome::manifest_hash: alloc::string::String
+pub ob_poc_kyc_store::ManifestPublishOutcome::verb_rows_updated: u64
+impl core::clone::Clone for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::clone(&self) -> ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::cmp::Eq for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::cmp::PartialEq for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::eq(&self, &ob_poc_kyc_store::manifest::ManifestPublishOutcome) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Freeze for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Send for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Sync for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::Unpin for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: core::clone::Clone
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Owned = T
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::manifest::ManifestPublishOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::manifest::ManifestPublishOutcome
+pub type ob_poc_kyc_store::manifest::ManifestPublishOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::manifest::ManifestPublishOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::manifest::ManifestPublishOutcome::vzip(self) -> V
+pub struct ob_poc_kyc_store::ObligationProjectionStats
+pub ob_poc_kyc_store::ObligationProjectionStats::obligations_written: usize
+pub ob_poc_kyc_store::ObligationProjectionStats::subjects_written: usize
+impl core::clone::Clone for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::clone(&self) -> ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::cmp::Eq for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::cmp::PartialEq for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::eq(&self, &ob_poc_kyc_store::projection::ObligationProjectionStats) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Freeze for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Send for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Sync for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::Unpin for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::projection::ObligationProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::projection::ObligationProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::ObligationProjectionStats where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::ObligationProjectionStats where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::ObligationProjectionStats where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::projection::ObligationProjectionStats where T: core::clone::Clone
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Owned = T
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::projection::ObligationProjectionStats where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::ObligationProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::ObligationProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::projection::ObligationProjectionStats where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::projection::ObligationProjectionStats::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::ObligationProjectionStats
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::ObligationProjectionStats
+pub type ob_poc_kyc_store::projection::ObligationProjectionStats::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::ObligationProjectionStats where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::ObligationProjectionStats::vzip(self) -> V
+pub struct ob_poc_kyc_store::PgKycEventStore
+impl ob_poc_kyc_store::store::PgKycEventStore
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::append<V>(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, &ob_poc_kyc_substrate::event::IntentEvent, V) -> core::result::Result<ob_poc_kyc_store::store::AppendOutcome, ob_poc_kyc_store::error::StoreError> where V: core::ops::function::FnOnce(&ob_poc_kyc_substrate::fold::control::ControlState) -> core::result::Result<(), ob_poc_kyc_substrate::error::KycError>
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::load_events(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<alloc::vec::Vec<ob_poc_kyc_substrate::event::IntentEvent>, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::load_events_up_to_committed(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::SubjectId, chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> core::result::Result<alloc::vec::Vec<ob_poc_kyc_substrate::event::IntentEvent>, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::store::PgKycEventStore::recover_control_at(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, ob_poc_kyc_substrate::types::SubjectId, chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> core::result::Result<ob_poc_kyc_substrate::fold::control::ControlState, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::Send for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::Sync for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::Unpin for ob_poc_kyc_store::store::PgKycEventStore
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::store::PgKycEventStore
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::store::PgKycEventStore
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::store::PgKycEventStore
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::store::PgKycEventStore where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::store::PgKycEventStore::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::store::PgKycEventStore where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::store::PgKycEventStore::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::store::PgKycEventStore::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::store::PgKycEventStore where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::store::PgKycEventStore::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::store::PgKycEventStore::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::store::PgKycEventStore where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::PgKycEventStore::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::store::PgKycEventStore where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::PgKycEventStore::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::store::PgKycEventStore where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::store::PgKycEventStore::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::store::PgKycEventStore
+pub fn ob_poc_kyc_store::store::PgKycEventStore::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::store::PgKycEventStore
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::store::PgKycEventStore
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::store::PgKycEventStore
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::store::PgKycEventStore
+pub type ob_poc_kyc_store::store::PgKycEventStore::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::store::PgKycEventStore where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::store::PgKycEventStore::vzip(self) -> V
+pub struct ob_poc_kyc_store::PgKycObligationDrainer
+impl ob_poc_kyc_store::projection::PgKycObligationDrainer
+pub async fn ob_poc_kyc_store::projection::PgKycObligationDrainer::drain_all(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, usize) -> core::result::Result<usize, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::projection::PgKycObligationDrainer::drain_once(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry) -> core::result::Result<core::option::Option<ob_poc_kyc_substrate::types::SubjectId>, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycObligationDrainer where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycObligationDrainer where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationDrainer::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycObligationDrainer where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationDrainer::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycObligationDrainer where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycObligationDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycObligationDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycObligationDrainer
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycObligationDrainer
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycObligationDrainer
+pub type ob_poc_kyc_store::projection::PgKycObligationDrainer::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycObligationDrainer where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationDrainer::vzip(self) -> V
+pub struct ob_poc_kyc_store::PgKycObligationProjector
+impl ob_poc_kyc_store::projection::PgKycObligationProjector
+pub async fn ob_poc_kyc_store::projection::PgKycObligationProjector::rebuild_obligations(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<ob_poc_kyc_store::projection::ObligationProjectionStats, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycObligationProjector where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycObligationProjector where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationProjector::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycObligationProjector where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycObligationProjector::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycObligationProjector where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycObligationProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycObligationProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycObligationProjector
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycObligationProjector
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycObligationProjector
+pub type ob_poc_kyc_store::projection::PgKycObligationProjector::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycObligationProjector where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycObligationProjector::vzip(self) -> V
+pub struct ob_poc_kyc_store::PgKycProjectionDrainer
+impl ob_poc_kyc_store::projection::PgKycProjectionDrainer
+pub async fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::drain_all(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, usize) -> core::result::Result<usize, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::drain_once(&sqlx_postgres::PgPool, &ob_poc_kyc_substrate::fold::registry::FoldRegistry) -> core::result::Result<core::option::Option<ob_poc_kyc_substrate::types::SubjectId>, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycProjectionDrainer::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycProjectionDrainer::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycProjectionDrainer where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycProjectionDrainer
+pub type ob_poc_kyc_store::projection::PgKycProjectionDrainer::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycProjectionDrainer where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjectionDrainer::vzip(self) -> V
+pub struct ob_poc_kyc_store::PgKycProjector
+impl ob_poc_kyc_store::projection::PgKycProjector
+pub async fn ob_poc_kyc_store::projection::PgKycProjector::rebuild_control_edges(&mut sqlx_postgres::connection::PgConnection, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<ob_poc_kyc_store::projection::ProjectionStats, ob_poc_kyc_store::error::StoreError>
+impl core::marker::Freeze for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::Send for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::Sync for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::Unpin for ob_poc_kyc_store::projection::PgKycProjector
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::PgKycProjector
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::PgKycProjector
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::PgKycProjector
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::PgKycProjector where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjector::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::PgKycProjector where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::PgKycProjector::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::PgKycProjector::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::PgKycProjector where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::PgKycProjector::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::PgKycProjector::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_store::projection::PgKycProjector where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjector::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::PgKycProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjector::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::PgKycProjector where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::PgKycProjector::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::PgKycProjector
+pub fn ob_poc_kyc_store::projection::PgKycProjector::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::PgKycProjector
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::PgKycProjector
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::PgKycProjector
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::PgKycProjector
+pub type ob_poc_kyc_store::projection::PgKycProjector::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::PgKycProjector where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::PgKycProjector::vzip(self) -> V
+pub struct ob_poc_kyc_store::ProjectionStats
+pub ob_poc_kyc_store::ProjectionStats::edges_written: usize
+impl core::clone::Clone for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::clone(&self) -> ob_poc_kyc_store::projection::ProjectionStats
+impl core::cmp::Eq for ob_poc_kyc_store::projection::ProjectionStats
+impl core::cmp::PartialEq for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::eq(&self, &ob_poc_kyc_store::projection::ProjectionStats) -> bool
+impl core::fmt::Debug for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::StructuralPartialEq for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Freeze for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Send for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Sync for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::Unpin for ob_poc_kyc_store::projection::ProjectionStats
+impl core::marker::UnsafeUnpin for ob_poc_kyc_store::projection::ProjectionStats
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_store::projection::ProjectionStats
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_store::projection::ProjectionStats
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_kyc_store::projection::ProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_kyc_store::projection::ProjectionStats where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_store::projection::ProjectionStats where U: core::convert::From<T>
+pub fn ob_poc_kyc_store::projection::ProjectionStats::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_store::projection::ProjectionStats where U: core::convert::Into<T>
+pub type ob_poc_kyc_store::projection::ProjectionStats::Error = core::convert::Infallible
+pub fn ob_poc_kyc_store::projection::ProjectionStats::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_store::projection::ProjectionStats where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_store::projection::ProjectionStats::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_store::projection::ProjectionStats::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_kyc_store::projection::ProjectionStats where T: core::clone::Clone
+pub type ob_poc_kyc_store::projection::ProjectionStats::Owned = T
+pub fn ob_poc_kyc_store::projection::ProjectionStats::clone_into(&self, &mut T)
+pub fn ob_poc_kyc_store::projection::ProjectionStats::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_kyc_store::projection::ProjectionStats where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_store::projection::ProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_store::projection::ProjectionStats where T: ?core::marker::Sized
+pub fn ob_poc_kyc_store::projection::ProjectionStats::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_kyc_store::projection::ProjectionStats where T: core::clone::Clone
+pub unsafe fn ob_poc_kyc_store::projection::ProjectionStats::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_kyc_store::projection::ProjectionStats
+pub fn ob_poc_kyc_store::projection::ProjectionStats::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_store::projection::ProjectionStats
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_store::projection::ProjectionStats
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_store::projection::ProjectionStats
+impl<T> typenum::type_operators::Same for ob_poc_kyc_store::projection::ProjectionStats
+pub type ob_poc_kyc_store::projection::ProjectionStats::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_store::projection::ProjectionStats where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_store::projection::ProjectionStats::vzip(self) -> V
+pub const ob_poc_kyc_store::CONTROL_EDGE_PROJECTION_EFFECT: &str
+pub const ob_poc_kyc_store::CROSS_STREAM_OBLIGATION_CREATE: &str
+pub const ob_poc_kyc_store::CROSS_STREAM_OBLIGATION_SUPERSEDE: &str
+pub const ob_poc_kyc_store::OBLIGATION_PROJECTION_EFFECT: &str
+pub fn ob_poc_kyc_store::cross_stream_idem_key(ob_poc_kyc_substrate::types::EventId, ob_poc_kyc_substrate::types::SubjectId, &str) -> alloc::string::String
+pub async fn ob_poc_kyc_store::enqueue_cross_stream_obligations(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::EventId, ob_poc_kyc_substrate::types::SubjectId, &[ob_poc_kyc_substrate::types::PersonId], &[ob_poc_kyc_substrate::types::PersonId], &str, uuid::Uuid) -> core::result::Result<ob_poc_kyc_store::cross_stream::CrossStreamEnqueueOutcome, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::prior_freeze_persons(&mut sqlx_postgres::connection::PgConnection, ob_poc_kyc_substrate::types::SubjectId) -> core::result::Result<alloc::vec::Vec<ob_poc_kyc_substrate::types::PersonId>, ob_poc_kyc_store::error::StoreError>
+pub async fn ob_poc_kyc_store::publish_manifest(&mut sqlx_postgres::connection::PgConnection, core::option::Option<&str>) -> core::result::Result<ob_poc_kyc_store::manifest::ManifestPublishOutcome, ob_poc_kyc_store::error::StoreError>

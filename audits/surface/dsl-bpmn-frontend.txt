@@ -1,0 +1,459 @@
+# dsl-bpmn-frontend | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:38:35Z
+pub mod dsl_bpmn_frontend
+pub enum dsl_bpmn_frontend::GatewayKind
+pub dsl_bpmn_frontend::GatewayKind::EventBased
+pub dsl_bpmn_frontend::GatewayKind::Exclusive
+pub dsl_bpmn_frontend::GatewayKind::Inclusive
+pub dsl_bpmn_frontend::GatewayKind::Parallel
+pub dsl_bpmn_frontend::GatewayKind::ParallelEventBased
+impl dsl_bpmn_frontend::GatewayKind
+pub fn dsl_bpmn_frontend::GatewayKind::as_str(&self) -> &'static str
+impl core::clone::Clone for dsl_bpmn_frontend::GatewayKind
+pub fn dsl_bpmn_frontend::GatewayKind::clone(&self) -> dsl_bpmn_frontend::GatewayKind
+impl core::cmp::Eq for dsl_bpmn_frontend::GatewayKind
+impl core::cmp::PartialEq for dsl_bpmn_frontend::GatewayKind
+pub fn dsl_bpmn_frontend::GatewayKind::eq(&self, &dsl_bpmn_frontend::GatewayKind) -> bool
+impl core::fmt::Debug for dsl_bpmn_frontend::GatewayKind
+pub fn dsl_bpmn_frontend::GatewayKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_bpmn_frontend::GatewayKind
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::GatewayKind
+pub fn dsl_bpmn_frontend::GatewayKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::GatewayKind
+impl core::marker::Send for dsl_bpmn_frontend::GatewayKind
+impl core::marker::Sync for dsl_bpmn_frontend::GatewayKind
+impl core::marker::Unpin for dsl_bpmn_frontend::GatewayKind
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::GatewayKind
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::GatewayKind
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::GatewayKind
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::GatewayKind where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::GatewayKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::GatewayKind where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::GatewayKind::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::GatewayKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::GatewayKind where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::GatewayKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::GatewayKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::GatewayKind where T: core::clone::Clone
+pub type dsl_bpmn_frontend::GatewayKind::Owned = T
+pub fn dsl_bpmn_frontend::GatewayKind::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::GatewayKind::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::GatewayKind where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::GatewayKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::GatewayKind where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::GatewayKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::GatewayKind where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::GatewayKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::GatewayKind where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::GatewayKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::GatewayKind
+pub fn dsl_bpmn_frontend::GatewayKind::from(T) -> T
+pub enum dsl_bpmn_frontend::MergeOperator
+pub dsl_bpmn_frontend::MergeOperator::Concat
+pub dsl_bpmn_frontend::MergeOperator::Custom
+pub dsl_bpmn_frontend::MergeOperator::Earliest
+pub dsl_bpmn_frontend::MergeOperator::Latest
+pub dsl_bpmn_frontend::MergeOperator::Max
+pub dsl_bpmn_frontend::MergeOperator::Min
+pub dsl_bpmn_frontend::MergeOperator::Sum
+pub dsl_bpmn_frontend::MergeOperator::Union
+impl dsl_bpmn_frontend::MergeOperator
+pub fn dsl_bpmn_frontend::MergeOperator::as_str(&self) -> &'static str
+impl core::clone::Clone for dsl_bpmn_frontend::MergeOperator
+pub fn dsl_bpmn_frontend::MergeOperator::clone(&self) -> dsl_bpmn_frontend::MergeOperator
+impl core::cmp::Eq for dsl_bpmn_frontend::MergeOperator
+impl core::cmp::PartialEq for dsl_bpmn_frontend::MergeOperator
+pub fn dsl_bpmn_frontend::MergeOperator::eq(&self, &dsl_bpmn_frontend::MergeOperator) -> bool
+impl core::fmt::Debug for dsl_bpmn_frontend::MergeOperator
+pub fn dsl_bpmn_frontend::MergeOperator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_bpmn_frontend::MergeOperator
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::MergeOperator
+pub fn dsl_bpmn_frontend::MergeOperator::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::MergeOperator
+impl core::marker::Send for dsl_bpmn_frontend::MergeOperator
+impl core::marker::Sync for dsl_bpmn_frontend::MergeOperator
+impl core::marker::Unpin for dsl_bpmn_frontend::MergeOperator
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::MergeOperator
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::MergeOperator
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::MergeOperator
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::MergeOperator where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::MergeOperator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::MergeOperator where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::MergeOperator::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::MergeOperator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::MergeOperator where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::MergeOperator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::MergeOperator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::MergeOperator where T: core::clone::Clone
+pub type dsl_bpmn_frontend::MergeOperator::Owned = T
+pub fn dsl_bpmn_frontend::MergeOperator::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::MergeOperator::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::MergeOperator where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::MergeOperator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::MergeOperator where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::MergeOperator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::MergeOperator where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::MergeOperator::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::MergeOperator where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::MergeOperator::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::MergeOperator
+pub fn dsl_bpmn_frontend::MergeOperator::from(T) -> T
+pub enum dsl_bpmn_frontend::NodeKind
+pub dsl_bpmn_frontend::NodeKind::BusinessRuleTask
+pub dsl_bpmn_frontend::NodeKind::CallActivity
+pub dsl_bpmn_frontend::NodeKind::EndEvent
+pub dsl_bpmn_frontend::NodeKind::EndEventCancel
+pub dsl_bpmn_frontend::NodeKind::EndEventCompensation
+pub dsl_bpmn_frontend::NodeKind::EndEventError
+pub dsl_bpmn_frontend::NodeKind::EndEventEscalation
+pub dsl_bpmn_frontend::NodeKind::EndEventMessage
+pub dsl_bpmn_frontend::NodeKind::EndEventSignal
+pub dsl_bpmn_frontend::NodeKind::EndEventTerminate
+pub dsl_bpmn_frontend::NodeKind::EventSubprocess
+pub dsl_bpmn_frontend::NodeKind::IntermediateCatchLink
+pub dsl_bpmn_frontend::NodeKind::IntermediateCatchMessage
+pub dsl_bpmn_frontend::NodeKind::IntermediateCatchSignal
+pub dsl_bpmn_frontend::NodeKind::IntermediateCatchTimer
+pub dsl_bpmn_frontend::NodeKind::IntermediateThrowCompensation
+pub dsl_bpmn_frontend::NodeKind::IntermediateThrowEscalation
+pub dsl_bpmn_frontend::NodeKind::IntermediateThrowLink
+pub dsl_bpmn_frontend::NodeKind::IntermediateThrowMessage
+pub dsl_bpmn_frontend::NodeKind::IntermediateThrowSignal
+pub dsl_bpmn_frontend::NodeKind::ManualTask
+pub dsl_bpmn_frontend::NodeKind::ReceiveTask
+pub dsl_bpmn_frontend::NodeKind::ScriptTask
+pub dsl_bpmn_frontend::NodeKind::SendTask
+pub dsl_bpmn_frontend::NodeKind::ServiceTask
+pub dsl_bpmn_frontend::NodeKind::StartEvent
+pub dsl_bpmn_frontend::NodeKind::StartEventCompensation
+pub dsl_bpmn_frontend::NodeKind::StartEventError
+pub dsl_bpmn_frontend::NodeKind::StartEventEscalation
+pub dsl_bpmn_frontend::NodeKind::StartEventMessage
+pub dsl_bpmn_frontend::NodeKind::StartEventSignal
+pub dsl_bpmn_frontend::NodeKind::StartEventTimer
+pub dsl_bpmn_frontend::NodeKind::Subprocess
+pub dsl_bpmn_frontend::NodeKind::TransactionSubprocess
+pub dsl_bpmn_frontend::NodeKind::UserTask
+impl dsl_bpmn_frontend::NodeKind
+pub fn dsl_bpmn_frontend::NodeKind::as_str(&self) -> &'static str
+impl core::clone::Clone for dsl_bpmn_frontend::NodeKind
+pub fn dsl_bpmn_frontend::NodeKind::clone(&self) -> dsl_bpmn_frontend::NodeKind
+impl core::cmp::Eq for dsl_bpmn_frontend::NodeKind
+impl core::cmp::PartialEq for dsl_bpmn_frontend::NodeKind
+pub fn dsl_bpmn_frontend::NodeKind::eq(&self, &dsl_bpmn_frontend::NodeKind) -> bool
+impl core::fmt::Debug for dsl_bpmn_frontend::NodeKind
+pub fn dsl_bpmn_frontend::NodeKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_bpmn_frontend::NodeKind
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::NodeKind
+pub fn dsl_bpmn_frontend::NodeKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::NodeKind
+impl core::marker::Send for dsl_bpmn_frontend::NodeKind
+impl core::marker::Sync for dsl_bpmn_frontend::NodeKind
+impl core::marker::Unpin for dsl_bpmn_frontend::NodeKind
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::NodeKind
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::NodeKind
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::NodeKind
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::NodeKind where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::NodeKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::NodeKind where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::NodeKind::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::NodeKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::NodeKind where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::NodeKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::NodeKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::NodeKind where T: core::clone::Clone
+pub type dsl_bpmn_frontend::NodeKind::Owned = T
+pub fn dsl_bpmn_frontend::NodeKind::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::NodeKind::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::NodeKind where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::NodeKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::NodeKind where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::NodeKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::NodeKind where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::NodeKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::NodeKind where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::NodeKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::NodeKind
+pub fn dsl_bpmn_frontend::NodeKind::from(T) -> T
+pub struct dsl_bpmn_frontend::BoundaryAttachmentEntry
+pub dsl_bpmn_frontend::BoundaryAttachmentEntry::event_kind: alloc::string::String
+pub dsl_bpmn_frontend::BoundaryAttachmentEntry::event_name: alloc::string::String
+pub dsl_bpmn_frontend::BoundaryAttachmentEntry::host_node: alloc::string::String
+pub dsl_bpmn_frontend::BoundaryAttachmentEntry::interrupting: bool
+impl core::clone::Clone for dsl_bpmn_frontend::BoundaryAttachmentEntry
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::clone(&self) -> dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::fmt::Debug for dsl_bpmn_frontend::BoundaryAttachmentEntry
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::BoundaryAttachmentEntry
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::marker::Send for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::marker::Sync for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::marker::Unpin for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::BoundaryAttachmentEntry
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::BoundaryAttachmentEntry where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::BoundaryAttachmentEntry where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::BoundaryAttachmentEntry::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::BoundaryAttachmentEntry where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::BoundaryAttachmentEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::BoundaryAttachmentEntry where T: core::clone::Clone
+pub type dsl_bpmn_frontend::BoundaryAttachmentEntry::Owned = T
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::BoundaryAttachmentEntry where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::BoundaryAttachmentEntry where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::BoundaryAttachmentEntry where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::BoundaryAttachmentEntry where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::BoundaryAttachmentEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::BoundaryAttachmentEntry
+pub fn dsl_bpmn_frontend::BoundaryAttachmentEntry::from(T) -> T
+pub struct dsl_bpmn_frontend::MergeClause
+pub dsl_bpmn_frontend::MergeClause::custom_verb: core::option::Option<alloc::string::String>
+pub dsl_bpmn_frontend::MergeClause::location: alloc::string::String
+pub dsl_bpmn_frontend::MergeClause::operator: dsl_bpmn_frontend::MergeOperator
+impl core::clone::Clone for dsl_bpmn_frontend::MergeClause
+pub fn dsl_bpmn_frontend::MergeClause::clone(&self) -> dsl_bpmn_frontend::MergeClause
+impl core::fmt::Debug for dsl_bpmn_frontend::MergeClause
+pub fn dsl_bpmn_frontend::MergeClause::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::MergeClause
+pub fn dsl_bpmn_frontend::MergeClause::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::MergeClause
+impl core::marker::Send for dsl_bpmn_frontend::MergeClause
+impl core::marker::Sync for dsl_bpmn_frontend::MergeClause
+impl core::marker::Unpin for dsl_bpmn_frontend::MergeClause
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::MergeClause
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::MergeClause
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::MergeClause
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::MergeClause where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::MergeClause::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::MergeClause where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::MergeClause::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::MergeClause::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::MergeClause where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::MergeClause::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::MergeClause::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::MergeClause where T: core::clone::Clone
+pub type dsl_bpmn_frontend::MergeClause::Owned = T
+pub fn dsl_bpmn_frontend::MergeClause::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::MergeClause::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::MergeClause where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::MergeClause::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::MergeClause where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::MergeClause::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::MergeClause where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::MergeClause::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::MergeClause where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::MergeClause::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::MergeClause
+pub fn dsl_bpmn_frontend::MergeClause::from(T) -> T
+pub struct dsl_bpmn_frontend::ParallelJoinEntry
+pub dsl_bpmn_frontend::ParallelJoinEntry::expects: alloc::vec::Vec<alloc::string::String>
+pub dsl_bpmn_frontend::ParallelJoinEntry::merge: alloc::vec::Vec<dsl_bpmn_frontend::MergeClause>
+pub dsl_bpmn_frontend::ParallelJoinEntry::name: alloc::string::String
+impl core::clone::Clone for dsl_bpmn_frontend::ParallelJoinEntry
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::clone(&self) -> dsl_bpmn_frontend::ParallelJoinEntry
+impl core::fmt::Debug for dsl_bpmn_frontend::ParallelJoinEntry
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::ParallelJoinEntry
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::ParallelJoinEntry
+impl core::marker::Send for dsl_bpmn_frontend::ParallelJoinEntry
+impl core::marker::Sync for dsl_bpmn_frontend::ParallelJoinEntry
+impl core::marker::Unpin for dsl_bpmn_frontend::ParallelJoinEntry
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::ParallelJoinEntry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::ParallelJoinEntry
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::ParallelJoinEntry
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::ParallelJoinEntry where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::ParallelJoinEntry where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::ParallelJoinEntry::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::ParallelJoinEntry where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::ParallelJoinEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::ParallelJoinEntry where T: core::clone::Clone
+pub type dsl_bpmn_frontend::ParallelJoinEntry::Owned = T
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::ParallelJoinEntry where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::ParallelJoinEntry where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::ParallelJoinEntry where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::ParallelJoinEntry where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::ParallelJoinEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::ParallelJoinEntry
+pub fn dsl_bpmn_frontend::ParallelJoinEntry::from(T) -> T
+pub struct dsl_bpmn_frontend::RailwayEdge
+pub dsl_bpmn_frontend::RailwayEdge::condition: core::option::Option<alloc::string::String>
+pub dsl_bpmn_frontend::RailwayEdge::is_default: bool
+pub dsl_bpmn_frontend::RailwayEdge::source: alloc::string::String
+pub dsl_bpmn_frontend::RailwayEdge::target: alloc::string::String
+impl core::clone::Clone for dsl_bpmn_frontend::RailwayEdge
+pub fn dsl_bpmn_frontend::RailwayEdge::clone(&self) -> dsl_bpmn_frontend::RailwayEdge
+impl core::fmt::Debug for dsl_bpmn_frontend::RailwayEdge
+pub fn dsl_bpmn_frontend::RailwayEdge::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::RailwayEdge
+pub fn dsl_bpmn_frontend::RailwayEdge::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::RailwayEdge
+impl core::marker::Send for dsl_bpmn_frontend::RailwayEdge
+impl core::marker::Sync for dsl_bpmn_frontend::RailwayEdge
+impl core::marker::Unpin for dsl_bpmn_frontend::RailwayEdge
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::RailwayEdge
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::RailwayEdge
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::RailwayEdge
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::RailwayEdge where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::RailwayEdge::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::RailwayEdge where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::RailwayEdge::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::RailwayEdge::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::RailwayEdge where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::RailwayEdge::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::RailwayEdge::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::RailwayEdge where T: core::clone::Clone
+pub type dsl_bpmn_frontend::RailwayEdge::Owned = T
+pub fn dsl_bpmn_frontend::RailwayEdge::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::RailwayEdge::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::RailwayEdge where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayEdge::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::RailwayEdge where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayEdge::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::RailwayEdge where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayEdge::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::RailwayEdge where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::RailwayEdge::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::RailwayEdge
+pub fn dsl_bpmn_frontend::RailwayEdge::from(T) -> T
+pub struct dsl_bpmn_frontend::RailwayGateway
+pub dsl_bpmn_frontend::RailwayGateway::kind: dsl_bpmn_frontend::GatewayKind
+pub dsl_bpmn_frontend::RailwayGateway::name: alloc::string::String
+impl core::clone::Clone for dsl_bpmn_frontend::RailwayGateway
+pub fn dsl_bpmn_frontend::RailwayGateway::clone(&self) -> dsl_bpmn_frontend::RailwayGateway
+impl core::fmt::Debug for dsl_bpmn_frontend::RailwayGateway
+pub fn dsl_bpmn_frontend::RailwayGateway::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::RailwayGateway
+pub fn dsl_bpmn_frontend::RailwayGateway::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::RailwayGateway
+impl core::marker::Send for dsl_bpmn_frontend::RailwayGateway
+impl core::marker::Sync for dsl_bpmn_frontend::RailwayGateway
+impl core::marker::Unpin for dsl_bpmn_frontend::RailwayGateway
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::RailwayGateway
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::RailwayGateway
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::RailwayGateway
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::RailwayGateway where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::RailwayGateway::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::RailwayGateway where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::RailwayGateway::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::RailwayGateway::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::RailwayGateway where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::RailwayGateway::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::RailwayGateway::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::RailwayGateway where T: core::clone::Clone
+pub type dsl_bpmn_frontend::RailwayGateway::Owned = T
+pub fn dsl_bpmn_frontend::RailwayGateway::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::RailwayGateway::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::RailwayGateway where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayGateway::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::RailwayGateway where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayGateway::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::RailwayGateway where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayGateway::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::RailwayGateway where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::RailwayGateway::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::RailwayGateway
+pub fn dsl_bpmn_frontend::RailwayGateway::from(T) -> T
+pub struct dsl_bpmn_frontend::RailwayGraph
+pub dsl_bpmn_frontend::RailwayGraph::boundary_attachments: alloc::vec::Vec<dsl_bpmn_frontend::BoundaryAttachmentEntry>
+pub dsl_bpmn_frontend::RailwayGraph::edges: alloc::vec::Vec<dsl_bpmn_frontend::RailwayEdge>
+pub dsl_bpmn_frontend::RailwayGraph::gateways: std::collections::hash::map::HashMap<alloc::string::String, dsl_bpmn_frontend::RailwayGateway>
+pub dsl_bpmn_frontend::RailwayGraph::nodes: std::collections::hash::map::HashMap<alloc::string::String, dsl_bpmn_frontend::RailwayNode>
+pub dsl_bpmn_frontend::RailwayGraph::parallel_joins: std::collections::hash::map::HashMap<alloc::string::String, dsl_bpmn_frontend::ParallelJoinEntry>
+pub dsl_bpmn_frontend::RailwayGraph::start_node: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_bpmn_frontend::RailwayGraph
+pub fn dsl_bpmn_frontend::RailwayGraph::clone(&self) -> dsl_bpmn_frontend::RailwayGraph
+impl core::fmt::Debug for dsl_bpmn_frontend::RailwayGraph
+pub fn dsl_bpmn_frontend::RailwayGraph::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::RailwayGraph
+pub fn dsl_bpmn_frontend::RailwayGraph::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::RailwayGraph
+impl core::marker::Send for dsl_bpmn_frontend::RailwayGraph
+impl core::marker::Sync for dsl_bpmn_frontend::RailwayGraph
+impl core::marker::Unpin for dsl_bpmn_frontend::RailwayGraph
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::RailwayGraph
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::RailwayGraph
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::RailwayGraph
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::RailwayGraph where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::RailwayGraph::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::RailwayGraph where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::RailwayGraph::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::RailwayGraph::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::RailwayGraph where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::RailwayGraph::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::RailwayGraph::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::RailwayGraph where T: core::clone::Clone
+pub type dsl_bpmn_frontend::RailwayGraph::Owned = T
+pub fn dsl_bpmn_frontend::RailwayGraph::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::RailwayGraph::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::RailwayGraph where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayGraph::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::RailwayGraph where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayGraph::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::RailwayGraph where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayGraph::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::RailwayGraph where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::RailwayGraph::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::RailwayGraph
+pub fn dsl_bpmn_frontend::RailwayGraph::from(T) -> T
+pub struct dsl_bpmn_frontend::RailwayNode
+pub dsl_bpmn_frontend::RailwayNode::kind: dsl_bpmn_frontend::NodeKind
+pub dsl_bpmn_frontend::RailwayNode::name: alloc::string::String
+pub dsl_bpmn_frontend::RailwayNode::verb_ref: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_bpmn_frontend::RailwayNode
+pub fn dsl_bpmn_frontend::RailwayNode::clone(&self) -> dsl_bpmn_frontend::RailwayNode
+impl core::fmt::Debug for dsl_bpmn_frontend::RailwayNode
+pub fn dsl_bpmn_frontend::RailwayNode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_bpmn_frontend::RailwayNode
+pub fn dsl_bpmn_frontend::RailwayNode::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_bpmn_frontend::RailwayNode
+impl core::marker::Send for dsl_bpmn_frontend::RailwayNode
+impl core::marker::Sync for dsl_bpmn_frontend::RailwayNode
+impl core::marker::Unpin for dsl_bpmn_frontend::RailwayNode
+impl core::marker::UnsafeUnpin for dsl_bpmn_frontend::RailwayNode
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_bpmn_frontend::RailwayNode
+impl core::panic::unwind_safe::UnwindSafe for dsl_bpmn_frontend::RailwayNode
+impl<T, U> core::convert::Into<U> for dsl_bpmn_frontend::RailwayNode where U: core::convert::From<T>
+pub fn dsl_bpmn_frontend::RailwayNode::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_bpmn_frontend::RailwayNode where U: core::convert::Into<T>
+pub type dsl_bpmn_frontend::RailwayNode::Error = core::convert::Infallible
+pub fn dsl_bpmn_frontend::RailwayNode::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_bpmn_frontend::RailwayNode where U: core::convert::TryFrom<T>
+pub type dsl_bpmn_frontend::RailwayNode::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_bpmn_frontend::RailwayNode::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_bpmn_frontend::RailwayNode where T: core::clone::Clone
+pub type dsl_bpmn_frontend::RailwayNode::Owned = T
+pub fn dsl_bpmn_frontend::RailwayNode::clone_into(&self, &mut T)
+pub fn dsl_bpmn_frontend::RailwayNode::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_bpmn_frontend::RailwayNode where T: 'static + ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayNode::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_bpmn_frontend::RailwayNode where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayNode::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_bpmn_frontend::RailwayNode where T: ?core::marker::Sized
+pub fn dsl_bpmn_frontend::RailwayNode::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_bpmn_frontend::RailwayNode where T: core::clone::Clone
+pub unsafe fn dsl_bpmn_frontend::RailwayNode::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_bpmn_frontend::RailwayNode
+pub fn dsl_bpmn_frontend::RailwayNode::from(T) -> T
+pub const dsl_bpmn_frontend::DUPLICATE_NAME: &str
+pub const dsl_bpmn_frontend::GATEWAY_FAN_OUT_ERROR: &str
+pub const dsl_bpmn_frontend::INVALID_BOUNDARY_TARGET: &str
+pub const dsl_bpmn_frontend::UNREACHABLE_NODE: &str
+pub const dsl_bpmn_frontend::UNTERMINATED_PATH: &str
+pub fn dsl_bpmn_frontend::assemble(&dsl_ast::atom_bag::AtomBag, &mut dsl_diagnostics::diagnostic::DiagnosticBag) -> dsl_bpmn_frontend::RailwayGraph

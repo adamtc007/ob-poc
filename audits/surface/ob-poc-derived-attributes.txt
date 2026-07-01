@@ -1,0 +1,664 @@
+# ob-poc-derived-attributes | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:41:01Z
+pub mod ob_poc_derived_attributes
+pub mod ob_poc_derived_attributes::advisory_lock
+pub async fn ob_poc_derived_attributes::advisory_lock::advisory_xact_lock(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, i64) -> core::result::Result<(), sqlx_core::error::Error>
+pub fn ob_poc_derived_attributes::advisory_lock::lock_key(&str, &str) -> i64
+pub async fn ob_poc_derived_attributes::advisory_lock::try_advisory_xact_lock(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, i64) -> core::result::Result<bool, sqlx_core::error::Error>
+pub mod ob_poc_derived_attributes::derived_attributes
+pub mod ob_poc_derived_attributes::derived_attributes::repository
+pub struct ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::failed: usize
+pub ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::picked: usize
+pub ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::recomputed: usize
+pub ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::skipped_already_current: usize
+pub ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::still_stale: usize
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::default::Default for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::default() -> ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::dependency_role: core::option::Option<alloc::string::String>
+pub ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::input_attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::input_entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::input_kind: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::input_source_row_id: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::resolved_value: serde_json::value::Value
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::created_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::dependency_role: core::option::Option<alloc::string::String>
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::derived_value_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::input_attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::input_entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::input_kind: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::input_source_row_id: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::resolved_value: core::option::Option<serde_json::value::Value>
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<uuid::Uuid>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<serde_json::value::Value>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, chrono::datetime::DateTime<chrono::offset::utc::Utc>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::dependency_role: core::option::Option<alloc::string::String>
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::input_attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::input_entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::input_kind: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::input_source_row_id: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::resolved_value: core::option::Option<serde_json::value::Value>
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::content_hash: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::created_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::dependency_depth: i32
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::derivation_spec_fqn: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::entity_type: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::evaluated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::inherited_security_label: core::option::Option<serde_json::value::Value>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::input_values: serde_json::value::Value
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::spec_snapshot_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::stale: bool
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::superseded_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::superseded_by: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::value: serde_json::value::Value
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, serde_json::value::Value: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<serde_json::value::Value>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, i32: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, chrono::datetime::DateTime<chrono::offset::utc::Utc>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, bool: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<uuid::Uuid>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::content_hash: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::dependency_depth: i32
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::derivation_spec_fqn: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::entity_type: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::evaluated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::inherited_security_label: core::option::Option<serde_json::value::Value>
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::input_values: serde_json::value::Value
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::spec_snapshot_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::stale: bool
+pub ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::value: serde_json::value::Value
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::vzip(self) -> V
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::acquire_derivation_lock(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<()>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::compute_content_hash(uuid::Uuid, &[ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput]) -> alloc::string::String
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_current(&sqlx_postgres::PgPool, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_current_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_direct_dependencies(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DependencyRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_entity_scoped_impact(&sqlx_postgres::PgPool, uuid::Uuid, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_latest(&sqlx_postgres::PgPool, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_recompute_queue(&sqlx_postgres::PgPool, i64) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_reverse_impact(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::get_transitive_closure(&sqlx_postgres::PgPool, uuid::Uuid, i32) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::insert_dependencies(&sqlx_postgres::PgPool, uuid::Uuid, &[ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput]) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DependencyRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::insert_dependencies_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, uuid::Uuid, &[ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput]) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DependencyRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::insert_derived_value(&sqlx_postgres::PgPool, &ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput) -> anyhow::Result<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::insert_derived_value_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput) -> anyhow::Result<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::mark_stale(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<()>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::mark_stale_by_input(&sqlx_postgres::PgPool, uuid::Uuid, uuid::Uuid) -> anyhow::Result<u64>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::mark_stale_by_spec(&sqlx_postgres::PgPool, &str, uuid::Uuid) -> anyhow::Result<u64>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::supersede_current(&sqlx_postgres::PgPool, &str, uuid::Uuid, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<uuid::Uuid>>
+pub async fn ob_poc_derived_attributes::derived_attributes::repository::supersede_current_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &str, uuid::Uuid, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<uuid::Uuid>>
+pub struct ob_poc_derived_attributes::derived_attributes::BatchRecomputeResult
+pub ob_poc_derived_attributes::derived_attributes::BatchRecomputeResult::failed: usize
+pub ob_poc_derived_attributes::derived_attributes::BatchRecomputeResult::picked: usize
+pub ob_poc_derived_attributes::derived_attributes::BatchRecomputeResult::recomputed: usize
+pub ob_poc_derived_attributes::derived_attributes::BatchRecomputeResult::skipped_already_current: usize
+pub ob_poc_derived_attributes::derived_attributes::BatchRecomputeResult::still_stale: usize
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::default::Default for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::default() -> ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult
+pub type ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::BatchRecomputeResult::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::ContentHashInput
+pub ob_poc_derived_attributes::derived_attributes::ContentHashInput::dependency_role: core::option::Option<alloc::string::String>
+pub ob_poc_derived_attributes::derived_attributes::ContentHashInput::input_attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::ContentHashInput::input_entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::ContentHashInput::input_kind: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::ContentHashInput::input_source_row_id: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::ContentHashInput::resolved_value: serde_json::value::Value
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput
+pub type ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::DependencyRow
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::created_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::dependency_role: core::option::Option<alloc::string::String>
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::derived_value_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::input_attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::input_entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::input_kind: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::input_source_row_id: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::DependencyRow::resolved_value: core::option::Option<serde_json::value::Value>
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<uuid::Uuid>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<serde_json::value::Value>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, chrono::datetime::DateTime<chrono::offset::utc::Utc>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRow::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::DependencyRowInput
+pub ob_poc_derived_attributes::derived_attributes::DependencyRowInput::dependency_role: core::option::Option<alloc::string::String>
+pub ob_poc_derived_attributes::derived_attributes::DependencyRowInput::input_attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DependencyRowInput::input_entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DependencyRowInput::input_kind: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DependencyRowInput::input_source_row_id: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::DependencyRowInput::resolved_value: core::option::Option<serde_json::value::Value>
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput
+pub type ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::DerivedValueRow
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::content_hash: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::created_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::dependency_depth: i32
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::derivation_spec_fqn: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::entity_type: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::evaluated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::inherited_security_label: core::option::Option<serde_json::value::Value>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::input_values: serde_json::value::Value
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::spec_snapshot_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::stale: bool
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::superseded_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::superseded_by: core::option::Option<uuid::Uuid>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRow::value: serde_json::value::Value
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, serde_json::value::Value: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<serde_json::value::Value>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, i32: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, chrono::datetime::DateTime<chrono::offset::utc::Utc>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, bool: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<uuid::Uuid>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow::vzip(self) -> V
+pub struct ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::attr_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::content_hash: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::dependency_depth: i32
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::derivation_spec_fqn: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::entity_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::entity_type: alloc::string::String
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::evaluated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::inherited_security_label: core::option::Option<serde_json::value::Value>
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::input_values: serde_json::value::Value
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::spec_snapshot_id: uuid::Uuid
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::stale: bool
+pub ob_poc_derived_attributes::derived_attributes::DerivedValueRowInput::value: serde_json::value::Value
+impl core::clone::Clone for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::clone(&self) -> ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::fmt::Debug for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::Send for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::Sync for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::Unpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::marker::UnsafeUnpin for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T, U> core::convert::Into<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where U: core::convert::From<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where U: core::convert::Into<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Error = core::convert::Infallible
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where U: core::convert::TryFrom<T>
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: core::clone::Clone
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Owned = T
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::clone_into(&self, &mut T)
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: ?core::marker::Sized
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where T: core::clone::Clone
+pub unsafe fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T> tracing::instrument::Instrument for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T> tracing::instrument::WithSubscriber for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+impl<T> typenum::type_operators::Same for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput
+pub type ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput::vzip(self) -> V
+pub async fn ob_poc_derived_attributes::derived_attributes::acquire_derivation_lock(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<()>
+pub fn ob_poc_derived_attributes::derived_attributes::compute_content_hash(uuid::Uuid, &[ob_poc_derived_attributes::derived_attributes::repository::ContentHashInput]) -> alloc::string::String
+pub async fn ob_poc_derived_attributes::derived_attributes::get_current(&sqlx_postgres::PgPool, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_current_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_direct_dependencies(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DependencyRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_entity_scoped_impact(&sqlx_postgres::PgPool, uuid::Uuid, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_latest(&sqlx_postgres::PgPool, &str, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_recompute_queue(&sqlx_postgres::PgPool, i64) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_reverse_impact(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::get_transitive_closure(&sqlx_postgres::PgPool, uuid::Uuid, i32) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::insert_dependencies(&sqlx_postgres::PgPool, uuid::Uuid, &[ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput]) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DependencyRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::insert_dependencies_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, uuid::Uuid, &[ob_poc_derived_attributes::derived_attributes::repository::DependencyRowInput]) -> anyhow::Result<alloc::vec::Vec<ob_poc_derived_attributes::derived_attributes::repository::DependencyRow>>
+pub async fn ob_poc_derived_attributes::derived_attributes::insert_derived_value(&sqlx_postgres::PgPool, &ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput) -> anyhow::Result<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>
+pub async fn ob_poc_derived_attributes::derived_attributes::insert_derived_value_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRowInput) -> anyhow::Result<ob_poc_derived_attributes::derived_attributes::repository::DerivedValueRow>
+pub async fn ob_poc_derived_attributes::derived_attributes::mark_stale(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<()>
+pub async fn ob_poc_derived_attributes::derived_attributes::mark_stale_by_input(&sqlx_postgres::PgPool, uuid::Uuid, uuid::Uuid) -> anyhow::Result<u64>
+pub async fn ob_poc_derived_attributes::derived_attributes::mark_stale_by_spec(&sqlx_postgres::PgPool, &str, uuid::Uuid) -> anyhow::Result<u64>
+pub async fn ob_poc_derived_attributes::derived_attributes::supersede_current(&sqlx_postgres::PgPool, &str, uuid::Uuid, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<uuid::Uuid>>
+pub async fn ob_poc_derived_attributes::derived_attributes::supersede_current_tx(&mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::database::Postgres>, &str, uuid::Uuid, uuid::Uuid, uuid::Uuid) -> anyhow::Result<core::option::Option<uuid::Uuid>>

@@ -1,0 +1,207 @@
+# ob-poc-ontology | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:41:20Z
+pub mod ob_poc_ontology
+pub enum ob_poc_ontology::SearchKeyDef
+pub ob_poc_ontology::SearchKeyDef::Composite
+pub ob_poc_ontology::SearchKeyDef::Composite::applies_to: core::option::Option<alloc::vec::Vec<alloc::string::String>>
+pub ob_poc_ontology::SearchKeyDef::Composite::columns: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_ontology::SearchKeyDef::Composite::unique: bool
+pub ob_poc_ontology::SearchKeyDef::Single
+pub ob_poc_ontology::SearchKeyDef::Single::applies_to: core::option::Option<alloc::vec::Vec<alloc::string::String>>
+pub ob_poc_ontology::SearchKeyDef::Single::column: alloc::string::String
+pub ob_poc_ontology::SearchKeyDef::Single::unique: bool
+impl ob_poc_ontology::SearchKeyDef
+pub fn ob_poc_ontology::SearchKeyDef::columns(&self) -> alloc::vec::Vec<&str>
+pub fn ob_poc_ontology::SearchKeyDef::is_unique(&self) -> bool
+impl core::clone::Clone for ob_poc_ontology::SearchKeyDef
+pub fn ob_poc_ontology::SearchKeyDef::clone(&self) -> ob_poc_ontology::SearchKeyDef
+impl core::fmt::Debug for ob_poc_ontology::SearchKeyDef
+pub fn ob_poc_ontology::SearchKeyDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_ontology::SearchKeyDef
+pub fn ob_poc_ontology::SearchKeyDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_ontology::SearchKeyDef
+pub fn ob_poc_ontology::SearchKeyDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_ontology::SearchKeyDef
+impl core::marker::Send for ob_poc_ontology::SearchKeyDef
+impl core::marker::Sync for ob_poc_ontology::SearchKeyDef
+impl core::marker::Unpin for ob_poc_ontology::SearchKeyDef
+impl core::marker::UnsafeUnpin for ob_poc_ontology::SearchKeyDef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_ontology::SearchKeyDef
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_ontology::SearchKeyDef
+impl<T, U> core::convert::Into<U> for ob_poc_ontology::SearchKeyDef where U: core::convert::From<T>
+pub fn ob_poc_ontology::SearchKeyDef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_ontology::SearchKeyDef where U: core::convert::Into<T>
+pub type ob_poc_ontology::SearchKeyDef::Error = core::convert::Infallible
+pub fn ob_poc_ontology::SearchKeyDef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_ontology::SearchKeyDef where U: core::convert::TryFrom<T>
+pub type ob_poc_ontology::SearchKeyDef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_ontology::SearchKeyDef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_ontology::SearchKeyDef where T: core::clone::Clone
+pub type ob_poc_ontology::SearchKeyDef::Owned = T
+pub fn ob_poc_ontology::SearchKeyDef::clone_into(&self, &mut T)
+pub fn ob_poc_ontology::SearchKeyDef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_ontology::SearchKeyDef where T: 'static + ?core::marker::Sized
+pub fn ob_poc_ontology::SearchKeyDef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_ontology::SearchKeyDef where T: ?core::marker::Sized
+pub fn ob_poc_ontology::SearchKeyDef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_ontology::SearchKeyDef where T: ?core::marker::Sized
+pub fn ob_poc_ontology::SearchKeyDef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_ontology::SearchKeyDef where T: core::clone::Clone
+pub unsafe fn ob_poc_ontology::SearchKeyDef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_ontology::SearchKeyDef
+pub fn ob_poc_ontology::SearchKeyDef::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_ontology::SearchKeyDef where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_ontology::EntityTaxonomy
+impl ob_poc_ontology::EntityTaxonomy
+pub fn ob_poc_ontology::EntityTaxonomy::allows_implicit_create(&self, &str) -> bool
+pub fn ob_poc_ontology::EntityTaxonomy::canonical_creator(&self, &str, core::option::Option<&str>) -> core::option::Option<alloc::string::String>
+pub fn ob_poc_ontology::EntityTaxonomy::entity_types(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+pub fn ob_poc_ontology::EntityTaxonomy::find_entity_type_by_storage(&self, &str, &str, core::option::Option<&str>) -> core::option::Option<&str>
+pub fn ob_poc_ontology::EntityTaxonomy::from_yaml(&str) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::EntityTaxonomy::get(&self, &str) -> core::option::Option<&ob_poc_ontology::types::EntityDef>
+pub fn ob_poc_ontology::EntityTaxonomy::get_db_config(&self, &str) -> core::option::Option<&ob_poc_ontology::types::EntityDbConfig>
+pub fn ob_poc_ontology::EntityTaxonomy::get_fk(&self, &str, &str) -> core::option::Option<&str>
+pub fn ob_poc_ontology::EntityTaxonomy::get_lifecycle(&self, &str) -> core::option::Option<&ob_poc_ontology::types::EntityLifecycle>
+pub fn ob_poc_ontology::EntityTaxonomy::get_reference_table(&self, &str) -> core::option::Option<&ob_poc_ontology::types::ReferenceTableDef>
+pub fn ob_poc_ontology::EntityTaxonomy::implicit_create_required_args(&self, &str) -> alloc::vec::Vec<&str>
+pub fn ob_poc_ontology::EntityTaxonomy::initial_state(&self, &str) -> core::option::Option<&str>
+pub fn ob_poc_ontology::EntityTaxonomy::is_subtype_of(&self, &str, &str) -> bool
+pub fn ob_poc_ontology::EntityTaxonomy::load<P: core::convert::AsRef<std::path::Path>>(P) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::EntityTaxonomy::parent_type(&self, &str) -> core::option::Option<&str>
+pub fn ob_poc_ontology::EntityTaxonomy::relationships(&self) -> &[ob_poc_ontology::types::FkRelationship]
+pub fn ob_poc_ontology::EntityTaxonomy::resolve_alias<'a>(&'a self, &'a str) -> &'a str
+pub fn ob_poc_ontology::EntityTaxonomy::status_column(&self, &str) -> core::option::Option<&str>
+impl core::clone::Clone for ob_poc_ontology::EntityTaxonomy
+pub fn ob_poc_ontology::EntityTaxonomy::clone(&self) -> ob_poc_ontology::EntityTaxonomy
+impl core::fmt::Debug for ob_poc_ontology::EntityTaxonomy
+pub fn ob_poc_ontology::EntityTaxonomy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_ontology::EntityTaxonomy
+impl core::marker::Send for ob_poc_ontology::EntityTaxonomy
+impl core::marker::Sync for ob_poc_ontology::EntityTaxonomy
+impl core::marker::Unpin for ob_poc_ontology::EntityTaxonomy
+impl core::marker::UnsafeUnpin for ob_poc_ontology::EntityTaxonomy
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_ontology::EntityTaxonomy
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_ontology::EntityTaxonomy
+impl<T, U> core::convert::Into<U> for ob_poc_ontology::EntityTaxonomy where U: core::convert::From<T>
+pub fn ob_poc_ontology::EntityTaxonomy::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_ontology::EntityTaxonomy where U: core::convert::Into<T>
+pub type ob_poc_ontology::EntityTaxonomy::Error = core::convert::Infallible
+pub fn ob_poc_ontology::EntityTaxonomy::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_ontology::EntityTaxonomy where U: core::convert::TryFrom<T>
+pub type ob_poc_ontology::EntityTaxonomy::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_ontology::EntityTaxonomy::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_ontology::EntityTaxonomy where T: core::clone::Clone
+pub type ob_poc_ontology::EntityTaxonomy::Owned = T
+pub fn ob_poc_ontology::EntityTaxonomy::clone_into(&self, &mut T)
+pub fn ob_poc_ontology::EntityTaxonomy::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_ontology::EntityTaxonomy where T: 'static + ?core::marker::Sized
+pub fn ob_poc_ontology::EntityTaxonomy::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_ontology::EntityTaxonomy where T: ?core::marker::Sized
+pub fn ob_poc_ontology::EntityTaxonomy::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_ontology::EntityTaxonomy where T: ?core::marker::Sized
+pub fn ob_poc_ontology::EntityTaxonomy::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_ontology::EntityTaxonomy where T: core::clone::Clone
+pub unsafe fn ob_poc_ontology::EntityTaxonomy::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_ontology::EntityTaxonomy
+pub fn ob_poc_ontology::EntityTaxonomy::from(T) -> T
+pub struct ob_poc_ontology::OntologyService
+impl ob_poc_ontology::OntologyService
+pub fn ob_poc_ontology::OntologyService::allows_implicit_create(&self, &str) -> bool
+pub fn ob_poc_ontology::OntologyService::canonical_creator(&self, &str, core::option::Option<&str>) -> core::option::Option<alloc::string::String>
+pub fn ob_poc_ontology::OntologyService::entity_types(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+pub fn ob_poc_ontology::OntologyService::get_entity(&self, &str) -> core::option::Option<&ob_poc_ontology::types::EntityDef>
+pub fn ob_poc_ontology::OntologyService::get_fk(&self, &str, &str) -> core::option::Option<&str>
+pub fn ob_poc_ontology::OntologyService::get_lifecycle(&self, &str) -> core::option::Option<&ob_poc_ontology::types::EntityLifecycle>
+pub fn ob_poc_ontology::OntologyService::global() -> &'static alloc::sync::Arc<ob_poc_ontology::OntologyService>
+pub fn ob_poc_ontology::OntologyService::init_global(ob_poc_ontology::OntologyService) -> core::result::Result<(), ob_poc_ontology::OntologyService>
+pub fn ob_poc_ontology::OntologyService::initial_state(&self, &str) -> core::option::Option<&str>
+pub fn ob_poc_ontology::OntologyService::is_canonical_creator(&self, &str, &str, &str) -> bool
+pub fn ob_poc_ontology::OntologyService::is_valid_transition(&self, &str, &str, &str) -> bool
+pub fn ob_poc_ontology::OntologyService::load() -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::OntologyService::load_from<P: core::convert::AsRef<std::path::Path>>(P) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::OntologyService::resolve_alias<'a>(&'a self, &'a str) -> &'a str
+pub fn ob_poc_ontology::OntologyService::taxonomy(&self) -> &ob_poc_ontology::EntityTaxonomy
+pub fn ob_poc_ontology::OntologyService::valid_next_states(&self, &str, &str) -> alloc::vec::Vec<&str>
+impl core::clone::Clone for ob_poc_ontology::OntologyService
+pub fn ob_poc_ontology::OntologyService::clone(&self) -> ob_poc_ontology::OntologyService
+impl core::fmt::Debug for ob_poc_ontology::OntologyService
+pub fn ob_poc_ontology::OntologyService::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_ontology::OntologyService
+impl core::marker::Send for ob_poc_ontology::OntologyService
+impl core::marker::Sync for ob_poc_ontology::OntologyService
+impl core::marker::Unpin for ob_poc_ontology::OntologyService
+impl core::marker::UnsafeUnpin for ob_poc_ontology::OntologyService
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_ontology::OntologyService
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_ontology::OntologyService
+impl<T, U> core::convert::Into<U> for ob_poc_ontology::OntologyService where U: core::convert::From<T>
+pub fn ob_poc_ontology::OntologyService::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_ontology::OntologyService where U: core::convert::Into<T>
+pub type ob_poc_ontology::OntologyService::Error = core::convert::Infallible
+pub fn ob_poc_ontology::OntologyService::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_ontology::OntologyService where U: core::convert::TryFrom<T>
+pub type ob_poc_ontology::OntologyService::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_ontology::OntologyService::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_ontology::OntologyService where T: core::clone::Clone
+pub type ob_poc_ontology::OntologyService::Owned = T
+pub fn ob_poc_ontology::OntologyService::clone_into(&self, &mut T)
+pub fn ob_poc_ontology::OntologyService::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_ontology::OntologyService where T: 'static + ?core::marker::Sized
+pub fn ob_poc_ontology::OntologyService::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_ontology::OntologyService where T: ?core::marker::Sized
+pub fn ob_poc_ontology::OntologyService::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_ontology::OntologyService where T: ?core::marker::Sized
+pub fn ob_poc_ontology::OntologyService::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_ontology::OntologyService where T: core::clone::Clone
+pub unsafe fn ob_poc_ontology::OntologyService::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_ontology::OntologyService
+pub fn ob_poc_ontology::OntologyService::from(T) -> T
+pub struct ob_poc_ontology::SemanticStageRegistry
+impl ob_poc_ontology::SemanticStageRegistry
+pub fn ob_poc_ontology::SemanticStageRegistry::dependents_of(&self, &str) -> alloc::vec::Vec<&str>
+pub fn ob_poc_ontology::SemanticStageRegistry::from_yaml(&str) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::SemanticStageRegistry::get_stage(&self, &str) -> core::option::Option<&ob_poc_types::semantic_stage::StageDefinition>
+pub fn ob_poc_ontology::SemanticStageRegistry::is_blocking(&self, &str) -> bool
+pub fn ob_poc_ontology::SemanticStageRegistry::load<P: core::convert::AsRef<std::path::Path>>(P) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::SemanticStageRegistry::load_default() -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn ob_poc_ontology::SemanticStageRegistry::map(&self) -> &ob_poc_types::semantic_stage::SemanticStageMap
+pub fn ob_poc_ontology::SemanticStageRegistry::stage_for_entity(&self, &str) -> core::option::Option<&ob_poc_types::semantic_stage::StageDefinition>
+pub fn ob_poc_ontology::SemanticStageRegistry::stages_for_product(&self, &str) -> alloc::vec::Vec<&str>
+pub fn ob_poc_ontology::SemanticStageRegistry::stages_for_products(&self, &[alloc::string::String]) -> alloc::vec::Vec<&str>
+pub fn ob_poc_ontology::SemanticStageRegistry::stages_in_order(&self) -> impl core::iter::traits::iterator::Iterator<Item = &ob_poc_types::semantic_stage::StageDefinition>
+impl core::clone::Clone for ob_poc_ontology::SemanticStageRegistry
+pub fn ob_poc_ontology::SemanticStageRegistry::clone(&self) -> ob_poc_ontology::SemanticStageRegistry
+impl core::fmt::Debug for ob_poc_ontology::SemanticStageRegistry
+pub fn ob_poc_ontology::SemanticStageRegistry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_ontology::SemanticStageRegistry
+impl core::marker::Send for ob_poc_ontology::SemanticStageRegistry
+impl core::marker::Sync for ob_poc_ontology::SemanticStageRegistry
+impl core::marker::Unpin for ob_poc_ontology::SemanticStageRegistry
+impl core::marker::UnsafeUnpin for ob_poc_ontology::SemanticStageRegistry
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_ontology::SemanticStageRegistry
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_ontology::SemanticStageRegistry
+impl<T, U> core::convert::Into<U> for ob_poc_ontology::SemanticStageRegistry where U: core::convert::From<T>
+pub fn ob_poc_ontology::SemanticStageRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_ontology::SemanticStageRegistry where U: core::convert::Into<T>
+pub type ob_poc_ontology::SemanticStageRegistry::Error = core::convert::Infallible
+pub fn ob_poc_ontology::SemanticStageRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_ontology::SemanticStageRegistry where U: core::convert::TryFrom<T>
+pub type ob_poc_ontology::SemanticStageRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_ontology::SemanticStageRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_ontology::SemanticStageRegistry where T: core::clone::Clone
+pub type ob_poc_ontology::SemanticStageRegistry::Owned = T
+pub fn ob_poc_ontology::SemanticStageRegistry::clone_into(&self, &mut T)
+pub fn ob_poc_ontology::SemanticStageRegistry::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_ontology::SemanticStageRegistry where T: 'static + ?core::marker::Sized
+pub fn ob_poc_ontology::SemanticStageRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_ontology::SemanticStageRegistry where T: ?core::marker::Sized
+pub fn ob_poc_ontology::SemanticStageRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_ontology::SemanticStageRegistry where T: ?core::marker::Sized
+pub fn ob_poc_ontology::SemanticStageRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_ontology::SemanticStageRegistry where T: core::clone::Clone
+pub unsafe fn ob_poc_ontology::SemanticStageRegistry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_ontology::SemanticStageRegistry
+pub fn ob_poc_ontology::SemanticStageRegistry::from(T) -> T
+pub fn ob_poc_ontology::is_terminal_state(&ob_poc_ontology::types::EntityLifecycle, &str) -> bool
+pub fn ob_poc_ontology::is_valid_state(&ob_poc_ontology::types::EntityLifecycle, &str) -> bool
+pub fn ob_poc_ontology::is_valid_transition(&ob_poc_ontology::types::EntityLifecycle, &str, &str) -> bool
+pub fn ob_poc_ontology::ontology() -> &'static ob_poc_ontology::OntologyService
+pub fn ob_poc_ontology::valid_next_states<'a>(&'a ob_poc_ontology::types::EntityLifecycle, &str) -> alloc::vec::Vec<&'a str>

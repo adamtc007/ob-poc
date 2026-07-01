@@ -1,0 +1,40 @@
+# dsl-migrate-verify | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:39:01Z
+pub mod dsl_migrate_verify
+pub struct dsl_migrate_verify::VerifyResult
+pub dsl_migrate_verify::VerifyResult::diagnostics: alloc::vec::Vec<alloc::string::String>
+pub dsl_migrate_verify::VerifyResult::lowered: bool
+pub dsl_migrate_verify::VerifyResult::parsed: bool
+pub dsl_migrate_verify::VerifyResult::started: bool
+pub dsl_migrate_verify::VerifyResult::validated: bool
+impl dsl_migrate_verify::VerifyResult
+pub fn dsl_migrate_verify::VerifyResult::is_ok(&self) -> bool
+impl core::fmt::Debug for dsl_migrate_verify::VerifyResult
+pub fn dsl_migrate_verify::VerifyResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate_verify::VerifyResult
+impl core::marker::Send for dsl_migrate_verify::VerifyResult
+impl core::marker::Sync for dsl_migrate_verify::VerifyResult
+impl core::marker::Unpin for dsl_migrate_verify::VerifyResult
+impl core::marker::UnsafeUnpin for dsl_migrate_verify::VerifyResult
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate_verify::VerifyResult
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate_verify::VerifyResult
+impl<T, U> core::convert::Into<U> for dsl_migrate_verify::VerifyResult where U: core::convert::From<T>
+pub fn dsl_migrate_verify::VerifyResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate_verify::VerifyResult where U: core::convert::Into<T>
+pub type dsl_migrate_verify::VerifyResult::Error = core::convert::Infallible
+pub fn dsl_migrate_verify::VerifyResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate_verify::VerifyResult where U: core::convert::TryFrom<T>
+pub type dsl_migrate_verify::VerifyResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate_verify::VerifyResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_migrate_verify::VerifyResult where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate_verify::VerifyResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate_verify::VerifyResult where T: ?core::marker::Sized
+pub fn dsl_migrate_verify::VerifyResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate_verify::VerifyResult where T: ?core::marker::Sized
+pub fn dsl_migrate_verify::VerifyResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_migrate_verify::VerifyResult
+pub fn dsl_migrate_verify::VerifyResult::from(T) -> T
+impl<T> tracing::instrument::Instrument for dsl_migrate_verify::VerifyResult
+impl<T> tracing::instrument::WithSubscriber for dsl_migrate_verify::VerifyResult
+pub fn dsl_migrate_verify::compile_to_spec(&str, &str) -> anyhow::Result<dsl_lowering::bpmn::JourneySpec>
+pub async fn dsl_migrate_verify::verify_dsl_source(&str, &str) -> dsl_migrate_verify::VerifyResult
+pub fn dsl_migrate_verify::verify_dsl_source_sync(&str, &str) -> dsl_migrate_verify::VerifyResult

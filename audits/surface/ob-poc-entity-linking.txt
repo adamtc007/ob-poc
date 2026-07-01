@@ -1,0 +1,1256 @@
+# ob-poc-entity-linking | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:41:07Z
+pub mod ob_poc_entity_linking
+pub mod ob_poc_entity_linking::compiler
+pub enum ob_poc_entity_linking::compiler::LintSeverity
+pub ob_poc_entity_linking::compiler::LintSeverity::Error
+pub ob_poc_entity_linking::compiler::LintSeverity::Info
+pub ob_poc_entity_linking::compiler::LintSeverity::Warning
+impl core::clone::Clone for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::clone(&self) -> ob_poc_entity_linking::compiler::LintSeverity
+impl core::cmp::Eq for ob_poc_entity_linking::compiler::LintSeverity
+impl core::cmp::PartialEq for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::eq(&self, &ob_poc_entity_linking::compiler::LintSeverity) -> bool
+impl core::fmt::Debug for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::StructuralPartialEq for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Freeze for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Send for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Sync for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Unpin for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::compiler::LintSeverity
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::compiler::LintSeverity
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::compiler::LintSeverity
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_entity_linking::compiler::LintSeverity where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_entity_linking::compiler::LintSeverity where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::compiler::LintSeverity where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::compiler::LintSeverity::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::compiler::LintSeverity where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::compiler::LintSeverity::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::compiler::LintSeverity::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::compiler::LintSeverity where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::compiler::LintSeverity::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::compiler::LintSeverity::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::compiler::LintSeverity where T: core::clone::Clone
+pub type ob_poc_entity_linking::compiler::LintSeverity::Owned = T
+pub fn ob_poc_entity_linking::compiler::LintSeverity::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::compiler::LintSeverity::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::compiler::LintSeverity where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::compiler::LintSeverity where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::compiler::LintSeverity where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::compiler::LintSeverity where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::compiler::LintSeverity::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::compiler::LintSeverity
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::compiler::LintSeverity
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::compiler::LintSeverity
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::compiler::LintSeverity
+pub type ob_poc_entity_linking::compiler::LintSeverity::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::compiler::LintSeverity where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::compiler::LintSeverity::vzip(self) -> V
+pub struct ob_poc_entity_linking::compiler::LintWarning
+pub ob_poc_entity_linking::compiler::LintWarning::message: alloc::string::String
+pub ob_poc_entity_linking::compiler::LintWarning::severity: ob_poc_entity_linking::compiler::LintSeverity
+pub ob_poc_entity_linking::compiler::LintWarning::suggestion: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::clone(&self) -> ob_poc_entity_linking::compiler::LintWarning
+impl core::fmt::Debug for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::Send for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::Sync for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::Unpin for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::compiler::LintWarning
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::compiler::LintWarning
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::compiler::LintWarning
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::compiler::LintWarning where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::compiler::LintWarning::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::compiler::LintWarning where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::compiler::LintWarning::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::compiler::LintWarning::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::compiler::LintWarning where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::compiler::LintWarning::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::compiler::LintWarning::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::compiler::LintWarning where T: core::clone::Clone
+pub type ob_poc_entity_linking::compiler::LintWarning::Owned = T
+pub fn ob_poc_entity_linking::compiler::LintWarning::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::compiler::LintWarning::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_entity_linking::compiler::LintWarning where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_entity_linking::compiler::LintWarning where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::compiler::LintWarning where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::compiler::LintWarning where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::compiler::LintWarning where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::compiler::LintWarning::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::compiler::LintWarning
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::compiler::LintWarning
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::compiler::LintWarning
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::compiler::LintWarning
+pub type ob_poc_entity_linking::compiler::LintWarning::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::compiler::LintWarning where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::compiler::LintWarning::vzip(self) -> V
+pub async fn ob_poc_entity_linking::compiler::compile_entity_snapshot(&sqlx_postgres::PgPool) -> anyhow::Result<ob_poc_entity_linking::snapshot::EntitySnapshot>
+pub async fn ob_poc_entity_linking::compiler::lint_entity_data(&sqlx_postgres::PgPool) -> anyhow::Result<alloc::vec::Vec<ob_poc_entity_linking::compiler::LintWarning>>
+pub mod ob_poc_entity_linking::mention
+pub struct ob_poc_entity_linking::mention::MentionExtractor
+impl ob_poc_entity_linking::mention::MentionExtractor
+pub fn ob_poc_entity_linking::mention::MentionExtractor::extract(&self, &str, &ob_poc_entity_linking::snapshot::EntitySnapshot) -> alloc::vec::Vec<ob_poc_entity_linking::mention::MentionSpan>
+impl core::default::Default for ob_poc_entity_linking::mention::MentionExtractor
+pub fn ob_poc_entity_linking::mention::MentionExtractor::default() -> ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Freeze for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Send for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Sync for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Unpin for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::mention::MentionExtractor
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::mention::MentionExtractor
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::mention::MentionExtractor
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::mention::MentionExtractor where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::mention::MentionExtractor::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::mention::MentionExtractor where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::mention::MentionExtractor::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::mention::MentionExtractor::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::mention::MentionExtractor where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::mention::MentionExtractor::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::mention::MentionExtractor::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_entity_linking::mention::MentionExtractor where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionExtractor::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::mention::MentionExtractor where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionExtractor::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::mention::MentionExtractor where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionExtractor::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_entity_linking::mention::MentionExtractor
+pub fn ob_poc_entity_linking::mention::MentionExtractor::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::mention::MentionExtractor
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::mention::MentionExtractor
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::mention::MentionExtractor
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::mention::MentionExtractor
+pub type ob_poc_entity_linking::mention::MentionExtractor::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::mention::MentionExtractor where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::mention::MentionExtractor::vzip(self) -> V
+pub struct ob_poc_entity_linking::mention::MentionSpan
+pub ob_poc_entity_linking::mention::MentionSpan::candidate_ids: smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 8]>
+pub ob_poc_entity_linking::mention::MentionSpan::end: usize
+pub ob_poc_entity_linking::mention::MentionSpan::normalized: alloc::string::String
+pub ob_poc_entity_linking::mention::MentionSpan::score: f32
+pub ob_poc_entity_linking::mention::MentionSpan::start: usize
+pub ob_poc_entity_linking::mention::MentionSpan::text: alloc::string::String
+pub ob_poc_entity_linking::mention::MentionSpan::tokens: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for ob_poc_entity_linking::mention::MentionSpan
+pub fn ob_poc_entity_linking::mention::MentionSpan::clone(&self) -> ob_poc_entity_linking::mention::MentionSpan
+impl core::fmt::Debug for ob_poc_entity_linking::mention::MentionSpan
+pub fn ob_poc_entity_linking::mention::MentionSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::Send for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::Sync for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::Unpin for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::mention::MentionSpan
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::mention::MentionSpan
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::mention::MentionSpan
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::mention::MentionSpan where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::mention::MentionSpan::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::mention::MentionSpan where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::mention::MentionSpan::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::mention::MentionSpan::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::mention::MentionSpan where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::mention::MentionSpan::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::mention::MentionSpan::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::mention::MentionSpan where T: core::clone::Clone
+pub type ob_poc_entity_linking::mention::MentionSpan::Owned = T
+pub fn ob_poc_entity_linking::mention::MentionSpan::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::mention::MentionSpan::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::mention::MentionSpan where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionSpan::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::mention::MentionSpan where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionSpan::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::mention::MentionSpan where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionSpan::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::mention::MentionSpan where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::mention::MentionSpan::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::mention::MentionSpan
+pub fn ob_poc_entity_linking::mention::MentionSpan::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::mention::MentionSpan
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::mention::MentionSpan
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::mention::MentionSpan
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::mention::MentionSpan
+pub type ob_poc_entity_linking::mention::MentionSpan::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::mention::MentionSpan where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::mention::MentionSpan::vzip(self) -> V
+pub mod ob_poc_entity_linking::normalize
+pub fn ob_poc_entity_linking::normalize::normalize_entity_text(&str, bool) -> alloc::string::String
+pub fn ob_poc_entity_linking::normalize::tokenize(&str) -> alloc::vec::Vec<alloc::string::String>
+pub mod ob_poc_entity_linking::resolver
+pub enum ob_poc_entity_linking::resolver::Evidence
+pub ob_poc_entity_linking::resolver::Evidence::AliasExact
+pub ob_poc_entity_linking::resolver::Evidence::AliasExact::alias: alloc::string::String
+pub ob_poc_entity_linking::resolver::Evidence::AliasTokenOverlap
+pub ob_poc_entity_linking::resolver::Evidence::AliasTokenOverlap::overlap: f32
+pub ob_poc_entity_linking::resolver::Evidence::AliasTokenOverlap::tokens: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_entity_linking::resolver::Evidence::ConceptOverlapBoost
+pub ob_poc_entity_linking::resolver::Evidence::ConceptOverlapBoost::boost: f32
+pub ob_poc_entity_linking::resolver::Evidence::ConceptOverlapBoost::concepts: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_entity_linking::resolver::Evidence::KindMatchBoost
+pub ob_poc_entity_linking::resolver::Evidence::KindMatchBoost::actual: alloc::string::String
+pub ob_poc_entity_linking::resolver::Evidence::KindMatchBoost::boost: f32
+pub ob_poc_entity_linking::resolver::Evidence::KindMatchBoost::expected: alloc::string::String
+pub ob_poc_entity_linking::resolver::Evidence::KindMismatchPenalty
+pub ob_poc_entity_linking::resolver::Evidence::KindMismatchPenalty::actual: alloc::string::String
+pub ob_poc_entity_linking::resolver::Evidence::KindMismatchPenalty::expected: alloc::string::String
+pub ob_poc_entity_linking::resolver::Evidence::KindMismatchPenalty::penalty: f32
+impl core::clone::Clone for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::clone(&self) -> ob_poc_entity_linking::resolver::Evidence
+impl core::cmp::PartialEq for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::eq(&self, &ob_poc_entity_linking::resolver::Evidence) -> bool
+impl core::fmt::Debug for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_entity_linking::resolver::Evidence
+impl serde_core::ser::Serialize for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::Send for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::Sync for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::Evidence
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::Evidence
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::Evidence
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::Evidence where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::Evidence::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::Evidence where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::Evidence::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::Evidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::Evidence where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::Evidence::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::Evidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::resolver::Evidence where T: core::clone::Clone
+pub type ob_poc_entity_linking::resolver::Evidence::Owned = T
+pub fn ob_poc_entity_linking::resolver::Evidence::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::resolver::Evidence::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::Evidence where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::Evidence::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::Evidence where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::Evidence::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::Evidence where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::Evidence::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::resolver::Evidence where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::resolver::Evidence::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::Evidence
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::resolver::Evidence where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::Evidence
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::Evidence
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::Evidence
+pub type ob_poc_entity_linking::resolver::Evidence::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::Evidence where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::Evidence::vzip(self) -> V
+pub struct ob_poc_entity_linking::resolver::EntityCandidate
+pub ob_poc_entity_linking::resolver::EntityCandidate::canonical_name: alloc::string::String
+pub ob_poc_entity_linking::resolver::EntityCandidate::entity_id: ob_poc_entity_linking::snapshot::EntityId
+pub ob_poc_entity_linking::resolver::EntityCandidate::entity_kind: alloc::string::String
+pub ob_poc_entity_linking::resolver::EntityCandidate::evidence: alloc::vec::Vec<ob_poc_entity_linking::resolver::Evidence>
+pub ob_poc_entity_linking::resolver::EntityCandidate::score: f32
+impl core::clone::Clone for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::clone(&self) -> ob_poc_entity_linking::resolver::EntityCandidate
+impl core::fmt::Debug for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::Send for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::Sync for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::EntityCandidate where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::EntityCandidate where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::EntityCandidate where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::resolver::EntityCandidate where T: core::clone::Clone
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Owned = T
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::EntityCandidate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::EntityCandidate where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::EntityCandidate where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::resolver::EntityCandidate where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::resolver::EntityCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::resolver::EntityCandidate where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::EntityCandidate
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::EntityCandidate where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::vzip(self) -> V
+pub struct ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::load_from(&std::path::Path) -> anyhow::Result<Self>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::new(alloc::sync::Arc<ob_poc_entity_linking::snapshot::EntitySnapshot>) -> Self
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_version(&self) -> u32
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::Send for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::Sync for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub type ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::vzip(self) -> V
+pub struct ob_poc_entity_linking::resolver::EntityResolution
+pub ob_poc_entity_linking::resolver::EntityResolution::candidates: alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityCandidate>
+pub ob_poc_entity_linking::resolver::EntityResolution::confidence: f32
+pub ob_poc_entity_linking::resolver::EntityResolution::evidence: alloc::vec::Vec<ob_poc_entity_linking::resolver::Evidence>
+pub ob_poc_entity_linking::resolver::EntityResolution::mention_span: (usize, usize)
+pub ob_poc_entity_linking::resolver::EntityResolution::mention_text: alloc::string::String
+pub ob_poc_entity_linking::resolver::EntityResolution::selected: core::option::Option<ob_poc_entity_linking::snapshot::EntityId>
+impl core::clone::Clone for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::clone(&self) -> ob_poc_entity_linking::resolver::EntityResolution
+impl core::fmt::Debug for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::Send for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::Sync for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::EntityResolution
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::EntityResolution
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::EntityResolution
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::EntityResolution where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::EntityResolution::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::EntityResolution where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::EntityResolution::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::EntityResolution::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::EntityResolution where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::EntityResolution::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::EntityResolution::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::resolver::EntityResolution where T: core::clone::Clone
+pub type ob_poc_entity_linking::resolver::EntityResolution::Owned = T
+pub fn ob_poc_entity_linking::resolver::EntityResolution::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::resolver::EntityResolution::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::EntityResolution where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityResolution::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::EntityResolution where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityResolution::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::EntityResolution where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityResolution::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::resolver::EntityResolution where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::resolver::EntityResolution::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::EntityResolution
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::resolver::EntityResolution where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::EntityResolution
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::EntityResolution
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::EntityResolution
+pub type ob_poc_entity_linking::resolver::EntityResolution::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::EntityResolution where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::EntityResolution::vzip(self) -> V
+pub trait ob_poc_entity_linking::resolver::EntityLinkingService: core::marker::Send + core::marker::Sync
+pub fn ob_poc_entity_linking::resolver::EntityLinkingService::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::resolver::EntityLinkingService::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingService::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingService::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::resolver::EntityLinkingService::snapshot_version(&self) -> u32
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_version(&self) -> u32
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_version(&self) -> u32
+pub mod ob_poc_entity_linking::snapshot
+pub struct ob_poc_entity_linking::snapshot::EntityRow
+pub ob_poc_entity_linking::snapshot::EntityRow::canonical_name: alloc::string::String
+pub ob_poc_entity_linking::snapshot::EntityRow::canonical_name_norm: alloc::string::String
+pub ob_poc_entity_linking::snapshot::EntityRow::entity_id: ob_poc_entity_linking::snapshot::EntityId
+pub ob_poc_entity_linking::snapshot::EntityRow::entity_kind: alloc::string::String
+impl core::clone::Clone for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::clone(&self) -> ob_poc_entity_linking::snapshot::EntityRow
+impl core::fmt::Debug for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::Send for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::Sync for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::Unpin for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::snapshot::EntityRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::snapshot::EntityRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::snapshot::EntityRow
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::snapshot::EntityRow where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::snapshot::EntityRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::snapshot::EntityRow where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::snapshot::EntityRow::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::snapshot::EntityRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::snapshot::EntityRow where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::snapshot::EntityRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::snapshot::EntityRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::snapshot::EntityRow where T: core::clone::Clone
+pub type ob_poc_entity_linking::snapshot::EntityRow::Owned = T
+pub fn ob_poc_entity_linking::snapshot::EntityRow::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::snapshot::EntityRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::snapshot::EntityRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntityRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::snapshot::EntityRow where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntityRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::snapshot::EntityRow where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntityRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::snapshot::EntityRow where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::snapshot::EntityRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::snapshot::EntityRow
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::snapshot::EntityRow where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::snapshot::EntityRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::snapshot::EntityRow
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::snapshot::EntityRow
+pub type ob_poc_entity_linking::snapshot::EntityRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::snapshot::EntityRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::snapshot::EntityRow::vzip(self) -> V
+pub struct ob_poc_entity_linking::snapshot::EntitySnapshot
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::alias_index: std::collections::hash::map::HashMap<alloc::string::String, smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 4]>>
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::concept_links: std::collections::hash::map::HashMap<ob_poc_entity_linking::snapshot::EntityId, smallvec::SmallVec<[(alloc::string::String, f32); 8]>>
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::entities: alloc::vec::Vec<ob_poc_entity_linking::snapshot::EntityRow>
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::hash: alloc::string::String
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::kind_index: std::collections::hash::map::HashMap<alloc::string::String, smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 16]>>
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::name_index: std::collections::hash::map::HashMap<alloc::string::String, ob_poc_entity_linking::snapshot::EntityId>
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::token_index: std::collections::hash::map::HashMap<alloc::string::String, smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 8]>>
+pub ob_poc_entity_linking::snapshot::EntitySnapshot::version: u32
+impl ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::get(&self, &ob_poc_entity_linking::snapshot::EntityId) -> core::option::Option<&ob_poc_entity_linking::snapshot::EntityRow>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::get_concepts(&self, &ob_poc_entity_linking::snapshot::EntityId) -> core::option::Option<&smallvec::SmallVec<[(alloc::string::String, f32); 8]>>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::load(&std::path::Path) -> anyhow::Result<Self>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::lookup_by_alias(&self, &str) -> core::option::Option<&smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 4]>>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::lookup_by_name(&self, &str) -> core::option::Option<ob_poc_entity_linking::snapshot::EntityId>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::lookup_by_token(&self, &str) -> core::option::Option<&smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 8]>>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::save(&self, &std::path::Path) -> anyhow::Result<()>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::stats(&self) -> ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::clone::Clone for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::clone(&self) -> ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::fmt::Debug for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::Send for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::Sync for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::Unpin for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::snapshot::EntitySnapshot where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::snapshot::EntitySnapshot where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::snapshot::EntitySnapshot where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::snapshot::EntitySnapshot where T: core::clone::Clone
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Owned = T
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::snapshot::EntitySnapshot where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::snapshot::EntitySnapshot where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::snapshot::EntitySnapshot where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::snapshot::EntitySnapshot where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::snapshot::EntitySnapshot::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::snapshot::EntitySnapshot where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::snapshot::EntitySnapshot where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::vzip(self) -> V
+pub struct ob_poc_entity_linking::snapshot::SnapshotStats
+pub ob_poc_entity_linking::snapshot::SnapshotStats::alias_index_size: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::concept_link_count: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::entities_with_concepts: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::entity_count: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::hash: alloc::string::String
+pub ob_poc_entity_linking::snapshot::SnapshotStats::kind_count: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::name_index_size: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::token_index_size: usize
+pub ob_poc_entity_linking::snapshot::SnapshotStats::version: u32
+impl core::clone::Clone for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::clone(&self) -> ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::fmt::Debug for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::Send for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::Sync for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::Unpin for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::snapshot::SnapshotStats where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::snapshot::SnapshotStats where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::snapshot::SnapshotStats where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::snapshot::SnapshotStats where T: core::clone::Clone
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Owned = T
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_entity_linking::snapshot::SnapshotStats where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_entity_linking::snapshot::SnapshotStats where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::snapshot::SnapshotStats where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::snapshot::SnapshotStats where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::snapshot::SnapshotStats where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::snapshot::SnapshotStats::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::snapshot::SnapshotStats
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::snapshot::SnapshotStats where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::vzip(self) -> V
+pub const ob_poc_entity_linking::snapshot::SNAPSHOT_VERSION: u32
+pub type ob_poc_entity_linking::snapshot::EntityId = uuid::Uuid
+pub mod ob_poc_entity_linking::stub
+pub struct ob_poc_entity_linking::stub::StubEntityLinkingService
+impl ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::new() -> Self
+impl core::default::Default for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::default() -> Self
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_version(&self) -> u32
+impl core::marker::Freeze for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::Send for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::Sync for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::Unpin for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::stub::StubEntityLinkingService where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::stub::StubEntityLinkingService where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::stub::StubEntityLinkingService::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::stub::StubEntityLinkingService where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::stub::StubEntityLinkingService::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_entity_linking::stub::StubEntityLinkingService where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::stub::StubEntityLinkingService where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::stub::StubEntityLinkingService where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub type ob_poc_entity_linking::stub::StubEntityLinkingService::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::stub::StubEntityLinkingService where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::vzip(self) -> V
+pub enum ob_poc_entity_linking::Evidence
+pub ob_poc_entity_linking::Evidence::AliasExact
+pub ob_poc_entity_linking::Evidence::AliasExact::alias: alloc::string::String
+pub ob_poc_entity_linking::Evidence::AliasTokenOverlap
+pub ob_poc_entity_linking::Evidence::AliasTokenOverlap::overlap: f32
+pub ob_poc_entity_linking::Evidence::AliasTokenOverlap::tokens: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_entity_linking::Evidence::ConceptOverlapBoost
+pub ob_poc_entity_linking::Evidence::ConceptOverlapBoost::boost: f32
+pub ob_poc_entity_linking::Evidence::ConceptOverlapBoost::concepts: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_entity_linking::Evidence::KindMatchBoost
+pub ob_poc_entity_linking::Evidence::KindMatchBoost::actual: alloc::string::String
+pub ob_poc_entity_linking::Evidence::KindMatchBoost::boost: f32
+pub ob_poc_entity_linking::Evidence::KindMatchBoost::expected: alloc::string::String
+pub ob_poc_entity_linking::Evidence::KindMismatchPenalty
+pub ob_poc_entity_linking::Evidence::KindMismatchPenalty::actual: alloc::string::String
+pub ob_poc_entity_linking::Evidence::KindMismatchPenalty::expected: alloc::string::String
+pub ob_poc_entity_linking::Evidence::KindMismatchPenalty::penalty: f32
+impl core::clone::Clone for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::clone(&self) -> ob_poc_entity_linking::resolver::Evidence
+impl core::cmp::PartialEq for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::eq(&self, &ob_poc_entity_linking::resolver::Evidence) -> bool
+impl core::fmt::Debug for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_entity_linking::resolver::Evidence
+impl serde_core::ser::Serialize for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::Send for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::Sync for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::Evidence
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::Evidence
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::Evidence
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::Evidence
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::Evidence where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::Evidence::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::Evidence where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::Evidence::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::Evidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::Evidence where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::Evidence::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::Evidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::resolver::Evidence where T: core::clone::Clone
+pub type ob_poc_entity_linking::resolver::Evidence::Owned = T
+pub fn ob_poc_entity_linking::resolver::Evidence::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::resolver::Evidence::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::Evidence where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::Evidence::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::Evidence where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::Evidence::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::Evidence where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::Evidence::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::resolver::Evidence where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::resolver::Evidence::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::Evidence
+pub fn ob_poc_entity_linking::resolver::Evidence::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::Evidence
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::resolver::Evidence where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::Evidence
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::Evidence
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::Evidence
+pub type ob_poc_entity_linking::resolver::Evidence::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::Evidence where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::Evidence::vzip(self) -> V
+pub enum ob_poc_entity_linking::LintSeverity
+pub ob_poc_entity_linking::LintSeverity::Error
+pub ob_poc_entity_linking::LintSeverity::Info
+pub ob_poc_entity_linking::LintSeverity::Warning
+impl core::clone::Clone for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::clone(&self) -> ob_poc_entity_linking::compiler::LintSeverity
+impl core::cmp::Eq for ob_poc_entity_linking::compiler::LintSeverity
+impl core::cmp::PartialEq for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::eq(&self, &ob_poc_entity_linking::compiler::LintSeverity) -> bool
+impl core::fmt::Debug for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::StructuralPartialEq for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Freeze for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Send for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Sync for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::Unpin for ob_poc_entity_linking::compiler::LintSeverity
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::compiler::LintSeverity
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::compiler::LintSeverity
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::compiler::LintSeverity
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_entity_linking::compiler::LintSeverity where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_entity_linking::compiler::LintSeverity where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::compiler::LintSeverity where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::compiler::LintSeverity::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::compiler::LintSeverity where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::compiler::LintSeverity::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::compiler::LintSeverity::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::compiler::LintSeverity where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::compiler::LintSeverity::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::compiler::LintSeverity::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::compiler::LintSeverity where T: core::clone::Clone
+pub type ob_poc_entity_linking::compiler::LintSeverity::Owned = T
+pub fn ob_poc_entity_linking::compiler::LintSeverity::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::compiler::LintSeverity::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::compiler::LintSeverity where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::compiler::LintSeverity where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::compiler::LintSeverity where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintSeverity::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::compiler::LintSeverity where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::compiler::LintSeverity::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::compiler::LintSeverity
+pub fn ob_poc_entity_linking::compiler::LintSeverity::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::compiler::LintSeverity
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::compiler::LintSeverity
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::compiler::LintSeverity
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::compiler::LintSeverity
+pub type ob_poc_entity_linking::compiler::LintSeverity::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::compiler::LintSeverity where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::compiler::LintSeverity::vzip(self) -> V
+pub struct ob_poc_entity_linking::EntityCandidate
+pub ob_poc_entity_linking::EntityCandidate::canonical_name: alloc::string::String
+pub ob_poc_entity_linking::EntityCandidate::entity_id: ob_poc_entity_linking::snapshot::EntityId
+pub ob_poc_entity_linking::EntityCandidate::entity_kind: alloc::string::String
+pub ob_poc_entity_linking::EntityCandidate::evidence: alloc::vec::Vec<ob_poc_entity_linking::resolver::Evidence>
+pub ob_poc_entity_linking::EntityCandidate::score: f32
+impl core::clone::Clone for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::clone(&self) -> ob_poc_entity_linking::resolver::EntityCandidate
+impl core::fmt::Debug for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::Send for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::Sync for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::EntityCandidate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::EntityCandidate where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::EntityCandidate where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::EntityCandidate where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::resolver::EntityCandidate where T: core::clone::Clone
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Owned = T
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::EntityCandidate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::EntityCandidate where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::EntityCandidate where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::resolver::EntityCandidate where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::resolver::EntityCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::EntityCandidate
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::resolver::EntityCandidate where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::EntityCandidate
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::EntityCandidate
+pub type ob_poc_entity_linking::resolver::EntityCandidate::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::EntityCandidate where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::EntityCandidate::vzip(self) -> V
+pub struct ob_poc_entity_linking::EntityLinkingServiceImpl
+impl ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::load_from(&std::path::Path) -> anyhow::Result<Self>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::new(alloc::sync::Arc<ob_poc_entity_linking::snapshot::EntitySnapshot>) -> Self
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_version(&self) -> u32
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::Send for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::Sync for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub type ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::vzip(self) -> V
+pub struct ob_poc_entity_linking::EntityResolution
+pub ob_poc_entity_linking::EntityResolution::candidates: alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityCandidate>
+pub ob_poc_entity_linking::EntityResolution::confidence: f32
+pub ob_poc_entity_linking::EntityResolution::evidence: alloc::vec::Vec<ob_poc_entity_linking::resolver::Evidence>
+pub ob_poc_entity_linking::EntityResolution::mention_span: (usize, usize)
+pub ob_poc_entity_linking::EntityResolution::mention_text: alloc::string::String
+pub ob_poc_entity_linking::EntityResolution::selected: core::option::Option<ob_poc_entity_linking::snapshot::EntityId>
+impl core::clone::Clone for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::clone(&self) -> ob_poc_entity_linking::resolver::EntityResolution
+impl core::fmt::Debug for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::Send for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::Sync for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::Unpin for ob_poc_entity_linking::resolver::EntityResolution
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::resolver::EntityResolution
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::resolver::EntityResolution
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::resolver::EntityResolution
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::resolver::EntityResolution where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::resolver::EntityResolution::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::resolver::EntityResolution where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::resolver::EntityResolution::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::resolver::EntityResolution::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::resolver::EntityResolution where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::resolver::EntityResolution::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::resolver::EntityResolution::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::resolver::EntityResolution where T: core::clone::Clone
+pub type ob_poc_entity_linking::resolver::EntityResolution::Owned = T
+pub fn ob_poc_entity_linking::resolver::EntityResolution::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::resolver::EntityResolution::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::resolver::EntityResolution where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityResolution::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::resolver::EntityResolution where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityResolution::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::resolver::EntityResolution where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::resolver::EntityResolution::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::resolver::EntityResolution where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::resolver::EntityResolution::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::resolver::EntityResolution
+pub fn ob_poc_entity_linking::resolver::EntityResolution::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::resolver::EntityResolution
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::resolver::EntityResolution where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::resolver::EntityResolution
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::resolver::EntityResolution
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::resolver::EntityResolution
+pub type ob_poc_entity_linking::resolver::EntityResolution::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::resolver::EntityResolution where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::resolver::EntityResolution::vzip(self) -> V
+pub struct ob_poc_entity_linking::EntityRow
+pub ob_poc_entity_linking::EntityRow::canonical_name: alloc::string::String
+pub ob_poc_entity_linking::EntityRow::canonical_name_norm: alloc::string::String
+pub ob_poc_entity_linking::EntityRow::entity_id: ob_poc_entity_linking::snapshot::EntityId
+pub ob_poc_entity_linking::EntityRow::entity_kind: alloc::string::String
+impl core::clone::Clone for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::clone(&self) -> ob_poc_entity_linking::snapshot::EntityRow
+impl core::fmt::Debug for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::Send for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::Sync for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::Unpin for ob_poc_entity_linking::snapshot::EntityRow
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::snapshot::EntityRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::snapshot::EntityRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::snapshot::EntityRow
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::snapshot::EntityRow where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::snapshot::EntityRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::snapshot::EntityRow where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::snapshot::EntityRow::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::snapshot::EntityRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::snapshot::EntityRow where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::snapshot::EntityRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::snapshot::EntityRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::snapshot::EntityRow where T: core::clone::Clone
+pub type ob_poc_entity_linking::snapshot::EntityRow::Owned = T
+pub fn ob_poc_entity_linking::snapshot::EntityRow::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::snapshot::EntityRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::snapshot::EntityRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntityRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::snapshot::EntityRow where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntityRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::snapshot::EntityRow where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntityRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::snapshot::EntityRow where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::snapshot::EntityRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::snapshot::EntityRow
+pub fn ob_poc_entity_linking::snapshot::EntityRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::snapshot::EntityRow
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::snapshot::EntityRow where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::snapshot::EntityRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::snapshot::EntityRow
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::snapshot::EntityRow
+pub type ob_poc_entity_linking::snapshot::EntityRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::snapshot::EntityRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::snapshot::EntityRow::vzip(self) -> V
+pub struct ob_poc_entity_linking::EntitySnapshot
+pub ob_poc_entity_linking::EntitySnapshot::alias_index: std::collections::hash::map::HashMap<alloc::string::String, smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 4]>>
+pub ob_poc_entity_linking::EntitySnapshot::concept_links: std::collections::hash::map::HashMap<ob_poc_entity_linking::snapshot::EntityId, smallvec::SmallVec<[(alloc::string::String, f32); 8]>>
+pub ob_poc_entity_linking::EntitySnapshot::entities: alloc::vec::Vec<ob_poc_entity_linking::snapshot::EntityRow>
+pub ob_poc_entity_linking::EntitySnapshot::hash: alloc::string::String
+pub ob_poc_entity_linking::EntitySnapshot::kind_index: std::collections::hash::map::HashMap<alloc::string::String, smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 16]>>
+pub ob_poc_entity_linking::EntitySnapshot::name_index: std::collections::hash::map::HashMap<alloc::string::String, ob_poc_entity_linking::snapshot::EntityId>
+pub ob_poc_entity_linking::EntitySnapshot::token_index: std::collections::hash::map::HashMap<alloc::string::String, smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 8]>>
+pub ob_poc_entity_linking::EntitySnapshot::version: u32
+impl ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::get(&self, &ob_poc_entity_linking::snapshot::EntityId) -> core::option::Option<&ob_poc_entity_linking::snapshot::EntityRow>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::get_concepts(&self, &ob_poc_entity_linking::snapshot::EntityId) -> core::option::Option<&smallvec::SmallVec<[(alloc::string::String, f32); 8]>>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::load(&std::path::Path) -> anyhow::Result<Self>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::lookup_by_alias(&self, &str) -> core::option::Option<&smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 4]>>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::lookup_by_name(&self, &str) -> core::option::Option<ob_poc_entity_linking::snapshot::EntityId>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::lookup_by_token(&self, &str) -> core::option::Option<&smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 8]>>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::save(&self, &std::path::Path) -> anyhow::Result<()>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::stats(&self) -> ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::clone::Clone for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::clone(&self) -> ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::fmt::Debug for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::Send for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::Sync for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::Unpin for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::snapshot::EntitySnapshot where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::snapshot::EntitySnapshot where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::snapshot::EntitySnapshot where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::snapshot::EntitySnapshot where T: core::clone::Clone
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Owned = T
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::snapshot::EntitySnapshot where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::snapshot::EntitySnapshot where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::snapshot::EntitySnapshot where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::snapshot::EntitySnapshot where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::snapshot::EntitySnapshot::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T> serde_core::de::DeserializeOwned for ob_poc_entity_linking::snapshot::EntitySnapshot where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::snapshot::EntitySnapshot
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::snapshot::EntitySnapshot
+pub type ob_poc_entity_linking::snapshot::EntitySnapshot::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::snapshot::EntitySnapshot where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::snapshot::EntitySnapshot::vzip(self) -> V
+pub struct ob_poc_entity_linking::LintWarning
+pub ob_poc_entity_linking::LintWarning::message: alloc::string::String
+pub ob_poc_entity_linking::LintWarning::severity: ob_poc_entity_linking::compiler::LintSeverity
+pub ob_poc_entity_linking::LintWarning::suggestion: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::clone(&self) -> ob_poc_entity_linking::compiler::LintWarning
+impl core::fmt::Debug for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::Send for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::Sync for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::Unpin for ob_poc_entity_linking::compiler::LintWarning
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::compiler::LintWarning
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::compiler::LintWarning
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::compiler::LintWarning
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::compiler::LintWarning where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::compiler::LintWarning::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::compiler::LintWarning where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::compiler::LintWarning::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::compiler::LintWarning::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::compiler::LintWarning where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::compiler::LintWarning::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::compiler::LintWarning::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::compiler::LintWarning where T: core::clone::Clone
+pub type ob_poc_entity_linking::compiler::LintWarning::Owned = T
+pub fn ob_poc_entity_linking::compiler::LintWarning::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::compiler::LintWarning::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_entity_linking::compiler::LintWarning where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_entity_linking::compiler::LintWarning where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::compiler::LintWarning where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::compiler::LintWarning where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::compiler::LintWarning::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::compiler::LintWarning where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::compiler::LintWarning::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::compiler::LintWarning
+pub fn ob_poc_entity_linking::compiler::LintWarning::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::compiler::LintWarning
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::compiler::LintWarning
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::compiler::LintWarning
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::compiler::LintWarning
+pub type ob_poc_entity_linking::compiler::LintWarning::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::compiler::LintWarning where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::compiler::LintWarning::vzip(self) -> V
+pub struct ob_poc_entity_linking::MentionExtractor
+impl ob_poc_entity_linking::mention::MentionExtractor
+pub fn ob_poc_entity_linking::mention::MentionExtractor::extract(&self, &str, &ob_poc_entity_linking::snapshot::EntitySnapshot) -> alloc::vec::Vec<ob_poc_entity_linking::mention::MentionSpan>
+impl core::default::Default for ob_poc_entity_linking::mention::MentionExtractor
+pub fn ob_poc_entity_linking::mention::MentionExtractor::default() -> ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Freeze for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Send for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Sync for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::Unpin for ob_poc_entity_linking::mention::MentionExtractor
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::mention::MentionExtractor
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::mention::MentionExtractor
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::mention::MentionExtractor
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::mention::MentionExtractor where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::mention::MentionExtractor::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::mention::MentionExtractor where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::mention::MentionExtractor::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::mention::MentionExtractor::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::mention::MentionExtractor where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::mention::MentionExtractor::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::mention::MentionExtractor::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_entity_linking::mention::MentionExtractor where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionExtractor::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::mention::MentionExtractor where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionExtractor::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::mention::MentionExtractor where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionExtractor::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_entity_linking::mention::MentionExtractor
+pub fn ob_poc_entity_linking::mention::MentionExtractor::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::mention::MentionExtractor
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::mention::MentionExtractor
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::mention::MentionExtractor
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::mention::MentionExtractor
+pub type ob_poc_entity_linking::mention::MentionExtractor::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::mention::MentionExtractor where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::mention::MentionExtractor::vzip(self) -> V
+pub struct ob_poc_entity_linking::MentionSpan
+pub ob_poc_entity_linking::MentionSpan::candidate_ids: smallvec::SmallVec<[ob_poc_entity_linking::snapshot::EntityId; 8]>
+pub ob_poc_entity_linking::MentionSpan::end: usize
+pub ob_poc_entity_linking::MentionSpan::normalized: alloc::string::String
+pub ob_poc_entity_linking::MentionSpan::score: f32
+pub ob_poc_entity_linking::MentionSpan::start: usize
+pub ob_poc_entity_linking::MentionSpan::text: alloc::string::String
+pub ob_poc_entity_linking::MentionSpan::tokens: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for ob_poc_entity_linking::mention::MentionSpan
+pub fn ob_poc_entity_linking::mention::MentionSpan::clone(&self) -> ob_poc_entity_linking::mention::MentionSpan
+impl core::fmt::Debug for ob_poc_entity_linking::mention::MentionSpan
+pub fn ob_poc_entity_linking::mention::MentionSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::Send for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::Sync for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::Unpin for ob_poc_entity_linking::mention::MentionSpan
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::mention::MentionSpan
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::mention::MentionSpan
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::mention::MentionSpan
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::mention::MentionSpan where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::mention::MentionSpan::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::mention::MentionSpan where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::mention::MentionSpan::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::mention::MentionSpan::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::mention::MentionSpan where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::mention::MentionSpan::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::mention::MentionSpan::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::mention::MentionSpan where T: core::clone::Clone
+pub type ob_poc_entity_linking::mention::MentionSpan::Owned = T
+pub fn ob_poc_entity_linking::mention::MentionSpan::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::mention::MentionSpan::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_entity_linking::mention::MentionSpan where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionSpan::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::mention::MentionSpan where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionSpan::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::mention::MentionSpan where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::mention::MentionSpan::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::mention::MentionSpan where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::mention::MentionSpan::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::mention::MentionSpan
+pub fn ob_poc_entity_linking::mention::MentionSpan::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::mention::MentionSpan
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::mention::MentionSpan
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::mention::MentionSpan
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::mention::MentionSpan
+pub type ob_poc_entity_linking::mention::MentionSpan::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::mention::MentionSpan where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::mention::MentionSpan::vzip(self) -> V
+pub struct ob_poc_entity_linking::SnapshotStats
+pub ob_poc_entity_linking::SnapshotStats::alias_index_size: usize
+pub ob_poc_entity_linking::SnapshotStats::concept_link_count: usize
+pub ob_poc_entity_linking::SnapshotStats::entities_with_concepts: usize
+pub ob_poc_entity_linking::SnapshotStats::entity_count: usize
+pub ob_poc_entity_linking::SnapshotStats::hash: alloc::string::String
+pub ob_poc_entity_linking::SnapshotStats::kind_count: usize
+pub ob_poc_entity_linking::SnapshotStats::name_index_size: usize
+pub ob_poc_entity_linking::SnapshotStats::token_index_size: usize
+pub ob_poc_entity_linking::SnapshotStats::version: u32
+impl core::clone::Clone for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::clone(&self) -> ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::fmt::Debug for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::Send for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::Sync for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::Unpin for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::snapshot::SnapshotStats
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::snapshot::SnapshotStats where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::snapshot::SnapshotStats where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::snapshot::SnapshotStats where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_entity_linking::snapshot::SnapshotStats where T: core::clone::Clone
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Owned = T
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::clone_into(&self, &mut T)
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_entity_linking::snapshot::SnapshotStats where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_entity_linking::snapshot::SnapshotStats where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::snapshot::SnapshotStats where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::snapshot::SnapshotStats where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_entity_linking::snapshot::SnapshotStats where T: core::clone::Clone
+pub unsafe fn ob_poc_entity_linking::snapshot::SnapshotStats::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_entity_linking::snapshot::SnapshotStats
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::snapshot::SnapshotStats
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::snapshot::SnapshotStats
+pub type ob_poc_entity_linking::snapshot::SnapshotStats::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::snapshot::SnapshotStats where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::snapshot::SnapshotStats::vzip(self) -> V
+pub struct ob_poc_entity_linking::StubEntityLinkingService
+impl ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::new() -> Self
+impl core::default::Default for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::default() -> Self
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_version(&self) -> u32
+impl core::marker::Freeze for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::Send for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::Sync for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::Unpin for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::marker::UnsafeUnpin for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T, U> core::convert::Into<U> for ob_poc_entity_linking::stub::StubEntityLinkingService where U: core::convert::From<T>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_entity_linking::stub::StubEntityLinkingService where U: core::convert::Into<T>
+pub type ob_poc_entity_linking::stub::StubEntityLinkingService::Error = core::convert::Infallible
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_entity_linking::stub::StubEntityLinkingService where U: core::convert::TryFrom<T>
+pub type ob_poc_entity_linking::stub::StubEntityLinkingService::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_entity_linking::stub::StubEntityLinkingService where T: 'static + ?core::marker::Sized
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_entity_linking::stub::StubEntityLinkingService where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_entity_linking::stub::StubEntityLinkingService where T: ?core::marker::Sized
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T> tracing::instrument::Instrument for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T> tracing::instrument::WithSubscriber for ob_poc_entity_linking::stub::StubEntityLinkingService
+impl<T> typenum::type_operators::Same for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub type ob_poc_entity_linking::stub::StubEntityLinkingService::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_entity_linking::stub::StubEntityLinkingService where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::vzip(self) -> V
+pub const ob_poc_entity_linking::SNAPSHOT_VERSION: u32
+pub trait ob_poc_entity_linking::EntityLinkingService: core::marker::Send + core::marker::Sync
+pub fn ob_poc_entity_linking::EntityLinkingService::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::EntityLinkingService::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::EntityLinkingService::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::EntityLinkingService::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::EntityLinkingService::snapshot_version(&self) -> u32
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::resolver::EntityLinkingServiceImpl
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::resolver::EntityLinkingServiceImpl::snapshot_version(&self) -> u32
+impl ob_poc_entity_linking::resolver::EntityLinkingService for ob_poc_entity_linking::stub::StubEntityLinkingService
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::entity_count(&self) -> usize
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::extract_mention_spans(&self, &str) -> alloc::vec::Vec<(usize, usize)>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::resolve_mentions(&self, &str, core::option::Option<&[alloc::string::String]>, core::option::Option<&[alloc::string::String]>, usize) -> alloc::vec::Vec<ob_poc_entity_linking::resolver::EntityResolution>
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_hash(&self) -> &str
+pub fn ob_poc_entity_linking::stub::StubEntityLinkingService::snapshot_version(&self) -> u32
+pub async fn ob_poc_entity_linking::compile_entity_snapshot(&sqlx_postgres::PgPool) -> anyhow::Result<ob_poc_entity_linking::snapshot::EntitySnapshot>
+pub async fn ob_poc_entity_linking::lint_entity_data(&sqlx_postgres::PgPool) -> anyhow::Result<alloc::vec::Vec<ob_poc_entity_linking::compiler::LintWarning>>
+pub fn ob_poc_entity_linking::normalize_entity_text(&str, bool) -> alloc::string::String
+pub fn ob_poc_entity_linking::tokenize(&str) -> alloc::vec::Vec<alloc::string::String>
+pub type ob_poc_entity_linking::EntityId = uuid::Uuid

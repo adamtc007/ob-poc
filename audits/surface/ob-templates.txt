@@ -1,0 +1,761 @@
+# ob-templates | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:41:51Z
+pub mod ob_templates
+pub enum ob_templates::ParamCardinality
+pub ob_templates::ParamCardinality::Batch
+pub ob_templates::ParamCardinality::Output
+pub ob_templates::ParamCardinality::Shared
+impl core::clone::Clone for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::clone(&self) -> ob_templates::ParamCardinality
+impl core::cmp::Eq for ob_templates::ParamCardinality
+impl core::cmp::PartialEq for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::eq(&self, &ob_templates::ParamCardinality) -> bool
+impl core::default::Default for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::default() -> ob_templates::ParamCardinality
+impl core::fmt::Debug for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_templates::ParamCardinality
+impl core::marker::StructuralPartialEq for ob_templates::ParamCardinality
+impl serde_core::ser::Serialize for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::ParamCardinality
+impl core::marker::Send for ob_templates::ParamCardinality
+impl core::marker::Sync for ob_templates::ParamCardinality
+impl core::marker::Unpin for ob_templates::ParamCardinality
+impl core::marker::UnsafeUnpin for ob_templates::ParamCardinality
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::ParamCardinality
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::ParamCardinality
+impl<Q, K> equivalent::Equivalent<K> for ob_templates::ParamCardinality where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_templates::ParamCardinality::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_templates::ParamCardinality where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_templates::ParamCardinality::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_templates::ParamCardinality where U: core::convert::From<T>
+pub fn ob_templates::ParamCardinality::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::ParamCardinality where U: core::convert::Into<T>
+pub type ob_templates::ParamCardinality::Error = core::convert::Infallible
+pub fn ob_templates::ParamCardinality::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::ParamCardinality where U: core::convert::TryFrom<T>
+pub type ob_templates::ParamCardinality::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::ParamCardinality::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::ParamCardinality where T: core::clone::Clone
+pub type ob_templates::ParamCardinality::Owned = T
+pub fn ob_templates::ParamCardinality::clone_into(&self, &mut T)
+pub fn ob_templates::ParamCardinality::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::ParamCardinality where T: 'static + ?core::marker::Sized
+pub fn ob_templates::ParamCardinality::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::ParamCardinality where T: ?core::marker::Sized
+pub fn ob_templates::ParamCardinality::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::ParamCardinality where T: ?core::marker::Sized
+pub fn ob_templates::ParamCardinality::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::ParamCardinality where T: core::clone::Clone
+pub unsafe fn ob_templates::ParamCardinality::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::ParamCardinality
+pub fn ob_templates::ParamCardinality::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::ParamCardinality where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::ParamCardinality
+impl<T> tracing::instrument::WithSubscriber for ob_templates::ParamCardinality
+pub enum ob_templates::PrimaryEntityType
+pub ob_templates::PrimaryEntityType::Cbu
+pub ob_templates::PrimaryEntityType::KycCase
+pub ob_templates::PrimaryEntityType::OnboardingRequest
+impl ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::pk_column(&self) -> &'static str
+pub fn ob_templates::PrimaryEntityType::table_name(&self) -> &'static str
+impl core::clone::Clone for ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::clone(&self) -> ob_templates::PrimaryEntityType
+impl core::cmp::Eq for ob_templates::PrimaryEntityType
+impl core::cmp::PartialEq for ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::eq(&self, &ob_templates::PrimaryEntityType) -> bool
+impl core::fmt::Debug for ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_templates::PrimaryEntityType
+impl core::marker::StructuralPartialEq for ob_templates::PrimaryEntityType
+impl serde_core::ser::Serialize for ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::PrimaryEntityType
+impl core::marker::Send for ob_templates::PrimaryEntityType
+impl core::marker::Sync for ob_templates::PrimaryEntityType
+impl core::marker::Unpin for ob_templates::PrimaryEntityType
+impl core::marker::UnsafeUnpin for ob_templates::PrimaryEntityType
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::PrimaryEntityType
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::PrimaryEntityType
+impl<Q, K> equivalent::Equivalent<K> for ob_templates::PrimaryEntityType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_templates::PrimaryEntityType::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_templates::PrimaryEntityType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_templates::PrimaryEntityType::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_templates::PrimaryEntityType where U: core::convert::From<T>
+pub fn ob_templates::PrimaryEntityType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::PrimaryEntityType where U: core::convert::Into<T>
+pub type ob_templates::PrimaryEntityType::Error = core::convert::Infallible
+pub fn ob_templates::PrimaryEntityType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::PrimaryEntityType where U: core::convert::TryFrom<T>
+pub type ob_templates::PrimaryEntityType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::PrimaryEntityType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::PrimaryEntityType where T: core::clone::Clone
+pub type ob_templates::PrimaryEntityType::Owned = T
+pub fn ob_templates::PrimaryEntityType::clone_into(&self, &mut T)
+pub fn ob_templates::PrimaryEntityType::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::PrimaryEntityType where T: 'static + ?core::marker::Sized
+pub fn ob_templates::PrimaryEntityType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::PrimaryEntityType where T: ?core::marker::Sized
+pub fn ob_templates::PrimaryEntityType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::PrimaryEntityType where T: ?core::marker::Sized
+pub fn ob_templates::PrimaryEntityType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::PrimaryEntityType where T: core::clone::Clone
+pub unsafe fn ob_templates::PrimaryEntityType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::PrimaryEntityType
+pub fn ob_templates::PrimaryEntityType::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::PrimaryEntityType where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::PrimaryEntityType
+impl<T> tracing::instrument::WithSubscriber for ob_templates::PrimaryEntityType
+pub enum ob_templates::TemplateError
+pub ob_templates::TemplateError::Expansion(alloc::string::String)
+pub ob_templates::TemplateError::InvalidParam
+pub ob_templates::TemplateError::InvalidParam::message: alloc::string::String
+pub ob_templates::TemplateError::InvalidParam::param: alloc::string::String
+pub ob_templates::TemplateError::Io(core::io::error::Error)
+pub ob_templates::TemplateError::MissingParam(alloc::string::String)
+pub ob_templates::TemplateError::NotFound(alloc::string::String)
+pub ob_templates::TemplateError::YamlParse(serde_yaml::error::Error)
+impl core::convert::From<core::io::error::Error> for ob_templates::TemplateError
+pub fn ob_templates::TemplateError::from(core::io::error::Error) -> Self
+impl core::convert::From<serde_yaml::error::Error> for ob_templates::TemplateError
+pub fn ob_templates::TemplateError::from(serde_yaml::error::Error) -> Self
+impl core::error::Error for ob_templates::TemplateError
+pub fn ob_templates::TemplateError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for ob_templates::TemplateError
+pub fn ob_templates::TemplateError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_templates::TemplateError
+pub fn ob_templates::TemplateError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_templates::TemplateError
+impl core::marker::Send for ob_templates::TemplateError
+impl core::marker::Sync for ob_templates::TemplateError
+impl core::marker::Unpin for ob_templates::TemplateError
+impl core::marker::UnsafeUnpin for ob_templates::TemplateError
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_templates::TemplateError
+impl !core::panic::unwind_safe::UnwindSafe for ob_templates::TemplateError
+impl<T, U> core::convert::Into<U> for ob_templates::TemplateError where U: core::convert::From<T>
+pub fn ob_templates::TemplateError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::TemplateError where U: core::convert::Into<T>
+pub type ob_templates::TemplateError::Error = core::convert::Infallible
+pub fn ob_templates::TemplateError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::TemplateError where U: core::convert::TryFrom<T>
+pub type ob_templates::TemplateError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::TemplateError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_templates::TemplateError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_templates::TemplateError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_templates::TemplateError where T: 'static + ?core::marker::Sized
+pub fn ob_templates::TemplateError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::TemplateError where T: ?core::marker::Sized
+pub fn ob_templates::TemplateError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::TemplateError where T: ?core::marker::Sized
+pub fn ob_templates::TemplateError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_templates::TemplateError
+pub fn ob_templates::TemplateError::from(T) -> T
+impl<T> tracing::instrument::Instrument for ob_templates::TemplateError
+impl<T> tracing::instrument::WithSubscriber for ob_templates::TemplateError
+pub struct ob_templates::EntityDependencySummary
+pub ob_templates::EntityDependencySummary::batch_params: alloc::vec::Vec<ob_templates::EntityParamInfo>
+pub ob_templates::EntityDependencySummary::output_params: alloc::vec::Vec<ob_templates::EntityParamInfo>
+pub ob_templates::EntityDependencySummary::shared_params: alloc::vec::Vec<ob_templates::EntityParamInfo>
+impl core::clone::Clone for ob_templates::EntityDependencySummary
+pub fn ob_templates::EntityDependencySummary::clone(&self) -> ob_templates::EntityDependencySummary
+impl core::fmt::Debug for ob_templates::EntityDependencySummary
+pub fn ob_templates::EntityDependencySummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::EntityDependencySummary
+pub fn ob_templates::EntityDependencySummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::EntityDependencySummary
+pub fn ob_templates::EntityDependencySummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::EntityDependencySummary
+impl core::marker::Send for ob_templates::EntityDependencySummary
+impl core::marker::Sync for ob_templates::EntityDependencySummary
+impl core::marker::Unpin for ob_templates::EntityDependencySummary
+impl core::marker::UnsafeUnpin for ob_templates::EntityDependencySummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::EntityDependencySummary
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::EntityDependencySummary
+impl<T, U> core::convert::Into<U> for ob_templates::EntityDependencySummary where U: core::convert::From<T>
+pub fn ob_templates::EntityDependencySummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::EntityDependencySummary where U: core::convert::Into<T>
+pub type ob_templates::EntityDependencySummary::Error = core::convert::Infallible
+pub fn ob_templates::EntityDependencySummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::EntityDependencySummary where U: core::convert::TryFrom<T>
+pub type ob_templates::EntityDependencySummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::EntityDependencySummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::EntityDependencySummary where T: core::clone::Clone
+pub type ob_templates::EntityDependencySummary::Owned = T
+pub fn ob_templates::EntityDependencySummary::clone_into(&self, &mut T)
+pub fn ob_templates::EntityDependencySummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::EntityDependencySummary where T: 'static + ?core::marker::Sized
+pub fn ob_templates::EntityDependencySummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::EntityDependencySummary where T: ?core::marker::Sized
+pub fn ob_templates::EntityDependencySummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::EntityDependencySummary where T: ?core::marker::Sized
+pub fn ob_templates::EntityDependencySummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::EntityDependencySummary where T: core::clone::Clone
+pub unsafe fn ob_templates::EntityDependencySummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::EntityDependencySummary
+pub fn ob_templates::EntityDependencySummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::EntityDependencySummary where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::EntityDependencySummary
+impl<T> tracing::instrument::WithSubscriber for ob_templates::EntityDependencySummary
+pub struct ob_templates::EntityParamInfo
+pub ob_templates::EntityParamInfo::entity_type: alloc::string::String
+pub ob_templates::EntityParamInfo::param_name: alloc::string::String
+pub ob_templates::EntityParamInfo::prompt: core::option::Option<alloc::string::String>
+pub ob_templates::EntityParamInfo::role_hint: core::option::Option<alloc::string::String>
+pub ob_templates::EntityParamInfo::search_key: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_templates::EntityParamInfo
+pub fn ob_templates::EntityParamInfo::clone(&self) -> ob_templates::EntityParamInfo
+impl core::fmt::Debug for ob_templates::EntityParamInfo
+pub fn ob_templates::EntityParamInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::EntityParamInfo
+pub fn ob_templates::EntityParamInfo::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::EntityParamInfo
+pub fn ob_templates::EntityParamInfo::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::EntityParamInfo
+impl core::marker::Send for ob_templates::EntityParamInfo
+impl core::marker::Sync for ob_templates::EntityParamInfo
+impl core::marker::Unpin for ob_templates::EntityParamInfo
+impl core::marker::UnsafeUnpin for ob_templates::EntityParamInfo
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::EntityParamInfo
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::EntityParamInfo
+impl<T, U> core::convert::Into<U> for ob_templates::EntityParamInfo where U: core::convert::From<T>
+pub fn ob_templates::EntityParamInfo::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::EntityParamInfo where U: core::convert::Into<T>
+pub type ob_templates::EntityParamInfo::Error = core::convert::Infallible
+pub fn ob_templates::EntityParamInfo::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::EntityParamInfo where U: core::convert::TryFrom<T>
+pub type ob_templates::EntityParamInfo::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::EntityParamInfo::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::EntityParamInfo where T: core::clone::Clone
+pub type ob_templates::EntityParamInfo::Owned = T
+pub fn ob_templates::EntityParamInfo::clone_into(&self, &mut T)
+pub fn ob_templates::EntityParamInfo::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::EntityParamInfo where T: 'static + ?core::marker::Sized
+pub fn ob_templates::EntityParamInfo::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::EntityParamInfo where T: ?core::marker::Sized
+pub fn ob_templates::EntityParamInfo::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::EntityParamInfo where T: ?core::marker::Sized
+pub fn ob_templates::EntityParamInfo::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::EntityParamInfo where T: core::clone::Clone
+pub unsafe fn ob_templates::EntityParamInfo::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::EntityParamInfo
+pub fn ob_templates::EntityParamInfo::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::EntityParamInfo where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::EntityParamInfo
+impl<T> tracing::instrument::WithSubscriber for ob_templates::EntityParamInfo
+pub struct ob_templates::ExpansionContext
+pub ob_templates::ExpansionContext::binding_types: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub ob_templates::ExpansionContext::bindings: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub ob_templates::ExpansionContext::current_case: core::option::Option<uuid::Uuid>
+pub ob_templates::ExpansionContext::current_cbu: core::option::Option<uuid::Uuid>
+impl ob_templates::ExpansionContext
+pub fn ob_templates::ExpansionContext::bind(&mut self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>)
+pub fn ob_templates::ExpansionContext::bind_typed(&mut self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>)
+pub fn ob_templates::ExpansionContext::binding_matches_type(&self, &str, &str) -> bool
+pub fn ob_templates::ExpansionContext::get_binding_type(&self, &str) -> core::option::Option<&str>
+pub fn ob_templates::ExpansionContext::new() -> Self
+pub fn ob_templates::ExpansionContext::set_current_case(&mut self, uuid::Uuid)
+pub fn ob_templates::ExpansionContext::set_current_cbu(&mut self, uuid::Uuid)
+pub fn ob_templates::ExpansionContext::with_cbu(uuid::Uuid) -> Self
+pub fn ob_templates::ExpansionContext::with_cbu_and_case(uuid::Uuid, uuid::Uuid) -> Self
+impl core::clone::Clone for ob_templates::ExpansionContext
+pub fn ob_templates::ExpansionContext::clone(&self) -> ob_templates::ExpansionContext
+impl core::default::Default for ob_templates::ExpansionContext
+pub fn ob_templates::ExpansionContext::default() -> ob_templates::ExpansionContext
+impl core::fmt::Debug for ob_templates::ExpansionContext
+pub fn ob_templates::ExpansionContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_templates::ExpansionContext
+impl core::marker::Send for ob_templates::ExpansionContext
+impl core::marker::Sync for ob_templates::ExpansionContext
+impl core::marker::Unpin for ob_templates::ExpansionContext
+impl core::marker::UnsafeUnpin for ob_templates::ExpansionContext
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::ExpansionContext
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::ExpansionContext
+impl<T, U> core::convert::Into<U> for ob_templates::ExpansionContext where U: core::convert::From<T>
+pub fn ob_templates::ExpansionContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::ExpansionContext where U: core::convert::Into<T>
+pub type ob_templates::ExpansionContext::Error = core::convert::Infallible
+pub fn ob_templates::ExpansionContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::ExpansionContext where U: core::convert::TryFrom<T>
+pub type ob_templates::ExpansionContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::ExpansionContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::ExpansionContext where T: core::clone::Clone
+pub type ob_templates::ExpansionContext::Owned = T
+pub fn ob_templates::ExpansionContext::clone_into(&self, &mut T)
+pub fn ob_templates::ExpansionContext::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::ExpansionContext where T: 'static + ?core::marker::Sized
+pub fn ob_templates::ExpansionContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::ExpansionContext where T: ?core::marker::Sized
+pub fn ob_templates::ExpansionContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::ExpansionContext where T: ?core::marker::Sized
+pub fn ob_templates::ExpansionContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::ExpansionContext where T: core::clone::Clone
+pub unsafe fn ob_templates::ExpansionContext::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::ExpansionContext
+pub fn ob_templates::ExpansionContext::from(T) -> T
+impl<T> tracing::instrument::Instrument for ob_templates::ExpansionContext
+impl<T> tracing::instrument::WithSubscriber for ob_templates::ExpansionContext
+pub struct ob_templates::ExpansionResult
+pub ob_templates::ExpansionResult::dsl: alloc::string::String
+pub ob_templates::ExpansionResult::filled_params: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::ExpansionResult::missing_params: alloc::vec::Vec<ob_templates::MissingParam>
+pub ob_templates::ExpansionResult::outputs: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::ExpansionResult::template_id: alloc::string::String
+impl core::clone::Clone for ob_templates::ExpansionResult
+pub fn ob_templates::ExpansionResult::clone(&self) -> ob_templates::ExpansionResult
+impl core::fmt::Debug for ob_templates::ExpansionResult
+pub fn ob_templates::ExpansionResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_templates::ExpansionResult
+impl core::marker::Send for ob_templates::ExpansionResult
+impl core::marker::Sync for ob_templates::ExpansionResult
+impl core::marker::Unpin for ob_templates::ExpansionResult
+impl core::marker::UnsafeUnpin for ob_templates::ExpansionResult
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::ExpansionResult
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::ExpansionResult
+impl<T, U> core::convert::Into<U> for ob_templates::ExpansionResult where U: core::convert::From<T>
+pub fn ob_templates::ExpansionResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::ExpansionResult where U: core::convert::Into<T>
+pub type ob_templates::ExpansionResult::Error = core::convert::Infallible
+pub fn ob_templates::ExpansionResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::ExpansionResult where U: core::convert::TryFrom<T>
+pub type ob_templates::ExpansionResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::ExpansionResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::ExpansionResult where T: core::clone::Clone
+pub type ob_templates::ExpansionResult::Owned = T
+pub fn ob_templates::ExpansionResult::clone_into(&self, &mut T)
+pub fn ob_templates::ExpansionResult::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::ExpansionResult where T: 'static + ?core::marker::Sized
+pub fn ob_templates::ExpansionResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::ExpansionResult where T: ?core::marker::Sized
+pub fn ob_templates::ExpansionResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::ExpansionResult where T: ?core::marker::Sized
+pub fn ob_templates::ExpansionResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::ExpansionResult where T: core::clone::Clone
+pub unsafe fn ob_templates::ExpansionResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::ExpansionResult
+pub fn ob_templates::ExpansionResult::from(T) -> T
+impl<T> tracing::instrument::Instrument for ob_templates::ExpansionResult
+impl<T> tracing::instrument::WithSubscriber for ob_templates::ExpansionResult
+pub struct ob_templates::MissingParam
+pub ob_templates::MissingParam::example: core::option::Option<alloc::string::String>
+pub ob_templates::MissingParam::name: alloc::string::String
+pub ob_templates::MissingParam::param_type: alloc::string::String
+pub ob_templates::MissingParam::prompt: alloc::string::String
+pub ob_templates::MissingParam::required: bool
+pub ob_templates::MissingParam::validation: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_templates::MissingParam
+pub fn ob_templates::MissingParam::clone(&self) -> ob_templates::MissingParam
+impl core::fmt::Debug for ob_templates::MissingParam
+pub fn ob_templates::MissingParam::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_templates::MissingParam
+impl core::marker::Send for ob_templates::MissingParam
+impl core::marker::Sync for ob_templates::MissingParam
+impl core::marker::Unpin for ob_templates::MissingParam
+impl core::marker::UnsafeUnpin for ob_templates::MissingParam
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::MissingParam
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::MissingParam
+impl<T, U> core::convert::Into<U> for ob_templates::MissingParam where U: core::convert::From<T>
+pub fn ob_templates::MissingParam::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::MissingParam where U: core::convert::Into<T>
+pub type ob_templates::MissingParam::Error = core::convert::Infallible
+pub fn ob_templates::MissingParam::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::MissingParam where U: core::convert::TryFrom<T>
+pub type ob_templates::MissingParam::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::MissingParam::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::MissingParam where T: core::clone::Clone
+pub type ob_templates::MissingParam::Owned = T
+pub fn ob_templates::MissingParam::clone_into(&self, &mut T)
+pub fn ob_templates::MissingParam::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::MissingParam where T: 'static + ?core::marker::Sized
+pub fn ob_templates::MissingParam::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::MissingParam where T: ?core::marker::Sized
+pub fn ob_templates::MissingParam::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::MissingParam where T: ?core::marker::Sized
+pub fn ob_templates::MissingParam::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::MissingParam where T: core::clone::Clone
+pub unsafe fn ob_templates::MissingParam::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::MissingParam
+pub fn ob_templates::MissingParam::from(T) -> T
+impl<T> tracing::instrument::Instrument for ob_templates::MissingParam
+impl<T> tracing::instrument::WithSubscriber for ob_templates::MissingParam
+pub struct ob_templates::OutputDefinition
+pub ob_templates::OutputDefinition::binding: core::option::Option<alloc::string::String>
+pub ob_templates::OutputDefinition::description: alloc::string::String
+pub ob_templates::OutputDefinition::output_type: alloc::string::String
+impl core::clone::Clone for ob_templates::OutputDefinition
+pub fn ob_templates::OutputDefinition::clone(&self) -> ob_templates::OutputDefinition
+impl core::fmt::Debug for ob_templates::OutputDefinition
+pub fn ob_templates::OutputDefinition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::OutputDefinition
+pub fn ob_templates::OutputDefinition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::OutputDefinition
+pub fn ob_templates::OutputDefinition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::OutputDefinition
+impl core::marker::Send for ob_templates::OutputDefinition
+impl core::marker::Sync for ob_templates::OutputDefinition
+impl core::marker::Unpin for ob_templates::OutputDefinition
+impl core::marker::UnsafeUnpin for ob_templates::OutputDefinition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::OutputDefinition
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::OutputDefinition
+impl<T, U> core::convert::Into<U> for ob_templates::OutputDefinition where U: core::convert::From<T>
+pub fn ob_templates::OutputDefinition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::OutputDefinition where U: core::convert::Into<T>
+pub type ob_templates::OutputDefinition::Error = core::convert::Infallible
+pub fn ob_templates::OutputDefinition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::OutputDefinition where U: core::convert::TryFrom<T>
+pub type ob_templates::OutputDefinition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::OutputDefinition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::OutputDefinition where T: core::clone::Clone
+pub type ob_templates::OutputDefinition::Owned = T
+pub fn ob_templates::OutputDefinition::clone_into(&self, &mut T)
+pub fn ob_templates::OutputDefinition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::OutputDefinition where T: 'static + ?core::marker::Sized
+pub fn ob_templates::OutputDefinition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::OutputDefinition where T: ?core::marker::Sized
+pub fn ob_templates::OutputDefinition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::OutputDefinition where T: ?core::marker::Sized
+pub fn ob_templates::OutputDefinition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::OutputDefinition where T: core::clone::Clone
+pub unsafe fn ob_templates::OutputDefinition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::OutputDefinition
+pub fn ob_templates::OutputDefinition::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::OutputDefinition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::OutputDefinition
+impl<T> tracing::instrument::WithSubscriber for ob_templates::OutputDefinition
+pub struct ob_templates::ParamDefinition
+pub ob_templates::ParamDefinition::cardinality: ob_templates::ParamCardinality
+pub ob_templates::ParamDefinition::default: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::description: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::entity_type: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::enum_values: core::option::Option<alloc::vec::Vec<alloc::string::String>>
+pub ob_templates::ParamDefinition::example: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::param_type: alloc::string::String
+pub ob_templates::ParamDefinition::prompt: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::required: bool
+pub ob_templates::ParamDefinition::role_hint: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::search_key: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::source: core::option::Option<alloc::string::String>
+pub ob_templates::ParamDefinition::validation: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_templates::ParamDefinition
+pub fn ob_templates::ParamDefinition::clone(&self) -> ob_templates::ParamDefinition
+impl core::fmt::Debug for ob_templates::ParamDefinition
+pub fn ob_templates::ParamDefinition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::ParamDefinition
+pub fn ob_templates::ParamDefinition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::ParamDefinition
+pub fn ob_templates::ParamDefinition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::ParamDefinition
+impl core::marker::Send for ob_templates::ParamDefinition
+impl core::marker::Sync for ob_templates::ParamDefinition
+impl core::marker::Unpin for ob_templates::ParamDefinition
+impl core::marker::UnsafeUnpin for ob_templates::ParamDefinition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::ParamDefinition
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::ParamDefinition
+impl<T, U> core::convert::Into<U> for ob_templates::ParamDefinition where U: core::convert::From<T>
+pub fn ob_templates::ParamDefinition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::ParamDefinition where U: core::convert::Into<T>
+pub type ob_templates::ParamDefinition::Error = core::convert::Infallible
+pub fn ob_templates::ParamDefinition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::ParamDefinition where U: core::convert::TryFrom<T>
+pub type ob_templates::ParamDefinition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::ParamDefinition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::ParamDefinition where T: core::clone::Clone
+pub type ob_templates::ParamDefinition::Owned = T
+pub fn ob_templates::ParamDefinition::clone_into(&self, &mut T)
+pub fn ob_templates::ParamDefinition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::ParamDefinition where T: 'static + ?core::marker::Sized
+pub fn ob_templates::ParamDefinition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::ParamDefinition where T: ?core::marker::Sized
+pub fn ob_templates::ParamDefinition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::ParamDefinition where T: ?core::marker::Sized
+pub fn ob_templates::ParamDefinition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::ParamDefinition where T: core::clone::Clone
+pub unsafe fn ob_templates::ParamDefinition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::ParamDefinition
+pub fn ob_templates::ParamDefinition::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::ParamDefinition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::ParamDefinition
+impl<T> tracing::instrument::WithSubscriber for ob_templates::ParamDefinition
+pub struct ob_templates::PrimaryEntity
+pub ob_templates::PrimaryEntity::description: alloc::string::String
+pub ob_templates::PrimaryEntity::entity_type: ob_templates::PrimaryEntityType
+pub ob_templates::PrimaryEntity::param: alloc::string::String
+impl core::clone::Clone for ob_templates::PrimaryEntity
+pub fn ob_templates::PrimaryEntity::clone(&self) -> ob_templates::PrimaryEntity
+impl core::fmt::Debug for ob_templates::PrimaryEntity
+pub fn ob_templates::PrimaryEntity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::PrimaryEntity
+pub fn ob_templates::PrimaryEntity::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::PrimaryEntity
+pub fn ob_templates::PrimaryEntity::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::PrimaryEntity
+impl core::marker::Send for ob_templates::PrimaryEntity
+impl core::marker::Sync for ob_templates::PrimaryEntity
+impl core::marker::Unpin for ob_templates::PrimaryEntity
+impl core::marker::UnsafeUnpin for ob_templates::PrimaryEntity
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::PrimaryEntity
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::PrimaryEntity
+impl<T, U> core::convert::Into<U> for ob_templates::PrimaryEntity where U: core::convert::From<T>
+pub fn ob_templates::PrimaryEntity::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::PrimaryEntity where U: core::convert::Into<T>
+pub type ob_templates::PrimaryEntity::Error = core::convert::Infallible
+pub fn ob_templates::PrimaryEntity::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::PrimaryEntity where U: core::convert::TryFrom<T>
+pub type ob_templates::PrimaryEntity::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::PrimaryEntity::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::PrimaryEntity where T: core::clone::Clone
+pub type ob_templates::PrimaryEntity::Owned = T
+pub fn ob_templates::PrimaryEntity::clone_into(&self, &mut T)
+pub fn ob_templates::PrimaryEntity::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::PrimaryEntity where T: 'static + ?core::marker::Sized
+pub fn ob_templates::PrimaryEntity::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::PrimaryEntity where T: ?core::marker::Sized
+pub fn ob_templates::PrimaryEntity::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::PrimaryEntity where T: ?core::marker::Sized
+pub fn ob_templates::PrimaryEntity::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::PrimaryEntity where T: core::clone::Clone
+pub unsafe fn ob_templates::PrimaryEntity::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::PrimaryEntity
+pub fn ob_templates::PrimaryEntity::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::PrimaryEntity where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::PrimaryEntity
+impl<T> tracing::instrument::WithSubscriber for ob_templates::PrimaryEntity
+pub struct ob_templates::TemplateDefinition
+pub ob_templates::TemplateDefinition::body: alloc::string::String
+pub ob_templates::TemplateDefinition::metadata: ob_templates::TemplateMetadata
+pub ob_templates::TemplateDefinition::outputs: std::collections::hash::map::HashMap<alloc::string::String, ob_templates::OutputDefinition>
+pub ob_templates::TemplateDefinition::params: std::collections::hash::map::HashMap<alloc::string::String, ob_templates::ParamDefinition>
+pub ob_templates::TemplateDefinition::primary_entity: core::option::Option<ob_templates::PrimaryEntity>
+pub ob_templates::TemplateDefinition::related_templates: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::TemplateDefinition::tags: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::TemplateDefinition::template: alloc::string::String
+pub ob_templates::TemplateDefinition::version: u32
+pub ob_templates::TemplateDefinition::workflow_context: ob_templates::WorkflowContext
+impl ob_templates::TemplateDefinition
+pub fn ob_templates::TemplateDefinition::applies_to_state(&self, &str, &str) -> bool
+pub fn ob_templates::TemplateDefinition::batch_entity_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+pub fn ob_templates::TemplateDefinition::batch_entity_type(&self) -> core::option::Option<&str>
+pub fn ob_templates::TemplateDefinition::entity_dependency_summary(&self) -> ob_templates::EntityDependencySummary
+pub fn ob_templates::TemplateDefinition::entity_ref_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+pub fn ob_templates::TemplateDefinition::is_cbu_scoped(&self) -> bool
+pub fn ob_templates::TemplateDefinition::is_kyc_case_scoped(&self) -> bool
+pub fn ob_templates::TemplateDefinition::optional_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+pub fn ob_templates::TemplateDefinition::output_entity_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+pub fn ob_templates::TemplateDefinition::primary_entity_param(&self) -> core::option::Option<&str>
+pub fn ob_templates::TemplateDefinition::primary_entity_type(&self) -> core::option::Option<ob_templates::PrimaryEntityType>
+pub fn ob_templates::TemplateDefinition::required_entity_types(&self) -> alloc::vec::Vec<&str>
+pub fn ob_templates::TemplateDefinition::required_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+pub fn ob_templates::TemplateDefinition::resolves_blocker(&self, &str) -> bool
+pub fn ob_templates::TemplateDefinition::shared_entity_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+pub fn ob_templates::TemplateDefinition::user_input_params(&self) -> alloc::vec::Vec<(&alloc::string::String, &ob_templates::ParamDefinition)>
+impl core::clone::Clone for ob_templates::TemplateDefinition
+pub fn ob_templates::TemplateDefinition::clone(&self) -> ob_templates::TemplateDefinition
+impl core::fmt::Debug for ob_templates::TemplateDefinition
+pub fn ob_templates::TemplateDefinition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::TemplateDefinition
+pub fn ob_templates::TemplateDefinition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::TemplateDefinition
+pub fn ob_templates::TemplateDefinition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::TemplateDefinition
+impl core::marker::Send for ob_templates::TemplateDefinition
+impl core::marker::Sync for ob_templates::TemplateDefinition
+impl core::marker::Unpin for ob_templates::TemplateDefinition
+impl core::marker::UnsafeUnpin for ob_templates::TemplateDefinition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::TemplateDefinition
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::TemplateDefinition
+impl<T, U> core::convert::Into<U> for ob_templates::TemplateDefinition where U: core::convert::From<T>
+pub fn ob_templates::TemplateDefinition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::TemplateDefinition where U: core::convert::Into<T>
+pub type ob_templates::TemplateDefinition::Error = core::convert::Infallible
+pub fn ob_templates::TemplateDefinition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::TemplateDefinition where U: core::convert::TryFrom<T>
+pub type ob_templates::TemplateDefinition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::TemplateDefinition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::TemplateDefinition where T: core::clone::Clone
+pub type ob_templates::TemplateDefinition::Owned = T
+pub fn ob_templates::TemplateDefinition::clone_into(&self, &mut T)
+pub fn ob_templates::TemplateDefinition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::TemplateDefinition where T: 'static + ?core::marker::Sized
+pub fn ob_templates::TemplateDefinition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::TemplateDefinition where T: ?core::marker::Sized
+pub fn ob_templates::TemplateDefinition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::TemplateDefinition where T: ?core::marker::Sized
+pub fn ob_templates::TemplateDefinition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::TemplateDefinition where T: core::clone::Clone
+pub unsafe fn ob_templates::TemplateDefinition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::TemplateDefinition
+pub fn ob_templates::TemplateDefinition::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::TemplateDefinition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::TemplateDefinition
+impl<T> tracing::instrument::WithSubscriber for ob_templates::TemplateDefinition
+pub struct ob_templates::TemplateExpander
+impl ob_templates::TemplateExpander
+pub fn ob_templates::TemplateExpander::expand(&ob_templates::TemplateDefinition, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>, &ob_templates::ExpansionContext) -> ob_templates::ExpansionResult
+pub fn ob_templates::TemplateExpander::format_missing_params_prompt(&[ob_templates::MissingParam]) -> alloc::string::String
+pub fn ob_templates::TemplateExpander::is_complete(&ob_templates::ExpansionResult) -> bool
+impl core::marker::Freeze for ob_templates::TemplateExpander
+impl core::marker::Send for ob_templates::TemplateExpander
+impl core::marker::Sync for ob_templates::TemplateExpander
+impl core::marker::Unpin for ob_templates::TemplateExpander
+impl core::marker::UnsafeUnpin for ob_templates::TemplateExpander
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::TemplateExpander
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::TemplateExpander
+impl<T, U> core::convert::Into<U> for ob_templates::TemplateExpander where U: core::convert::From<T>
+pub fn ob_templates::TemplateExpander::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::TemplateExpander where U: core::convert::Into<T>
+pub type ob_templates::TemplateExpander::Error = core::convert::Infallible
+pub fn ob_templates::TemplateExpander::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::TemplateExpander where U: core::convert::TryFrom<T>
+pub type ob_templates::TemplateExpander::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::TemplateExpander::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_templates::TemplateExpander where T: 'static + ?core::marker::Sized
+pub fn ob_templates::TemplateExpander::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::TemplateExpander where T: ?core::marker::Sized
+pub fn ob_templates::TemplateExpander::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::TemplateExpander where T: ?core::marker::Sized
+pub fn ob_templates::TemplateExpander::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_templates::TemplateExpander
+pub fn ob_templates::TemplateExpander::from(T) -> T
+impl<T> tracing::instrument::Instrument for ob_templates::TemplateExpander
+impl<T> tracing::instrument::WithSubscriber for ob_templates::TemplateExpander
+pub struct ob_templates::TemplateMetadata
+pub ob_templates::TemplateMetadata::description: alloc::string::String
+pub ob_templates::TemplateMetadata::effects: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::TemplateMetadata::name: alloc::string::String
+pub ob_templates::TemplateMetadata::next_steps: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::TemplateMetadata::summary: alloc::string::String
+pub ob_templates::TemplateMetadata::when_not_to_use: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::TemplateMetadata::when_to_use: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for ob_templates::TemplateMetadata
+pub fn ob_templates::TemplateMetadata::clone(&self) -> ob_templates::TemplateMetadata
+impl core::fmt::Debug for ob_templates::TemplateMetadata
+pub fn ob_templates::TemplateMetadata::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::TemplateMetadata
+pub fn ob_templates::TemplateMetadata::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::TemplateMetadata
+pub fn ob_templates::TemplateMetadata::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::TemplateMetadata
+impl core::marker::Send for ob_templates::TemplateMetadata
+impl core::marker::Sync for ob_templates::TemplateMetadata
+impl core::marker::Unpin for ob_templates::TemplateMetadata
+impl core::marker::UnsafeUnpin for ob_templates::TemplateMetadata
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::TemplateMetadata
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::TemplateMetadata
+impl<T, U> core::convert::Into<U> for ob_templates::TemplateMetadata where U: core::convert::From<T>
+pub fn ob_templates::TemplateMetadata::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::TemplateMetadata where U: core::convert::Into<T>
+pub type ob_templates::TemplateMetadata::Error = core::convert::Infallible
+pub fn ob_templates::TemplateMetadata::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::TemplateMetadata where U: core::convert::TryFrom<T>
+pub type ob_templates::TemplateMetadata::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::TemplateMetadata::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::TemplateMetadata where T: core::clone::Clone
+pub type ob_templates::TemplateMetadata::Owned = T
+pub fn ob_templates::TemplateMetadata::clone_into(&self, &mut T)
+pub fn ob_templates::TemplateMetadata::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::TemplateMetadata where T: 'static + ?core::marker::Sized
+pub fn ob_templates::TemplateMetadata::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::TemplateMetadata where T: ?core::marker::Sized
+pub fn ob_templates::TemplateMetadata::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::TemplateMetadata where T: ?core::marker::Sized
+pub fn ob_templates::TemplateMetadata::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::TemplateMetadata where T: core::clone::Clone
+pub unsafe fn ob_templates::TemplateMetadata::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::TemplateMetadata
+pub fn ob_templates::TemplateMetadata::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::TemplateMetadata where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::TemplateMetadata
+impl<T> tracing::instrument::WithSubscriber for ob_templates::TemplateMetadata
+pub struct ob_templates::TemplateRegistry
+impl ob_templates::TemplateRegistry
+pub fn ob_templates::TemplateRegistry::all_blockers(&self) -> alloc::vec::Vec<&str>
+pub fn ob_templates::TemplateRegistry::all_tags(&self) -> alloc::vec::Vec<&str>
+pub fn ob_templates::TemplateRegistry::find_by_blocker(&self, &str) -> alloc::vec::Vec<&ob_templates::TemplateDefinition>
+pub fn ob_templates::TemplateRegistry::find_by_tag(&self, &str) -> alloc::vec::Vec<&ob_templates::TemplateDefinition>
+pub fn ob_templates::TemplateRegistry::find_by_workflow_state(&self, &str, &str) -> alloc::vec::Vec<&ob_templates::TemplateDefinition>
+pub fn ob_templates::TemplateRegistry::get(&self, &str) -> core::option::Option<&ob_templates::TemplateDefinition>
+pub fn ob_templates::TemplateRegistry::is_empty(&self) -> bool
+pub fn ob_templates::TemplateRegistry::len(&self) -> usize
+pub fn ob_templates::TemplateRegistry::list(&self) -> alloc::vec::Vec<&ob_templates::TemplateDefinition>
+pub fn ob_templates::TemplateRegistry::list_ids(&self) -> alloc::vec::Vec<&str>
+pub fn ob_templates::TemplateRegistry::load_from_dir(&std::path::Path) -> core::result::Result<Self, ob_templates::TemplateError>
+pub fn ob_templates::TemplateRegistry::new() -> Self
+pub fn ob_templates::TemplateRegistry::register(&mut self, ob_templates::TemplateDefinition)
+pub fn ob_templates::TemplateRegistry::search(&self, &str) -> alloc::vec::Vec<&ob_templates::TemplateDefinition>
+impl core::default::Default for ob_templates::TemplateRegistry
+pub fn ob_templates::TemplateRegistry::default() -> Self
+impl core::marker::Freeze for ob_templates::TemplateRegistry
+impl core::marker::Send for ob_templates::TemplateRegistry
+impl core::marker::Sync for ob_templates::TemplateRegistry
+impl core::marker::Unpin for ob_templates::TemplateRegistry
+impl core::marker::UnsafeUnpin for ob_templates::TemplateRegistry
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::TemplateRegistry
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::TemplateRegistry
+impl<T, U> core::convert::Into<U> for ob_templates::TemplateRegistry where U: core::convert::From<T>
+pub fn ob_templates::TemplateRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::TemplateRegistry where U: core::convert::Into<T>
+pub type ob_templates::TemplateRegistry::Error = core::convert::Infallible
+pub fn ob_templates::TemplateRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::TemplateRegistry where U: core::convert::TryFrom<T>
+pub type ob_templates::TemplateRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::TemplateRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_templates::TemplateRegistry where T: 'static + ?core::marker::Sized
+pub fn ob_templates::TemplateRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::TemplateRegistry where T: ?core::marker::Sized
+pub fn ob_templates::TemplateRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::TemplateRegistry where T: ?core::marker::Sized
+pub fn ob_templates::TemplateRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_templates::TemplateRegistry
+pub fn ob_templates::TemplateRegistry::from(T) -> T
+impl<T> tracing::instrument::Instrument for ob_templates::TemplateRegistry
+impl<T> tracing::instrument::WithSubscriber for ob_templates::TemplateRegistry
+pub struct ob_templates::WorkflowContext
+pub ob_templates::WorkflowContext::applicable_states: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::WorkflowContext::applicable_workflows: alloc::vec::Vec<alloc::string::String>
+pub ob_templates::WorkflowContext::resolves_blockers: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for ob_templates::WorkflowContext
+pub fn ob_templates::WorkflowContext::clone(&self) -> ob_templates::WorkflowContext
+impl core::default::Default for ob_templates::WorkflowContext
+pub fn ob_templates::WorkflowContext::default() -> ob_templates::WorkflowContext
+impl core::fmt::Debug for ob_templates::WorkflowContext
+pub fn ob_templates::WorkflowContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_templates::WorkflowContext
+pub fn ob_templates::WorkflowContext::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_templates::WorkflowContext
+pub fn ob_templates::WorkflowContext::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_templates::WorkflowContext
+impl core::marker::Send for ob_templates::WorkflowContext
+impl core::marker::Sync for ob_templates::WorkflowContext
+impl core::marker::Unpin for ob_templates::WorkflowContext
+impl core::marker::UnsafeUnpin for ob_templates::WorkflowContext
+impl core::panic::unwind_safe::RefUnwindSafe for ob_templates::WorkflowContext
+impl core::panic::unwind_safe::UnwindSafe for ob_templates::WorkflowContext
+impl<T, U> core::convert::Into<U> for ob_templates::WorkflowContext where U: core::convert::From<T>
+pub fn ob_templates::WorkflowContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_templates::WorkflowContext where U: core::convert::Into<T>
+pub type ob_templates::WorkflowContext::Error = core::convert::Infallible
+pub fn ob_templates::WorkflowContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_templates::WorkflowContext where U: core::convert::TryFrom<T>
+pub type ob_templates::WorkflowContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_templates::WorkflowContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_templates::WorkflowContext where T: core::clone::Clone
+pub type ob_templates::WorkflowContext::Owned = T
+pub fn ob_templates::WorkflowContext::clone_into(&self, &mut T)
+pub fn ob_templates::WorkflowContext::to_owned(&self) -> T
+impl<T> core::any::Any for ob_templates::WorkflowContext where T: 'static + ?core::marker::Sized
+pub fn ob_templates::WorkflowContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_templates::WorkflowContext where T: ?core::marker::Sized
+pub fn ob_templates::WorkflowContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_templates::WorkflowContext where T: ?core::marker::Sized
+pub fn ob_templates::WorkflowContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_templates::WorkflowContext where T: core::clone::Clone
+pub unsafe fn ob_templates::WorkflowContext::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_templates::WorkflowContext
+pub fn ob_templates::WorkflowContext::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_templates::WorkflowContext where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_templates::WorkflowContext
+impl<T> tracing::instrument::WithSubscriber for ob_templates::WorkflowContext

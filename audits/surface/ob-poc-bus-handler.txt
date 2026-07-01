@@ -1,0 +1,176 @@
+# ob-poc-bus-handler | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:40:51Z
+pub mod ob_poc_bus_handler
+pub use ob_poc_bus_handler::ObPocEntityServiceImpl
+pub use ob_poc_bus_handler::ObPocSemOsServiceImpl
+pub enum ob_poc_bus_handler::VerbExecutorError
+pub ob_poc_bus_handler::VerbExecutorError::AuthorityDenied(alloc::string::String)
+pub ob_poc_bus_handler::VerbExecutorError::Internal(alloc::string::String)
+pub ob_poc_bus_handler::VerbExecutorError::Malformed(alloc::string::String)
+pub ob_poc_bus_handler::VerbExecutorError::UnknownVerb(alloc::string::String)
+pub ob_poc_bus_handler::VerbExecutorError::VersionIncompatible(alloc::string::String)
+impl core::convert::From<ob_poc_bus_handler::VerbExecutorError> for dsl_bus_server::server::BusServerError
+pub fn dsl_bus_server::server::BusServerError::from(ob_poc_bus_handler::VerbExecutorError) -> Self
+impl core::error::Error for ob_poc_bus_handler::VerbExecutorError
+impl core::fmt::Debug for ob_poc_bus_handler::VerbExecutorError
+pub fn ob_poc_bus_handler::VerbExecutorError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_bus_handler::VerbExecutorError
+pub fn ob_poc_bus_handler::VerbExecutorError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_bus_handler::VerbExecutorError
+impl core::marker::Send for ob_poc_bus_handler::VerbExecutorError
+impl core::marker::Sync for ob_poc_bus_handler::VerbExecutorError
+impl core::marker::Unpin for ob_poc_bus_handler::VerbExecutorError
+impl core::marker::UnsafeUnpin for ob_poc_bus_handler::VerbExecutorError
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bus_handler::VerbExecutorError
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bus_handler::VerbExecutorError
+impl<T, U> core::convert::Into<U> for ob_poc_bus_handler::VerbExecutorError where U: core::convert::From<T>
+pub fn ob_poc_bus_handler::VerbExecutorError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bus_handler::VerbExecutorError where U: core::convert::Into<T>
+pub type ob_poc_bus_handler::VerbExecutorError::Error = core::convert::Infallible
+pub fn ob_poc_bus_handler::VerbExecutorError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bus_handler::VerbExecutorError where U: core::convert::TryFrom<T>
+pub type ob_poc_bus_handler::VerbExecutorError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bus_handler::VerbExecutorError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_poc_bus_handler::VerbExecutorError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbExecutorError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_bus_handler::VerbExecutorError where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbExecutorError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bus_handler::VerbExecutorError where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbExecutorError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bus_handler::VerbExecutorError where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbExecutorError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_bus_handler::VerbExecutorError
+pub fn ob_poc_bus_handler::VerbExecutorError::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bus_handler::VerbExecutorError
+impl<T> tonic::request::IntoRequest<T> for ob_poc_bus_handler::VerbExecutorError
+pub fn ob_poc_bus_handler::VerbExecutorError::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for ob_poc_bus_handler::VerbExecutorError
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bus_handler::VerbExecutorError
+impl<T> typenum::type_operators::Same for ob_poc_bus_handler::VerbExecutorError
+pub type ob_poc_bus_handler::VerbExecutorError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bus_handler::VerbExecutorError where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bus_handler::VerbExecutorError::vzip(self) -> V
+pub struct ob_poc_bus_handler::NoopResultDispatcher
+impl dsl_bus_server::services::ResultDispatcher for ob_poc_bus_handler::NoopResultDispatcher
+pub fn ob_poc_bus_handler::NoopResultDispatcher::dispatch<'life0, 'async_trait>(&'life0 self, dsl_bus_server::services::ResultContext, dsl_bus_protocol::v1::ExecutionOutcome) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<(), dsl_bus_server::server::BusServerError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+impl core::marker::Freeze for ob_poc_bus_handler::NoopResultDispatcher
+impl core::marker::Send for ob_poc_bus_handler::NoopResultDispatcher
+impl core::marker::Sync for ob_poc_bus_handler::NoopResultDispatcher
+impl core::marker::Unpin for ob_poc_bus_handler::NoopResultDispatcher
+impl core::marker::UnsafeUnpin for ob_poc_bus_handler::NoopResultDispatcher
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bus_handler::NoopResultDispatcher
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bus_handler::NoopResultDispatcher
+impl<T, U> core::convert::Into<U> for ob_poc_bus_handler::NoopResultDispatcher where U: core::convert::From<T>
+pub fn ob_poc_bus_handler::NoopResultDispatcher::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bus_handler::NoopResultDispatcher where U: core::convert::Into<T>
+pub type ob_poc_bus_handler::NoopResultDispatcher::Error = core::convert::Infallible
+pub fn ob_poc_bus_handler::NoopResultDispatcher::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bus_handler::NoopResultDispatcher where U: core::convert::TryFrom<T>
+pub type ob_poc_bus_handler::NoopResultDispatcher::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bus_handler::NoopResultDispatcher::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_bus_handler::NoopResultDispatcher where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bus_handler::NoopResultDispatcher::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bus_handler::NoopResultDispatcher where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::NoopResultDispatcher::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bus_handler::NoopResultDispatcher where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::NoopResultDispatcher::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_bus_handler::NoopResultDispatcher
+pub fn ob_poc_bus_handler::NoopResultDispatcher::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bus_handler::NoopResultDispatcher
+impl<T> tonic::request::IntoRequest<T> for ob_poc_bus_handler::NoopResultDispatcher
+pub fn ob_poc_bus_handler::NoopResultDispatcher::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for ob_poc_bus_handler::NoopResultDispatcher
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bus_handler::NoopResultDispatcher
+impl<T> typenum::type_operators::Same for ob_poc_bus_handler::NoopResultDispatcher
+pub type ob_poc_bus_handler::NoopResultDispatcher::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bus_handler::NoopResultDispatcher where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bus_handler::NoopResultDispatcher::vzip(self) -> V
+pub struct ob_poc_bus_handler::ObPocBusHandler
+impl ob_poc_bus_handler::ObPocBusHandler
+pub fn ob_poc_bus_handler::ObPocBusHandler::from_arc(alloc::sync::Arc<dyn ob_poc_bus_handler::VerbExecutor>) -> Self
+pub fn ob_poc_bus_handler::ObPocBusHandler::new<E: ob_poc_bus_handler::VerbExecutor>(E) -> Self
+pub fn ob_poc_bus_handler::ObPocBusHandler::with_catalogue_version(self, impl core::convert::Into<alloc::string::String>) -> Self
+impl dsl_bus_server::services::InvocationDispatcher for ob_poc_bus_handler::ObPocBusHandler
+pub fn ob_poc_bus_handler::ObPocBusHandler::dispatch<'life0, 'async_trait>(&'life0 self, dsl_bus_server::services::InvocationContext, alloc::vec::Vec<dsl_bus_protocol::v1::ResolvedBinding>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<dsl_bus_server::services::InvocationOutcome, dsl_bus_server::server::BusServerError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+impl core::marker::Freeze for ob_poc_bus_handler::ObPocBusHandler
+impl core::marker::Send for ob_poc_bus_handler::ObPocBusHandler
+impl core::marker::Sync for ob_poc_bus_handler::ObPocBusHandler
+impl core::marker::Unpin for ob_poc_bus_handler::ObPocBusHandler
+impl core::marker::UnsafeUnpin for ob_poc_bus_handler::ObPocBusHandler
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_poc_bus_handler::ObPocBusHandler
+impl !core::panic::unwind_safe::UnwindSafe for ob_poc_bus_handler::ObPocBusHandler
+impl<T, U> core::convert::Into<U> for ob_poc_bus_handler::ObPocBusHandler where U: core::convert::From<T>
+pub fn ob_poc_bus_handler::ObPocBusHandler::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bus_handler::ObPocBusHandler where U: core::convert::Into<T>
+pub type ob_poc_bus_handler::ObPocBusHandler::Error = core::convert::Infallible
+pub fn ob_poc_bus_handler::ObPocBusHandler::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bus_handler::ObPocBusHandler where U: core::convert::TryFrom<T>
+pub type ob_poc_bus_handler::ObPocBusHandler::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bus_handler::ObPocBusHandler::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_bus_handler::ObPocBusHandler where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bus_handler::ObPocBusHandler::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bus_handler::ObPocBusHandler where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::ObPocBusHandler::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bus_handler::ObPocBusHandler where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::ObPocBusHandler::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_bus_handler::ObPocBusHandler
+pub fn ob_poc_bus_handler::ObPocBusHandler::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bus_handler::ObPocBusHandler
+impl<T> tonic::request::IntoRequest<T> for ob_poc_bus_handler::ObPocBusHandler
+pub fn ob_poc_bus_handler::ObPocBusHandler::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for ob_poc_bus_handler::ObPocBusHandler
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bus_handler::ObPocBusHandler
+impl<T> typenum::type_operators::Same for ob_poc_bus_handler::ObPocBusHandler
+pub type ob_poc_bus_handler::ObPocBusHandler::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bus_handler::ObPocBusHandler where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bus_handler::ObPocBusHandler::vzip(self) -> V
+pub struct ob_poc_bus_handler::VerbOutcome
+pub ob_poc_bus_handler::VerbOutcome::bindings: alloc::vec::Vec<dsl_bus_protocol::v1::ResolvedBinding>
+pub ob_poc_bus_handler::VerbOutcome::detail: alloc::string::String
+pub ob_poc_bus_handler::VerbOutcome::execution_id: uuid::Uuid
+pub ob_poc_bus_handler::VerbOutcome::kind: dsl_bus_protocol::v1::ExecutionOutcomeKind
+impl core::clone::Clone for ob_poc_bus_handler::VerbOutcome
+pub fn ob_poc_bus_handler::VerbOutcome::clone(&self) -> ob_poc_bus_handler::VerbOutcome
+impl core::fmt::Debug for ob_poc_bus_handler::VerbOutcome
+pub fn ob_poc_bus_handler::VerbOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_bus_handler::VerbOutcome
+impl core::marker::Send for ob_poc_bus_handler::VerbOutcome
+impl core::marker::Sync for ob_poc_bus_handler::VerbOutcome
+impl core::marker::Unpin for ob_poc_bus_handler::VerbOutcome
+impl core::marker::UnsafeUnpin for ob_poc_bus_handler::VerbOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bus_handler::VerbOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bus_handler::VerbOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_bus_handler::VerbOutcome where U: core::convert::From<T>
+pub fn ob_poc_bus_handler::VerbOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bus_handler::VerbOutcome where U: core::convert::Into<T>
+pub type ob_poc_bus_handler::VerbOutcome::Error = core::convert::Infallible
+pub fn ob_poc_bus_handler::VerbOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bus_handler::VerbOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_bus_handler::VerbOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bus_handler::VerbOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bus_handler::VerbOutcome where T: core::clone::Clone
+pub type ob_poc_bus_handler::VerbOutcome::Owned = T
+pub fn ob_poc_bus_handler::VerbOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_bus_handler::VerbOutcome::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for ob_poc_bus_handler::VerbOutcome where T: core::clone::Clone
+pub fn ob_poc_bus_handler::VerbOutcome::from_ref(&T) -> T
+impl<T> core::any::Any for ob_poc_bus_handler::VerbOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bus_handler::VerbOutcome where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bus_handler::VerbOutcome where T: ?core::marker::Sized
+pub fn ob_poc_bus_handler::VerbOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bus_handler::VerbOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_bus_handler::VerbOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bus_handler::VerbOutcome
+pub fn ob_poc_bus_handler::VerbOutcome::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bus_handler::VerbOutcome
+impl<T> tonic::request::IntoRequest<T> for ob_poc_bus_handler::VerbOutcome
+pub fn ob_poc_bus_handler::VerbOutcome::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for ob_poc_bus_handler::VerbOutcome
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bus_handler::VerbOutcome
+impl<T> typenum::type_operators::Same for ob_poc_bus_handler::VerbOutcome
+pub type ob_poc_bus_handler::VerbOutcome::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bus_handler::VerbOutcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bus_handler::VerbOutcome::vzip(self) -> V
+pub trait ob_poc_bus_handler::VerbExecutor: core::marker::Send + core::marker::Sync + 'static
+pub fn ob_poc_bus_handler::VerbExecutor::execute<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, alloc::vec::Vec<dsl_bus_protocol::v1::ResolvedBinding>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<ob_poc_bus_handler::VerbOutcome, ob_poc_bus_handler::VerbExecutorError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait

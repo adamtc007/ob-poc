@@ -1,0 +1,916 @@
+# dsl-migrate | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:38:55Z
+pub mod dsl_migrate
+pub mod dsl_migrate::emitter
+pub struct dsl_migrate::emitter::MigrationResult
+pub dsl_migrate::emitter::MigrationResult::coverage: dsl_migrate::reporter::CoverageReport
+pub dsl_migrate::emitter::MigrationResult::dsl_source: alloc::string::String
+pub dsl_migrate::emitter::MigrationResult::process_name: alloc::string::String
+impl core::marker::Freeze for dsl_migrate::emitter::MigrationResult
+impl core::marker::Send for dsl_migrate::emitter::MigrationResult
+impl core::marker::Sync for dsl_migrate::emitter::MigrationResult
+impl core::marker::Unpin for dsl_migrate::emitter::MigrationResult
+impl core::marker::UnsafeUnpin for dsl_migrate::emitter::MigrationResult
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::emitter::MigrationResult
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::emitter::MigrationResult
+impl<T, U> core::convert::Into<U> for dsl_migrate::emitter::MigrationResult where U: core::convert::From<T>
+pub fn dsl_migrate::emitter::MigrationResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::emitter::MigrationResult where U: core::convert::Into<T>
+pub type dsl_migrate::emitter::MigrationResult::Error = core::convert::Infallible
+pub fn dsl_migrate::emitter::MigrationResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::emitter::MigrationResult where U: core::convert::TryFrom<T>
+pub type dsl_migrate::emitter::MigrationResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::emitter::MigrationResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_migrate::emitter::MigrationResult where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::emitter::MigrationResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::emitter::MigrationResult where T: ?core::marker::Sized
+pub fn dsl_migrate::emitter::MigrationResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::emitter::MigrationResult where T: ?core::marker::Sized
+pub fn dsl_migrate::emitter::MigrationResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_migrate::emitter::MigrationResult
+pub fn dsl_migrate::emitter::MigrationResult::from(T) -> T
+pub fn dsl_migrate::emitter::emit(&dsl_migrate::xml_reader::BpmnProcess) -> dsl_migrate::emitter::MigrationResult
+pub mod dsl_migrate::feel_parser
+pub enum dsl_migrate::feel_parser::FeelNormaliseResult
+pub dsl_migrate::feel_parser::FeelNormaliseResult::Clean(alloc::string::String)
+pub dsl_migrate::feel_parser::FeelNormaliseResult::NeedsReview
+pub dsl_migrate::feel_parser::FeelNormaliseResult::NeedsReview::reason: alloc::string::String
+pub dsl_migrate::feel_parser::FeelNormaliseResult::NeedsReview::stripped: alloc::string::String
+impl core::clone::Clone for dsl_migrate::feel_parser::FeelNormaliseResult
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::clone(&self) -> dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::cmp::PartialEq for dsl_migrate::feel_parser::FeelNormaliseResult
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::eq(&self, &dsl_migrate::feel_parser::FeelNormaliseResult) -> bool
+impl core::fmt::Debug for dsl_migrate::feel_parser::FeelNormaliseResult
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::marker::Freeze for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::marker::Send for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::marker::Sync for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::marker::Unpin for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::marker::UnsafeUnpin for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::feel_parser::FeelNormaliseResult
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::feel_parser::FeelNormaliseResult
+impl<T, U> core::convert::Into<U> for dsl_migrate::feel_parser::FeelNormaliseResult where U: core::convert::From<T>
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::feel_parser::FeelNormaliseResult where U: core::convert::Into<T>
+pub type dsl_migrate::feel_parser::FeelNormaliseResult::Error = core::convert::Infallible
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::feel_parser::FeelNormaliseResult where U: core::convert::TryFrom<T>
+pub type dsl_migrate::feel_parser::FeelNormaliseResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::feel_parser::FeelNormaliseResult where T: core::clone::Clone
+pub type dsl_migrate::feel_parser::FeelNormaliseResult::Owned = T
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::clone_into(&self, &mut T)
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::feel_parser::FeelNormaliseResult where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::feel_parser::FeelNormaliseResult where T: ?core::marker::Sized
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::feel_parser::FeelNormaliseResult where T: ?core::marker::Sized
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::feel_parser::FeelNormaliseResult where T: core::clone::Clone
+pub unsafe fn dsl_migrate::feel_parser::FeelNormaliseResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::feel_parser::FeelNormaliseResult
+pub fn dsl_migrate::feel_parser::FeelNormaliseResult::from(T) -> T
+pub fn dsl_migrate::feel_parser::feel_normalise(&str) -> dsl_migrate::feel_parser::FeelNormaliseResult
+pub mod dsl_migrate::form_key
+pub enum dsl_migrate::form_key::FormKeyNormalised
+pub dsl_migrate::form_key::FormKeyNormalised::Absent
+pub dsl_migrate::form_key::FormKeyNormalised::NeedsReview
+pub dsl_migrate::form_key::FormKeyNormalised::NeedsReview::raw: alloc::string::String
+pub dsl_migrate::form_key::FormKeyNormalised::NeedsReview::reason: alloc::string::String
+pub dsl_migrate::form_key::FormKeyNormalised::Resolved(alloc::string::String)
+impl core::clone::Clone for dsl_migrate::form_key::FormKeyNormalised
+pub fn dsl_migrate::form_key::FormKeyNormalised::clone(&self) -> dsl_migrate::form_key::FormKeyNormalised
+impl core::cmp::PartialEq for dsl_migrate::form_key::FormKeyNormalised
+pub fn dsl_migrate::form_key::FormKeyNormalised::eq(&self, &dsl_migrate::form_key::FormKeyNormalised) -> bool
+impl core::fmt::Debug for dsl_migrate::form_key::FormKeyNormalised
+pub fn dsl_migrate::form_key::FormKeyNormalised::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_migrate::form_key::FormKeyNormalised
+impl core::marker::Freeze for dsl_migrate::form_key::FormKeyNormalised
+impl core::marker::Send for dsl_migrate::form_key::FormKeyNormalised
+impl core::marker::Sync for dsl_migrate::form_key::FormKeyNormalised
+impl core::marker::Unpin for dsl_migrate::form_key::FormKeyNormalised
+impl core::marker::UnsafeUnpin for dsl_migrate::form_key::FormKeyNormalised
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::form_key::FormKeyNormalised
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::form_key::FormKeyNormalised
+impl<T, U> core::convert::Into<U> for dsl_migrate::form_key::FormKeyNormalised where U: core::convert::From<T>
+pub fn dsl_migrate::form_key::FormKeyNormalised::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::form_key::FormKeyNormalised where U: core::convert::Into<T>
+pub type dsl_migrate::form_key::FormKeyNormalised::Error = core::convert::Infallible
+pub fn dsl_migrate::form_key::FormKeyNormalised::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::form_key::FormKeyNormalised where U: core::convert::TryFrom<T>
+pub type dsl_migrate::form_key::FormKeyNormalised::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::form_key::FormKeyNormalised::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::form_key::FormKeyNormalised where T: core::clone::Clone
+pub type dsl_migrate::form_key::FormKeyNormalised::Owned = T
+pub fn dsl_migrate::form_key::FormKeyNormalised::clone_into(&self, &mut T)
+pub fn dsl_migrate::form_key::FormKeyNormalised::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::form_key::FormKeyNormalised where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::form_key::FormKeyNormalised::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::form_key::FormKeyNormalised where T: ?core::marker::Sized
+pub fn dsl_migrate::form_key::FormKeyNormalised::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::form_key::FormKeyNormalised where T: ?core::marker::Sized
+pub fn dsl_migrate::form_key::FormKeyNormalised::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::form_key::FormKeyNormalised where T: core::clone::Clone
+pub unsafe fn dsl_migrate::form_key::FormKeyNormalised::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::form_key::FormKeyNormalised
+pub fn dsl_migrate::form_key::FormKeyNormalised::from(T) -> T
+pub fn dsl_migrate::form_key::normalise_form_key(core::option::Option<&str>) -> dsl_migrate::form_key::FormKeyNormalised
+pub mod dsl_migrate::mapper
+pub struct dsl_migrate::mapper::MappedDsl
+pub dsl_migrate::mapper::MappedDsl::atom_lines: alloc::vec::Vec<alloc::string::String>
+pub dsl_migrate::mapper::MappedDsl::element_statuses: alloc::vec::Vec<dsl_migrate::reporter::MigrationElement>
+impl core::marker::Freeze for dsl_migrate::mapper::MappedDsl
+impl core::marker::Send for dsl_migrate::mapper::MappedDsl
+impl core::marker::Sync for dsl_migrate::mapper::MappedDsl
+impl core::marker::Unpin for dsl_migrate::mapper::MappedDsl
+impl core::marker::UnsafeUnpin for dsl_migrate::mapper::MappedDsl
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::mapper::MappedDsl
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::mapper::MappedDsl
+impl<T, U> core::convert::Into<U> for dsl_migrate::mapper::MappedDsl where U: core::convert::From<T>
+pub fn dsl_migrate::mapper::MappedDsl::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::mapper::MappedDsl where U: core::convert::Into<T>
+pub type dsl_migrate::mapper::MappedDsl::Error = core::convert::Infallible
+pub fn dsl_migrate::mapper::MappedDsl::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::mapper::MappedDsl where U: core::convert::TryFrom<T>
+pub type dsl_migrate::mapper::MappedDsl::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::mapper::MappedDsl::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_migrate::mapper::MappedDsl where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::mapper::MappedDsl::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::mapper::MappedDsl where T: ?core::marker::Sized
+pub fn dsl_migrate::mapper::MappedDsl::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::mapper::MappedDsl where T: ?core::marker::Sized
+pub fn dsl_migrate::mapper::MappedDsl::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_migrate::mapper::MappedDsl
+pub fn dsl_migrate::mapper::MappedDsl::from(T) -> T
+pub fn dsl_migrate::mapper::map_process(&dsl_migrate::xml_reader::BpmnProcess) -> dsl_migrate::mapper::MappedDsl
+pub mod dsl_migrate::reporter
+pub enum dsl_migrate::reporter::MigrationStatus
+pub dsl_migrate::reporter::MigrationStatus::Clean
+pub dsl_migrate::reporter::MigrationStatus::HumanResolve
+pub dsl_migrate::reporter::MigrationStatus::Rejected
+pub dsl_migrate::reporter::MigrationStatus::Skipped
+impl core::clone::Clone for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::clone(&self) -> dsl_migrate::reporter::MigrationStatus
+impl core::cmp::PartialEq for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::eq(&self, &dsl_migrate::reporter::MigrationStatus) -> bool
+impl core::fmt::Debug for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_migrate::reporter::MigrationStatus
+impl serde_core::ser::Serialize for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_migrate::reporter::MigrationStatus
+impl core::marker::Send for dsl_migrate::reporter::MigrationStatus
+impl core::marker::Sync for dsl_migrate::reporter::MigrationStatus
+impl core::marker::Unpin for dsl_migrate::reporter::MigrationStatus
+impl core::marker::UnsafeUnpin for dsl_migrate::reporter::MigrationStatus
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::reporter::MigrationStatus
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::reporter::MigrationStatus
+impl<T, U> core::convert::Into<U> for dsl_migrate::reporter::MigrationStatus where U: core::convert::From<T>
+pub fn dsl_migrate::reporter::MigrationStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::reporter::MigrationStatus where U: core::convert::Into<T>
+pub type dsl_migrate::reporter::MigrationStatus::Error = core::convert::Infallible
+pub fn dsl_migrate::reporter::MigrationStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::reporter::MigrationStatus where U: core::convert::TryFrom<T>
+pub type dsl_migrate::reporter::MigrationStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::reporter::MigrationStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::reporter::MigrationStatus where T: core::clone::Clone
+pub type dsl_migrate::reporter::MigrationStatus::Owned = T
+pub fn dsl_migrate::reporter::MigrationStatus::clone_into(&self, &mut T)
+pub fn dsl_migrate::reporter::MigrationStatus::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::reporter::MigrationStatus where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::reporter::MigrationStatus where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::reporter::MigrationStatus where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::reporter::MigrationStatus where T: core::clone::Clone
+pub unsafe fn dsl_migrate::reporter::MigrationStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::from(T) -> T
+pub struct dsl_migrate::reporter::CoverageReport
+pub dsl_migrate::reporter::CoverageReport::clean: usize
+pub dsl_migrate::reporter::CoverageReport::elements: alloc::vec::Vec<dsl_migrate::reporter::MigrationElement>
+pub dsl_migrate::reporter::CoverageReport::human_resolve: usize
+pub dsl_migrate::reporter::CoverageReport::rejected: usize
+pub dsl_migrate::reporter::CoverageReport::skipped: usize
+pub dsl_migrate::reporter::CoverageReport::total: usize
+impl dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::from_elements(alloc::vec::Vec<dsl_migrate::reporter::MigrationElement>) -> Self
+pub fn dsl_migrate::reporter::CoverageReport::summary(&self) -> alloc::string::String
+impl core::fmt::Debug for dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_migrate::reporter::CoverageReport
+impl core::marker::Send for dsl_migrate::reporter::CoverageReport
+impl core::marker::Sync for dsl_migrate::reporter::CoverageReport
+impl core::marker::Unpin for dsl_migrate::reporter::CoverageReport
+impl core::marker::UnsafeUnpin for dsl_migrate::reporter::CoverageReport
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::reporter::CoverageReport
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::reporter::CoverageReport
+impl<T, U> core::convert::Into<U> for dsl_migrate::reporter::CoverageReport where U: core::convert::From<T>
+pub fn dsl_migrate::reporter::CoverageReport::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::reporter::CoverageReport where U: core::convert::Into<T>
+pub type dsl_migrate::reporter::CoverageReport::Error = core::convert::Infallible
+pub fn dsl_migrate::reporter::CoverageReport::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::reporter::CoverageReport where U: core::convert::TryFrom<T>
+pub type dsl_migrate::reporter::CoverageReport::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::reporter::CoverageReport::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_migrate::reporter::CoverageReport where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::reporter::CoverageReport::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::reporter::CoverageReport where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::CoverageReport::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::reporter::CoverageReport where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::CoverageReport::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::from(T) -> T
+pub struct dsl_migrate::reporter::MigrationElement
+pub dsl_migrate::reporter::MigrationElement::element_id: alloc::string::String
+pub dsl_migrate::reporter::MigrationElement::element_name: core::option::Option<alloc::string::String>
+pub dsl_migrate::reporter::MigrationElement::element_type: alloc::string::String
+pub dsl_migrate::reporter::MigrationElement::note: core::option::Option<alloc::string::String>
+pub dsl_migrate::reporter::MigrationElement::status: dsl_migrate::reporter::MigrationStatus
+impl dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::clean(&str, core::option::Option<&str>, &str) -> Self
+pub fn dsl_migrate::reporter::MigrationElement::human_resolve(&str, core::option::Option<&str>, &str, &str) -> Self
+pub fn dsl_migrate::reporter::MigrationElement::rejected(&str, core::option::Option<&str>, &str, &str) -> Self
+pub fn dsl_migrate::reporter::MigrationElement::skip(&str) -> Self
+impl core::clone::Clone for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::clone(&self) -> dsl_migrate::reporter::MigrationElement
+impl core::fmt::Debug for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_migrate::reporter::MigrationElement
+impl core::marker::Send for dsl_migrate::reporter::MigrationElement
+impl core::marker::Sync for dsl_migrate::reporter::MigrationElement
+impl core::marker::Unpin for dsl_migrate::reporter::MigrationElement
+impl core::marker::UnsafeUnpin for dsl_migrate::reporter::MigrationElement
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::reporter::MigrationElement
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::reporter::MigrationElement
+impl<T, U> core::convert::Into<U> for dsl_migrate::reporter::MigrationElement where U: core::convert::From<T>
+pub fn dsl_migrate::reporter::MigrationElement::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::reporter::MigrationElement where U: core::convert::Into<T>
+pub type dsl_migrate::reporter::MigrationElement::Error = core::convert::Infallible
+pub fn dsl_migrate::reporter::MigrationElement::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::reporter::MigrationElement where U: core::convert::TryFrom<T>
+pub type dsl_migrate::reporter::MigrationElement::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::reporter::MigrationElement::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::reporter::MigrationElement where T: core::clone::Clone
+pub type dsl_migrate::reporter::MigrationElement::Owned = T
+pub fn dsl_migrate::reporter::MigrationElement::clone_into(&self, &mut T)
+pub fn dsl_migrate::reporter::MigrationElement::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::reporter::MigrationElement where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationElement::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::reporter::MigrationElement where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationElement::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::reporter::MigrationElement where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationElement::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::reporter::MigrationElement where T: core::clone::Clone
+pub unsafe fn dsl_migrate::reporter::MigrationElement::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::from(T) -> T
+pub mod dsl_migrate::verb_resolver
+pub fn dsl_migrate::verb_resolver::resolve_verb(&str) -> core::option::Option<alloc::string::String>
+pub mod dsl_migrate::xml_reader
+pub enum dsl_migrate::xml_reader::BpmnElement
+pub dsl_migrate::xml_reader::BpmnElement::BoundaryEvent(dsl_migrate::xml_reader::BpmnBoundaryEvent)
+pub dsl_migrate::xml_reader::BpmnElement::EndEvent(dsl_migrate::xml_reader::BpmnEvent)
+pub dsl_migrate::xml_reader::BpmnElement::Gateway(dsl_migrate::xml_reader::BpmnGateway)
+pub dsl_migrate::xml_reader::BpmnElement::IntermediateCatchEvent(dsl_migrate::xml_reader::BpmnEvent)
+pub dsl_migrate::xml_reader::BpmnElement::IntermediateThrowEvent(dsl_migrate::xml_reader::BpmnEvent)
+pub dsl_migrate::xml_reader::BpmnElement::StartEvent(dsl_migrate::xml_reader::BpmnEvent)
+pub dsl_migrate::xml_reader::BpmnElement::SubProcess(dsl_migrate::xml_reader::BpmnSubProcess)
+pub dsl_migrate::xml_reader::BpmnElement::Task(dsl_migrate::xml_reader::BpmnTask)
+pub dsl_migrate::xml_reader::BpmnElement::Unknown
+pub dsl_migrate::xml_reader::BpmnElement::Unknown::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnElement::Unknown::name: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnElement::Unknown::tag: alloc::string::String
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnElement
+pub fn dsl_migrate::xml_reader::BpmnElement::clone(&self) -> dsl_migrate::xml_reader::BpmnElement
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnElement
+pub fn dsl_migrate::xml_reader::BpmnElement::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnElement
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnElement
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnElement
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnElement
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnElement
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnElement
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnElement
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnElement where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnElement::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnElement where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnElement::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnElement::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnElement where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnElement::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnElement::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnElement where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnElement::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnElement::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnElement::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnElement where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnElement::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnElement where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnElement::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnElement where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnElement::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnElement where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnElement::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnElement
+pub fn dsl_migrate::xml_reader::BpmnElement::from(T) -> T
+pub enum dsl_migrate::xml_reader::EventType
+pub dsl_migrate::xml_reader::EventType::Compensation
+pub dsl_migrate::xml_reader::EventType::Error
+pub dsl_migrate::xml_reader::EventType::Error::error_ref: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::EventType::Escalation
+pub dsl_migrate::xml_reader::EventType::Escalation::escalation_ref: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::EventType::Link
+pub dsl_migrate::xml_reader::EventType::Link::link_name: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::EventType::Message
+pub dsl_migrate::xml_reader::EventType::Message::message_ref: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::EventType::None
+pub dsl_migrate::xml_reader::EventType::Signal
+pub dsl_migrate::xml_reader::EventType::Signal::signal_ref: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::EventType::Terminate
+pub dsl_migrate::xml_reader::EventType::Timer
+pub dsl_migrate::xml_reader::EventType::Timer::timer_def: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_migrate::xml_reader::EventType
+pub fn dsl_migrate::xml_reader::EventType::clone(&self) -> dsl_migrate::xml_reader::EventType
+impl core::fmt::Debug for dsl_migrate::xml_reader::EventType
+pub fn dsl_migrate::xml_reader::EventType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::EventType
+impl core::marker::Send for dsl_migrate::xml_reader::EventType
+impl core::marker::Sync for dsl_migrate::xml_reader::EventType
+impl core::marker::Unpin for dsl_migrate::xml_reader::EventType
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::EventType
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::EventType
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::EventType
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::EventType where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::EventType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::EventType where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::EventType::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::EventType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::EventType where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::EventType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::EventType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::EventType where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::EventType::Owned = T
+pub fn dsl_migrate::xml_reader::EventType::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::EventType::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::EventType where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::EventType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::EventType where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::EventType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::EventType where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::EventType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::EventType where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::EventType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::EventType
+pub fn dsl_migrate::xml_reader::EventType::from(T) -> T
+pub enum dsl_migrate::xml_reader::GatewayType
+pub dsl_migrate::xml_reader::GatewayType::Complex
+pub dsl_migrate::xml_reader::GatewayType::EventBased
+pub dsl_migrate::xml_reader::GatewayType::Exclusive
+pub dsl_migrate::xml_reader::GatewayType::Inclusive
+pub dsl_migrate::xml_reader::GatewayType::Parallel
+impl core::clone::Clone for dsl_migrate::xml_reader::GatewayType
+pub fn dsl_migrate::xml_reader::GatewayType::clone(&self) -> dsl_migrate::xml_reader::GatewayType
+impl core::fmt::Debug for dsl_migrate::xml_reader::GatewayType
+pub fn dsl_migrate::xml_reader::GatewayType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::GatewayType
+impl core::marker::Send for dsl_migrate::xml_reader::GatewayType
+impl core::marker::Sync for dsl_migrate::xml_reader::GatewayType
+impl core::marker::Unpin for dsl_migrate::xml_reader::GatewayType
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::GatewayType
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::GatewayType
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::GatewayType
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::GatewayType where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::GatewayType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::GatewayType where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::GatewayType::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::GatewayType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::GatewayType where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::GatewayType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::GatewayType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::GatewayType where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::GatewayType::Owned = T
+pub fn dsl_migrate::xml_reader::GatewayType::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::GatewayType::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::GatewayType where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::GatewayType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::GatewayType where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::GatewayType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::GatewayType where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::GatewayType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::GatewayType where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::GatewayType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::GatewayType
+pub fn dsl_migrate::xml_reader::GatewayType::from(T) -> T
+pub enum dsl_migrate::xml_reader::TaskType
+pub dsl_migrate::xml_reader::TaskType::BusinessRule
+pub dsl_migrate::xml_reader::TaskType::CallActivity
+pub dsl_migrate::xml_reader::TaskType::Manual
+pub dsl_migrate::xml_reader::TaskType::Receive
+pub dsl_migrate::xml_reader::TaskType::Script
+pub dsl_migrate::xml_reader::TaskType::Send
+pub dsl_migrate::xml_reader::TaskType::Service
+pub dsl_migrate::xml_reader::TaskType::User
+impl core::clone::Clone for dsl_migrate::xml_reader::TaskType
+pub fn dsl_migrate::xml_reader::TaskType::clone(&self) -> dsl_migrate::xml_reader::TaskType
+impl core::fmt::Debug for dsl_migrate::xml_reader::TaskType
+pub fn dsl_migrate::xml_reader::TaskType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::TaskType
+impl core::marker::Send for dsl_migrate::xml_reader::TaskType
+impl core::marker::Sync for dsl_migrate::xml_reader::TaskType
+impl core::marker::Unpin for dsl_migrate::xml_reader::TaskType
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::TaskType
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::TaskType
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::TaskType
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::TaskType where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::TaskType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::TaskType where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::TaskType::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::TaskType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::TaskType where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::TaskType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::TaskType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::TaskType where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::TaskType::Owned = T
+pub fn dsl_migrate::xml_reader::TaskType::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::TaskType::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::TaskType where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::TaskType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::TaskType where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::TaskType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::TaskType where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::TaskType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::TaskType where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::TaskType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::TaskType
+pub fn dsl_migrate::xml_reader::TaskType::from(T) -> T
+pub struct dsl_migrate::xml_reader::BpmnBoundaryEvent
+pub dsl_migrate::xml_reader::BpmnBoundaryEvent::attached_to_ref: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnBoundaryEvent::cancel_activity: bool
+pub dsl_migrate::xml_reader::BpmnBoundaryEvent::event_type: dsl_migrate::xml_reader::EventType
+pub dsl_migrate::xml_reader::BpmnBoundaryEvent::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnBoundaryEvent::name: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnBoundaryEvent
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::clone(&self) -> dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnBoundaryEvent
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnBoundaryEvent
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnBoundaryEvent where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnBoundaryEvent where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnBoundaryEvent::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnBoundaryEvent where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnBoundaryEvent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnBoundaryEvent where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnBoundaryEvent::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnBoundaryEvent where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnBoundaryEvent where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnBoundaryEvent where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnBoundaryEvent where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnBoundaryEvent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnBoundaryEvent
+pub fn dsl_migrate::xml_reader::BpmnBoundaryEvent::from(T) -> T
+pub struct dsl_migrate::xml_reader::BpmnEvent
+pub dsl_migrate::xml_reader::BpmnEvent::event_type: dsl_migrate::xml_reader::EventType
+pub dsl_migrate::xml_reader::BpmnEvent::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnEvent::name: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnEvent
+pub fn dsl_migrate::xml_reader::BpmnEvent::clone(&self) -> dsl_migrate::xml_reader::BpmnEvent
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnEvent
+pub fn dsl_migrate::xml_reader::BpmnEvent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnEvent
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnEvent
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnEvent
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnEvent
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnEvent
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnEvent
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnEvent
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnEvent where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnEvent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnEvent where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnEvent::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnEvent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnEvent where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnEvent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnEvent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnEvent where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnEvent::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnEvent::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnEvent::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnEvent where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnEvent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnEvent where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnEvent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnEvent where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnEvent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnEvent where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnEvent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnEvent
+pub fn dsl_migrate::xml_reader::BpmnEvent::from(T) -> T
+pub struct dsl_migrate::xml_reader::BpmnGateway
+pub dsl_migrate::xml_reader::BpmnGateway::gateway_type: dsl_migrate::xml_reader::GatewayType
+pub dsl_migrate::xml_reader::BpmnGateway::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnGateway::name: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnGateway
+pub fn dsl_migrate::xml_reader::BpmnGateway::clone(&self) -> dsl_migrate::xml_reader::BpmnGateway
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnGateway
+pub fn dsl_migrate::xml_reader::BpmnGateway::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnGateway
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnGateway
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnGateway
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnGateway
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnGateway
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnGateway
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnGateway
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnGateway where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnGateway::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnGateway where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnGateway::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnGateway::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnGateway where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnGateway::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnGateway::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnGateway where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnGateway::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnGateway::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnGateway::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnGateway where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnGateway::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnGateway where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnGateway::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnGateway where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnGateway::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnGateway where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnGateway::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnGateway
+pub fn dsl_migrate::xml_reader::BpmnGateway::from(T) -> T
+pub struct dsl_migrate::xml_reader::BpmnProcess
+pub dsl_migrate::xml_reader::BpmnProcess::elements: alloc::vec::Vec<dsl_migrate::xml_reader::BpmnElement>
+pub dsl_migrate::xml_reader::BpmnProcess::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnProcess::name: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnProcess::sequence_flows: alloc::vec::Vec<dsl_migrate::xml_reader::SequenceFlow>
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnProcess
+pub fn dsl_migrate::xml_reader::BpmnProcess::clone(&self) -> dsl_migrate::xml_reader::BpmnProcess
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnProcess
+pub fn dsl_migrate::xml_reader::BpmnProcess::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnProcess
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnProcess
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnProcess
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnProcess where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnProcess::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnProcess where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnProcess::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnProcess::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnProcess where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnProcess::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnProcess::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnProcess where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnProcess::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnProcess::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnProcess::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnProcess where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnProcess::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnProcess where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnProcess::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnProcess where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnProcess::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnProcess where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnProcess::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnProcess
+pub fn dsl_migrate::xml_reader::BpmnProcess::from(T) -> T
+pub struct dsl_migrate::xml_reader::BpmnSubProcess
+pub dsl_migrate::xml_reader::BpmnSubProcess::elements: alloc::vec::Vec<dsl_migrate::xml_reader::BpmnElement>
+pub dsl_migrate::xml_reader::BpmnSubProcess::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnSubProcess::is_event_subprocess: bool
+pub dsl_migrate::xml_reader::BpmnSubProcess::name: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnSubProcess::sequence_flows: alloc::vec::Vec<dsl_migrate::xml_reader::SequenceFlow>
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnSubProcess
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::clone(&self) -> dsl_migrate::xml_reader::BpmnSubProcess
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnSubProcess
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnSubProcess
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnSubProcess
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnSubProcess
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnSubProcess
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnSubProcess
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnSubProcess
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnSubProcess
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnSubProcess where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnSubProcess where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnSubProcess::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnSubProcess where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnSubProcess::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnSubProcess where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnSubProcess::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnSubProcess where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnSubProcess where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnSubProcess where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnSubProcess where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnSubProcess::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnSubProcess
+pub fn dsl_migrate::xml_reader::BpmnSubProcess::from(T) -> T
+pub struct dsl_migrate::xml_reader::BpmnTask
+pub dsl_migrate::xml_reader::BpmnTask::assignee: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnTask::camunda_props: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnTask::form_key: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnTask::id: alloc::string::String
+pub dsl_migrate::xml_reader::BpmnTask::implementation: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnTask::name: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::BpmnTask::task_type: dsl_migrate::xml_reader::TaskType
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnTask
+pub fn dsl_migrate::xml_reader::BpmnTask::clone(&self) -> dsl_migrate::xml_reader::BpmnTask
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnTask
+pub fn dsl_migrate::xml_reader::BpmnTask::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnTask
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnTask
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnTask
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnTask
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnTask
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnTask
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnTask
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnTask where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnTask::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnTask where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnTask::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnTask::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnTask where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnTask::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnTask::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnTask where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnTask::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnTask::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnTask::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnTask where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnTask::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnTask where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnTask::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnTask where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnTask::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnTask where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnTask::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnTask
+pub fn dsl_migrate::xml_reader::BpmnTask::from(T) -> T
+pub struct dsl_migrate::xml_reader::SequenceFlow
+pub dsl_migrate::xml_reader::SequenceFlow::condition_expression: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::SequenceFlow::id: alloc::string::String
+pub dsl_migrate::xml_reader::SequenceFlow::name: core::option::Option<alloc::string::String>
+pub dsl_migrate::xml_reader::SequenceFlow::source_ref: alloc::string::String
+pub dsl_migrate::xml_reader::SequenceFlow::target_ref: alloc::string::String
+impl core::clone::Clone for dsl_migrate::xml_reader::SequenceFlow
+pub fn dsl_migrate::xml_reader::SequenceFlow::clone(&self) -> dsl_migrate::xml_reader::SequenceFlow
+impl core::fmt::Debug for dsl_migrate::xml_reader::SequenceFlow
+pub fn dsl_migrate::xml_reader::SequenceFlow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::SequenceFlow
+impl core::marker::Send for dsl_migrate::xml_reader::SequenceFlow
+impl core::marker::Sync for dsl_migrate::xml_reader::SequenceFlow
+impl core::marker::Unpin for dsl_migrate::xml_reader::SequenceFlow
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::SequenceFlow
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::SequenceFlow
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::SequenceFlow
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::SequenceFlow where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::SequenceFlow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::SequenceFlow where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::SequenceFlow::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::SequenceFlow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::SequenceFlow where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::SequenceFlow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::SequenceFlow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::SequenceFlow where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::SequenceFlow::Owned = T
+pub fn dsl_migrate::xml_reader::SequenceFlow::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::SequenceFlow::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::SequenceFlow where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::SequenceFlow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::SequenceFlow where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::SequenceFlow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::SequenceFlow where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::SequenceFlow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::SequenceFlow where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::SequenceFlow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::SequenceFlow
+pub fn dsl_migrate::xml_reader::SequenceFlow::from(T) -> T
+pub fn dsl_migrate::xml_reader::parse_bpmn_xml(&str) -> anyhow::Result<dsl_migrate::xml_reader::BpmnProcess>
+pub enum dsl_migrate::MigrationStatus
+pub dsl_migrate::MigrationStatus::Clean
+pub dsl_migrate::MigrationStatus::HumanResolve
+pub dsl_migrate::MigrationStatus::Rejected
+pub dsl_migrate::MigrationStatus::Skipped
+impl core::clone::Clone for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::clone(&self) -> dsl_migrate::reporter::MigrationStatus
+impl core::cmp::PartialEq for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::eq(&self, &dsl_migrate::reporter::MigrationStatus) -> bool
+impl core::fmt::Debug for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_migrate::reporter::MigrationStatus
+impl serde_core::ser::Serialize for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_migrate::reporter::MigrationStatus
+impl core::marker::Send for dsl_migrate::reporter::MigrationStatus
+impl core::marker::Sync for dsl_migrate::reporter::MigrationStatus
+impl core::marker::Unpin for dsl_migrate::reporter::MigrationStatus
+impl core::marker::UnsafeUnpin for dsl_migrate::reporter::MigrationStatus
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::reporter::MigrationStatus
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::reporter::MigrationStatus
+impl<T, U> core::convert::Into<U> for dsl_migrate::reporter::MigrationStatus where U: core::convert::From<T>
+pub fn dsl_migrate::reporter::MigrationStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::reporter::MigrationStatus where U: core::convert::Into<T>
+pub type dsl_migrate::reporter::MigrationStatus::Error = core::convert::Infallible
+pub fn dsl_migrate::reporter::MigrationStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::reporter::MigrationStatus where U: core::convert::TryFrom<T>
+pub type dsl_migrate::reporter::MigrationStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::reporter::MigrationStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::reporter::MigrationStatus where T: core::clone::Clone
+pub type dsl_migrate::reporter::MigrationStatus::Owned = T
+pub fn dsl_migrate::reporter::MigrationStatus::clone_into(&self, &mut T)
+pub fn dsl_migrate::reporter::MigrationStatus::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::reporter::MigrationStatus where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::reporter::MigrationStatus where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::reporter::MigrationStatus where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::reporter::MigrationStatus where T: core::clone::Clone
+pub unsafe fn dsl_migrate::reporter::MigrationStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::reporter::MigrationStatus
+pub fn dsl_migrate::reporter::MigrationStatus::from(T) -> T
+pub struct dsl_migrate::BpmnProcess
+pub dsl_migrate::BpmnProcess::elements: alloc::vec::Vec<dsl_migrate::xml_reader::BpmnElement>
+pub dsl_migrate::BpmnProcess::id: alloc::string::String
+pub dsl_migrate::BpmnProcess::name: core::option::Option<alloc::string::String>
+pub dsl_migrate::BpmnProcess::sequence_flows: alloc::vec::Vec<dsl_migrate::xml_reader::SequenceFlow>
+impl core::clone::Clone for dsl_migrate::xml_reader::BpmnProcess
+pub fn dsl_migrate::xml_reader::BpmnProcess::clone(&self) -> dsl_migrate::xml_reader::BpmnProcess
+impl core::fmt::Debug for dsl_migrate::xml_reader::BpmnProcess
+pub fn dsl_migrate::xml_reader::BpmnProcess::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::Send for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::Sync for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::Unpin for dsl_migrate::xml_reader::BpmnProcess
+impl core::marker::UnsafeUnpin for dsl_migrate::xml_reader::BpmnProcess
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::xml_reader::BpmnProcess
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::xml_reader::BpmnProcess
+impl<T, U> core::convert::Into<U> for dsl_migrate::xml_reader::BpmnProcess where U: core::convert::From<T>
+pub fn dsl_migrate::xml_reader::BpmnProcess::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::xml_reader::BpmnProcess where U: core::convert::Into<T>
+pub type dsl_migrate::xml_reader::BpmnProcess::Error = core::convert::Infallible
+pub fn dsl_migrate::xml_reader::BpmnProcess::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::xml_reader::BpmnProcess where U: core::convert::TryFrom<T>
+pub type dsl_migrate::xml_reader::BpmnProcess::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::xml_reader::BpmnProcess::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::xml_reader::BpmnProcess where T: core::clone::Clone
+pub type dsl_migrate::xml_reader::BpmnProcess::Owned = T
+pub fn dsl_migrate::xml_reader::BpmnProcess::clone_into(&self, &mut T)
+pub fn dsl_migrate::xml_reader::BpmnProcess::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::xml_reader::BpmnProcess where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnProcess::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::xml_reader::BpmnProcess where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnProcess::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::xml_reader::BpmnProcess where T: ?core::marker::Sized
+pub fn dsl_migrate::xml_reader::BpmnProcess::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::xml_reader::BpmnProcess where T: core::clone::Clone
+pub unsafe fn dsl_migrate::xml_reader::BpmnProcess::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::xml_reader::BpmnProcess
+pub fn dsl_migrate::xml_reader::BpmnProcess::from(T) -> T
+pub struct dsl_migrate::CoverageReport
+pub dsl_migrate::CoverageReport::clean: usize
+pub dsl_migrate::CoverageReport::elements: alloc::vec::Vec<dsl_migrate::reporter::MigrationElement>
+pub dsl_migrate::CoverageReport::human_resolve: usize
+pub dsl_migrate::CoverageReport::rejected: usize
+pub dsl_migrate::CoverageReport::skipped: usize
+pub dsl_migrate::CoverageReport::total: usize
+impl dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::from_elements(alloc::vec::Vec<dsl_migrate::reporter::MigrationElement>) -> Self
+pub fn dsl_migrate::reporter::CoverageReport::summary(&self) -> alloc::string::String
+impl core::fmt::Debug for dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_migrate::reporter::CoverageReport
+impl core::marker::Send for dsl_migrate::reporter::CoverageReport
+impl core::marker::Sync for dsl_migrate::reporter::CoverageReport
+impl core::marker::Unpin for dsl_migrate::reporter::CoverageReport
+impl core::marker::UnsafeUnpin for dsl_migrate::reporter::CoverageReport
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::reporter::CoverageReport
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::reporter::CoverageReport
+impl<T, U> core::convert::Into<U> for dsl_migrate::reporter::CoverageReport where U: core::convert::From<T>
+pub fn dsl_migrate::reporter::CoverageReport::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::reporter::CoverageReport where U: core::convert::Into<T>
+pub type dsl_migrate::reporter::CoverageReport::Error = core::convert::Infallible
+pub fn dsl_migrate::reporter::CoverageReport::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::reporter::CoverageReport where U: core::convert::TryFrom<T>
+pub type dsl_migrate::reporter::CoverageReport::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::reporter::CoverageReport::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_migrate::reporter::CoverageReport where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::reporter::CoverageReport::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::reporter::CoverageReport where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::CoverageReport::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::reporter::CoverageReport where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::CoverageReport::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_migrate::reporter::CoverageReport
+pub fn dsl_migrate::reporter::CoverageReport::from(T) -> T
+pub struct dsl_migrate::MigrationElement
+pub dsl_migrate::MigrationElement::element_id: alloc::string::String
+pub dsl_migrate::MigrationElement::element_name: core::option::Option<alloc::string::String>
+pub dsl_migrate::MigrationElement::element_type: alloc::string::String
+pub dsl_migrate::MigrationElement::note: core::option::Option<alloc::string::String>
+pub dsl_migrate::MigrationElement::status: dsl_migrate::reporter::MigrationStatus
+impl dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::clean(&str, core::option::Option<&str>, &str) -> Self
+pub fn dsl_migrate::reporter::MigrationElement::human_resolve(&str, core::option::Option<&str>, &str, &str) -> Self
+pub fn dsl_migrate::reporter::MigrationElement::rejected(&str, core::option::Option<&str>, &str, &str) -> Self
+pub fn dsl_migrate::reporter::MigrationElement::skip(&str) -> Self
+impl core::clone::Clone for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::clone(&self) -> dsl_migrate::reporter::MigrationElement
+impl core::fmt::Debug for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_migrate::reporter::MigrationElement
+impl core::marker::Send for dsl_migrate::reporter::MigrationElement
+impl core::marker::Sync for dsl_migrate::reporter::MigrationElement
+impl core::marker::Unpin for dsl_migrate::reporter::MigrationElement
+impl core::marker::UnsafeUnpin for dsl_migrate::reporter::MigrationElement
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::reporter::MigrationElement
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::reporter::MigrationElement
+impl<T, U> core::convert::Into<U> for dsl_migrate::reporter::MigrationElement where U: core::convert::From<T>
+pub fn dsl_migrate::reporter::MigrationElement::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::reporter::MigrationElement where U: core::convert::Into<T>
+pub type dsl_migrate::reporter::MigrationElement::Error = core::convert::Infallible
+pub fn dsl_migrate::reporter::MigrationElement::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::reporter::MigrationElement where U: core::convert::TryFrom<T>
+pub type dsl_migrate::reporter::MigrationElement::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::reporter::MigrationElement::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_migrate::reporter::MigrationElement where T: core::clone::Clone
+pub type dsl_migrate::reporter::MigrationElement::Owned = T
+pub fn dsl_migrate::reporter::MigrationElement::clone_into(&self, &mut T)
+pub fn dsl_migrate::reporter::MigrationElement::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_migrate::reporter::MigrationElement where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationElement::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::reporter::MigrationElement where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationElement::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::reporter::MigrationElement where T: ?core::marker::Sized
+pub fn dsl_migrate::reporter::MigrationElement::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_migrate::reporter::MigrationElement where T: core::clone::Clone
+pub unsafe fn dsl_migrate::reporter::MigrationElement::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_migrate::reporter::MigrationElement
+pub fn dsl_migrate::reporter::MigrationElement::from(T) -> T
+pub struct dsl_migrate::MigrationResult
+pub dsl_migrate::MigrationResult::coverage: dsl_migrate::reporter::CoverageReport
+pub dsl_migrate::MigrationResult::dsl_source: alloc::string::String
+pub dsl_migrate::MigrationResult::process_name: alloc::string::String
+impl core::marker::Freeze for dsl_migrate::emitter::MigrationResult
+impl core::marker::Send for dsl_migrate::emitter::MigrationResult
+impl core::marker::Sync for dsl_migrate::emitter::MigrationResult
+impl core::marker::Unpin for dsl_migrate::emitter::MigrationResult
+impl core::marker::UnsafeUnpin for dsl_migrate::emitter::MigrationResult
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_migrate::emitter::MigrationResult
+impl core::panic::unwind_safe::UnwindSafe for dsl_migrate::emitter::MigrationResult
+impl<T, U> core::convert::Into<U> for dsl_migrate::emitter::MigrationResult where U: core::convert::From<T>
+pub fn dsl_migrate::emitter::MigrationResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_migrate::emitter::MigrationResult where U: core::convert::Into<T>
+pub type dsl_migrate::emitter::MigrationResult::Error = core::convert::Infallible
+pub fn dsl_migrate::emitter::MigrationResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_migrate::emitter::MigrationResult where U: core::convert::TryFrom<T>
+pub type dsl_migrate::emitter::MigrationResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_migrate::emitter::MigrationResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_migrate::emitter::MigrationResult where T: 'static + ?core::marker::Sized
+pub fn dsl_migrate::emitter::MigrationResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_migrate::emitter::MigrationResult where T: ?core::marker::Sized
+pub fn dsl_migrate::emitter::MigrationResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_migrate::emitter::MigrationResult where T: ?core::marker::Sized
+pub fn dsl_migrate::emitter::MigrationResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_migrate::emitter::MigrationResult
+pub fn dsl_migrate::emitter::MigrationResult::from(T) -> T
+pub fn dsl_migrate::emit(&dsl_migrate::xml_reader::BpmnProcess) -> dsl_migrate::emitter::MigrationResult
+pub fn dsl_migrate::parse_bpmn_xml(&str) -> anyhow::Result<dsl_migrate::xml_reader::BpmnProcess>

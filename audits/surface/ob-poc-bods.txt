@@ -1,0 +1,638 @@
+# ob-poc-bods | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:40:35Z
+pub mod ob_poc_bods
+pub struct ob_poc_bods::BodsEntityType
+pub ob_poc_bods::BodsEntityType::bods_standard: core::option::Option<bool>
+pub ob_poc_bods::BodsEntityType::description: core::option::Option<alloc::string::String>
+pub ob_poc_bods::BodsEntityType::display_name: alloc::string::String
+pub ob_poc_bods::BodsEntityType::display_order: core::option::Option<i32>
+pub ob_poc_bods::BodsEntityType::type_code: alloc::string::String
+impl core::clone::Clone for ob_poc_bods::BodsEntityType
+pub fn ob_poc_bods::BodsEntityType::clone(&self) -> ob_poc_bods::BodsEntityType
+impl core::fmt::Debug for ob_poc_bods::BodsEntityType
+pub fn ob_poc_bods::BodsEntityType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::BodsEntityType
+pub fn ob_poc_bods::BodsEntityType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::BodsEntityType where &'a str: sqlx_core::column::ColumnIndex<R>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<bool>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<i32>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::BodsEntityType::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::BodsEntityType
+pub fn ob_poc_bods::BodsEntityType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::BodsEntityType
+impl core::marker::Send for ob_poc_bods::BodsEntityType
+impl core::marker::Sync for ob_poc_bods::BodsEntityType
+impl core::marker::Unpin for ob_poc_bods::BodsEntityType
+impl core::marker::UnsafeUnpin for ob_poc_bods::BodsEntityType
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::BodsEntityType
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::BodsEntityType
+impl<T, U> core::convert::Into<U> for ob_poc_bods::BodsEntityType where U: core::convert::From<T>
+pub fn ob_poc_bods::BodsEntityType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::BodsEntityType where U: core::convert::Into<T>
+pub type ob_poc_bods::BodsEntityType::Error = core::convert::Infallible
+pub fn ob_poc_bods::BodsEntityType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::BodsEntityType where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::BodsEntityType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::BodsEntityType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::BodsEntityType where T: core::clone::Clone
+pub type ob_poc_bods::BodsEntityType::Owned = T
+pub fn ob_poc_bods::BodsEntityType::clone_into(&self, &mut T)
+pub fn ob_poc_bods::BodsEntityType::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::BodsEntityType where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::BodsEntityType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::BodsEntityType where T: ?core::marker::Sized
+pub fn ob_poc_bods::BodsEntityType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::BodsEntityType where T: ?core::marker::Sized
+pub fn ob_poc_bods::BodsEntityType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::BodsEntityType where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::BodsEntityType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::BodsEntityType
+pub fn ob_poc_bods::BodsEntityType::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::BodsEntityType
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::BodsEntityType where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::BodsEntityType
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::BodsEntityType
+impl<T> typenum::type_operators::Same for ob_poc_bods::BodsEntityType
+pub type ob_poc_bods::BodsEntityType::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::BodsEntityType where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::BodsEntityType::vzip(self) -> V
+pub struct ob_poc_bods::BodsInterestType
+pub ob_poc_bods::BodsInterestType::bods_standard: core::option::Option<bool>
+pub ob_poc_bods::BodsInterestType::category: alloc::string::String
+pub ob_poc_bods::BodsInterestType::description: core::option::Option<alloc::string::String>
+pub ob_poc_bods::BodsInterestType::display_name: alloc::string::String
+pub ob_poc_bods::BodsInterestType::display_order: core::option::Option<i32>
+pub ob_poc_bods::BodsInterestType::requires_percentage: core::option::Option<bool>
+pub ob_poc_bods::BodsInterestType::type_code: alloc::string::String
+impl core::clone::Clone for ob_poc_bods::BodsInterestType
+pub fn ob_poc_bods::BodsInterestType::clone(&self) -> ob_poc_bods::BodsInterestType
+impl core::fmt::Debug for ob_poc_bods::BodsInterestType
+pub fn ob_poc_bods::BodsInterestType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::BodsInterestType
+pub fn ob_poc_bods::BodsInterestType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::BodsInterestType where &'a str: sqlx_core::column::ColumnIndex<R>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<bool>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<i32>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::BodsInterestType::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::BodsInterestType
+pub fn ob_poc_bods::BodsInterestType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::BodsInterestType
+impl core::marker::Send for ob_poc_bods::BodsInterestType
+impl core::marker::Sync for ob_poc_bods::BodsInterestType
+impl core::marker::Unpin for ob_poc_bods::BodsInterestType
+impl core::marker::UnsafeUnpin for ob_poc_bods::BodsInterestType
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::BodsInterestType
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::BodsInterestType
+impl<T, U> core::convert::Into<U> for ob_poc_bods::BodsInterestType where U: core::convert::From<T>
+pub fn ob_poc_bods::BodsInterestType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::BodsInterestType where U: core::convert::Into<T>
+pub type ob_poc_bods::BodsInterestType::Error = core::convert::Infallible
+pub fn ob_poc_bods::BodsInterestType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::BodsInterestType where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::BodsInterestType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::BodsInterestType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::BodsInterestType where T: core::clone::Clone
+pub type ob_poc_bods::BodsInterestType::Owned = T
+pub fn ob_poc_bods::BodsInterestType::clone_into(&self, &mut T)
+pub fn ob_poc_bods::BodsInterestType::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::BodsInterestType where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::BodsInterestType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::BodsInterestType where T: ?core::marker::Sized
+pub fn ob_poc_bods::BodsInterestType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::BodsInterestType where T: ?core::marker::Sized
+pub fn ob_poc_bods::BodsInterestType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::BodsInterestType where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::BodsInterestType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::BodsInterestType
+pub fn ob_poc_bods::BodsInterestType::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::BodsInterestType
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::BodsInterestType where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::BodsInterestType
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::BodsInterestType
+impl<T> typenum::type_operators::Same for ob_poc_bods::BodsInterestType
+pub type ob_poc_bods::BodsInterestType::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::BodsInterestType where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::BodsInterestType::vzip(self) -> V
+pub struct ob_poc_bods::EntityIdentifier
+pub ob_poc_bods::EntityIdentifier::created_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::EntityIdentifier::entity_id: uuid::Uuid
+pub ob_poc_bods::EntityIdentifier::identifier_id: uuid::Uuid
+pub ob_poc_bods::EntityIdentifier::identifier_type: alloc::string::String
+pub ob_poc_bods::EntityIdentifier::identifier_value: alloc::string::String
+pub ob_poc_bods::EntityIdentifier::is_primary: core::option::Option<bool>
+pub ob_poc_bods::EntityIdentifier::is_validated: core::option::Option<bool>
+pub ob_poc_bods::EntityIdentifier::issuing_authority: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityIdentifier::lei_initial_registration: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::EntityIdentifier::lei_last_update: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::EntityIdentifier::lei_managing_lou: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityIdentifier::lei_next_renewal: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::EntityIdentifier::lei_status: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityIdentifier::scheme_name: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityIdentifier::source: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityIdentifier::updated_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::EntityIdentifier::uri: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityIdentifier::valid_from: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::EntityIdentifier::valid_until: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::EntityIdentifier::validated_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::EntityIdentifier::validation_details: core::option::Option<serde_json::value::Value>
+pub ob_poc_bods::EntityIdentifier::validation_source: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_bods::EntityIdentifier
+pub fn ob_poc_bods::EntityIdentifier::clone(&self) -> ob_poc_bods::EntityIdentifier
+impl core::fmt::Debug for ob_poc_bods::EntityIdentifier
+pub fn ob_poc_bods::EntityIdentifier::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::EntityIdentifier
+pub fn ob_poc_bods::EntityIdentifier::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::EntityIdentifier where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<bool>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::naive::date::NaiveDate>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<serde_json::value::Value>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::EntityIdentifier::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::EntityIdentifier
+pub fn ob_poc_bods::EntityIdentifier::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::EntityIdentifier
+impl core::marker::Send for ob_poc_bods::EntityIdentifier
+impl core::marker::Sync for ob_poc_bods::EntityIdentifier
+impl core::marker::Unpin for ob_poc_bods::EntityIdentifier
+impl core::marker::UnsafeUnpin for ob_poc_bods::EntityIdentifier
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::EntityIdentifier
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::EntityIdentifier
+impl<T, U> core::convert::Into<U> for ob_poc_bods::EntityIdentifier where U: core::convert::From<T>
+pub fn ob_poc_bods::EntityIdentifier::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::EntityIdentifier where U: core::convert::Into<T>
+pub type ob_poc_bods::EntityIdentifier::Error = core::convert::Infallible
+pub fn ob_poc_bods::EntityIdentifier::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::EntityIdentifier where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::EntityIdentifier::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::EntityIdentifier::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::EntityIdentifier where T: core::clone::Clone
+pub type ob_poc_bods::EntityIdentifier::Owned = T
+pub fn ob_poc_bods::EntityIdentifier::clone_into(&self, &mut T)
+pub fn ob_poc_bods::EntityIdentifier::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::EntityIdentifier where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::EntityIdentifier::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::EntityIdentifier where T: ?core::marker::Sized
+pub fn ob_poc_bods::EntityIdentifier::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::EntityIdentifier where T: ?core::marker::Sized
+pub fn ob_poc_bods::EntityIdentifier::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::EntityIdentifier where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::EntityIdentifier::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::EntityIdentifier
+pub fn ob_poc_bods::EntityIdentifier::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::EntityIdentifier
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::EntityIdentifier where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::EntityIdentifier
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::EntityIdentifier
+impl<T> typenum::type_operators::Same for ob_poc_bods::EntityIdentifier
+pub type ob_poc_bods::EntityIdentifier::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::EntityIdentifier where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::EntityIdentifier::vzip(self) -> V
+pub struct ob_poc_bods::EntityWithLei
+pub ob_poc_bods::EntityWithLei::bods_entity_type: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityWithLei::entity_id: uuid::Uuid
+pub ob_poc_bods::EntityWithLei::entity_type_code: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityWithLei::lei: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityWithLei::lei_next_renewal: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::EntityWithLei::lei_status: core::option::Option<alloc::string::String>
+pub ob_poc_bods::EntityWithLei::lei_validated: core::option::Option<bool>
+pub ob_poc_bods::EntityWithLei::name: alloc::string::String
+impl core::clone::Clone for ob_poc_bods::EntityWithLei
+pub fn ob_poc_bods::EntityWithLei::clone(&self) -> ob_poc_bods::EntityWithLei
+impl core::fmt::Debug for ob_poc_bods::EntityWithLei
+pub fn ob_poc_bods::EntityWithLei::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::EntityWithLei
+pub fn ob_poc_bods::EntityWithLei::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::EntityWithLei where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::naive::date::NaiveDate>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<bool>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::EntityWithLei::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::EntityWithLei
+pub fn ob_poc_bods::EntityWithLei::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::EntityWithLei
+impl core::marker::Send for ob_poc_bods::EntityWithLei
+impl core::marker::Sync for ob_poc_bods::EntityWithLei
+impl core::marker::Unpin for ob_poc_bods::EntityWithLei
+impl core::marker::UnsafeUnpin for ob_poc_bods::EntityWithLei
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::EntityWithLei
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::EntityWithLei
+impl<T, U> core::convert::Into<U> for ob_poc_bods::EntityWithLei where U: core::convert::From<T>
+pub fn ob_poc_bods::EntityWithLei::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::EntityWithLei where U: core::convert::Into<T>
+pub type ob_poc_bods::EntityWithLei::Error = core::convert::Infallible
+pub fn ob_poc_bods::EntityWithLei::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::EntityWithLei where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::EntityWithLei::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::EntityWithLei::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::EntityWithLei where T: core::clone::Clone
+pub type ob_poc_bods::EntityWithLei::Owned = T
+pub fn ob_poc_bods::EntityWithLei::clone_into(&self, &mut T)
+pub fn ob_poc_bods::EntityWithLei::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::EntityWithLei where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::EntityWithLei::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::EntityWithLei where T: ?core::marker::Sized
+pub fn ob_poc_bods::EntityWithLei::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::EntityWithLei where T: ?core::marker::Sized
+pub fn ob_poc_bods::EntityWithLei::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::EntityWithLei where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::EntityWithLei::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::EntityWithLei
+pub fn ob_poc_bods::EntityWithLei::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::EntityWithLei
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::EntityWithLei where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::EntityWithLei
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::EntityWithLei
+impl<T> typenum::type_operators::Same for ob_poc_bods::EntityWithLei
+pub type ob_poc_bods::EntityWithLei::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::EntityWithLei where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::EntityWithLei::vzip(self) -> V
+pub struct ob_poc_bods::GleifHierarchyEntry
+pub ob_poc_bods::GleifHierarchyEntry::accounting_standard: core::option::Option<alloc::string::String>
+pub ob_poc_bods::GleifHierarchyEntry::child_entity_id: uuid::Uuid
+pub ob_poc_bods::GleifHierarchyEntry::child_lei: alloc::string::String
+pub ob_poc_bods::GleifHierarchyEntry::child_name: alloc::string::String
+pub ob_poc_bods::GleifHierarchyEntry::end_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::GleifHierarchyEntry::gleif_rel_id: uuid::Uuid
+pub ob_poc_bods::GleifHierarchyEntry::ownership_percentage: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_bods::GleifHierarchyEntry::parent_entity_id: uuid::Uuid
+pub ob_poc_bods::GleifHierarchyEntry::parent_lei: alloc::string::String
+pub ob_poc_bods::GleifHierarchyEntry::parent_name: alloc::string::String
+pub ob_poc_bods::GleifHierarchyEntry::relationship_status: core::option::Option<alloc::string::String>
+pub ob_poc_bods::GleifHierarchyEntry::relationship_type: alloc::string::String
+pub ob_poc_bods::GleifHierarchyEntry::start_date: core::option::Option<chrono::naive::date::NaiveDate>
+impl core::clone::Clone for ob_poc_bods::GleifHierarchyEntry
+pub fn ob_poc_bods::GleifHierarchyEntry::clone(&self) -> ob_poc_bods::GleifHierarchyEntry
+impl core::fmt::Debug for ob_poc_bods::GleifHierarchyEntry
+pub fn ob_poc_bods::GleifHierarchyEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::GleifHierarchyEntry
+pub fn ob_poc_bods::GleifHierarchyEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::GleifHierarchyEntry where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<rust_decimal::decimal::Decimal>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::naive::date::NaiveDate>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::GleifHierarchyEntry::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::GleifHierarchyEntry
+pub fn ob_poc_bods::GleifHierarchyEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::GleifHierarchyEntry
+impl core::marker::Send for ob_poc_bods::GleifHierarchyEntry
+impl core::marker::Sync for ob_poc_bods::GleifHierarchyEntry
+impl core::marker::Unpin for ob_poc_bods::GleifHierarchyEntry
+impl core::marker::UnsafeUnpin for ob_poc_bods::GleifHierarchyEntry
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::GleifHierarchyEntry
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::GleifHierarchyEntry
+impl<T, U> core::convert::Into<U> for ob_poc_bods::GleifHierarchyEntry where U: core::convert::From<T>
+pub fn ob_poc_bods::GleifHierarchyEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::GleifHierarchyEntry where U: core::convert::Into<T>
+pub type ob_poc_bods::GleifHierarchyEntry::Error = core::convert::Infallible
+pub fn ob_poc_bods::GleifHierarchyEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::GleifHierarchyEntry where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::GleifHierarchyEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::GleifHierarchyEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::GleifHierarchyEntry where T: core::clone::Clone
+pub type ob_poc_bods::GleifHierarchyEntry::Owned = T
+pub fn ob_poc_bods::GleifHierarchyEntry::clone_into(&self, &mut T)
+pub fn ob_poc_bods::GleifHierarchyEntry::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::GleifHierarchyEntry where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::GleifHierarchyEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::GleifHierarchyEntry where T: ?core::marker::Sized
+pub fn ob_poc_bods::GleifHierarchyEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::GleifHierarchyEntry where T: ?core::marker::Sized
+pub fn ob_poc_bods::GleifHierarchyEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::GleifHierarchyEntry where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::GleifHierarchyEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::GleifHierarchyEntry
+pub fn ob_poc_bods::GleifHierarchyEntry::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::GleifHierarchyEntry
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::GleifHierarchyEntry where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::GleifHierarchyEntry
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::GleifHierarchyEntry
+impl<T> typenum::type_operators::Same for ob_poc_bods::GleifHierarchyEntry
+pub type ob_poc_bods::GleifHierarchyEntry::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::GleifHierarchyEntry where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::GleifHierarchyEntry::vzip(self) -> V
+pub struct ob_poc_bods::GleifRelationship
+pub ob_poc_bods::GleifRelationship::accounting_standard: core::option::Option<alloc::string::String>
+pub ob_poc_bods::GleifRelationship::child_entity_id: uuid::Uuid
+pub ob_poc_bods::GleifRelationship::child_lei: alloc::string::String
+pub ob_poc_bods::GleifRelationship::created_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::GleifRelationship::end_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::GleifRelationship::fetched_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::GleifRelationship::gleif_record_id: core::option::Option<alloc::string::String>
+pub ob_poc_bods::GleifRelationship::gleif_rel_id: uuid::Uuid
+pub ob_poc_bods::GleifRelationship::ownership_percentage: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_bods::GleifRelationship::parent_entity_id: uuid::Uuid
+pub ob_poc_bods::GleifRelationship::parent_lei: alloc::string::String
+pub ob_poc_bods::GleifRelationship::relationship_status: core::option::Option<alloc::string::String>
+pub ob_poc_bods::GleifRelationship::relationship_type: alloc::string::String
+pub ob_poc_bods::GleifRelationship::start_date: core::option::Option<chrono::naive::date::NaiveDate>
+impl core::clone::Clone for ob_poc_bods::GleifRelationship
+pub fn ob_poc_bods::GleifRelationship::clone(&self) -> ob_poc_bods::GleifRelationship
+impl core::fmt::Debug for ob_poc_bods::GleifRelationship
+pub fn ob_poc_bods::GleifRelationship::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::GleifRelationship
+pub fn ob_poc_bods::GleifRelationship::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::GleifRelationship where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<rust_decimal::decimal::Decimal>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::naive::date::NaiveDate>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::GleifRelationship::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::GleifRelationship
+pub fn ob_poc_bods::GleifRelationship::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::GleifRelationship
+impl core::marker::Send for ob_poc_bods::GleifRelationship
+impl core::marker::Sync for ob_poc_bods::GleifRelationship
+impl core::marker::Unpin for ob_poc_bods::GleifRelationship
+impl core::marker::UnsafeUnpin for ob_poc_bods::GleifRelationship
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::GleifRelationship
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::GleifRelationship
+impl<T, U> core::convert::Into<U> for ob_poc_bods::GleifRelationship where U: core::convert::From<T>
+pub fn ob_poc_bods::GleifRelationship::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::GleifRelationship where U: core::convert::Into<T>
+pub type ob_poc_bods::GleifRelationship::Error = core::convert::Infallible
+pub fn ob_poc_bods::GleifRelationship::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::GleifRelationship where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::GleifRelationship::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::GleifRelationship::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::GleifRelationship where T: core::clone::Clone
+pub type ob_poc_bods::GleifRelationship::Owned = T
+pub fn ob_poc_bods::GleifRelationship::clone_into(&self, &mut T)
+pub fn ob_poc_bods::GleifRelationship::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::GleifRelationship where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::GleifRelationship::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::GleifRelationship where T: ?core::marker::Sized
+pub fn ob_poc_bods::GleifRelationship::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::GleifRelationship where T: ?core::marker::Sized
+pub fn ob_poc_bods::GleifRelationship::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::GleifRelationship where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::GleifRelationship::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::GleifRelationship
+pub fn ob_poc_bods::GleifRelationship::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::GleifRelationship
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::GleifRelationship where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::GleifRelationship
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::GleifRelationship
+impl<T> typenum::type_operators::Same for ob_poc_bods::GleifRelationship
+pub type ob_poc_bods::GleifRelationship::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::GleifRelationship where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::GleifRelationship::vzip(self) -> V
+pub struct ob_poc_bods::NewEntityIdentifier
+pub ob_poc_bods::NewEntityIdentifier::entity_id: uuid::Uuid
+pub ob_poc_bods::NewEntityIdentifier::identifier_type: alloc::string::String
+pub ob_poc_bods::NewEntityIdentifier::identifier_value: alloc::string::String
+pub ob_poc_bods::NewEntityIdentifier::is_primary: core::option::Option<bool>
+pub ob_poc_bods::NewEntityIdentifier::issuing_authority: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewEntityIdentifier::scheme_name: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewEntityIdentifier::source: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewEntityIdentifier::uri: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_bods::NewEntityIdentifier
+pub fn ob_poc_bods::NewEntityIdentifier::clone(&self) -> ob_poc_bods::NewEntityIdentifier
+impl core::fmt::Debug for ob_poc_bods::NewEntityIdentifier
+pub fn ob_poc_bods::NewEntityIdentifier::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_bods::NewEntityIdentifier
+impl core::marker::Send for ob_poc_bods::NewEntityIdentifier
+impl core::marker::Sync for ob_poc_bods::NewEntityIdentifier
+impl core::marker::Unpin for ob_poc_bods::NewEntityIdentifier
+impl core::marker::UnsafeUnpin for ob_poc_bods::NewEntityIdentifier
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::NewEntityIdentifier
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::NewEntityIdentifier
+impl<T, U> core::convert::Into<U> for ob_poc_bods::NewEntityIdentifier where U: core::convert::From<T>
+pub fn ob_poc_bods::NewEntityIdentifier::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::NewEntityIdentifier where U: core::convert::Into<T>
+pub type ob_poc_bods::NewEntityIdentifier::Error = core::convert::Infallible
+pub fn ob_poc_bods::NewEntityIdentifier::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::NewEntityIdentifier where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::NewEntityIdentifier::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::NewEntityIdentifier::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::NewEntityIdentifier where T: core::clone::Clone
+pub type ob_poc_bods::NewEntityIdentifier::Owned = T
+pub fn ob_poc_bods::NewEntityIdentifier::clone_into(&self, &mut T)
+pub fn ob_poc_bods::NewEntityIdentifier::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::NewEntityIdentifier where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::NewEntityIdentifier::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::NewEntityIdentifier where T: ?core::marker::Sized
+pub fn ob_poc_bods::NewEntityIdentifier::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::NewEntityIdentifier where T: ?core::marker::Sized
+pub fn ob_poc_bods::NewEntityIdentifier::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::NewEntityIdentifier where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::NewEntityIdentifier::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::NewEntityIdentifier
+pub fn ob_poc_bods::NewEntityIdentifier::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::NewEntityIdentifier
+impl<T> tracing::instrument::Instrument for ob_poc_bods::NewEntityIdentifier
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::NewEntityIdentifier
+impl<T> typenum::type_operators::Same for ob_poc_bods::NewEntityIdentifier
+pub type ob_poc_bods::NewEntityIdentifier::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::NewEntityIdentifier where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::NewEntityIdentifier::vzip(self) -> V
+pub struct ob_poc_bods::NewGleifRelationship
+pub ob_poc_bods::NewGleifRelationship::accounting_standard: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewGleifRelationship::child_entity_id: uuid::Uuid
+pub ob_poc_bods::NewGleifRelationship::child_lei: alloc::string::String
+pub ob_poc_bods::NewGleifRelationship::end_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::NewGleifRelationship::gleif_record_id: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewGleifRelationship::ownership_percentage: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_bods::NewGleifRelationship::parent_entity_id: uuid::Uuid
+pub ob_poc_bods::NewGleifRelationship::parent_lei: alloc::string::String
+pub ob_poc_bods::NewGleifRelationship::relationship_type: alloc::string::String
+pub ob_poc_bods::NewGleifRelationship::start_date: core::option::Option<chrono::naive::date::NaiveDate>
+impl core::clone::Clone for ob_poc_bods::NewGleifRelationship
+pub fn ob_poc_bods::NewGleifRelationship::clone(&self) -> ob_poc_bods::NewGleifRelationship
+impl core::fmt::Debug for ob_poc_bods::NewGleifRelationship
+pub fn ob_poc_bods::NewGleifRelationship::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_bods::NewGleifRelationship
+impl core::marker::Send for ob_poc_bods::NewGleifRelationship
+impl core::marker::Sync for ob_poc_bods::NewGleifRelationship
+impl core::marker::Unpin for ob_poc_bods::NewGleifRelationship
+impl core::marker::UnsafeUnpin for ob_poc_bods::NewGleifRelationship
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::NewGleifRelationship
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::NewGleifRelationship
+impl<T, U> core::convert::Into<U> for ob_poc_bods::NewGleifRelationship where U: core::convert::From<T>
+pub fn ob_poc_bods::NewGleifRelationship::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::NewGleifRelationship where U: core::convert::Into<T>
+pub type ob_poc_bods::NewGleifRelationship::Error = core::convert::Infallible
+pub fn ob_poc_bods::NewGleifRelationship::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::NewGleifRelationship where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::NewGleifRelationship::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::NewGleifRelationship::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::NewGleifRelationship where T: core::clone::Clone
+pub type ob_poc_bods::NewGleifRelationship::Owned = T
+pub fn ob_poc_bods::NewGleifRelationship::clone_into(&self, &mut T)
+pub fn ob_poc_bods::NewGleifRelationship::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::NewGleifRelationship where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::NewGleifRelationship::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::NewGleifRelationship where T: ?core::marker::Sized
+pub fn ob_poc_bods::NewGleifRelationship::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::NewGleifRelationship where T: ?core::marker::Sized
+pub fn ob_poc_bods::NewGleifRelationship::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::NewGleifRelationship where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::NewGleifRelationship::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::NewGleifRelationship
+pub fn ob_poc_bods::NewGleifRelationship::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::NewGleifRelationship
+impl<T> tracing::instrument::Instrument for ob_poc_bods::NewGleifRelationship
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::NewGleifRelationship
+impl<T> typenum::type_operators::Same for ob_poc_bods::NewGleifRelationship
+pub type ob_poc_bods::NewGleifRelationship::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::NewGleifRelationship where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::NewGleifRelationship::vzip(self) -> V
+pub struct ob_poc_bods::NewPersonPepStatus
+pub ob_poc_bods::NewPersonPepStatus::end_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::NewPersonPepStatus::jurisdiction: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewPersonPepStatus::person_entity_id: uuid::Uuid
+pub ob_poc_bods::NewPersonPepStatus::position_held: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewPersonPepStatus::position_level: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewPersonPepStatus::reason: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewPersonPepStatus::screening_id: core::option::Option<uuid::Uuid>
+pub ob_poc_bods::NewPersonPepStatus::source_type: core::option::Option<alloc::string::String>
+pub ob_poc_bods::NewPersonPepStatus::start_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::NewPersonPepStatus::status: alloc::string::String
+impl core::clone::Clone for ob_poc_bods::NewPersonPepStatus
+pub fn ob_poc_bods::NewPersonPepStatus::clone(&self) -> ob_poc_bods::NewPersonPepStatus
+impl core::fmt::Debug for ob_poc_bods::NewPersonPepStatus
+pub fn ob_poc_bods::NewPersonPepStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_bods::NewPersonPepStatus
+impl core::marker::Send for ob_poc_bods::NewPersonPepStatus
+impl core::marker::Sync for ob_poc_bods::NewPersonPepStatus
+impl core::marker::Unpin for ob_poc_bods::NewPersonPepStatus
+impl core::marker::UnsafeUnpin for ob_poc_bods::NewPersonPepStatus
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::NewPersonPepStatus
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::NewPersonPepStatus
+impl<T, U> core::convert::Into<U> for ob_poc_bods::NewPersonPepStatus where U: core::convert::From<T>
+pub fn ob_poc_bods::NewPersonPepStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::NewPersonPepStatus where U: core::convert::Into<T>
+pub type ob_poc_bods::NewPersonPepStatus::Error = core::convert::Infallible
+pub fn ob_poc_bods::NewPersonPepStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::NewPersonPepStatus where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::NewPersonPepStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::NewPersonPepStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::NewPersonPepStatus where T: core::clone::Clone
+pub type ob_poc_bods::NewPersonPepStatus::Owned = T
+pub fn ob_poc_bods::NewPersonPepStatus::clone_into(&self, &mut T)
+pub fn ob_poc_bods::NewPersonPepStatus::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::NewPersonPepStatus where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::NewPersonPepStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::NewPersonPepStatus where T: ?core::marker::Sized
+pub fn ob_poc_bods::NewPersonPepStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::NewPersonPepStatus where T: ?core::marker::Sized
+pub fn ob_poc_bods::NewPersonPepStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::NewPersonPepStatus where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::NewPersonPepStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::NewPersonPepStatus
+pub fn ob_poc_bods::NewPersonPepStatus::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::NewPersonPepStatus
+impl<T> tracing::instrument::Instrument for ob_poc_bods::NewPersonPepStatus
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::NewPersonPepStatus
+impl<T> typenum::type_operators::Same for ob_poc_bods::NewPersonPepStatus
+pub type ob_poc_bods::NewPersonPepStatus::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::NewPersonPepStatus where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::NewPersonPepStatus::vzip(self) -> V
+pub struct ob_poc_bods::PersonPepStatus
+pub ob_poc_bods::PersonPepStatus::created_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::PersonPepStatus::end_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::PersonPepStatus::jurisdiction: core::option::Option<alloc::string::String>
+pub ob_poc_bods::PersonPepStatus::pep_risk_level: core::option::Option<alloc::string::String>
+pub ob_poc_bods::PersonPepStatus::pep_status_id: uuid::Uuid
+pub ob_poc_bods::PersonPepStatus::person_entity_id: uuid::Uuid
+pub ob_poc_bods::PersonPepStatus::position_held: core::option::Option<alloc::string::String>
+pub ob_poc_bods::PersonPepStatus::position_level: core::option::Option<alloc::string::String>
+pub ob_poc_bods::PersonPepStatus::reason: core::option::Option<alloc::string::String>
+pub ob_poc_bods::PersonPepStatus::screening_id: core::option::Option<uuid::Uuid>
+pub ob_poc_bods::PersonPepStatus::source_type: core::option::Option<alloc::string::String>
+pub ob_poc_bods::PersonPepStatus::start_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::PersonPepStatus::status: alloc::string::String
+pub ob_poc_bods::PersonPepStatus::updated_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::PersonPepStatus::verified_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_bods::PersonPepStatus::verified_by: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_bods::PersonPepStatus
+pub fn ob_poc_bods::PersonPepStatus::clone(&self) -> ob_poc_bods::PersonPepStatus
+impl core::fmt::Debug for ob_poc_bods::PersonPepStatus
+pub fn ob_poc_bods::PersonPepStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::PersonPepStatus
+pub fn ob_poc_bods::PersonPepStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::PersonPepStatus where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::naive::date::NaiveDate>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<uuid::Uuid>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::PersonPepStatus::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::PersonPepStatus
+pub fn ob_poc_bods::PersonPepStatus::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::PersonPepStatus
+impl core::marker::Send for ob_poc_bods::PersonPepStatus
+impl core::marker::Sync for ob_poc_bods::PersonPepStatus
+impl core::marker::Unpin for ob_poc_bods::PersonPepStatus
+impl core::marker::UnsafeUnpin for ob_poc_bods::PersonPepStatus
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::PersonPepStatus
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::PersonPepStatus
+impl<T, U> core::convert::Into<U> for ob_poc_bods::PersonPepStatus where U: core::convert::From<T>
+pub fn ob_poc_bods::PersonPepStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::PersonPepStatus where U: core::convert::Into<T>
+pub type ob_poc_bods::PersonPepStatus::Error = core::convert::Infallible
+pub fn ob_poc_bods::PersonPepStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::PersonPepStatus where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::PersonPepStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::PersonPepStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::PersonPepStatus where T: core::clone::Clone
+pub type ob_poc_bods::PersonPepStatus::Owned = T
+pub fn ob_poc_bods::PersonPepStatus::clone_into(&self, &mut T)
+pub fn ob_poc_bods::PersonPepStatus::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::PersonPepStatus where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::PersonPepStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::PersonPepStatus where T: ?core::marker::Sized
+pub fn ob_poc_bods::PersonPepStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::PersonPepStatus where T: ?core::marker::Sized
+pub fn ob_poc_bods::PersonPepStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::PersonPepStatus where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::PersonPepStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::PersonPepStatus
+pub fn ob_poc_bods::PersonPepStatus::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::PersonPepStatus
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::PersonPepStatus where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::PersonPepStatus
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::PersonPepStatus
+impl<T> typenum::type_operators::Same for ob_poc_bods::PersonPepStatus
+pub type ob_poc_bods::PersonPepStatus::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::PersonPepStatus where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::PersonPepStatus::vzip(self) -> V
+pub struct ob_poc_bods::UboInterest
+pub ob_poc_bods::UboInterest::component_of_relationship_id: core::option::Option<uuid::Uuid>
+pub ob_poc_bods::UboInterest::direct_or_indirect: core::option::Option<alloc::string::String>
+pub ob_poc_bods::UboInterest::effective_from: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::UboInterest::effective_to: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_bods::UboInterest::interest_category: core::option::Option<alloc::string::String>
+pub ob_poc_bods::UboInterest::interest_type: core::option::Option<alloc::string::String>
+pub ob_poc_bods::UboInterest::interest_type_display: core::option::Option<alloc::string::String>
+pub ob_poc_bods::UboInterest::interested_party_id: uuid::Uuid
+pub ob_poc_bods::UboInterest::interested_party_name: alloc::string::String
+pub ob_poc_bods::UboInterest::is_component: core::option::Option<bool>
+pub ob_poc_bods::UboInterest::ownership_share: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_bods::UboInterest::relationship_id: uuid::Uuid
+pub ob_poc_bods::UboInterest::share_maximum: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_bods::UboInterest::share_minimum: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_bods::UboInterest::subject_id: uuid::Uuid
+pub ob_poc_bods::UboInterest::subject_name: alloc::string::String
+impl core::clone::Clone for ob_poc_bods::UboInterest
+pub fn ob_poc_bods::UboInterest::clone(&self) -> ob_poc_bods::UboInterest
+impl core::fmt::Debug for ob_poc_bods::UboInterest
+pub fn ob_poc_bods::UboInterest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_bods::UboInterest
+pub fn ob_poc_bods::UboInterest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'a, R: sqlx_core::row::Row> sqlx_core::from_row::FromRow<'a, R> for ob_poc_bods::UboInterest where &'a str: sqlx_core::column::ColumnIndex<R>, uuid::Uuid: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, alloc::string::String: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<alloc::string::String>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<rust_decimal::decimal::Decimal>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<chrono::naive::date::NaiveDate>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<bool>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>, core::option::Option<uuid::Uuid>: sqlx_core::decode::Decode<'a, <R as sqlx_core::row::Row>::Database> + sqlx_core::types::Type<<R as sqlx_core::row::Row>::Database>
+pub fn ob_poc_bods::UboInterest::from_row(&'a R) -> sqlx_core::error::Result<Self>
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_bods::UboInterest
+pub fn ob_poc_bods::UboInterest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_bods::UboInterest
+impl core::marker::Send for ob_poc_bods::UboInterest
+impl core::marker::Sync for ob_poc_bods::UboInterest
+impl core::marker::Unpin for ob_poc_bods::UboInterest
+impl core::marker::UnsafeUnpin for ob_poc_bods::UboInterest
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_bods::UboInterest
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_bods::UboInterest
+impl<T, U> core::convert::Into<U> for ob_poc_bods::UboInterest where U: core::convert::From<T>
+pub fn ob_poc_bods::UboInterest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_bods::UboInterest where U: core::convert::Into<T>
+pub type ob_poc_bods::UboInterest::Error = core::convert::Infallible
+pub fn ob_poc_bods::UboInterest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_bods::UboInterest where U: core::convert::TryFrom<T>
+pub type ob_poc_bods::UboInterest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_bods::UboInterest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_bods::UboInterest where T: core::clone::Clone
+pub type ob_poc_bods::UboInterest::Owned = T
+pub fn ob_poc_bods::UboInterest::clone_into(&self, &mut T)
+pub fn ob_poc_bods::UboInterest::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_bods::UboInterest where T: 'static + ?core::marker::Sized
+pub fn ob_poc_bods::UboInterest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_bods::UboInterest where T: ?core::marker::Sized
+pub fn ob_poc_bods::UboInterest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_bods::UboInterest where T: ?core::marker::Sized
+pub fn ob_poc_bods::UboInterest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_bods::UboInterest where T: core::clone::Clone
+pub unsafe fn ob_poc_bods::UboInterest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_bods::UboInterest
+pub fn ob_poc_bods::UboInterest::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_bods::UboInterest
+impl<T> serde_core::de::DeserializeOwned for ob_poc_bods::UboInterest where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_bods::UboInterest
+impl<T> tracing::instrument::WithSubscriber for ob_poc_bods::UboInterest
+impl<T> typenum::type_operators::Same for ob_poc_bods::UboInterest
+pub type ob_poc_bods::UboInterest::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_bods::UboInterest where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_bods::UboInterest::vzip(self) -> V

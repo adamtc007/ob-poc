@@ -1,0 +1,502 @@
+# dsl-resolution | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:39:04Z
+pub mod dsl_resolution
+pub mod dsl_resolution::pack_registry
+pub struct dsl_resolution::pack_registry::DecisionPack
+pub dsl_resolution::pack_registry::DecisionPack::description: alloc::string::String
+pub dsl_resolution::pack_registry::DecisionPack::domain_scope: alloc::vec::Vec<alloc::string::String>
+pub dsl_resolution::pack_registry::DecisionPack::example_utterances: alloc::vec::Vec<alloc::string::String>
+pub dsl_resolution::pack_registry::DecisionPack::governance_ref: core::option::Option<alloc::string::String>
+pub dsl_resolution::pack_registry::DecisionPack::name: alloc::string::String
+pub dsl_resolution::pack_registry::DecisionPack::parameters: alloc::vec::Vec<dsl_resolution::pack_registry::PackParam>
+pub dsl_resolution::pack_registry::DecisionPack::structural_signature: core::option::Option<serde_json::value::Value>
+pub dsl_resolution::pack_registry::DecisionPack::template_raw: alloc::string::String
+pub dsl_resolution::pack_registry::DecisionPack::version: alloc::string::String
+impl core::clone::Clone for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::clone(&self) -> dsl_resolution::pack_registry::DecisionPack
+impl core::fmt::Debug for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::Send for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::Sync for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::Unpin for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::UnsafeUnpin for dsl_resolution::pack_registry::DecisionPack
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::pack_registry::DecisionPack
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::pack_registry::DecisionPack
+impl<T, U> core::convert::Into<U> for dsl_resolution::pack_registry::DecisionPack where U: core::convert::From<T>
+pub fn dsl_resolution::pack_registry::DecisionPack::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::pack_registry::DecisionPack where U: core::convert::Into<T>
+pub type dsl_resolution::pack_registry::DecisionPack::Error = core::convert::Infallible
+pub fn dsl_resolution::pack_registry::DecisionPack::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::pack_registry::DecisionPack where U: core::convert::TryFrom<T>
+pub type dsl_resolution::pack_registry::DecisionPack::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::pack_registry::DecisionPack::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_resolution::pack_registry::DecisionPack where T: core::clone::Clone
+pub type dsl_resolution::pack_registry::DecisionPack::Owned = T
+pub fn dsl_resolution::pack_registry::DecisionPack::clone_into(&self, &mut T)
+pub fn dsl_resolution::pack_registry::DecisionPack::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_resolution::pack_registry::DecisionPack where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::DecisionPack::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::pack_registry::DecisionPack where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::DecisionPack::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::pack_registry::DecisionPack where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::DecisionPack::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_resolution::pack_registry::DecisionPack where T: core::clone::Clone
+pub unsafe fn dsl_resolution::pack_registry::DecisionPack::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_resolution::pack_registry::DecisionPack where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_resolution::pack_registry::PackParam
+pub dsl_resolution::pack_registry::PackParam::default_value: core::option::Option<alloc::string::String>
+pub dsl_resolution::pack_registry::PackParam::description: core::option::Option<alloc::string::String>
+pub dsl_resolution::pack_registry::PackParam::name: alloc::string::String
+pub dsl_resolution::pack_registry::PackParam::param_type: alloc::string::String
+pub dsl_resolution::pack_registry::PackParam::required: bool
+impl core::clone::Clone for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::clone(&self) -> dsl_resolution::pack_registry::PackParam
+impl core::fmt::Debug for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_resolution::pack_registry::PackParam
+impl core::marker::Send for dsl_resolution::pack_registry::PackParam
+impl core::marker::Sync for dsl_resolution::pack_registry::PackParam
+impl core::marker::Unpin for dsl_resolution::pack_registry::PackParam
+impl core::marker::UnsafeUnpin for dsl_resolution::pack_registry::PackParam
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::pack_registry::PackParam
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::pack_registry::PackParam
+impl<T, U> core::convert::Into<U> for dsl_resolution::pack_registry::PackParam where U: core::convert::From<T>
+pub fn dsl_resolution::pack_registry::PackParam::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::pack_registry::PackParam where U: core::convert::Into<T>
+pub type dsl_resolution::pack_registry::PackParam::Error = core::convert::Infallible
+pub fn dsl_resolution::pack_registry::PackParam::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::pack_registry::PackParam where U: core::convert::TryFrom<T>
+pub type dsl_resolution::pack_registry::PackParam::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::pack_registry::PackParam::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_resolution::pack_registry::PackParam where T: core::clone::Clone
+pub type dsl_resolution::pack_registry::PackParam::Owned = T
+pub fn dsl_resolution::pack_registry::PackParam::clone_into(&self, &mut T)
+pub fn dsl_resolution::pack_registry::PackParam::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_resolution::pack_registry::PackParam where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackParam::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::pack_registry::PackParam where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackParam::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::pack_registry::PackParam where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackParam::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_resolution::pack_registry::PackParam where T: core::clone::Clone
+pub unsafe fn dsl_resolution::pack_registry::PackParam::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_resolution::pack_registry::PackParam where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_resolution::pack_registry::PackRegistry
+impl dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::is_empty(&self) -> bool
+pub fn dsl_resolution::pack_registry::PackRegistry::len(&self) -> usize
+pub fn dsl_resolution::pack_registry::PackRegistry::list_active(&self) -> alloc::vec::Vec<&dsl_resolution::pack_registry::DecisionPack>
+pub fn dsl_resolution::pack_registry::PackRegistry::lookup(&self, &str, &str) -> core::option::Option<&dsl_resolution::pack_registry::DecisionPack>
+pub fn dsl_resolution::pack_registry::PackRegistry::lookup_latest(&self, &str) -> core::option::Option<&dsl_resolution::pack_registry::DecisionPack>
+pub fn dsl_resolution::pack_registry::PackRegistry::new() -> Self
+pub fn dsl_resolution::pack_registry::PackRegistry::register(&mut self, dsl_resolution::pack_registry::DecisionPack) -> core::result::Result<(), alloc::string::String>
+impl core::clone::Clone for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::clone(&self) -> dsl_resolution::pack_registry::PackRegistry
+impl core::default::Default for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::default() -> dsl_resolution::pack_registry::PackRegistry
+impl core::fmt::Debug for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::Send for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::Sync for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::Unpin for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::UnsafeUnpin for dsl_resolution::pack_registry::PackRegistry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::pack_registry::PackRegistry
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::pack_registry::PackRegistry
+impl<T, U> core::convert::Into<U> for dsl_resolution::pack_registry::PackRegistry where U: core::convert::From<T>
+pub fn dsl_resolution::pack_registry::PackRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::pack_registry::PackRegistry where U: core::convert::Into<T>
+pub type dsl_resolution::pack_registry::PackRegistry::Error = core::convert::Infallible
+pub fn dsl_resolution::pack_registry::PackRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::pack_registry::PackRegistry where U: core::convert::TryFrom<T>
+pub type dsl_resolution::pack_registry::PackRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::pack_registry::PackRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_resolution::pack_registry::PackRegistry where T: core::clone::Clone
+pub type dsl_resolution::pack_registry::PackRegistry::Owned = T
+pub fn dsl_resolution::pack_registry::PackRegistry::clone_into(&self, &mut T)
+pub fn dsl_resolution::pack_registry::PackRegistry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_resolution::pack_registry::PackRegistry where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::pack_registry::PackRegistry where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::pack_registry::PackRegistry where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_resolution::pack_registry::PackRegistry where T: core::clone::Clone
+pub unsafe fn dsl_resolution::pack_registry::PackRegistry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::from(T) -> T
+pub fn dsl_resolution::pack_registry::load_packs_from_dir(&std::path::Path, &mut dsl_resolution::pack_registry::PackRegistry, &mut dsl_diagnostics::diagnostic::DiagnosticBag) -> core::result::Result<(), core::io::error::Error>
+pub mod dsl_resolution::resolve
+pub fn dsl_resolution::resolve::resolve(&dsl_ast::atom_bag::AtomBag, &mut dsl_resolution::pack_registry::PackRegistry, &mut dsl_diagnostics::diagnostic::DiagnosticBag)
+pub mod dsl_resolution::validator
+pub struct dsl_resolution::validator::DiagnosticSummary
+pub dsl_resolution::validator::DiagnosticSummary::code: core::option::Option<alloc::string::String>
+pub dsl_resolution::validator::DiagnosticSummary::message: alloc::string::String
+pub dsl_resolution::validator::DiagnosticSummary::severity: alloc::string::String
+impl core::convert::From<&dsl_diagnostics::diagnostic::Diagnostic> for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::from(&dsl_diagnostics::diagnostic::Diagnostic) -> Self
+impl core::fmt::Debug for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::Send for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::Sync for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::Unpin for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::DiagnosticSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::DiagnosticSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::DiagnosticSummary
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::DiagnosticSummary where U: core::convert::From<T>
+pub fn dsl_resolution::validator::DiagnosticSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::DiagnosticSummary where U: core::convert::Into<T>
+pub type dsl_resolution::validator::DiagnosticSummary::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::DiagnosticSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::DiagnosticSummary where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::DiagnosticSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::DiagnosticSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::DiagnosticSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::DiagnosticSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::DiagnosticSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::DiagnosticSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::DiagnosticSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::DiagnosticSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::from(T) -> T
+pub struct dsl_resolution::validator::ProvenanceInstantiation
+pub dsl_resolution::validator::ProvenanceInstantiation::covered_atoms: alloc::vec::Vec<alloc::string::String>
+pub dsl_resolution::validator::ProvenanceInstantiation::pack_id: alloc::string::String
+pub dsl_resolution::validator::ProvenanceInstantiation::session: core::option::Option<alloc::string::String>
+pub dsl_resolution::validator::ProvenanceInstantiation::version: alloc::string::String
+impl core::fmt::Debug for dsl_resolution::validator::ProvenanceInstantiation
+pub fn dsl_resolution::validator::ProvenanceInstantiation::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::ProvenanceInstantiation
+pub fn dsl_resolution::validator::ProvenanceInstantiation::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::ProvenanceInstantiation
+impl core::marker::Send for dsl_resolution::validator::ProvenanceInstantiation
+impl core::marker::Sync for dsl_resolution::validator::ProvenanceInstantiation
+impl core::marker::Unpin for dsl_resolution::validator::ProvenanceInstantiation
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::ProvenanceInstantiation
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::ProvenanceInstantiation
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::ProvenanceInstantiation
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::ProvenanceInstantiation where U: core::convert::From<T>
+pub fn dsl_resolution::validator::ProvenanceInstantiation::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::ProvenanceInstantiation where U: core::convert::Into<T>
+pub type dsl_resolution::validator::ProvenanceInstantiation::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::ProvenanceInstantiation::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::ProvenanceInstantiation where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::ProvenanceInstantiation::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::ProvenanceInstantiation::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::ProvenanceInstantiation where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceInstantiation::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::ProvenanceInstantiation where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceInstantiation::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::ProvenanceInstantiation where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceInstantiation::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::ProvenanceInstantiation
+pub fn dsl_resolution::validator::ProvenanceInstantiation::from(T) -> T
+pub struct dsl_resolution::validator::ProvenanceSummary
+pub dsl_resolution::validator::ProvenanceSummary::instantiations: alloc::vec::Vec<dsl_resolution::validator::ProvenanceInstantiation>
+pub dsl_resolution::validator::ProvenanceSummary::uncovered_atoms: alloc::vec::Vec<alloc::string::String>
+impl core::fmt::Debug for dsl_resolution::validator::ProvenanceSummary
+pub fn dsl_resolution::validator::ProvenanceSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::ProvenanceSummary
+pub fn dsl_resolution::validator::ProvenanceSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::Send for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::Sync for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::Unpin for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::ProvenanceSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::ProvenanceSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::ProvenanceSummary
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::ProvenanceSummary where U: core::convert::From<T>
+pub fn dsl_resolution::validator::ProvenanceSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::ProvenanceSummary where U: core::convert::Into<T>
+pub type dsl_resolution::validator::ProvenanceSummary::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::ProvenanceSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::ProvenanceSummary where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::ProvenanceSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::ProvenanceSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::ProvenanceSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::ProvenanceSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::ProvenanceSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::ProvenanceSummary
+pub fn dsl_resolution::validator::ProvenanceSummary::from(T) -> T
+pub struct dsl_resolution::validator::ValidateResponse
+pub dsl_resolution::validator::ValidateResponse::diagnostics: alloc::vec::Vec<dsl_resolution::validator::DiagnosticSummary>
+pub dsl_resolution::validator::ValidateResponse::has_errors: bool
+pub dsl_resolution::validator::ValidateResponse::provenance_summary: dsl_resolution::validator::ProvenanceSummary
+impl core::fmt::Debug for dsl_resolution::validator::ValidateResponse
+pub fn dsl_resolution::validator::ValidateResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::ValidateResponse
+pub fn dsl_resolution::validator::ValidateResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::ValidateResponse
+impl core::marker::Send for dsl_resolution::validator::ValidateResponse
+impl core::marker::Sync for dsl_resolution::validator::ValidateResponse
+impl core::marker::Unpin for dsl_resolution::validator::ValidateResponse
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::ValidateResponse
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::ValidateResponse
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::ValidateResponse
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::ValidateResponse where U: core::convert::From<T>
+pub fn dsl_resolution::validator::ValidateResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::ValidateResponse where U: core::convert::Into<T>
+pub type dsl_resolution::validator::ValidateResponse::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::ValidateResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::ValidateResponse where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::ValidateResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::ValidateResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::ValidateResponse where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::ValidateResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::ValidateResponse where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ValidateResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::ValidateResponse where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ValidateResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::ValidateResponse
+pub fn dsl_resolution::validator::ValidateResponse::from(T) -> T
+pub fn dsl_resolution::validator::validate_bpmn(&str, &str, &mut dsl_resolution::pack_registry::PackRegistry) -> dsl_resolution::validator::ValidateResponse
+pub struct dsl_resolution::DecisionPack
+pub dsl_resolution::DecisionPack::description: alloc::string::String
+pub dsl_resolution::DecisionPack::domain_scope: alloc::vec::Vec<alloc::string::String>
+pub dsl_resolution::DecisionPack::example_utterances: alloc::vec::Vec<alloc::string::String>
+pub dsl_resolution::DecisionPack::governance_ref: core::option::Option<alloc::string::String>
+pub dsl_resolution::DecisionPack::name: alloc::string::String
+pub dsl_resolution::DecisionPack::parameters: alloc::vec::Vec<dsl_resolution::pack_registry::PackParam>
+pub dsl_resolution::DecisionPack::structural_signature: core::option::Option<serde_json::value::Value>
+pub dsl_resolution::DecisionPack::template_raw: alloc::string::String
+pub dsl_resolution::DecisionPack::version: alloc::string::String
+impl core::clone::Clone for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::clone(&self) -> dsl_resolution::pack_registry::DecisionPack
+impl core::fmt::Debug for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::Send for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::Sync for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::Unpin for dsl_resolution::pack_registry::DecisionPack
+impl core::marker::UnsafeUnpin for dsl_resolution::pack_registry::DecisionPack
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::pack_registry::DecisionPack
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::pack_registry::DecisionPack
+impl<T, U> core::convert::Into<U> for dsl_resolution::pack_registry::DecisionPack where U: core::convert::From<T>
+pub fn dsl_resolution::pack_registry::DecisionPack::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::pack_registry::DecisionPack where U: core::convert::Into<T>
+pub type dsl_resolution::pack_registry::DecisionPack::Error = core::convert::Infallible
+pub fn dsl_resolution::pack_registry::DecisionPack::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::pack_registry::DecisionPack where U: core::convert::TryFrom<T>
+pub type dsl_resolution::pack_registry::DecisionPack::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::pack_registry::DecisionPack::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_resolution::pack_registry::DecisionPack where T: core::clone::Clone
+pub type dsl_resolution::pack_registry::DecisionPack::Owned = T
+pub fn dsl_resolution::pack_registry::DecisionPack::clone_into(&self, &mut T)
+pub fn dsl_resolution::pack_registry::DecisionPack::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_resolution::pack_registry::DecisionPack where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::DecisionPack::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::pack_registry::DecisionPack where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::DecisionPack::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::pack_registry::DecisionPack where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::DecisionPack::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_resolution::pack_registry::DecisionPack where T: core::clone::Clone
+pub unsafe fn dsl_resolution::pack_registry::DecisionPack::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_resolution::pack_registry::DecisionPack
+pub fn dsl_resolution::pack_registry::DecisionPack::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_resolution::pack_registry::DecisionPack where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_resolution::DiagnosticSummary
+pub dsl_resolution::DiagnosticSummary::code: core::option::Option<alloc::string::String>
+pub dsl_resolution::DiagnosticSummary::message: alloc::string::String
+pub dsl_resolution::DiagnosticSummary::severity: alloc::string::String
+impl core::convert::From<&dsl_diagnostics::diagnostic::Diagnostic> for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::from(&dsl_diagnostics::diagnostic::Diagnostic) -> Self
+impl core::fmt::Debug for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::Send for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::Sync for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::Unpin for dsl_resolution::validator::DiagnosticSummary
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::DiagnosticSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::DiagnosticSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::DiagnosticSummary
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::DiagnosticSummary where U: core::convert::From<T>
+pub fn dsl_resolution::validator::DiagnosticSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::DiagnosticSummary where U: core::convert::Into<T>
+pub type dsl_resolution::validator::DiagnosticSummary::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::DiagnosticSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::DiagnosticSummary where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::DiagnosticSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::DiagnosticSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::DiagnosticSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::DiagnosticSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::DiagnosticSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::DiagnosticSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::DiagnosticSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::DiagnosticSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::DiagnosticSummary
+pub fn dsl_resolution::validator::DiagnosticSummary::from(T) -> T
+pub struct dsl_resolution::PackParam
+pub dsl_resolution::PackParam::default_value: core::option::Option<alloc::string::String>
+pub dsl_resolution::PackParam::description: core::option::Option<alloc::string::String>
+pub dsl_resolution::PackParam::name: alloc::string::String
+pub dsl_resolution::PackParam::param_type: alloc::string::String
+pub dsl_resolution::PackParam::required: bool
+impl core::clone::Clone for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::clone(&self) -> dsl_resolution::pack_registry::PackParam
+impl core::fmt::Debug for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_resolution::pack_registry::PackParam
+impl core::marker::Send for dsl_resolution::pack_registry::PackParam
+impl core::marker::Sync for dsl_resolution::pack_registry::PackParam
+impl core::marker::Unpin for dsl_resolution::pack_registry::PackParam
+impl core::marker::UnsafeUnpin for dsl_resolution::pack_registry::PackParam
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::pack_registry::PackParam
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::pack_registry::PackParam
+impl<T, U> core::convert::Into<U> for dsl_resolution::pack_registry::PackParam where U: core::convert::From<T>
+pub fn dsl_resolution::pack_registry::PackParam::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::pack_registry::PackParam where U: core::convert::Into<T>
+pub type dsl_resolution::pack_registry::PackParam::Error = core::convert::Infallible
+pub fn dsl_resolution::pack_registry::PackParam::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::pack_registry::PackParam where U: core::convert::TryFrom<T>
+pub type dsl_resolution::pack_registry::PackParam::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::pack_registry::PackParam::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_resolution::pack_registry::PackParam where T: core::clone::Clone
+pub type dsl_resolution::pack_registry::PackParam::Owned = T
+pub fn dsl_resolution::pack_registry::PackParam::clone_into(&self, &mut T)
+pub fn dsl_resolution::pack_registry::PackParam::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_resolution::pack_registry::PackParam where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackParam::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::pack_registry::PackParam where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackParam::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::pack_registry::PackParam where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackParam::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_resolution::pack_registry::PackParam where T: core::clone::Clone
+pub unsafe fn dsl_resolution::pack_registry::PackParam::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_resolution::pack_registry::PackParam
+pub fn dsl_resolution::pack_registry::PackParam::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_resolution::pack_registry::PackParam where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_resolution::PackRegistry
+impl dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::is_empty(&self) -> bool
+pub fn dsl_resolution::pack_registry::PackRegistry::len(&self) -> usize
+pub fn dsl_resolution::pack_registry::PackRegistry::list_active(&self) -> alloc::vec::Vec<&dsl_resolution::pack_registry::DecisionPack>
+pub fn dsl_resolution::pack_registry::PackRegistry::lookup(&self, &str, &str) -> core::option::Option<&dsl_resolution::pack_registry::DecisionPack>
+pub fn dsl_resolution::pack_registry::PackRegistry::lookup_latest(&self, &str) -> core::option::Option<&dsl_resolution::pack_registry::DecisionPack>
+pub fn dsl_resolution::pack_registry::PackRegistry::new() -> Self
+pub fn dsl_resolution::pack_registry::PackRegistry::register(&mut self, dsl_resolution::pack_registry::DecisionPack) -> core::result::Result<(), alloc::string::String>
+impl core::clone::Clone for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::clone(&self) -> dsl_resolution::pack_registry::PackRegistry
+impl core::default::Default for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::default() -> dsl_resolution::pack_registry::PackRegistry
+impl core::fmt::Debug for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::Send for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::Sync for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::Unpin for dsl_resolution::pack_registry::PackRegistry
+impl core::marker::UnsafeUnpin for dsl_resolution::pack_registry::PackRegistry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::pack_registry::PackRegistry
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::pack_registry::PackRegistry
+impl<T, U> core::convert::Into<U> for dsl_resolution::pack_registry::PackRegistry where U: core::convert::From<T>
+pub fn dsl_resolution::pack_registry::PackRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::pack_registry::PackRegistry where U: core::convert::Into<T>
+pub type dsl_resolution::pack_registry::PackRegistry::Error = core::convert::Infallible
+pub fn dsl_resolution::pack_registry::PackRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::pack_registry::PackRegistry where U: core::convert::TryFrom<T>
+pub type dsl_resolution::pack_registry::PackRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::pack_registry::PackRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_resolution::pack_registry::PackRegistry where T: core::clone::Clone
+pub type dsl_resolution::pack_registry::PackRegistry::Owned = T
+pub fn dsl_resolution::pack_registry::PackRegistry::clone_into(&self, &mut T)
+pub fn dsl_resolution::pack_registry::PackRegistry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_resolution::pack_registry::PackRegistry where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::pack_registry::PackRegistry where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::pack_registry::PackRegistry where T: ?core::marker::Sized
+pub fn dsl_resolution::pack_registry::PackRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_resolution::pack_registry::PackRegistry where T: core::clone::Clone
+pub unsafe fn dsl_resolution::pack_registry::PackRegistry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_resolution::pack_registry::PackRegistry
+pub fn dsl_resolution::pack_registry::PackRegistry::from(T) -> T
+pub struct dsl_resolution::ProvenanceSummary
+pub dsl_resolution::ProvenanceSummary::instantiations: alloc::vec::Vec<dsl_resolution::validator::ProvenanceInstantiation>
+pub dsl_resolution::ProvenanceSummary::uncovered_atoms: alloc::vec::Vec<alloc::string::String>
+impl core::fmt::Debug for dsl_resolution::validator::ProvenanceSummary
+pub fn dsl_resolution::validator::ProvenanceSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::ProvenanceSummary
+pub fn dsl_resolution::validator::ProvenanceSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::Send for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::Sync for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::Unpin for dsl_resolution::validator::ProvenanceSummary
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::ProvenanceSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::ProvenanceSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::ProvenanceSummary
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::ProvenanceSummary where U: core::convert::From<T>
+pub fn dsl_resolution::validator::ProvenanceSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::ProvenanceSummary where U: core::convert::Into<T>
+pub type dsl_resolution::validator::ProvenanceSummary::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::ProvenanceSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::ProvenanceSummary where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::ProvenanceSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::ProvenanceSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::ProvenanceSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::ProvenanceSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::ProvenanceSummary where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ProvenanceSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::ProvenanceSummary
+pub fn dsl_resolution::validator::ProvenanceSummary::from(T) -> T
+pub struct dsl_resolution::ValidateResponse
+pub dsl_resolution::ValidateResponse::diagnostics: alloc::vec::Vec<dsl_resolution::validator::DiagnosticSummary>
+pub dsl_resolution::ValidateResponse::has_errors: bool
+pub dsl_resolution::ValidateResponse::provenance_summary: dsl_resolution::validator::ProvenanceSummary
+impl core::fmt::Debug for dsl_resolution::validator::ValidateResponse
+pub fn dsl_resolution::validator::ValidateResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_resolution::validator::ValidateResponse
+pub fn dsl_resolution::validator::ValidateResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for dsl_resolution::validator::ValidateResponse
+impl core::marker::Send for dsl_resolution::validator::ValidateResponse
+impl core::marker::Sync for dsl_resolution::validator::ValidateResponse
+impl core::marker::Unpin for dsl_resolution::validator::ValidateResponse
+impl core::marker::UnsafeUnpin for dsl_resolution::validator::ValidateResponse
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_resolution::validator::ValidateResponse
+impl core::panic::unwind_safe::UnwindSafe for dsl_resolution::validator::ValidateResponse
+impl<T, U> core::convert::Into<U> for dsl_resolution::validator::ValidateResponse where U: core::convert::From<T>
+pub fn dsl_resolution::validator::ValidateResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_resolution::validator::ValidateResponse where U: core::convert::Into<T>
+pub type dsl_resolution::validator::ValidateResponse::Error = core::convert::Infallible
+pub fn dsl_resolution::validator::ValidateResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_resolution::validator::ValidateResponse where U: core::convert::TryFrom<T>
+pub type dsl_resolution::validator::ValidateResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_resolution::validator::ValidateResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_resolution::validator::ValidateResponse where T: 'static + ?core::marker::Sized
+pub fn dsl_resolution::validator::ValidateResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_resolution::validator::ValidateResponse where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ValidateResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_resolution::validator::ValidateResponse where T: ?core::marker::Sized
+pub fn dsl_resolution::validator::ValidateResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_resolution::validator::ValidateResponse
+pub fn dsl_resolution::validator::ValidateResponse::from(T) -> T
+pub fn dsl_resolution::resolve(&dsl_ast::atom_bag::AtomBag, &mut dsl_resolution::pack_registry::PackRegistry, &mut dsl_diagnostics::diagnostic::DiagnosticBag)
+pub fn dsl_resolution::validate_bpmn(&str, &str, &mut dsl_resolution::pack_registry::PackRegistry) -> dsl_resolution::validator::ValidateResponse
