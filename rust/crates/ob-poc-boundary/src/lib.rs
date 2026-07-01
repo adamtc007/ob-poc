@@ -33,6 +33,7 @@
 //! (`ob-poc-sage`, `ob-poc-journey`, `ob-poc-domain`, `ob-poc-authoring`).
 //! Phases 2–5 of the plan will perform those moves. Until then, do not add
 //! to the misplaced module list — those modules are leaving.
+#![deny(unreachable_pub)]
 
 pub mod acp;
 pub mod acp_dag_semantic;
