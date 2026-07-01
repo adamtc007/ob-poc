@@ -77,7 +77,7 @@ pub mod sem_os_context_resolver_impl;
 
 // Phase 5a composite-blocker #25 — ob-poc-side impl of
 // `SchemaIntrospectionAccess`; bridges to
-// `crate::ontology::ontology()`, `crate::dsl_v2::verb_registry::registry()`,
+// `ob_poc_ontology::ontology()`, `crate::dsl_v2::verb_registry::registry()`,
 // and `crate::sem_reg::store::SnapshotStore` for the 5 structure-
 // semantics verbs in `sem_os_schema_ops`.
 pub mod schema_introspection_impl;

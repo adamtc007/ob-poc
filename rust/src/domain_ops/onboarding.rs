@@ -4,7 +4,7 @@
 //! from `CustomOperation` + `inventory::collect!` to `SemOsVerbOp`.
 //! Stays in `ob-poc::domain_ops` (not `sem_os_postgres::ops`) because
 //! it reaches into `ob-poc` internals (`crate::database::derive_semantic_state`,
-//! `crate::ontology::SemanticStageRegistry`, `crate::dsl_v2::executor::DslExecutor`,
+//! `ob_poc_ontology::SemanticStageRegistry`, `crate::dsl_v2::executor::DslExecutor`,
 //! `crate::sem_os_runtime::verb_executor_adapter::to_dsl_context_pub`) that
 //! can't be inverted behind a service trait without a disproportionate
 //! refactor. Registered into the canonical `SemOsVerbOpRegistry` via
@@ -107,7 +107,7 @@ async fn run_auto_complete(
     pool: &sqlx::PgPool,
 ) -> Result<AutoCompleteResult> {
     use crate::database::derive_semantic_state;
-    use crate::ontology::SemanticStageRegistry;
+    use ob_poc_ontology::SemanticStageRegistry;
 
     tracing::info!(
         cbu_id = %cbu_id,

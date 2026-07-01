@@ -1,7 +1,7 @@
 //! ob-poc impl of [`SchemaIntrospectionAccess`].
 //!
 //! Bridges the trait to:
-//!  - `crate::ontology::ontology()` for entity defs / lifecycles / taxonomy
+//!  - `ob_poc_ontology::ontology()` for entity defs / lifecycles / taxonomy
 //!  - `crate::dsl_v2::verb_registry::registry()` for runtime verb registry
 //!  - `crate::sem_reg::store::SnapshotStore` for `EntityTypeDef` snapshots
 //!
@@ -17,7 +17,7 @@ use sqlx::PgPool;
 use dsl_runtime::SchemaIntrospectionAccess;
 
 use crate::dsl_v2::verb_registry::registry;
-use crate::ontology::{ontology, SearchKeyDef};
+use ob_poc_ontology::{ontology, SearchKeyDef};
 use crate::sem_reg::entity_type_def::EntityTypeDefBody;
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::ObjectType;

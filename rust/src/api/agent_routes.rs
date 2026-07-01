@@ -40,7 +40,7 @@ use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::tooling::SemanticValidator;
 use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
-use crate::ontology::SemanticStageRegistry;
+use ob_poc_ontology::SemanticStageRegistry;
 use ob_poc_types::{DslState, SessionInputRequest, SessionInputResponse};
 use std::time::Instant;
 

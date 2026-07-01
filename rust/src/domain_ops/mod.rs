@@ -405,7 +405,7 @@ pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 /// Phase 5c-migrate Phase B Pattern B slice (#72+) ports ops that reach
 /// into ob-poc internals from `CustomOperation` + `inventory` to
 /// `SemOsVerbOp`, but keeps the op bodies inside `rust/src/domain_ops/`
-/// because the internals (`crate::database::*`, `crate::ontology::*`,
+/// because the internals (`crate::database::*`, `ob_poc_ontology::*`,
 /// `crate::dsl_v2::*`, `crate::sem_os_runtime::*`) can't be inverted
 /// behind a service trait without a disproportionate refactor. This
 /// function is called from `ob-poc-web::main` right after
@@ -445,7 +445,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::KycPersonReject));
 
     // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
-    // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry
+    // crate::database::derive_semantic_state + ob_poc_ontology::SemanticStageRegistry
     // + crate::dsl_v2::executor::DslExecutor).
     registry.register(Arc::new(onboarding::OnboardingAutoComplete));
     registry.register(Arc::new(onboarding_data_request::CompileDataRequest));

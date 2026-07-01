@@ -70,11 +70,6 @@ pub mod dsl_v2;
 #[cfg(feature = "database")]
 pub mod domain_ops;
 
-// Ontology - Entity taxonomy and lifecycle management
-// ob-poc-domain split v1 Slice B2 (2026-05-14): ontology now lives in
-// `ob-poc-ontology`.
-pub use ob_poc_ontology as ontology;
-
 // REST API module (when server feature is enabled)
 #[cfg(feature = "server")]
 pub mod api;
