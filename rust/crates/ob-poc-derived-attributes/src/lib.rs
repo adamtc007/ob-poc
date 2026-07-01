@@ -10,6 +10,7 @@
 //!
 //! `crate::advisory_lock::*` — the pg advisory-lock helpers.
 //! `crate::derived_attributes::*` — the canonical derived-value plane.
+#![deny(unreachable_pub)]
 
 pub mod advisory_lock;
 pub mod derived_attributes;
