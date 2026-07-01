@@ -44,6 +44,7 @@
 //! // Try to advance (evaluates guards, auto-transitions if possible)
 //! let instance = engine.try_advance(instance.instance_id).await?;
 //! ```
+#![deny(unreachable_pub)]
 
 mod cargo_ref;
 mod definition;
