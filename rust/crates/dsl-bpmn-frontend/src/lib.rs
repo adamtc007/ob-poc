@@ -12,6 +12,7 @@
 //!
 //! - `railway` — typed graph types (`RailwayGraph`, `RailwayNode`, etc.)
 //! - `assembly` — the assembly pass implementation
+#![deny(unreachable_pub)]
 
 pub(crate) mod assembly;
 pub(crate) mod railway;
