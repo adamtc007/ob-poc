@@ -3,6 +3,7 @@
 //! Provides the closed catalogue of structural and declarative atom kinds,
 //! the `classify` function for kind string mapping, and slot parameter type
 //! descriptors used by the type-checker (Tranche 5+).
+#![deny(unreachable_pub)]
 
 mod kinds;
 mod param_type;
