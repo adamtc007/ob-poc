@@ -11,6 +11,7 @@
 //! - test_projection_watermark_advances — outbox → projection → watermark (S2.2)
 //!
 //! SC-4 applied: test DB isolation uses CREATE/DROP DATABASE per run.
+#![deny(unreachable_pub)]
 
 #[cfg(test)]
 mod db;
