@@ -57,6 +57,7 @@
 //! let projection: InspectorProjection = serde_yaml::from_str(yaml).unwrap();
 //! assert!(projection.nodes.contains_key(&NodeId::new("cbu:test").unwrap()));
 //! ```
+#![deny(unreachable_pub)]
 
 mod error;
 pub mod generator;
