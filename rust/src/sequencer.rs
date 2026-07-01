@@ -265,10 +265,10 @@ pub struct ReplOrchestratorV2 {
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
     /// R8 single-path unification (2026-05-11): ACP session-input draft-mode
     /// selection. Configured once at orchestrator construction (typically
-    /// via [`crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
+    /// via [`ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
     /// rather than read per request. Used by the orchestrator's internal
     /// ACP resolution step (R8 §13.5).
-    acp_session_input_draft_mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    acp_session_input_draft_mode: ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode,
     /// Maximum time a single runbook step may spend inside the execution
     /// bridge before the REPL marks it failed and returns control to the
     /// caller. This protects `/run` from indefinitely-held HTTP requests.
@@ -310,7 +310,7 @@ impl ReplOrchestratorV2 {
             orchestrated_verbs: HashSet::new(),
             gate_pipeline: None,
             acp_session_input_draft_mode:
-                crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
+                ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
             runbook_step_timeout: std::time::Duration::from_secs(5),
             sage_engine: None,
             nlci_compiler: None,
@@ -327,7 +327,7 @@ impl ReplOrchestratorV2 {
     /// startup.
     pub fn with_acp_draft_mode(
         mut self,
-        mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+        mode: ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode,
     ) -> Self {
         self.acp_session_input_draft_mode = mode;
         self
@@ -336,7 +336,7 @@ impl ReplOrchestratorV2 {
     /// Return the configured ACP session-input draft mode.
     pub fn acp_session_input_draft_mode(
         &self,
-    ) -> crate::acp_session_input_draft_mode::AcpSessionInputDraftMode {
+    ) -> ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode {
         self.acp_session_input_draft_mode
     }
 
@@ -9062,7 +9062,7 @@ mod tests {
         entities: std::collections::HashMap<String, Uuid>,
     }
 
-    impl crate::entity_linking::EntityLinkingService for SingleEntityLinker {
+    impl ob_poc_entity_linking::EntityLinkingService for SingleEntityLinker {
         fn snapshot_hash(&self) -> &str {
             "test-snapshot"
         }
@@ -9081,11 +9081,11 @@ mod tests {
             _expected_kinds: Option<&[String]>,
             _context_concepts: Option<&[String]>,
             _limit: usize,
-        ) -> Vec<crate::entity_linking::EntityResolution> {
-            vec![crate::entity_linking::EntityResolution {
+        ) -> Vec<ob_poc_entity_linking::EntityResolution> {
+            vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, utterance.len()),
                 mention_text: utterance.to_string(),
-                candidates: vec![crate::entity_linking::EntityCandidate {
+                candidates: vec![ob_poc_entity_linking::EntityCandidate {
                     entity_id: self.entity_id,
                     entity_kind: "cbu".to_string(),
                     canonical_name: "Allianz Fund".to_string(),
@@ -9103,7 +9103,7 @@ mod tests {
         }
     }
 
-    impl crate::entity_linking::EntityLinkingService for NamedEntityLinker {
+    impl ob_poc_entity_linking::EntityLinkingService for NamedEntityLinker {
         fn snapshot_hash(&self) -> &str {
             "test-snapshot"
         }
@@ -9122,7 +9122,7 @@ mod tests {
             _expected_kinds: Option<&[String]>,
             _context_concepts: Option<&[String]>,
             _limit: usize,
-        ) -> Vec<crate::entity_linking::EntityResolution> {
+        ) -> Vec<ob_poc_entity_linking::EntityResolution> {
             let Some((name, entity_id)) = self
                 .entities
                 .iter()
@@ -9131,10 +9131,10 @@ mod tests {
                 return Vec::new();
             };
 
-            vec![crate::entity_linking::EntityResolution {
+            vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, utterance.len()),
                 mention_text: utterance.to_string(),
-                candidates: vec![crate::entity_linking::EntityCandidate {
+                candidates: vec![ob_poc_entity_linking::EntityCandidate {
                     entity_id: *entity_id,
                     entity_kind: "cbu".to_string(),
                     canonical_name: name.clone(),
@@ -10569,18 +10569,18 @@ definition_of_done:
                 entity_count: 2,
             },
             verbs: vec![],
-            entities: vec![crate::entity_linking::EntityResolution {
+            entities: vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, 7),
                 mention_text: "Allianz".to_string(),
                 candidates: vec![
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "company".to_string(),
                         canonical_name: "Allianz SE".to_string(),
                         score: 0.81,
                         evidence: vec![],
                     },
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "fund".to_string(),
                         canonical_name: "Allianz Fund".to_string(),
@@ -10680,18 +10680,18 @@ definition_of_done:
                 entity_count: 2,
             },
             verbs: vec![],
-            entities: vec![crate::entity_linking::EntityResolution {
+            entities: vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, 7),
                 mention_text: "Allianz".to_string(),
                 candidates: vec![
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "company".to_string(),
                         canonical_name: "Allianz SE".to_string(),
                         score: 0.81,
                         evidence: vec![],
                     },
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "fund".to_string(),
                         canonical_name: "Allianz Fund".to_string(),

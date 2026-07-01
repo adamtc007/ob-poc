@@ -223,12 +223,12 @@ async fn session_input(
 /// Returns `Some(ReplResponseV2)` if a V2 REPL session exists; returns
 /// `None` if it doesn't (caller returns 404).
 // R8 single-path unification (2026-05-11, §13.1):
-//   `AcpSessionInputDraftMode` moved to `crate::acp_session_input_draft_mode`
+//   `AcpSessionInputDraftMode` moved to `ob_poc_boundary::acp_session_input_draft_mode`
 //   and is now an `ReplOrchestratorV2` field. The env-var read fires once at
 //   orchestrator construction (see `ReplOrchestratorV2::with_acp_draft_mode`
 //   + `AcpSessionInputDraftMode::from_env`). HTTP callers consult the
 //   orchestrator instead of reading env per request.
-use crate::acp_session_input_draft_mode::AcpSessionInputDraftMode;
+use ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode;
 
 /// R8 Phase B bundle returned to the orchestrator. Carries the typed
 /// resolution (with `route_metadata` populated) alongside the message

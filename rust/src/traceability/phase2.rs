@@ -915,7 +915,7 @@ impl Phase2Artifacts {
 mod tests {
     use super::{Phase2Artifacts, Phase2Service};
     use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
-    use crate::entity_linking::{EntityCandidate, EntityResolution};
+    use ob_poc_entity_linking::{EntityCandidate, EntityResolution};
     use crate::lookup::LookupResult;
     use sem_os_policy::context_resolution::{
         BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal, SubjectRef,

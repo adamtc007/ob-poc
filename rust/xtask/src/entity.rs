@@ -30,7 +30,7 @@ pub(crate) async fn compile(output: Option<&Path>, verbose: bool) -> Result<()> 
         println!("Compiling entity snapshot...\n");
     }
 
-    let snapshot = ob_poc::entity_linking::compile_entity_snapshot(&pool)
+    let snapshot = ob_poc_entity_linking::compile_entity_snapshot(&pool)
         .await
         .context("Failed to compile entity snapshot")?;
 
@@ -65,7 +65,7 @@ pub(crate) async fn lint(errors_only: bool) -> Result<()> {
         .await
         .context("Failed to connect to database")?;
 
-    let warnings = ob_poc::entity_linking::lint_entity_data(&pool)
+    let warnings = ob_poc_entity_linking::lint_entity_data(&pool)
         .await
         .context("Failed to lint entity data")?;
 
@@ -75,13 +75,13 @@ pub(crate) async fn lint(errors_only: bool) -> Result<()> {
 
     for w in &warnings {
         match w.severity {
-            ob_poc::entity_linking::LintSeverity::Error => error_count += 1,
-            ob_poc::entity_linking::LintSeverity::Warning => warning_count += 1,
-            ob_poc::entity_linking::LintSeverity::Info => info_count += 1,
+            ob_poc_entity_linking::LintSeverity::Error => error_count += 1,
+            ob_poc_entity_linking::LintSeverity::Warning => warning_count += 1,
+            ob_poc_entity_linking::LintSeverity::Info => info_count += 1,
         }
 
         // Skip info if errors_only
-        if errors_only && w.severity == ob_poc::entity_linking::LintSeverity::Info {
+        if errors_only && w.severity == ob_poc_entity_linking::LintSeverity::Info {
             continue;
         }
 
@@ -122,7 +122,7 @@ pub(crate) fn stats(snapshot_path: Option<&Path>) -> Result<()> {
     }
 
     let snapshot =
-        ob_poc::entity_linking::EntitySnapshot::load(path).context("Failed to load snapshot")?;
+        ob_poc_entity_linking::EntitySnapshot::load(path).context("Failed to load snapshot")?;
 
     let stats = snapshot.stats();
     println!("{}", stats);

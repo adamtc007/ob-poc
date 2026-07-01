@@ -18,8 +18,6 @@
 //! ```
 
 pub mod acp_runtime_context;
-// Phase 3 slice 2a (2026-05-12): relocated to ob-poc-boundary crate; compat re-export.
-pub use ob_poc_boundary::acp_session_input_draft_mode;
 // Phase 3 slice 2d.5 (2026-05-12): mixed-purity split — pure boundary types
 // (descriptors, registries, reports, outcomes, DealTransitionSpec) live in
 // ob-poc-boundary; Repl-coupled async drivers stay in src/ and re-export the
@@ -89,16 +87,6 @@ pub mod calibration;
 
 // Phase 4 Slice B (Group 2) — `verification` module relocated to
 // `dsl-runtime::verification`; consumer `verify_ops` moved alongside it.
-
-// Lexicon module - In-memory vocabulary lookup for verb discovery
-// Phase 3 slice 2j (2026-05-12): relocated to ob-poc-boundary; compat re-export.
-pub use ob_poc_authoring::lexicon;
-
-// Entity Linking module - In-memory entity resolution from utterances
-// ob-poc-domain split v1 Slice B3 (2026-05-14): entity_linking now lives in
-// `ob-poc-entity-linking`.
-#[cfg(feature = "database")]
-pub use ob_poc_entity_linking as entity_linking;
 
 // Lookup module - Unified verb search + entity linking with verb-first ordering
 #[cfg(feature = "database")]

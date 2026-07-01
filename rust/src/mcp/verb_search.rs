@@ -49,7 +49,7 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::runtime_registry::runtime_registry;
-use crate::lexicon::LexiconService;
+use ob_poc_authoring::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};

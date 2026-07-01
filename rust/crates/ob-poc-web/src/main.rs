@@ -1387,7 +1387,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // once at orchestrator construction. Replaces the per-request env
         // read previously in `agent_routes::acp_session_input_draft_mode()`.
         let acp_draft_mode =
-            ob_poc::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env();
+            ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env();
 
         let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
             .with_pool(pool.clone())
@@ -1493,7 +1493,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::agent::learning::embedder::CandleEmbedder;
             use ob_poc::agent::learning::warmup::LearningWarmup;
             use ob_poc::dsl_v2::{load_macro_registry_from_dir, ConfigLoader, MacroRegistry};
-            use ob_poc::entity_linking::{
+            use ob_poc_entity_linking::{
                 EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
             };
             use ob_poc::lookup::LookupService;
@@ -1553,7 +1553,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // 4. Load lexicon snapshot
                     let lexicon: Option<ob_poc::mcp::verb_search::SharedLexicon> = {
-                        use ob_poc::lexicon::{LexiconServiceImpl, LexiconSnapshot};
+                        use ob_poc_authoring::lexicon::{LexiconServiceImpl, LexiconSnapshot};
                         let snapshot_paths = [
                             std::path::Path::new("rust/assets/lexicon.snapshot.bin"),
                             std::path::Path::new("assets/lexicon.snapshot.bin"),
@@ -1565,7 +1565,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 if let Ok(snapshot) = LexiconSnapshot::load_binary(path) {
                                     loaded =
                                         Some(Arc::new(LexiconServiceImpl::new(Arc::new(snapshot)))
-                                            as Arc<dyn ob_poc::lexicon::LexiconService>);
+                                            as Arc<dyn ob_poc_authoring::lexicon::LexiconService>);
                                     break;
                                 }
                             }
