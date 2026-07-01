@@ -6,6 +6,7 @@
 //! - `scanner` — verb-first YAML scanner (pure conversion functions)
 //! - `seeds` — taxonomy, view, policy, derivation spec seed builders
 //! - `onboarding` — request validation and default generation
+#![deny(unreachable_pub)]
 
 pub mod metadata;
 pub mod onboarding;
