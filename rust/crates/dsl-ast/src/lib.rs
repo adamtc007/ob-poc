@@ -4,6 +4,7 @@
 //! typed `TypedAtom` values using the kind taxonomy from `dsl-atoms`.
 //!
 //! Full per-kind slot extraction and type checking are Tranche 5 work.
+#![deny(unreachable_pub)]
 
 pub(crate) mod atom_bag;
 
