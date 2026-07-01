@@ -35,6 +35,7 @@
 //! │  Capture → Analyze → Learn → Rebuild    │
 //! └─────────────────────────────────────────┘
 //! ```
+#![deny(unreachable_pub)]
 
 pub mod centroid;
 pub mod client_group_resolver;
