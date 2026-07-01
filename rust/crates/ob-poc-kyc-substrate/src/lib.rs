@@ -21,8 +21,9 @@ pub mod types;
 // ── Convenience re-exports ────────────────────────────────────────────────────
 
 pub use determination::{
-    freeze_determination, recover_determination_at, DeterminationInProgress, DeterminationPin,
-    FrozenDetermination, OwnershipProngStrategy, Prong, ProngCandidate, RecoveryPin, SmoResult,
+    find_subject_entity, freeze_determination, recover_determination_at, DeterminationInProgress,
+    DeterminationPin, DeterminationStrategy, FrozenDetermination, OwnershipProngStrategy, Prong,
+    ProngCandidate, RecoveryPin, SmoResult,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};

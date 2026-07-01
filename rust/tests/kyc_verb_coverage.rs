@@ -234,8 +234,17 @@ async fn coverage_ubo_determination_freeze() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
     run(&KycSubjectRegister, serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }), &pool).await;
+    run(&KycSubjectClassifyStructure, serde_json::json!({
+        "subject-id": subject.0, "structure-class": "private_company",
+    }), &pool).await;
+    run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject.0 }), &pool).await;
     run(&UboDeterminationSelectStrategy, serde_json::json!({
-        "subject-id": subject.0, "strategy": "ownership_prong",
+        "subject-id": subject.0, "strategy": "ownership_prong_strategy",
+    }), &pool).await;
+    // No qualifying economic edges asserted — K-5 requires an SMO fallback so the
+    // determination is never silent.
+    run(&UboDeterminationApplySmoFallback, serde_json::json!({
+        "subject-id": subject.0, "smo_person_id": Uuid::new_v4(),
     }), &pool).await;
     run(&UboDeterminationFreeze, serde_json::json!({
         "subject-id": subject.0, "policy-version": "v1.0",

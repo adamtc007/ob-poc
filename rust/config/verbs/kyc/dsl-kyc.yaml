@@ -471,6 +471,10 @@ domains:
             type: string
             required: true
             description: Policy version at freeze time
+          - name: threshold-pct
+            type: decimal
+            required: false
+            description: "UBO threshold in percentage points (K-6); defaults to 25.0 pending a governed per-jurisdiction reference-plane table (EOP-DD-KYCUBO-003 M1.4)"
         returns:
           type: record
           fields:
@@ -572,6 +576,10 @@ domains:
             type: boolean
             required: false
             description: Whether the subject is a natural person
+          - name: entity-id
+            type: uuid
+            required: false
+            description: The entity being registered, if distinct from subject-id (defaults to subject-id) — lets one determination stream register the intermediate entities/persons in its own ownership chain (V&S §7.1)
         returns:
           type: record
           fields:
@@ -616,6 +624,10 @@ domains:
             type: string
             required: true
             description: "Structure class (e.g. simple, complex, fund, trust)"
+          - name: entity-id
+            type: uuid
+            required: false
+            description: The entity being classified, if distinct from subject-id (defaults to subject-id)
         returns:
           type: record
           fields:

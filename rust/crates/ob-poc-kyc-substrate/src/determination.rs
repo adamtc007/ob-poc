@@ -373,7 +373,11 @@ pub fn recover_determination_at(
     ).ok()
 }
 
-fn find_subject_entity(events: &[&IntentEvent]) -> Option<EntityId> {
+/// Find the subject's own `EntityId`, recorded on `kyc.subject.classify-structure`
+/// (payload field `entity_id`). Shared by `recover_determination_at` (replay) and
+/// the live `ubo.determination.freeze` verb (EOP-DD-KYCUBO-003 remediation) so
+/// both paths resolve the subject entity identically.
+pub fn find_subject_entity(events: &[&IntentEvent]) -> Option<EntityId> {
     events.iter()
         .find(|e| e.verb_fqn.as_str() == "kyc.subject.classify-structure")
         .and_then(|e| {

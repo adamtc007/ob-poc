@@ -20,11 +20,13 @@ use sem_os_postgres::ops::SemOsVerbOp;
 
 use ob_poc_kyc_seam::{append_in_scope, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
+use ob_poc_kyc_substrate::determination::DeterminationStrategy;
 use ob_poc_kyc_substrate::fold::control::check_control_preconditions;
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, fold_obligations_versioned,
-    phase1_lexicon, AuthorityRef, EdgeId, FoldRegistry, PersonId, SubjectId, TargetBinding,
-    V1FoldImpl,
+    find_subject_entity, fold_control_versioned, fold_obligations_versioned,
+    natural_persons_from_events, phase1_lexicon, reconciled_economic_edges, AuthorityRef, EdgeId,
+    FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
+    SubjectOverallState, SubjectId, TargetBinding, V1FoldImpl,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
 #[allow(unused_imports)]
@@ -267,6 +269,7 @@ impl SemOsVerbOp for UboDeterminationComputeFold {
             "verified_edges": state.edges.values().filter(|e| e.is_verified()).count(),
             "is_reconciled": state.is_reconciled(),
             "has_strategy": state.has_strategy(),
+            "structure_class": state.structure_class,
         })))
     }
 }
@@ -315,15 +318,70 @@ impl SemOsVerbOp for UboDeterminationFreeze {
         let _ = fold_obligations_versioned(&refs, &KYC_REGISTRY)
             .map_err(|e| anyhow!("freeze: obligation fold failed: {e}"))?;
 
-        // 2. Extract resolved persons from the control fold's determination candidates.
-        //    (A full strategy run is out of scope here; we use the fold's natural-person
-        //    edges as a proxy for the resolved set. The full OwnershipProngStrategy
-        //    is in the substrate and would need entity→person resolution data.)
-        let resolved_persons: Vec<PersonId> = control
-            .edges
-            .values()
-            .filter(|e| e.is_active())
-            .map(|e| PersonId(e.from.0))
+        // 2. Run the actual determination strategy (EOP-DD-KYCUBO-003 R1/M1.2).
+        //    `select-strategy` must have fired (ReconciledProjection/StrategySelected
+        //    preconditions gate compute-fold/freeze already); dispatch on the
+        //    recorded strategy name rather than assuming ownership_prong_strategy.
+        let strategy_name = control
+            .selected_strategy
+            .as_deref()
+            .ok_or_else(|| anyhow!("freeze: no strategy selected (K-4 precondition)"))?;
+        let strategy: &dyn DeterminationStrategy = match strategy_name {
+            "ownership_prong_strategy" => &OwnershipProngStrategy,
+            other => {
+                return Err(anyhow!(
+                    "freeze: strategy '{other}' selected but no DeterminationStrategy is \
+                     registered for it — only ownership_prong_strategy exists today \
+                     (control-prong / role-based strategies are M2 follow-on work)"
+                ));
+            }
+        };
+
+        let subject_entity_id = find_subject_entity(&refs).ok_or_else(|| {
+            anyhow!("freeze: no kyc.subject.classify-structure event found — subject entity unknown")
+        })?;
+        let natural_persons = natural_persons_from_events(&refs);
+        let reconciled_edges = reconciled_economic_edges(&control);
+        // K-6: threshold should be reference-plane data (per jurisdiction/structure
+        // class); until that table exists, a caller-suppliable default is the
+        // documented interim (EOP-DD-KYCUBO-003 M1.4).
+        let threshold_pct = args.get("threshold-pct").and_then(|v| v.as_f64()).unwrap_or(25.0);
+
+        let mut candidates: Vec<ProngCandidate> =
+            strategy.resolve(&reconciled_edges, subject_entity_id, &natural_persons, threshold_pct);
+        candidates.sort_by_key(|c| c.person_id.0);
+
+        let smo_result = match (control.smo_person_id, control.smo_event_id) {
+            (Some(pid), Some(orig)) => Some(SmoResult::Person(ProngCandidate {
+                person_id: pid,
+                prong: Prong::SmoFallback,
+                effective_ownership_pct: None,
+                ownership_chain: vec![],
+                originating_event_id: orig,
+            })),
+            (None, _) => None,
+            (Some(_), None) => {
+                return Err(anyhow!(
+                    "freeze: fold invariant violated — smo_person_id set without smo_event_id"
+                ));
+            }
+        };
+
+        // K-5: a determination must never be silent.
+        if candidates.is_empty() && smo_result.is_none() {
+            return Err(anyhow!(
+                "freeze: determination would be silent — no ownership/control candidates and \
+                 no SMO fallback applied (K-5); call ubo.determination.apply-smo-fallback first"
+            ));
+        }
+
+        let resolved_persons: Vec<PersonId> = candidates
+            .iter()
+            .map(|c| c.person_id)
+            .chain(smo_result.iter().filter_map(|s| match s {
+                SmoResult::Person(c) => Some(c.person_id),
+                SmoResult::AuthorisedWaiver { .. } => None,
+            }))
             .collect::<std::collections::BTreeSet<_>>()
             .into_iter()
             .collect();
@@ -334,10 +392,22 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .map_err(|e| anyhow!("freeze: prior persons failed: {e}"))?;
 
         // 4. Append the freeze event to the stream (under the per-subject lock).
+        //    The payload carries the resolved candidates + basis (K-1, K-35) —
+        //    not just a bare person-id list — so the event itself is the audit record.
+        let mut payload = args.clone();
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert("strategy".into(), serde_json::Value::String(strategy_name.to_string()));
+            obj.insert("threshold_pct".into(), json!(threshold_pct));
+            obj.insert("candidates".into(), serde_json::to_value(&candidates)?);
+            obj.insert("smo_result".into(), serde_json::to_value(&smo_result)?);
+        }
+        //    `Some(fqn)` re-checks ReconciledProjection + StrategySelected against the
+        //    freshly-locked state (K-14) — the declared lexicon preconditions were
+        //    previously dead code here (freeze passed `None`, so they never ran).
         let outcome = stream_append(
             "ubo.determination.freeze", subject,
-            TargetBinding::for_subject(subject), args.clone(),
-            "senior-analyst.freeze", None,
+            TargetBinding::for_subject(subject), payload,
+            "senior-analyst.freeze", Some("ubo.determination.freeze"),
             ctx, scope,
         ).await?;
 
@@ -357,7 +427,10 @@ impl SemOsVerbOp for UboDeterminationFreeze {
 
         Ok(VerbExecutionOutcome::Record(json!({
             "seq": outcome.seq,
+            "strategy": strategy_name,
             "resolved_persons": resolved_persons.len(),
+            "candidates": candidates,
+            "smo_result": smo_result,
             "retracted_persons": prior_persons.len().saturating_sub(resolved_persons.len()),
         })))
     }
@@ -372,9 +445,10 @@ impl SemOsVerbOp for KycSubjectRegister {
     fn fqn(&self) -> &str { "kyc.subject.register" }
     async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let payload = normalize_register_payload(args, ctx, subject);
         let outcome = stream_append(
             "kyc.subject.register", subject,
-            TargetBinding::for_subject(subject), args.clone(),
+            TargetBinding::for_subject(subject), payload,
             "analyst.register", None,
             ctx, scope,
         ).await?;
@@ -390,9 +464,10 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
     async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let _class = json_extract_string(args, "structure-class")?;
+        let payload = normalize_classify_structure_payload(args, ctx, subject);
         let outcome = stream_append(
             "kyc.subject.classify-structure", subject,
-            TargetBinding::for_subject(subject), args.clone(),
+            TargetBinding::for_subject(subject), payload,
             "analyst.classify-structure", None,
             ctx, scope,
         ).await?;
@@ -400,6 +475,45 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
     }
 }
 
+/// Normalize `kyc.subject.register` payload for the fold (EOP-DD-KYCUBO-003 R3/M1.1):
+/// the fold reads `entity_id` (`natural_persons_from_events`, `find_subject_entity`);
+/// default it to `subject-id` (self-registration) when the caller registers a
+/// distinct entity/person within the same determination stream via `entity-id`.
+fn normalize_register_payload(
+    args: &serde_json::Value,
+    ctx: &VerbExecutionContext,
+    subject: SubjectId,
+) -> serde_json::Value {
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        obj.remove("entity-id");
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id").unwrap_or(subject.0);
+        obj.insert("entity_id".to_string(), serde_json::Value::String(entity_id.to_string()));
+    }
+    p
+}
+
+/// Normalize `kyc.subject.classify-structure` payload (EOP-DD-KYCUBO-003 R3/M1.1):
+/// the YAML arg is kebab-case `structure-class`, but the fold reads snake_case
+/// `structure_class` (`structure_class_from_payload`) — without this the fold
+/// silently recorded `structure_class: None` in production. Also stamps
+/// `entity_id` (defaulting to `subject-id`) so `find_subject_entity` resolves.
+fn normalize_classify_structure_payload(
+    args: &serde_json::Value,
+    ctx: &VerbExecutionContext,
+    subject: SubjectId,
+) -> serde_json::Value {
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        if let Some(v) = obj.remove("structure-class") {
+            obj.insert("structure_class".to_string(), v);
+        }
+        obj.remove("entity-id");
+        let entity_id = json_extract_uuid_opt(args, ctx, "entity-id").unwrap_or(subject.0);
+        obj.insert("entity_id".to_string(), serde_json::Value::String(entity_id.to_string()));
+    }
+    p
+}
 
 /// Normalize YAML-style arg names (kebab-case) to the fold's expected payload keys (snake_case).
 /// The obligation fold reads "obligation_id" (underscore), not "obligation-id" (hyphen).
@@ -529,6 +643,28 @@ impl SemOsVerbOp for KycPersonApprove {
     fn fqn(&self) -> &str { "kyc.person.approve" }
     async fn execute(&self, args: &serde_json::Value, ctx: &mut VerbExecutionContext, scope: &mut dyn TransactionScope) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+
+        // K-23 gate (EOP-DD-KYCUBO-003 R2/M1.3): a subject may be approved only
+        // once all required obligations have reached an allowed terminal state.
+        // Folded pre-append (same accepted small race window as freeze's
+        // pre-fold, above) rather than inside the ControlState-only
+        // `append_in_scope` validate closure, which has no obligation view.
+        let events = PgKycEventStore::load_events(scope.executor(), subject)
+            .await
+            .map_err(|e| anyhow!("person.approve: load events failed: {e}"))?;
+        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+        let obligations = fold_obligations_versioned(&refs, &KYC_REGISTRY)
+            .map_err(|e| anyhow!("person.approve: obligation fold failed: {e}"))?;
+        let overall = obligations.derive_subject_state(subject);
+        if overall != SubjectOverallState::AllTerminal {
+            return Err(anyhow!(
+                "kyc.person.approve rejected: subject {} obligations are not all terminal \
+                 (state={overall:?}) — K-23 gate (determination and approval are separate; \
+                 approval requires every required obligation to reach a terminal state)",
+                subject.0,
+            ));
+        }
+
         let outcome = stream_append("kyc.person.approve", subject, TargetBinding::for_subject(subject), args.clone(), "senior-analyst.approve", None, ctx, scope).await?;
         Ok(VerbExecutionOutcome::Record(serde_json::json!({ "seq": outcome.seq })))
     }
