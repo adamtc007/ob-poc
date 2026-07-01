@@ -44,6 +44,7 @@
 //!     }
 //! }
 //! ```
+#![deny(unreachable_pub)]
 
 pub mod compiler;
 pub mod mention;
