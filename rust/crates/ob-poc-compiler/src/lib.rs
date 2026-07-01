@@ -5,3 +5,4 @@
 //! This crate is retained as a workspace member to avoid breaking Cargo.toml
 //! dependency declarations; it re-exports nothing and will be removed in a
 //! follow-on cleanup CR when dependent crates' Cargo.toml files are updated.
+#![deny(unreachable_pub)]
