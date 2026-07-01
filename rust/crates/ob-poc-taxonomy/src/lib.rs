@@ -8,6 +8,7 @@
 //!
 //! `crate::taxonomy::*` — generic combinators, builder, stack, rules engine.
 //! `crate::view_config_service::*` — view-mode / node-type / layout loader.
+#![deny(unreachable_pub)]
 
 pub mod taxonomy;
 pub mod view_config_service;
