@@ -8,6 +8,7 @@
 //!
 //! Nothing outside this crate consumes the library beyond `analyze_document`;
 //! the actual LSP server runs as the `dsl-lsp` binary in `main.rs`.
+#![deny(unreachable_pub)]
 
 pub mod analysis;
 pub mod encoding;
