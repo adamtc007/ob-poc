@@ -1,3 +1,4 @@
+#![deny(unreachable_pub)]
 mod lower;
 mod parser;
 mod slots;
