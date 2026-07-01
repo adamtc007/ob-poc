@@ -1,4 +1,4 @@
-# dsl-lowering | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:38:39Z
+# dsl-lowering | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:14Z
 pub mod dsl_lowering
 pub struct dsl_lowering::JourneyBoundaryAttachment
 pub dsl_lowering::JourneyBoundaryAttachment::event_kind: alloc::string::String

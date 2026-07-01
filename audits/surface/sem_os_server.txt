@@ -1,4 +1,4 @@
-# sem_os_server | features=all | HEAD=86031a08098ee6b86f2f5c3a07acf3ab929d9c3c | 2026-07-01T11:42:45Z
+# sem_os_server | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:18Z
 pub mod sem_os_server
 pub struct sem_os_server::JwtConfig
 impl sem_os_server::JwtConfig

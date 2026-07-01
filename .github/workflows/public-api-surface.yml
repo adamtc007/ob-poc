@@ -1,0 +1,56 @@
+name: Public API surface
+
+# Charter-reconciliation-v1 §5/§6.2/§8 ratchet. Converts the Phase 1-4
+# public-surface cleanup (hub retirement, unreachable_pub tightening,
+# pub(crate) narrowing) from a one-time sweep into a standing gate:
+#
+#   1. Ratchet — every crate's --all-features public API must exactly
+#      match its committed audits/surface/<crate>.txt snapshot. Any
+#      change (growth or shrink) fails until the PR explicitly refreshes
+#      the snapshot, so surface changes are a reviewed decision, not a
+#      silent side effect.
+#   2. Membrane (§6.2) — the crates with an optional `database` feature
+#      must carry zero sqlx/PgPool/PgConnection symbols in their
+#      DEFAULT-features surface. The membrane may exist; it must stay
+#      off by default.
+#   3. Test-double leak (§8) — no crate's default surface may expose a
+#      Stub/Mock/Fake-prefixed type unconditionally.
+#
+# See scripts/check-public-api-surface.sh for the implementation.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  surface:
+    name: cargo public-api ratchet (§6.2 membrane + §8 test-double leak)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (stable, for the build)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95
+
+      - name: Install Rust nightly (for cargo-public-api's rustdoc JSON)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-public-api-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-public-api-
+
+      - name: Install cargo-public-api
+        run: cargo install cargo-public-api --locked
+
+      - name: Public API surface gate
+        run: bash scripts/check-public-api-surface.sh
