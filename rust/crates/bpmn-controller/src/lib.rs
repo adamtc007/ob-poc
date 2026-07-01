@@ -17,6 +17,7 @@
 //! This crate depends on `ob-poc-types` for shared DTOs and on `sqlx` for
 //! Postgres access. It does NOT depend on any execution-tier crate (dsl-runtime,
 //! sequencer, domain_ops, sem_os_*). It is a leaf in the ob-poc dependency graph.
+#![deny(unreachable_pub)]
 
 pub(crate) mod deployment;
 pub mod error;
