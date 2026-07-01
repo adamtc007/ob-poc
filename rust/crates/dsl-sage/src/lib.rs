@@ -26,6 +26,7 @@
 //! accuracy.  Plugging in the BGE-small-en-v1.5 model from `ob-semantic-matcher`
 //! is expected to push that to ≥ 80%.  The evaluation harness in
 //! `tests/pack_matching_eval.rs` targets 50% as the BoW baseline.
+#![deny(unreachable_pub)]
 
 pub mod audit;
 pub mod confirmation;
