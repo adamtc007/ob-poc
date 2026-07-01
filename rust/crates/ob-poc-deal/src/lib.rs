@@ -6,6 +6,7 @@
 //!
 //! Relocated from `ob_poc_domain::deal_types` by ob-poc-domain split v1
 //! Slice A2 (2026-05-14).
+#![deny(unreachable_pub)]
 
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
