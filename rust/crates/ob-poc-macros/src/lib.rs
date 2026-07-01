@@ -9,6 +9,7 @@
 //! had migrated to `sem_os_postgres::ops::SemOsVerbOp`; the sibling
 //! `dsl-runtime-macros` crate that briefly owned it was removed in the
 //! same slice.
+#![deny(unreachable_pub)]
 
 use proc_macro::TokenStream;
 
