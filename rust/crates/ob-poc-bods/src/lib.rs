@@ -5,6 +5,7 @@
 //!
 //! Relocated from `ob_poc_domain::bods_types` by ob-poc-domain split v1
 //! Slice A1 (2026-05-14). Single file, single capability.
+#![deny(unreachable_pub)]
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
