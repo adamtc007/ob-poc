@@ -29,6 +29,7 @@
 //!     (cbu.assign-role :cbu "$cbu_id" :entity person :role DIRECTOR)
 //!     ...)
 //! ```
+#![deny(unreachable_pub)]
 
 mod definition;
 mod error;
