@@ -104,7 +104,6 @@ pub mod tollgate_evaluate;
 pub mod trading_matrix;
 pub mod trading_profile_ca;
 pub mod trust;
-pub mod ubo_registry;
 pub mod verify;
 pub mod view;
 
@@ -394,13 +393,12 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(import_run::Complete));
     registry.register(Arc::new(import_run::Supersede));
 
-    // Phase B slice #24: ubo.registry domain (5 plugin verbs — state
-    // machine lifecycle promote/advance/waive/reject/expire).
-    registry.register(Arc::new(ubo_registry::Promote));
-    registry.register(Arc::new(ubo_registry::Advance));
-    registry.register(Arc::new(ubo_registry::Waive));
-    registry.register(Arc::new(ubo_registry::Reject));
-    registry.register(Arc::new(ubo_registry::Expire));
+    // Phase B slice #24 (ubo.registry domain, 5 plugin verbs —
+    // promote/advance/waive/reject/expire) DELETED (state-graph
+    // remediation Phase 6a): every op phantom-wrote nonexistent columns
+    // against the live kyc_ubo_registry/kyc_ubo_evidence schema and never
+    // successfully executed. Superseded by the dsl.kyc stream-governed
+    // verb families (see kyc_dag.yaml's stream_governed block).
 
     // Phase B slice #25: entity domain (6 plugin verbs — ghost/
     // identify person lifecycle + placeholder resolution).

@@ -143,12 +143,13 @@ slots:
       mark_deceased: { verb: ubo.mark-deceased, when: filled }
       mark_terminus: { verb: ubo.mark-terminus, when: filled }
       convergence_supersede: { verb: ubo.convergence-supersede, when: filled }
-      registry_create: { verb: ubo.registry.create, when: [empty, filled] }
-      registry_advance: { verb: ubo.registry.advance, when: filled }
-      registry_promote: { verb: ubo.registry.promote, when: filled }
-      registry_reject: { verb: ubo.registry.reject, when: filled }
-      registry_expire: { verb: ubo.registry.expire, when: filled }
-      registry_waive: { verb: ubo.registry.waive, when: filled }
+      # registry_create/advance/promote/reject/expire/waive removed
+      # (state-graph remediation Phase 6a): the ubo.registry.* verb family
+      # they referenced was deleted (phantom-writing ops that never
+      # successfully executed). This constellation slot pre-dates the W1-W7
+      # dsl.kyc migration and references numerous other already-deleted
+      # legacy verbs (ubo.discover, ubo.allege, ubo.compute-chains, etc.) --
+      # a large pre-existing residual out of this remediation's scope.
       snapshot_capture: { verb: ubo.snapshot.capture, when: filled }
       snapshot_diff: { verb: ubo.snapshot.diff, when: filled }
   control_chain:

@@ -533,109 +533,15 @@ slots:
           via: evidence.require  # re-collection
       terminal_states: [REJECTED]
 
-  - id: kyc_ubo_registry
-    stateless: false
-    state_machine:
-      id: kyc_ubo_registry_lifecycle
-      source_entity: '"ob-poc".kyc_ubo_registry'
-      state_column: status
-      description: |
-        UBO promotion lifecycle within a KYC case. 9 states tracking
-        the UBO's journey from candidate through formal declaration.
-      predicate_bindings:
-        - entity: entity_match
-          source_kind: dag_entity
-          source_entity: entity_match
-          scope: attached_to this UBO
-        - entity: ownership_percentage
-          source_kind: dag_entity
-          source_entity: ownership_percentage
-          scope: attached_to this UBO
-          value_column: value
-        - entity: evidence_requirement
-          source_kind: dag_entity
-          source_entity: evidence_requirement
-          scope: attached_to this UBO
-          required_universe:
-            source_kind: dag_entity
-            source_entity: ubo_evidence_requirement
-        - entity: ubo_taxonomy
-          source_kind: dag_entity
-          source_entity: ubo_taxonomy
-          scope: parent case
-        - entity: red_flag
-          source_kind: dag_entity
-          source_entity: red_flag
-          scope: attached_to this UBO
-      states:
-        - id: CANDIDATE
-          entry: true
-          description: "Identified as potential UBO."
-        - id: IDENTIFIED
-          description: "Formally identified as UBO."
-          green_when: |
-            entity_match exists
-            AND entity_match.state = THRESHOLD_PASSED
-            AND ownership_percentage exists
-            AND ownership_percentage.value >= registration_threshold
-        - id: PROVABLE
-          description: "Evidence path exists to prove UBO status."
-          green_when: |
-            every required evidence_requirement exists for this UBO
-        - id: PROVED
-          description: "Evidence collected and verified."
-          green_when: |
-            every required evidence_requirement exists for this UBO
-            AND every required evidence_requirement.state = VERIFIED
-        - id: REVIEWED
-          description: "Reviewed by compliance."
-        - id: APPROVED
-          description: "Approved as UBO in the case."
-          green_when: |
-            every required evidence_requirement exists for this UBO
-            AND every required evidence_requirement.state = VERIFIED
-            AND ubo_taxonomy exists for parent case
-            AND ubo_taxonomy.state = COMPLETE
-            AND no red_flag exists with state = OPEN AND attached_to this UBO
-        - id: WAIVED
-          description: "Waived — compliance accepts non-UBO outcome."
-        - id: REJECTED
-          description: "Rejected — not a UBO."
-        - id: EXPIRED
-          description: "Stale; periodic review required."
-      transitions:
-        # State-node green-switch model (v1.4): each transition's
-        # destination state declares its green_when predicate. Verbs
-        # run while source is green and make changes that satisfy
-        # the destination's green_when.
-        - from: CANDIDATE
-          to: IDENTIFIED
-          via: ubo.registry.promote
-        - from: IDENTIFIED
-          to: PROVABLE
-          via: ubo.registry.advance
-        - from: PROVABLE
-          to: PROVED
-          via: ubo.registry.advance
-        - from: PROVED
-          to: REVIEWED
-          via: "(compliance review)"
-        - from: REVIEWED
-          to: APPROVED
-          via: ubo.registry.advance
-        - from: REVIEWED
-          to: WAIVED
-          via: "(compliance waiver)"
-        - from: REVIEWED
-          to: REJECTED
-          via: ubo.registry.reject
-        - from: APPROVED
-          to: EXPIRED
-          via: "(time-decay)"
-        - from: EXPIRED
-          to: CANDIDATE
-          via: "(periodic review: ubo.registry.expire then re-enter as candidate)"
-      terminal_states: [APPROVED, WAIVED, REJECTED]
+  # kyc_ubo_registry slot DELETED (state-graph remediation Phase 6a): the
+  # entire ubo.registry.* verb family it depended on (promote/advance/
+  # waive/reject/expire) has been deleted -- every op phantom-wrote
+  # nonexistent columns against the live kyc_ubo_registry/kyc_ubo_evidence
+  # schema and never successfully executed. The stream_governed block
+  # (Phase 5a, above) is the successor declaration: dsl.kyc/ubo.edge.*/
+  # ubo.determination.* verbs govern UBO determination now, deliberately
+  # with no DAG slot (governance is lexicon + fold-precondition + K-23, not
+  # a from-state/to-state FSM).
 
   - id: kyc_ubo_evidence
     stateless: false
@@ -1018,9 +924,11 @@ slots:
         - from: PENDING
           to: MANUAL_REQUIRED
           via: "(backend: pipeline failure)"
-        - from: MANUAL_REQUIRED
-          to: DISCOVERED
-          via: ubo.registry.promote  # cross-workspace from KYC
+        # from: MANUAL_REQUIRED to: DISCOVERED row deleted (state-graph
+        # remediation Phase 6a, POLICY): via: ubo.registry.promote no
+        # longer exists (the whole ubo.registry.* family was deleted --
+        # phantom-writing ops that never successfully executed). wire-later:
+        # no verb currently resolves a manual UBO-discovery override.
       terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
 
   - id: investor

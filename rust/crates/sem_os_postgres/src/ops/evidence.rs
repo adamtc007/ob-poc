@@ -5,6 +5,13 @@
 //! State machine: REQUIRED → RECEIVED → VERIFIED; reject clears
 //! the document link and returns to REQUIRED-like; any state →
 //! WAIVED. Shared runner functions + thin alias ops.
+//!
+//! Superseded-by-obligation-projection (state-graph remediation Phase 6b):
+//! the dsl.kyc stream (`ubo.edge.attach-evidence`, `kyc_obligation_projection`
+//! identity/screening/risk tracks) is the determination-path evidence
+//! model going forward. This module is retained only for case-level
+//! outreach (evidence requests/uploads scoped to a case, not yet folded
+//! into the stream) until W5 wires that path onto the stream too.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -32,30 +39,42 @@ async fn do_require(
     ctx: &mut VerbExecutionContext,
     scope: &mut dyn TransactionScope,
 ) -> Result<VerbExecutionOutcome> {
-    let registry_id = json_extract_uuid(args, ctx, "registry-id")?;
+    // Columns fixed (state-graph remediation Phase 6b): the prior INSERT
+    // targeted registry_id/description/doc_type -- none exist on the live
+    // kyc_ubo_evidence table (PK-referencing column is ubo_id; there is no
+    // description or doc_type column, only notes). This op phantom-wrote on
+    // every invocation before this fix.
+    let ubo_id = json_extract_uuid(args, ctx, "registry-id")?;
     let evidence_type = json_extract_string(args, "evidence-type")?;
     let description = json_extract_string_opt(args, "description");
     let doc_type = json_extract_string_opt(args, "doc-type");
+    // notes is the only free-text column that exists; fold both former
+    // (nonexistent-column) args into it rather than silently dropping them.
+    let notes = match (description, doc_type) {
+        (Some(d), Some(t)) => Some(format!("{d} [doc-type: {t}]")),
+        (Some(d), None) => Some(d),
+        (None, Some(t)) => Some(format!("[doc-type: {t}]")),
+        (None, None) => None,
+    };
 
     let evidence_id: Uuid = sqlx::query_scalar(
         r#"
         INSERT INTO "ob-poc".kyc_ubo_evidence
-            (registry_id, evidence_type, description, doc_type, status)
-        VALUES ($1, $2, $3, $4, 'REQUIRED')
+            (ubo_id, evidence_type, notes, status)
+        VALUES ($1, $2, $3, 'REQUIRED')
         RETURNING evidence_id
         "#,
     )
-    .bind(registry_id)
+    .bind(ubo_id)
     .bind(&evidence_type)
-    .bind(&description)
-    .bind(&doc_type)
+    .bind(&notes)
     .fetch_one(scope.executor())
     .await?;
 
     ctx.bind("evidence", evidence_id);
     Ok(VerbExecutionOutcome::Record(json!({
         "evidence_id": evidence_id,
-        "registry_id": registry_id,
+        "registry_id": ubo_id,
         "evidence_type": evidence_type,
         "status": "REQUIRED",
     })))
@@ -173,20 +192,25 @@ async fn do_waive(
     ctx: &mut VerbExecutionContext,
     scope: &mut dyn TransactionScope,
 ) -> Result<VerbExecutionOutcome> {
+    // Columns fixed (state-graph remediation Phase 6b): the prior UPDATE
+    // targeted waived_reason/waived_by -- neither exists on the live
+    // kyc_ubo_evidence table. Waiver metadata lives on kyc_ubo_registry,
+    // not evidence; the only real free-text column here is notes, so both
+    // reason and authority are folded into it.
     let evidence_id = json_extract_uuid(args, ctx, "evidence-id")?;
     let reason = json_extract_string(args, "reason")?;
     let authority = json_extract_string(args, "authority")?;
     let _ = fetch_status(scope, evidence_id).await?;
+    let waiver_note = format!("[WAIVED by {authority}] {reason}");
     sqlx::query(
         r#"
         UPDATE "ob-poc".kyc_ubo_evidence
-        SET status = 'WAIVED', waived_reason = $2, waived_by = $3, updated_at = NOW()
+        SET status = 'WAIVED', notes = $2, updated_at = NOW()
         WHERE evidence_id = $1
         "#,
     )
     .bind(evidence_id)
-    .bind(&reason)
-    .bind(&authority)
+    .bind(&waiver_note)
     .execute(scope.executor())
     .await?;
     Ok(VerbExecutionOutcome::Record(json!({
