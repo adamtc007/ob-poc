@@ -93,7 +93,22 @@ pub struct BatchOnboardingResult {
 // State Machine Validation
 // =============================================================================
 
-/// Valid deal status transitions
+/// Valid deal status (commercial lifecycle) transitions.
+///
+/// deal.update-status governs `deals.deal_status` ONLY (state-graph
+/// remediation Phase 4b). The four ONBOARDING/ACTIVE/WINDING_DOWN/OFFBOARDED
+/// transitions that used to live here were operational-lifecycle moves
+/// misfiled onto the commercial column: `deals.deal_status`'s live CHECK
+/// constraint (`deals_status_check`) never allowed those four values at all
+/// (only PROSPECT/QUALIFYING/NEGOTIATING/IN_CLEARANCE/CONTRACTED/LOST/
+/// REJECTED/WITHDRAWN/CANCELLED are legal) -- so any deal that reached
+/// CONTRACTED and was then "advanced" via update-status would phantom-write
+/// an illegal deal_status value and error. That operational lifecycle
+/// already exists as its own column (`deals.operational_status`, values
+/// ONBOARDING/ACTIVE/SUSPENDED/WINDING_DOWN/OFFBOARDED) driven by
+/// deal.suspend/.reinstate/.begin-winding-down/.complete-offboard via
+/// SimpleStatusOp -- deal_status stops (correctly) at CONTRACTED, which is
+/// terminal-in-commercial, not terminal globally.
 fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
     matches!(
         (from, to),
@@ -110,12 +125,7 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
             | ("IN_CLEARANCE", "LOST")
             | ("IN_CLEARANCE", "WITHDRAWN")
             | ("IN_CLEARANCE", "CANCELLED")
-            | ("CONTRACTED", "ONBOARDING")
             | ("CONTRACTED", "CANCELLED")
-            | ("ONBOARDING", "ACTIVE")
-            | ("ONBOARDING", "CANCELLED")
-            | ("ACTIVE", "WINDING_DOWN")
-            | ("WINDING_DOWN", "OFFBOARDED")
     )
 }
 
@@ -435,8 +445,7 @@ impl SemOsVerbOp for UpdateStatus {
         let timestamp_column = match new_status.as_str() {
             "QUALIFYING" => Some("qualified_at"),
             "CONTRACTED" => Some("contracted_at"),
-            "ACTIVE" => Some("active_at"),
-            "OFFBOARDED" | "CANCELLED" => Some("closed_at"),
+            "CANCELLED" => Some("closed_at"),
             _ => None,
         };
 
@@ -743,17 +752,29 @@ impl SemOsVerbOp for Cancel {
         let deal_id = json_extract_uuid(args, ctx, "deal-id")?;
         let reason = json_extract_string(args, "reason")?;
 
-        let current_status: String =
-            sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
-                .bind(deal_id)
-                .fetch_one(scope.executor())
-                .await?;
+        // Guard retargeted (state-graph remediation Phase 4c): ACTIVE/
+        // WINDING_DOWN/OFFBOARDED are deals.operational_status values, not
+        // deals.deal_status values -- deal_status's live CHECK constraint
+        // never allowed them, so checking for them on deal_status was dead.
+        // deal_status's own guard keeps only its own legal terminal value.
+        let (current_status, operational_status): (String, Option<String>) = sqlx::query_as(
+            r#"SELECT deal_status, operational_status FROM "ob-poc".deals WHERE deal_id = $1"#,
+        )
+        .bind(deal_id)
+        .fetch_one(scope.executor())
+        .await?;
 
-        if matches!(
-            current_status.as_str(),
-            "ACTIVE" | "WINDING_DOWN" | "OFFBOARDED" | "CANCELLED"
-        ) {
+        if current_status == "CANCELLED" {
             return Err(anyhow!("Cannot cancel deal in status {}", current_status));
+        }
+        if matches!(
+            operational_status.as_deref(),
+            Some("ACTIVE") | Some("WINDING_DOWN") | Some("OFFBOARDED")
+        ) {
+            return Err(anyhow!(
+                "Cannot cancel deal with operational_status {}",
+                operational_status.unwrap_or_default()
+            ));
         }
 
         sqlx::query(
@@ -776,6 +797,25 @@ impl SemOsVerbOp for Cancel {
         .bind(deal_id)
         .bind(&current_status)
         .bind(&reason)
+        .execute(scope.executor())
+        .await?;
+
+        // Cascade (state-graph remediation Phase 4g): deal_dag.yaml's
+        // deal_cancel_cascades rule declares non-terminal rate cards move
+        // to CANCELLED when their deal is cancelled; this was declared but
+        // never implemented. Only the rate-card cascade is implemented
+        // here -- deal_product/deal_onboarding_request/billing_profile/
+        // deal_document cascades in the same DAG rule remain unimplemented
+        // (out of this remediation's ratified scope).
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".deal_rate_cards
+            SET status = 'CANCELLED', updated_at = NOW()
+            WHERE deal_id = $1
+              AND status IN ('DRAFT', 'PENDING_INTERNAL_APPROVAL', 'APPROVED_INTERNALLY', 'PROPOSED', 'COUNTER_PROPOSED')
+            "#,
+        )
+        .bind(deal_id)
         .execute(scope.executor())
         .await?;
 
@@ -2191,8 +2231,13 @@ impl SemOsVerbOp for UpdateOnboardingStatus {
             .await?;
 
             if pending_count == 0 {
+                // Column fixed (state-graph remediation Phase 4d): ONBOARDING
+                // and ACTIVE are deals.operational_status values, not
+                // deal_status values -- deal_status's CHECK constraint never
+                // allowed either, so this UPDATE's WHERE clause could never
+                // match any row (a live dead-writer bug).
                 sqlx::query(
-                    r#"UPDATE "ob-poc".deals SET deal_status = 'ACTIVE', active_at = NOW(), updated_at = NOW() WHERE deal_id = $1 AND deal_status = 'ONBOARDING'"#,
+                    r#"UPDATE "ob-poc".deals SET operational_status = 'ACTIVE', active_at = NOW(), updated_at = NOW() WHERE deal_id = $1 AND operational_status = 'ONBOARDING'"#,
                 )
                 .bind(deal_id)
                 .execute(scope.executor())
@@ -2452,6 +2497,25 @@ mod tests {
             "KYC_CLEARANCE",
             "CONTRACTED"
         ));
+    }
+
+    /// RED (state-graph remediation Phase 4b): deal.update-status must not
+    /// advance deal_status into the operational lifecycle. ONBOARDING/
+    /// ACTIVE/WINDING_DOWN/OFFBOARDED are not legal deals.deal_status values
+    /// per the live deals_status_check CHECK constraint -- that lifecycle is
+    /// deals.operational_status, driven by deal.suspend/.reinstate/
+    /// .begin-winding-down/.complete-offboard.
+    #[test]
+    fn update_status_rejects_operational_lifecycle_values() {
+        assert!(!is_valid_deal_status_transition("CONTRACTED", "ONBOARDING"));
+        assert!(!is_valid_deal_status_transition("ONBOARDING", "ACTIVE"));
+        assert!(!is_valid_deal_status_transition("ACTIVE", "WINDING_DOWN"));
+        assert!(!is_valid_deal_status_transition(
+            "WINDING_DOWN",
+            "OFFBOARDED"
+        ));
+        // CONTRACTED remains terminal-in-commercial: only CANCELLED stays legal.
+        assert!(is_valid_deal_status_transition("CONTRACTED", "CANCELLED"));
     }
 
     #[test]

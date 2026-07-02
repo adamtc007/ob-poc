@@ -733,8 +733,11 @@ slots:
 
   # R-4 NEW: trading_activity — per-CBU signal slot tracking first-trade
   # event + dormancy detection. Projects INTO CBU tollgate aggregate
-  # (cbu.operationally_active). Not a stored table in current schema;
-  # Tranche 3 migration will add cbu_trading_activity keyed by cbu_id.
+  # (cbu.operationally_active).
+  # state-graph remediation Phase 4d: the prior "not a stored table in
+  # current schema; Tranche 3 migration will add cbu_trading_activity" note
+  # was stale -- the table already exists live (verified), but has zero
+  # writers (see Phase 7b: cbu_trading_activity deprecation).
   - id: trading_activity
     constellation: trading.streetside
     stateless: false
@@ -742,7 +745,7 @@ slots:
       id: trading_activity_lifecycle
       owner: "trading+ops"
       expected_lifetime: long_lived
-      source_entity: '"ob-poc".cbu_trading_activity'  # DAG-first; schema follows in Tranche 3
+      source_entity: '"ob-poc".cbu_trading_activity'
       state_column: activity_state
       scope: per_cbu
       description: |

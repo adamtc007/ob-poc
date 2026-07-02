@@ -221,7 +221,7 @@ domains:
             type: string
             required: false
             maps_to: deal_status
-            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE, CONTRACTED, LOST, REJECTED, WITHDRAWN, CANCELLED]
           - name: sales-owner
             type: string
             required: false
@@ -345,7 +345,7 @@ domains:
             type: string
             required: true
             maps_to: deal_status
-            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE, CONTRACTED, LOST, REJECTED, WITHDRAWN, CANCELLED]
         returns:
           type: affected
         three_axis:
@@ -411,7 +411,7 @@ domains:
             type: string
             required: true
             maps_to: deal_status
-            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, KYC_CLEARANCE, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE, CONTRACTED, LOST, REJECTED, WITHDRAWN, CANCELLED]
         returns:
           type: affected
         three_axis:
@@ -2059,7 +2059,7 @@ domains:
             type: string
             required: true
             maps_to: request_status
-            valid_values: [REQUESTED, KYC_PENDING, KYC_CLEARED, IN_PROGRESS, COMPLETED, BLOCKED, CANCELLED]
+            valid_values: [PENDING, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED]
           - name: kyc-case-id
             type: uuid
             required: false
