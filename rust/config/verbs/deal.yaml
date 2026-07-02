@@ -2493,6 +2493,11 @@ domains:
         audit_class: deal_submit_for_pricing_approval
         description: "Submit rate card to pricing committee for internal approval (bespoke / discount threshold / new jurisdiction)"
         behavior: plugin
+        lifecycle:
+          entity_arg: rate-card-id
+          # From-state populated from deal_dag.yaml's pricing_approval slot
+          # transitions (state-graph remediation Phase 3c).
+          requires_states: [DRAFT]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2532,6 +2537,9 @@ domains:
         audit_class: deal_pricing_approve
         description: "Pricing committee approval of rate card — advances to ready-to-propose"
         behavior: plugin
+        lifecycle:
+          entity_arg: rate-card-id
+          requires_states: [PENDING_INTERNAL_APPROVAL]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2570,6 +2578,9 @@ domains:
         audit_class: deal_pricing_reject
         description: "Pricing committee rejection — rate card returns to DRAFT for revision"
         behavior: plugin
+        lifecycle:
+          entity_arg: rate-card-id
+          requires_states: [PENDING_INTERNAL_APPROVAL]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2612,6 +2623,10 @@ domains:
         audit_class: deal_mark_lost
         description: "Mark deal as lost (competitor won)"
         behavior: plugin
+        lifecycle:
+          entity_arg: deal-id
+          # ratified state-graph remediation Phase 3c populate list.
+          requires_states: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2655,6 +2670,9 @@ domains:
         audit_class: deal_mark_withdrawn
         description: "Mark deal as withdrawn (client walked away)"
         behavior: plugin
+        lifecycle:
+          entity_arg: deal-id
+          requires_states: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2697,6 +2715,16 @@ domains:
         audit_class: deal_reject
         description: "Reject deal (terminal-negative; internal decision)"
         behavior: plugin
+        lifecycle:
+          entity_arg: deal-id
+          # NOTE: deal_dag.yaml's own transitions list only declares
+          # IN_CLEARANCE -> REJECTED (shared row with deal.bac-reject) for
+          # this verb; this wider 4-state set is the explicitly ratified
+          # state-graph remediation Phase 3c value, deliberately broader
+          # than the DAG row (a deal may be rejected pre-clearance too). The
+          # DAG/YAML mismatch this creates is flagged as a residual, not
+          # fixed here (see the closure-audit follow-up notes).
+          requires_states: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2850,6 +2878,11 @@ domains:
         flavour: instance_adding
         description: "Begin remediation of a breached SLA (transition BREACHED → IN_REMEDIATION)"
         behavior: plugin
+        lifecycle:
+          entity_arg: sla-id
+          # From-state populated from deal_dag.yaml's sla_status slot
+          # transitions (state-graph remediation Phase 3c).
+          requires_states: [BREACHED]
         effect_class: read_modify_write
         metadata:
           tier: intent
@@ -2885,6 +2918,9 @@ domains:
         flavour: attribute_mutating
         description: "Resolve SLA breach (remediation complete; transition to RESOLVED)"
         behavior: plugin
+        lifecycle:
+          entity_arg: sla-id
+          requires_states: [IN_REMEDIATION]
         effect_class: read_modify_write
         metadata:
           tier: intent
@@ -2924,6 +2960,9 @@ domains:
         audit_class: deal_waive_sla_breach
         description: "Waive SLA breach (client concession; breach not pursued)"
         behavior: plugin
+        lifecycle:
+          entity_arg: sla-id
+          requires_states: [BREACHED]
         metadata:
           tier: intent
           source_of_truth: operational

@@ -941,6 +941,84 @@ fn is_generic_lookup_kind(kind: &str) -> bool {
 }
 
 // =============================================================================
+// LOAD-TIME LIFECYCLE INVARIANTS (state-graph remediation, RW-2, Phase 3)
+// =============================================================================
+
+/// Load-time lifecycle-config invariants. Both are HARD LOAD ERRORS: each one
+/// closes a silent fail-open enforcement gap where a verb's YAML *looked*
+/// gated but the executor never actually checked anything.
+///
+/// - 3a: `requires_states` without `entity_arg` fails open by construction in
+///   `enforce_requires_states_precondition`
+///   (`rust/src/dsl_v2/executor.rs`) — that function returns `Ok(())`
+///   immediately once `lifecycle.entity_arg` is `None`, so the declared
+///   states are never checked against anything.
+/// - 3b: `transitions_to` on a `behavior: plugin` or `behavior: crud,
+///   operation: insert` verb is dead documentation — it is read only by
+///   `validate_lifecycle_transition`, called exclusively from
+///   `execute_update` / `execute_update_in_tx` in
+///   `rust/src/dsl_v2/generic_executor.rs`, never from `execute_insert` or
+///   any plugin dispatch path. `requires_states` is deliberately excluded
+///   from this check: `enforce_requires_states_precondition` (3a's
+///   mechanism) is behavior-agnostic — it runs at `execute_verb_in_scope`,
+///   the single chokepoint every verb (plugin or CRUD) dispatches through —
+///   so `requires_states` alone is legitimately enforceable on a plugin verb
+///   once `entity_arg` is set. A plugin op with its own dedicated
+///   precondition logic (e.g. `SimpleStatusOp`'s from-state check, Phase 3c)
+///   is a second, independent enforcement path for `requires_states`, not a
+///   `validate_lifecycle_transition` call — so it never satisfies this rule,
+///   which is why `transitions_to` (never independently re-implemented; only
+///   ever consumed by `validate_lifecycle_transition`) is the correct signal
+///   here, not the mere presence of any lifecycle block.
+pub fn validate_lifecycle_invariants(registry: &RuntimeVerbRegistry) -> Result<()> {
+    let mut errors = Vec::new();
+
+    for verb in registry.all_verbs() {
+        let Some(lifecycle) = verb.lifecycle.as_ref() else {
+            continue;
+        };
+
+        if !lifecycle.requires_states.is_empty() && lifecycle.entity_arg.is_none() {
+            errors.push(format!(
+                "{}: requires_states {:?} declared without entity_arg -- \
+                 enforce_requires_states_precondition fails open (never enforced) \
+                 without an entity_arg binding",
+                verb.full_name, lifecycle.requires_states
+            ));
+        }
+
+        if lifecycle.transitions_to.is_some() {
+            let unenforced_behavior = match &verb.behavior {
+                RuntimeBehavior::Plugin(_) => Some("plugin"),
+                RuntimeBehavior::Crud(crud) if crud.operation == CrudOperation::Insert => {
+                    Some("crud/insert")
+                }
+                _ => None,
+            };
+            if let Some(kind) = unenforced_behavior {
+                errors.push(format!(
+                    "{}: transitions_to={:?} declared on a behavior:{} verb -- \
+                     validate_lifecycle_transition is only called from \
+                     execute_update/execute_update_in_tx, so this value is never written \
+                     or enforced from this field",
+                    verb.full_name, lifecycle.transitions_to, kind
+                ));
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "verb config lifecycle invariant violation(s) ({} verb(s)):\n  - {}",
+            errors.len(),
+            errors.join("\n  - ")
+        ))
+    }
+}
+
+// =============================================================================
 // GLOBAL REGISTRY ACCESSOR
 // =============================================================================
 
@@ -962,6 +1040,9 @@ pub fn runtime_registry() -> &'static RuntimeVerbRegistry {
                 let templates_dir = loader.config_dir().join("templates");
                 let registry =
                     RuntimeVerbRegistry::from_config_and_templates_dir(&config, &templates_dir);
+                if let Err(e) = validate_lifecycle_invariants(&registry) {
+                    panic!("FATAL: verb config failed load-time validation:\n{}", e);
+                }
                 info!(
                     "Loaded runtime registry: {} verbs across {} domains, {} templates",
                     registry.len(),
@@ -1001,6 +1082,9 @@ pub fn runtime_registry_arc() -> Arc<RuntimeVerbRegistry> {
                     let templates_dir = loader.config_dir().join("templates");
                     let registry =
                         RuntimeVerbRegistry::from_config_and_templates_dir(&config, &templates_dir);
+                    if let Err(e) = validate_lifecycle_invariants(&registry) {
+                        panic!("FATAL: verb config failed load-time validation:\n{}", e);
+                    }
                     info!(
                         "Loaded Arc runtime registry: {} verbs, {} templates",
                         registry.len(),
@@ -1350,5 +1434,79 @@ mod tests {
                 std::mem::discriminant(other)
             ),
         }
+    }
+
+    // =========================================================================
+    // Phase 3 load-time lifecycle invariants (state-graph remediation, RW-2)
+    // =========================================================================
+
+    /// RED: `requires_states` without `entity_arg` must be REJECTED at load.
+    #[test]
+    fn requires_states_without_entity_arg_is_rejected() {
+        let mut config = create_test_config();
+        let cbu_domain = config.domains.get_mut("cbu").expect("cbu domain");
+        let create_verb = cbu_domain.verbs.get_mut("create").expect("create verb");
+        create_verb.lifecycle = Some(VerbLifecycle {
+            entity_arg: None,
+            requires_states: vec!["FOO".to_string()],
+            ..Default::default()
+        });
+
+        let registry = RuntimeVerbRegistry::from_config(&config);
+        let result = validate_lifecycle_invariants(&registry);
+
+        assert!(result.is_err(), "expected rejection, got Ok");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("cbu.create") && msg.contains("entity_arg"),
+            "error should name the bad verb and the missing entity_arg: {msg}"
+        );
+    }
+
+    /// RED: `transitions_to` on a `behavior: plugin` verb must be REJECTED
+    /// at load (dead documentation -- validate_lifecycle_transition is only
+    /// reachable from the CRUD update path).
+    #[test]
+    fn transitions_to_on_plugin_verb_is_rejected() {
+        let mut config = create_test_config();
+        let cbu_domain = config.domains.get_mut("cbu").expect("cbu domain");
+        let create_verb = cbu_domain.verbs.get_mut("create").expect("create verb");
+        create_verb.behavior = VerbBehavior::Plugin;
+        create_verb.handler = Some("SomePluginOp".to_string());
+        create_verb.lifecycle = Some(VerbLifecycle {
+            entity_arg: Some("cbu-id".to_string()),
+            transitions_to: Some("SOME_STATE".to_string()),
+            ..Default::default()
+        });
+
+        let registry = RuntimeVerbRegistry::from_config(&config);
+        let result = validate_lifecycle_invariants(&registry);
+
+        assert!(result.is_err(), "expected rejection, got Ok");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("cbu.create") && msg.contains("transitions_to"),
+            "error should name the bad verb and transitions_to: {msg}"
+        );
+    }
+
+    /// GREEN: a verb with requires_states + entity_arg on a plugin behavior,
+    /// and no transitions_to, passes -- this is exactly the shape the CBU
+    /// operational verbs (cbu.suspend et al.) were fixed into.
+    #[test]
+    fn requires_states_with_entity_arg_on_plugin_passes() {
+        let mut config = create_test_config();
+        let cbu_domain = config.domains.get_mut("cbu").expect("cbu domain");
+        let create_verb = cbu_domain.verbs.get_mut("create").expect("create verb");
+        create_verb.behavior = VerbBehavior::Plugin;
+        create_verb.handler = Some("SomePluginOp".to_string());
+        create_verb.lifecycle = Some(VerbLifecycle {
+            entity_arg: Some("cbu-id".to_string()),
+            requires_states: vec!["actively_trading".to_string()],
+            ..Default::default()
+        });
+
+        let registry = RuntimeVerbRegistry::from_config(&config);
+        assert!(validate_lifecycle_invariants(&registry).is_ok());
     }
 }
