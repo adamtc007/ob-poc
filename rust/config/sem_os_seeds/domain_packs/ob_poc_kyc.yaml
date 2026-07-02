@@ -26,6 +26,11 @@ owned_verb_prefixes:
   - kyc-case.
   - kyc.
   - screening.
+  # state-graph remediation Phase 5b: no domain pack previously declared
+  # ownership of the ubo. prefix at all -- a governance gap for all 13 live
+  # dsl.kyc determination verbs (ubo.edge.*, ubo.determination.*,
+  # ubo.board-controller.override).
+  - ubo.
 owned_entity_kinds:
   - kyc_case
 business_crates: []

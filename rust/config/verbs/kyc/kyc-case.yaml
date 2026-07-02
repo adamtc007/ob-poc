@@ -297,6 +297,59 @@ domains:
           entity_id_arg: case-id
           target_workspace: kyc
           target_slot: kyc_case
+
+      refer:
+        flavour: discretionary
+        effect_class: admin_override
+        role_guard:
+          any_of: [compliance_officer, senior_compliance, mlro]
+        audit_class: kyc_case_refer
+        description: "Refer case to regulator (dedicated cascade — state-graph remediation Phase 5e)"
+        invocation_phrases:
+          - "refer case to regulator"
+          - "refer this case to the regulator"
+          - "escalate to the regulator"
+          - "this needs a regulatory referral"
+          - "file a regulatory referral"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: kyc_case
+          tags: [kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        behavior: plugin
+        handler: KycCaseReferOp
+        emits_event: case.referred
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            maps_to: case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: ob-poc
+              search_key: case_id
+              primary_key: case_id
+          - name: reason
+            type: string
+            required: true
+            maps_to: reason
+        returns:
+          type: record
+          description: "Returns KycCaseCloseResult with status REFER_TO_REGULATOR"
+        three_axis:
+          state_effect: transition
+          external_effects: [emitting]
+          consequence:
+            baseline: requires_explicit_authorisation
+        transition_args:
+          entity_id_arg: case-id
+          target_workspace: kyc
+          target_slot: kyc_case
+
       approve-with-conditions:
         flavour: discretionary
         effect_class: admin_override

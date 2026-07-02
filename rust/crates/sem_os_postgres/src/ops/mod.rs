@@ -804,6 +804,8 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(kyc_case::Close));
     registry.register(Arc::new(kyc_case::Approve));
     registry.register(Arc::new(kyc_case::Reject));
+    // state-graph remediation Phase 5e: dedicated regulator-referral verb.
+    registry.register(Arc::new(kyc_case::Refer));
     registry.register(Arc::new(kyc_case::ApproveWithConditions));
     registry.register(Arc::new(kyc_case::Escalate));
     registry.register(Arc::new(kyc_case::Summarize));

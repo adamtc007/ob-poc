@@ -43,6 +43,48 @@ dsl_verb_reconciliation:
     - screening.sanctions-check
 
 # =============================================================================
+# STREAM-GOVERNED SURFACE (state-graph remediation Phase 5a)
+# =============================================================================
+# The dsl.kyc determination vocabulary (EOP-VS-KYCUBO-001) is NOT modelled
+# as DAG slots/transitions -- its governance model is structurally different
+# from the CRUD-lifecycle slots above and deliberately absent here. This
+# block converts that absence-by-silence into declared law, per the
+# state-graph closure audit (docs/generated/state-graph-closure-audit.md).
+stream_governed:
+  description: |
+    The verb stream (`"ob-poc".kyc_intent_events`) is the system of record
+    for UBO/control determination -- not a mutable-row FSM, so it has no
+    from-state/to-state transitions to declare as DAG slots. Governance is
+    enforced at append-time by the substrate (ob-poc-kyc-substrate /
+    ob-poc-kyc-store / ob-poc-kyc-seam), not by GateChecker/DagRegistry.
+  stream_tables:
+    - '"ob-poc".kyc_intent_events'
+    - '"ob-poc".kyc_subject_streams'
+    - '"ob-poc".kyc_control_edge_projection'
+    - '"ob-poc".kyc_obligation_projection'
+    - '"ob-poc".kyc_subject_rollup_projection'
+  verb_families:
+    - prefix: ubo.edge.
+      verbs: [assert-control, assert-economic-interest, attach-evidence, verify, supersede, reconcile-conflict]
+    - prefix: ubo.determination.
+      verbs: [select-strategy, compute-fold, apply-smo-fallback, freeze]
+    - prefix: ubo.board-controller.
+      verbs: [override]
+    - prefix: kyc.subject.
+      verbs: [register, classify-structure]
+    - prefix: kyc.role.
+      verbs: [assign, withdraw]
+    - prefix: kyc.obligation.
+      verbs: [create, satisfy, waive, update-identity, update-screening, update-risk]
+    - prefix: kyc.person.
+      verbs: [approve, reject]
+  governance:
+    - "Content-addressed lexicon: dsl_verbs.lexicon_hash + kyc_lexicon_manifest (Q7, whole-manifest hash). Covers only the 12 W1/W4 determination verbs today; the 11 W3/W5 obligation verbs are not yet in the manifest (M2, open)."
+    - "Fold preconditions: K-11 ratchet -- reconcile-before-fold; every append validates against the FoldRegistry before the event is durable."
+    - "K-23 approval gate: kyc.person.approve folds obligations and rejects unless SubjectOverallState::AllTerminal (EOP-DD-KYCUBO-003)."
+  dag_slots: "intentionally absent -- see description above"
+
+# =============================================================================
 # 1. OVERALL KYC-CASE LIFECYCLE (per case, derived)
 # =============================================================================
 
@@ -277,7 +319,7 @@ slots:
           via: kyc-case.reject (with do-not-onboard flag)
         - from: "(any non-terminal)"
           to: REFER_TO_REGULATOR
-          via: kyc-case.escalate
+          via: [kyc-case.escalate, kyc-case.refer]
         - from: APPROVED
           to: DISCOVERY
           via: kyc-case.reopen (for periodic review)
@@ -395,10 +437,14 @@ slots:
           via: red-flag.escalate
         - from: "(any non-terminal)"
           to: REFERRED
-          via: kyc-case.escalate
+          # Retargeted (state-graph remediation Phase 5e): kyc-case.escalate
+          # only ever wrote cases.escalation_level/status -- it never
+          # touched entity_workstreams. kyc-case.refer is the dedicated verb
+          # that actually cascades non-terminal workstreams to REFERRED.
+          via: kyc-case.refer
         - from: "(any non-terminal)"
           to: PROHIBITED
-          via: kyc-case.reject (cascading)
+          via: kyc-case.reject
       terminal_states: [COMPLETE, PROHIBITED]
 
   - id: screening
@@ -1302,19 +1348,14 @@ cross_slot_constraints:
         → entity_workstream.status advances VERIFY → SCREEN
     severity: informational
 
-  - id: kyc_service_agreement_active_required_for_sponsored_cases
-    description: "KYC-as-a-Service sponsored cases require ACTIVE service agreement."
-    rule: |
-      cases.kyc_context = 'SPONSORED'
-        → EXISTS kyc_service_agreements WHERE sponsor_id = this.sponsor_cbu_id AND status = 'ACTIVE'
-    severity: error
-
-  - id: periodic_review_cases_must_reference_predecessor
-    description: "cases.case_type = PERIODIC_REVIEW must link to the predecessor case."
-    rule: |
-      cases.case_type = 'PERIODIC_REVIEW'
-        → cases.predecessor_case_id IS NOT NULL
-    severity: error
+  # kyc_service_agreement_active_required_for_sponsored_cases and
+  # periodic_review_cases_must_reference_predecessor deleted (state-graph
+  # remediation Phase 5f): both referenced columns that do not exist on the
+  # live "ob-poc".cases table (cases.kyc_context, cases.predecessor_case_id)
+  # -- dead constraints, unenforceable by construction. cases.service_context
+  # and cases.client_group_id exist and may be the intended live equivalents,
+  # but re-authoring the rules against them is out of this remediation's
+  # ratified scope.
 
 # =============================================================================
 # 4. PRODUCT-MODULE GATES
