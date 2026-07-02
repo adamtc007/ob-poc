@@ -17,6 +17,8 @@ mod csg_pipeline_integration;
 #[cfg(test)]
 mod dataflow_validation;
 #[cfg(test)]
+mod derived_attribute_persistence_integration;
+#[cfg(test)]
 mod discovery_ops_integration;
 #[cfg(test)]
 mod drafter_clash_matrix;
@@ -28,6 +30,8 @@ mod entity_deps_integration;
 mod expansion_determinism;
 #[cfg(test)]
 mod generic_lifecycle_guard_db;
+#[cfg(test)]
+mod gleif_parse_test;
 #[cfg(test)]
 mod intent_hit_rate;
 #[cfg(test)]
@@ -61,6 +65,8 @@ mod runbook_e2e_test;
 #[cfg(test)]
 mod runbook_pipeline_test;
 #[cfg(test)]
+mod sage_coverage;
+#[cfg(test)]
 mod scope_resolution_integration;
 #[cfg(test)]
 mod sem_reg_authoring_integration;
@@ -81,9 +87,13 @@ mod stewardship_b2_validation;
 #[cfg(test)]
 mod stewardship_b3_changesets;
 #[cfg(test)]
+mod sync_srdefs;
+#[cfg(test)]
 mod transaction_rollback_integration;
 #[cfg(test)]
 mod unified_pipeline_tollgates;
+#[cfg(test)]
+mod utterance_api_coverage;
 #[cfg(test)]
 mod verb_search_integration;
 #[cfg(test)]

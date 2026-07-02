@@ -1,9 +1,10 @@
+use crate::service_resources::load_and_sync_srdefs;
 use anyhow::Result;
-use ob_poc::service_resources::load_and_sync_srdefs;
 use sqlx::postgres::PgPoolOptions;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+#[tokio::test]
+#[ignore]
+async fn sync_srdefs() -> Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".into());
     let pool = PgPoolOptions::new()

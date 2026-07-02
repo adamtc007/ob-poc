@@ -6,14 +6,14 @@
 
 #[cfg(feature = "database")]
 mod integration {
-    use anyhow::{Context, Result};
-    use ob_poc::sem_reg::derivation_spec::{
+    use crate::sem_reg::derivation_spec::{
         DerivationExpression, DerivationInput, DerivationSpecBody, NullSemantics,
         SecurityInheritanceMode,
     };
-    use ob_poc::sem_reg::ids::object_id_for;
-    use ob_poc::sem_reg::types::ObjectType;
-    use ob_poc::service_resources::{PopulationEngine, ServiceResourcePipelineService};
+    use crate::sem_reg::ids::object_id_for;
+    use crate::sem_reg::types::ObjectType;
+    use crate::service_resources::{PopulationEngine, ServiceResourcePipelineService};
+    use anyhow::{Context, Result};
     use sem_os_core::types::EvidenceGrade;
     use serde_json::json;
     use sqlx::PgPool;
@@ -416,7 +416,7 @@ mod integration {
             .await?;
         assert!(matches!(
             outcome,
-            ob_poc::service_resources::discovery::RecomputeOutcome::Recomputed
+            crate::service_resources::discovery::RecomputeOutcome::Recomputed
         ));
 
         let row: Option<(String, serde_json::Value)> = sqlx::query_as(

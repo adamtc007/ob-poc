@@ -1,7 +1,9 @@
-use ob_poc::gleif::types::LeiRecord;
+use crate::gleif::types::LeiRecord;
 use std::fs;
 
-fn main() {
+#[test]
+#[ignore]
+fn gleif_parse_test() {
     let content = fs::read_to_string("/tmp/gleif_response.json").expect("read file");
     let value: serde_json::Value = serde_json::from_str(&content).expect("parse json");
 

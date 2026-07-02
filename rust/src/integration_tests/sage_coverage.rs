@@ -7,7 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use ob_poc::sage::{
+use crate::sage::{
     DeterministicSage, IntentPolarity, LlmSage, ObservationPlane, SageContext, SageEngine,
 };
 use serde::Deserialize;

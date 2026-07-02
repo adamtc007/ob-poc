@@ -12,7 +12,7 @@
 //!    A re-freeze computes set-diff of resolved persons:
 //!    - `now − before` → obligation-create effects
 //!    - `before − now` → obligation-supersede effects (retraction)
-//!    `before` is itself a fold of A's prior freeze emissions — pure, replayable.
+//!      `before` is itself a fold of A's prior freeze emissions — pure, replayable.
 //!
 //! 3. **Emission failure is dead-lettered, never dropped.**
 //!    The outbox already retries (at-least-once); permanent failure routes to
