@@ -553,32 +553,47 @@ slots:
       states:
         - id: REQUIRED
           entry: true
+        # wire-later (state-graph remediation Phase 7d): no doc-request.*
+        # verb domain exists at all in this codebase (config/verbs/
+        # document.yaml declares only a `document:` domain) -- REQUESTED
+        # was never reachable via any verb.
         - id: REQUESTED
         - id: RECEIVED
         - id: VERIFIED
         - id: REJECTED
+          description: "Not terminal -- evidence.attach-document accepts a re-attach from REJECTED (see transitions)."
         - id: WAIVED
+        # wire-later: no time-decay job exists; VERIFIED never expires today.
         - id: EXPIRED
       transitions:
+        # from: REQUIRED to: REQUESTED (via: doc-request.send) and
+        # from: REQUESTED to: RECEIVED (via: doc-request.verify) rows
+        # deleted (POLICY): doc-request.send/.verify do not exist as verbs.
+        # The real code path (evidence.rs do_link, verb
+        # evidence.attach-document) accepts REQUIRED directly, with no
+        # REQUESTED intermediate step.
         - from: REQUIRED
-          to: REQUESTED
-          via: doc-request.send
-        - from: REQUESTED
           to: RECEIVED
-          via: doc-request.verify
+          via: evidence.attach-document
         - from: RECEIVED
           to: VERIFIED
           via: evidence.mark-verified
         - from: RECEIVED
           to: REJECTED
           via: evidence.mark-rejected
+        # Added (state-graph remediation Phase 7d, ratified 7.14): code
+        # (evidence.rs do_link) allows re-attaching a document after
+        # rejection, contradicting REJECTED's old terminal_states
+        # membership. Code wins.
+        - from: REJECTED
+          to: RECEIVED
+          via: evidence.attach-document
         - from: "(any non-terminal)"
           to: WAIVED
           via: evidence.mark-waived
-        - from: VERIFIED
-          to: EXPIRED
-          via: "(time-decay)"
-      terminal_states: [REJECTED, WAIVED]
+        # from: VERIFIED to: EXPIRED (via: "(time-decay)") row deleted
+        # (POLICY): no time-decay job exists in this codebase.
+      terminal_states: [WAIVED]
 
   - id: red_flag
     stateless: false

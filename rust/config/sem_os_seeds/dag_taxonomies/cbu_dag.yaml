@@ -416,6 +416,11 @@ slots:
           - id: dormant
             entry: true
             description: "VALIDATED but no service consumption yet."
+          # wire-later (state-graph remediation Phase 7e, ratified 7.5):
+          # zero writers anywhere set operational_status='trade_permissioned'
+          # or 'actively_trading' via a "first trade executed" path -- only
+          # cbu.reinstate/cbu.unrestrict write actively_trading (both
+          # already declared below). CHECK vocabulary kept.
           - id: trade_permissioned
             description: "Trading profile + services provisioned; ready to transact but no first trade yet."
           - id: actively_trading
@@ -428,15 +433,13 @@ slots:
             description: "Exit decision made; positions being unwound."
           - id: offboarded
             description: "Terminal-positive; services retired."
+          # wire-later: no archival scheduler exists in this codebase.
           - id: archived
             description: "Historical only; retained for regulatory retention."
         transitions:
-          - from: dormant
-            to: trade_permissioned
-            via: "(backend: cbu.operationally_active becomes true)"
-          - from: trade_permissioned
-            to: actively_trading
-            via: "(backend: first trade executed — IM trading_activity first_trade_at set)"
+          # from: dormant to: trade_permissioned and from: trade_permissioned
+          # to: actively_trading "(backend: ...)" rows deleted (POLICY):
+          # neither writer exists.
           - from: actively_trading
             to: restricted
             via: cbu.restrict
@@ -455,9 +458,8 @@ slots:
           - from: winding_down
             to: offboarded
             via: cbu.complete-offboard
-          - from: offboarded
-            to: archived
-            via: "(backend: archival scheduler)"
+          # from: offboarded to: archived "(backend: archival scheduler)"
+          # row deleted (POLICY): no such scheduler exists.
         terminal_states: [offboarded, archived]
 
   # ---------------------------------------------------------------------------
@@ -588,6 +590,11 @@ slots:
             AND evidence_expiry.status = CURRENT
         - id: REJECTED
           description: "Evidence rejected (insufficient, expired, fraudulent)."
+        # wire-later (state-graph remediation Phase 7d): out_of_scope
+        # already documents "Evidence time-decay triggers — layer 3
+        # (scheduled job against document validity windows)" as
+        # unimplemented (see this file's out_of_scope section) -- EXPIRED
+        # is legal per the CHECK but has no writer.
         - id: EXPIRED
           description: "Previously VERIFIED; time-decay invalidation."
           green_when: |
@@ -601,9 +608,8 @@ slots:
           to: REJECTED
           via: cbu.verify-evidence
           args: { verification-status: REJECTED }
-        - from: VERIFIED
-          to: EXPIRED
-          via: "(backend: time-decay trigger based on evidence_type validity window)"
+        # from: VERIFIED to: EXPIRED (via: "(backend: time-decay trigger)")
+        # row deleted (POLICY): no such job exists in this codebase.
         - from: EXPIRED
           to: PENDING
           via: cbu.attach-evidence  # re-attach refresh
@@ -826,6 +832,8 @@ slots:
             AND no objection exists with state = OPEN
             AND every mandatory_disclosure exists
             AND every mandatory_disclosure.state = LODGED
+        # wire-later (state-graph remediation Phase 7e, ratified 7.9): no
+        # date-check job sets ca_status='effective'; zero writers confirmed.
         - id: effective
           description: "Effective_date reached; CA is now live. Transitional."
         - id: implemented
