@@ -133,7 +133,7 @@ overall_lifecycle:
         Case proceeds to approval, rejection, referral, or closure.
       derivation:
         any_of:
-          - "cases.status IN ('APPROVED', 'REJECTED', 'BLOCKED', 'WITHDRAWN', 'DO_NOT_ONBOARD')"
+          - "cases.status IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD', 'EXPIRED', 'REFER_TO_REGULATOR')"
           - "EXISTS kyc_decisions WHERE case_id = this.case_id AND status IN ('CLEARED', 'REJECTED', 'CONDITIONAL')"
       progression_verbs:
         - kyc-case.close

@@ -32,8 +32,8 @@
 //! - `deal.update-rate-card-line` — Modify line values (non-AGREED only)
 //! - `deal.remove-rate-card-line` — Delete line (validates no billing deps)
 //! - `deal.propose-rate-card` — Transition to PROPOSED (requires lines)
-//! - `deal.counter-rate-card` — Clone with COUNTER_OFFERED, mark original SUPERSEDED
-//! - `deal.agree-rate-card` — Transition to AGREED (from PROPOSED/COUNTER_OFFERED)
+//! - `deal.counter-rate-card` — Clone with COUNTER_PROPOSED, mark original SUPERSEDED
+//! - `deal.agree-rate-card` — Transition to AGREED (from PROPOSED/COUNTER_PROPOSED)
 //!
 //! SLA & Documents:
 //! - `deal.add-sla` — Create SLA record with optional contract/product/service
@@ -1515,7 +1515,7 @@ impl SemOsVerbOp for ProposeRateCard {
 // deal.counter-rate-card
 // =============================================================================
 
-/// Client counter-offer — clones rate card with COUNTER_OFFERED status.
+/// Client counter-offer — clones rate card with COUNTER_PROPOSED status.
 pub struct CounterRateCard;
 
 #[async_trait]
@@ -1547,7 +1547,7 @@ impl SemOsVerbOp for CounterRateCard {
         let new_rate_card_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".deal_rate_cards (deal_id, contract_id, product_id, rate_card_name, effective_from, effective_to, status, negotiation_round)
-            VALUES ($1, $2, $3, $4, $5::date, $6::date, 'COUNTER_OFFERED', $7)
+            VALUES ($1, $2, $3, $4, $5::date, $6::date, 'COUNTER_PROPOSED', $7)
             RETURNING rate_card_id
             "#,
         )
@@ -1628,7 +1628,7 @@ impl SemOsVerbOp for AgreeRateCard {
 
         let (status, deal_id) = row;
 
-        if !matches!(status.as_str(), "PROPOSED" | "COUNTER_OFFERED") {
+        if !matches!(status.as_str(), "PROPOSED" | "COUNTER_PROPOSED") {
             return Err(anyhow!("Cannot agree rate card in status {}", status));
         }
 

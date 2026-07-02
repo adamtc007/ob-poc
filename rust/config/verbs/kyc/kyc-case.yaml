@@ -170,7 +170,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: status
@@ -384,7 +384,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: escalation-level
@@ -444,7 +444,7 @@ domains:
         crud:
           operation: update
           table: cases
-          schema: kyc
+          schema: ob-poc
           key: case_id
         emits_event: case.assigned
         args:
@@ -455,7 +455,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: analyst-id
@@ -518,7 +518,7 @@ domains:
         crud:
           operation: update
           table: cases
-          schema: kyc
+          schema: ob-poc
           key: case_id
         emits_event: case.risk-rated
         args:
@@ -529,7 +529,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: risk-rating
@@ -592,7 +592,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: status
@@ -656,7 +656,7 @@ domains:
         crud:
           operation: select
           table: cases
-          schema: kyc
+          schema: ob-poc
         args:
           - name: case-id
             type: uuid
@@ -665,7 +665,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
         returns:
@@ -702,7 +702,7 @@ domains:
         crud:
           operation: list_by_fk
           table: cases
-          schema: kyc
+          schema: ob-poc
           fk_col: cbu_id
         args:
           - name: cbu-id
@@ -758,7 +758,7 @@ domains:
         crud:
           operation: update
           table: cases
-          schema: kyc
+          schema: ob-poc
           key: case_id
           set_values:
             closed_at:
@@ -771,7 +771,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: reopen-reason
@@ -843,7 +843,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
         returns:
