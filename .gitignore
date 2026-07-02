@@ -124,6 +124,14 @@ rust-project.json
 src/proto/
 proto/gen/
 
+# ==============================================================================
+# Java specific ignores
+# ==============================================================================
+
+# Local Gradle cache and generated docs for the Java workspace
+/java/.gradle/
+/java/docs/
+
 # Binary outputs from cargo build
 rust/dsl-poc
 rust/ob-poc
