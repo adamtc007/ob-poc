@@ -2717,13 +2717,6 @@ domains:
         behavior: plugin
         lifecycle:
           entity_arg: deal-id
-          # NOTE: deal_dag.yaml's own transitions list only declares
-          # IN_CLEARANCE -> REJECTED (shared row with deal.bac-reject) for
-          # this verb; this wider 4-state set is the explicitly ratified
-          # state-graph remediation Phase 3c value, deliberately broader
-          # than the DAG row (a deal may be rejected pre-clearance too). The
-          # DAG/YAML mismatch this creates is flagged as a residual, not
-          # fixed here (see the closure-audit follow-up notes).
           requires_states: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
         metadata:
           tier: intent

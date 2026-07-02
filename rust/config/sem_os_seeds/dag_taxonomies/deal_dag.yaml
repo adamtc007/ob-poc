@@ -387,7 +387,7 @@ slots:
           to: CONTRACTED
           via: [deal.update-status, deal.add-contract]
           precondition: "deals.bac_status = 'approved' AND deals.kyc_clearance_status = 'approved' AND group KYC case status = APPROVED (V1.3-1 cross-workspace)"
-        - from: IN_CLEARANCE
+        - from: [PROSPECT, QUALIFYING, NEGOTIATING, IN_CLEARANCE]
           to: REJECTED
           via: [deal.bac-reject, deal.reject]
           precondition: "deals.bac_status = 'rejected' OR deals.kyc_clearance_status = 'rejected' OR KYC failed (case.status = REJECTED or DO_NOT_ONBOARD)"
