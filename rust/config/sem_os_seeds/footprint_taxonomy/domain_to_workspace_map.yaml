@@ -112,7 +112,6 @@ exact:
   trading-profile: [InstrumentMatrix]
   trust: [CBU]
   ubo: [KYC]
-  ubo.registry: [KYC]
   user: ["*"]
   verify: [KYC]
   view: ["*"]

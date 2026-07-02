@@ -21,7 +21,7 @@ use super::{
     types::{ChangeType, GovernanceTier, ObjectType, SnapshotMeta},
 };
 
-const GOVERNED_VERB_DOMAINS: &[&str] = &["kyc-case", "entity-workstream", "ubo.registry"];
+const GOVERNED_VERB_DOMAINS: &[&str] = &["kyc-case", "entity-workstream"];
 
 // Re-export pure conversion functions from the adapter so existing call sites work.
 // Note: suggest_security_label is NOT re-exported because it returns sem_os_core types

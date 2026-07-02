@@ -328,7 +328,7 @@ slots:
     state_machine:
       id: entity_kyc_lifecycle
       source_entity: "(derived — tracks entity journey through case workstreams)"
-      state_column: (derived from entity_workstreams.status + kyc_ubo_registry.status)
+      state_column: (derived from entity_workstreams.status + stream projections)
       description: |
         Entity-level KYC journey (reconcile-existing from
         state_machines/entity_kyc_lifecycle.yaml). Tracks an entity's
@@ -1253,13 +1253,6 @@ cross_slot_constraints:
            OR EXISTS red_flags WHERE source = 'screening' AND status = 'MITIGATED'
     severity: error
 
-  - id: ubo_approved_requires_provable_evidence_chain
-    description: "kyc_ubo_registry.status = APPROVED requires at least one ubo_evidence.verification_status = VERIFIED."
-    rule: |
-      kyc_ubo_registry.status = 'APPROVED'
-        → EXISTS ubo_evidence WHERE ubo_id = this.ubo_id AND verification_status = 'VERIFIED'
-    severity: error
-
   - id: doc_request_verified_triggers_workstream_advance
     description: |
       When all required doc_requests for a workstream are VERIFIED / WAIVED,
@@ -1292,7 +1285,6 @@ product_module_gates:
     - entity_workstream
     - screening
     - ubo_evidence
-    - kyc_ubo_registry
     - kyc_ubo_evidence
     - red_flag
     - doc_request
