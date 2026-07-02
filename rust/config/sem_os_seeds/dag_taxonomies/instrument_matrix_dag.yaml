@@ -636,8 +636,8 @@ slots:
             AND ops_review exists
             AND ops_review.state = COMPLETE
             AND every required committee_signoff exists
-            AND every required committee_signoff.state = SIGNED
-            AND no objection exists with state = OPEN
+            AND every required committee_signoff.status = SIGNED
+            AND count(objection where objection.status = OPEN) = 0
         - id: PARALLEL_RUN
           description: "Running shadow alongside incumbent (or empty for new mandate)."
         - id: ACTIVE
@@ -863,10 +863,6 @@ slots:
     stateless: true
     rationale: "Reference data — jurisdictional booking perimeter. No lifecycle; only timestamps."
     source_entity: '"ob-poc".booking_location'
-    verbs:
-      - booking-location.create
-      - booking-location.update
-      - booking-location.list
 
   - id: legal_entity
     constellation: trading.streetside
@@ -933,8 +929,8 @@ slots:
           description: "Delivery complete."
           green_when: |
             every delivery_line_item exists
-            AND every delivery_line_item.state = CONFIRMED_RECEIVED
-            AND no exception exists with state = OPEN
+            AND every delivery_line_item.receipt_status = CONFIRMED_RECEIVED
+            AND count(exception where exception.status = OPEN) = 0
             AND counterparty_acknowledgement exists
             AND counterparty_acknowledgement.state = RECEIVED
         - id: FAILED

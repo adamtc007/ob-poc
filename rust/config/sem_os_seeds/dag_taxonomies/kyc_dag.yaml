@@ -43,48 +43,6 @@ dsl_verb_reconciliation:
     - screening.sanctions-check
 
 # =============================================================================
-# STREAM-GOVERNED SURFACE (state-graph remediation Phase 5a)
-# =============================================================================
-# The dsl.kyc determination vocabulary (EOP-VS-KYCUBO-001) is NOT modelled
-# as DAG slots/transitions -- its governance model is structurally different
-# from the CRUD-lifecycle slots above and deliberately absent here. This
-# block converts that absence-by-silence into declared law, per the
-# state-graph closure audit (docs/generated/state-graph-closure-audit.md).
-stream_governed:
-  description: |
-    The verb stream (`"ob-poc".kyc_intent_events`) is the system of record
-    for UBO/control determination -- not a mutable-row FSM, so it has no
-    from-state/to-state transitions to declare as DAG slots. Governance is
-    enforced at append-time by the substrate (ob-poc-kyc-substrate /
-    ob-poc-kyc-store / ob-poc-kyc-seam), not by GateChecker/DagRegistry.
-  stream_tables:
-    - '"ob-poc".kyc_intent_events'
-    - '"ob-poc".kyc_subject_streams'
-    - '"ob-poc".kyc_control_edge_projection'
-    - '"ob-poc".kyc_obligation_projection'
-    - '"ob-poc".kyc_subject_rollup_projection'
-  verb_families:
-    - prefix: ubo.edge.
-      verbs: [assert-control, assert-economic-interest, attach-evidence, verify, supersede, reconcile-conflict]
-    - prefix: ubo.determination.
-      verbs: [select-strategy, compute-fold, apply-smo-fallback, freeze]
-    - prefix: ubo.board-controller.
-      verbs: [override]
-    - prefix: kyc.subject.
-      verbs: [register, classify-structure]
-    - prefix: kyc.role.
-      verbs: [assign, withdraw]
-    - prefix: kyc.obligation.
-      verbs: [create, satisfy, waive, update-identity, update-screening, update-risk]
-    - prefix: kyc.person.
-      verbs: [approve, reject]
-  governance:
-    - "Content-addressed lexicon: dsl_verbs.lexicon_hash + kyc_lexicon_manifest (Q7, whole-manifest hash). Covers only the 12 W1/W4 determination verbs today; the 11 W3/W5 obligation verbs are not yet in the manifest (M2, open)."
-    - "Fold preconditions: K-11 ratchet -- reconcile-before-fold; every append validates against the FoldRegistry before the event is durable."
-    - "K-23 approval gate: kyc.person.approve folds obligations and rejects unless SubjectOverallState::AllTerminal (EOP-DD-KYCUBO-003)."
-  dag_slots: "intentionally absent -- see description above"
-
-# =============================================================================
 # 1. OVERALL KYC-CASE LIFECYCLE (per case, derived)
 # =============================================================================
 
@@ -120,7 +78,7 @@ overall_lifecycle:
       progression_verbs:
         - kyc-case.update-status
         - entity-workstream.update-status
-        - doc-request.create
+        - document.create-request
         - ubo-registry.discover
       next_phase: screening_in_flight
 
@@ -266,12 +224,14 @@ slots:
           description: "Case approved; CBU cleared for onboarding."
           green_when: |
             every evidence_requirement exists
-            AND every evidence_requirement.state = VERIFIED
+            AND every evidence_requirement.verification_status = VERIFIED
             AND every ubo_registry_entry exists
-            AND every ubo_registry_entry.state in {APPROVED, WAIVED}
-            AND no red_flag exists with state = OPEN
+            AND every ubo_registry_entry.status != PENDING
+            AND every ubo_registry_entry.status != REJECTED
+            AND every ubo_registry_entry.status != EXPIRED
+            AND count(red_flag where red_flag.status = OPEN) = 0
             AND every screening_run exists
-            AND every screening_run.state = CLEAN
+            AND every screening_run.status = CLEAN
         - id: REJECTED
           description: "Case rejected; CBU cannot onboard under this case."
         - id: BLOCKED
@@ -528,17 +488,13 @@ slots:
         - from: VERIFIED
           to: EXPIRED
           via: "(time-decay)"
-        - from: EXPIRED
-          to: PENDING
-          via: evidence.require  # re-collection
       terminal_states: [REJECTED]
 
   # kyc_ubo_registry slot DELETED (state-graph remediation Phase 6a): the
   # entire ubo.registry.* verb family it depended on (promote/advance/
   # waive/reject/expire) has been deleted -- every op phantom-wrote
   # nonexistent columns against the live kyc_ubo_registry/kyc_ubo_evidence
-  # schema and never successfully executed. The stream_governed block
-  # (Phase 5a, above) is the successor declaration: dsl.kyc/ubo.edge.*/
+  # schema and never successfully executed. The dsl.kyc/ubo.edge.*/
   # ubo.determination.* verbs govern UBO determination now, deliberately
   # with no DAG slot (governance is lexicon + fold-precondition + K-23, not
   # a from-state/to-state FSM).
@@ -553,11 +509,14 @@ slots:
       states:
         - id: REQUIRED
           entry: true
-        # wire-later (state-graph remediation Phase 7d): no doc-request.*
-        # verb domain exists at all in this codebase (config/verbs/
-        # document.yaml declares only a `document:` domain) -- REQUESTED
+        # wire-later (state-graph remediation Phase 7d): the legacy document
+        # request verb domain does not exist in this codebase; document.yaml
+        # declares only the live `document:` domain. REQUESTED
         # was never reachable via any verb.
         - id: REQUESTED
+          entry_via:
+            signal:
+              source: document_request_dispatch
         - id: RECEIVED
         - id: VERIFIED
         - id: REJECTED
@@ -565,10 +524,12 @@ slots:
         - id: WAIVED
         # wire-later: no time-decay job exists; VERIFIED never expires today.
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: evidence-expiry
       transitions:
-        # from: REQUIRED to: REQUESTED (via: doc-request.send) and
-        # from: REQUESTED to: RECEIVED (via: doc-request.verify) rows
-        # deleted (POLICY): doc-request.send/.verify do not exist as verbs.
+        # REQUIRED to REQUESTED and REQUESTED to RECEIVED rows
+        # deleted (POLICY): the legacy send/verify verbs do not exist.
         # The real code path (evidence.rs do_link, verb
         # evidence.attach-document) accepts REQUIRED directly, with no
         # REQUESTED intermediate step.
@@ -658,19 +619,19 @@ slots:
       transitions:
         - from: DRAFT
           to: REQUIRED
-          via: doc-request.create
+          via: document.create-request
         - from: REQUIRED
           to: REQUESTED
-          via: doc-request.send
+          via: document.mark-requested
         - from: REQUESTED
           to: RECEIVED
-          via: doc-request.verify
+          via: document.mark-received
         - from: RECEIVED
           to: UNDER_REVIEW
           via: "(compliance review)"
         - from: UNDER_REVIEW
           to: VERIFIED
-          via: evidence.mark-verified
+          via: document.verify-request
         - from: UNDER_REVIEW
           to: REJECTED
           via: evidence.mark-rejected
@@ -940,8 +901,8 @@ slots:
           to: MANUAL_REQUIRED
           via: "(backend: pipeline failure)"
         # from: MANUAL_REQUIRED to: DISCOVERED row deleted (state-graph
-        # remediation Phase 6a, POLICY): via: ubo.registry.promote no
-        # longer exists (the whole ubo.registry.* family was deleted --
+        # remediation Phase 6a, POLICY): the promotion verb no longer
+        # exists (the whole ubo.registry.* family was deleted --
         # phantom-writing ops that never successfully executed). wire-later:
         # no verb currently resolves a manual UBO-discovery override.
       terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
@@ -1180,8 +1141,8 @@ slots:
           description: "Manco cleared to manage new mandates."
           green_when: |
             every regulatory_licence exists
-            AND every regulatory_licence.state = CURRENT
-            AND no investigation exists with state = OPEN
+            AND every regulatory_licence.status = CURRENT
+            AND count(investigation where investigation.status = OPEN) = 0
             AND periodic_review exists
             AND periodic_review.state = COMPLETE
             AND credit_risk_assessment exists

@@ -49,7 +49,7 @@ domains:
         returns:
           type: record
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -108,6 +108,7 @@ domains:
 
       unassign:
         flavour: discretionary
+        audit_class: resource_owner_unassign
         description: Retire a governed resource owner principal
         effect_class: read_modify_write
         role_guard:
@@ -135,7 +136,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation

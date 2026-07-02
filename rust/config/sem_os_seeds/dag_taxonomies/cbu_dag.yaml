@@ -363,10 +363,15 @@ slots:
         - id: VALIDATED
           description: "Validation passed; hands off to operational lifecycle."
           green_when: |
-            every entity_proper_person.state = VERIFIED
-            AND every entity_limited_company_ubo.state in {DISCOVERED, PUBLIC_FLOAT, EXEMPT}
-            AND every mandate.state in {approved, active}
-            AND every cbu_evidence.state = VERIFIED
+            every entity_proper_person.verification_status = VERIFIED
+            AND every entity_limited_company_ubo.discovery_status != PENDING
+            AND every entity_limited_company_ubo.discovery_status != MANUAL_REQUIRED
+            AND every mandate.lifecycle_status != draft
+            AND every mandate.lifecycle_status != submitted
+            AND every mandate.lifecycle_status != suspended
+            AND every mandate.lifecycle_status != archived
+            AND every mandate.lifecycle_status != rejected
+            AND every cbu_evidence.verification_status = VERIFIED
             AND no investor_disqualifying_flag exists
             AND investment_managers.completeness = green
         - id: UPDATE_PENDING_PROOF
@@ -596,6 +601,9 @@ slots:
         # unimplemented (see this file's out_of_scope section) -- EXPIRED
         # is legal per the CHECK but has no writer.
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: evidence-expiry
           description: "Previously VERIFIED; time-decay invalidation."
           green_when: |
             evidence_expiry.status = EXPIRED
@@ -829,9 +837,9 @@ slots:
             AND legal_review.state = COMPLETE
             AND compliance_review exists
             AND compliance_review.state = COMPLETE
-            AND no objection exists with state = OPEN
+            AND count(objection where objection.status = OPEN) = 0
             AND every mandatory_disclosure exists
-            AND every mandatory_disclosure.state = LODGED
+            AND every mandatory_disclosure.status = LODGED
         # wire-later (state-graph remediation Phase 7e, ratified 7.9): no
         # date-check job sets ca_status='effective'; zero writers confirmed.
         - id: effective

@@ -117,20 +117,6 @@ allowed_verbs:
   - entity-settlement.add-ssi
   - entity-settlement.remove-ssi
   - entity-settlement.set-identity
-  # Booking principal
-  - booking-principal.create
-  - booking-principal.update
-  - booking-principal.retire
-  - booking-principal.evaluate
-  - booking-principal.select
-  - booking-principal.explain
-  - booking-principal.coverage-matrix
-  - booking-principal.gap-report
-  - booking-principal.impact-analysis
-  # Booking location
-  - booking-location.create
-  - booking-location.list
-  - booking-location.update
   # Corporate actions
   - corporate-action.define-event-type
   - corporate-action.list-event-types
@@ -258,8 +244,6 @@ section_layout:
       - "settlement-chain."
       - "cbu-custody."
       - "entity-settlement."
-      - "booking-principal."
-      - "booking-location."
   - title: "Corporate Actions"
     verb_prefixes:
       - "corporate-action."

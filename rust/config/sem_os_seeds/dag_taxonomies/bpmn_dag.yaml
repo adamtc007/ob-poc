@@ -27,3 +27,8 @@ dsl_verb_reconciliation:
     - bpmn-controller.instance-status
     - bpmn-controller.list-instances
     - workflow.start-process
+
+slots:
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root for BPMN orchestration operations."

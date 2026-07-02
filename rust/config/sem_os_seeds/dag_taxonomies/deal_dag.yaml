@@ -353,7 +353,7 @@ slots:
             AND deal_contract exists
             AND deal_contract.state in {DRAFT, EXECUTED}
             AND every deal_rate_card exists
-            AND at least one deal_rate_card.state = AGREED
+            AND count(deal_rate_card where deal_rate_card.status = AGREED) >= 1
         # Terminal-negative outcomes (G-3 granularity)
         - id: LOST
           description: "Terminal-negative: competitor won the deal."
@@ -461,9 +461,9 @@ slots:
             to: WINDING_DOWN
             via: deal.begin-winding-down
           # from: WINDING_DOWN to: OFFBOARDED row deleted (POLICY): no
-          # deal.complete-offboard verb exists; the prior `via: deal.update-
-          # status` was fictional (deal.update-status governs deal_status
-          # only, per Phase 4b). OFFBOARDED stays a legal CHECK value,
+          # terminal offboard verb exists; the prior status-update writer was
+          # fictional (deal.update-status governs deal_status only, per
+          # Phase 4b). OFFBOARDED stays a legal CHECK value,
           # wire-later annotated above.
         terminal_states: [OFFBOARDED]
 
@@ -928,8 +928,14 @@ slots:
           entry: true
           description: "SLA agreed but deal not yet CONTRACTED."
         - id: ACTIVE
+          entry_via:
+            cascade:
+              parent: deal.update-status
           description: "Deal CONTRACTED; SLA being measured."
         - id: BREACHED
+          entry_via:
+            signal:
+              source: sla_measurement_breach
           description: |
             Measured performance fell below SLA threshold; penalty
             calculation triggered (feeds into billing_period via

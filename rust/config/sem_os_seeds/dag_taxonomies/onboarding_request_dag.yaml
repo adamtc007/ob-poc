@@ -255,6 +255,9 @@ slots:
         - id: activated
           description: "Owner returned a successful locator."
         - id: blocked
+          entry_via:
+            cascade:
+              parent: readiness.compute
           description: "Slice cannot progress until data or owner issue is resolved."
         - id: failed
           description: "Owner returned a terminal failure."
