@@ -14,7 +14,9 @@ use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use ob_poc_boundary::llm_trace::{record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTrace};
+use ob_poc_boundary::llm_trace::{
+    record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTrace,
+};
 
 use super::{
     run_kyc_update_status_revision_loop, KycUpdateStatusWorkbookDraft, SemOsLanguagePack,

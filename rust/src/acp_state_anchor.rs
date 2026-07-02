@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use uuid::Uuid;
 
-use ob_poc_boundary::acp_facade::load_ob_poc_kyc_domain_pack;
 use crate::api::repl_routes_v2::{handle_repl_acp_request, ReplV2RouteState};
+use ob_poc_boundary::acp_facade::load_ob_poc_kyc_domain_pack;
 
 pub(crate) async fn acp_prompt_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
@@ -422,12 +422,14 @@ fn acp_prompt_unsupported_state_anchor_provider_outgoing(
                 }),
             },
         ),
-        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(ob_poc_boundary::acp_protocol::JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
-            id: Some(response_id),
-            result: Some(result),
-            error: None,
-        }),
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(
+            ob_poc_boundary::acp_protocol::JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: Some(response_id),
+                result: Some(result),
+                error: None,
+            },
+        ),
     ]
 }
 
@@ -731,17 +733,25 @@ fn acp_prompt_has_read_only_deal_state_anchor(
     })
 }
 
-fn acp_prompt_case_id_from_prompt(prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+fn acp_prompt_case_id_from_prompt(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<Uuid> {
     acp_subject_id_from_prompt(prompt)
 }
 
-fn acp_prompt_deal_id_from_prompt(prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+fn acp_prompt_deal_id_from_prompt(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<Uuid> {
     acp_subject_id_from_prompt(prompt)
 }
 
-fn acp_subject_id_from_prompt(prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+fn acp_subject_id_from_prompt(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<Uuid> {
     prompt.iter().find_map(|block| match block {
-        ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text } => acp_extract_first_uuid(text),
+        ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text } => {
+            acp_extract_first_uuid(text)
+        }
         ob_poc_boundary::acp_protocol::AcpContentBlock::ResourceLink { uri, .. } => {
             acp_entity_uuid_from_uri(uri).or_else(|| acp_extract_first_uuid(uri))
         }
@@ -855,7 +865,9 @@ fn normalize_deal_state(value: &str) -> String {
     value.trim().replace(['-', ' '], "_").to_ascii_uppercase()
 }
 
-fn acp_prompt_evidence_digest(prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock]) -> Option<String> {
+fn acp_prompt_evidence_digest(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<String> {
     let text = acp_prompt_text(prompt);
     let start = text.find("sha256:")?;
     let digest = text[start..]
@@ -1469,30 +1481,32 @@ fn acp_state_anchor_structured_outgoing(
         ));
     }
     if let Some(uri) = language_pack_uri {
-        outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
-            ob_poc_boundary::acp_protocol::JsonRpcNotification {
-                jsonrpc: "2.0".to_string(),
-                method: "session/update".to_string(),
-                params: json!({
-                    "sessionId": session_id.to_string(),
-                    "update": {
-                        "sessionUpdate": "tool_call_update",
-                        "toolCallId": format!("tool:language-pack:{session_id}"),
-                        "status": "completed",
-                        "kind": "read",
-                        "persona": ob_poc_boundary::acp::AcpPersonaMode::SagePlanning.as_str(),
-                        "workflowPhase": "discovery",
-                        "title": "SemOS language pack",
-                        "content": {
-                            "type": "resource_link",
-                            "uri": uri,
-                            "name": "Deal update-status language pack",
-                            "description": "Bounded private DSL context for deal.update-status"
+        outgoing.push(
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+                ob_poc_boundary::acp_protocol::JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "tool_call_update",
+                            "toolCallId": format!("tool:language-pack:{session_id}"),
+                            "status": "completed",
+                            "kind": "read",
+                            "persona": ob_poc_boundary::acp::AcpPersonaMode::SagePlanning.as_str(),
+                            "workflowPhase": "discovery",
+                            "title": "SemOS language pack",
+                            "content": {
+                                "type": "resource_link",
+                                "uri": uri,
+                                "name": "Deal update-status language pack",
+                                "description": "Bounded private DSL context for deal.update-status"
+                            }
                         }
-                    }
-                }),
-            },
-        ));
+                    }),
+                },
+            ),
+        );
     }
     outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
         ob_poc_boundary::acp_protocol::JsonRpcNotification {
@@ -1515,61 +1529,67 @@ fn acp_state_anchor_structured_outgoing(
             }),
         },
     ));
-    outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
-        ob_poc_boundary::acp_protocol::JsonRpcNotification {
-            jsonrpc: "2.0".to_string(),
-            method: "session/update".to_string(),
-            params: json!({
-                "sessionId": session_id.to_string(),
-                "update": {
-                    "sessionUpdate": "tool_call_update",
-                    "toolCallId": format!("tool:language-loop:{session_id}"),
-                    "status": validation_status,
-                    "kind": "think",
-                    "persona": ob_poc_boundary::acp::AcpPersonaMode::SageExecution.as_str(),
-                    "workflowPhase": "planning",
-                    "title": title,
-                    "traceProjection": result["traceProjection"].clone()
-                }
-            }),
-        },
-    ));
-    if let Some(dry_run) = result
-        .get("output")
-        .and_then(|output| output.get("dry_run"))
-    {
-        outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+    outgoing.push(
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
             ob_poc_boundary::acp_protocol::JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "session/update".to_string(),
                 params: json!({
                     "sessionId": session_id.to_string(),
                     "update": {
-                        "sessionUpdate": "semantic_diff",
+                        "sessionUpdate": "tool_call_update",
+                        "toolCallId": format!("tool:language-loop:{session_id}"),
+                        "status": validation_status,
+                        "kind": "think",
                         "persona": ob_poc_boundary::acp::AcpPersonaMode::SageExecution.as_str(),
-                        "semanticDiffId": dry_run["semantic_diff_uri"].clone(),
-                        "fallbackSummary": ["resource_link"],
-                        "diff": dry_run["semantic_diff"]["semantic_diff"].clone(),
-                        "transitionRef": dry_run["transition_ref"].clone(),
-                        "validationTrace": dry_run["validation_trace"].clone()
+                        "workflowPhase": "planning",
+                        "title": title,
+                        "traceProjection": result["traceProjection"].clone()
                     }
                 }),
             },
-        ));
+        ),
+    );
+    if let Some(dry_run) = result
+        .get("output")
+        .and_then(|output| output.get("dry_run"))
+    {
+        outgoing.push(
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+                ob_poc_boundary::acp_protocol::JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "semantic_diff",
+                            "persona": ob_poc_boundary::acp::AcpPersonaMode::SageExecution.as_str(),
+                            "semanticDiffId": dry_run["semantic_diff_uri"].clone(),
+                            "fallbackSummary": ["resource_link"],
+                            "diff": dry_run["semantic_diff"]["semantic_diff"].clone(),
+                            "transitionRef": dry_run["transition_ref"].clone(),
+                            "validationTrace": dry_run["validation_trace"].clone()
+                        }
+                    }),
+                },
+            ),
+        );
     }
-    outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
-        ob_poc_boundary::acp_protocol::JsonRpcNotification {
-            jsonrpc: "2.0".to_string(),
-            method: "session/update".to_string(),
-            params: json!({
-                "sessionId": session_id.to_string(),
-                "update": {
-                    "sessionUpdate": "agent_message_chunk",
-                    "content": {"type": "text", "text": message.into()}
-                }
-            }),
-        },
-    ));
+    outgoing.push(
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+            ob_poc_boundary::acp_protocol::JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "agent_message_chunk",
+                        "content": {"type": "text", "text": message.into()}
+                    }
+                }),
+            },
+        ),
+    );
     outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(
         ob_poc_boundary::acp_protocol::JsonRpcResponse {
             jsonrpc: "2.0".to_string(),

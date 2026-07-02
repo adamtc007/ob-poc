@@ -54,6 +54,7 @@
 //! application layer). Boundary may depend on this crate as a
 //! `dev-dependency` only — used by `#[cfg(test)]` fixtures that exercise
 //! the projection pipeline against real on-disk packs.
+#![deny(unreachable_pub)]
 
 pub mod handoff;
 pub mod pack;

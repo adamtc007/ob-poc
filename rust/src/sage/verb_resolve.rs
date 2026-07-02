@@ -109,18 +109,6 @@ impl StructuredVerbScorer {
     /// Access the underlying metadata index.
     ///
     /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    /// use ob_poc::sage::verb_resolve::StructuredVerbScorer;
-    ///
-    /// let scorer = StructuredVerbScorer::new(VerbMetadataIndex::load()?);
-    /// assert!(scorer.index().len() > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn index(&self) -> &VerbMetadataIndex {
-        &self.index
-    }
-
     /// Diagnose how many candidates survive each pre-score filter stage.
     ///
     /// # Examples
@@ -618,7 +606,6 @@ mod tests {
             },
             subject_kinds: vec![],
             phase_tags: vec![],
-            requires_subject: true,
             planes,
             action_tags: action_tags.iter().map(|s| s.to_string()).collect(),
             param_names: params.iter().map(|s| s.to_string()).collect(),

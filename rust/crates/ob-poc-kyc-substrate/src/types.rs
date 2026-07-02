@@ -131,7 +131,10 @@ pub struct Principal {
 
 impl Principal {
     pub fn new(actor_id: Uuid, role: impl Into<String>) -> Self {
-        Self { actor_id, role: role.into() }
+        Self {
+            actor_id,
+            role: role.into(),
+        }
     }
 
     /// Convenience: a fixed analyst principal for tests.
@@ -161,11 +164,18 @@ pub struct TargetBinding {
 
 impl TargetBinding {
     pub fn for_subject(id: SubjectId) -> Self {
-        Self { subject_root: Some(id), ..Default::default() }
+        Self {
+            subject_root: Some(id),
+            ..Default::default()
+        }
     }
 
     pub fn for_edge(subject: SubjectId, edge: EdgeId) -> Self {
-        Self { subject_root: Some(subject), edge_id: Some(edge), ..Default::default() }
+        Self {
+            subject_root: Some(subject),
+            edge_id: Some(edge),
+            ..Default::default()
+        }
     }
 }
 

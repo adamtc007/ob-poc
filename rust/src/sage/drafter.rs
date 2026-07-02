@@ -25,9 +25,7 @@ use super::verb_resolve::{FilterDiagnostics, ScoredVerbCandidate, StructuredVerb
 
 // Back-compat re-export — `sage::drafter::DraftResolution`, `sage::drafter::DraftResult`,
 // etc. are reached this way by agent::orchestrator and other callers.
-pub use super::drafter_result::{
-    DraftDiagnostics, DraftFailureKind, DraftFilterDiagnostics, DraftResolution, DraftResult,
-};
+pub use super::drafter_result::{DraftDiagnostics, DraftFailureKind, DraftResolution, DraftResult};
 
 /// Deterministic Drafter engine over verb metadata and config.
 #[derive(Debug, Clone)]
@@ -47,7 +45,6 @@ impl DrafterEngine {
     ///
     /// let config = ConfigLoader::from_env().load_verbs()?;
     /// let engine = DrafterEngine::from_config(config);
-    /// assert!(engine.verb_index().len() > 0);
     /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn from_config(config: VerbsConfig) -> Self {
@@ -160,20 +157,6 @@ impl DrafterEngine {
                 threshold: Some(threshold),
             }),
         )
-    }
-
-    /// Access the underlying verb index.
-    ///
-    /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::drafter::DrafterEngine;
-    ///
-    /// let engine = DrafterEngine::load()?;
-    /// assert!(engine.verb_index().len() > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn verb_index(&self) -> &VerbMetadataIndex {
-        &self.verb_index
     }
 
     fn try_structure_read_describe(&self, outcome: &OutcomeIntent) -> Result<Option<DraftResult>> {

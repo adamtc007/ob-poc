@@ -6,8 +6,8 @@
 //! This module is retained only for backward-compatible re-exports.
 //! No raw INSERT statements remain here.
 
-use ob_poc_authoring::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
+use ob_poc_authoring::data_dictionary::{AttributeId, DbAttributeDefinition};
 use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;

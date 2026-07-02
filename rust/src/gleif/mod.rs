@@ -75,4 +75,3 @@ pub mod types;
 
 pub use client::GleifClient;
 pub use enrichment::GleifEnrichmentService;
-pub use repository::GleifRepository;

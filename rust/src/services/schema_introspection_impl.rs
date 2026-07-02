@@ -17,10 +17,10 @@ use sqlx::PgPool;
 use dsl_runtime::SchemaIntrospectionAccess;
 
 use crate::dsl_v2::verb_registry::registry;
-use ob_poc_ontology::{ontology, SearchKeyDef};
 use crate::sem_reg::entity_type_def::EntityTypeDefBody;
 use crate::sem_reg::store::SnapshotStore;
 use crate::sem_reg::types::ObjectType;
+use ob_poc_ontology::{ontology, SearchKeyDef};
 
 pub struct ObPocSchemaIntrospectionAccess;
 

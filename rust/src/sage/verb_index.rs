@@ -6,13 +6,9 @@
 
 use std::collections::HashMap;
 
-use anyhow::Result;
-use dsl_core::ConfigLoader;
 use dsl_core::{
     ActionClass, CrudOperation, HarmClass, VerbConfig, VerbMetadata, VerbTier, VerbsConfig,
 };
-
-use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
 
 use super::{IntentPolarity, ObservationPlane};
 
@@ -23,12 +19,10 @@ pub struct VerbMeta {
     pub domain: String,
     pub verb_name: String,
     pub polarity: IntentPolarity,
-    pub side_effects: Option<String>,
     pub harm_class: HarmClass,
     pub action_class: ActionClass,
     pub subject_kinds: Vec<String>,
     pub phase_tags: Vec<String>,
-    pub requires_subject: bool,
     pub planes: Vec<ObservationPlane>,
     pub action_tags: Vec<String>,
     pub param_names: Vec<String>,
@@ -67,21 +61,6 @@ impl VerbMetadataIndex {
         Self { by_fqn }
     }
 
-    /// Build the index from the default runtime configuration.
-    ///
-    /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    ///
-    /// let index = VerbMetadataIndex::load()?;
-    /// println!("{}", index.len());
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn load() -> Result<Self> {
-        let config = ConfigLoader::from_env().load_verbs()?;
-        Ok(Self::from_config(&config))
-    }
-
     /// Return metadata for a verb FQN.
     ///
     /// # Examples
@@ -116,18 +95,6 @@ impl VerbMetadataIndex {
     /// Iterate only verbs that are safe to serve directly.
     ///
     /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    ///
-    /// let index = VerbMetadataIndex::load()?;
-    /// assert!(index.facts_only_verbs().count() > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn facts_only_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
-        self.iter()
-            .filter(|meta| meta.side_effects.as_deref() == Some("facts_only"))
-    }
-
     /// Iterate only verbs that are safe to serve directly.
     ///
     /// # Examples
@@ -147,18 +114,6 @@ impl VerbMetadataIndex {
     /// Iterate only verbs that mutate state and require confirmation.
     ///
     /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    ///
-    /// let index = VerbMetadataIndex::load()?;
-    /// assert!(index.state_write_verbs().count() > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn state_write_verbs(&self) -> impl Iterator<Item = &VerbMeta> {
-        self.iter()
-            .filter(|meta| meta.side_effects.as_deref() == Some("state_write"))
-    }
-
     /// Iterate only verbs that are not read-only.
     ///
     /// # Examples
@@ -210,32 +165,6 @@ impl VerbMetadataIndex {
     }
 
     /// Number of indexed verbs.
-    ///
-    /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    ///
-    /// let index = VerbMetadataIndex::load()?;
-    /// assert!(index.len() > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn len(&self) -> usize {
-        self.by_fqn.len()
-    }
-
-    /// Whether the index is empty.
-    ///
-    /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    ///
-    /// let index = VerbMetadataIndex::default();
-    /// assert!(index.is_empty());
-    /// ```
-    pub fn is_empty(&self) -> bool {
-        self.by_fqn.is_empty()
-    }
-
     fn matches_domain(&self, verb: &VerbMeta, domain_hint: Option<&str>) -> bool {
         let Some(hint) = domain_hint
             .map(str::trim)
@@ -273,10 +202,6 @@ impl VerbMetadataIndex {
             domain: domain.to_string(),
             verb_name: verb_name.to_string(),
             polarity,
-            side_effects: config
-                .metadata
-                .as_ref()
-                .and_then(|metadata| metadata.side_effects.clone()),
             harm_class: infer_harm_class(verb_name, config.metadata.as_ref()),
             action_class: infer_action_class(verb_name, config),
             subject_kinds: config
@@ -289,11 +214,6 @@ impl VerbMetadataIndex {
                 .as_ref()
                 .map(|metadata| metadata.phase_tags.clone())
                 .unwrap_or_default(),
-            requires_subject: config
-                .metadata
-                .as_ref()
-                .map(|metadata| metadata.requires_subject)
-                .unwrap_or(true),
             planes,
             action_tags,
             param_names,
@@ -600,20 +520,14 @@ fn action_tags(
 }
 
 /// Compare the metadata index size to the runtime registry size.
-///
-/// # Examples
-/// ```ignore
-/// use ob_poc::sage::verb_index::runtime_registry_parity;
-///
-/// let (index_count, registry_count) = runtime_registry_parity()?;
-/// assert_eq!(index_count, registry_count);
-/// # Ok::<(), anyhow::Error>(())
-/// ```
-pub fn runtime_registry_parity() -> Result<(usize, usize)> {
+#[cfg(test)]
+pub fn runtime_registry_parity() -> anyhow::Result<(usize, usize)> {
+    use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
+    use dsl_core::ConfigLoader;
     let config = ConfigLoader::from_env().load_verbs()?;
     let index = VerbMetadataIndex::from_config(&config);
     let registry = RuntimeVerbRegistry::from_config(&config);
-    Ok((index.len(), registry.len()))
+    Ok((index.by_fqn.len(), registry.len()))
 }
 
 #[cfg(test)]

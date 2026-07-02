@@ -26,5 +26,6 @@ pub use dsl_runtime_context::{ExecutionContext, ValueSource};
 // Re-export builder
 pub use builder::{DslBuilder, DslValue};
 
-// Re-export all KYC attributes
+// Deliberate wildcard — the kyc module is a catalogue of
+// macro-generated attribute types; every item is meant to be public.
 pub use kyc::*;

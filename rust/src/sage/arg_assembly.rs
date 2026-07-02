@@ -4,42 +4,19 @@ use anyhow::{anyhow, Result};
 use dsl_core::{ArgType, VerbConfig};
 
 use crate::mcp::intent_pipeline::{
-    assemble_dsl_string, IntentArgValue, IntentArgument, StructuredIntent,
+    IntentArgValue, IntentArgument, StructuredIntent,
 };
 
 use super::outcome::OutcomeStep;
 
-/// Assemble a DSL invocation from one `OutcomeStep` and a target verb config.
-///
-/// # Examples
-/// ```ignore
-/// use dsl_core::ConfigLoader;
-/// use ob_poc::sage::{OutcomeAction, OutcomeStep};
-/// use ob_poc::sage::arg_assembly::assemble_args_from_step;
-/// use std::collections::HashMap;
-///
-/// let config = ConfigLoader::from_env().load_verbs()?;
-/// let verb = &config.domains["cbu"].verbs["create"];
-/// let step = OutcomeStep {
-///     action: OutcomeAction::Create,
-///     target: "cbu".to_string(),
-///     params: HashMap::from([
-///         ("name".to_string(), "Apex Fund".to_string()),
-///         ("jurisdiction".to_string(), "LU".to_string()),
-///     ]),
-///     notes: None,
-/// };
-/// let dsl = assemble_args_from_step("cbu.create", &step, verb)?;
-/// assert!(dsl.starts_with("(cbu.create"));
-/// # Ok::<(), anyhow::Error>(())
-/// ```
+#[cfg(test)]
 pub fn assemble_args_from_step(
     verb_fqn: &str,
     step: &OutcomeStep,
     config: &VerbConfig,
 ) -> Result<String> {
     let intent = structured_intent_from_step(verb_fqn, step, config)?;
-    assemble_dsl_string(&intent)
+    crate::mcp::intent_pipeline::assemble_dsl_string(&intent)
 }
 
 /// Assemble a structured intent from one `OutcomeStep` and a target verb config.

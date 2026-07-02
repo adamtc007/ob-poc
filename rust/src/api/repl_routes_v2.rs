@@ -51,7 +51,9 @@ pub struct ReplV2RouteState {
 }
 
 static REPL_ACP_AGENTS: LazyLock<
-    tokio::sync::Mutex<std::collections::BTreeMap<Uuid, ob_poc_boundary::acp_protocol::AcpJsonRpcAgent>>,
+    tokio::sync::Mutex<
+        std::collections::BTreeMap<Uuid, ob_poc_boundary::acp_protocol::AcpJsonRpcAgent>,
+    >,
 > = LazyLock::new(|| tokio::sync::Mutex::new(std::collections::BTreeMap::new()));
 
 // ============================================================================
@@ -1080,8 +1082,12 @@ async fn get_acp_policy_route(
         .map_err(acp_json_error)
 }
 
-fn acp_policy_value(session_id: Uuid) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
-    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
+fn acp_policy_value(
+    session_id: Uuid,
+) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(
+        ob_poc_boundary::acp::AcpAdapterKind::Zed,
+    )?;
     let policy = facade.policy(session_id)?;
 
     Ok(serde_json::json!({
@@ -1102,7 +1108,9 @@ async fn list_acp_projections_route(
 fn list_acp_projections_value(
     session_id: Uuid,
 ) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
-    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(
+        ob_poc_boundary::acp::AcpAdapterKind::Zed,
+    )?;
     let pack_id = facade.manifest().pack_id.clone();
     let projections = facade.projections_list(session_id)?;
 
@@ -1190,7 +1198,9 @@ async fn get_acp_projection_value_for_state(
     session_id: Uuid,
     kind: &str,
 ) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
-    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(
+        ob_poc_boundary::acp::AcpAdapterKind::Zed,
+    )?;
     let parsed_kind = kind.parse::<AcpProjectionKind>().map_err(|_| {
         ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown {
             projection_kind: kind.to_string(),
@@ -1198,8 +1208,10 @@ async fn get_acp_projection_value_for_state(
     })?;
 
     if let Some(repl_session) = state.orchestrator.get_session(session_id).await {
-        let session =
-            facade.open_session_with_persona(session_id, ob_poc_boundary::acp::AcpPersonaMode::SagePlanning);
+        let session = facade.open_session_with_persona(
+            session_id,
+            ob_poc_boundary::acp::AcpPersonaMode::SagePlanning,
+        );
         if let Some(projection) =
             build_live_acp_projection(&session, facade.manifest(), &repl_session, parsed_kind)?
         {
@@ -1217,12 +1229,16 @@ fn get_acp_projection_value(
     session_id: Uuid,
     kind: &str,
 ) -> Result<serde_json::Value, ob_poc_boundary::acp::AcpAdapterError> {
-    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(ob_poc_boundary::acp::AcpAdapterKind::Zed)?;
+    let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(
+        ob_poc_boundary::acp::AcpAdapterKind::Zed,
+    )?;
     let kind = kind
         .parse::<sem_os_policy::acp_projection::AcpProjectionKind>()
-        .map_err(|_| ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown {
-            projection_kind: kind.to_string(),
-        })?;
+        .map_err(
+            |_| ob_poc_boundary::acp::AcpAdapterError::ProjectionUnknown {
+                projection_kind: kind.to_string(),
+            },
+        )?;
     let projection = facade.projection_get(
         session_id,
         ob_poc_boundary::acp::AcpProjectionRequest {
@@ -1617,7 +1633,9 @@ fn json_rpc_outgoing_result(
     outgoing: &[ob_poc_boundary::acp_protocol::JsonRpcOutgoing],
 ) -> Option<serde_json::Value> {
     outgoing.iter().rev().find_map(|item| match item {
-        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(response) => response.result.clone(),
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(response) => {
+            response.result.clone()
+        }
         ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(_) => None,
     })
 }
@@ -1868,19 +1886,21 @@ pub(crate) fn compute_session_aware_runtime_trace_typed(
         },
     );
     let projection = crate::acp_runtime_context::build_acp_runtime_context_projection(source);
-    Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticRuntimeTrace {
-        schema_version: projection.schema_version,
-        pack_id: projection.pack_id,
-        snapshot_id: projection.snapshot_id,
-        runtime_hash: projection.runtime_hash,
-        redaction_policy: projection.redaction_policy,
-        freshness_policy: projection.freshness_policy,
-        static_envelope_hash: projection.static_envelope_hash,
-        projection_hash: projection.projection_hash,
-        verified: projection.verified,
-        redacted_count: projection.redacted_count,
-        blocked_field_codes: projection.blocked_field_codes,
-    })
+    Some(
+        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticRuntimeTrace {
+            schema_version: projection.schema_version,
+            pack_id: projection.pack_id,
+            snapshot_id: projection.snapshot_id,
+            runtime_hash: projection.runtime_hash,
+            redaction_policy: projection.redaction_policy,
+            freshness_policy: projection.freshness_policy,
+            static_envelope_hash: projection.static_envelope_hash,
+            projection_hash: projection.projection_hash,
+            verified: projection.verified,
+            redacted_count: projection.redacted_count,
+            blocked_field_codes: projection.blocked_field_codes,
+        },
+    )
 }
 
 /// R8 Phase B.8 (2026-05-11): JSON wrapper around the typed runtime
@@ -1892,7 +1912,10 @@ pub(crate) fn compute_session_aware_runtime_trace_typed(
 /// source of truth.
 fn attach_session_runtime_trace_to_result(result: &mut serde_json::Value, session: &ReplSessionV2) {
     let Some(resolution) = result.get("dag_semantic").and_then(|v| {
-        serde_json::from_value::<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+        serde_json::from_value::<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>(
+            v.clone(),
+        )
+        .ok()
     }) else {
         return;
     };
@@ -3625,7 +3648,9 @@ pub(crate) fn load_ob_poc_kyc_domain_pack(
     ob_poc_boundary::acp_facade::load_ob_poc_kyc_domain_pack()
 }
 
-fn acp_json_error(error: ob_poc_boundary::acp::AcpAdapterError) -> (StatusCode, Json<ErrorResponseV2>) {
+fn acp_json_error(
+    error: ob_poc_boundary::acp::AcpAdapterError,
+) -> (StatusCode, Json<ErrorResponseV2>) {
     let status = match error {
         ob_poc_boundary::acp::AcpAdapterError::DiscoveryRefused { .. }
         | ob_poc_boundary::acp::AcpAdapterError::DiscoveryMutatedState
@@ -4754,18 +4779,22 @@ mod tests {
     #[test]
     fn test_json_rpc_result_prefers_prompt_response_after_seeded_discovery() {
         let outgoing = vec![
-            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(ob_poc_boundary::acp_protocol::JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
-                id: Some(serde_json::json!("live-case-state-discovery")),
-                result: Some(serde_json::json!({"status": "kyc_case_state_discovered"})),
-                error: None,
-            }),
-            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(ob_poc_boundary::acp_protocol::JsonRpcResponse {
-                jsonrpc: "2.0".to_string(),
-                id: Some(serde_json::json!("prompt")),
-                result: Some(serde_json::json!({"status": "dry_run_validated"})),
-                error: None,
-            }),
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(
+                ob_poc_boundary::acp_protocol::JsonRpcResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id: Some(serde_json::json!("live-case-state-discovery")),
+                    result: Some(serde_json::json!({"status": "kyc_case_state_discovered"})),
+                    error: None,
+                },
+            ),
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(
+                ob_poc_boundary::acp_protocol::JsonRpcResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id: Some(serde_json::json!("prompt")),
+                    result: Some(serde_json::json!({"status": "dry_run_validated"})),
+                    error: None,
+                },
+            ),
         ];
 
         let result = json_rpc_outgoing_result(&outgoing).expect("last response result");
@@ -5657,14 +5686,19 @@ mod tests {
         req: AcpPromptEnvelopeRequest,
         variant: LiveAblationVariant,
         client: Result<std::sync::Arc<dyn ob_agentic::llm_client::LlmClient>, String>,
-    ) -> Result<(serde_json::Value, crate::runbook::SemOsLanguagePack), ob_poc_boundary::acp::AcpAdapterError>
-    {
+    ) -> Result<
+        (serde_json::Value, crate::runbook::SemOsLanguagePack),
+        ob_poc_boundary::acp::AcpAdapterError,
+    > {
         let prompt_request = ob_poc_boundary::acp_protocol::AcpJsonRpcAgent::new()
             .kyc_update_status_language_loop_request_from_prompt(session_id, &req.prompt)
-            .map_err(|missing| ob_poc_boundary::acp::AcpAdapterError::LanguagePackRefused {
-                reason: format!("prompt missing {}", missing.join(", ")),
-            })?;
-        let facade = ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(prompt_request.adapter)?;
+            .map_err(
+                |missing| ob_poc_boundary::acp::AcpAdapterError::LanguagePackRefused {
+                    reason: format!("prompt missing {}", missing.join(", ")),
+                },
+            )?;
+        let facade =
+            ob_poc_boundary::acp_facade::AcpFacade::for_default_pack(prompt_request.adapter)?;
         let session = ob_poc_boundary::acp::open_acp_session(session_id, prompt_request.adapter);
         let total_started_at = Instant::now();
         let actor_id = prompt_request.draft.actor_id.clone();

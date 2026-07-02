@@ -50,7 +50,7 @@ use ob_poc::repl::runbook::{
     RunbookStatus, SlotProvenance,
 };
 use ob_poc::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2};
-use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, ReplOrchestratorV2, NullDslExecutor};
+use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, NullDslExecutor, ReplOrchestratorV2};
 
 // ---------------------------------------------------------------------------
 // BPMN model

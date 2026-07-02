@@ -31,7 +31,13 @@ fn v1_registry() -> FoldRegistry {
     r
 }
 
-fn base(subject: SubjectId, verb: &str, target: TargetBinding, payload: serde_json::Value, idem: &str) -> IntentEvent {
+fn base(
+    subject: SubjectId,
+    verb: &str,
+    target: TargetBinding,
+    payload: serde_json::Value,
+    idem: &str,
+) -> IntentEvent {
     IntentEvent::new(
         subject,
         verb,
@@ -48,23 +54,35 @@ fn base(subject: SubjectId, verb: &str, target: TargetBinding, payload: serde_js
 }
 
 fn register(subject: SubjectId, idem: &str) -> IntentEvent {
-    base(subject, "kyc.subject.register", TargetBinding::for_subject(subject),
-         serde_json::json!({ "is_natural_person": false }), idem)
+    base(
+        subject,
+        "kyc.subject.register",
+        TargetBinding::for_subject(subject),
+        serde_json::json!({ "is_natural_person": false }),
+        idem,
+    )
 }
 
 fn assert_control(subject: SubjectId, edge: Uuid, idem: &str) -> IntentEvent {
-    base(subject, "ubo.edge.assert-control", TargetBinding::for_edge(subject, EdgeId(edge)),
+    base(
+        subject,
+        "ubo.edge.assert-control",
+        TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({
             "from_entity_id": Uuid::new_v4(),
             "to_entity_id": Uuid::new_v4(),
             "edge_id": edge.to_string(),
             "edge_kind": "voting_rights",
-        }), idem)
+        }),
+        idem,
+    )
 }
 
 async fn append(pool: &PgPool, registry: &FoldRegistry, ev: &IntentEvent) {
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, registry, ev, |_| Ok(())).await.unwrap();
+    PgKycEventStore::append(&mut tx, registry, ev, |_| Ok(()))
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
 }
 
@@ -82,25 +100,35 @@ async fn outbox_count(pool: &PgPool, subject: SubjectId, status: &str) -> i64 {
 }
 
 async fn projection_count(pool: &PgPool, subject: SubjectId) -> i64 {
-    sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".kyc_control_edge_projection WHERE subject_root = $1"#)
-        .bind(subject.0)
-        .fetch_one(pool)
-        .await
-        .unwrap()
+    sqlx::query_scalar(
+        r#"SELECT count(*) FROM "ob-poc".kyc_control_edge_projection WHERE subject_root = $1"#,
+    )
+    .bind(subject.0)
+    .fetch_one(pool)
+    .await
+    .unwrap()
 }
 
 async fn cleanup(pool: &PgPool, subject: SubjectId) {
-    for t in ["kyc_intent_events", "kyc_subject_streams", "kyc_control_edge_projection"] {
-        let _ = sqlx::query(&format!(r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#))
-            .bind(subject.0)
-            .execute(pool)
-            .await;
-    }
-    let _ = sqlx::query(r#"DELETE FROM "public".outbox WHERE effect_kind = $1 AND idempotency_key LIKE $2"#)
-        .bind(CONTROL_EDGE_PROJECTION_EFFECT)
-        .bind(format!("{}:%", subject.0))
+    for t in [
+        "kyc_intent_events",
+        "kyc_subject_streams",
+        "kyc_control_edge_projection",
+    ] {
+        let _ = sqlx::query(&format!(
+            r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
+        ))
+        .bind(subject.0)
         .execute(pool)
         .await;
+    }
+    let _ = sqlx::query(
+        r#"DELETE FROM "public".outbox WHERE effect_kind = $1 AND idempotency_key LIKE $2"#,
+    )
+    .bind(CONTROL_EDGE_PROJECTION_EFFECT)
+    .bind(format!("{}:%", subject.0))
+    .execute(pool)
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -119,13 +147,31 @@ async fn drainer_enqueue_dedupe_and_concurrency() {
         append(&pool, &registry, &register(subject, "reg")).await;
         append(&pool, &registry, &assert_control(subject, edge, "edge")).await;
 
-        assert_eq!(outbox_count(&pool, subject, "pending").await, 2, "two pending effects enqueued");
-        assert_eq!(projection_count(&pool, subject).await, 0, "drainer has not run yet");
+        assert_eq!(
+            outbox_count(&pool, subject, "pending").await,
+            2,
+            "two pending effects enqueued"
+        );
+        assert_eq!(
+            projection_count(&pool, subject).await,
+            0,
+            "drainer has not run yet"
+        );
 
-        PgKycProjectionDrainer::drain_all(&pool, &registry, 1000).await.unwrap();
+        PgKycProjectionDrainer::drain_all(&pool, &registry, 1000)
+            .await
+            .unwrap();
 
-        assert_eq!(projection_count(&pool, subject).await, 1, "edge projected by the drainer");
-        assert_eq!(outbox_count(&pool, subject, "done").await, 2, "both effects marked done");
+        assert_eq!(
+            projection_count(&pool, subject).await,
+            1,
+            "edge projected by the drainer"
+        );
+        assert_eq!(
+            outbox_count(&pool, subject, "done").await,
+            2,
+            "both effects marked done"
+        );
         assert_eq!(outbox_count(&pool, subject, "pending").await, 0);
         cleanup(&pool, subject).await;
     }
@@ -136,7 +182,11 @@ async fn drainer_enqueue_dedupe_and_concurrency() {
         let ev = register(subject, "same");
         append(&pool, &registry, &ev).await;
         append(&pool, &registry, &ev).await; // same idempotency_key → deduped at the store
-        assert_eq!(outbox_count(&pool, subject, "pending").await, 1, "deduped append enqueues nothing");
+        assert_eq!(
+            outbox_count(&pool, subject, "pending").await,
+            1,
+            "deduped append enqueues nothing"
+        );
         cleanup(&pool, subject).await;
     }
 
@@ -144,21 +194,38 @@ async fn drainer_enqueue_dedupe_and_concurrency() {
     {
         let subjects: Vec<SubjectId> = (0..6).map(|_| SubjectId(Uuid::new_v4())).collect();
         for s in &subjects {
-            append(&pool, &registry, &assert_control(*s, Uuid::new_v4(), "edge")).await;
+            append(
+                &pool,
+                &registry,
+                &assert_control(*s, Uuid::new_v4(), "edge"),
+            )
+            .await;
         }
 
         let drain = || {
             let pool = pool.clone();
             let registry = registry.clone();
-            async move { PgKycProjectionDrainer::drain_all(&pool, &registry, 1000).await.unwrap() }
+            async move {
+                PgKycProjectionDrainer::drain_all(&pool, &registry, 1000)
+                    .await
+                    .unwrap()
+            }
         };
         let _ = tokio::join!(drain(), drain());
 
         // SKIP LOCKED + terminal 'done' → each subject's effect processed exactly once.
         for s in &subjects {
-            assert_eq!(outbox_count(&pool, *s, "done").await, 1, "effect done exactly once");
+            assert_eq!(
+                outbox_count(&pool, *s, "done").await,
+                1,
+                "effect done exactly once"
+            );
             assert_eq!(outbox_count(&pool, *s, "pending").await, 0);
-            assert_eq!(projection_count(&pool, *s).await, 1, "subject's edge projected");
+            assert_eq!(
+                projection_count(&pool, *s).await,
+                1,
+                "subject's edge projected"
+            );
         }
         for s in &subjects {
             cleanup(&pool, *s).await;

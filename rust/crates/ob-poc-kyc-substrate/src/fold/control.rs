@@ -183,7 +183,9 @@ pub struct ControlState {
 impl ControlState {
     /// Active (non-superseded) economic-interest edges only.
     pub fn active_economic_edges(&self) -> impl Iterator<Item = &EdgeState> {
-        self.edges.values().filter(|e| e.is_active() && e.is_economic())
+        self.edges
+            .values()
+            .filter(|e| e.is_active() && e.is_economic())
     }
 
     /// Total claimed economic interest in the subject (across all active
@@ -211,7 +213,9 @@ impl ControlState {
 
 /// Parse an `EdgeId` from the event payload (field `"edge_id"`).
 fn edge_id_from_payload(payload: &serde_json::Value) -> Option<EdgeId> {
-    payload.get("edge_id")?.as_str()
+    payload
+        .get("edge_id")?
+        .as_str()
         .and_then(|s| uuid::Uuid::parse_str(s).ok())
         .map(EdgeId)
 }
@@ -221,13 +225,15 @@ fn edge_id_from_target(event: &IntentEvent) -> Option<EdgeId> {
 }
 
 fn entity_id(v: &serde_json::Value, field: &str) -> Option<EntityId> {
-    v.get(field)?.as_str()
+    v.get(field)?
+        .as_str()
         .and_then(|s| Uuid::parse_str(s).ok())
         .map(EntityId)
 }
 
 fn person_id(v: &serde_json::Value, field: &str) -> Option<PersonId> {
-    v.get(field)?.as_str()
+    v.get(field)?
+        .as_str()
         .and_then(|s| Uuid::parse_str(s).ok())
         .map(PersonId)
 }
@@ -269,7 +275,10 @@ fn structure_class_from_payload(payload: &serde_json::Value) -> Option<Structure
 ///
 /// Extracted so `fold/registry.rs` can compose it without duplicating the match.
 /// `pub(crate)`: visible to the registry, not to crate consumers.
-pub(crate) fn apply_one_control_event(mut state: ControlState, event: &IntentEvent) -> ControlState {
+pub(crate) fn apply_one_control_event(
+    mut state: ControlState,
+    event: &IntentEvent,
+) -> ControlState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
         "kyc.subject.register" => {
@@ -283,47 +292,50 @@ pub(crate) fn apply_one_control_event(mut state: ControlState, event: &IntentEve
         }
 
         "ubo.edge.assert-economic-interest" => {
-            if let (Some(from), Some(to)) = (
-                entity_id(p, "from_entity_id"),
-                entity_id(p, "to_entity_id"),
-            ) {
+            if let (Some(from), Some(to)) =
+                (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
+            {
                 let edge_id = edge_id_from_payload(p).unwrap_or_else(|| {
                     let key = format!("economic:{}:{}", from.0, to.0);
                     EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes()))
                 });
-                state.edges.insert(edge_id, EdgeState {
-                    id: edge_id,
-                    kind: EdgeKind::EconomicInterest,
-                    from,
-                    to,
-                    percentage: opt_f64(p, "percentage"),
-                    status: EdgeStatus::Asserted,
-                    evidence_event_id: None,
-                    originating_event_id: event.id,
-                });
+                state.edges.insert(
+                    edge_id,
+                    EdgeState {
+                        id: edge_id,
+                        kind: EdgeKind::EconomicInterest,
+                        from,
+                        to,
+                        percentage: opt_f64(p, "percentage"),
+                        status: EdgeStatus::Asserted,
+                        evidence_event_id: None,
+                        originating_event_id: event.id,
+                    },
+                );
             }
         }
 
         "ubo.edge.assert-control" => {
-            if let (Some(from), Some(to)) = (
-                entity_id(p, "from_entity_id"),
-                entity_id(p, "to_entity_id"),
-            ) {
+            if let (Some(from), Some(to)) =
+                (entity_id(p, "from_entity_id"), entity_id(p, "to_entity_id"))
+            {
                 let kind = edge_kind_from_payload(p);
                 let key = format!("control:{}:{}:{:?}", from.0, to.0, kind);
-                let edge_id = edge_id_from_payload(p).unwrap_or_else(|| {
-                    EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes()))
-                });
-                state.edges.insert(edge_id, EdgeState {
-                    id: edge_id,
-                    kind,
-                    from,
-                    to,
-                    percentage: opt_f64(p, "percentage"),
-                    status: EdgeStatus::Asserted,
-                    evidence_event_id: None,
-                    originating_event_id: event.id,
-                });
+                let edge_id = edge_id_from_payload(p)
+                    .unwrap_or_else(|| EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes())));
+                state.edges.insert(
+                    edge_id,
+                    EdgeState {
+                        id: edge_id,
+                        kind,
+                        from,
+                        to,
+                        percentage: opt_f64(p, "percentage"),
+                        status: EdgeStatus::Asserted,
+                        evidence_event_id: None,
+                        originating_event_id: event.id,
+                    },
+                );
             }
         }
 
@@ -362,7 +374,8 @@ pub(crate) fn apply_one_control_event(mut state: ControlState, event: &IntentEve
         }
 
         "ubo.determination.select-strategy" => {
-            state.selected_strategy = p.get("strategy")
+            state.selected_strategy = p
+                .get("strategy")
                 .and_then(|v| v.as_str())
                 .map(str::to_owned);
             state.strategy_event_id = Some(event.id);
@@ -375,22 +388,25 @@ pub(crate) fn apply_one_control_event(mut state: ControlState, event: &IntentEve
 
         "kyc.person.approve" => {
             if let Some(pid) = person_id(p, "person_id") {
-                state.terminal_persons.insert(
-                    pid,
-                    TerminalStatus::Approved { by_event: event.id },
-                );
+                state
+                    .terminal_persons
+                    .insert(pid, TerminalStatus::Approved { by_event: event.id });
             }
         }
 
         "kyc.person.waive" => {
             if let Some(pid) = person_id(p, "person_id") {
-                let reason = p.get("reason")
+                let reason = p
+                    .get("reason")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unspecified")
                     .to_owned();
                 state.terminal_persons.insert(
                     pid,
-                    TerminalStatus::Waived { by_event: event.id, reason },
+                    TerminalStatus::Waived {
+                        by_event: event.id,
+                        reason,
+                    },
                 );
             }
         }
@@ -409,7 +425,9 @@ pub(crate) fn apply_one_control_event(mut state: ControlState, event: &IntentEve
 /// `fold::registry` — it dispatches each event through the `FoldRegistry`
 /// keyed on `event.lexicon_hash`.
 pub fn fold_control(events: &[&IntentEvent]) -> ControlState {
-    events.iter().fold(ControlState::default(), |st, e| apply_one_control_event(st, e))
+    events.iter().fold(ControlState::default(), |st, e| {
+        apply_one_control_event(st, e)
+    })
 }
 
 // ── Precondition checker ──────────────────────────────────────────────────────
@@ -485,7 +503,9 @@ pub fn reconciled_economic_edges(state: &ControlState) -> Vec<ReconciledEconomic
     // canonicalises which source representation is authoritative; evidence
     // attachment is the next step, not a prerequisite for reconcile.
     // Only exclude Superseded.
-    state.edges.values()
+    state
+        .edges
+        .values()
         .filter(|e| e.is_economic() && e.is_active())
         .filter_map(|e| {
             let pct = e.percentage?;
@@ -494,7 +514,11 @@ pub fn reconciled_economic_edges(state: &ControlState) -> Vec<ReconciledEconomic
                 from: e.from,
                 to: e.to,
                 percentage: pct,
-                verified_by: if e.is_verified() { e.evidence_event_id } else { None },
+                verified_by: if e.is_verified() {
+                    e.evidence_event_id
+                } else {
+                    None
+                },
                 originating_event_id: e.originating_event_id,
             })
         })
@@ -511,7 +535,11 @@ pub fn natural_persons_from_events(events: &[&IntentEvent]) -> BTreeSet<PersonId
     let mut persons = BTreeSet::new();
     for event in events {
         if event.verb_fqn.as_str() == "kyc.subject.register"
-            && event.payload.get("is_natural_person").and_then(|v| v.as_bool()) == Some(true)
+            && event
+                .payload
+                .get("is_natural_person")
+                .and_then(|v| v.as_bool())
+                == Some(true)
         {
             if let Some(pid) = person_id(&event.payload, "entity_id") {
                 persons.insert(pid);

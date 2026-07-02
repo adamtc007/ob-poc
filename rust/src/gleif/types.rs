@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// kept for serde deserialization
+#[allow(dead_code)]
 pub enum EntityCategory {
     Fund,
     General,
@@ -28,6 +30,8 @@ pub enum EntityCategory {
     Unknown(String),
 }
 
+// kept for serde deserialization
+#[allow(dead_code)]
 impl EntityCategory {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
@@ -42,6 +46,7 @@ impl EntityCategory {
         }
     }
 
+    #[allow(dead_code)]
     pub fn as_str(&self) -> &str {
         match self {
             Self::Fund => "FUND",
@@ -67,195 +72,12 @@ impl Default for EntityCategory {
     }
 }
 
-/// Fund structure type - legal wrapper/vehicle type
-///
-/// Uses resilience pattern - unknown values captured verbatim.
-/// GLEIF and other sources may use different terminology.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FundStructureType {
-    /// SICAV - Société d'Investissement à Capital Variable
-    Sicav,
-    /// ICAV - Irish Collective Asset-management Vehicle
-    Icav,
-    /// OEIC - Open-Ended Investment Company (UK)
-    Oeic,
-    /// VCC - Variable Capital Company (Singapore)
-    Vcc,
-    /// Unit Trust
-    UnitTrust,
-    /// FCP - Fonds Commun de Placement
-    Fcp,
-    /// Limited Partnership
-    LimitedPartnership,
-    /// LLC - Limited Liability Company
-    Llc,
-    /// Corporate (standard company structure)
-    Corporate,
-    /// Unknown structure from external source - captured verbatim
-    Unknown(String),
-}
-
-impl FundStructureType {
-    pub fn parse(s: &str) -> Self {
-        match s.to_uppercase().replace(['-', ' '], "_").as_str() {
-            "SICAV" => Self::Sicav,
-            "ICAV" => Self::Icav,
-            "OEIC" => Self::Oeic,
-            "VCC" => Self::Vcc,
-            "UNIT_TRUST" | "UNITTRUST" => Self::UnitTrust,
-            "FCP" => Self::Fcp,
-            "LIMITED_PARTNERSHIP" | "LP" => Self::LimitedPartnership,
-            "LLC" => Self::Llc,
-            "CORPORATE" | "CORP" => Self::Corporate,
-            other => {
-                tracing::debug!(code = other, "Unknown fund structure type");
-                Self::Unknown(s.to_string())
-            }
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Sicav => "SICAV",
-            Self::Icav => "ICAV",
-            Self::Oeic => "OEIC",
-            Self::Vcc => "VCC",
-            Self::UnitTrust => "UNIT_TRUST",
-            Self::Fcp => "FCP",
-            Self::LimitedPartnership => "LIMITED_PARTNERSHIP",
-            Self::Llc => "LLC",
-            Self::Corporate => "CORPORATE",
-            Self::Unknown(s) => s.as_str(),
-        }
-    }
-
-    pub fn is_unknown(&self) -> bool {
-        matches!(self, Self::Unknown(_))
-    }
-}
-
-impl Default for FundStructureType {
-    fn default() -> Self {
-        Self::Unknown("UNSPECIFIED".to_string())
-    }
-}
-
-/// Fund type - regulatory/strategy classification
-///
-/// Uses resilience pattern - unknown values captured verbatim.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FundType {
-    /// UCITS - EU retail fund
-    Ucits,
-    /// AIF - Alternative Investment Fund
-    Aif,
-    /// Hedge Fund
-    HedgeFund,
-    /// Private Equity
-    PrivateEquity,
-    /// Venture Capital
-    VentureCapital,
-    /// Real Estate / REIT
-    RealEstate,
-    /// Infrastructure
-    Infrastructure,
-    /// Fund of Funds
-    FundOfFunds,
-    /// ETF - Exchange Traded Fund
-    Etf,
-    /// Money Market Fund
-    MoneyMarket,
-    /// Pension Fund
-    PensionFund,
-    /// Sovereign Wealth Fund
-    SovereignWealth,
-    /// ELTIF - European Long-Term Investment Fund
-    Eltif,
-    /// RAIF - Reserved Alternative Investment Fund
-    Raif,
-    /// Unknown type from external source - captured verbatim
-    Unknown(String),
-}
-
-impl FundType {
-    pub fn parse(s: &str) -> Self {
-        match s.to_uppercase().replace(['-', ' '], "_").as_str() {
-            "UCITS" => Self::Ucits,
-            "AIF" | "AIFMD" => Self::Aif,
-            "HEDGE_FUND" | "HEDGEFUND" => Self::HedgeFund,
-            "PRIVATE_EQUITY" | "PE" => Self::PrivateEquity,
-            "VENTURE_CAPITAL" | "VC" => Self::VentureCapital,
-            "REAL_ESTATE" | "REIT" => Self::RealEstate,
-            "INFRASTRUCTURE" | "INFRA" => Self::Infrastructure,
-            "FUND_OF_FUNDS" | "FOF" => Self::FundOfFunds,
-            "ETF" => Self::Etf,
-            "MONEY_MARKET" | "MMF" => Self::MoneyMarket,
-            "PENSION_FUND" | "PENSION" => Self::PensionFund,
-            "SOVEREIGN_WEALTH" | "SWF" => Self::SovereignWealth,
-            "ELTIF" => Self::Eltif,
-            "RAIF" => Self::Raif,
-            other => {
-                tracing::debug!(code = other, "Unknown fund type");
-                Self::Unknown(s.to_string())
-            }
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Ucits => "UCITS",
-            Self::Aif => "AIF",
-            Self::HedgeFund => "HEDGE_FUND",
-            Self::PrivateEquity => "PRIVATE_EQUITY",
-            Self::VentureCapital => "VENTURE_CAPITAL",
-            Self::RealEstate => "REAL_ESTATE",
-            Self::Infrastructure => "INFRASTRUCTURE",
-            Self::FundOfFunds => "FUND_OF_FUNDS",
-            Self::Etf => "ETF",
-            Self::MoneyMarket => "MONEY_MARKET",
-            Self::PensionFund => "PENSION_FUND",
-            Self::SovereignWealth => "SOVEREIGN_WEALTH",
-            Self::Eltif => "ELTIF",
-            Self::Raif => "RAIF",
-            Self::Unknown(s) => s.as_str(),
-        }
-    }
-
-    pub fn is_unknown(&self) -> bool {
-        matches!(self, Self::Unknown(_))
-    }
-
-    /// Is this a retail-eligible fund type?
-    pub fn is_retail_eligible(&self) -> bool {
-        matches!(self, Self::Ucits | Self::Etf | Self::MoneyMarket)
-    }
-
-    /// Is this an alternative/professional fund type?
-    pub fn is_alternative(&self) -> bool {
-        matches!(
-            self,
-            Self::Aif
-                | Self::HedgeFund
-                | Self::PrivateEquity
-                | Self::VentureCapital
-                | Self::RealEstate
-                | Self::Infrastructure
-                | Self::Eltif
-                | Self::Raif
-        )
-    }
-}
-
-impl Default for FundType {
-    fn default() -> Self {
-        Self::Unknown("UNSPECIFIED".to_string())
-    }
-}
-
 /// GLEIF Entity Status (ACTIVE, INACTIVE, etc.)
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// kept for serde deserialization
+#[allow(dead_code)]
 pub enum EntityStatus {
     Active,
     Inactive,
@@ -263,6 +85,8 @@ pub enum EntityStatus {
     Unknown(String),
 }
 
+// kept for serde deserialization
+#[allow(dead_code)]
 impl EntityStatus {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
@@ -302,6 +126,9 @@ impl Default for EntityStatus {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(dead_code)]
+// kept for serde deserialization
+#[allow(dead_code)]
 pub enum RegistrationStatus {
     Issued,
     Lapsed,
@@ -317,6 +144,8 @@ pub enum RegistrationStatus {
     Unknown(String),
 }
 
+// kept for serde deserialization
+#[allow(dead_code)]
 impl RegistrationStatus {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
@@ -372,6 +201,9 @@ impl Default for RegistrationStatus {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(dead_code)]
+// kept for serde deserialization
+#[allow(dead_code)]
 pub enum CorroborationLevel {
     FullyCorroborated,
     PartiallyCorroborated,
@@ -380,6 +212,8 @@ pub enum CorroborationLevel {
     Unknown(String),
 }
 
+// kept for serde deserialization
+#[allow(dead_code)]
 impl CorroborationLevel {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
@@ -421,6 +255,9 @@ impl Default for CorroborationLevel {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(dead_code)]
+// kept for serde deserialization
+#[allow(dead_code)]
 pub enum RelationshipType {
     IsDirectlyConsolidatedBy,
     IsUltimatelyConsolidatedBy,
@@ -431,6 +268,8 @@ pub enum RelationshipType {
     Unknown(String),
 }
 
+// kept for serde deserialization
+#[allow(dead_code)]
 impl RelationshipType {
     pub fn parse(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
@@ -503,112 +342,21 @@ pub enum RelationshipCategory {
     Unknown(String),
 }
 
-impl RelationshipCategory {
-    /// Derive category from relationship type
-    pub fn from_relationship_type(rel_type: &RelationshipType) -> Self {
-        match rel_type {
-            RelationshipType::IsDirectlyConsolidatedBy
-            | RelationshipType::IsUltimatelyConsolidatedBy => Self::Ownership,
-            RelationshipType::IsFundManagedBy => Self::InvestmentManagement,
-            RelationshipType::IsSubfundOf | RelationshipType::IsFeederTo => Self::FundStructure,
-            RelationshipType::Unknown(_) => Self::Unknown("UNKNOWN".to_string()),
-        }
-    }
-
-    /// Parse from string (for DB storage/retrieval)
-    pub fn parse(s: &str) -> Self {
-        match s.to_uppercase().as_str() {
-            "OWNERSHIP" => Self::Ownership,
-            "INVESTMENT_MANAGEMENT" | "IM" => Self::InvestmentManagement,
-            "FUND_STRUCTURE" => Self::FundStructure,
-            "BRANCH" => Self::Branch,
-            other => {
-                tracing::debug!(code = other, "Unknown relationship category");
-                Self::Unknown(s.to_string())
-            }
-        }
-    }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Ownership => "OWNERSHIP",
-            Self::InvestmentManagement => "INVESTMENT_MANAGEMENT",
-            Self::FundStructure => "FUND_STRUCTURE",
-            Self::Branch => "BRANCH",
-            Self::Unknown(s) => s.as_str(),
-        }
-    }
-
-    /// Check if this is an ownership/consolidation relationship
-    pub fn is_ownership(&self) -> bool {
-        matches!(self, Self::Ownership)
-    }
-
-    /// Check if this is an investment management relationship
-    pub fn is_im_relationship(&self) -> bool {
-        matches!(self, Self::InvestmentManagement)
-    }
-
-    /// Check if this is a fund structure relationship
-    pub fn is_fund_structure(&self) -> bool {
-        matches!(self, Self::FundStructure)
-    }
-
-    pub fn is_unknown(&self) -> bool {
-        matches!(self, Self::Unknown(_))
-    }
-}
-
-impl Default for RelationshipCategory {
-    fn default() -> Self {
-        Self::Unknown("UNSPECIFIED".to_string())
-    }
-}
-
 /// Top-level API response wrapper
 #[derive(Debug, Clone, Deserialize)]
 pub struct GleifResponse<T> {
     pub data: T,
     #[serde(default)]
-    pub links: Option<PaginationLinks>,
-    #[serde(default)]
     pub meta: Option<ResponseMeta>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct PaginationLinks {
-    pub first: Option<String>,
-    pub prev: Option<String>,
-    pub next: Option<String>,
-    pub last: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct ResponseMeta {
-    #[serde(rename = "goldenCopy")]
-    pub golden_copy: Option<GoldenCopyInfo>,
     pub pagination: Option<PaginationInfo>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct GoldenCopyInfo {
-    #[serde(rename = "publishDate")]
-    pub publish_date: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct PaginationInfo {
-    #[serde(rename = "currentPage")]
-    pub current_page: i32,
-    #[serde(rename = "perPage")]
-    pub per_page: i32,
-    /// May be null for empty results
-    #[serde(default)]
-    pub from: Option<i32>,
-    /// May be null for empty results
-    #[serde(default)]
-    pub to: Option<i32>,
-    pub total: i32,
     #[serde(rename = "lastPage")]
     pub last_page: i32,
 }
@@ -653,42 +401,13 @@ impl LeiRecord {
             .unwrap_or_default()
     }
 
-    /// Get registration status as typed enum (never fails - unknown values captured)
-    pub fn registration_status(&self) -> RegistrationStatus {
-        self.attributes
-            .registration
-            .status
-            .as_deref()
-            .map(RegistrationStatus::parse)
-            .unwrap_or_default()
-    }
-
-    /// Get corroboration level as typed enum (never fails - unknown values captured)
-    pub fn corroboration_level(&self) -> CorroborationLevel {
-        self.attributes
-            .registration
-            .corroboration_level
-            .as_deref()
-            .map(CorroborationLevel::parse)
-            .unwrap_or_default()
-    }
-
     /// Check if this is a fund entity
     pub fn is_fund(&self) -> bool {
         self.category().is_fund()
     }
 
-    /// Check if this entity has an active status
-    pub fn is_active(&self) -> bool {
-        self.entity_status().is_active()
-    }
-
-    /// Check if this LEI registration is valid/issued
-    pub fn is_registration_valid(&self) -> bool {
-        self.registration_status().is_valid()
-    }
-
     /// Get legal name safely (never panics)
+    #[allow(dead_code)] // kept for serde deserialization
     pub fn legal_name(&self) -> &str {
         &self.attributes.entity.legal_name.name
     }
@@ -696,15 +415,6 @@ impl LeiRecord {
     /// Get jurisdiction if present
     pub fn jurisdiction(&self) -> Option<&str> {
         self.attributes.entity.jurisdiction.as_deref()
-    }
-
-    /// Get legal form ID if present
-    pub fn legal_form_id(&self) -> Option<&str> {
-        self.attributes
-            .entity
-            .legal_form
-            .as_ref()
-            .and_then(|lf| lf.id.as_deref())
     }
 }
 
@@ -963,43 +673,6 @@ pub struct RelationshipRecord {
     pub attributes: RelationshipAttributes,
 }
 
-impl RelationshipRecord {
-    /// Get relationship type as typed enum (never fails - unknown values captured)
-    pub fn relationship_type(&self) -> RelationshipType {
-        RelationshipType::parse(&self.attributes.relationship.relationship_type)
-    }
-
-    /// Get start node LEI
-    pub fn start_lei(&self) -> &str {
-        &self.attributes.relationship.start_node.id
-    }
-
-    /// Get end node LEI
-    pub fn end_lei(&self) -> &str {
-        &self.attributes.relationship.end_node.id
-    }
-
-    /// Get corroboration level as typed enum
-    pub fn corroboration_level(&self) -> CorroborationLevel {
-        self.attributes
-            .registration
-            .corroboration_level
-            .as_deref()
-            .map(CorroborationLevel::parse)
-            .unwrap_or_default()
-    }
-
-    /// Check if this is a parent relationship (consolidation)
-    pub fn is_parent_relationship(&self) -> bool {
-        self.relationship_type().is_parent_relationship()
-    }
-
-    /// Check if this is a fund-related relationship
-    pub fn is_fund_relationship(&self) -> bool {
-        self.relationship_type().is_fund_relationship()
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RelationshipAttributes {
     pub relationship: RelationshipDetail,
@@ -1117,6 +790,8 @@ pub struct BicMappingAttributes {
 /// Uses the resilience pattern: known variants are typed, unknown are captured raw.
 /// GLEIF may add new exception codes at any time - we never fail on unknown values.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// kept for serde deserialization
+#[allow(dead_code)]
 pub enum ReportingException {
     /// Widely held / publicly traded - no single UBO
     NoKnownPerson,
@@ -1137,6 +812,8 @@ pub enum ReportingException {
     Unknown(String),
 }
 
+// kept for serde deserialization
+#[allow(dead_code)]
 impl ReportingException {
     /// Parse from GLEIF API string. Never returns None - unknown codes become Unknown(code).
     pub fn parse(s: &str) -> Self {
@@ -1195,17 +872,10 @@ impl ReportingException {
 /// Result of enriching an entity from GLEIF
 #[derive(Debug, Clone)]
 pub struct EnrichmentResult {
-    pub entity_id: uuid::Uuid,
-    pub lei: String,
     pub names_added: i32,
     pub addresses_added: i32,
     pub identifiers_added: i32,
     pub parent_relationships_added: i32,
-    /// Fund relationships: fund_manager, umbrella_fund, master_fund
-    pub fund_relationships_added: i32,
-    pub events_added: i32,
-    pub direct_parent_exception: Option<ReportingException>,
-    pub ultimate_parent_exception: Option<ReportingException>,
 }
 
 /// Result of importing a corporate tree
@@ -1222,11 +892,7 @@ pub struct TreeImportResult {
 
 /// An entity at the end of an ownership chain
 #[derive(Debug, Clone)]
-pub struct TerminalEntity {
-    pub lei: String,
-    pub name: String,
-    pub exception: Option<ReportingException>,
-}
+pub struct TerminalEntity;
 
 // =============================================================================
 // UBO and Ownership Chain Types
@@ -1245,19 +911,6 @@ pub enum UboStatus {
     RegulatedEntity,
     /// Unknown/not determined
     Unknown,
-}
-
-impl UboStatus {
-    pub fn from_exception(exception: Option<&str>) -> Self {
-        match exception {
-            Some("NO_KNOWN_PERSON") => Self::PublicFloat,
-            Some("NON_CONSOLIDATING") => Self::RegulatedEntity,
-            Some("NATURAL_PERSONS") => Self::NaturalPerson {
-                name: "Unknown".to_string(),
-            },
-            _ => Self::Unknown,
-        }
-    }
 }
 
 /// Discovered entity from GLEIF

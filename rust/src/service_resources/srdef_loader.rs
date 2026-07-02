@@ -112,7 +112,6 @@ pub struct LoadedSrdef {
     pub per_market: bool,
     pub per_currency: bool,
     pub per_counterparty: bool,
-    pub resource_id: Option<Uuid>,
     pub application_binding: Option<LoadedSrdefApplicationBinding>,
 }
 
@@ -120,7 +119,6 @@ pub struct LoadedSrdef {
 #[derive(Debug, Clone)]
 pub struct LoadedSrdefAttribute {
     pub attr_id: String,
-    pub attr_uuid: Option<Uuid>,
     pub requirement: String,
     pub source_policy: Vec<String>,
     pub constraints: JsonValue,
@@ -173,13 +171,7 @@ impl SrdefRegistry {
             .unwrap_or_default()
     }
 
-    /// Get dependencies for an SRDEF
-    pub fn get_dependencies(&self, srdef_id: &str) -> Vec<&LoadedSrdef> {
-        self.dependencies
-            .get(srdef_id)
-            .map(|ids| ids.iter().filter_map(|id| self.srdefs.get(id)).collect())
-            .unwrap_or_default()
-    }
+    // (get_by_service covers the common case; topo_sort consumes deps directly)
 
     /// Topological sort of SRDEFs (dependencies first)
     pub fn topo_sort(&self, srdef_ids: &[String]) -> Result<Vec<String>> {
@@ -324,7 +316,6 @@ impl SrdefLoader {
             .iter()
             .map(|attr| LoadedSrdefAttribute {
                 attr_id: attr.id.clone(),
-                attr_uuid: None, // Will be resolved when syncing to DB
                 requirement: attr.requirement.clone(),
                 source_policy: attr.source_policy.clone(),
                 constraints: attr.constraints.clone().unwrap_or(json!({})),
@@ -349,7 +340,6 @@ impl SrdefLoader {
             per_market: config.per_market,
             per_currency: config.per_currency,
             per_counterparty: config.per_counterparty,
-            resource_id: None,
             application_binding: config.application_binding.as_ref().map(|binding| {
                 LoadedSrdefApplicationBinding {
                     application_id: binding.application_id,

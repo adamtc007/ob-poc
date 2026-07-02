@@ -7,8 +7,8 @@ use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, fold_obligations_versioned, FoldRegistry, IntentEvent, SubjectId,
-    fold::obligation::SubjectOverallState,
+    fold::obligation::SubjectOverallState, fold_control_versioned, fold_obligations_versioned,
+    FoldRegistry, IntentEvent, SubjectId,
 };
 
 use crate::error::StoreError;
@@ -83,7 +83,9 @@ impl PgKycProjector {
             .await?;
         }
 
-        Ok(ProjectionStats { edges_written: state.edges.len() })
+        Ok(ProjectionStats {
+            edges_written: state.edges.len(),
+        })
     }
 }
 
@@ -143,10 +145,12 @@ impl PgKycProjectionDrainer {
 
         PgKycProjector::rebuild_control_edges(&mut tx, registry, subject).await?;
 
-        sqlx::query(r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#,
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
 
         Ok(Some(subject))
@@ -195,9 +199,15 @@ impl PgKycObligationProjector {
 
         // Full replace (idempotent).
         sqlx::query(r#"DELETE FROM "ob-poc".kyc_obligation_projection WHERE subject_root = $1"#)
-            .bind(subject_root.0).execute(&mut *conn).await?;
-        sqlx::query(r#"DELETE FROM "ob-poc".kyc_subject_rollup_projection WHERE subject_root = $1"#)
-            .bind(subject_root.0).execute(&mut *conn).await?;
+            .bind(subject_root.0)
+            .execute(&mut *conn)
+            .await?;
+        sqlx::query(
+            r#"DELETE FROM "ob-poc".kyc_subject_rollup_projection WHERE subject_root = $1"#,
+        )
+        .bind(subject_root.0)
+        .execute(&mut *conn)
+        .await?;
 
         let mut obl_count = 0usize;
         for (oid, tracks) in &state.obligations {
@@ -224,28 +234,27 @@ impl PgKycObligationProjector {
         let mut subj_count = 0usize;
         for (sid, rollup) in &state.subjects {
             let (overall, decision_event_id) = match &rollup.overall_state {
-                SubjectOverallState::Approved { by_event } =>
-                    ("Approved", Some(by_event.0)),
-                SubjectOverallState::Rejected { by_event } =>
-                    ("Rejected", Some(by_event.0)),
+                SubjectOverallState::Approved { by_event } => ("Approved", Some(by_event.0)),
+                SubjectOverallState::Rejected { by_event } => ("Rejected", Some(by_event.0)),
                 SubjectOverallState::AllTerminal => ("AllTerminal", None),
                 SubjectOverallState::InProgress => ("InProgress", None),
             };
             let all_terminal = matches!(
                 rollup.overall_state,
-                SubjectOverallState::AllTerminal
-                | SubjectOverallState::Approved { .. }
+                SubjectOverallState::AllTerminal | SubjectOverallState::Approved { .. }
             );
             sqlx::query(
                 r#"INSERT INTO "ob-poc".kyc_subject_rollup_projection
                    (subject_root, overall_state, obligation_count, all_terminal, decision_event_id)
                    VALUES ($1,$2,$3,$4,$5)"#,
             )
-            .bind(sid.0).bind(overall)
+            .bind(sid.0)
+            .bind(overall)
             .bind(rollup.obligations.len() as i32)
             .bind(all_terminal)
             .bind(decision_event_id)
-            .execute(&mut *conn).await?;
+            .execute(&mut *conn)
+            .await?;
             subj_count += 1;
         }
 
@@ -271,28 +280,49 @@ impl PgKycObligationDrainer {
                ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1"#,
         )
         .bind(OBLIGATION_PROJECTION_EFFECT)
-        .fetch_optional(&mut *tx).await?;
+        .fetch_optional(&mut *tx)
+        .await?;
 
-        let Some(row) = claimed else { tx.rollback().await?; return Ok(None); };
+        let Some(row) = claimed else {
+            tx.rollback().await?;
+            return Ok(None);
+        };
         let id: Uuid = row.get("id");
         let payload: serde_json::Value = row.get("payload");
-        let subject = payload.get("subject_root")
+        let subject = payload
+            .get("subject_root")
             .and_then(|v| v.as_str())
             .and_then(|s| Uuid::parse_str(s).ok())
             .map(SubjectId)
-            .ok_or_else(|| StoreError::Db(sqlx::Error::Decode(
-                "outbox payload missing/invalid subject_root".into())))?;
+            .ok_or_else(|| {
+                StoreError::Db(sqlx::Error::Decode(
+                    "outbox payload missing/invalid subject_root".into(),
+                ))
+            })?;
 
         PgKycObligationProjector::rebuild_obligations(&mut tx, registry, subject).await?;
-        sqlx::query(r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#)
-            .bind(id).execute(&mut *tx).await?;
+        sqlx::query(
+            r#"UPDATE "public".outbox SET status = 'done', processed_at = now() WHERE id = $1"#,
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         Ok(Some(subject))
     }
 
-    pub async fn drain_all(pool: &PgPool, registry: &FoldRegistry, max: usize) -> Result<usize, StoreError> {
+    pub async fn drain_all(
+        pool: &PgPool,
+        registry: &FoldRegistry,
+        max: usize,
+    ) -> Result<usize, StoreError> {
         let mut n = 0;
-        while n < max { if Self::drain_once(pool, registry).await?.is_none() { break; } n += 1; }
+        while n < max {
+            if Self::drain_once(pool, registry).await?.is_none() {
+                break;
+            }
+            n += 1;
+        }
         Ok(n)
     }
 }

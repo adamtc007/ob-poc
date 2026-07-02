@@ -16,7 +16,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use dsl_core::VerbsConfig;
 use crate::journey::router::PackRouter;
 use crate::repl::intent_matcher::IntentMatcher;
 use crate::repl::intent_service::{ClarificationOutcome, IntentService};
@@ -24,7 +23,8 @@ use crate::repl::runbook::ConfirmPolicy;
 use crate::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use crate::repl::types_v2::{UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
+use crate::sequencer::{NullDslExecutor, ReplOrchestratorV2};
+use dsl_core::VerbsConfig;
 
 // ---------------------------------------------------------------------------
 // Helpers

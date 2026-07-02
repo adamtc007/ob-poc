@@ -16,8 +16,8 @@ mod integration {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use anyhow::Result;
     use crate::outbox::{narration_emit, NarrateConsumer, OutboxDrainerConfig, OutboxDrainerImpl};
+    use anyhow::Result;
     use ob_poc_types::TraceId;
     use serde_json::json;
     use sqlx::PgPool;

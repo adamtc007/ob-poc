@@ -40,7 +40,6 @@ use crate::mcp::scope_resolution::ScopeContext;
 use crate::mcp::verb_search::{
     HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult, VerbSearchSource,
 };
-use ob_poc_boundary::policy::{gate::PolicySnapshot, PolicyGate};
 use crate::sage::{
     drafter::DraftResolution, DraftResult, ObservationPlane, OutcomeStep, PendingMutation,
     SageConfidence, SageEngine, UtteranceDisposition,
@@ -55,6 +54,7 @@ use crate::traceability::{
     build_trace_scaffold_payload, evaluate_phase3_against_phase2, evaluate_phase4_within_phase2,
     NewUtteranceTrace, Phase2Service, TraceKind, UtteranceTraceRepository,
 };
+use ob_poc_boundary::policy::{gate::PolicySnapshot, PolicyGate};
 
 use sem_os_client::SemOsClient;
 use sem_os_types::agent_mode::AgentMode;

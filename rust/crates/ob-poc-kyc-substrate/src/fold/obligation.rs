@@ -173,7 +173,9 @@ impl ObligationState {
 /// Parse a `SubjectId` from an event target or payload.
 fn subject_id_from_event(event: &IntentEvent) -> Option<SubjectId> {
     event.target.subject_root.or_else(|| {
-        event.payload.get("subject_id")
+        event
+            .payload
+            .get("subject_id")
             .and_then(|v| v.as_str())
             .and_then(|s| uuid::Uuid::parse_str(s).ok())
             .map(SubjectId)
@@ -181,7 +183,8 @@ fn subject_id_from_event(event: &IntentEvent) -> Option<SubjectId> {
 }
 
 fn obligation_id_from_payload(payload: &serde_json::Value) -> Option<ObligationId> {
-    payload.get("obligation_id")
+    payload
+        .get("obligation_id")
         .and_then(|v| v.as_str())
         .and_then(|s| uuid::Uuid::parse_str(s).ok())
         .map(ObligationId)
@@ -197,7 +200,10 @@ fn track_state_from_event(event_id: EventId, payload: &serde_json::Value) -> Tra
         Some("satisfied") => TrackState::Satisfied { by_event: event_id },
         Some("waived") => {
             let reason = str_field(payload, "reason").unwrap_or_default();
-            TrackState::Waived { by_event: event_id, reason }
+            TrackState::Waived {
+                by_event: event_id,
+                reason,
+            }
         }
         Some("deferred") => TrackState::Deferred { by_event: event_id },
         Some("expired") => TrackState::Expired { by_event: event_id },
@@ -213,7 +219,10 @@ fn track_state_from_event(event_id: EventId, payload: &serde_json::Value) -> Tra
 ///
 /// `continue` arms from the loop become early `return state` (semantically identical
 /// since they skip the rest of the match arm and move to the next event).
-pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &IntentEvent) -> ObligationState {
+pub(crate) fn apply_one_obligation_event(
+    mut state: ObligationState,
+    event: &IntentEvent,
+) -> ObligationState {
     let p = &event.payload;
     match event.verb_fqn.as_str() {
         "kyc.subject.register" => {
@@ -228,8 +237,12 @@ pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &Int
         }
 
         "kyc.obligation.create" => {
-            let Some(sid) = subject_id_from_event(event) else { return state };
-            let Some(oid) = obligation_id_from_payload(p) else { return state };
+            let Some(sid) = subject_id_from_event(event) else {
+                return state;
+            };
+            let Some(oid) = obligation_id_from_payload(p) else {
+                return state;
+            };
 
             let basis = ObligationBasis {
                 role: str_field(p, "role").unwrap_or_else(|| "unknown".into()),
@@ -238,21 +251,29 @@ pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &Int
                 source_event_id: event.id,
             };
 
-            state.obligations.insert(oid, ObligationTracks {
-                obligation_id: oid,
-                basis,
-                identity: TrackState::Pending,
-                screening: TrackState::Pending,
-                risk: TrackState::Pending,
-                originating_event_id: event.id,
-            });
+            state.obligations.insert(
+                oid,
+                ObligationTracks {
+                    obligation_id: oid,
+                    basis,
+                    identity: TrackState::Pending,
+                    screening: TrackState::Pending,
+                    risk: TrackState::Pending,
+                    originating_event_id: event.id,
+                },
+            );
 
-            state.subjects.entry(sid).or_insert_with(|| SubjectRollup {
-                subject_id: sid,
-                obligations: vec![],
-                overall_state: SubjectOverallState::InProgress,
-                decision_event_id: None,
-            }).obligations.push(oid);
+            state
+                .subjects
+                .entry(sid)
+                .or_insert_with(|| SubjectRollup {
+                    subject_id: sid,
+                    obligations: vec![],
+                    overall_state: SubjectOverallState::InProgress,
+                    decision_event_id: None,
+                })
+                .obligations
+                .push(oid);
         }
 
         "ubo.determination.freeze" => {}
@@ -292,7 +313,10 @@ pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &Int
             let reason = str_field(p, "reason").unwrap_or_default();
             if let Some(oid) = obligation_id_from_payload(p) {
                 if let Some(tracks) = state.obligations.get_mut(&oid) {
-                    let s = TrackState::Waived { by_event: event.id, reason };
+                    let s = TrackState::Waived {
+                        by_event: event.id,
+                        reason,
+                    };
                     tracks.identity = s.clone();
                     tracks.screening = s.clone();
                     tracks.risk = s;
@@ -303,8 +327,7 @@ pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &Int
         "kyc.person.approve" => {
             if let Some(sid) = subject_id_from_event(event) {
                 if let Some(rollup) = state.subjects.get_mut(&sid) {
-                    rollup.overall_state =
-                        SubjectOverallState::Approved { by_event: event.id };
+                    rollup.overall_state = SubjectOverallState::Approved { by_event: event.id };
                     rollup.decision_event_id = Some(event.id);
                 }
             }
@@ -312,8 +335,7 @@ pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &Int
         "kyc.person.reject" => {
             if let Some(sid) = subject_id_from_event(event) {
                 if let Some(rollup) = state.subjects.get_mut(&sid) {
-                    rollup.overall_state =
-                        SubjectOverallState::Rejected { by_event: event.id };
+                    rollup.overall_state = SubjectOverallState::Rejected { by_event: event.id };
                     rollup.decision_event_id = Some(event.id);
                 }
             }
@@ -337,5 +359,7 @@ pub(crate) fn apply_one_obligation_event(mut state: ObligationState, event: &Int
 /// For version-dispatched replay (D2), use `fold_obligations_versioned` in
 /// `fold::registry`.
 pub fn fold_obligations(events: &[&IntentEvent]) -> ObligationState {
-    events.iter().fold(ObligationState::default(), |st, e| apply_one_obligation_event(st, e))
+    events.iter().fold(ObligationState::default(), |st, e| {
+        apply_one_obligation_event(st, e)
+    })
 }

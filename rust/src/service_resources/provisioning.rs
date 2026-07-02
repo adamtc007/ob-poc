@@ -697,56 +697,6 @@ pub struct ReadinessComputeResult {
 }
 
 // =============================================================================
-// STUB PROVISIONER
-// =============================================================================
-
-/// Trait for resource provisioners
-#[async_trait::async_trait]
-pub trait ResourceProvisioner: Send + Sync {
-    /// Provision a resource
-    async fn provision(
-        &self,
-        cbu_id: Uuid,
-        srdef_id: &str,
-        attrs: &HashMap<String, JsonValue>,
-    ) -> Result<ProvisionResult>;
-}
-
-/// Result of provisioning
-pub struct ProvisionResult {
-    pub srid: String,
-    pub native_key: String,
-    pub resource_url: Option<String>,
-}
-
-/// Stub provisioner that synthesizes fake resources
-pub struct StubProvisioner;
-
-#[async_trait::async_trait]
-impl ResourceProvisioner for StubProvisioner {
-    async fn provision(
-        &self,
-        _cbu_id: Uuid,
-        srdef_id: &str,
-        _attrs: &HashMap<String, JsonValue>,
-    ) -> Result<ProvisionResult> {
-        let fake_key = format!("FAKE-{}", Uuid::new_v4().to_string()[..8].to_uppercase());
-        let parts: Vec<&str> = srdef_id.split("::").collect();
-        let (app, kind) = if parts.len() >= 3 {
-            (parts[1], parts[2])
-        } else {
-            ("UNKNOWN", "Resource")
-        };
-
-        Ok(ProvisionResult {
-            srid: format!("SR::{}::{}::{}", app, kind, fake_key),
-            native_key: fake_key,
-            resource_url: None,
-        })
-    }
-}
-
-// =============================================================================
 // CONVENIENCE FUNCTIONS
 // =============================================================================
 

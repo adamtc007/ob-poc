@@ -55,7 +55,12 @@ fn event(subject: SubjectId, verb: &str, payload: serde_json::Value, idem: &str)
 }
 
 fn register(subject: SubjectId) -> IntentEvent {
-    event(subject, "kyc.subject.register", serde_json::json!({ "is_natural_person": false }), "reg")
+    event(
+        subject,
+        "kyc.subject.register",
+        serde_json::json!({ "is_natural_person": false }),
+        "reg",
+    )
 }
 
 fn assert_control(subject: SubjectId, to: Uuid, idem: &str) -> IntentEvent {
@@ -114,42 +119,69 @@ async fn recover_control_at_folds_the_transaction_time_prefix() {
 
     // Three events, each committed in its own transaction → distinct committed_at.
     append_committed(&pool, &registry, &register(subject)).await;
-    append_committed(&pool, &registry, &assert_control(subject, Uuid::new_v4(), "edge-a")).await;
-    append_committed(&pool, &registry, &assert_control(subject, Uuid::new_v4(), "edge-b")).await;
+    append_committed(
+        &pool,
+        &registry,
+        &assert_control(subject, Uuid::new_v4(), "edge-a"),
+    )
+    .await;
+    append_committed(
+        &pool,
+        &registry,
+        &assert_control(subject, Uuid::new_v4(), "edge-b"),
+    )
+    .await;
 
     let t0 = committed_at_of(&pool, subject, 0).await;
     let t1 = committed_at_of(&pool, subject, 1).await;
     let t2 = committed_at_of(&pool, subject, 2).await;
 
     // B1 fix: committed_at is monotonic with seq (clock_timestamp under the lock).
-    assert!(t0 < t1 && t1 < t2, "committed_at strictly increases with seq: {t0} < {t1} < {t2}");
+    assert!(
+        t0 < t1 && t1 < t2,
+        "committed_at strictly increases with seq: {t0} < {t1} < {t2}"
+    );
 
     let mut conn = pool.acquire().await.unwrap();
 
     // As-of t0 → prefix {register}: registered, zero edges.
-    let s0 = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, t0).await.unwrap();
+    let s0 = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, t0)
+        .await
+        .unwrap();
     assert!(s0.registered, "register is in the t0 prefix");
     assert_eq!(s0.edges.len(), 0, "no edges asserted yet at t0");
 
     // As-of t1 → {register, edge-a}: one edge.
-    let s1 = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, t1).await.unwrap();
+    let s1 = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, t1)
+        .await
+        .unwrap();
     assert_eq!(s1.edges.len(), 1, "one edge at t1");
 
     // As-of t2 (and as-of now) → full stream: two edges.
-    let s2 = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, t2).await.unwrap();
+    let s2 = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, t2)
+        .await
+        .unwrap();
     assert_eq!(s2.edges.len(), 2, "two edges at t2");
-    let now = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, Utc::now()).await.unwrap();
+    let now = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, Utc::now())
+        .await
+        .unwrap();
     assert_eq!(now.edges.len(), 2, "recover at now == fold whole stream");
 
     // Before the first event → empty fold (not registered, no edges).
     let before = t0 - chrono::Duration::seconds(1);
-    let sb = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, before).await.unwrap();
+    let sb = PgKycEventStore::recover_control_at(&mut conn, &registry, subject, before)
+        .await
+        .unwrap();
     assert!(!sb.registered, "nothing committed before t0");
     assert_eq!(sb.edges.len(), 0);
 
     // Prefix loader counts line up with the recovery folds.
-    let n_before = PgKycEventStore::load_events_up_to_committed(&mut conn, subject, before).await.unwrap();
-    let n1 = PgKycEventStore::load_events_up_to_committed(&mut conn, subject, t1).await.unwrap();
+    let n_before = PgKycEventStore::load_events_up_to_committed(&mut conn, subject, before)
+        .await
+        .unwrap();
+    let n1 = PgKycEventStore::load_events_up_to_committed(&mut conn, subject, t1)
+        .await
+        .unwrap();
     assert_eq!(n_before.len(), 0);
     assert_eq!(n1.len(), 2, "prefix at t1 is exactly [seq0, seq1]");
     assert_eq!(n1.iter().map(|e| e.seq).collect::<Vec<_>>(), vec![0, 1]);

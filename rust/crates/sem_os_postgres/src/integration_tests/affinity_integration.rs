@@ -24,12 +24,12 @@ mod integration {
     use anyhow::Result;
     use sqlx::PgPool;
 
+    use crate::PgStores;
     use sem_os_core::ports::SnapshotStore;
     use sem_os_policy::affinity::types::{DataRef, TableRef};
     use sem_os_policy::affinity::AffinityGraph;
     use sem_os_policy::diagram::model::{ColumnInput, RenderOptions, TableInput};
     use sem_os_policy::diagram::{build_diagram_model, render_erd};
-    use crate::PgStores;
 
     // ── Test Infrastructure ───────────────────────────────────────────────────
 

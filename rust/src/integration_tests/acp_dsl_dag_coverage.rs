@@ -2,11 +2,11 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Result};
 use crate::api::acp_dsl_dag_coverage::{
     build_acp_dsl_dag_coverage_report, write_acp_dsl_dag_coverage_artifacts,
     AcpDslDagCoverageStatus, ACP_DSL_DAG_COVERAGE_SCHEMA_VERSION,
 };
+use anyhow::{bail, Result};
 
 fn config_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("config")

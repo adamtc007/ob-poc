@@ -2,10 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use anyhow::{anyhow, ensure, Result};
-use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use crate::sequencer_tx::PgTransactionScope;
 use crate::service_resources::resolve;
+use anyhow::{anyhow, ensure, Result};
+use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_core::principal::Principal;
 use sem_os_postgres::ops::{build_registry, SemOsVerbOpRegistry};
 use serde_json::{json, Value};
@@ -193,9 +193,7 @@ async fn base_service_ids(pool: &PgPool, product_id: Uuid) -> Result<BTreeSet<Uu
     Ok(ids.into_iter().collect())
 }
 
-fn resolved_service_ids(
-    output: &crate::service_resources::ResolvedDependencies,
-) -> BTreeSet<Uuid> {
+fn resolved_service_ids(output: &crate::service_resources::ResolvedDependencies) -> BTreeSet<Uuid> {
     output
         .services
         .iter()

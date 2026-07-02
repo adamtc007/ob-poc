@@ -32,17 +32,6 @@ pub struct LlmResponse {
 
     /// Sources discovered during web search tool use
     pub sources: Vec<ResearchSource>,
-
-    /// Raw tool use interactions for debugging
-    pub tool_calls: Vec<ToolCall>,
-}
-
-/// A single tool call and its result
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolCall {
-    pub tool_name: String,
-    pub input: Value,
-    pub output: Value,
 }
 
 /// Trait for LLM client used by research executor
@@ -63,17 +52,6 @@ pub trait ResearchLlmClient: Send + Sync {
         user_prompt: &str,
         tools: &[ToolDef],
     ) -> Result<LlmResponse>;
-
-    /// Complete expecting JSON response (no tools)
-    async fn complete_json(
-        &self,
-        system_prompt: &str,
-        user_prompt: &str,
-        schema: &Value,
-    ) -> Result<Value>;
-
-    /// Get the model name for logging
-    fn model_name(&self) -> &str;
 }
 
 /// Web search tool definition
@@ -108,14 +86,6 @@ impl ClaudeResearchClient {
         Self {
             api_key,
             model: "claude-sonnet-4-20250514".to_string(),
-            client: reqwest::Client::new(),
-        }
-    }
-
-    pub fn with_model(api_key: String, model: String) -> Self {
-        Self {
-            api_key,
-            model,
             client: reqwest::Client::new(),
         }
     }
@@ -227,7 +197,6 @@ impl ResearchLlmClient for ClaudeResearchClient {
         })];
 
         let mut all_sources = Vec::new();
-        let mut all_tool_calls = Vec::new();
 
         // Convert tools to Claude format
         let claude_tools: Vec<Value> = tools
@@ -317,12 +286,6 @@ impl ResearchLlmClient for ClaudeResearchClient {
                             })
                         };
 
-                        all_tool_calls.push(ToolCall {
-                            tool_name: tool_name.to_string(),
-                            input: tool_input.clone(),
-                            output: tool_output.clone(),
-                        });
-
                         tool_results.push(serde_json::json!({
                             "type": "tool_result",
                             "tool_use_id": tool_id,
@@ -359,79 +322,12 @@ impl ResearchLlmClient for ClaudeResearchClient {
             return Ok(LlmResponse {
                 content: final_text,
                 sources: all_sources,
-                tool_calls: all_tool_calls,
             });
         }
 
         Err(super::error::ResearchError::LlmClient(
             "Max tool use iterations exceeded".into(),
         ))
-    }
-
-    async fn complete_json(
-        &self,
-        system_prompt: &str,
-        user_prompt: &str,
-        _schema: &Value,
-    ) -> Result<Value> {
-        let enhanced_system = format!(
-            "{}\n\nIMPORTANT: Return ONLY valid JSON. No markdown, no explanation, just JSON.",
-            system_prompt
-        );
-
-        let request_body = serde_json::json!({
-            "model": self.model,
-            "max_tokens": 4096,
-            "system": enhanced_system,
-            "messages": [{
-                "role": "user",
-                "content": user_prompt
-            }]
-        });
-
-        let response = self
-            .client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&request_body)
-            .send()
-            .await
-            .map_err(|e| super::error::ResearchError::LlmClient(e.to_string()))?;
-
-        let status = response.status();
-        let body: Value = response
-            .json()
-            .await
-            .map_err(|e| super::error::ResearchError::LlmClient(e.to_string()))?;
-
-        if !status.is_success() {
-            return Err(super::error::ResearchError::LlmClient(format!(
-                "Claude API error {}: {:?}",
-                status, body
-            )));
-        }
-
-        // Extract text content
-        let content = body["content"]
-            .as_array()
-            .and_then(|arr| arr.first())
-            .and_then(|block| block["text"].as_str())
-            .unwrap_or("");
-
-        // Parse as JSON
-        serde_json::from_str(content).map_err(|e| {
-            super::error::ResearchError::JsonParse(format!(
-                "Failed to parse LLM response as JSON: {}. Content: {}",
-                e,
-                &content[..content.len().min(200)]
-            ))
-        })
-    }
-
-    fn model_name(&self) -> &str {
-        &self.model
     }
 }
 

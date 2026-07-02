@@ -1493,9 +1493,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::agent::learning::embedder::CandleEmbedder;
             use ob_poc::agent::learning::warmup::LearningWarmup;
             use ob_poc::dsl_v2::{load_macro_registry_from_dir, ConfigLoader, MacroRegistry};
-            use ob_poc_entity_linking::{
-                EntityLinkingService, EntityLinkingServiceImpl, NullEntityLinkingService,
-            };
             use ob_poc::lookup::LookupService;
             use ob_poc::mcp::macro_index::MacroIndex;
             use ob_poc::mcp::scenario_index::ScenarioIndex;
@@ -1503,6 +1500,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::mcp::verb_search_intent_matcher::VerbSearchIntentMatcher;
             use ob_poc::repl::intent_service::IntentService;
             use ob_poc::repl::verb_config_index::VerbConfigIndex;
+            use ob_poc_entity_linking::{
+                EntityLinkingService, EntityLinkingServiceImpl, NullEntityLinkingService,
+            };
 
             tracing::info!("Initializing V2 REPL IntentService...");
             let intent_start = std::time::Instant::now();

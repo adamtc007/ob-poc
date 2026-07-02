@@ -108,21 +108,25 @@ pub struct ResearchMacroWrapper {
 
 impl ResearchMacroDef {
     /// Get parameter by name
+    #[allow(dead_code)] // kept for tests
     pub fn get_param(&self, name: &str) -> Option<&MacroParamDef> {
         self.parameters.iter().find(|p| p.name == name)
     }
 
     /// Get required parameters
+    #[allow(dead_code)] // kept for tests
     pub fn required_params(&self) -> Vec<&MacroParamDef> {
         self.parameters.iter().filter(|p| p.required).collect()
     }
 
     /// Check if a specific tool is enabled
+    #[allow(dead_code)] // kept for tests
     pub fn has_tool(&self, tool: &str) -> bool {
         self.tools.iter().any(|t| t == tool)
     }
 
     /// Check if review is required
+    #[allow(dead_code)] // kept for tests
     pub fn requires_review(&self) -> bool {
         self.output.review == ReviewRequirement::Required
     }

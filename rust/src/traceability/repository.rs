@@ -260,6 +260,7 @@ impl UtteranceTraceRepository {
     /// # Ok(())
     /// # }
     /// ```
+    #[allow(dead_code)]
     pub async fn list_for_session(
         &self,
         session_id: Uuid,
@@ -318,6 +319,7 @@ impl UtteranceTraceRepository {
     /// # Ok(())
     /// # }
     /// ```
+    #[allow(dead_code)]
     pub async fn set_synthetic(&self, trace_id: Uuid, is_synthetic: bool) -> Result<()> {
         sqlx::query(
             r#"

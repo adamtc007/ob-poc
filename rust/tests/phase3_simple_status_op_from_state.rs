@@ -114,7 +114,9 @@ mod red {
             .await?;
 
         let result = db
-            .execute_dsl(&format!(r#"(deal.mark-lost :deal-id "{deal_id}" :reason "test")"#))
+            .execute_dsl(&format!(
+                r#"(deal.mark-lost :deal-id "{deal_id}" :reason "test")"#
+            ))
             .await;
         assert!(
             result.is_err(),
@@ -126,7 +128,10 @@ mod red {
                 .bind(deal_id)
                 .fetch_one(&db.pool)
                 .await?;
-        assert_eq!(status, "CONTRACTED", "status must be unchanged after rejection");
+        assert_eq!(
+            status, "CONTRACTED",
+            "status must be unchanged after rejection"
+        );
 
         db.cleanup().await;
         Ok(())
@@ -158,7 +163,9 @@ mod red {
         .await?;
 
         let result = db
-            .execute_dsl(&format!(r#"(deal.start-sla-remediation :sla-id "{sla_id}")"#))
+            .execute_dsl(&format!(
+                r#"(deal.start-sla-remediation :sla-id "{sla_id}")"#
+            ))
             .await;
         assert!(
             result.is_err(),
@@ -201,7 +208,9 @@ mod red {
         .await?;
 
         let result = db
-            .execute_dsl(&format!(r#"(deal.start-sla-remediation :sla-id "{sla_id}")"#))
+            .execute_dsl(&format!(
+                r#"(deal.start-sla-remediation :sla-id "{sla_id}")"#
+            ))
             .await;
         assert!(result.is_ok(), "expected success: {:?}", result.err());
 

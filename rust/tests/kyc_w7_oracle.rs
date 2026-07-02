@@ -33,7 +33,9 @@ fn w7_oracle_ownership_prong_on_private_company_fixture() {
     let nil_event = EventId(uuid::Uuid::nil());
     let mk = |from: EntityId, to: EntityId, pct: f64| ReconciledEconomicEdge {
         id: EdgeId(uuid::Uuid::new_v4()),
-        from, to, percentage: pct,
+        from,
+        to,
+        percentage: pct,
         verified_by: None,
         originating_event_id: nil_event,
     };
@@ -55,11 +57,21 @@ fn w7_oracle_ownership_prong_on_private_company_fixture() {
     //   P1 effective = 60 * 30 / 100 = 18pp. P2 effective = 60 * 80 / 100 = 48pp.
     //   threshold_pct = 0.25pp → both 18 and 48 are >= 0.25.
     let resolved: BTreeSet<uuid::Uuid> = candidates.iter().map(|c| c.person_id.0).collect();
-    assert!(resolved.contains(&p1.0), "P1 at 18pp effective resolves (threshold=0.25pp)");
-    assert!(resolved.contains(&p2.0), "P2 at 48pp effective resolves (threshold=0.25pp)");
+    assert!(
+        resolved.contains(&p1.0),
+        "P1 at 18pp effective resolves (threshold=0.25pp)"
+    );
+    assert!(
+        resolved.contains(&p2.0),
+        "P2 at 48pp effective resolves (threshold=0.25pp)"
+    );
 
     // W7 attestation: live DB has 0 UBO ownership chains in entity_relationships
     // (verified: control_edges=0 rows; 122 relationship rows are structural).
     // OwnershipProngStrategy IS the replacement for the deleted ubo.compute-chains.
-    assert_eq!(candidates.len(), 2, "W7 oracle: both persons resolve on private-company fixture");
+    assert_eq!(
+        candidates.len(),
+        2,
+        "W7 oracle: both persons resolve on private-company fixture"
+    );
 }

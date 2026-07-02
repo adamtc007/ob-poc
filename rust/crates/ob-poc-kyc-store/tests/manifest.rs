@@ -28,13 +28,11 @@ async fn w2_publish_manifest_stamps_verbs_and_is_idempotent() {
     let manifest = phase1_lexicon();
 
     // Clear any prior state so this test is idempotent across runs.
-    sqlx::query(
-        r#"UPDATE "ob-poc".dsl_verbs SET lexicon_hash = NULL WHERE full_name = ANY($1)"#,
-    )
-    .bind(manifest.entries.keys().cloned().collect::<Vec<_>>())
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query(r#"UPDATE "ob-poc".dsl_verbs SET lexicon_hash = NULL WHERE full_name = ANY($1)"#)
+        .bind(manifest.entries.keys().cloned().collect::<Vec<_>>())
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query(r#"DELETE FROM "ob-poc".kyc_lexicon_manifest WHERE manifest_hash = $1"#)
         .bind(manifest.hash.to_hex())
         .execute(&pool)
@@ -46,8 +44,15 @@ async fn w2_publish_manifest_stamps_verbs_and_is_idempotent() {
     let outcome = publish_manifest(&mut conn, Some("w2-test")).await.unwrap();
     assert_eq!(outcome.entry_count, 12, "phase1_lexicon has 12 entries");
     assert!(!outcome.already_existed, "first publish inserts the row");
-    assert_eq!(outcome.verb_rows_updated, 12, "all 12 dsl.kyc verb rows stamped");
-    assert_eq!(outcome.manifest_hash, manifest.hash.to_hex(), "hash round-trips");
+    assert_eq!(
+        outcome.verb_rows_updated, 12,
+        "all 12 dsl.kyc verb rows stamped"
+    );
+    assert_eq!(
+        outcome.manifest_hash,
+        manifest.hash.to_hex(),
+        "hash round-trips"
+    );
 
     // K-30 lint: every dsl.kyc verb now has a non-null lexicon_hash.
     let nulls: i64 = sqlx::query_scalar(
@@ -58,7 +63,10 @@ async fn w2_publish_manifest_stamps_verbs_and_is_idempotent() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(nulls, 0, "K-30 lint: every dsl.kyc verb must have lexicon_hash set");
+    assert_eq!(
+        nulls, 0,
+        "K-30 lint: every dsl.kyc verb must have lexicon_hash set"
+    );
 
     // Verify the stamped hash matches the substrate entry hash (content-addressed, Q7).
     for (fqn, entry) in &manifest.entries {
@@ -77,17 +85,24 @@ async fn w2_publish_manifest_stamps_verbs_and_is_idempotent() {
     }
 
     // Manifest row persisted.
-    let row_count: i64 =
-        sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".kyc_lexicon_manifest WHERE manifest_hash = $1"#)
-            .bind(&outcome.manifest_hash)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let row_count: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM "ob-poc".kyc_lexicon_manifest WHERE manifest_hash = $1"#,
+    )
+    .bind(&outcome.manifest_hash)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(row_count, 1);
 
     // Second publish is a no-op (idempotent).
     let mut conn2 = pool.acquire().await.unwrap();
     let outcome2 = publish_manifest(&mut conn2, Some("w2-test")).await.unwrap();
-    assert!(outcome2.already_existed, "second publish with same manifest_hash is a no-op");
-    assert_eq!(outcome2.manifest_hash, outcome.manifest_hash, "hash is stable (Q7)");
+    assert!(
+        outcome2.already_existed,
+        "second publish with same manifest_hash is a no-op"
+    );
+    assert_eq!(
+        outcome2.manifest_hash, outcome.manifest_hash,
+        "hash is stable (Q7)"
+    );
 }

@@ -18,5 +18,9 @@ pub enum StoreError {
     /// malformed hash, etc.). This is a data-integrity error, never expected at
     /// runtime — surfaced rather than silently skipped (K-35).
     #[error("row rehydration failed for subject {subject} seq {seq}: {reason}")]
-    Rehydrate { subject: uuid::Uuid, seq: i64, reason: String },
+    Rehydrate {
+        subject: uuid::Uuid,
+        seq: i64,
+        reason: String,
+    },
 }

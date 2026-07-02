@@ -61,6 +61,7 @@
 //! - Tools that need DB access reach through
 //!   `sem_os_client` → `sem_os_postgres`. No direct sqlx usage
 //!   in this crate.
+#![deny(unreachable_pub)]
 
 /// Minimal JSON-RPC 2.0 primitives — Phase 4.2a.
 pub mod protocol;

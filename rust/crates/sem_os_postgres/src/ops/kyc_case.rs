@@ -557,8 +557,7 @@ impl SemOsVerbOp for Reject {
             "REJECTED"
         };
         let outcome =
-            close_with_status(ctx, scope, self.fqn(), case_id, target_status, Some(reason))
-                .await?;
+            close_with_status(ctx, scope, self.fqn(), case_id, target_status, Some(reason)).await?;
 
         // Cascade (state-graph remediation Phase 5e): kyc_dag.yaml declares
         // "(any non-terminal) -> PROHIBITED via: kyc-case.reject" on the
@@ -653,7 +652,10 @@ impl SemOsVerbOp for Refer {
             case_id,
             "kyc-case:refer_to_regulator",
             "kyc-case/workstream",
-            &format!("kyc-case.refer — {} → REFER_TO_REGULATOR ({})", current_status, reason),
+            &format!(
+                "kyc-case.refer — {} → REFER_TO_REGULATOR ({})",
+                current_status, reason
+            ),
         );
 
         Ok(VerbExecutionOutcome::Record(serde_json::to_value(

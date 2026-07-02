@@ -71,13 +71,22 @@ pub struct AuthoritySpec {
 
 impl AuthoritySpec {
     pub fn analyst() -> Self {
-        Self { required_role: "analyst".into(), interactive_only: false }
+        Self {
+            required_role: "analyst".into(),
+            interactive_only: false,
+        }
     }
     pub fn senior_analyst() -> Self {
-        Self { required_role: "senior_analyst".into(), interactive_only: false }
+        Self {
+            required_role: "senior_analyst".into(),
+            interactive_only: false,
+        }
     }
     pub fn compliance_officer() -> Self {
-        Self { required_role: "compliance_officer".into(), interactive_only: true }
+        Self {
+            required_role: "compliance_officer".into(),
+            interactive_only: true,
+        }
     }
 }
 
@@ -93,10 +102,14 @@ pub struct EmitSpec {
 
 impl EmitSpec {
     pub fn person_obligation() -> Self {
-        Self { kind: "PersonObligation".into() }
+        Self {
+            kind: "PersonObligation".into(),
+        }
     }
     pub fn entity_obligation() -> Self {
-        Self { kind: "EntityObligation".into() }
+        Self {
+            kind: "EntityObligation".into(),
+        }
     }
 }
 
@@ -146,7 +159,16 @@ impl LexiconEntry {
             "emits": emits,
         });
         let hash = Hash::of_json(&canonical);
-        Self { fqn, intent: intent.to_owned(), governing_taxonomy, writes, preconditions, authority, emits, hash }
+        Self {
+            fqn,
+            intent: intent.to_owned(),
+            governing_taxonomy,
+            writes,
+            preconditions,
+            authority,
+            emits,
+            hash,
+        }
     }
 }
 
@@ -189,7 +211,6 @@ pub fn phase1_lexicon() -> LexiconManifest {
 
     let entries = vec![
         // ── Phase 1 — substrate verbs ────────────────────────────────────────
-
         LexiconEntry::build(
             "kyc.subject.register",
             "Bring a subject into KYC scope, recording the basis for obligation",
@@ -263,9 +284,7 @@ pub fn phase1_lexicon() -> LexiconManifest {
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
-
         // ── Phase 2 — determination verbs ────────────────────────────────────
-
         LexiconEntry::build(
             "ubo.determination.select-strategy",
             "Choose the determination strategy keyed on the subject structure class (K-4)",
@@ -280,7 +299,10 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Fold the reconciled control graph to UBO candidates with basis/prong (K-1)",
             Taxonomy::Control,
             smallvec![FoldId::Determination],
-            vec![Precondition::ReconciledProjection, Precondition::StrategySelected],
+            vec![
+                Precondition::ReconciledProjection,
+                Precondition::StrategySelected,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -299,7 +321,10 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Pin an immutable determination; emits PersonObligation for each resolved person",
             Taxonomy::Control,
             smallvec![FoldId::Determination, FoldId::ObligationGraph],
-            vec![Precondition::ReconciledProjection, Precondition::StrategySelected],
+            vec![
+                Precondition::ReconciledProjection,
+                Precondition::StrategySelected,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![EmitSpec::person_obligation(), EmitSpec::entity_obligation()],
         ),

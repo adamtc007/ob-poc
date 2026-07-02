@@ -11,9 +11,9 @@
 
 #[cfg(feature = "database")]
 mod integration {
-    use anyhow::Result;
     use crate::dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult};
     use crate::dsl_v2::{Argument, AstNode, Literal, Span, VerbCall};
+    use anyhow::Result;
     use sqlx::PgPool;
 
     fn s(value: &str) -> AstNode {

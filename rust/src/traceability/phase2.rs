@@ -5,6 +5,7 @@ use crate::lookup::LookupResult;
 use std::collections::HashSet;
 
 /// Structured blocked action surfaced by Phase 2 legality.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Phase2BlockedAction {
     pub action_id: String,
@@ -185,6 +186,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert!(!evaluation.allows_verb("case.open"));
     /// ```
+    #[cfg(test)]
     pub fn allows_verb(&self, verb: &str) -> bool {
         self.artifacts.allows_verb(verb)
     }
@@ -536,6 +538,7 @@ impl Phase2Artifacts {
     /// let artifacts = Phase2Artifacts::new(None, None);
     /// assert!(artifacts.is_unavailable());
     /// ```
+    #[cfg(test)]
     pub fn new(lookup: Option<LookupResult>, envelope: Option<SemOsContextEnvelope>) -> Self {
         Phase2Service::compose(lookup, envelope)
     }
@@ -549,6 +552,7 @@ impl Phase2Artifacts {
     /// let artifacts = Phase2Artifacts::from_refs(None, None);
     /// assert!(artifacts.is_unavailable());
     /// ```
+    #[cfg(test)]
     pub fn from_refs(
         lookup: Option<&LookupResult>,
         envelope: Option<&SemOsContextEnvelope>,
@@ -756,6 +760,7 @@ impl Phase2Artifacts {
     /// let blocked = Phase2Artifacts::new(None, None).blocked_actions();
     /// assert!(blocked.is_empty());
     /// ```
+    #[cfg(test)]
     pub fn blocked_actions(&self) -> Vec<Phase2BlockedAction> {
         self.envelope
             .as_ref()
@@ -915,8 +920,8 @@ impl Phase2Artifacts {
 mod tests {
     use super::{Phase2Artifacts, Phase2Service};
     use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
-    use ob_poc_entity_linking::{EntityCandidate, EntityResolution};
     use crate::lookup::LookupResult;
+    use ob_poc_entity_linking::{EntityCandidate, EntityResolution};
     use sem_os_policy::context_resolution::{
         BlockedActionOption, GroundedActionSurface, GroundedConstraintSignal, SubjectRef,
     };

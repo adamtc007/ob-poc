@@ -9,9 +9,9 @@ mod integration {
     use std::sync::Arc;
     use std::time::Duration;
 
+    use crate::outbox::{AsyncOutboxConsumer, OutboxDrainerConfig, OutboxDrainerImpl};
     use anyhow::Result;
     use async_trait::async_trait;
-    use crate::outbox::{AsyncOutboxConsumer, OutboxDrainerConfig, OutboxDrainerImpl};
     use ob_poc_types::{ClaimedOutboxRow, OutboxEffectKind, OutboxProcessOutcome};
     use serde_json::json;
     use sqlx::PgPool;

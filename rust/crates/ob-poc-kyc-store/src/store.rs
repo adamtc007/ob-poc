@@ -166,7 +166,11 @@ impl PgKycEventStore {
         .fetch_optional(&mut *conn)
         .await?;
         if let Some(seq) = existing {
-            return Ok(AppendOutcome { seq: seq as u64, event_id: event.id, deduped: true });
+            return Ok(AppendOutcome {
+                seq: seq as u64,
+                event_id: event.id,
+                deduped: true,
+            });
         }
 
         // 3. Fold existing events (from seq 0 — checkpoint optimization deferred)
@@ -191,7 +195,11 @@ impl PgKycEventStore {
         //    The drainer re-derives the subject's projections by folding the stream.
         Self::enqueue_projection_effects(conn, event, next_seq).await?;
 
-        Ok(AppendOutcome { seq: next_seq as u64, event_id: event.id, deduped: false })
+        Ok(AppendOutcome {
+            seq: next_seq as u64,
+            event_id: event.id,
+            deduped: false,
+        })
     }
 
     /// Enqueue one outbox row per projection effect-kind for a freshly appended
@@ -266,16 +274,20 @@ async fn insert_event(
 fn row_to_event(row: &sqlx::postgres::PgRow) -> Result<IntentEvent, StoreError> {
     let subject: Uuid = row.get("subject_root");
     let seq: i64 = row.get("seq");
-    let rehydrate = |reason: String| StoreError::Rehydrate { subject, seq, reason };
+    let rehydrate = |reason: String| StoreError::Rehydrate {
+        subject,
+        seq,
+        reason,
+    };
 
     let lexicon_hash = Hash::from_hex(&row.get::<String, _>("lexicon_hash"))
         .map_err(|e| rehydrate(format!("lexicon_hash: {e}")))?;
     let payload_hash = Hash::from_hex(&row.get::<String, _>("payload_hash"))
         .map_err(|e| rehydrate(format!("payload_hash: {e}")))?;
-    let actor: Principal = serde_json::from_value(row.get("actor"))
-        .map_err(|e| rehydrate(format!("actor: {e}")))?;
-    let target: TargetBinding = serde_json::from_value(row.get("target"))
-        .map_err(|e| rehydrate(format!("target: {e}")))?;
+    let actor: Principal =
+        serde_json::from_value(row.get("actor")).map_err(|e| rehydrate(format!("actor: {e}")))?;
+    let target: TargetBinding =
+        serde_json::from_value(row.get("target")).map_err(|e| rehydrate(format!("target: {e}")))?;
     let captured_effects: Vec<CapturedEffect> = serde_json::from_value(row.get("captured_effects"))
         .map_err(|e| rehydrate(format!("captured_effects: {e}")))?;
 

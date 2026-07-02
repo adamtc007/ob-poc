@@ -77,13 +77,12 @@ pub(crate) async fn publish_manifest_inner(
     let mut total_updated: u64 = 0;
     for (fqn, entry) in &manifest.entries {
         let entry_hash = entry.hash.to_hex();
-        let res = sqlx::query(
-            r#"UPDATE "ob-poc".dsl_verbs SET lexicon_hash = $1 WHERE full_name = $2"#,
-        )
-        .bind(&entry_hash)
-        .bind(fqn)
-        .execute(&mut *conn)
-        .await?;
+        let res =
+            sqlx::query(r#"UPDATE "ob-poc".dsl_verbs SET lexicon_hash = $1 WHERE full_name = $2"#)
+                .bind(&entry_hash)
+                .bind(fqn)
+                .execute(&mut *conn)
+                .await?;
         total_updated += res.rows_affected();
     }
 

@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::build_seed_bundle_with_metadata;
+use crate::metadata::DomainMetadata;
 use async_trait::async_trait;
 use chrono::Utc;
 use dsl_core::ConfigLoader;
@@ -24,8 +26,6 @@ use sem_os_core::types::{
     Manifest, OutboxEvent, PublishInput, SecurityLabel, SnapshotExport, SnapshotId, SnapshotMeta,
     SnapshotRow, SnapshotSetId, SnapshotStatus, SnapshotSummary, TrustClass, TypedObject,
 };
-use crate::build_seed_bundle_with_metadata;
-use crate::metadata::DomainMetadata;
 use sem_os_policy::abac::ActorContext;
 use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, DiscoverySurface, EvidenceMode,
@@ -319,7 +319,8 @@ fn test_actor() -> ActorContext {
 }
 
 fn fixture_path() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../tests/fixtures/sem_os_discovery_utterances.toml")
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../../tests/fixtures/sem_os_discovery_utterances.toml")
 }
 
 fn metadata_path() -> std::path::PathBuf {

@@ -133,7 +133,16 @@ mod e2e_tests {
             .with_embedder(dyn_embedder);
 
         let results = searcher
-            .search("load the allianz book", None, None, None, 5, None, None, None)
+            .search(
+                "load the allianz book",
+                None,
+                None,
+                None,
+                5,
+                None,
+                None,
+                None,
+            )
             .await?;
 
         assert!(!results.is_empty(), "Should find at least one verb match");

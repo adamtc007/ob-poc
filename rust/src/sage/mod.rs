@@ -59,7 +59,6 @@ pub mod valid_verb_set;
 
 // Phase 1.4
 pub mod arg_assembly;
-pub mod clash_matrix;
 pub mod deterministic;
 pub mod drafter;
 pub mod llm_sage;
@@ -67,22 +66,14 @@ pub mod verb_index;
 pub mod verb_resolve;
 
 // Re-export core types for convenience
-pub use arg_assembly::assemble_args_from_step;
-pub use clash_matrix::{build_clash_matrix, render_clash_reports, ClashRow};
 pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;
 pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
-pub use drafter::{DraftResolution, DraftResult, DrafterEngine};
+pub use drafter::{DraftResult, DrafterEngine};
 pub use llm_sage::LlmSage;
-pub use outcome::{
-    Clarification, DrafterHandoff, EntityRef, OutcomeAction, OutcomeIntent, OutcomeStep,
-    SageConfidence, SageExplain, UtteranceHints,
-};
+pub use outcome::{OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence};
 pub use plane::ObservationPlane;
 pub use polarity::IntentPolarity;
-pub use pre_classify::SagePreClassification;
-pub use verb_index::{runtime_registry_parity, VerbMeta, VerbMetadataIndex};
-pub use verb_resolve::{ScoredVerbCandidate, StructuredVerbScorer};
 
 // Phase 2.2 (2026-05-13): SageEngine trait relocated to
 // `ob_poc_sage::engine`. Compat re-export keeps existing `crate::sage::

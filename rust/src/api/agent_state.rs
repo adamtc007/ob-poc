@@ -20,8 +20,8 @@ use axum::Router;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use ob_poc_boundary::policy::PolicyGate;
 use crate::sage::{DeterministicSage, LlmSage, SageEngine};
+use ob_poc_boundary::policy::PolicyGate;
 
 // ============================================================================
 // State

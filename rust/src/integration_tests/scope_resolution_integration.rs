@@ -14,13 +14,13 @@
 
 #[cfg(feature = "database")]
 mod tests {
-    use anyhow::Result;
     use crate::agent::learning::embedder::CandleEmbedder;
     use crate::agent::learning::warmup::LearningWarmup;
     use crate::database::verb_service::VerbService;
     use crate::mcp::intent_pipeline::{IntentPipeline, PipelineOutcome};
     use crate::mcp::scope_resolution::{ScopeContext, ScopeResolutionOutcome, ScopeResolver};
     use crate::mcp::verb_search::HybridVerbSearcher;
+    use anyhow::Result;
     use sqlx::PgPool;
     use std::sync::Arc;
     use tokio::sync::OnceCell;

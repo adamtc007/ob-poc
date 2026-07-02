@@ -20,14 +20,14 @@ pub mod projection;
 pub mod store;
 
 pub use cross_stream::{
-    enqueue_cross_stream_obligations, prior_freeze_persons, cross_stream_idem_key,
+    cross_stream_idem_key, enqueue_cross_stream_obligations, prior_freeze_persons,
     CrossStreamEnqueueOutcome, CROSS_STREAM_OBLIGATION_CREATE, CROSS_STREAM_OBLIGATION_SUPERSEDE,
 };
 pub use error::StoreError;
 pub use manifest::{publish_manifest, ManifestPublishOutcome};
 pub use projection::{
     ObligationProjectionStats, PgKycObligationDrainer, PgKycObligationProjector,
-    PgKycProjectionDrainer, PgKycProjector, ProjectionStats,
-    CONTROL_EDGE_PROJECTION_EFFECT, OBLIGATION_PROJECTION_EFFECT,
+    PgKycProjectionDrainer, PgKycProjector, ProjectionStats, CONTROL_EDGE_PROJECTION_EFFECT,
+    OBLIGATION_PROJECTION_EFFECT,
 };
 pub use store::{AppendOutcome, PgKycEventStore};

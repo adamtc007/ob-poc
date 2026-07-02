@@ -51,7 +51,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use dsl_core::VerbsConfig;
 use crate::journey::pack::{load_pack_from_bytes, PackManifest};
 use crate::journey::router::PackRouter;
 use crate::repl::intent_matcher::IntentMatcher;
@@ -62,7 +61,8 @@ use crate::repl::runbook::{EntryStatus, Runbook, RunbookEntry, RunbookEvent, Slo
 use crate::repl::types::{IntentMatchResult, MatchContext, MatchOutcome};
 use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{rebuild_dsl, ReplOrchestratorV2, NullDslExecutor};
+use crate::sequencer::{rebuild_dsl, NullDslExecutor, ReplOrchestratorV2};
+use dsl_core::VerbsConfig;
 
 // ===========================================================================
 // Helpers (shared with Phase 3 test patterns)

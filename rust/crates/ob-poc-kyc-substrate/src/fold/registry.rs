@@ -75,7 +75,9 @@ pub struct FoldRegistry {
 impl FoldRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self { impls: BTreeMap::new() }
+        Self {
+            impls: BTreeMap::new(),
+        }
     }
 
     /// Register a fold implementation under `hash`.
@@ -93,7 +95,9 @@ impl FoldRegistry {
     /// is a replay-integrity error; the caller must register the version before
     /// replaying events written against it.
     pub fn get(&self, hash: &Hash) -> Result<&Arc<dyn FoldImpl>, KycError> {
-        self.impls.get(hash).ok_or(KycError::UnregisteredLexiconHash(*hash))
+        self.impls
+            .get(hash)
+            .ok_or(KycError::UnregisteredLexiconHash(*hash))
     }
 
     /// Number of registered versions.

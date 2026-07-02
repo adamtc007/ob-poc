@@ -2,10 +2,8 @@
 mod tests {
     use std::collections::HashMap;
 
+    use crate::dsl_v2::execution::{runtime_registry, GenericCrudExecutor, GenericExecutionResult};
     use anyhow::Result;
-    use crate::dsl_v2::execution::{
-        runtime_registry, GenericCrudExecutor, GenericExecutionResult,
-    };
     use serde_json::json;
     use sqlx::PgPool;
     use uuid::Uuid;

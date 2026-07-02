@@ -117,6 +117,7 @@ impl Phase3Evaluation {
     /// );
     /// assert!(!evaluation.had_violation());
     /// ```
+    #[cfg(test)]
     pub fn had_violation(&self) -> bool {
         self.subset_result.had_violation()
     }

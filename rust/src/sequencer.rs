@@ -195,6 +195,7 @@ impl<T: DslExecutor> DslExecutorV2 for T {
 /// Test executor that parks entries whose DSL contains ":park" or ":durable" markers.
 /// Same-crate test-only (verified — no external crate consumer); `pub(crate)`
 /// keeps it off the public API surface.
+#[allow(dead_code)] // kept for tests
 pub(crate) struct ParkableStubExecutor;
 
 #[async_trait::async_trait]
@@ -276,7 +277,8 @@ pub struct ReplOrchestratorV2 {
     /// via [`ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
     /// rather than read per request. Used by the orchestrator's internal
     /// ACP resolution step (R8 §13.5).
-    acp_session_input_draft_mode: ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    acp_session_input_draft_mode:
+        ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode,
     /// Maximum time a single runbook step may spend inside the execution
     /// bridge before the REPL marks it failed and returns control to the
     /// caller. This protects `/run` from indefinitely-held HTTP requests.
@@ -5323,7 +5325,6 @@ impl ReplOrchestratorV2 {
                     );
                     crate::sequencer_stages::VerbSurfaceComposition::SemOsAvailableWithPack {
                         legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),
-                        pack_id: pack.id.to_string(),
                         pack_verbs: pack.allowed_verbs.to_vec(),
                         fingerprint: phase2.fingerprint(),
                         pruned_count: phase2.pruned_verb_count(),
@@ -5344,7 +5345,6 @@ impl ReplOrchestratorV2 {
                 );
                 session.pending_sem_os_envelope = None;
                 crate::sequencer_stages::VerbSurfaceComposition::SemOsUnavailableWithPack {
-                    pack_id: pack.id.to_string(),
                     pack_verbs: pack.allowed_verbs.to_vec(),
                 }
             } else {

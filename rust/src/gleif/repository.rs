@@ -20,6 +20,7 @@ impl GleifRepository {
     }
 
     /// Get a reference to the connection pool
+    #[allow(dead_code)] // kept for external access
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }

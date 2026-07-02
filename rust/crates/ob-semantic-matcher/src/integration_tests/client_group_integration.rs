@@ -12,11 +12,11 @@
 
 #[cfg(feature = "database")]
 mod tests {
-    use anyhow::Result;
     use crate::{
         client_group_resolver::ClientGroupResolveError, AnchorRole, ClientGroupAliasResolver,
         ClientGroupAnchorResolver, ClientGroupResolver, PgClientGroupResolver, ResolutionConfig,
     };
+    use anyhow::Result;
     use sqlx::PgPool;
     use std::sync::Arc;
     use tokio::sync::OnceCell;

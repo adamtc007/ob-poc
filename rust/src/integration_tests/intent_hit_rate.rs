@@ -1295,9 +1295,10 @@ mod clarification_roundtrip {
         let pool = PgPool::connect(&db_url)
             .await
             .expect("Failed to connect to DB");
-        let fixture: TestFixture =
-            toml::from_str(include_str!("../../tests/fixtures/intent_test_utterances.toml"))
-                .expect("Failed to parse fixture TOML");
+        let fixture: TestFixture = toml::from_str(include_str!(
+            "../../tests/fixtures/intent_test_utterances.toml"
+        ))
+        .expect("Failed to parse fixture TOML");
         let searcher = std::sync::Arc::new(build_test_searcher(&pool).await);
 
         let mut total_disambig = 0usize;

@@ -66,10 +66,8 @@ pub async fn enqueue_cross_stream_obligations(
     role: &str,
     correlation_id: Uuid,
 ) -> Result<CrossStreamEnqueueOutcome, StoreError> {
-    let current: std::collections::BTreeSet<Uuid> =
-        resolved_persons.iter().map(|p| p.0).collect();
-    let prior: std::collections::BTreeSet<Uuid> =
-        prior_person_ids.iter().map(|p| p.0).collect();
+    let current: std::collections::BTreeSet<Uuid> = resolved_persons.iter().map(|p| p.0).collect();
+    let prior: std::collections::BTreeSet<Uuid> = prior_person_ids.iter().map(|p| p.0).collect();
 
     let to_create: Vec<Uuid> = current.difference(&prior).copied().collect();
     let to_supersede: Vec<Uuid> = prior.difference(&current).copied().collect();
@@ -104,7 +102,8 @@ pub async fn enqueue_cross_stream_obligations(
 
     for person_uuid in &to_supersede {
         let target = SubjectId(*person_uuid);
-        let idem = cross_stream_idem_key(freeze_event_id, target, CROSS_STREAM_OBLIGATION_SUPERSEDE);
+        let idem =
+            cross_stream_idem_key(freeze_event_id, target, CROSS_STREAM_OBLIGATION_SUPERSEDE);
         let payload = serde_json::json!({
             "subject_root": person_uuid,
             "determination_subject": subject.0,
@@ -127,7 +126,10 @@ pub async fn enqueue_cross_stream_obligations(
         supersedes += 1;
     }
 
-    Ok(CrossStreamEnqueueOutcome { creates, supersedes })
+    Ok(CrossStreamEnqueueOutcome {
+        creates,
+        supersedes,
+    })
 }
 
 /// The set of PersonIds emitted by the most recent freeze on a subject's stream.

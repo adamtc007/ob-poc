@@ -132,6 +132,7 @@ impl GleifEnrichmentService {
     /// internally. Callers can migrate to the split methods as needed;
     /// under the new `GleifEnrich::pre_fetch` / `execute` flow the
     /// split is explicit.
+    #[allow(dead_code)] // kept for legacy compat
     pub async fn enrich_entity(&self, entity_id: Uuid, lei: &str) -> Result<EnrichmentResult> {
         let fetched = self.fetch_all_for_enrich(lei).await?;
         self.persist_enrichment(entity_id, lei, fetched).await
@@ -197,7 +198,7 @@ impl GleifEnrichmentService {
             .await?;
 
         // Insert lifecycle events.
-        let events_added = self
+        let _events_added = self
             .repository
             .insert_lifecycle_events(entity_id, &record)
             .await?;
@@ -254,7 +255,7 @@ impl GleifEnrichmentService {
         }
 
         // Fund relationships.
-        let mut fund_relationships_added = 0;
+        let mut _fund_relationships_added = 0;
 
         if let Some((manager_lei, manager_name)) = fund_manager.as_ref() {
             self.repository
@@ -266,7 +267,7 @@ impl GleifEnrichmentService {
                     None,
                 )
                 .await?;
-            fund_relationships_added += 1;
+            _fund_relationships_added += 1;
             tracing::info!(
                 entity_id = %entity_id,
                 %manager_lei,
@@ -285,7 +286,7 @@ impl GleifEnrichmentService {
                     None,
                 )
                 .await?;
-            fund_relationships_added += 1;
+            _fund_relationships_added += 1;
             tracing::info!(
                 entity_id = %entity_id,
                 %umbrella_lei,
@@ -304,7 +305,7 @@ impl GleifEnrichmentService {
                     None,
                 )
                 .await?;
-            fund_relationships_added += 1;
+            _fund_relationships_added += 1;
             tracing::info!(
                 entity_id = %entity_id,
                 %master_lei,
@@ -366,16 +367,10 @@ impl GleifEnrichmentService {
             .await?;
 
         Ok(EnrichmentResult {
-            entity_id,
-            lei: lei.to_string(),
             names_added,
             addresses_added,
             identifiers_added,
             parent_relationships_added,
-            fund_relationships_added,
-            events_added,
-            direct_parent_exception: direct_exception,
-            ultimate_parent_exception: ultimate_exception,
         })
     }
 
@@ -456,11 +451,7 @@ impl GleifEnrichmentService {
                     .map(|r| r.direct_parent.is_none() && r.ultimate_parent.is_none())
                     .unwrap_or(true);
             if has_no_parents && !record.is_fund() {
-                terminal_entities.push(TerminalEntity {
-                    lei: lei.to_string(),
-                    name: record.attributes.entity.legal_name.name.clone(),
-                    exception: None,
-                });
+                terminal_entities.push(TerminalEntity);
             }
         }
 
@@ -515,6 +506,7 @@ impl GleifEnrichmentService {
     }
 
     /// Import a corporate tree starting from a root LEI
+    #[allow(dead_code)] // kept for legacy compat
     pub async fn import_corporate_tree(
         &self,
         root_lei: &str,
@@ -574,11 +566,7 @@ impl GleifEnrichmentService {
                     .map(|r| r.direct_parent.is_none() && r.ultimate_parent.is_none())
                     .unwrap_or(true))
             {
-                terminal_entities.push(TerminalEntity {
-                    lei: lei.to_string(),
-                    name: record.attributes.entity.legal_name.name.clone(),
-                    exception: None, // Would need to fetch from exception endpoint
-                });
+                terminal_entities.push(TerminalEntity);
             }
         }
 
@@ -624,6 +612,7 @@ impl GleifEnrichmentService {
     /// (IS_FUND-MANAGED_BY) along with fund structure relationships.
     ///
     /// Returns an enhanced TreeImportResult with fund counts.
+    #[allow(dead_code)] // kept for legacy compat
     pub async fn import_corporate_tree_with_options(
         &self,
         root_lei: &str,
@@ -695,11 +684,7 @@ impl GleifEnrichmentService {
             {
                 // Only add non-funds as terminal entities (funds have ManCo, not parent)
                 if !record.is_fund() {
-                    terminal_entities.push(TerminalEntity {
-                        lei: lei.to_string(),
-                        name: record.attributes.entity.legal_name.name.clone(),
-                        exception: None,
-                    });
+                    terminal_entities.push(TerminalEntity);
                 }
             }
         }
@@ -760,6 +745,7 @@ impl GleifEnrichmentService {
     }
 
     /// Refresh GLEIF data for an entity
+    #[allow(dead_code)] // kept for legacy compat
     pub async fn refresh_entity(&self, entity_id: Uuid) -> Result<EnrichmentResult> {
         // Get the LEI for this entity
         let lei: Option<String> = sqlx::query_scalar(

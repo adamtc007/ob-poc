@@ -10,7 +10,6 @@
 //! returns `BusServerError::UnknownVerb` for every DeliverResult call —
 //! handy for `BusServer::builder().result_dispatcher(NoopResultDispatcher)`.
 #![deny(unreachable_pub)]
-
 #![forbid(unsafe_code)]
 
 use std::sync::Arc;

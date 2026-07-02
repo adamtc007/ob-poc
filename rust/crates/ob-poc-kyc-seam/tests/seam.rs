@@ -55,8 +55,15 @@ fn into_event_maps_identity_deterministically() {
     let e2 = draft().into_event(&p, correlation, execution);
 
     // Non-UUID actor_id → a STABLE derived UUID (replay/audit reproducible).
-    assert_eq!(e1.actor.actor_id, e2.actor.actor_id, "actor_id mapping is deterministic");
-    assert_ne!(e1.actor.actor_id, Uuid::nil(), "derived actor_id is non-nil");
+    assert_eq!(
+        e1.actor.actor_id, e2.actor.actor_id,
+        "actor_id mapping is deterministic"
+    );
+    assert_ne!(
+        e1.actor.actor_id,
+        Uuid::nil(),
+        "derived actor_id is non-nil"
+    );
     // Primary role only (substrate principal is single-role).
     assert_eq!(e1.actor.role, "analyst");
     // execution_id is the idempotency key (F); correlation threaded through.
@@ -178,7 +185,11 @@ async fn append_in_scope_commits_and_rolls_back_with_the_scope() {
             .unwrap();
         scope.rollback().await;
     }
-    assert_eq!(count(&pool, subject).await, 0, "rollback of the scope dropped the appended event");
+    assert_eq!(
+        count(&pool, subject).await,
+        0,
+        "rollback of the scope dropped the appended event"
+    );
 
     // Append inside a scope, then COMMIT the scope → the event persists.
     {
@@ -189,7 +200,11 @@ async fn append_in_scope_commits_and_rolls_back_with_the_scope() {
         assert_eq!(outcome.seq, 0);
         scope.commit().await;
     }
-    assert_eq!(count(&pool, subject).await, 1, "commit of the scope persisted the event");
+    assert_eq!(
+        count(&pool, subject).await,
+        1,
+        "commit of the scope persisted the event"
+    );
 
     cleanup(&pool, subject).await;
 }
@@ -204,7 +219,9 @@ async fn lexicon_precondition_rejects_through_the_seam() {
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
     let lexicon = phase1_lexicon();
-    let verify_entry = lexicon.get("ubo.edge.verify").expect("verify entry in lexicon");
+    let verify_entry = lexicon
+        .get("ubo.edge.verify")
+        .expect("verify entry in lexicon");
 
     // A verify event for an edge with no prior evidence in the (empty) stream.
     let edge = Uuid::new_v4();
@@ -226,13 +243,23 @@ async fn lexicon_precondition_rejects_through_the_seam() {
     );
 
     let mut scope = TestScope::begin(&pool).await;
-    let result = append_in_scope(&mut scope, &registry, &verify_event, |state: &ControlState| {
-        check_control_preconditions(verify_entry, state, &verify_event)
-    })
+    let result = append_in_scope(
+        &mut scope,
+        &registry,
+        &verify_event,
+        |state: &ControlState| check_control_preconditions(verify_entry, state, &verify_event),
+    )
     .await;
-    assert!(result.is_err(), "verify with no evidence must be rejected through the seam");
+    assert!(
+        result.is_err(),
+        "verify with no evidence must be rejected through the seam"
+    );
     scope.rollback().await;
 
-    assert_eq!(count(&pool, subject).await, 0, "rejected append inserts nothing");
+    assert_eq!(
+        count(&pool, subject).await,
+        0,
+        "rejected append inserts nothing"
+    );
     cleanup(&pool, subject).await;
 }

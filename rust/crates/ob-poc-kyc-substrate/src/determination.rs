@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use crate::error::KycError;
 use crate::event::IntentEvent;
-use crate::fold::control::{ControlState, ReconciledEconomicEdge, reconciled_economic_edges};
+use crate::fold::control::{reconciled_economic_edges, ControlState, ReconciledEconomicEdge};
 use crate::types::{EntityId, EventId, Hash, PersonId};
 
 // ── Prong ─────────────────────────────────────────────────────────────────────
@@ -115,9 +115,8 @@ impl DeterminationStrategy for OwnershipProngStrategy {
 
         // DFS with cumulative percentage multiplication.
         // Stack: (current_entity, cumulative_pct, path_so_far, earliest_originating_event_id)
-        let mut stack: Vec<(EntityId, f64, Vec<EntityId>, Option<EventId>)> = vec![
-            (subject_entity_id, 100.0, vec![subject_entity_id], None),
-        ];
+        let mut stack: Vec<(EntityId, f64, Vec<EntityId>, Option<EventId>)> =
+            vec![(subject_entity_id, 100.0, vec![subject_entity_id], None)];
         // BTreeMap for deterministic merge when a person is reachable via multiple chains.
         let mut candidates: BTreeMap<PersonId, (f64, Vec<EntityId>, Option<EventId>)> =
             BTreeMap::new();
@@ -136,9 +135,11 @@ impl DeterminationStrategy for OwnershipProngStrategy {
                 // Is the parent a natural person?
                 let parent_person_id = PersonId(parent.0);
                 if natural_persons.contains(&parent_person_id) {
-                    let entry = candidates
-                        .entry(parent_person_id)
-                        .or_insert((0.0, path.clone(), chain_orig));
+                    let entry = candidates.entry(parent_person_id).or_insert((
+                        0.0,
+                        path.clone(),
+                        chain_orig,
+                    ));
                     entry.0 += new_pct;
                 } else {
                     // Intermediate entity — continue traversal.
@@ -352,7 +353,9 @@ pub fn recover_determination_at(
     };
 
     // Find the freeze event.
-    let freeze_event = events.iter().rev()
+    let freeze_event = events
+        .iter()
+        .rev()
         .find(|e| e.verb_fqn.as_str() == "ubo.determination.freeze")?;
 
     let det = DeterminationInProgress {
@@ -370,7 +373,8 @@ pub fn recover_determination_at(
         pin.lexicon_manifest_hash,
         pin.reference_snapshot_id,
         pin.import_run_ids,
-    ).ok()
+    )
+    .ok()
 }
 
 /// Find the subject's own `EntityId`, recorded on `kyc.subject.classify-structure`
@@ -378,10 +382,12 @@ pub fn recover_determination_at(
 /// the live `ubo.determination.freeze` verb (EOP-DD-KYCUBO-003 remediation) so
 /// both paths resolve the subject entity identically.
 pub fn find_subject_entity(events: &[&IntentEvent]) -> Option<EntityId> {
-    events.iter()
+    events
+        .iter()
         .find(|e| e.verb_fqn.as_str() == "kyc.subject.classify-structure")
         .and_then(|e| {
-            e.payload.get("entity_id")
+            e.payload
+                .get("entity_id")
                 .and_then(|v| v.as_str())
                 .and_then(|s| Uuid::parse_str(s).ok())
                 .map(EntityId)

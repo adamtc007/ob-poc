@@ -123,6 +123,7 @@ impl ResearchMacroRegistry {
     }
 
     /// Get macros by tag
+    #[allow(dead_code)] // kept for tests
     pub fn by_tag(&self, tag: &str) -> Vec<&ResearchMacroDef> {
         self.by_tag
             .get(tag)
@@ -131,21 +132,25 @@ impl ResearchMacroRegistry {
     }
 
     /// Get all macro names
+    #[allow(dead_code)] // kept for tests
     pub fn names(&self) -> Vec<&str> {
         self.macros.keys().map(|s| s.as_str()).collect()
     }
 
     /// Get all tags
+    #[allow(dead_code)] // kept for tests
     pub fn tags(&self) -> Vec<&str> {
         self.by_tag.keys().map(|s| s.as_str()).collect()
     }
 
     /// Check if registry is empty
+    #[allow(dead_code)] // kept for tests
     pub fn is_empty(&self) -> bool {
         self.macros.is_empty()
     }
 
     /// Get count of registered macros
+    #[allow(dead_code)] // kept for tests
     pub fn len(&self) -> usize {
         self.macros.len()
     }

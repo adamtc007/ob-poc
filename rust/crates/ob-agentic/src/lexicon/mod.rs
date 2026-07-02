@@ -70,9 +70,9 @@ pub use loader::{
     PrepositionsConfig, VerbsConfig,
 };
 pub use pipeline::{LexiconPipeline, LexiconPipelineResult};
-pub use tokenizer::{EntityResolver, ResolvedEntity, SalientEntity, SessionSalience, Tokenizer};
 #[cfg(any(test, feature = "test-util"))]
 pub use tokenizer::MockEntityResolver;
+pub use tokenizer::{EntityResolver, ResolvedEntity, SalientEntity, SessionSalience, Tokenizer};
 pub use tokens::{
     EntityClass, ModifierType, NumberType, PrepType, Token, TokenSource, TokenType, VerbClass,
 };

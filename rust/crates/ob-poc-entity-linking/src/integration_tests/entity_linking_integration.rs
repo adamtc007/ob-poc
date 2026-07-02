@@ -273,7 +273,10 @@ fn test_null_service_returns_empty() {
     let svc = NullEntityLinkingService;
 
     let results = svc.resolve_mentions("Goldman Sachs", None, None, 5);
-    assert!(results.is_empty(), "Null service should return empty results");
+    assert!(
+        results.is_empty(),
+        "Null service should return empty results"
+    );
 }
 
 #[test]

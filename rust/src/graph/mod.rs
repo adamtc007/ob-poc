@@ -41,8 +41,19 @@ pub use investor_register::{
 pub use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 #[cfg(feature = "database")]
 pub use query_engine::GraphQueryEngine;
-pub use types::*;
-pub use view_model::*;
+pub use types::{
+    CbuGraph, CbuNode, CbuStatus, CbuSummary, ControlEdge, ControlType, EdgeType, EntityGraph,
+    EntityType, FundEdge, FundRelationshipType, GraphEdge, GraphFilters, GraphNode, GraphScope,
+    GraphStats, LayerInfo, LayerType, LayoutBehavior, LayoutOverride, LegacyCbuGraph,
+    LegacyGraphEdge, LegacyGraphNode, LegacyGraphStats, NavigationHistory, NodeOffset,
+    NodeSizeOverride, NodeStatus, NodeType, Orientation, OwnershipEdge, OwnershipType, PersonState,
+    ProngFilter, RoleAssignment, RoleCategory, ServiceEdge, ServiceRelationshipType, UboTreatment,
+    VerificationStatus, ViewMode,
+};
+pub use view_model::{
+    CanvasBounds, ComparisonSummary, FieldChange, GraphComparison, GraphFilter, GraphPath,
+    GraphViewModel, GraphViewStats, LayoutOrientation, NodeChange, NodeGroup, ViewModeInfo,
+};
 pub use viewport::{
     Breakpoint, DisplayConfig, LayoutHint, OffScreenSummary, PanDirection, ViewportContext,
     ZoomName,

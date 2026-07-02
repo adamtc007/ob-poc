@@ -21,7 +21,7 @@ use crate::repl::runbook::{ConfirmPolicy, EntryStatus, RunbookEntry};
 use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::types_v2::{ReplCommandV2, UserInputV2, WorkspaceKind};
 use crate::repl::verb_config_index::VerbConfigIndex;
-use crate::sequencer::{DslExecutor, ReplOrchestratorV2, NullDslExecutor};
+use crate::sequencer::{DslExecutor, NullDslExecutor, ReplOrchestratorV2};
 
 // ---------------------------------------------------------------------------
 // Helpers

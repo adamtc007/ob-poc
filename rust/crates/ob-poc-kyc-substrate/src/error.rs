@@ -42,7 +42,9 @@ pub enum KycError {
     /// under a lexicon version that was never registered cannot be replayed
     /// faithfully, so the fold must halt.  There is no "latest version" fallback;
     /// that would silently destroy replay-faithfulness (Q7, K-18/K-31).
-    #[error("unregistered lexicon hash {0} — register a FoldImpl for this version before replaying")]
+    #[error(
+        "unregistered lexicon hash {0} — register a FoldImpl for this version before replaying"
+    )]
     UnregisteredLexiconHash(Hash),
 
     #[error("other error: {0}")]

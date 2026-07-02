@@ -21,8 +21,8 @@ use uuid::Uuid;
 
 use ob_poc_kyc_store::PgKycEventStore;
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, AuthorityRef, FoldRegistry, Hash, IdemKey,
-    IntentEvent, KycError, Principal, SubjectId, TargetBinding, V1FoldImpl, VerbFqn,
+    fold_control_versioned, phase1_lexicon, AuthorityRef, FoldRegistry, Hash, IdemKey, IntentEvent,
+    KycError, Principal, SubjectId, TargetBinding, V1FoldImpl, VerbFqn,
 };
 
 // ── Harness helpers ────────────────────────────────────────────────────────────
@@ -110,9 +110,16 @@ async fn exit3_idempotent_reapply_same_key_one_event() {
     tx.commit().await.unwrap();
 
     assert!(!o1.deduped, "first append must insert");
-    assert!(o2.deduped, "second append with same idempotency_key must be a no-op (F)");
+    assert!(
+        o2.deduped,
+        "second append with same idempotency_key must be a no-op (F)"
+    );
     assert_eq!(o1.seq, o2.seq, "deduped append returns the existing seq");
-    assert_eq!(event_count(&pool, subject).await, 1, "exactly one event row");
+    assert_eq!(
+        event_count(&pool, subject).await,
+        1,
+        "exactly one event row"
+    );
 
     cleanup(&pool, subject).await;
 }
@@ -137,13 +144,18 @@ async fn exit1_rollback_leaves_no_orphan() {
     }
 
     // Event, seq-bump, AND stream-row creation all rolled back together (K-16, K-35).
-    assert_eq!(event_count(&pool, subject).await, 0, "no orphan event after rollback");
-    let stream_exists: i64 =
-        sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".kyc_subject_streams WHERE subject_root = $1"#)
-            .bind(subject.0)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    assert_eq!(
+        event_count(&pool, subject).await,
+        0,
+        "no orphan event after rollback"
+    );
+    let stream_exists: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM "ob-poc".kyc_subject_streams WHERE subject_root = $1"#,
+    )
+    .bind(subject.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(stream_exists, 0, "no orphan stream row after rollback");
 
     cleanup(&pool, subject).await;
@@ -183,8 +195,15 @@ async fn exit2_concurrent_appends_one_subject_dense_seq() {
 
     // The FOR UPDATE lock serialized the appends → dense, gap-free 0..N-1, no dupes.
     let expected: Vec<u64> = (0..N as u64).collect();
-    assert_eq!(seqs, expected, "concurrent appends must produce dense gap-free seq 0..N-1");
-    assert_eq!(event_count(&pool, subject).await, N, "N distinct events persisted");
+    assert_eq!(
+        seqs, expected,
+        "concurrent appends must produce dense gap-free seq 0..N-1"
+    );
+    assert_eq!(
+        event_count(&pool, subject).await,
+        N,
+        "N distinct events persisted"
+    );
 
     cleanup(&pool, subject).await;
 }
@@ -208,10 +227,17 @@ async fn precondition_rejection_under_lock_inserts_nothing() {
     })
     .await;
     // The append must surface the rejection (validate runs BEFORE insert).
-    assert!(result.is_err(), "rejected precondition must fail the append");
+    assert!(
+        result.is_err(),
+        "rejected precondition must fail the append"
+    );
     tx.rollback().await.unwrap();
 
-    assert_eq!(event_count(&pool, subject).await, 0, "rejected append inserts nothing");
+    assert_eq!(
+        event_count(&pool, subject).await,
+        0,
+        "rejected append inserts nothing"
+    );
 
     cleanup(&pool, subject).await;
 }
@@ -274,7 +300,9 @@ async fn roundtrip_loaded_events_fold_identically() {
 
     // Load them back and fold.
     let mut conn = pool.acquire().await.unwrap();
-    let loaded = PgKycEventStore::load_events(&mut conn, subject).await.unwrap();
+    let loaded = PgKycEventStore::load_events(&mut conn, subject)
+        .await
+        .unwrap();
     assert_eq!(loaded.len(), 3, "all three events loaded");
     assert_eq!(
         loaded.iter().map(|e| e.seq).collect::<Vec<_>>(),
@@ -286,7 +314,10 @@ async fn roundtrip_loaded_events_fold_identically() {
     // (storage round-trip preserves fold semantics).
     let loaded_refs: Vec<&IntentEvent> = loaded.iter().collect();
     let folded_from_db = fold_control_versioned(&loaded_refs, &registry).unwrap();
-    assert!(folded_from_db.registered, "register event survived the round-trip");
+    assert!(
+        folded_from_db.registered,
+        "register event survived the round-trip"
+    );
 
     cleanup(&pool, subject).await;
 }

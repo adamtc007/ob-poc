@@ -40,21 +40,36 @@ struct Scope {
 }
 impl Scope {
     async fn begin(p: &PgPool) -> Self {
-        Self { tx: p.begin().await.unwrap(), pool: p.clone(), id: TransactionScopeId::new() }
+        Self {
+            tx: p.begin().await.unwrap(),
+            pool: p.clone(),
+            id: TransactionScopeId::new(),
+        }
     }
-    async fn commit(self) { self.tx.commit().await.unwrap(); }
+    async fn commit(self) {
+        self.tx.commit().await.unwrap();
+    }
 }
 impl TransactionScope for Scope {
-    fn scope_id(&self) -> TransactionScopeId { self.id }
-    fn transaction(&mut self) -> &mut Transaction<'static, Postgres> { &mut self.tx }
-    fn pool(&self) -> &PgPool { &self.pool }
+    fn scope_id(&self) -> TransactionScopeId {
+        self.id
+    }
+    fn transaction(&mut self) -> &mut Transaction<'static, Postgres> {
+        &mut self.tx
+    }
+    fn pool(&self) -> &PgPool {
+        &self.pool
+    }
 }
 
 /// Dispatch a verb op and commit, returning the outcome as JSON.
 async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> serde_json::Value {
     let mut ctx = VerbExecutionContext::default();
     let mut scope = Scope::begin(pool).await;
-    let out = op.execute(&args, &mut ctx, &mut scope).await.expect(op.fqn());
+    let out = op
+        .execute(&args, &mut ctx, &mut scope)
+        .await
+        .expect(op.fqn());
     scope.commit().await;
     match out {
         dsl_runtime::VerbExecutionOutcome::Record(v) => v,
@@ -81,11 +96,18 @@ async fn run_fallible(
 async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
     for s in subjects {
         for t in [
-            "kyc_intent_events", "kyc_subject_streams", "kyc_control_edge_projection",
-            "kyc_obligation_projection", "kyc_subject_rollup_projection",
+            "kyc_intent_events",
+            "kyc_subject_streams",
+            "kyc_control_edge_projection",
+            "kyc_obligation_projection",
+            "kyc_subject_rollup_projection",
         ] {
-            let _ = sqlx::query(&format!(r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#))
-                .bind(s.0).execute(pool).await;
+            let _ = sqlx::query(&format!(
+                r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
+            ))
+            .bind(s.0)
+            .execute(pool)
+            .await;
         }
         let _ = sqlx::query(
             r#"DELETE FROM "public".outbox WHERE idempotency_key LIKE $1
@@ -94,7 +116,8 @@ async fn cleanup(pool: &PgPool, subjects: &[SubjectId]) {
         )
         .bind(format!("{}:%", s.0))
         .bind(s.0.to_string())
-        .execute(pool).await;
+        .execute(pool)
+        .await;
     }
 }
 
@@ -115,65 +138,139 @@ async fn m3_1_freeze_differential_matches_ownership_prong_strategy() {
     let p2 = Uuid::new_v4();
     let p3 = Uuid::new_v4();
 
-    run(&KycSubjectRegister, serde_json::json!({
-        "subject-id": subject.0, "is_natural_person": false,
-    }), &pool).await;
-    run(&KycSubjectClassifyStructure, serde_json::json!({
-        "subject-id": subject.0, "structure-class": "private_company",
-    }), &pool).await;
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({
+            "subject-id": subject.0, "is_natural_person": false,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({
+            "subject-id": subject.0, "structure-class": "private_company",
+        }),
+        &pool,
+    )
+    .await;
     for p in [p1, p2, p3] {
-        run(&KycSubjectRegister, serde_json::json!({
-            "subject-id": subject.0, "entity-id": p, "is_natural_person": true,
-        }), &pool).await;
+        run(
+            &KycSubjectRegister,
+            serde_json::json!({
+                "subject-id": subject.0, "entity-id": p, "is_natural_person": true,
+            }),
+            &pool,
+        )
+        .await;
     }
 
     // B → A: 60%
-    run(&UboEdgeAssertEconomicInterest, serde_json::json!({
-        "subject-id": subject.0, "from_entity_id": entity_b, "to_entity_id": subject.0,
-        "percentage": 60.0,
-    }), &pool).await;
+    run(
+        &UboEdgeAssertEconomicInterest,
+        serde_json::json!({
+            "subject-id": subject.0, "from_entity_id": entity_b, "to_entity_id": subject.0,
+            "percentage": 60.0,
+        }),
+        &pool,
+    )
+    .await;
     // P1 → B: 80% (effective on A: 48%)
-    run(&UboEdgeAssertEconomicInterest, serde_json::json!({
-        "subject-id": subject.0, "from_entity_id": p1, "to_entity_id": entity_b,
-        "percentage": 80.0,
-    }), &pool).await;
+    run(
+        &UboEdgeAssertEconomicInterest,
+        serde_json::json!({
+            "subject-id": subject.0, "from_entity_id": p1, "to_entity_id": entity_b,
+            "percentage": 80.0,
+        }),
+        &pool,
+    )
+    .await;
     // P2 → B: 20% (effective on A: 12% — below 25% threshold)
-    run(&UboEdgeAssertEconomicInterest, serde_json::json!({
-        "subject-id": subject.0, "from_entity_id": p2, "to_entity_id": entity_b,
-        "percentage": 20.0,
-    }), &pool).await;
+    run(
+        &UboEdgeAssertEconomicInterest,
+        serde_json::json!({
+            "subject-id": subject.0, "from_entity_id": p2, "to_entity_id": entity_b,
+            "percentage": 20.0,
+        }),
+        &pool,
+    )
+    .await;
     // P3 → A: 40% direct
-    run(&UboEdgeAssertEconomicInterest, serde_json::json!({
-        "subject-id": subject.0, "from_entity_id": p3, "to_entity_id": subject.0,
-        "percentage": 40.0,
-    }), &pool).await;
+    run(
+        &UboEdgeAssertEconomicInterest,
+        serde_json::json!({
+            "subject-id": subject.0, "from_entity_id": p3, "to_entity_id": subject.0,
+            "percentage": 40.0,
+        }),
+        &pool,
+    )
+    .await;
 
-    run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject.0 }), &pool).await;
-    run(&UboDeterminationSelectStrategy, serde_json::json!({
-        "subject-id": subject.0, "strategy": "ownership_prong_strategy",
-    }), &pool).await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({
+            "subject-id": subject.0, "strategy": "ownership_prong_strategy",
+        }),
+        &pool,
+    )
+    .await;
 
-    let freeze_out = run(&UboDeterminationFreeze, serde_json::json!({
-        "subject-id": subject.0, "policy-version": "v1.0",
-    }), &pool).await;
+    let freeze_out = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({
+            "subject-id": subject.0, "policy-version": "v1.0",
+        }),
+        &pool,
+    )
+    .await;
 
-    let candidates = freeze_out["candidates"].as_array().expect("candidates array");
+    let candidates = freeze_out["candidates"]
+        .as_array()
+        .expect("candidates array");
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
         .map(|c| c["person_id"].as_str().unwrap().to_string())
         .collect();
 
-    assert_eq!(candidates.len(), 2, "expected exactly P1 and P3; got {candidates:?}");
-    assert!(person_ids.contains(&p1.to_string()), "P1 (48% effective) must resolve");
-    assert!(person_ids.contains(&p3.to_string()), "P3 (40% effective) must resolve");
-    assert!(!person_ids.contains(&p2.to_string()), "P2 (12% effective, below threshold) must NOT resolve");
+    assert_eq!(
+        candidates.len(),
+        2,
+        "expected exactly P1 and P3; got {candidates:?}"
+    );
+    assert!(
+        person_ids.contains(&p1.to_string()),
+        "P1 (48% effective) must resolve"
+    );
+    assert!(
+        person_ids.contains(&p3.to_string()),
+        "P3 (40% effective) must resolve"
+    );
+    assert!(
+        !person_ids.contains(&p2.to_string()),
+        "P2 (12% effective, below threshold) must NOT resolve"
+    );
 
     for c in candidates {
-        assert_eq!(c["prong"], "OwnershipProng", "K-1: basis must be recorded on every candidate");
+        assert_eq!(
+            c["prong"], "OwnershipProng",
+            "K-1: basis must be recorded on every candidate"
+        );
     }
-    let p1_cand = candidates.iter().find(|c| c["person_id"] == p1.to_string()).unwrap();
+    let p1_cand = candidates
+        .iter()
+        .find(|c| c["person_id"] == p1.to_string())
+        .unwrap();
     let pct = p1_cand["effective_ownership_pct"].as_f64().unwrap();
-    assert!((pct - 48.0).abs() < 0.01, "P1 effective pct should be ~48, got {pct}");
+    assert!(
+        (pct - 48.0).abs() < 0.01,
+        "P1 effective pct should be ~48, got {pct}"
+    );
 
     cleanup(&pool, &[subject]).await;
 }
@@ -185,21 +282,42 @@ async fn m3_2_person_approve_rejects_when_obligations_not_terminal() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
 
-    run(&KycSubjectRegister, serde_json::json!({
-        "subject-id": subject.0, "is_natural_person": true,
-    }), &pool).await;
-    run(&KycObligationCreate, serde_json::json!({
-        "subject-id": subject.0, "role": "director", "jurisdiction": "LU",
-    }), &pool).await;
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({
+            "subject-id": subject.0, "is_natural_person": true,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycObligationCreate,
+        serde_json::json!({
+            "subject-id": subject.0, "role": "director", "jurisdiction": "LU",
+        }),
+        &pool,
+    )
+    .await;
     // Deliberately leave identity/screening/risk tracks Pending — no update-* calls.
 
-    let result = run_fallible(&KycPersonApprove, serde_json::json!({
-        "subject-id": subject.0,
-    }), &pool).await;
+    let result = run_fallible(
+        &KycPersonApprove,
+        serde_json::json!({
+            "subject-id": subject.0,
+        }),
+        &pool,
+    )
+    .await;
 
-    assert!(result.is_err(), "approve must be rejected while obligations are not all terminal (K-23)");
+    assert!(
+        result.is_err(),
+        "approve must be rejected while obligations are not all terminal (K-23)"
+    );
     let msg = result.unwrap_err().to_string();
-    assert!(msg.contains("K-23"), "error should name the K-23 gate; got: {msg}");
+    assert!(
+        msg.contains("K-23"),
+        "error should name the K-23 gate; got: {msg}"
+    );
 
     cleanup(&pool, &[subject]).await;
 }
@@ -211,16 +329,31 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
 
-    run(&KycSubjectRegister, serde_json::json!({
-        "subject-id": subject.0, "is_natural_person": false,
-    }), &pool).await;
-    run(&KycSubjectClassifyStructure, serde_json::json!({
-        "subject-id": subject.0, "structure-class": "private_company",
-    }), &pool).await;
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({
+            "subject-id": subject.0, "is_natural_person": false,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({
+            "subject-id": subject.0, "structure-class": "private_company",
+        }),
+        &pool,
+    )
+    .await;
 
-    let fold_out = run(&UboDeterminationComputeFold, serde_json::json!({
-        "subject-id": subject.0,
-    }), &pool).await;
+    let fold_out = run(
+        &UboDeterminationComputeFold,
+        serde_json::json!({
+            "subject-id": subject.0,
+        }),
+        &pool,
+    )
+    .await;
 
     assert_eq!(
         fold_out["structure_class"], "PrivateCompany",
@@ -246,20 +379,45 @@ async fn m3_4_unimplemented_strategy_fails_loudly_not_silently() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
 
-    run(&KycSubjectRegister, serde_json::json!({
-        "subject-id": subject.0, "is_natural_person": false,
-    }), &pool).await;
-    run(&KycSubjectClassifyStructure, serde_json::json!({
-        "subject-id": subject.0, "structure-class": "lp_fund",
-    }), &pool).await;
-    run(&UboEdgeReconcileConflict, serde_json::json!({ "subject-id": subject.0 }), &pool).await;
-    run(&UboDeterminationSelectStrategy, serde_json::json!({
-        "subject-id": subject.0, "strategy": "control_prong_strategy",
-    }), &pool).await;
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({
+            "subject-id": subject.0, "is_natural_person": false,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({
+            "subject-id": subject.0, "structure-class": "lp_fund",
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({
+            "subject-id": subject.0, "strategy": "control_prong_strategy",
+        }),
+        &pool,
+    )
+    .await;
 
-    let result = run_fallible(&UboDeterminationFreeze, serde_json::json!({
-        "subject-id": subject.0, "policy-version": "v1.0",
-    }), &pool).await;
+    let result = run_fallible(
+        &UboDeterminationFreeze,
+        serde_json::json!({
+            "subject-id": subject.0, "policy-version": "v1.0",
+        }),
+        &pool,
+    )
+    .await;
 
     assert!(
         result.is_err(),

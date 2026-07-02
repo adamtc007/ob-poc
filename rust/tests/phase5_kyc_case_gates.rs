@@ -52,12 +52,13 @@ mod gates {
             cbu_name: &str,
             workstream_status: &str,
         ) -> (Uuid, Uuid) {
-            let cbu_id: Uuid =
-                sqlx::query_scalar(r#"INSERT INTO "ob-poc".cbus (name) VALUES ($1) RETURNING cbu_id"#)
-                    .bind(cbu_name)
-                    .fetch_one(&self.pool)
-                    .await
-                    .unwrap();
+            let cbu_id: Uuid = sqlx::query_scalar(
+                r#"INSERT INTO "ob-poc".cbus (name) VALUES ($1) RETURNING cbu_id"#,
+            )
+            .bind(cbu_name)
+            .fetch_one(&self.pool)
+            .await
+            .unwrap();
             let case_id: Uuid = sqlx::query_scalar(
                 r#"INSERT INTO "ob-poc".cases (cbu_id, status, case_ref)
                    VALUES ($1, 'REVIEW', $2) RETURNING case_id"#,
@@ -67,15 +68,14 @@ mod gates {
             .fetch_one(&self.pool)
             .await
             .unwrap();
-            let entity_id: Uuid = sqlx::query_scalar(
-                r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#,
-            )
-            .fetch_optional(&self.pool)
-            .await
-            .unwrap()
-            .unwrap_or_else(|| {
-                panic!("fixture requires at least one existing entities row in the test DB")
-            });
+            let entity_id: Uuid =
+                sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .unwrap()
+                    .unwrap_or_else(|| {
+                        panic!("fixture requires at least one existing entities row in the test DB")
+                    });
             sqlx::query(
                 r#"INSERT INTO "ob-poc".entity_workstreams (case_id, entity_id, status, is_ubo)
                    VALUES ($1, $2, $3, false)"#,
@@ -146,7 +146,10 @@ mod gates {
                 .bind(case_id)
                 .fetch_one(&db.pool)
                 .await?;
-        assert_eq!(status, "REVIEW", "case must remain in REVIEW after rejection");
+        assert_eq!(
+            status, "REVIEW",
+            "case must remain in REVIEW after rejection"
+        );
 
         db.cleanup_case(cbu_id).await;
         Ok(())
@@ -163,7 +166,11 @@ mod gates {
         let result = db
             .execute_dsl(&format!(r#"(kyc-case.approve :case-id "{case_id}")"#))
             .await;
-        assert!(result.is_ok(), "expected approve to succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "expected approve to succeed: {:?}",
+            result.err()
+        );
 
         let status: String =
             sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)

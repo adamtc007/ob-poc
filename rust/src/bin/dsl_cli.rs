@@ -1943,8 +1943,8 @@ async fn cmd_repl(
         RuntimeVerbRegistry, ValidationContext, ValidationRustStyleFormatter as RustStyleFormatter,
     };
     use ob_poc::dsl_v2::{emit_dsl, topological_sort};
-    use ob_poc_diagnostics::events::{init_events, EventConfig, SharedEmitter};
     use ob_poc_authoring::feedback::{FeedbackInspector, ReproGenerator, TodoGenerator};
+    use ob_poc_diagnostics::events::{init_events, EventConfig, SharedEmitter};
     use rustyline::completion::{Completer, Pair};
     use rustyline::error::ReadlineError;
     use rustyline::highlight::Highlighter;

@@ -49,11 +49,11 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::runtime_registry::runtime_registry;
-use ob_poc_authoring::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
 use dsl_analysis::entity_kind::canonicalize as canonicalize_entity_kind;
+use ob_poc_authoring::lexicon::LexiconService;
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;

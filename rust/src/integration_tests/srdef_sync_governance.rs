@@ -84,7 +84,6 @@ async fn sync_definitions_records_only_real_entity_changes() -> Result<()> {
         triggered_by_services: Vec::new(),
         attributes: vec![LoadedSrdefAttribute {
             attr_id,
-            attr_uuid: None,
             requirement: "required".to_string(),
             source_policy: vec!["manual".to_string()],
             constraints: serde_json::json!({}),
@@ -97,7 +96,6 @@ async fn sync_definitions_records_only_real_entity_changes() -> Result<()> {
         per_market: false,
         per_currency: false,
         per_counterparty: false,
-        resource_id: None,
         application_binding: None,
     };
 

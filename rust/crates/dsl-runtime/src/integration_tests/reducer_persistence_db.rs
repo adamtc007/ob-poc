@@ -1,7 +1,7 @@
 #[cfg(feature = "database")]
 mod tests {
-    use anyhow::Result;
     use crate::{handle_state_derive, load_builtin_state_machine};
+    use anyhow::Result;
     use sqlx::PgPool;
     use uuid::Uuid;
 

@@ -68,47 +68,6 @@ impl Default for TreeFetchOptions {
     }
 }
 
-impl TreeFetchOptions {
-    /// Create options for ownership-only traversal (default, backwards compatible)
-    pub fn ownership_only() -> Self {
-        Self {
-            max_depth: 10,
-            include_managed_funds: false,
-            include_fund_structures: false,
-            include_master_feeder: false,
-            fund_type_filter: vec![],
-            fund_jurisdiction_filter: vec![],
-            max_funds_per_manco: None,
-        }
-    }
-
-    /// Create options for full traversal including all fund relationships
-    pub fn full_with_funds() -> Self {
-        Self {
-            max_depth: 10,
-            include_managed_funds: true,
-            include_fund_structures: true,
-            include_master_feeder: true,
-            fund_type_filter: vec![],
-            fund_jurisdiction_filter: vec![],
-            max_funds_per_manco: Some(500), // Safety limit
-        }
-    }
-
-    /// Create options with fund inclusion and custom limits
-    pub fn with_fund_limit(max_funds_per_manco: usize) -> Self {
-        Self {
-            max_depth: 10,
-            include_managed_funds: true,
-            include_fund_structures: true,
-            include_master_feeder: true,
-            fund_type_filter: vec![],
-            fund_jurisdiction_filter: vec![],
-            max_funds_per_manco: Some(max_funds_per_manco),
-        }
-    }
-}
-
 pub struct GleifClient {
     client: Client,
     last_request: Mutex<Instant>,
@@ -209,30 +168,16 @@ impl GleifClient {
                             }
                         }
                         if records_ok {
-                            // All records parse fine - try the meta and links
+                            // All records parse fine - try the meta
                             let meta_ok = value
                                 .get("meta")
                                 .map(|m| serde_json::from_value::<ResponseMeta>(m.clone()).is_ok())
-                                .unwrap_or(true);
-                            let links_ok = value
-                                .get("links")
-                                .map(|l| {
-                                    serde_json::from_value::<PaginationLinks>(l.clone()).is_ok()
-                                })
                                 .unwrap_or(true);
                             if !meta_ok {
                                 format!(
                                     "Meta parse error. meta: {}",
                                     value
                                         .get("meta")
-                                        .map(|v| v.to_string())
-                                        .unwrap_or_default()
-                                )
-                            } else if !links_ok {
-                                format!(
-                                    "Links parse error. links: {}",
-                                    value
-                                        .get("links")
                                         .map(|v| v.to_string())
                                         .unwrap_or_default()
                                 )
@@ -888,27 +833,6 @@ impl GleifClient {
 
         // Return the first matching record
         Ok(data.data.into_iter().next())
-    }
-
-    /// Check if an LEI has a reporting exception for its parent
-    pub async fn get_reporting_exception(
-        &self,
-        lei: &str,
-    ) -> Result<Option<(Option<String>, Option<String>)>> {
-        // Fetch the LEI record with full details
-        let record = self.get_lei_record(lei).await?;
-
-        // Check for exception in relationships
-        if let Some(ref _rels) = record.relationships {
-            // TODO: Fetch actual exceptions from relationship-record URLs
-            // For now, we return None for both - this is a placeholder
-            let direct_exception: Option<String> = None;
-            let ultimate_exception: Option<String> = None;
-
-            return Ok(Some((direct_exception, ultimate_exception)));
-        }
-
-        Ok(None)
     }
 
     /// Search for funds by name pattern with category filter

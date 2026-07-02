@@ -33,13 +33,13 @@
 //!   - Audit record presence in dsl_execution_audit after commit
 //!   - OptimisticConflict for concurrent idempotent_ensure plans
 
-use dsl_core::EffectClass;
-use dsl_core::{BindingSlotId, DagEdge, JoinBarrierMode, NodeId};
 use crate::coordination::{
     effect_class_to_concurrency_policy, plan_effective_policy, plan_requires_locking,
     ConcurrencyPolicy,
 };
 use crate::frame::{AttemptId, BindingFrame, ExecutionFrame, ExecutionId};
+use dsl_core::EffectClass;
+use dsl_core::{BindingSlotId, DagEdge, JoinBarrierMode, NodeId};
 
 // =============================================================================
 // 1. Coordination strategy table (T12, v0.5 §5.3)

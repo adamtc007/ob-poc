@@ -21,7 +21,7 @@ use crate::repl::response_v2::ReplResponseKindV2;
 use crate::repl::runbook::{EntryStatus, RunbookStatus, SlotSource};
 use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::types_v2::{ReplCommandV2, ReplStateV2, UserInputV2, WorkspaceKind};
-use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
+use crate::sequencer::{NullDslExecutor, ReplOrchestratorV2};
 
 // ---------------------------------------------------------------------------
 // Helpers

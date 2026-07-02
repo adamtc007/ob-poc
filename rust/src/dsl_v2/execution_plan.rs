@@ -33,8 +33,8 @@ use super::ast::{Argument, AstNode, Program, Span, Statement, VerbCall};
 use super::runtime_registry::runtime_registry;
 use super::verb_registry::{registry, VerbBehavior};
 use dsl_core::ResolvedResourceDependency;
-use ob_poc_ontology::ontology;
 use dsl_core::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
+use ob_poc_ontology::ontology;
 use std::collections::{HashMap, HashSet};
 
 /// A compiled execution plan — dependency-sorted sequence of steps.

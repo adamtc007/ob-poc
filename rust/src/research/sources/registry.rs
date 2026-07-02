@@ -67,6 +67,7 @@ impl SourceRegistry {
     }
 
     /// Find the best source for a jurisdiction and data type
+    #[allow(dead_code)] // kept for tests
     pub fn find_best(
         &self,
         jurisdiction: &str,
@@ -92,21 +93,25 @@ impl SourceRegistry {
     }
 
     /// Get all source IDs
+    #[allow(dead_code)] // kept for tests
     pub fn source_ids(&self) -> Vec<String> {
         self.loaders.keys().cloned().collect()
     }
 
     /// Check if a source is registered
+    #[allow(dead_code)] // kept for tests
     pub fn contains(&self, source_id: &str) -> bool {
         self.loaders.contains_key(source_id)
     }
 
     /// Number of registered sources
+    #[allow(dead_code)] // kept for tests
     pub fn len(&self) -> usize {
         self.loaders.len()
     }
 
     /// Check if registry is empty
+    #[allow(dead_code)] // kept for tests
     pub fn is_empty(&self) -> bool {
         self.loaders.is_empty()
     }
@@ -137,10 +142,10 @@ pub struct SourceInfo {
 mod tests {
     use super::*;
     use crate::research::sources::normalized::{
-        NormalizedControlHolder, NormalizedEntity, NormalizedOfficer, NormalizedRelationship,
+        NormalizedControlHolder, NormalizedEntity, NormalizedOfficer,
     };
     use crate::research::sources::traits::{
-        FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, FetchParentChainOptions,
+        FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
         SearchCandidate, SearchOptions,
     };
     use anyhow::Result;
@@ -212,14 +217,6 @@ mod tests {
             _key: &str,
             _options: Option<FetchOfficersOptions>,
         ) -> Result<Vec<NormalizedOfficer>> {
-            Ok(vec![])
-        }
-
-        async fn fetch_parent_chain(
-            &self,
-            _key: &str,
-            _options: Option<FetchParentChainOptions>,
-        ) -> Result<Vec<NormalizedRelationship>> {
             Ok(vec![])
         }
     }

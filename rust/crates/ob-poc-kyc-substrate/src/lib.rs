@@ -32,12 +32,12 @@ pub use fold::control::{
     reconciled_economic_edges, ControlState, EdgeKind, EdgeState, EdgeStatus, StructureClass,
     TerminalStatus,
 };
-pub use fold::registry::{
-    fold_control_versioned, fold_obligations_versioned, FoldImpl, FoldRegistry, V1FoldImpl,
-};
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
     SubjectRollup, TrackState,
+};
+pub use fold::registry::{
+    fold_control_versioned, fold_obligations_versioned, FoldImpl, FoldRegistry, V1FoldImpl,
 };
 pub use lexicon::{phase1_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition, Taxonomy};
 pub use types::{

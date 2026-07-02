@@ -36,7 +36,13 @@ fn v1_registry() -> FoldRegistry {
     r
 }
 
-fn base(subject: SubjectId, verb: &str, target: TargetBinding, payload: serde_json::Value, idem: &str) -> IntentEvent {
+fn base(
+    subject: SubjectId,
+    verb: &str,
+    target: TargetBinding,
+    payload: serde_json::Value,
+    idem: &str,
+) -> IntentEvent {
     IntentEvent::new(
         subject,
         verb,
@@ -53,33 +59,53 @@ fn base(subject: SubjectId, verb: &str, target: TargetBinding, payload: serde_js
 }
 
 fn register(subject: SubjectId) -> IntentEvent {
-    base(subject, "kyc.subject.register", TargetBinding::for_subject(subject),
-         serde_json::json!({ "is_natural_person": false }), "reg")
+    base(
+        subject,
+        "kyc.subject.register",
+        TargetBinding::for_subject(subject),
+        serde_json::json!({ "is_natural_person": false }),
+        "reg",
+    )
 }
 
 fn assert_control(subject: SubjectId, edge: Uuid, idem: &str) -> IntentEvent {
-    base(subject, "ubo.edge.assert-control", TargetBinding::for_edge(subject, EdgeId(edge)),
+    base(
+        subject,
+        "ubo.edge.assert-control",
+        TargetBinding::for_edge(subject, EdgeId(edge)),
         serde_json::json!({
             "from_entity_id": Uuid::new_v4(),
             "to_entity_id": Uuid::new_v4(),
             "edge_id": edge.to_string(),
             "edge_kind": "voting_rights",
-        }), idem)
+        }),
+        idem,
+    )
 }
 
 fn edge_op(subject: SubjectId, verb: &str, edge: Uuid, idem: &str) -> IntentEvent {
-    base(subject, verb, TargetBinding::for_edge(subject, EdgeId(edge)), serde_json::json!({}), idem)
+    base(
+        subject,
+        verb,
+        TargetBinding::for_edge(subject, EdgeId(edge)),
+        serde_json::json!({}),
+        idem,
+    )
 }
 
 async fn append(pool: &PgPool, registry: &FoldRegistry, ev: &IntentEvent) {
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, registry, ev, |_| Ok(())).await.unwrap();
+    PgKycEventStore::append(&mut tx, registry, ev, |_| Ok(()))
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
 }
 
 async fn rebuild(pool: &PgPool, registry: &FoldRegistry, subject: SubjectId) -> usize {
     let mut tx = pool.begin().await.unwrap();
-    let stats = PgKycProjector::rebuild_control_edges(&mut tx, registry, subject).await.unwrap();
+    let stats = PgKycProjector::rebuild_control_edges(&mut tx, registry, subject)
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
     stats.edges_written
 }
@@ -111,11 +137,17 @@ async fn status_of(pool: &PgPool, subject: SubjectId, edge: Uuid) -> String {
 }
 
 async fn cleanup(pool: &PgPool, subject: SubjectId) {
-    for t in ["kyc_intent_events", "kyc_subject_streams", "kyc_control_edge_projection"] {
-        let _ = sqlx::query(&format!(r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#))
-            .bind(subject.0)
-            .execute(pool)
-            .await;
+    for t in [
+        "kyc_intent_events",
+        "kyc_subject_streams",
+        "kyc_control_edge_projection",
+    ] {
+        let _ = sqlx::query(&format!(
+            r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
+        ))
+        .bind(subject.0)
+        .execute(pool)
+        .await;
     }
     let _ = sqlx::query(r#"DELETE FROM "public".outbox WHERE effect_kind = 'kyc.projection.control_edges' AND idempotency_key LIKE $1"#)
         .bind(format!("{}:%", subject.0))
@@ -134,14 +166,22 @@ async fn rebuild_is_idempotent_and_matches_fold() {
     append(&pool, &registry, &assert_control(subject, a, "a")).await;
     append(&pool, &registry, &assert_control(subject, b, "b")).await;
 
-    assert_eq!(rebuild(&pool, &registry, subject).await, 2, "two edges projected");
+    assert_eq!(
+        rebuild(&pool, &registry, subject).await,
+        2,
+        "two edges projected"
+    );
     let first = projection_rows(&pool, subject).await;
     assert_eq!(first.len(), 2);
     assert!(first.iter().all(|(_, s)| s == "Asserted"));
 
     // Idempotent: re-running yields identical rows (full replace, no dup PK).
     assert_eq!(rebuild(&pool, &registry, subject).await, 2);
-    assert_eq!(projection_rows(&pool, subject).await, first, "rebuild is idempotent");
+    assert_eq!(
+        projection_rows(&pool, subject).await,
+        first,
+        "rebuild is idempotent"
+    );
 
     cleanup(&pool, subject).await;
 }
@@ -158,16 +198,31 @@ async fn projection_tracks_derived_edge_status() {
     rebuild(&pool, &registry, subject).await;
     assert_eq!(status_of(&pool, subject, edge).await, "Asserted");
 
-    append(&pool, &registry, &edge_op(subject, "ubo.edge.attach-evidence", edge, "ev")).await;
+    append(
+        &pool,
+        &registry,
+        &edge_op(subject, "ubo.edge.attach-evidence", edge, "ev"),
+    )
+    .await;
     rebuild(&pool, &registry, subject).await;
     assert_eq!(status_of(&pool, subject, edge).await, "Evidenced");
 
-    append(&pool, &registry, &edge_op(subject, "ubo.edge.verify", edge, "vf")).await;
+    append(
+        &pool,
+        &registry,
+        &edge_op(subject, "ubo.edge.verify", edge, "vf"),
+    )
+    .await;
     rebuild(&pool, &registry, subject).await;
     assert_eq!(status_of(&pool, subject, edge).await, "Verified");
 
     // K-13: supersede-never-delete — the edge stays, status flips.
-    append(&pool, &registry, &edge_op(subject, "ubo.edge.supersede", edge, "sup")).await;
+    append(
+        &pool,
+        &registry,
+        &edge_op(subject, "ubo.edge.supersede", edge, "sup"),
+    )
+    .await;
     rebuild(&pool, &registry, subject).await;
     assert_eq!(status_of(&pool, subject, edge).await, "Superseded");
 
@@ -183,7 +238,12 @@ async fn projection_is_disposable_and_rebuilds_from_stream() {
 
     append(&pool, &registry, &register(subject)).await;
     append(&pool, &registry, &assert_control(subject, a, "a")).await;
-    append(&pool, &registry, &edge_op(subject, "ubo.edge.attach-evidence", a, "ev")).await;
+    append(
+        &pool,
+        &registry,
+        &edge_op(subject, "ubo.edge.attach-evidence", a, "ev"),
+    )
+    .await;
     append(&pool, &registry, &assert_control(subject, b, "b")).await;
 
     rebuild(&pool, &registry, subject).await;
@@ -196,11 +256,19 @@ async fn projection_is_disposable_and_rebuilds_from_stream() {
         .execute(&pool)
         .await
         .unwrap();
-    assert_eq!(projection_rows(&pool, subject).await.len(), 0, "projection dropped");
+    assert_eq!(
+        projection_rows(&pool, subject).await.len(),
+        0,
+        "projection dropped"
+    );
 
     // Rebuild purely from the stream → identical rows, no data loss.
     rebuild(&pool, &registry, subject).await;
-    assert_eq!(projection_rows(&pool, subject).await, before, "rebuilt from stream, identical");
+    assert_eq!(
+        projection_rows(&pool, subject).await,
+        before,
+        "rebuilt from stream, identical"
+    );
 
     cleanup(&pool, subject).await;
 }

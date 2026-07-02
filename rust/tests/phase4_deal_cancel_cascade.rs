@@ -151,8 +151,10 @@ mod cascade {
         .fetch_one(&db.pool)
         .await?;
 
-        db.execute_dsl(&format!(r#"(deal.cancel :deal-id "{deal_id}" :reason "test cascade")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(deal.cancel :deal-id "{deal_id}" :reason "test cascade")"#
+        ))
+        .await?;
 
         let deal_status: String =
             sqlx::query_scalar(r#"SELECT deal_status FROM "ob-poc".deals WHERE deal_id = $1"#)
@@ -205,8 +207,10 @@ mod cascade {
         .fetch_one(&db.pool)
         .await?;
 
-        db.execute_dsl(&format!(r#"(deal.cancel :deal-id "{deal_id}" :reason "test no-cascade")"#))
-            .await?;
+        db.execute_dsl(&format!(
+            r#"(deal.cancel :deal-id "{deal_id}" :reason "test no-cascade")"#
+        ))
+        .await?;
 
         let card_status: String = sqlx::query_scalar(
             r#"SELECT status FROM "ob-poc".deal_rate_cards WHERE rate_card_id = $1"#,

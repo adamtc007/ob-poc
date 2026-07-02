@@ -402,7 +402,10 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     // path we synthesize a stub resolution and use `override_status` to
     // carry the language-pack outcome through the typed chat-trace.
     let mut resolution = match result.get("dag_semantic").and_then(|v| {
-        serde_json::from_value::<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+        serde_json::from_value::<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>(
+            v.clone(),
+        )
+        .ok()
     }) {
         Some(r) => r,
         None => ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
@@ -3606,7 +3609,7 @@ async fn get_enriched_dsl(
 mod tests {
     use super::*;
     use crate::journey::router::PackRouter;
-    use crate::sequencer::{ReplOrchestratorV2, NullDslExecutor};
+    use crate::sequencer::{NullDslExecutor, ReplOrchestratorV2};
     use std::sync::Arc;
 
     #[test]
@@ -3707,7 +3710,8 @@ mod tests {
         .expect("supported ACP prompt should route through ACP");
 
         assert!(bundle.message.contains("validated a dry-run workbook"));
-        let trace = ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        let trace =
+            ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
         assert_eq!(trace["status"], "dry_run_validated");
         assert_eq!(trace["route"], "session_input");
         assert_eq!(trace["provider_task"], "deal.update-status");
@@ -3754,7 +3758,8 @@ mod tests {
         .await
         .expect("supported deal prompt should still route through ACP");
 
-        let trace = ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        let trace =
+            ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
         assert_eq!(trace["status"], "dry_run_validated");
         assert_eq!(trace["provider_task"], "deal.update-status");
         assert_eq!(trace["requested_draft_source"], "llm_tool_call");

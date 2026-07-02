@@ -2,7 +2,6 @@
 //! using keyword matching. Fast (~1ms), deterministic, no embeddings or LLM calls.
 
 use anyhow::Result;
-use uuid::Uuid;
 
 use super::valid_verb_set::{ValidVerbSet, VerbCandidate};
 use crate::mcp::verb_search::HybridVerbSearcher;
@@ -26,11 +25,9 @@ pub enum MatchStrategy {
 #[derive(Debug, Clone)]
 pub struct ConstrainedResult {
     pub verb_fqn: Option<String>,
-    pub entity_id: Option<Uuid>,
     pub confidence: f32,
     pub strategy: MatchStrategy,
     pub keyword_hits: usize,
-    pub candidate_count: usize,
 }
 
 impl ConstrainedResult {
@@ -46,11 +43,9 @@ impl ConstrainedResult {
     pub fn fallthrough() -> Self {
         Self {
             verb_fqn: None,
-            entity_id: None,
             confidence: 0.0,
             strategy: MatchStrategy::Fallthrough,
             keyword_hits: 0,
-            candidate_count: 0,
         }
     }
 }
@@ -730,8 +725,6 @@ pub fn resolve_constrained(utterance: &str, valid_verbs: &ValidVerbSet) -> Const
             .then_with(|| b.1.hits.cmp(&a.1.hits))
     });
 
-    let candidate_count = scored.len();
-
     // Check top candidate
     if let Some((top, top_stats)) = scored.first() {
         let same_entity_verbs = valid_verbs
@@ -756,27 +749,23 @@ pub fn resolve_constrained(utterance: &str, valid_verbs: &ValidVerbSet) -> Const
         if top_stats.distinctive_hits >= 2 && adjusted_score >= 0.50 && margin >= 0.15 {
             return ConstrainedResult {
                 verb_fqn: Some(top.verb_fqn.clone()),
-                entity_id: top.entity_id,
                 confidence: adjusted_score.min(0.95),
                 strategy: MatchStrategy::Keyword,
                 keyword_hits: top_stats.hits,
-                candidate_count,
             };
         }
     }
 
-    ConstrainedResult::fallthrough_with_candidates(candidate_count)
+    ConstrainedResult::fallthrough_with_candidates()
 }
 
 impl ConstrainedResult {
-    fn fallthrough_with_candidates(candidate_count: usize) -> Self {
+    fn fallthrough_with_candidates() -> Self {
         Self {
             verb_fqn: None,
-            entity_id: None,
             confidence: 0.0,
             strategy: MatchStrategy::Fallthrough,
             keyword_hits: 0,
-            candidate_count,
         }
     }
 }
@@ -850,12 +839,11 @@ pub async fn resolve_constrained_hybrid(
         .await?;
 
     let Some(mut top) = scoped_results.first().cloned() else {
-        return Ok(ConstrainedResult::fallthrough_with_candidates(0));
+        return Ok(ConstrainedResult::fallthrough_with_candidates());
     };
+
     if !allowed_verbs.contains(&top.verb) {
-        return Ok(ConstrainedResult::fallthrough_with_candidates(
-            scoped_results.len(),
-        ));
+        return Ok(ConstrainedResult::fallthrough_with_candidates());
     }
 
     let preferred_verbs = preferred_scoped_verbs(&utterance_lower, &tokens);
@@ -928,24 +916,14 @@ pub async fn resolve_constrained_hybrid(
                 .join(", "),
             margin
         );
-        return Ok(ConstrainedResult::fallthrough_with_candidates(
-            scoped_results.len(),
-        ));
+        return Ok(ConstrainedResult::fallthrough_with_candidates());
     }
-
-    let entity_id = valid_verbs
-        .verbs
-        .iter()
-        .find(|candidate| candidate.verb_fqn == top.verb)
-        .and_then(|candidate| candidate.entity_id);
 
     Ok(ConstrainedResult {
         verb_fqn: Some(top.verb.clone()),
-        entity_id,
         confidence: top.score.min(0.95),
         strategy: MatchStrategy::ScopedEmbedding,
         keyword_hits: 0,
-        candidate_count: scoped_results.len(),
     })
 }
 

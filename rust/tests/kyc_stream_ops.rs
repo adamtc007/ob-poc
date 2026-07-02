@@ -44,7 +44,11 @@ struct TestScope {
 }
 impl TestScope {
     async fn begin(pool: &PgPool) -> Self {
-        Self { tx: pool.begin().await.unwrap(), pool: pool.clone(), id: TransactionScopeId::new() }
+        Self {
+            tx: pool.begin().await.unwrap(),
+            pool: pool.clone(),
+            id: TransactionScopeId::new(),
+        }
     }
     async fn commit(self) {
         self.tx.commit().await.unwrap();
@@ -66,17 +70,25 @@ impl TransactionScope for TestScope {
 }
 
 async fn cleanup(pool: &PgPool, subject: SubjectId) {
-    for t in ["kyc_intent_events", "kyc_subject_streams", "kyc_control_edge_projection"] {
-        let _ = sqlx::query(&format!(r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#))
-            .bind(subject.0)
-            .execute(pool)
-            .await;
-    }
-    let _ = sqlx::query(r#"DELETE FROM "public".outbox WHERE effect_kind = $1 AND idempotency_key LIKE $2"#)
-        .bind(CONTROL_EDGE_PROJECTION_EFFECT)
-        .bind(format!("{}:%", subject.0))
+    for t in [
+        "kyc_intent_events",
+        "kyc_subject_streams",
+        "kyc_control_edge_projection",
+    ] {
+        let _ = sqlx::query(&format!(
+            r#"DELETE FROM "ob-poc".{t} WHERE subject_root = $1"#
+        ))
+        .bind(subject.0)
         .execute(pool)
         .await;
+    }
+    let _ = sqlx::query(
+        r#"DELETE FROM "public".outbox WHERE effect_kind = $1 AND idempotency_key LIKE $2"#,
+    )
+    .bind(CONTROL_EDGE_PROJECTION_EFFECT)
+    .bind(format!("{}:%", subject.0))
+    .execute(pool)
+    .await;
 }
 
 #[tokio::test]
@@ -108,12 +120,13 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
             .expect("op executes");
         scope.rollback().await;
     }
-    let rolled: i64 =
-        sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#)
-            .bind(subject.0)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let rolled: i64 = sqlx::query_scalar(
+        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#,
+    )
+    .bind(subject.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(rolled, 0, "the verb's append rolled back with the scope");
 
     // 2. Commit path: event lands in the stream with the right verb + as_of.
@@ -139,10 +152,15 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     .await
     .unwrap();
     assert_eq!(verb, "ubo.edge.assert-control");
-    assert_eq!(as_of, fixed_as_of, "as_of flowed from the context, frozen at entry");
+    assert_eq!(
+        as_of, fixed_as_of,
+        "as_of flowed from the context, frozen at entry"
+    );
 
     // 3. The append enqueued a projection effect; the drainer projects the edge.
-    PgKycProjectionDrainer::drain_all(&pool, &v1_registry(), 100).await.unwrap();
+    PgKycProjectionDrainer::drain_all(&pool, &v1_registry(), 100)
+        .await
+        .unwrap();
     let edges: i64 = sqlx::query_scalar(
         r#"SELECT count(*) FROM "ob-poc".kyc_control_edge_projection WHERE subject_root = $1 AND status = 'Asserted'"#,
     )
