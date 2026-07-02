@@ -1776,6 +1776,7 @@ dependencies = [
  "dsl-parser",
  "dsl-render",
  "dsl-resolution",
+ "dsl-sage",
  "serde",
  "serde_json",
  "tokio",

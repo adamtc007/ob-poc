@@ -3345,6 +3345,30 @@ dependencies = [
 ]
 
 [[patch.unused]]
+name = "dsl-core"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "dsl_types"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "sem_os_core"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "sem_os_ontology"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "sem_os_policy"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "sem_os_types"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "bpmn-lite-engine"
 version = "0.1.0"
 
@@ -3390,28 +3414,4 @@ version = "0.1.0"
 
 [[patch.unused]]
 name = "ffi-catalogue"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "dsl-core"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "dsl_types"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_core"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_ontology"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_policy"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_types"
 version = "0.1.0"
