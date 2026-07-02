@@ -42,6 +42,44 @@ dsl_verb_reconciliation:
     - screening.sanctions
     - screening.sanctions-check
 
+stream_governed:
+  id: kyc_ubo_determination_stream
+  description: >
+    UBO/KYC determination verbs are governed by the stream lexicon and fold
+    preconditions, not by DAG from-state/to-state slots. The DAG intentionally
+    has no lifecycle slot for these stream-backed verb families.
+  verb_families:
+    - ubo.edge.*
+    - ubo.determination.*
+    - kyc.subject.*
+    - kyc.role.*
+    - kyc.obligation.*
+    - kyc.person.*
+  stream_tables:
+    - kyc_intent_events
+    - kyc_subject_streams
+    - kyc_control_edge_projection
+    - kyc_obligation_projection
+    - kyc_subject_rollup_projection
+  governance:
+    dag_slots: intentionally_absent
+    declaration: >
+      Current state is derived from kyc_intent_events by folds/projections.
+      Edge status is fold-output-only (K-11); no verb sets it directly.
+    content_addressed_lexicon_manifest:
+      table: kyc_lexicon_manifest
+      enforcement_refs:
+        - rust/crates/ob-poc-kyc-store/src/manifest.rs
+    fold_preconditions:
+      keys: [K-11]
+      enforcement_refs:
+        - rust/crates/ob-poc-kyc-substrate/src/lexicon.rs
+        - rust/crates/ob-poc-kyc-store/src/store.rs
+    approval_gate:
+      key: K-23
+      enforcement_refs:
+        - rust/src/domain_ops/kyc_stream_ops.rs
+
 # =============================================================================
 # 1. OVERALL KYC-CASE LIFECYCLE (per case, derived)
 # =============================================================================
