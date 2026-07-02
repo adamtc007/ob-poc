@@ -3,15 +3,6 @@ description: UBO epistemic lifecycle
 states: [approved, proved, provable, alleged, undiscovered]
 initial: undiscovered
 transitions:
-  - from: undiscovered
-    to: alleged
-    verbs: [ubo.allege]
-  - from: alleged
-    to: provable
-    verbs: [ubo.collect-evidence]
-  - from: provable
-    to: proved
-    verbs: [ubo.verify]
   - from: proved
     to: approved
     verbs: [case.approve]

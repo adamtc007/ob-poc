@@ -47,11 +47,6 @@ edges:
     to_node: cbu.documents
     verb_ids: ["document.missing-for-entity", "document.for-entity"]
     edge_type: conditional
-  - edge_id: cbu.ubo
-    from_node: cbu.active
-    to_node: cbu.ubo
-    verb_ids: ["ubo.list-ubos", "ubo.list-owners"]
-    edge_type: conditional
 gates:
   - gate_node: cbu.active
     required_nodes: ["cbu.entry"]

@@ -117,41 +117,6 @@ slots:
     state_machine: ubo_epistemic_lifecycle
     overlays: [registry, evidence, screenings]
     edge_overlays: [ownership]
-    verbs:
-      discover: { verb: ubo.discover, when: empty }
-      allege: { verb: ubo.allege, when: [empty, filled] }
-      calculate: { verb: ubo.compute-chains, when: [empty, filled] }
-      compute_chains: { verb: ubo.compute-chains, when: [empty, filled] }
-      trace_chains: { verb: ubo.trace-chains, when: filled }
-      verify: { verb: ubo.verify, when: filled }
-      promote: { verb: ubo.promote, when: filled }
-      approve: { verb: ubo.approve, when: filled }
-      reject: { verb: ubo.reject, when: filled }
-      list: { verb: ubo.list-ubos, when: filled }
-      list_ubos: { verb: ubo.list-ubos, when: filled }
-      list_owned: { verb: ubo.list-owned, when: filled }
-      list_owners: { verb: ubo.list-owners, when: filled }
-      list_owners_of: { verb: ubo.list-owners-of, when: filled }
-      add_ownership: { verb: ubo.add-ownership, when: filled }
-      update_ownership: { verb: ubo.update-ownership, when: filled }
-      add_control: { verb: control.add, when: filled }
-      transfer_control: { verb: ubo.transfer-control, when: filled }
-      add_trust_role: { verb: ubo.add-trust-role, when: filled }
-      delete_relationship: { verb: ubo.delete-relationship, when: filled }
-      end_relationship: { verb: ubo.end-relationship, when: filled }
-      waive_verification: { verb: ubo.waive-verification, when: filled }
-      mark_deceased: { verb: ubo.mark-deceased, when: filled }
-      mark_terminus: { verb: ubo.mark-terminus, when: filled }
-      convergence_supersede: { verb: ubo.convergence-supersede, when: filled }
-      # registry_create/advance/promote/reject/expire/waive removed
-      # (state-graph remediation Phase 6a): the ubo.registry.* verb family
-      # they referenced was deleted (phantom-writing ops that never
-      # successfully executed). This constellation slot pre-dates the W1-W7
-      # dsl.kyc migration and references numerous other already-deleted
-      # legacy verbs (ubo.discover, ubo.allege, ubo.compute-chains, etc.) --
-      # a large pre-existing residual out of this remediation's scope.
-      snapshot_capture: { verb: ubo.snapshot.capture, when: filled }
-      snapshot_diff: { verb: ubo.snapshot.diff, when: filled }
   control_chain:
     type: entity_graph
     entity_kinds: [company]
@@ -167,55 +132,8 @@ slots:
     overlays: [ownership]
     edge_overlays: [control]
     verbs:
-      trace: { verb: ownership.trace-chain, when: empty }
-      build: { verb: control.build-graph, when: [empty, filled] }
       refresh: { verb: ownership.refresh, when: filled }
-      read: { verb: control.analyze, when: filled }
       list_links: { verb: ownership.control-links.list, when: filled }
-      add: { verb: control.add, when: [empty, filled] }
-      end: { verb: control.end, when: filled }
-      analyze: { verb: control.analyze, when: filled }
-      list_controllers: { verb: control.list-controllers, when: filled }
-      list_controllers_ubo: { verb: ubo.list-controllers, when: [empty, filled] }
-      list_controlled: { verb: control.list-controlled, when: filled }
-      trace_chain: { verb: ownership.trace-chain, when: filled }
-      compute_controllers: { verb: control.compute-controllers, when: filled }
-      identify_ubos: { verb: control.identify-ubos, when: filled }
-      reconcile_ownership: { verb: ownership.reconcile, when: filled }
-      set_board_controller: { verb: control.set-board-controller, when: filled }
-      show_board_controller:
-        { verb: control.show-board-controller, when: filled }
-      recompute_board_controller:
-        { verb: control.recompute-board-controller, when: filled }
-      clear_board_controller_override:
-        { verb: control.clear-board-controller-override, when: filled }
-      import_gleif_control:
-        { verb: control.import-gleif-control, when: [empty, filled] }
-      import_psc_register:
-        { verb: control.import-psc-register, when: [empty, filled] }
-      ownership_compute: { verb: ownership.compute, when: filled }
-      ownership_control_positions:
-        { verb: ownership.list-control-positions, when: filled }
-      ownership_find_controller: { verb: ownership.find-controller, when: filled }
-      ownership_analyze_gaps: { verb: ownership.analyze-gaps, when: filled }
-      ownership_reconcile: { verb: ownership.reconcile, when: filled }
-      ownership_reconcile_findings:
-        { verb: ownership.reconcile.findings, when: filled }
-      ownership_reconcile_list_runs:
-        { verb: ownership.reconcile.list-runs, when: filled }
-      ownership_reconcile_resolve:
-        { verb: ownership.reconcile.resolve-finding, when: filled }
-      ownership_right_add_class:
-        { verb: ownership.right.add-to-class, when: filled }
-      ownership_right_add_holder:
-        { verb: ownership.right.add-to-holder, when: filled }
-      ownership_right_end: { verb: ownership.right.end, when: filled }
-      ownership_right_list_holder:
-        { verb: ownership.right.list-for-holder, when: filled }
-      ownership_right_list_issuer:
-        { verb: ownership.right.list-for-issuer, when: filled }
-      ownership_snapshot_get: { verb: ownership.snapshot.get, when: filled }
-      ownership_snapshot_list: { verb: ownership.snapshot.list, when: filled }
   group_kyc_clearance:
     type: case
     table: cases

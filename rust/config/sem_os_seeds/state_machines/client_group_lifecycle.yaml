@@ -22,15 +22,9 @@ transitions:
         gleif.import-tree,
         gleif.import-to-client-group,
       ]
-  - from: researching
-    to: ubo_mapped
-    verbs: [ubo.discover, ubo.allege]
-  - from: ubo_mapped
-    to: control_mapped
-    verbs: [control.build-graph, ownership.trace-chain]
   - from: control_mapped
     to: group_kyc_cleared
-    verbs: [ubo.approve, client-group.verify-ownership, kyc-case.close]
+    verbs: [client-group.verify-ownership, kyc-case.close]
   - from: group_kyc_cleared
     to: cbus_identified
     verbs: [cbu.create, cbu.create-from-client-group, cbu.ensure]
