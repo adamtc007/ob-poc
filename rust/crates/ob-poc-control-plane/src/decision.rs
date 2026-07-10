@@ -15,7 +15,7 @@ use crate::proof::ControlPlaneProof;
 #[derive(Debug, Clone)]
 pub enum ControlPlaneDecision {
     ApprovedStp(Box<ExecutionEnvelope>),
-    RequiresHumanGate(ControlPlaneProof),
+    RequiresHumanGate(Box<ControlPlaneProof>),
     Rejected(ControlPlaneRejection),
 }
 

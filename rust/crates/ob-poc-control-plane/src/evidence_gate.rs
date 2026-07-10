@@ -60,7 +60,7 @@ pub(crate) mod tests_support {
 /// site. `satisfied_obligation_ids` lists obligations already resolved
 /// (`kyc.obligation.satisfy`/`waive`) that this evaluation may cite as
 /// evidence.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EvidenceInput {
     pub evidence_gaps: Vec<String>,
     pub kyc_precondition_failures: Vec<KycPreconditionFailure>,
@@ -72,7 +72,7 @@ pub struct EvidenceInput {
 /// (K-11 evidence-before-verify, K-14 reconcile-before-fold,
 /// strategy-not-selected) without depending on `ob-poc-kyc-substrate`
 /// directly (§9.1: no execution-tier dependency).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum KycPreconditionFailure {
     EvidenceNotCited,
     NotReconciled,

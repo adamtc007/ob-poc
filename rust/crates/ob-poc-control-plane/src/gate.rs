@@ -214,7 +214,7 @@ fn topological_order() -> Vec<GateId> {
 
 /// The result of a full collect-where-independent evaluation pass: one
 /// `GateResult` per `GateId`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EvaluationReport {
     pub results: BTreeMap<GateId, GateResult>,
 }

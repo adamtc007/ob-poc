@@ -81,7 +81,7 @@ pub(crate) mod tests_support {
 /// T0.2 `requires_states` precondition result (C-027) so this gate can
 /// unify both semantics in one decision rather than the two independently
 /// diverging as they did before T0.2.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct DagProofInput {
     pub entity_id: Uuid,
     pub from_state: String,

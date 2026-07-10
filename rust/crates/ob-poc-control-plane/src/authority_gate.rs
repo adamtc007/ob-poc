@@ -70,7 +70,7 @@ pub(crate) mod tests_support {
 /// `AllowWithMasking` case. `toctou_drifted` carries a `TocTouResult` that
 /// is not `StillAllowed` (C-008) — this gate consumes that outcome, it does
 /// not recompute the row-version comparison itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AuthorityInput {
     pub actor_id: String,
     pub role: String,
@@ -84,7 +84,7 @@ pub struct AuthorityInput {
 
 /// Mirrors `sem_os_policy::abac::AccessDecision`'s three variants without
 /// depending on that crate (§9.1: no execution-tier dependency).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AccessDecisionKind {
     Allow,
     Deny,

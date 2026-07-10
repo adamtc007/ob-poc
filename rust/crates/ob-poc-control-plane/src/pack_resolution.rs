@@ -57,7 +57,7 @@ pub(crate) mod tests_support {
 /// under evaluation (constraint gate, C-015); `semreg_allowed_set_available`
 /// mirrors the compiler's fail-closed check when the SemReg allowed-set
 /// resolves to `None` (C-016).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PackResolutionInput {
     pub candidate_pack_ids: Vec<String>,
     pub semreg_allowed_set_available: bool,

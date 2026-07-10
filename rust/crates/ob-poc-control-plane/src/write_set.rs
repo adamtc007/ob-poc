@@ -112,7 +112,7 @@ pub(crate) mod tests_support {
 /// derivation resting solely on it cannot bound a bona fide `WriteSetProof`
 /// and must report `CannotDerive` (this adapter does not fabricate table
 /// names the heuristic scan never produced).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WriteSetInput {
     pub entity_ids: Vec<Uuid>,
     pub state_slots: Vec<String>,

@@ -89,7 +89,7 @@ pub(crate) mod tests_support {
 /// `SemOsContextEnvelope.pruned_verbs` (C-007) — this struct is a plain
 /// snapshot of their outcome, not a re-implementation of the pruning logic
 /// itself.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct IntentAdmissionInput {
     pub intent_id: Uuid,
     pub verb_fqn: String,

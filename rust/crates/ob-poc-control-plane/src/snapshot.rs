@@ -6,14 +6,25 @@
 //! entity row_versions where available (RR-5 Mode-1 entities lacking a
 //! comparable version pin are capped at `RequiresHumanGate` by the STP
 //! classifier, per plan A5).
+//!
+//! Unlike the other T2/T3 gates, this one has no rejection semantics of its
+//! own in §6.15 — its job is to pin whatever was read, not to judge it. The
+//! `DecisionSnapshotGate` adapter therefore only distinguishes "pins were
+//! supplied" (`Success`) from "no `SnapshotInput` was collected for this
+//! evaluation" (`Failure`, fail-closed, same posture as every other gate in
+//! this crate) — refusing an empty-but-present pin set is explicitly not
+//! this gate's job (a session with no KYC entities bound legitimately has no
+//! `kyc_manifest_hash`, for example).
 
 use uuid::Uuid;
+
+use crate::gate::{Gate, GateId, GateResult};
 
 /// `SnapshotPins` — the artefact pinning every gate read against a
 /// specific, reproducible system state, so replaying a persisted
 /// `ControlPlaneProof` against the pinned snapshot reproduces the original
 /// decision (§12.11). Constructible only from within this module.
-#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct SnapshotPins {
     sem_reg_snapshot_id: Option<Uuid>,
     session_snapshot_id: Option<Uuid>,
@@ -92,9 +103,83 @@ pub(crate) mod tests_support {
     }
 }
 
+/// Pre-computed input for the decision snapshot gate — the raw pin values
+/// the call site collected while resolving the intent (SemReg snapshot set
+/// id, session snapshot id, KYC manifest hash, per-entity row versions).
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct SnapshotInput {
+    pub sem_reg_snapshot_id: Option<Uuid>,
+    pub session_snapshot_id: Option<Uuid>,
+    pub kyc_manifest_hash: Option<String>,
+    pub entity_row_versions: Vec<(Uuid, i64)>,
+}
+
+/// Translates a `SnapshotInput` into `SnapshotPins` — the function T3.4's
+/// `ControlPlaneProof` assembly (and any other future consumer that needs
+/// the actual pin values, not just a pass/fail signal) calls to obtain the
+/// proof.
+pub fn build_pins(input: &SnapshotInput) -> SnapshotPins {
+    SnapshotPins::new(
+        input.sem_reg_snapshot_id,
+        input.session_snapshot_id,
+        input.kyc_manifest_hash.clone(),
+        input.entity_row_versions.clone(),
+    )
+}
+
+/// T3.2 adapter: `Gate<crate::context::EvaluationContext>` impl for G13.
+pub struct DecisionSnapshotGate;
+
+impl Gate<crate::context::EvaluationContext> for DecisionSnapshotGate {
+    fn id(&self) -> GateId {
+        GateId::DecisionSnapshot
+    }
+
+    fn evaluate(&self, ctx: &crate::context::EvaluationContext) -> GateResult {
+        match &ctx.snapshot {
+            Some(_) => GateResult::Success,
+            None => GateResult::Failure("no SnapshotInput supplied".to_string()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn snapshot_input_pins_translate_faithfully() {
+        let entity = Uuid::nil();
+        let input = SnapshotInput {
+            sem_reg_snapshot_id: Some(Uuid::nil()),
+            session_snapshot_id: None,
+            kyc_manifest_hash: Some("hash-1".to_string()),
+            entity_row_versions: vec![(entity, 5)],
+        };
+        let pins = build_pins(&input);
+        assert_eq!(pins.sem_reg_snapshot_id(), Some(Uuid::nil()));
+        assert_eq!(pins.kyc_manifest_hash(), Some("hash-1"));
+        assert_eq!(pins.entity_row_version(entity), Some(5));
+    }
+
+    #[test]
+    fn gate_evaluate_fails_closed_when_input_missing() {
+        let ctx = crate::context::EvaluationContext::default();
+        assert!(matches!(DecisionSnapshotGate.evaluate(&ctx), GateResult::Failure(_)));
+        assert_eq!(DecisionSnapshotGate.id(), GateId::DecisionSnapshot);
+    }
+
+    #[test]
+    fn gate_evaluate_succeeds_even_with_empty_pins() {
+        // A session with no KYC entities bound legitimately has no
+        // kyc_manifest_hash — an empty-but-present SnapshotInput must still
+        // succeed (this gate pins whatever was read, it doesn't judge it).
+        let ctx = crate::context::EvaluationContext {
+            snapshot: Some(SnapshotInput::default()),
+            ..Default::default()
+        };
+        assert_eq!(DecisionSnapshotGate.evaluate(&ctx), GateResult::Success);
+    }
 
     #[test]
     fn snapshot_pins_is_constructible_within_its_own_module() {
