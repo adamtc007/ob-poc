@@ -1,0 +1,28 @@
+# Allowlist of files containing a non-test `VerbExecutionContext::new(`
+# construction site (EOP-PLAN-CONTROLPLANE-001 T6 exit criterion: "no
+# call site constructs VerbExecutionContext outside control-plane-issued
+# paths (allowlist file, CI-checked)"; independent adversarial review,
+# docs/research/control-plane-pir-001.md, PIR-D-005).
+#
+# Format: <file-path-relative-to-rust/>:<category>:<note>
+#
+# Categories:
+#   ADMISSION-WIRED   — the context this constructs is subsequently
+#                        dispatched via VerbExecutionPort::execute_verb_admitting_envelope,
+#                        so it passes through the T4.1 admission checkpoint
+#                        (envelope_id may be None — see the ledger's T6/T4
+#                        entries for what that does and does not prove).
+#   KNOWN-BYPASS       — constructs a context that dispatches WITHOUT ever
+#                        reaching execute_verb_admitting_envelope. Tracked,
+#                        not hidden — see the cited ledger row. Adding a
+#                        NEW file here requires an ownership-ledger entry,
+#                        not just an allowlist line.
+#
+# A file's absence from this list means: if check-verb-execution-context-allowlist.sh
+# finds a non-test construction site there, CI fails. Removing a
+# KNOWN-BYPASS line means that site is now admission-wired — update the
+# category, don't just delete the line silently.
+
+src/runbook/step_executor_bridge.rs:ADMISSION-WIRED:Path A (Sequencer/runbook). Fixed PIR-D-002 — routes through execute_verb_admitting_envelope, envelope_id always None today (mechanism-only, enforce off by default).
+crates/ob-poc-web/src/bus_runtime.rs:ADMISSION-WIRED:Path D (bus). T6.1 — routes through execute_verb_admitting_envelope, envelope_id always None until T6.1a lands EnvelopeHandle threading through bpmn-lite domain_payload.
+src/dsl_v2/executor.rs:KNOWN-BYPASS:dispatch_plugin_via_sem_os_op_in_scope — DslExecutor's own internal plugin dispatch chain. Reached directly (with zero admission check anywhere in the call chain) by Path B (RealDslExecutor, repl/executor_bridge.rs) and Path C (WorkflowDispatcher's direct branch, bpmn_integration/dispatcher.rs), which construct their own DslExecutor and never touch ObPocVerbExecutor/VerbExecutionPort at all — ledger T6.3 (investigated, not implemented; instrumenting this shared engine or rerouting Path B/C through ObPocVerbExecutor was assessed as materially riskier than a single-call-site swap). For Path A/D dispatches that DO reach this helper for an unregistered-in-sem_os_ops-registry plugin verb, the outer execute_verb_admitting_envelope admission check already ran before reaching here — this line is only a full, independent bypass for Path B/C.

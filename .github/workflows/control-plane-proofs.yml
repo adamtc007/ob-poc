@@ -17,6 +17,11 @@ name: Control plane type-level proofs
 # NOT weaken the compile-fail proofs themselves, which test the opposite
 # direction (construction attempts that must fail regardless of feature
 # flags).
+#
+# The second job enforces T6's own exit criterion — "no call site
+# constructs VerbExecutionContext outside control-plane-issued paths
+# (allowlist file, CI-checked)" — which was found unmet (PIR-D-005) until
+# scripts/check-verb-execution-context-allowlist.sh existed.
 
 on:
   push:
@@ -49,3 +54,11 @@ jobs:
       - name: Run ob-poc-control-plane test suite (unit + trybuild compile-fail)
         working-directory: rust
         run: cargo test -p ob-poc-control-plane --all-targets --features test-support
+
+  verb-execution-context-allowlist:
+    name: VerbExecutionContext construction-site allowlist gate (T6 exit criterion)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allowlist gate
+        run: bash scripts/check-verb-execution-context-allowlist.sh
