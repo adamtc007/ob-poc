@@ -4335,6 +4335,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ob-poc-control-plane"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "trybuild",
+ "uuid",
+]
+
+[[package]]
 name = "ob-poc-deal"
 version = "0.1.0"
 dependencies = [

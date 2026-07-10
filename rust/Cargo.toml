@@ -295,6 +295,7 @@ members = [
     "crates/ob-poc-types",
     "crates/ob-poc-diagnostics",
     "crates/ob-poc-boundary",
+    "crates/ob-poc-control-plane",
     "crates/ob-poc-sage",
     "crates/ob-poc-journey",
     # ob-poc-domain split v1 — 9 per-business-capability crates carved out of

@@ -1,0 +1,1290 @@
+# ob-poc-control-plane | features=all | HEAD=b52e9d93bec39d66f20346345827f71fa450478b | 2026-07-10T11:28:19Z
+pub mod ob_poc_control_plane
+pub mod ob_poc_control_plane::audit
+pub mod ob_poc_control_plane::authority_gate
+pub enum ob_poc_control_plane::authority_gate::AuthorityOutcome
+pub ob_poc_control_plane::authority_gate::AuthorityOutcome::Authorised(ob_poc_control_plane::authority_gate::Authorised)
+pub ob_poc_control_plane::authority_gate::AuthorityOutcome::RejectedPolicy
+pub ob_poc_control_plane::authority_gate::AuthorityOutcome::RejectedSegregationOfDuties
+pub ob_poc_control_plane::authority_gate::AuthorityOutcome::RejectedUnauthorised
+pub ob_poc_control_plane::authority_gate::AuthorityOutcome::RequiresHumanApproval
+pub ob_poc_control_plane::authority_gate::AuthorityOutcome::RequiresSecondLineReview
+impl core::clone::Clone for ob_poc_control_plane::authority_gate::AuthorityOutcome
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::clone(&self) -> ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::cmp::Eq for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::cmp::PartialEq for ob_poc_control_plane::authority_gate::AuthorityOutcome
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::eq(&self, &ob_poc_control_plane::authority_gate::AuthorityOutcome) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::authority_gate::AuthorityOutcome
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::marker::Freeze for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::marker::Send for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::marker::Sync for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::marker::Unpin for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::authority_gate::AuthorityOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::authority_gate::AuthorityOutcome where U: core::convert::From<T>
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::authority_gate::AuthorityOutcome where U: core::convert::Into<T>
+pub type ob_poc_control_plane::authority_gate::AuthorityOutcome::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::authority_gate::AuthorityOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::authority_gate::AuthorityOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::authority_gate::AuthorityOutcome where T: core::clone::Clone
+pub type ob_poc_control_plane::authority_gate::AuthorityOutcome::Owned = T
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::authority_gate::AuthorityOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::authority_gate::AuthorityOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::authority_gate::AuthorityOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::authority_gate::AuthorityOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::authority_gate::AuthorityOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::authority_gate::AuthorityOutcome
+pub fn ob_poc_control_plane::authority_gate::AuthorityOutcome::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::authority_gate::AuthorityOutcome
+pub type ob_poc_control_plane::authority_gate::AuthorityOutcome::Output = T
+pub struct ob_poc_control_plane::authority_gate::Authorised
+impl ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::authority_gate::Authorised::actor_id(&self) -> uuid::Uuid
+pub fn ob_poc_control_plane::authority_gate::Authorised::role(&self) -> &str
+impl core::clone::Clone for ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::authority_gate::Authorised::clone(&self) -> ob_poc_control_plane::authority_gate::Authorised
+impl core::cmp::Eq for ob_poc_control_plane::authority_gate::Authorised
+impl core::cmp::PartialEq for ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::authority_gate::Authorised::eq(&self, &ob_poc_control_plane::authority_gate::Authorised) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::authority_gate::Authorised::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::authority_gate::Authorised
+impl serde_core::ser::Serialize for ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::authority_gate::Authorised::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::authority_gate::Authorised
+impl core::marker::Send for ob_poc_control_plane::authority_gate::Authorised
+impl core::marker::Sync for ob_poc_control_plane::authority_gate::Authorised
+impl core::marker::Unpin for ob_poc_control_plane::authority_gate::Authorised
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::authority_gate::Authorised
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::authority_gate::Authorised
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::authority_gate::Authorised
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::authority_gate::Authorised where U: core::convert::From<T>
+pub fn ob_poc_control_plane::authority_gate::Authorised::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::authority_gate::Authorised where U: core::convert::Into<T>
+pub type ob_poc_control_plane::authority_gate::Authorised::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::authority_gate::Authorised::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::authority_gate::Authorised where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::authority_gate::Authorised::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::authority_gate::Authorised::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::authority_gate::Authorised where T: core::clone::Clone
+pub type ob_poc_control_plane::authority_gate::Authorised::Owned = T
+pub fn ob_poc_control_plane::authority_gate::Authorised::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::authority_gate::Authorised::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::authority_gate::Authorised where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::authority_gate::Authorised::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::authority_gate::Authorised where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::authority_gate::Authorised::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::authority_gate::Authorised where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::authority_gate::Authorised::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::authority_gate::Authorised where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::authority_gate::Authorised::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::authority_gate::Authorised::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::authority_gate::Authorised
+pub type ob_poc_control_plane::authority_gate::Authorised::Output = T
+pub mod ob_poc_control_plane::dag_proof
+pub enum ob_poc_control_plane::dag_proof::StateTransitionOutcome
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::GuardFailed
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::GuardFailed::reason: alloc::string::String
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::IllegalFromState
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::IllegalToState
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::Legal(ob_poc_control_plane::dag_proof::LegalTransition)
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::TransitionUnimplemented
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::Unreachable
+pub ob_poc_control_plane::dag_proof::StateTransitionOutcome::WrongLifecycleAxis
+impl core::clone::Clone for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::clone(&self) -> ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::cmp::Eq for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::cmp::PartialEq for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::eq(&self, &ob_poc_control_plane::dag_proof::StateTransitionOutcome) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::marker::Freeze for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::marker::Send for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::marker::Sync for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::marker::Unpin for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::dag_proof::StateTransitionOutcome where U: core::convert::From<T>
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::dag_proof::StateTransitionOutcome where U: core::convert::Into<T>
+pub type ob_poc_control_plane::dag_proof::StateTransitionOutcome::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::dag_proof::StateTransitionOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::dag_proof::StateTransitionOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::dag_proof::StateTransitionOutcome where T: core::clone::Clone
+pub type ob_poc_control_plane::dag_proof::StateTransitionOutcome::Owned = T
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::dag_proof::StateTransitionOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::dag_proof::StateTransitionOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::dag_proof::StateTransitionOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::dag_proof::StateTransitionOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+pub fn ob_poc_control_plane::dag_proof::StateTransitionOutcome::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::dag_proof::StateTransitionOutcome
+pub type ob_poc_control_plane::dag_proof::StateTransitionOutcome::Output = T
+pub struct ob_poc_control_plane::dag_proof::LegalTransition
+impl ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::entity_id(&self) -> uuid::Uuid
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::from_state(&self) -> &str
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::to_state(&self) -> &str
+impl core::clone::Clone for ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::clone(&self) -> ob_poc_control_plane::dag_proof::LegalTransition
+impl core::cmp::Eq for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::cmp::PartialEq for ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::eq(&self, &ob_poc_control_plane::dag_proof::LegalTransition) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::dag_proof::LegalTransition
+impl serde_core::ser::Serialize for ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::marker::Send for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::marker::Sync for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::marker::Unpin for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::dag_proof::LegalTransition
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::dag_proof::LegalTransition
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::dag_proof::LegalTransition where U: core::convert::From<T>
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::dag_proof::LegalTransition where U: core::convert::Into<T>
+pub type ob_poc_control_plane::dag_proof::LegalTransition::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::dag_proof::LegalTransition where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::dag_proof::LegalTransition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::dag_proof::LegalTransition where T: core::clone::Clone
+pub type ob_poc_control_plane::dag_proof::LegalTransition::Owned = T
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::dag_proof::LegalTransition where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::dag_proof::LegalTransition where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::dag_proof::LegalTransition where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::dag_proof::LegalTransition where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::dag_proof::LegalTransition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::dag_proof::LegalTransition::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::dag_proof::LegalTransition
+pub type ob_poc_control_plane::dag_proof::LegalTransition::Output = T
+pub mod ob_poc_control_plane::decision
+pub enum ob_poc_control_plane::decision::ControlPlaneDecision
+pub ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(alloc::boxed::Box<ob_poc_control_plane::envelope::ExecutionEnvelope>)
+pub ob_poc_control_plane::decision::ControlPlaneDecision::Rejected(ob_poc_control_plane::decision::ControlPlaneRejection)
+pub ob_poc_control_plane::decision::ControlPlaneDecision::RequiresHumanGate(ob_poc_control_plane::proof::ControlPlaneProof)
+impl core::clone::Clone for ob_poc_control_plane::decision::ControlPlaneDecision
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::clone(&self) -> ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::fmt::Debug for ob_poc_control_plane::decision::ControlPlaneDecision
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::marker::Send for ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::marker::Sync for ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::marker::Unpin for ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::decision::ControlPlaneDecision
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::decision::ControlPlaneDecision
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::decision::ControlPlaneDecision where U: core::convert::From<T>
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::decision::ControlPlaneDecision where U: core::convert::Into<T>
+pub type ob_poc_control_plane::decision::ControlPlaneDecision::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::decision::ControlPlaneDecision where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::decision::ControlPlaneDecision::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::decision::ControlPlaneDecision where T: core::clone::Clone
+pub type ob_poc_control_plane::decision::ControlPlaneDecision::Owned = T
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::decision::ControlPlaneDecision where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::decision::ControlPlaneDecision where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::decision::ControlPlaneDecision where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::decision::ControlPlaneDecision where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::decision::ControlPlaneDecision::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::decision::ControlPlaneDecision
+pub fn ob_poc_control_plane::decision::ControlPlaneDecision::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::decision::ControlPlaneDecision
+pub type ob_poc_control_plane::decision::ControlPlaneDecision::Output = T
+pub enum ob_poc_control_plane::decision::GateFailure
+pub ob_poc_control_plane::decision::GateFailure::Failed
+pub ob_poc_control_plane::decision::GateFailure::Failed::gate: ob_poc_control_plane::gate::GateId
+pub ob_poc_control_plane::decision::GateFailure::Failed::reason: alloc::string::String
+pub ob_poc_control_plane::decision::GateFailure::NotEvaluated
+pub ob_poc_control_plane::decision::GateFailure::NotEvaluated::blocked_by: alloc::vec::Vec<ob_poc_control_plane::gate::GateId>
+pub ob_poc_control_plane::decision::GateFailure::NotEvaluated::gate: ob_poc_control_plane::gate::GateId
+impl core::clone::Clone for ob_poc_control_plane::decision::GateFailure
+pub fn ob_poc_control_plane::decision::GateFailure::clone(&self) -> ob_poc_control_plane::decision::GateFailure
+impl core::fmt::Debug for ob_poc_control_plane::decision::GateFailure
+pub fn ob_poc_control_plane::decision::GateFailure::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_control_plane::decision::GateFailure
+impl core::marker::Send for ob_poc_control_plane::decision::GateFailure
+impl core::marker::Sync for ob_poc_control_plane::decision::GateFailure
+impl core::marker::Unpin for ob_poc_control_plane::decision::GateFailure
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::decision::GateFailure
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::decision::GateFailure
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::decision::GateFailure
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::decision::GateFailure where U: core::convert::From<T>
+pub fn ob_poc_control_plane::decision::GateFailure::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::decision::GateFailure where U: core::convert::Into<T>
+pub type ob_poc_control_plane::decision::GateFailure::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::decision::GateFailure::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::decision::GateFailure where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::decision::GateFailure::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::decision::GateFailure::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::decision::GateFailure where T: core::clone::Clone
+pub type ob_poc_control_plane::decision::GateFailure::Owned = T
+pub fn ob_poc_control_plane::decision::GateFailure::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::decision::GateFailure::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::decision::GateFailure where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::GateFailure::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::decision::GateFailure where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::GateFailure::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::decision::GateFailure where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::GateFailure::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::decision::GateFailure where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::decision::GateFailure::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::decision::GateFailure
+pub fn ob_poc_control_plane::decision::GateFailure::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::decision::GateFailure
+pub type ob_poc_control_plane::decision::GateFailure::Output = T
+pub struct ob_poc_control_plane::decision::ControlPlaneRejection
+impl ob_poc_control_plane::decision::ControlPlaneRejection
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::failures(&self) -> &[ob_poc_control_plane::decision::GateFailure]
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::is_empty(&self) -> bool
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::new(alloc::vec::Vec<ob_poc_control_plane::decision::GateFailure>) -> Self
+impl core::clone::Clone for ob_poc_control_plane::decision::ControlPlaneRejection
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::clone(&self) -> ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::default::Default for ob_poc_control_plane::decision::ControlPlaneRejection
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::default() -> ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::fmt::Debug for ob_poc_control_plane::decision::ControlPlaneRejection
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::marker::Send for ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::marker::Sync for ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::marker::Unpin for ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::decision::ControlPlaneRejection
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::decision::ControlPlaneRejection
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::decision::ControlPlaneRejection where U: core::convert::From<T>
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::decision::ControlPlaneRejection where U: core::convert::Into<T>
+pub type ob_poc_control_plane::decision::ControlPlaneRejection::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::decision::ControlPlaneRejection where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::decision::ControlPlaneRejection::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::decision::ControlPlaneRejection where T: core::clone::Clone
+pub type ob_poc_control_plane::decision::ControlPlaneRejection::Owned = T
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::decision::ControlPlaneRejection where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::decision::ControlPlaneRejection where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::decision::ControlPlaneRejection where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::decision::ControlPlaneRejection where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::decision::ControlPlaneRejection::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::decision::ControlPlaneRejection
+pub fn ob_poc_control_plane::decision::ControlPlaneRejection::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::decision::ControlPlaneRejection
+pub type ob_poc_control_plane::decision::ControlPlaneRejection::Output = T
+pub mod ob_poc_control_plane::entity_binding
+pub struct ob_poc_control_plane::entity_binding::BoundEntities
+impl ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::entity_ids(&self) -> &[uuid::Uuid]
+impl core::clone::Clone for ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::clone(&self) -> ob_poc_control_plane::entity_binding::BoundEntities
+impl core::cmp::Eq for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::cmp::PartialEq for ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::eq(&self, &ob_poc_control_plane::entity_binding::BoundEntities) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::entity_binding::BoundEntities
+impl serde_core::ser::Serialize for ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::marker::Send for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::marker::Sync for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::marker::Unpin for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::entity_binding::BoundEntities
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::entity_binding::BoundEntities
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::entity_binding::BoundEntities where U: core::convert::From<T>
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::entity_binding::BoundEntities where U: core::convert::Into<T>
+pub type ob_poc_control_plane::entity_binding::BoundEntities::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::entity_binding::BoundEntities where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::entity_binding::BoundEntities::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::entity_binding::BoundEntities where T: core::clone::Clone
+pub type ob_poc_control_plane::entity_binding::BoundEntities::Owned = T
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::entity_binding::BoundEntities where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::entity_binding::BoundEntities where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::entity_binding::BoundEntities where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::entity_binding::BoundEntities where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::entity_binding::BoundEntities::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::entity_binding::BoundEntities::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::entity_binding::BoundEntities
+pub type ob_poc_control_plane::entity_binding::BoundEntities::Output = T
+pub struct ob_poc_control_plane::entity_binding::EntityBindingReport
+impl ob_poc_control_plane::entity_binding::EntityBindingReport
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::success(&self) -> core::option::Option<&ob_poc_control_plane::entity_binding::BoundEntities>
+impl core::clone::Clone for ob_poc_control_plane::entity_binding::EntityBindingReport
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::clone(&self) -> ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::cmp::Eq for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::cmp::PartialEq for ob_poc_control_plane::entity_binding::EntityBindingReport
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::eq(&self, &ob_poc_control_plane::entity_binding::EntityBindingReport) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::entity_binding::EntityBindingReport
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::marker::Freeze for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::marker::Send for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::marker::Sync for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::marker::Unpin for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::entity_binding::EntityBindingReport
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::entity_binding::EntityBindingReport where U: core::convert::From<T>
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::entity_binding::EntityBindingReport where U: core::convert::Into<T>
+pub type ob_poc_control_plane::entity_binding::EntityBindingReport::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::entity_binding::EntityBindingReport where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::entity_binding::EntityBindingReport::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::entity_binding::EntityBindingReport where T: core::clone::Clone
+pub type ob_poc_control_plane::entity_binding::EntityBindingReport::Owned = T
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::entity_binding::EntityBindingReport where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::entity_binding::EntityBindingReport where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::entity_binding::EntityBindingReport where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::entity_binding::EntityBindingReport where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::entity_binding::EntityBindingReport::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::entity_binding::EntityBindingReport
+pub fn ob_poc_control_plane::entity_binding::EntityBindingReport::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::entity_binding::EntityBindingReport
+pub type ob_poc_control_plane::entity_binding::EntityBindingReport::Output = T
+pub mod ob_poc_control_plane::envelope
+pub struct ob_poc_control_plane::envelope::EnvelopeHandle
+impl ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::content_hash_hex(&self) -> alloc::string::String
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::id(&self) -> uuid::Uuid
+impl core::clone::Clone for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::clone(&self) -> ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::cmp::Eq for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::cmp::PartialEq for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::eq(&self, &ob_poc_control_plane::envelope::EnvelopeHandle) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::envelope::EnvelopeHandle
+impl serde_core::ser::Serialize for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::marker::Send for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::marker::Sync for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::marker::Unpin for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::envelope::EnvelopeHandle
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::envelope::EnvelopeHandle
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::envelope::EnvelopeHandle where U: core::convert::From<T>
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::envelope::EnvelopeHandle where U: core::convert::Into<T>
+pub type ob_poc_control_plane::envelope::EnvelopeHandle::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::envelope::EnvelopeHandle where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::envelope::EnvelopeHandle::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::envelope::EnvelopeHandle where T: core::clone::Clone
+pub type ob_poc_control_plane::envelope::EnvelopeHandle::Owned = T
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::envelope::EnvelopeHandle where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::envelope::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::envelope::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::envelope::EnvelopeHandle where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::envelope::EnvelopeHandle::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::EnvelopeHandle::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_control_plane::envelope::EnvelopeHandle where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::envelope::EnvelopeHandle
+pub type ob_poc_control_plane::envelope::EnvelopeHandle::Output = T
+pub struct ob_poc_control_plane::envelope::ExecutionEnvelope
+impl ob_poc_control_plane::envelope::ExecutionEnvelope
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::authority(&self) -> &ob_poc_control_plane::authority_gate::Authorised
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::binding(&self) -> &ob_poc_control_plane::entity_binding::BoundEntities
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::dag(&self) -> &ob_poc_control_plane::dag_proof::LegalTransition
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::evidence(&self) -> &ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::handle(&self) -> ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::id(&self) -> uuid::Uuid
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::intent(&self) -> &ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::pack(&self) -> &ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::runbook(&self) -> &ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::snapshot(&self) -> &ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::validity(&self) -> ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::write_set(&self) -> &ob_poc_control_plane::write_set::WriteSetProof
+impl core::clone::Clone for ob_poc_control_plane::envelope::ExecutionEnvelope
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::clone(&self) -> ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::fmt::Debug for ob_poc_control_plane::envelope::ExecutionEnvelope
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_control_plane::envelope::ExecutionEnvelope
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::marker::Send for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::marker::Sync for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::marker::Unpin for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::envelope::ExecutionEnvelope
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::envelope::ExecutionEnvelope where U: core::convert::From<T>
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::envelope::ExecutionEnvelope where U: core::convert::Into<T>
+pub type ob_poc_control_plane::envelope::ExecutionEnvelope::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::envelope::ExecutionEnvelope where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::envelope::ExecutionEnvelope::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::envelope::ExecutionEnvelope where T: core::clone::Clone
+pub type ob_poc_control_plane::envelope::ExecutionEnvelope::Owned = T
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::envelope::ExecutionEnvelope where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::envelope::ExecutionEnvelope where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::envelope::ExecutionEnvelope where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::envelope::ExecutionEnvelope where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::envelope::ExecutionEnvelope::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::envelope::ExecutionEnvelope
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::envelope::ExecutionEnvelope
+pub type ob_poc_control_plane::envelope::ExecutionEnvelope::Output = T
+pub struct ob_poc_control_plane::envelope::ValidityWindow
+impl ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ValidityWindow::contains(&self, chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> bool
+pub fn ob_poc_control_plane::envelope::ValidityWindow::new(chrono::datetime::DateTime<chrono::offset::utc::Utc>, chrono::datetime::DateTime<chrono::offset::utc::Utc>) -> Self
+pub fn ob_poc_control_plane::envelope::ValidityWindow::not_after(&self) -> chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub fn ob_poc_control_plane::envelope::ValidityWindow::not_before(&self) -> chrono::datetime::DateTime<chrono::offset::utc::Utc>
+impl core::clone::Clone for ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ValidityWindow::clone(&self) -> ob_poc_control_plane::envelope::ValidityWindow
+impl core::cmp::Eq for ob_poc_control_plane::envelope::ValidityWindow
+impl core::cmp::PartialEq for ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ValidityWindow::eq(&self, &ob_poc_control_plane::envelope::ValidityWindow) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ValidityWindow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_control_plane::envelope::ValidityWindow
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::envelope::ValidityWindow
+impl serde_core::ser::Serialize for ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ValidityWindow::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::envelope::ValidityWindow
+impl core::marker::Send for ob_poc_control_plane::envelope::ValidityWindow
+impl core::marker::Sync for ob_poc_control_plane::envelope::ValidityWindow
+impl core::marker::Unpin for ob_poc_control_plane::envelope::ValidityWindow
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::envelope::ValidityWindow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::envelope::ValidityWindow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::envelope::ValidityWindow
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::envelope::ValidityWindow where U: core::convert::From<T>
+pub fn ob_poc_control_plane::envelope::ValidityWindow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::envelope::ValidityWindow where U: core::convert::Into<T>
+pub type ob_poc_control_plane::envelope::ValidityWindow::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::envelope::ValidityWindow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::envelope::ValidityWindow where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::envelope::ValidityWindow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::envelope::ValidityWindow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::envelope::ValidityWindow where T: core::clone::Clone
+pub type ob_poc_control_plane::envelope::ValidityWindow::Owned = T
+pub fn ob_poc_control_plane::envelope::ValidityWindow::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::envelope::ValidityWindow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::envelope::ValidityWindow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::ValidityWindow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::envelope::ValidityWindow where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::ValidityWindow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::envelope::ValidityWindow where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::envelope::ValidityWindow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::envelope::ValidityWindow where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::envelope::ValidityWindow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::envelope::ValidityWindow
+pub fn ob_poc_control_plane::envelope::ValidityWindow::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::envelope::ValidityWindow
+pub type ob_poc_control_plane::envelope::ValidityWindow::Output = T
+pub mod ob_poc_control_plane::evidence_gate
+pub enum ob_poc_control_plane::evidence_gate::EvidenceOutcome
+pub ob_poc_control_plane::evidence_gate::EvidenceOutcome::ConflictingEvidence
+pub ob_poc_control_plane::evidence_gate::EvidenceOutcome::ExpiredEvidence
+pub ob_poc_control_plane::evidence_gate::EvidenceOutcome::MissingRequiredEvidence
+pub ob_poc_control_plane::evidence_gate::EvidenceOutcome::ObligationOpen
+pub ob_poc_control_plane::evidence_gate::EvidenceOutcome::PendingApproval
+pub ob_poc_control_plane::evidence_gate::EvidenceOutcome::Sufficient(ob_poc_control_plane::evidence_gate::EvidenceSufficient)
+impl core::clone::Clone for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::clone(&self) -> ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::cmp::Eq for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::cmp::PartialEq for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::eq(&self, &ob_poc_control_plane::evidence_gate::EvidenceOutcome) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::marker::Freeze for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::marker::Send for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::marker::Sync for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::marker::Unpin for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::evidence_gate::EvidenceOutcome where U: core::convert::From<T>
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::evidence_gate::EvidenceOutcome where U: core::convert::Into<T>
+pub type ob_poc_control_plane::evidence_gate::EvidenceOutcome::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::evidence_gate::EvidenceOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::evidence_gate::EvidenceOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::evidence_gate::EvidenceOutcome where T: core::clone::Clone
+pub type ob_poc_control_plane::evidence_gate::EvidenceOutcome::Owned = T
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::evidence_gate::EvidenceOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::evidence_gate::EvidenceOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::evidence_gate::EvidenceOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::evidence_gate::EvidenceOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+pub fn ob_poc_control_plane::evidence_gate::EvidenceOutcome::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::evidence_gate::EvidenceOutcome
+pub type ob_poc_control_plane::evidence_gate::EvidenceOutcome::Output = T
+pub struct ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::satisfied_obligation_ids(&self) -> &[alloc::string::String]
+impl core::clone::Clone for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::clone(&self) -> ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::cmp::Eq for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::cmp::PartialEq for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::eq(&self, &ob_poc_control_plane::evidence_gate::EvidenceSufficient) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl serde_core::ser::Serialize for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::marker::Send for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::marker::Sync for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::marker::Unpin for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::evidence_gate::EvidenceSufficient where U: core::convert::From<T>
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::evidence_gate::EvidenceSufficient where U: core::convert::Into<T>
+pub type ob_poc_control_plane::evidence_gate::EvidenceSufficient::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::evidence_gate::EvidenceSufficient where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::evidence_gate::EvidenceSufficient::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::evidence_gate::EvidenceSufficient where T: core::clone::Clone
+pub type ob_poc_control_plane::evidence_gate::EvidenceSufficient::Owned = T
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::evidence_gate::EvidenceSufficient where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::evidence_gate::EvidenceSufficient where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::evidence_gate::EvidenceSufficient where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::evidence_gate::EvidenceSufficient where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub fn ob_poc_control_plane::evidence_gate::EvidenceSufficient::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::evidence_gate::EvidenceSufficient
+pub type ob_poc_control_plane::evidence_gate::EvidenceSufficient::Output = T
+pub mod ob_poc_control_plane::exceptions
+pub mod ob_poc_control_plane::gate
+pub enum ob_poc_control_plane::gate::GateId
+pub ob_poc_control_plane::gate::GateId::AuditReplay
+pub ob_poc_control_plane::gate::GateId::Authority
+pub ob_poc_control_plane::gate::GateId::DagProof
+pub ob_poc_control_plane::gate::GateId::DecisionSnapshot
+pub ob_poc_control_plane::gate::GateId::EntityBinding
+pub ob_poc_control_plane::gate::GateId::Evidence
+pub ob_poc_control_plane::gate::GateId::ExecutionEnvelope
+pub ob_poc_control_plane::gate::GateId::IntentAdmission
+pub ob_poc_control_plane::gate::GateId::PackResolution
+pub ob_poc_control_plane::gate::GateId::RunbookProof
+pub ob_poc_control_plane::gate::GateId::StpClassifier
+pub ob_poc_control_plane::gate::GateId::VersionPinning
+pub ob_poc_control_plane::gate::GateId::WriteSet
+pub ob_poc_control_plane::gate::GateId::WriteSetAttestation
+impl ob_poc_control_plane::gate::GateId
+pub const ob_poc_control_plane::gate::GateId::ALL: [ob_poc_control_plane::gate::GateId; 14]
+impl core::clone::Clone for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::clone(&self) -> ob_poc_control_plane::gate::GateId
+impl core::cmp::Eq for ob_poc_control_plane::gate::GateId
+impl core::cmp::Ord for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::cmp(&self, &ob_poc_control_plane::gate::GateId) -> core::cmp::Ordering
+impl core::cmp::PartialEq for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::eq(&self, &ob_poc_control_plane::gate::GateId) -> bool
+impl core::cmp::PartialOrd for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::partial_cmp(&self, &ob_poc_control_plane::gate::GateId) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_control_plane::gate::GateId
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::gate::GateId
+impl core::marker::Freeze for ob_poc_control_plane::gate::GateId
+impl core::marker::Send for ob_poc_control_plane::gate::GateId
+impl core::marker::Sync for ob_poc_control_plane::gate::GateId
+impl core::marker::Unpin for ob_poc_control_plane::gate::GateId
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::gate::GateId
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::gate::GateId
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::gate::GateId
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::gate::GateId where U: core::convert::From<T>
+pub fn ob_poc_control_plane::gate::GateId::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::gate::GateId where U: core::convert::Into<T>
+pub type ob_poc_control_plane::gate::GateId::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::gate::GateId::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::gate::GateId where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::gate::GateId::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::gate::GateId::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::gate::GateId where T: core::clone::Clone
+pub type ob_poc_control_plane::gate::GateId::Owned = T
+pub fn ob_poc_control_plane::gate::GateId::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::gate::GateId::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::gate::GateId where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::GateId::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::gate::GateId where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::GateId::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::gate::GateId where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::GateId::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::gate::GateId where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::gate::GateId::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::GateId::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::gate::GateId
+pub type ob_poc_control_plane::gate::GateId::Output = T
+pub enum ob_poc_control_plane::gate::GateResult
+pub ob_poc_control_plane::gate::GateResult::Failure(alloc::string::String)
+pub ob_poc_control_plane::gate::GateResult::NotEvaluated
+pub ob_poc_control_plane::gate::GateResult::NotEvaluated::blocked_by: alloc::vec::Vec<ob_poc_control_plane::gate::GateId>
+pub ob_poc_control_plane::gate::GateResult::NotImplemented
+pub ob_poc_control_plane::gate::GateResult::Success
+impl ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::GateResult::is_success(&self) -> bool
+impl core::clone::Clone for ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::GateResult::clone(&self) -> ob_poc_control_plane::gate::GateResult
+impl core::cmp::Eq for ob_poc_control_plane::gate::GateResult
+impl core::cmp::PartialEq for ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::GateResult::eq(&self, &ob_poc_control_plane::gate::GateResult) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::GateResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::gate::GateResult
+impl core::marker::Freeze for ob_poc_control_plane::gate::GateResult
+impl core::marker::Send for ob_poc_control_plane::gate::GateResult
+impl core::marker::Sync for ob_poc_control_plane::gate::GateResult
+impl core::marker::Unpin for ob_poc_control_plane::gate::GateResult
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::gate::GateResult
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::gate::GateResult
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::gate::GateResult
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::gate::GateResult where U: core::convert::From<T>
+pub fn ob_poc_control_plane::gate::GateResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::gate::GateResult where U: core::convert::Into<T>
+pub type ob_poc_control_plane::gate::GateResult::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::gate::GateResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::gate::GateResult where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::gate::GateResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::gate::GateResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::gate::GateResult where T: core::clone::Clone
+pub type ob_poc_control_plane::gate::GateResult::Owned = T
+pub fn ob_poc_control_plane::gate::GateResult::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::gate::GateResult::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::gate::GateResult where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::GateResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::gate::GateResult where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::GateResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::gate::GateResult where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::GateResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::gate::GateResult where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::gate::GateResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::GateResult::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::gate::GateResult
+pub type ob_poc_control_plane::gate::GateResult::Output = T
+pub struct ob_poc_control_plane::gate::EvaluationReport
+pub ob_poc_control_plane::gate::EvaluationReport::results: alloc::collections::btree::map::BTreeMap<ob_poc_control_plane::gate::GateId, ob_poc_control_plane::gate::GateResult>
+impl ob_poc_control_plane::gate::EvaluationReport
+pub fn ob_poc_control_plane::gate::EvaluationReport::get(&self, ob_poc_control_plane::gate::GateId) -> core::option::Option<&ob_poc_control_plane::gate::GateResult>
+impl core::clone::Clone for ob_poc_control_plane::gate::EvaluationReport
+pub fn ob_poc_control_plane::gate::EvaluationReport::clone(&self) -> ob_poc_control_plane::gate::EvaluationReport
+impl core::default::Default for ob_poc_control_plane::gate::EvaluationReport
+pub fn ob_poc_control_plane::gate::EvaluationReport::default() -> ob_poc_control_plane::gate::EvaluationReport
+impl core::fmt::Debug for ob_poc_control_plane::gate::EvaluationReport
+pub fn ob_poc_control_plane::gate::EvaluationReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_control_plane::gate::EvaluationReport
+impl core::marker::Send for ob_poc_control_plane::gate::EvaluationReport
+impl core::marker::Sync for ob_poc_control_plane::gate::EvaluationReport
+impl core::marker::Unpin for ob_poc_control_plane::gate::EvaluationReport
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::gate::EvaluationReport
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::gate::EvaluationReport
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::gate::EvaluationReport
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::gate::EvaluationReport where U: core::convert::From<T>
+pub fn ob_poc_control_plane::gate::EvaluationReport::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::gate::EvaluationReport where U: core::convert::Into<T>
+pub type ob_poc_control_plane::gate::EvaluationReport::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::gate::EvaluationReport::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::gate::EvaluationReport where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::gate::EvaluationReport::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::gate::EvaluationReport::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::gate::EvaluationReport where T: core::clone::Clone
+pub type ob_poc_control_plane::gate::EvaluationReport::Owned = T
+pub fn ob_poc_control_plane::gate::EvaluationReport::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::gate::EvaluationReport::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::gate::EvaluationReport where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::EvaluationReport::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::gate::EvaluationReport where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::EvaluationReport::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::gate::EvaluationReport where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::EvaluationReport::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::gate::EvaluationReport where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::gate::EvaluationReport::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::gate::EvaluationReport
+pub fn ob_poc_control_plane::gate::EvaluationReport::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::gate::EvaluationReport
+pub type ob_poc_control_plane::gate::EvaluationReport::Output = T
+pub struct ob_poc_control_plane::gate::UnimplementedGate(pub ob_poc_control_plane::gate::GateId)
+impl<Ctx> ob_poc_control_plane::gate::Gate<Ctx> for ob_poc_control_plane::gate::UnimplementedGate
+pub fn ob_poc_control_plane::gate::UnimplementedGate::evaluate(&self, &Ctx) -> ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::UnimplementedGate::id(&self) -> ob_poc_control_plane::gate::GateId
+impl core::marker::Freeze for ob_poc_control_plane::gate::UnimplementedGate
+impl core::marker::Send for ob_poc_control_plane::gate::UnimplementedGate
+impl core::marker::Sync for ob_poc_control_plane::gate::UnimplementedGate
+impl core::marker::Unpin for ob_poc_control_plane::gate::UnimplementedGate
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::gate::UnimplementedGate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::gate::UnimplementedGate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::gate::UnimplementedGate
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::gate::UnimplementedGate where U: core::convert::From<T>
+pub fn ob_poc_control_plane::gate::UnimplementedGate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::gate::UnimplementedGate where U: core::convert::Into<T>
+pub type ob_poc_control_plane::gate::UnimplementedGate::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::gate::UnimplementedGate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::gate::UnimplementedGate where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::gate::UnimplementedGate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::gate::UnimplementedGate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_control_plane::gate::UnimplementedGate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::UnimplementedGate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::gate::UnimplementedGate where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::UnimplementedGate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::gate::UnimplementedGate where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::gate::UnimplementedGate::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_control_plane::gate::UnimplementedGate
+pub fn ob_poc_control_plane::gate::UnimplementedGate::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::gate::UnimplementedGate
+pub type ob_poc_control_plane::gate::UnimplementedGate::Output = T
+pub const ob_poc_control_plane::gate::GATE_DEPENDENCIES: &[(ob_poc_control_plane::gate::GateId, &[ob_poc_control_plane::gate::GateId])]
+pub trait ob_poc_control_plane::gate::Gate<Ctx>
+pub fn ob_poc_control_plane::gate::Gate::evaluate(&self, &Ctx) -> ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::Gate::id(&self) -> ob_poc_control_plane::gate::GateId
+impl<Ctx> ob_poc_control_plane::gate::Gate<Ctx> for ob_poc_control_plane::gate::UnimplementedGate
+pub fn ob_poc_control_plane::gate::UnimplementedGate::evaluate(&self, &Ctx) -> ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::gate::UnimplementedGate::id(&self) -> ob_poc_control_plane::gate::GateId
+pub fn ob_poc_control_plane::gate::declared_dependencies(ob_poc_control_plane::gate::GateId) -> &'static [ob_poc_control_plane::gate::GateId]
+pub fn ob_poc_control_plane::gate::evaluate_collect_where_independent<Ctx>(&alloc::collections::btree::map::BTreeMap<ob_poc_control_plane::gate::GateId, &dyn ob_poc_control_plane::gate::Gate<Ctx>>, &Ctx) -> ob_poc_control_plane::gate::EvaluationReport
+pub mod ob_poc_control_plane::intent_admission
+pub enum ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+pub ob_poc_control_plane::intent_admission::IntentAdmissionDecision::Admitted(ob_poc_control_plane::intent_admission::AdmittedIntent)
+pub ob_poc_control_plane::intent_admission::IntentAdmissionDecision::RejectedAttestationInsufficient
+pub ob_poc_control_plane::intent_admission::IntentAdmissionDecision::RejectedDeprecated
+pub ob_poc_control_plane::intent_admission::IntentAdmissionDecision::RejectedOutsidePack
+pub ob_poc_control_plane::intent_admission::IntentAdmissionDecision::RejectedUnauthorisedSurface
+pub ob_poc_control_plane::intent_admission::IntentAdmissionDecision::RejectedUnknownIntent
+impl core::clone::Clone for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::clone(&self) -> ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::cmp::Eq for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::cmp::PartialEq for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::eq(&self, &ob_poc_control_plane::intent_admission::IntentAdmissionDecision) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::marker::Freeze for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::marker::Send for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::marker::Sync for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::marker::Unpin for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where U: core::convert::From<T>
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where U: core::convert::Into<T>
+pub type ob_poc_control_plane::intent_admission::IntentAdmissionDecision::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::intent_admission::IntentAdmissionDecision::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where T: core::clone::Clone
+pub type ob_poc_control_plane::intent_admission::IntentAdmissionDecision::Owned = T
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::intent_admission::IntentAdmissionDecision where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+pub fn ob_poc_control_plane::intent_admission::IntentAdmissionDecision::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::intent_admission::IntentAdmissionDecision
+pub type ob_poc_control_plane::intent_admission::IntentAdmissionDecision::Output = T
+pub struct ob_poc_control_plane::intent_admission::AdmittedIntent
+impl ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::attested(&self) -> bool
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::intent_id(&self) -> uuid::Uuid
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::verb_fqn(&self) -> &str
+impl core::clone::Clone for ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::clone(&self) -> ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::cmp::Eq for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::cmp::PartialEq for ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::eq(&self, &ob_poc_control_plane::intent_admission::AdmittedIntent) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl serde_core::ser::Serialize for ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::marker::Send for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::marker::Sync for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::marker::Unpin for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::intent_admission::AdmittedIntent
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::intent_admission::AdmittedIntent where U: core::convert::From<T>
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::intent_admission::AdmittedIntent where U: core::convert::Into<T>
+pub type ob_poc_control_plane::intent_admission::AdmittedIntent::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::intent_admission::AdmittedIntent where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::intent_admission::AdmittedIntent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::intent_admission::AdmittedIntent where T: core::clone::Clone
+pub type ob_poc_control_plane::intent_admission::AdmittedIntent::Owned = T
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::intent_admission::AdmittedIntent where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::intent_admission::AdmittedIntent where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::intent_admission::AdmittedIntent where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::intent_admission::AdmittedIntent where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::intent_admission::AdmittedIntent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::intent_admission::AdmittedIntent
+pub fn ob_poc_control_plane::intent_admission::AdmittedIntent::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::intent_admission::AdmittedIntent
+pub type ob_poc_control_plane::intent_admission::AdmittedIntent::Output = T
+pub mod ob_poc_control_plane::metrics
+pub mod ob_poc_control_plane::pack_resolution
+pub enum ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+pub ob_poc_control_plane::pack_resolution::PackResolutionOutcome::AmbiguousPack
+pub ob_poc_control_plane::pack_resolution::PackResolutionOutcome::MissingPack
+pub ob_poc_control_plane::pack_resolution::PackResolutionOutcome::PackDeniesEntity
+pub ob_poc_control_plane::pack_resolution::PackResolutionOutcome::PackDeniesIntent
+pub ob_poc_control_plane::pack_resolution::PackResolutionOutcome::Resolved(ob_poc_control_plane::pack_resolution::ResolvedPack)
+impl core::clone::Clone for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::clone(&self) -> ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::cmp::Eq for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::cmp::PartialEq for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::eq(&self, &ob_poc_control_plane::pack_resolution::PackResolutionOutcome) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::marker::Freeze for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::marker::Send for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::marker::Sync for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::marker::Unpin for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where U: core::convert::From<T>
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where U: core::convert::Into<T>
+pub type ob_poc_control_plane::pack_resolution::PackResolutionOutcome::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::pack_resolution::PackResolutionOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where T: core::clone::Clone
+pub type ob_poc_control_plane::pack_resolution::PackResolutionOutcome::Owned = T
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::pack_resolution::PackResolutionOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+pub fn ob_poc_control_plane::pack_resolution::PackResolutionOutcome::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::pack_resolution::PackResolutionOutcome
+pub type ob_poc_control_plane::pack_resolution::PackResolutionOutcome::Output = T
+pub struct ob_poc_control_plane::pack_resolution::ResolvedPack
+impl ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::pack_id(&self) -> &str
+impl core::clone::Clone for ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::clone(&self) -> ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::cmp::Eq for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::cmp::PartialEq for ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::eq(&self, &ob_poc_control_plane::pack_resolution::ResolvedPack) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl serde_core::ser::Serialize for ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::marker::Send for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::marker::Sync for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::marker::Unpin for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::pack_resolution::ResolvedPack
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::pack_resolution::ResolvedPack where U: core::convert::From<T>
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::pack_resolution::ResolvedPack where U: core::convert::Into<T>
+pub type ob_poc_control_plane::pack_resolution::ResolvedPack::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::pack_resolution::ResolvedPack where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::pack_resolution::ResolvedPack::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::pack_resolution::ResolvedPack where T: core::clone::Clone
+pub type ob_poc_control_plane::pack_resolution::ResolvedPack::Owned = T
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::pack_resolution::ResolvedPack where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::pack_resolution::ResolvedPack where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::pack_resolution::ResolvedPack where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::pack_resolution::ResolvedPack where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::pack_resolution::ResolvedPack::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::pack_resolution::ResolvedPack
+pub fn ob_poc_control_plane::pack_resolution::ResolvedPack::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::pack_resolution::ResolvedPack
+pub type ob_poc_control_plane::pack_resolution::ResolvedPack::Output = T
+pub mod ob_poc_control_plane::proof
+pub struct ob_poc_control_plane::proof::CompiledRunbookRef
+impl ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::new(uuid::Uuid) -> Self
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::runbook_id(&self) -> uuid::Uuid
+impl core::clone::Clone for ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::clone(&self) -> ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::cmp::Eq for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::cmp::PartialEq for ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::eq(&self, &ob_poc_control_plane::proof::CompiledRunbookRef) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::proof::CompiledRunbookRef
+impl serde_core::ser::Serialize for ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::marker::Send for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::marker::Sync for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::marker::Unpin for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::proof::CompiledRunbookRef
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::proof::CompiledRunbookRef where U: core::convert::From<T>
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::proof::CompiledRunbookRef where U: core::convert::Into<T>
+pub type ob_poc_control_plane::proof::CompiledRunbookRef::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::proof::CompiledRunbookRef where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::proof::CompiledRunbookRef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::proof::CompiledRunbookRef where T: core::clone::Clone
+pub type ob_poc_control_plane::proof::CompiledRunbookRef::Owned = T
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::proof::CompiledRunbookRef where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::proof::CompiledRunbookRef where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::proof::CompiledRunbookRef where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::proof::CompiledRunbookRef where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::proof::CompiledRunbookRef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::proof::CompiledRunbookRef
+pub fn ob_poc_control_plane::proof::CompiledRunbookRef::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::proof::CompiledRunbookRef
+pub type ob_poc_control_plane::proof::CompiledRunbookRef::Output = T
+pub struct ob_poc_control_plane::proof::ControlPlaneProof
+pub ob_poc_control_plane::proof::ControlPlaneProof::runbook: ob_poc_control_plane::proof::CompiledRunbookRef
+impl core::clone::Clone for ob_poc_control_plane::proof::ControlPlaneProof
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::clone(&self) -> ob_poc_control_plane::proof::ControlPlaneProof
+impl core::fmt::Debug for ob_poc_control_plane::proof::ControlPlaneProof
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_control_plane::proof::ControlPlaneProof
+impl core::marker::Send for ob_poc_control_plane::proof::ControlPlaneProof
+impl core::marker::Sync for ob_poc_control_plane::proof::ControlPlaneProof
+impl core::marker::Unpin for ob_poc_control_plane::proof::ControlPlaneProof
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::proof::ControlPlaneProof
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::proof::ControlPlaneProof
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::proof::ControlPlaneProof
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::proof::ControlPlaneProof where U: core::convert::From<T>
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::proof::ControlPlaneProof where U: core::convert::Into<T>
+pub type ob_poc_control_plane::proof::ControlPlaneProof::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::proof::ControlPlaneProof where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::proof::ControlPlaneProof::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::proof::ControlPlaneProof where T: core::clone::Clone
+pub type ob_poc_control_plane::proof::ControlPlaneProof::Owned = T
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::proof::ControlPlaneProof where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::proof::ControlPlaneProof where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::proof::ControlPlaneProof where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::proof::ControlPlaneProof where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::proof::ControlPlaneProof::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::proof::ControlPlaneProof
+pub fn ob_poc_control_plane::proof::ControlPlaneProof::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::proof::ControlPlaneProof
+pub type ob_poc_control_plane::proof::ControlPlaneProof::Output = T
+pub mod ob_poc_control_plane::snapshot
+pub struct ob_poc_control_plane::snapshot::SnapshotPins
+impl ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::entity_row_version(&self, uuid::Uuid) -> core::option::Option<i64>
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::kyc_manifest_hash(&self) -> core::option::Option<&str>
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::sem_reg_snapshot_id(&self) -> core::option::Option<uuid::Uuid>
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::session_snapshot_id(&self) -> core::option::Option<uuid::Uuid>
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::unpinned_entities<'a>(&'a self, &'a [uuid::Uuid]) -> impl core::iter::traits::iterator::Iterator<Item = uuid::Uuid> + 'a
+impl core::clone::Clone for ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::clone(&self) -> ob_poc_control_plane::snapshot::SnapshotPins
+impl core::cmp::Eq for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::cmp::PartialEq for ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::eq(&self, &ob_poc_control_plane::snapshot::SnapshotPins) -> bool
+impl core::default::Default for ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::default() -> ob_poc_control_plane::snapshot::SnapshotPins
+impl core::fmt::Debug for ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::snapshot::SnapshotPins
+impl serde_core::ser::Serialize for ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::marker::Send for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::marker::Sync for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::marker::Unpin for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::snapshot::SnapshotPins
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::snapshot::SnapshotPins
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::snapshot::SnapshotPins where U: core::convert::From<T>
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::snapshot::SnapshotPins where U: core::convert::Into<T>
+pub type ob_poc_control_plane::snapshot::SnapshotPins::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::snapshot::SnapshotPins where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::snapshot::SnapshotPins::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::snapshot::SnapshotPins where T: core::clone::Clone
+pub type ob_poc_control_plane::snapshot::SnapshotPins::Owned = T
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::snapshot::SnapshotPins where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::snapshot::SnapshotPins where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::snapshot::SnapshotPins where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::snapshot::SnapshotPins where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::snapshot::SnapshotPins::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::snapshot::SnapshotPins
+pub type ob_poc_control_plane::snapshot::SnapshotPins::Output = T
+pub mod ob_poc_control_plane::stp_classifier
+pub enum ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+pub ob_poc_control_plane::stp_classifier::StpEligibilityDecision::HumanGated
+pub ob_poc_control_plane::stp_classifier::StpEligibilityDecision::Rejected
+pub ob_poc_control_plane::stp_classifier::StpEligibilityDecision::StpExecutable
+impl core::clone::Clone for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::clone(&self) -> ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::cmp::Eq for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::cmp::PartialEq for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::eq(&self, &ob_poc_control_plane::stp_classifier::StpEligibilityDecision) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::marker::Freeze for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::marker::Send for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::marker::Sync for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::marker::Unpin for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where U: core::convert::From<T>
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where U: core::convert::Into<T>
+pub type ob_poc_control_plane::stp_classifier::StpEligibilityDecision::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::stp_classifier::StpEligibilityDecision::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where T: core::clone::Clone
+pub type ob_poc_control_plane::stp_classifier::StpEligibilityDecision::Owned = T
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::stp_classifier::StpEligibilityDecision where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+pub fn ob_poc_control_plane::stp_classifier::StpEligibilityDecision::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::stp_classifier::StpEligibilityDecision
+pub type ob_poc_control_plane::stp_classifier::StpEligibilityDecision::Output = T
+pub mod ob_poc_control_plane::versioning
+pub mod ob_poc_control_plane::write_set
+pub enum ob_poc_control_plane::write_set::WriteSetOutcome
+pub ob_poc_control_plane::write_set::WriteSetOutcome::Bounded(ob_poc_control_plane::write_set::WriteSetProof)
+pub ob_poc_control_plane::write_set::WriteSetOutcome::CannotDerive
+pub ob_poc_control_plane::write_set::WriteSetOutcome::CannotDerive::reason: alloc::string::String
+impl core::clone::Clone for ob_poc_control_plane::write_set::WriteSetOutcome
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::clone(&self) -> ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::cmp::Eq for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::cmp::PartialEq for ob_poc_control_plane::write_set::WriteSetOutcome
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::eq(&self, &ob_poc_control_plane::write_set::WriteSetOutcome) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::write_set::WriteSetOutcome
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::marker::Freeze for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::marker::Send for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::marker::Sync for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::marker::Unpin for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::write_set::WriteSetOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::write_set::WriteSetOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::write_set::WriteSetOutcome where U: core::convert::From<T>
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::write_set::WriteSetOutcome where U: core::convert::Into<T>
+pub type ob_poc_control_plane::write_set::WriteSetOutcome::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::write_set::WriteSetOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::write_set::WriteSetOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::write_set::WriteSetOutcome where T: core::clone::Clone
+pub type ob_poc_control_plane::write_set::WriteSetOutcome::Owned = T
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::write_set::WriteSetOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::write_set::WriteSetOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::write_set::WriteSetOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::write_set::WriteSetOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::write_set::WriteSetOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::write_set::WriteSetOutcome
+pub fn ob_poc_control_plane::write_set::WriteSetOutcome::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set::WriteSetOutcome
+pub type ob_poc_control_plane::write_set::WriteSetOutcome::Output = T
+pub struct ob_poc_control_plane::write_set::WriteSetProof
+impl ob_poc_control_plane::write_set::WriteSetProof
+pub fn ob_poc_control_plane::write_set::WriteSetProof::allowed_columns(&self) -> &[alloc::string::String]
+pub fn ob_poc_control_plane::write_set::WriteSetProof::entity_ids(&self) -> &[uuid::Uuid]
+pub fn ob_poc_control_plane::write_set::WriteSetProof::idempotency_key(&self) -> &str
+pub fn ob_poc_control_plane::write_set::WriteSetProof::state_slots(&self) -> &[alloc::string::String]
+pub fn ob_poc_control_plane::write_set::WriteSetProof::tables(&self) -> &[alloc::string::String]
+impl core::clone::Clone for ob_poc_control_plane::write_set::WriteSetProof
+pub fn ob_poc_control_plane::write_set::WriteSetProof::clone(&self) -> ob_poc_control_plane::write_set::WriteSetProof
+impl core::cmp::Eq for ob_poc_control_plane::write_set::WriteSetProof
+impl core::cmp::PartialEq for ob_poc_control_plane::write_set::WriteSetProof
+pub fn ob_poc_control_plane::write_set::WriteSetProof::eq(&self, &ob_poc_control_plane::write_set::WriteSetProof) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::write_set::WriteSetProof
+pub fn ob_poc_control_plane::write_set::WriteSetProof::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::write_set::WriteSetProof
+impl serde_core::ser::Serialize for ob_poc_control_plane::write_set::WriteSetProof
+pub fn ob_poc_control_plane::write_set::WriteSetProof::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_poc_control_plane::write_set::WriteSetProof
+impl core::marker::Send for ob_poc_control_plane::write_set::WriteSetProof
+impl core::marker::Sync for ob_poc_control_plane::write_set::WriteSetProof
+impl core::marker::Unpin for ob_poc_control_plane::write_set::WriteSetProof
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::write_set::WriteSetProof
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::write_set::WriteSetProof
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::write_set::WriteSetProof
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::write_set::WriteSetProof where U: core::convert::From<T>
+pub fn ob_poc_control_plane::write_set::WriteSetProof::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::write_set::WriteSetProof where U: core::convert::Into<T>
+pub type ob_poc_control_plane::write_set::WriteSetProof::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::write_set::WriteSetProof::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::write_set::WriteSetProof where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::write_set::WriteSetProof::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::write_set::WriteSetProof::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::write_set::WriteSetProof where T: core::clone::Clone
+pub type ob_poc_control_plane::write_set::WriteSetProof::Owned = T
+pub fn ob_poc_control_plane::write_set::WriteSetProof::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::write_set::WriteSetProof::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::write_set::WriteSetProof where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set::WriteSetProof::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::write_set::WriteSetProof where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set::WriteSetProof::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::write_set::WriteSetProof where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set::WriteSetProof::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::write_set::WriteSetProof where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::write_set::WriteSetProof::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::write_set::WriteSetProof
+pub fn ob_poc_control_plane::write_set::WriteSetProof::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set::WriteSetProof
+pub type ob_poc_control_plane::write_set::WriteSetProof::Output = T
