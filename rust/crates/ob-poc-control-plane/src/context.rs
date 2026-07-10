@@ -32,13 +32,14 @@ use crate::pack_resolution::PackResolutionInput;
 use crate::snapshot::SnapshotInput;
 use crate::stp_classifier::StpClassifierInput;
 use crate::write_set::WriteSetInput;
+use crate::write_set_attestation::WriteSetAttestationInput;
 
 /// Shared evaluation context for every gate adapter wired so far (G1-G8,
-/// G13). The remaining gates (G9-G12, G14) are downstream/infrastructural
+/// G13, G14). The remaining gates (G9-G12) are downstream/infrastructural
 /// artefacts (runbook proof, execution envelope, audit/replay, version
-/// pinning, write-set attestation) that consume this context's *outputs*
-/// rather than being graded from within it — they stay `UnimplementedGate`
-/// in `evaluate_shadow` until T3.4/T4/T5 land.
+/// pinning) that consume this context's *outputs* rather than being graded
+/// from within it — they stay `UnimplementedGate` in `evaluate_shadow`
+/// until T3.4/T4 follow-on work lands them.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EvaluationContext {
     pub intent_admission: Option<IntentAdmissionInput>,
@@ -50,4 +51,5 @@ pub struct EvaluationContext {
     pub write_set: Option<WriteSetInput>,
     pub snapshot: Option<SnapshotInput>,
     pub stp_classifier: Option<StpClassifierInput>,
+    pub write_set_attestation: Option<WriteSetAttestationInput>,
 }

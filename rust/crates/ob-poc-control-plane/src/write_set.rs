@@ -122,7 +122,15 @@ pub struct WriteSetInput {
     pub contract_derived: bool,
 }
 
-fn decide(input: &WriteSetInput) -> WriteSetOutcome {
+/// Public (unlike every other gate module's `decide`): `WriteSetProof` is
+/// not a final-authority tollgate the way `ExecutionEnvelope` is — G7 has
+/// no predecessor gates to enforce structurally (see `GATE_DEPENDENCIES`:
+/// `WriteSet` depends only on `DagProof`, and even that isn't required for
+/// *deriving* a proof, only for the evaluator's admission ordering). T5.1's
+/// pre-commit attestation needs a real `WriteSetProof` value to compare
+/// captured writes against, not just a pass/fail `GateResult` — this is
+/// that production-usable derivation entry point.
+pub fn decide(input: &WriteSetInput) -> WriteSetOutcome {
     if !input.contract_derived || input.tables.is_empty() {
         return WriteSetOutcome::CannotDerive {
             reason: "heuristic-only derivation carries no table/column bound".to_string(),

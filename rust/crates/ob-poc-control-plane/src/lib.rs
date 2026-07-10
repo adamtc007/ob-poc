@@ -34,6 +34,7 @@ pub mod pack_resolution;
 pub mod snapshot;
 pub mod stp_classifier;
 pub mod write_set;
+pub mod write_set_attestation;
 
 pub mod audit;
 pub mod exceptions;
@@ -73,13 +74,13 @@ pub fn evaluate_shadow(ctx: &EvaluationContext) -> EvaluationReport {
     let write_set_gate = write_set::WriteSetGate;
     let stp_classifier_gate = stp_classifier::StpClassifierGate;
     let decision_snapshot_gate = snapshot::DecisionSnapshotGate;
+    let write_set_attestation_gate = write_set_attestation::WriteSetAttestationGate;
 
     let stub_ids = [
         GateId::RunbookProof,
         GateId::ExecutionEnvelope,
         GateId::AuditReplay,
         GateId::VersionPinning,
-        GateId::WriteSetAttestation,
     ];
     let stubs: Vec<UnimplementedGate> = stub_ids.iter().map(|id| UnimplementedGate(*id)).collect();
 
@@ -93,6 +94,7 @@ pub fn evaluate_shadow(ctx: &EvaluationContext) -> EvaluationReport {
     gates.insert(GateId::WriteSet, &write_set_gate);
     gates.insert(GateId::StpClassifier, &stp_classifier_gate);
     gates.insert(GateId::DecisionSnapshot, &decision_snapshot_gate);
+    gates.insert(GateId::WriteSetAttestation, &write_set_attestation_gate);
     for stub in &stubs {
         gates.insert(stub.0, stub);
     }
@@ -237,11 +239,21 @@ mod evaluate_shadow_tests {
                 durable_execution_explicitly_allowed: false,
                 has_unpinned_entities: false,
             }),
+            write_set_attestation: Some(write_set_attestation::WriteSetAttestationInput {
+                captured: vec![write_set_attestation::CapturedWrite {
+                    table: "ob-poc.cbus".to_string(),
+                    entity_id: entity,
+                    columns: vec!["status".to_string()],
+                }],
+                expected_tables: vec!["ob-poc.cbus".to_string()],
+                expected_entity_ids: vec![entity],
+                expected_allowed_columns: vec!["status".to_string()],
+            }),
         }
     }
 
     #[test]
-    fn fully_admitted_context_succeeds_through_g8() {
+    fn fully_admitted_context_succeeds_through_every_wired_gate() {
         let ctx = fully_admitted_context();
         let report = evaluate_shadow(&ctx);
         for id in [
@@ -254,6 +266,7 @@ mod evaluate_shadow_tests {
             GateId::WriteSet,
             GateId::StpClassifier,
             GateId::DecisionSnapshot,
+            GateId::WriteSetAttestation,
         ] {
             assert_eq!(report.get(id), Some(&gate::GateResult::Success), "{id:?} did not succeed");
         }

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qWt8bgTgi3uHDk6xNeXwrU649ayCTtdEjcwuENuNW8dOqtNwuvyejH4RZQ08AtY
+\restrict y8ZHloIeRzGcivtRbXGz8g5FDa620Y4GFq7asJ9w82F5ZGPctGBDO1mQ6BWDBJR
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -10508,6 +10508,43 @@ COMMENT ON TABLE "ob-poc".control_plane_shadow_decisions IS 'T2.7 shadow-mode ob
 
 ALTER TABLE "ob-poc".control_plane_shadow_decisions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME "ob-poc".control_plane_shadow_decisions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: control_plane_write_attestations; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_write_attestations (
+    attestation_id bigint NOT NULL,
+    attested_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    scope_id uuid NOT NULL,
+    session_id uuid,
+    verb_fqn text,
+    bounded boolean NOT NULL,
+    captured_writes jsonb NOT NULL,
+    excess_writes jsonb NOT NULL
+);
+
+
+--
+-- Name: TABLE control_plane_write_attestations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_write_attestations IS 'T5.3 write-set attestation audit trail (EOP-PLAN-CONTROLPLANE-001). Enforcement (rollback on breach) happens at PgTransactionScope::commit_attested before this row is written, not here.';
+
+
+--
+-- Name: control_plane_write_attestations_attestation_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE "ob-poc".control_plane_write_attestations ALTER COLUMN attestation_id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "ob-poc".control_plane_write_attestations_attestation_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -25160,6 +25197,14 @@ ALTER TABLE ONLY "ob-poc".control_plane_shadow_decisions
 
 
 --
+-- Name: control_plane_write_attestations control_plane_write_attestations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_write_attestations
+    ADD CONSTRAINT control_plane_write_attestations_pkey PRIMARY KEY (attestation_id);
+
+
+--
 -- Name: corporate_action_events corporate_action_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -30561,6 +30606,20 @@ CREATE INDEX idx_control_plane_shadow_decisions_diverged ON "ob-poc".control_pla
 --
 
 CREATE INDEX idx_control_plane_shadow_decisions_session ON "ob-poc".control_plane_shadow_decisions USING btree (session_id, decided_at DESC);
+
+
+--
+-- Name: idx_control_plane_write_attestations_breaches; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_write_attestations_breaches ON "ob-poc".control_plane_write_attestations USING btree (attested_at DESC) WHERE (NOT bounded);
+
+
+--
+-- Name: idx_control_plane_write_attestations_scope; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_write_attestations_scope ON "ob-poc".control_plane_write_attestations USING btree (scope_id);
 
 
 --
@@ -41110,5 +41169,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qWt8bgTgi3uHDk6xNeXwrU649ayCTtdEjcwuENuNW8dOqtNwuvyejH4RZQ08AtY
+\unrestrict y8ZHloIeRzGcivtRbXGz8g5FDa620Y4GFq7asJ9w82F5ZGPctGBDO1mQ6BWDBJR
 

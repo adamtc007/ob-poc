@@ -1,4 +1,3 @@
-# ob-poc-control-plane | features=all | HEAD=35d840d97708a13fc4acda12527f49401cd25eea | 2026-07-10T13:12:29Z
 pub mod ob_poc_control_plane
 pub mod ob_poc_control_plane::audit
 pub mod ob_poc_control_plane::authority_gate
@@ -237,6 +236,7 @@ pub ob_poc_control_plane::context::EvaluationContext::pack_resolution: core::opt
 pub ob_poc_control_plane::context::EvaluationContext::snapshot: core::option::Option<ob_poc_control_plane::snapshot::SnapshotInput>
 pub ob_poc_control_plane::context::EvaluationContext::stp_classifier: core::option::Option<ob_poc_control_plane::stp_classifier::StpClassifierInput>
 pub ob_poc_control_plane::context::EvaluationContext::write_set: core::option::Option<ob_poc_control_plane::write_set::WriteSetInput>
+pub ob_poc_control_plane::context::EvaluationContext::write_set_attestation: core::option::Option<ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput>
 impl core::clone::Clone for ob_poc_control_plane::context::EvaluationContext
 pub fn ob_poc_control_plane::context::EvaluationContext::clone(&self) -> ob_poc_control_plane::context::EvaluationContext
 impl core::cmp::PartialEq for ob_poc_control_plane::context::EvaluationContext
@@ -273,6 +273,9 @@ pub fn ob_poc_control_plane::stp_classifier::StpClassifierGate::id(&self) -> ob_
 impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::write_set::WriteSetGate
 pub fn ob_poc_control_plane::write_set::WriteSetGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
 pub fn ob_poc_control_plane::write_set::WriteSetGate::id(&self) -> ob_poc_control_plane::gate::GateId
+impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::id(&self) -> ob_poc_control_plane::gate::GateId
 impl serde_core::ser::Serialize for ob_poc_control_plane::context::EvaluationContext
 pub fn ob_poc_control_plane::context::EvaluationContext::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
 impl<'de> serde_core::de::Deserialize<'de> for ob_poc_control_plane::context::EvaluationContext
@@ -1418,6 +1421,9 @@ pub fn ob_poc_control_plane::stp_classifier::StpClassifierGate::id(&self) -> ob_
 impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::write_set::WriteSetGate
 pub fn ob_poc_control_plane::write_set::WriteSetGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
 pub fn ob_poc_control_plane::write_set::WriteSetGate::id(&self) -> ob_poc_control_plane::gate::GateId
+impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::id(&self) -> ob_poc_control_plane::gate::GateId
 impl<Ctx> ob_poc_control_plane::gate::Gate<Ctx> for ob_poc_control_plane::gate::UnimplementedGate
 pub fn ob_poc_control_plane::gate::UnimplementedGate::evaluate(&self, &Ctx) -> ob_poc_control_plane::gate::GateResult
 pub fn ob_poc_control_plane::gate::UnimplementedGate::id(&self) -> ob_poc_control_plane::gate::GateId
@@ -2350,4 +2356,178 @@ impl<T> core::convert::From<T> for ob_poc_control_plane::write_set::WriteSetProo
 pub fn ob_poc_control_plane::write_set::WriteSetProof::from(T) -> T
 impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set::WriteSetProof
 pub type ob_poc_control_plane::write_set::WriteSetProof::Output = T
+pub fn ob_poc_control_plane::write_set::decide(&ob_poc_control_plane::write_set::WriteSetInput) -> ob_poc_control_plane::write_set::WriteSetOutcome
+pub mod ob_poc_control_plane::write_set_attestation
+pub enum ob_poc_control_plane::write_set_attestation::AttestationOutcome
+pub ob_poc_control_plane::write_set_attestation::AttestationOutcome::Bounded
+pub ob_poc_control_plane::write_set_attestation::AttestationOutcome::Breach
+pub ob_poc_control_plane::write_set_attestation::AttestationOutcome::Breach::excess: alloc::vec::Vec<ob_poc_control_plane::write_set_attestation::CapturedWrite>
+impl core::clone::Clone for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::clone(&self) -> ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::cmp::Eq for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::cmp::PartialEq for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::eq(&self, &ob_poc_control_plane::write_set_attestation::AttestationOutcome) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::marker::Freeze for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::marker::Send for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::marker::Sync for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::marker::Unpin for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::write_set_attestation::AttestationOutcome where U: core::convert::From<T>
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::write_set_attestation::AttestationOutcome where U: core::convert::Into<T>
+pub type ob_poc_control_plane::write_set_attestation::AttestationOutcome::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::write_set_attestation::AttestationOutcome where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::write_set_attestation::AttestationOutcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::write_set_attestation::AttestationOutcome where T: core::clone::Clone
+pub type ob_poc_control_plane::write_set_attestation::AttestationOutcome::Owned = T
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::write_set_attestation::AttestationOutcome where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::write_set_attestation::AttestationOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::write_set_attestation::AttestationOutcome where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::write_set_attestation::AttestationOutcome where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+pub fn ob_poc_control_plane::write_set_attestation::AttestationOutcome::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set_attestation::AttestationOutcome
+pub type ob_poc_control_plane::write_set_attestation::AttestationOutcome::Output = T
+pub struct ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub ob_poc_control_plane::write_set_attestation::CapturedWrite::columns: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_control_plane::write_set_attestation::CapturedWrite::entity_id: uuid::Uuid
+pub ob_poc_control_plane::write_set_attestation::CapturedWrite::table: alloc::string::String
+impl core::clone::Clone for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::clone(&self) -> ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::cmp::Eq for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::cmp::PartialEq for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::eq(&self, &ob_poc_control_plane::write_set_attestation::CapturedWrite) -> bool
+impl core::fmt::Debug for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl serde_core::ser::Serialize for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::marker::Send for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::marker::Sync for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::marker::Unpin for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::write_set_attestation::CapturedWrite
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::write_set_attestation::CapturedWrite where U: core::convert::From<T>
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::write_set_attestation::CapturedWrite where U: core::convert::Into<T>
+pub type ob_poc_control_plane::write_set_attestation::CapturedWrite::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::write_set_attestation::CapturedWrite where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::write_set_attestation::CapturedWrite::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::write_set_attestation::CapturedWrite where T: core::clone::Clone
+pub type ob_poc_control_plane::write_set_attestation::CapturedWrite::Owned = T
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::write_set_attestation::CapturedWrite where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::write_set_attestation::CapturedWrite where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::write_set_attestation::CapturedWrite where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::write_set_attestation::CapturedWrite where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::write_set_attestation::CapturedWrite::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub fn ob_poc_control_plane::write_set_attestation::CapturedWrite::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_control_plane::write_set_attestation::CapturedWrite where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set_attestation::CapturedWrite
+pub type ob_poc_control_plane::write_set_attestation::CapturedWrite::Output = T
+pub struct ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::id(&self) -> ob_poc_control_plane::gate::GateId
+impl core::marker::Freeze for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl core::marker::Send for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl core::marker::Sync for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl core::marker::Unpin for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate where U: core::convert::From<T>
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate where U: core::convert::Into<T>
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::from(T) -> T
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationGate::Output = T
+pub struct ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::captured: alloc::vec::Vec<ob_poc_control_plane::write_set_attestation::CapturedWrite>
+pub ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::expected_allowed_columns: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::expected_entity_ids: alloc::vec::Vec<uuid::Uuid>
+pub ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::expected_tables: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::clone(&self) -> ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::cmp::Eq for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::cmp::PartialEq for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::eq(&self, &ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput) -> bool
+impl core::default::Default for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::default() -> ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::fmt::Debug for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl serde_core::ser::Serialize for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::marker::Send for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::marker::Sync for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::marker::Unpin for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::marker::UnsafeUnpin for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+impl<T, U> core::convert::Into<U> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where U: core::convert::From<T>
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where U: core::convert::Into<T>
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::Error = core::convert::Infallible
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where U: core::convert::TryFrom<T>
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where T: core::clone::Clone
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::Owned = T
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::clone_into(&self, &mut T)
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where T: 'static + ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where T: ?core::marker::Sized
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where T: core::clone::Clone
+pub unsafe fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub fn ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> typenum::type_operators::Same for ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput
+pub type ob_poc_control_plane::write_set_attestation::WriteSetAttestationInput::Output = T
+pub fn ob_poc_control_plane::write_set_attestation::attest(&[ob_poc_control_plane::write_set_attestation::CapturedWrite], &ob_poc_control_plane::write_set::WriteSetProof) -> ob_poc_control_plane::write_set_attestation::AttestationOutcome
 pub fn ob_poc_control_plane::evaluate_shadow(&ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::EvaluationReport
