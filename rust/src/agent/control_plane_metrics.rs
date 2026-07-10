@@ -251,8 +251,14 @@ mod t7_2_metrics_tests {
         );
 
         let after = shadow_divergence_stats(&pool).await.expect("query failed");
-        assert_eq!(after.total_decisions, before.total_decisions + 1);
-        assert_eq!(after.diverged, before.diverged + 1);
+        // `control_plane_shadow_decisions` is insert-only (no UPDATE/DELETE
+        // path exists), so a `>=` monotonic-increase check is race-safe
+        // against sibling tests concurrently inserting into the same shared
+        // table — an exact-equality delta is not (PIR-D-004: fails under
+        // default parallel `cargo test`, only passed under
+        // `--test-threads=1`).
+        assert!(after.total_decisions >= before.total_decisions + 1);
+        assert!(after.diverged >= before.diverged + 1);
     }
 
     #[tokio::test]
@@ -281,8 +287,11 @@ mod t7_2_metrics_tests {
         let after = write_attestation_breach_stats(&pool)
             .await
             .expect("query failed");
-        assert_eq!(after.total_attestations, before.total_attestations + 2);
-        assert_eq!(after.breaches, before.breaches + 1);
+        // `control_plane_write_attestations` is insert-only — same
+        // race-safety reasoning as shadow_divergence_stats_counts_only_diverged_rows
+        // above (PIR-D-004).
+        assert!(after.total_attestations >= before.total_attestations + 2);
+        assert!(after.breaches >= before.breaches + 1);
     }
 
     #[tokio::test]
@@ -290,13 +299,16 @@ mod t7_2_metrics_tests {
     async fn envelope_status_counts_reflects_current_row_statuses() {
         let pool = test_pool().await;
 
-        let before = envelope_status_counts(&pool).await.expect("query failed");
-        let sealed_before = before
-            .iter()
-            .find(|c| c.status == "sealed")
-            .map(|c| c.count)
-            .unwrap_or(0);
-
+        // Unlike the other two `control_plane_*` tables, `status` here is
+        // mutable (control_plane_envelope_store.rs performs in-place UPDATEs
+        // for consume/expire/void), so a whole-table `sealed` count is
+        // neither monotonic nor race-safe: a concurrent sibling test
+        // transitioning an envelope OUT of `sealed` between the before/after
+        // reads can decrease it, and a before/after delta can therefore fail
+        // in either direction under default parallel `cargo test`
+        // (PIR-D-004). Scope the assertion to the specific row this test
+        // inserted instead of the shared-table aggregate.
+        let envelope_id = Uuid::new_v4();
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".control_plane_envelopes (
@@ -304,7 +316,7 @@ mod t7_2_metrics_tests {
             ) VALUES ($1, $2, $3, $4, 'sealed', now(), now() + interval '1 hour')
             "#,
         )
-        .bind(Uuid::new_v4())
+        .bind(envelope_id)
         .bind("deadbeef")
         .bind(Uuid::new_v4())
         .bind("cbu.confirm")
@@ -312,12 +324,27 @@ mod t7_2_metrics_tests {
         .await
         .expect("seed insert failed");
 
-        let after = envelope_status_counts(&pool).await.expect("query failed");
-        let sealed_after = after
+        let this_row_status: String = sqlx::query_scalar(
+            r#"SELECT status FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#,
+        )
+        .bind(envelope_id)
+        .fetch_one(&pool)
+        .await
+        .expect("row must exist");
+        assert_eq!(this_row_status, "sealed");
+
+        // Still exercises the real production aggregate query end-to-end —
+        // just doesn't rely on its whole-table count being stable across
+        // concurrent sibling activity for the assertion.
+        let counts = envelope_status_counts(&pool).await.expect("query failed");
+        let sealed_count = counts
             .iter()
             .find(|c| c.status == "sealed")
             .map(|c| c.count)
             .unwrap_or(0);
-        assert_eq!(sealed_after, sealed_before + 1);
+        assert!(
+            sealed_count >= 1,
+            "expected at least the row just inserted to appear in the sealed bucket, got {counts:?}"
+        );
     }
 }
