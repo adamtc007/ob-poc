@@ -61,6 +61,7 @@ impl Phase5Evaluation {
     /// let evaluation = Phase5Evaluation::new(serde_json::json!({"status": "unavailable"}), None);
     /// assert!(evaluation.is_unavailable());
     /// ```
+    #[allow(dead_code)] // kept for tests
     pub fn is_unavailable(&self) -> bool {
         self.payload
             .get("status")
@@ -101,7 +102,7 @@ pub fn build_phase5_unavailable_payload(entrypoint: &str) -> serde_json::Value {
 /// ```rust,ignore
 /// // Built from a real chat execution response at runtime.
 /// ```
-#[cfg(feature = "database")]
+#[cfg(all(test, feature = "database"))]
 pub fn build_phase5_agent_payload(
     session: &crate::session::UnifiedSession,
     response: &crate::api::agent_service::AgentChatResponse,
@@ -115,7 +116,7 @@ pub fn build_phase5_agent_payload(
 /// ```rust,ignore
 /// // Built from a real chat execution response at runtime.
 /// ```
-#[cfg(feature = "database")]
+#[cfg(all(test, feature = "database"))]
 pub fn evaluate_phase5_agent(
     session: &crate::session::UnifiedSession,
     response: &crate::api::agent_service::AgentChatResponse,
@@ -250,6 +251,7 @@ pub fn build_repl_execution_shape_kind(
 /// ```rust,ignore
 /// // Built from a real REPL response at runtime.
 /// ```
+#[cfg(test)]
 pub fn build_phase5_repl_payload(
     session: &crate::repl::session_v2::ReplSessionV2,
     response: &crate::repl::response_v2::ReplResponseV2,

@@ -1,0 +1,75 @@
+# bpmn-test-harness | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:08Z
+pub mod bpmn_test_harness
+pub use bpmn_test_harness::VerbEffect
+pub use bpmn_test_harness::VerbError
+pub use bpmn_test_harness::VerbHandler
+pub use bpmn_test_harness::VerbOutput
+pub use bpmn_test_harness::dsl_resolution
+pub struct bpmn_test_harness::RunResult
+pub bpmn_test_harness::RunResult::engine: bpmn_runtime::event_loop::RuntimeEngine
+pub bpmn_test_harness::RunResult::instance_id: bpmn_runtime::types::InstanceId
+pub bpmn_test_harness::RunResult::store: alloc::sync::Arc<bpmn_runtime::store::InMemoryJourneyStore>
+impl bpmn_test_harness::RunResult
+pub async fn bpmn_test_harness::RunResult::assert_token_at(&self, &str) -> bpmn_runtime::types::ActiveToken
+pub async fn bpmn_test_harness::RunResult::complete_task(self, &str, uuid::Uuid, serde_json::value::Value) -> Self
+pub async fn bpmn_test_harness::RunResult::read_data(&self, &str) -> core::option::Option<serde_json::value::Value>
+pub async fn bpmn_test_harness::RunResult::status(&self) -> bpmn_runtime::types::InstanceStatus
+pub async fn bpmn_test_harness::RunResult::tokens(&self) -> alloc::vec::Vec<bpmn_runtime::types::ActiveToken>
+impl core::marker::Freeze for bpmn_test_harness::RunResult
+impl core::marker::Send for bpmn_test_harness::RunResult
+impl core::marker::Sync for bpmn_test_harness::RunResult
+impl core::marker::Unpin for bpmn_test_harness::RunResult
+impl core::marker::UnsafeUnpin for bpmn_test_harness::RunResult
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_test_harness::RunResult
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_test_harness::RunResult
+impl<T, U> core::convert::Into<U> for bpmn_test_harness::RunResult where U: core::convert::From<T>
+pub fn bpmn_test_harness::RunResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_test_harness::RunResult where U: core::convert::Into<T>
+pub type bpmn_test_harness::RunResult::Error = core::convert::Infallible
+pub fn bpmn_test_harness::RunResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_test_harness::RunResult where U: core::convert::TryFrom<T>
+pub type bpmn_test_harness::RunResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_test_harness::RunResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_test_harness::RunResult where T: 'static + ?core::marker::Sized
+pub fn bpmn_test_harness::RunResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_test_harness::RunResult where T: ?core::marker::Sized
+pub fn bpmn_test_harness::RunResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_test_harness::RunResult where T: ?core::marker::Sized
+pub fn bpmn_test_harness::RunResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_test_harness::RunResult
+pub fn bpmn_test_harness::RunResult::from(T) -> T
+impl<T> tracing::instrument::Instrument for bpmn_test_harness::RunResult
+impl<T> tracing::instrument::WithSubscriber for bpmn_test_harness::RunResult
+pub struct bpmn_test_harness::Scenario
+impl bpmn_test_harness::Scenario
+pub fn bpmn_test_harness::Scenario::new(&str) -> Self
+pub async fn bpmn_test_harness::Scenario::run_to_quiescence(self, serde_json::value::Value) -> bpmn_test_harness::RunResult
+pub fn bpmn_test_harness::Scenario::with_gateway_reply(self, &str, alloc::vec::Vec<&str>) -> Self
+pub fn bpmn_test_harness::Scenario::with_verb_handler(self, alloc::boxed::Box<dyn bpmn_runtime::verb::VerbHandler>) -> Self
+impl core::marker::Freeze for bpmn_test_harness::Scenario
+impl core::marker::Send for bpmn_test_harness::Scenario
+impl core::marker::Sync for bpmn_test_harness::Scenario
+impl core::marker::Unpin for bpmn_test_harness::Scenario
+impl core::marker::UnsafeUnpin for bpmn_test_harness::Scenario
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_test_harness::Scenario
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_test_harness::Scenario
+impl<T, U> core::convert::Into<U> for bpmn_test_harness::Scenario where U: core::convert::From<T>
+pub fn bpmn_test_harness::Scenario::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_test_harness::Scenario where U: core::convert::Into<T>
+pub type bpmn_test_harness::Scenario::Error = core::convert::Infallible
+pub fn bpmn_test_harness::Scenario::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_test_harness::Scenario where U: core::convert::TryFrom<T>
+pub type bpmn_test_harness::Scenario::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_test_harness::Scenario::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_test_harness::Scenario where T: 'static + ?core::marker::Sized
+pub fn bpmn_test_harness::Scenario::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_test_harness::Scenario where T: ?core::marker::Sized
+pub fn bpmn_test_harness::Scenario::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_test_harness::Scenario where T: ?core::marker::Sized
+pub fn bpmn_test_harness::Scenario::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_test_harness::Scenario
+pub fn bpmn_test_harness::Scenario::from(T) -> T
+impl<T> tracing::instrument::Instrument for bpmn_test_harness::Scenario
+impl<T> tracing::instrument::WithSubscriber for bpmn_test_harness::Scenario
+pub fn bpmn_test_harness::compile_dsl(&str) -> dsl_lowering::bpmn::JourneySpec
+pub fn bpmn_test_harness::instantiate_pack(&str, &serde_json::map::Map<alloc::string::String, serde_json::value::Value>) -> alloc::string::String

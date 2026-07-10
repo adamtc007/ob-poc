@@ -21,7 +21,7 @@ const KYC_TAXONOMY_FQN: &str = "taxonomy.domain";
 const KYC_NODE_FQN: &str = "taxonomy.domain.kyc";
 const KYC_VIEW_FQN: &str = "view.kyc-case";
 const KYC_SUBJECT_ENTITY_FQN: &str = "entity.cbu";
-const GOVERNED_VERB_DOMAINS: &[&str] = &["kyc-case", "entity-workstream", "ubo.registry"];
+const GOVERNED_VERB_DOMAINS: &[&str] = &["kyc-case", "entity-workstream"];
 
 /// Report from membership rule seeding.
 #[derive(Debug, Default)]

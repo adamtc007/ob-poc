@@ -1,0 +1,224 @@
+# dsl-atoms | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:11Z
+pub mod dsl_atoms
+pub enum dsl_atoms::AtomKindClass
+pub dsl_atoms::AtomKindClass::Declarative(dsl_atoms::DeclarativeKind)
+pub dsl_atoms::AtomKindClass::Structural(dsl_atoms::StructuralKind)
+pub dsl_atoms::AtomKindClass::UnknownDeclarative(alloc::string::String)
+pub dsl_atoms::AtomKindClass::UnknownStructural(alloc::string::String)
+impl core::clone::Clone for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::clone(&self) -> dsl_atoms::AtomKindClass
+impl core::cmp::Eq for dsl_atoms::AtomKindClass
+impl core::cmp::PartialEq for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::eq(&self, &dsl_atoms::AtomKindClass) -> bool
+impl core::fmt::Debug for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for dsl_atoms::AtomKindClass
+impl serde_core::ser::Serialize for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_atoms::AtomKindClass
+impl core::marker::Send for dsl_atoms::AtomKindClass
+impl core::marker::Sync for dsl_atoms::AtomKindClass
+impl core::marker::Unpin for dsl_atoms::AtomKindClass
+impl core::marker::UnsafeUnpin for dsl_atoms::AtomKindClass
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_atoms::AtomKindClass
+impl core::panic::unwind_safe::UnwindSafe for dsl_atoms::AtomKindClass
+impl<T, U> core::convert::Into<U> for dsl_atoms::AtomKindClass where U: core::convert::From<T>
+pub fn dsl_atoms::AtomKindClass::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_atoms::AtomKindClass where U: core::convert::Into<T>
+pub type dsl_atoms::AtomKindClass::Error = core::convert::Infallible
+pub fn dsl_atoms::AtomKindClass::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_atoms::AtomKindClass where U: core::convert::TryFrom<T>
+pub type dsl_atoms::AtomKindClass::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_atoms::AtomKindClass::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_atoms::AtomKindClass where T: core::clone::Clone
+pub type dsl_atoms::AtomKindClass::Owned = T
+pub fn dsl_atoms::AtomKindClass::clone_into(&self, &mut T)
+pub fn dsl_atoms::AtomKindClass::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_atoms::AtomKindClass where T: 'static + ?core::marker::Sized
+pub fn dsl_atoms::AtomKindClass::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_atoms::AtomKindClass where T: ?core::marker::Sized
+pub fn dsl_atoms::AtomKindClass::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_atoms::AtomKindClass where T: ?core::marker::Sized
+pub fn dsl_atoms::AtomKindClass::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_atoms::AtomKindClass where T: core::clone::Clone
+pub unsafe fn dsl_atoms::AtomKindClass::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_atoms::AtomKindClass
+pub fn dsl_atoms::AtomKindClass::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_atoms::AtomKindClass where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_atoms::DeclarativeKind
+pub dsl_atoms::DeclarativeKind::GovernanceStatus
+pub dsl_atoms::DeclarativeKind::JurisdictionTag
+pub dsl_atoms::DeclarativeKind::Provenance
+pub dsl_atoms::DeclarativeKind::ReviewAnnotation
+impl core::clone::Clone for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::clone(&self) -> dsl_atoms::DeclarativeKind
+impl core::cmp::Eq for dsl_atoms::DeclarativeKind
+impl core::cmp::PartialEq for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::eq(&self, &dsl_atoms::DeclarativeKind) -> bool
+impl core::fmt::Debug for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for dsl_atoms::DeclarativeKind
+impl serde_core::ser::Serialize for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_atoms::DeclarativeKind
+impl core::marker::Send for dsl_atoms::DeclarativeKind
+impl core::marker::Sync for dsl_atoms::DeclarativeKind
+impl core::marker::Unpin for dsl_atoms::DeclarativeKind
+impl core::marker::UnsafeUnpin for dsl_atoms::DeclarativeKind
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_atoms::DeclarativeKind
+impl core::panic::unwind_safe::UnwindSafe for dsl_atoms::DeclarativeKind
+impl<T, U> core::convert::Into<U> for dsl_atoms::DeclarativeKind where U: core::convert::From<T>
+pub fn dsl_atoms::DeclarativeKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_atoms::DeclarativeKind where U: core::convert::Into<T>
+pub type dsl_atoms::DeclarativeKind::Error = core::convert::Infallible
+pub fn dsl_atoms::DeclarativeKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_atoms::DeclarativeKind where U: core::convert::TryFrom<T>
+pub type dsl_atoms::DeclarativeKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_atoms::DeclarativeKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_atoms::DeclarativeKind where T: core::clone::Clone
+pub type dsl_atoms::DeclarativeKind::Owned = T
+pub fn dsl_atoms::DeclarativeKind::clone_into(&self, &mut T)
+pub fn dsl_atoms::DeclarativeKind::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_atoms::DeclarativeKind where T: 'static + ?core::marker::Sized
+pub fn dsl_atoms::DeclarativeKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_atoms::DeclarativeKind where T: ?core::marker::Sized
+pub fn dsl_atoms::DeclarativeKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_atoms::DeclarativeKind where T: ?core::marker::Sized
+pub fn dsl_atoms::DeclarativeKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_atoms::DeclarativeKind where T: core::clone::Clone
+pub unsafe fn dsl_atoms::DeclarativeKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_atoms::DeclarativeKind
+pub fn dsl_atoms::DeclarativeKind::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_atoms::DeclarativeKind where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_atoms::ParamType
+pub dsl_atoms::ParamType::Boolean
+pub dsl_atoms::ParamType::ConditionExpr
+pub dsl_atoms::ParamType::DecisionRef
+pub dsl_atoms::ParamType::Integer
+pub dsl_atoms::ParamType::ListOfConditionExpr
+pub dsl_atoms::ParamType::ListOfMap
+pub dsl_atoms::ParamType::ListOfNodeRef
+pub dsl_atoms::ParamType::ListOfPredicateRef
+pub dsl_atoms::ParamType::NodeRef
+pub dsl_atoms::ParamType::PathMap
+pub dsl_atoms::ParamType::PredicateRef
+pub dsl_atoms::ParamType::String_
+pub dsl_atoms::ParamType::Symbol
+impl core::clone::Clone for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::clone(&self) -> dsl_atoms::ParamType
+impl core::cmp::Eq for dsl_atoms::ParamType
+impl core::cmp::PartialEq for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::eq(&self, &dsl_atoms::ParamType) -> bool
+impl core::fmt::Debug for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for dsl_atoms::ParamType
+impl serde_core::ser::Serialize for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_atoms::ParamType
+impl core::marker::Send for dsl_atoms::ParamType
+impl core::marker::Sync for dsl_atoms::ParamType
+impl core::marker::Unpin for dsl_atoms::ParamType
+impl core::marker::UnsafeUnpin for dsl_atoms::ParamType
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_atoms::ParamType
+impl core::panic::unwind_safe::UnwindSafe for dsl_atoms::ParamType
+impl<T, U> core::convert::Into<U> for dsl_atoms::ParamType where U: core::convert::From<T>
+pub fn dsl_atoms::ParamType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_atoms::ParamType where U: core::convert::Into<T>
+pub type dsl_atoms::ParamType::Error = core::convert::Infallible
+pub fn dsl_atoms::ParamType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_atoms::ParamType where U: core::convert::TryFrom<T>
+pub type dsl_atoms::ParamType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_atoms::ParamType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_atoms::ParamType where T: core::clone::Clone
+pub type dsl_atoms::ParamType::Owned = T
+pub fn dsl_atoms::ParamType::clone_into(&self, &mut T)
+pub fn dsl_atoms::ParamType::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_atoms::ParamType where T: 'static + ?core::marker::Sized
+pub fn dsl_atoms::ParamType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_atoms::ParamType where T: ?core::marker::Sized
+pub fn dsl_atoms::ParamType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_atoms::ParamType where T: ?core::marker::Sized
+pub fn dsl_atoms::ParamType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_atoms::ParamType where T: core::clone::Clone
+pub unsafe fn dsl_atoms::ParamType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_atoms::ParamType
+pub fn dsl_atoms::ParamType::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_atoms::ParamType where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_atoms::StructuralKind
+pub dsl_atoms::StructuralKind::BoundaryAttachment
+pub dsl_atoms::StructuralKind::ConstellationRoot
+pub dsl_atoms::StructuralKind::DataType
+pub dsl_atoms::StructuralKind::Decision
+pub dsl_atoms::StructuralKind::DecisionPack
+pub dsl_atoms::StructuralKind::Entity
+pub dsl_atoms::StructuralKind::ErrorDefinition
+pub dsl_atoms::StructuralKind::Flow
+pub dsl_atoms::StructuralKind::Gateway
+pub dsl_atoms::StructuralKind::GraphPack
+pub dsl_atoms::StructuralKind::Invoke
+pub dsl_atoms::StructuralKind::MessageDefinition
+pub dsl_atoms::StructuralKind::Node
+pub dsl_atoms::StructuralKind::ParallelJoin
+pub dsl_atoms::StructuralKind::Predicate
+pub dsl_atoms::StructuralKind::Relationship
+pub dsl_atoms::StructuralKind::TimerDefinition
+pub dsl_atoms::StructuralKind::UtteranceBinding
+pub dsl_atoms::StructuralKind::Verb
+pub dsl_atoms::StructuralKind::WorkspaceConstraint
+impl core::clone::Clone for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::clone(&self) -> dsl_atoms::StructuralKind
+impl core::cmp::Eq for dsl_atoms::StructuralKind
+impl core::cmp::PartialEq for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::eq(&self, &dsl_atoms::StructuralKind) -> bool
+impl core::fmt::Debug for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for dsl_atoms::StructuralKind
+impl serde_core::ser::Serialize for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_atoms::StructuralKind
+impl core::marker::Send for dsl_atoms::StructuralKind
+impl core::marker::Sync for dsl_atoms::StructuralKind
+impl core::marker::Unpin for dsl_atoms::StructuralKind
+impl core::marker::UnsafeUnpin for dsl_atoms::StructuralKind
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_atoms::StructuralKind
+impl core::panic::unwind_safe::UnwindSafe for dsl_atoms::StructuralKind
+impl<T, U> core::convert::Into<U> for dsl_atoms::StructuralKind where U: core::convert::From<T>
+pub fn dsl_atoms::StructuralKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_atoms::StructuralKind where U: core::convert::Into<T>
+pub type dsl_atoms::StructuralKind::Error = core::convert::Infallible
+pub fn dsl_atoms::StructuralKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_atoms::StructuralKind where U: core::convert::TryFrom<T>
+pub type dsl_atoms::StructuralKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_atoms::StructuralKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_atoms::StructuralKind where T: core::clone::Clone
+pub type dsl_atoms::StructuralKind::Owned = T
+pub fn dsl_atoms::StructuralKind::clone_into(&self, &mut T)
+pub fn dsl_atoms::StructuralKind::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_atoms::StructuralKind where T: 'static + ?core::marker::Sized
+pub fn dsl_atoms::StructuralKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_atoms::StructuralKind where T: ?core::marker::Sized
+pub fn dsl_atoms::StructuralKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_atoms::StructuralKind where T: ?core::marker::Sized
+pub fn dsl_atoms::StructuralKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_atoms::StructuralKind where T: core::clone::Clone
+pub unsafe fn dsl_atoms::StructuralKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_atoms::StructuralKind
+pub fn dsl_atoms::StructuralKind::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_atoms::StructuralKind where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn dsl_atoms::classify(&str) -> dsl_atoms::AtomKindClass

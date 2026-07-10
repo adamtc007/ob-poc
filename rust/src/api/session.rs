@@ -2117,7 +2117,7 @@ pub struct SessionContext {
 
     /// Taxonomy navigation stack for fractal drill-down
     #[serde(default)]
-    pub taxonomy_stack: crate::taxonomy::TaxonomyStack,
+    pub taxonomy_stack: ob_poc_taxonomy::taxonomy::TaxonomyStack,
 
     // =========================================================================
     // Taxonomy-Driven Layout Fields

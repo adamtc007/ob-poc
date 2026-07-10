@@ -1,0 +1,132 @@
+# dsl-ast | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:11Z
+pub mod dsl_ast
+pub struct dsl_ast::AtomBag
+impl dsl_ast::AtomBag
+pub fn dsl_ast::AtomBag::atoms_of_structural_kind(&self, dsl_atoms::kinds::StructuralKind) -> alloc::vec::Vec<&dsl_ast::TypedAtom>
+pub fn dsl_ast::AtomBag::declarative_atoms(&self) -> impl core::iter::traits::iterator::Iterator<Item = &dsl_ast::TypedAtom>
+pub fn dsl_ast::AtomBag::find(&self, &str) -> core::option::Option<dsl_ast::AtomIndex>
+pub fn dsl_ast::AtomBag::from_source_file(dsl_parser::raw_ast::SourceFile, &mut dsl_diagnostics::diagnostic::DiagnosticBag) -> Self
+pub fn dsl_ast::AtomBag::get(&self, dsl_ast::AtomIndex) -> &dsl_ast::TypedAtom
+pub fn dsl_ast::AtomBag::is_empty(&self) -> bool
+pub fn dsl_ast::AtomBag::len(&self) -> usize
+pub fn dsl_ast::AtomBag::structural_atoms(&self) -> impl core::iter::traits::iterator::Iterator<Item = &dsl_ast::TypedAtom>
+impl core::default::Default for dsl_ast::AtomBag
+pub fn dsl_ast::AtomBag::default() -> dsl_ast::AtomBag
+impl core::fmt::Debug for dsl_ast::AtomBag
+pub fn dsl_ast::AtomBag::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_ast::AtomBag
+pub fn dsl_ast::AtomBag::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_ast::AtomBag
+pub fn dsl_ast::AtomBag::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_ast::AtomBag
+impl core::marker::Send for dsl_ast::AtomBag
+impl core::marker::Sync for dsl_ast::AtomBag
+impl core::marker::Unpin for dsl_ast::AtomBag
+impl core::marker::UnsafeUnpin for dsl_ast::AtomBag
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_ast::AtomBag
+impl core::panic::unwind_safe::UnwindSafe for dsl_ast::AtomBag
+impl<T, U> core::convert::Into<U> for dsl_ast::AtomBag where U: core::convert::From<T>
+pub fn dsl_ast::AtomBag::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_ast::AtomBag where U: core::convert::Into<T>
+pub type dsl_ast::AtomBag::Error = core::convert::Infallible
+pub fn dsl_ast::AtomBag::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_ast::AtomBag where U: core::convert::TryFrom<T>
+pub type dsl_ast::AtomBag::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_ast::AtomBag::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_ast::AtomBag where T: 'static + ?core::marker::Sized
+pub fn dsl_ast::AtomBag::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_ast::AtomBag where T: ?core::marker::Sized
+pub fn dsl_ast::AtomBag::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_ast::AtomBag where T: ?core::marker::Sized
+pub fn dsl_ast::AtomBag::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_ast::AtomBag
+pub fn dsl_ast::AtomBag::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_ast::AtomBag where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_ast::AtomIndex(pub usize)
+impl core::clone::Clone for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::clone(&self) -> dsl_ast::AtomIndex
+impl core::cmp::Eq for dsl_ast::AtomIndex
+impl core::cmp::PartialEq for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::eq(&self, &dsl_ast::AtomIndex) -> bool
+impl core::fmt::Debug for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for dsl_ast::AtomIndex
+impl core::marker::StructuralPartialEq for dsl_ast::AtomIndex
+impl serde_core::ser::Serialize for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_ast::AtomIndex
+impl core::marker::Send for dsl_ast::AtomIndex
+impl core::marker::Sync for dsl_ast::AtomIndex
+impl core::marker::Unpin for dsl_ast::AtomIndex
+impl core::marker::UnsafeUnpin for dsl_ast::AtomIndex
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_ast::AtomIndex
+impl core::panic::unwind_safe::UnwindSafe for dsl_ast::AtomIndex
+impl<T, U> core::convert::Into<U> for dsl_ast::AtomIndex where U: core::convert::From<T>
+pub fn dsl_ast::AtomIndex::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_ast::AtomIndex where U: core::convert::Into<T>
+pub type dsl_ast::AtomIndex::Error = core::convert::Infallible
+pub fn dsl_ast::AtomIndex::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_ast::AtomIndex where U: core::convert::TryFrom<T>
+pub type dsl_ast::AtomIndex::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_ast::AtomIndex::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_ast::AtomIndex where T: core::clone::Clone
+pub type dsl_ast::AtomIndex::Owned = T
+pub fn dsl_ast::AtomIndex::clone_into(&self, &mut T)
+pub fn dsl_ast::AtomIndex::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_ast::AtomIndex where T: 'static + ?core::marker::Sized
+pub fn dsl_ast::AtomIndex::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_ast::AtomIndex where T: ?core::marker::Sized
+pub fn dsl_ast::AtomIndex::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_ast::AtomIndex where T: ?core::marker::Sized
+pub fn dsl_ast::AtomIndex::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_ast::AtomIndex where T: core::clone::Clone
+pub unsafe fn dsl_ast::AtomIndex::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_ast::AtomIndex
+pub fn dsl_ast::AtomIndex::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_ast::AtomIndex where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_ast::TypedAtom
+pub dsl_ast::TypedAtom::kind_class: dsl_atoms::kinds::AtomKindClass
+pub dsl_ast::TypedAtom::name: core::option::Option<alloc::string::String>
+pub dsl_ast::TypedAtom::raw: dsl_parser::raw_ast::RawAtom
+impl core::clone::Clone for dsl_ast::TypedAtom
+pub fn dsl_ast::TypedAtom::clone(&self) -> dsl_ast::TypedAtom
+impl core::fmt::Debug for dsl_ast::TypedAtom
+pub fn dsl_ast::TypedAtom::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_ast::TypedAtom
+pub fn dsl_ast::TypedAtom::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_ast::TypedAtom
+pub fn dsl_ast::TypedAtom::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_ast::TypedAtom
+impl core::marker::Send for dsl_ast::TypedAtom
+impl core::marker::Sync for dsl_ast::TypedAtom
+impl core::marker::Unpin for dsl_ast::TypedAtom
+impl core::marker::UnsafeUnpin for dsl_ast::TypedAtom
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_ast::TypedAtom
+impl core::panic::unwind_safe::UnwindSafe for dsl_ast::TypedAtom
+impl<T, U> core::convert::Into<U> for dsl_ast::TypedAtom where U: core::convert::From<T>
+pub fn dsl_ast::TypedAtom::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_ast::TypedAtom where U: core::convert::Into<T>
+pub type dsl_ast::TypedAtom::Error = core::convert::Infallible
+pub fn dsl_ast::TypedAtom::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_ast::TypedAtom where U: core::convert::TryFrom<T>
+pub type dsl_ast::TypedAtom::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_ast::TypedAtom::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_ast::TypedAtom where T: core::clone::Clone
+pub type dsl_ast::TypedAtom::Owned = T
+pub fn dsl_ast::TypedAtom::clone_into(&self, &mut T)
+pub fn dsl_ast::TypedAtom::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_ast::TypedAtom where T: 'static + ?core::marker::Sized
+pub fn dsl_ast::TypedAtom::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_ast::TypedAtom where T: ?core::marker::Sized
+pub fn dsl_ast::TypedAtom::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_ast::TypedAtom where T: ?core::marker::Sized
+pub fn dsl_ast::TypedAtom::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_ast::TypedAtom where T: core::clone::Clone
+pub unsafe fn dsl_ast::TypedAtom::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_ast::TypedAtom
+pub fn dsl_ast::TypedAtom::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_ast::TypedAtom where T: for<'de> serde_core::de::Deserialize<'de>

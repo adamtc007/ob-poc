@@ -104,17 +104,6 @@ pub struct UtteranceReceiptOutput {
 
 // ─── Stage 2a — Utterance interpretation (NLP) ────────────────────────────────
 
-/// Stage 2a input: raw text + session context (workspace, scope).
-///
-/// Maps to `handle_in_pack` body via `IntentService`.
-#[derive(Debug, Clone)]
-pub struct UtteranceInterpretationInput {
-    pub trace_id: TraceId,
-    pub utterance: String,
-    pub workspace: Option<String>,
-    pub scope_summary: Option<String>,
-}
-
 /// Stage 2a output: structured triples + verb intent.
 ///
 /// `triples` is the (type, name, scope) projection that stage 2b
@@ -139,14 +128,6 @@ pub struct EntityTriple {
 
 // ─── Stage 2b — Entity resolution ─────────────────────────────────────────────
 
-/// Stage 2b input: triples from 2a + session-scoped lookup context.
-#[derive(Debug, Clone)]
-pub struct EntityResolutionInput {
-    pub trace_id: TraceId,
-    pub triples: Vec<EntityTriple>,
-    pub session_id: Uuid,
-}
-
 /// Stage 2b output: triples mapped to canonical entity ids.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityResolutionOutput {
@@ -163,14 +144,6 @@ pub struct ResolvedEntity {
 
 // ─── Stage 3 — DAG navigation ─────────────────────────────────────────────────
 
-/// Stage 3 input: resolved entity ids → session DAG cursor.
-#[derive(Debug, Clone)]
-pub struct DagNavigationInput {
-    pub trace_id: TraceId,
-    pub session_id: Uuid,
-    pub anchor_entity_ids: Vec<Uuid>,
-}
-
 /// Stage 3 output: current state nodes for the session's DAG cursor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DagNavigationOutput {
@@ -186,22 +159,6 @@ pub struct StateNodeRef {
 }
 
 // ─── Stage 4 — Verb surface disclosure ────────────────────────────────────────
-
-/// Stage 4 input: state nodes from stage 3 + session actor.
-///
-/// **Note:** The orchestrator today derives the surface from the
-/// SemOS context envelope (Phase 2 evaluation) plus a pack fallback,
-/// not raw state nodes. The state-nodes shape here is the spec's
-/// idealised view that only becomes the operative input once
-/// Stage 3 is extracted as its own typed call. For the practical
-/// shape used by the current orchestrator, see
-/// [`VerbSurfaceComposition::run`].
-#[derive(Debug, Clone)]
-pub struct VerbSurfaceInput {
-    pub trace_id: TraceId,
-    pub session_id: Uuid,
-    pub state_nodes: Vec<StateNodeRef>,
-}
 
 /// Practical Stage 4 input — the surface composition the orchestrator
 /// actually has at the moment it needs to call Stage 4. Exhaustively
@@ -228,7 +185,6 @@ pub enum VerbSurfaceComposition {
     /// what the user is encouraged to do at this stage.
     SemOsAvailableWithPack {
         legal_verbs: Vec<String>,
-        pack_id: String,
         pack_verbs: Vec<String>,
         fingerprint: Option<String>,
         pruned_count: usize,
@@ -240,7 +196,6 @@ pub enum VerbSurfaceComposition {
     /// SemOS unavailable AND a pack is active — fall back to the
     /// pack's `allowed_verbs` so the REPL stays usable in dev/test.
     SemOsUnavailableWithPack {
-        pack_id: String,
         pack_verbs: Vec<String>,
     },
     /// SemOS unavailable AND no pack active — fail closed: empty
@@ -270,7 +225,6 @@ impl VerbSurfaceComposition {
                 pack_verbs,
                 fingerprint,
                 pruned_count,
-                ..
             } => {
                 // Union — pack additively whitelists verbs the pack
                 // journey explicitly authorises, even when SemOS has
@@ -294,7 +248,7 @@ impl VerbSurfaceComposition {
                 fingerprint: String::new(),
                 pruned_count: 0,
             },
-            Self::SemOsUnavailableWithPack { pack_verbs, .. } => VerbSurfaceOutput {
+            Self::SemOsUnavailableWithPack { pack_verbs } => VerbSurfaceOutput {
                 allowed_verbs: pack_verbs,
                 fingerprint: String::new(),
                 pruned_count: 0,
@@ -321,15 +275,6 @@ pub struct VerbSurfaceOutput {
 
 // ─── Stage 5 — NLP match ──────────────────────────────────────────────────────
 
-/// Stage 5 input: utterance interpretation + verb surface.
-#[derive(Debug, Clone)]
-pub struct NlpMatchInput {
-    pub trace_id: TraceId,
-    pub utterance: String,
-    pub verb_intent: Option<Vec<String>>,
-    pub allowed_verbs: Vec<String>,
-}
-
 /// Stage 5 output: selected verb + arg binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NlpMatchOutput {
@@ -340,35 +285,7 @@ pub struct NlpMatchOutput {
 
 // ─── Stage 6 — Gate decision ──────────────────────────────────────────────────
 
-/// Stage 6 input: selected verb + bound args + session.
-///
-/// The gate produces a `GatedVerbEnvelope` (defined in `ob-poc-types`)
-/// which already has its own typed contract; we re-export it here as
-/// the stage output for symmetry.
-#[derive(Debug, Clone)]
-pub struct GateDecisionInput {
-    pub trace_id: TraceId,
-    pub session_id: Uuid,
-    pub selected_verb: String,
-    pub arg_bindings: serde_json::Value,
-}
-
-/// Stage 6 output: a sealed envelope ready for stage-7 runbook
-/// compilation. Boxed because `GatedVerbEnvelope` is a wide struct
-/// and the harness fixtures pass it around by reference.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GateDecisionOutput {
-    pub envelope: ob_poc_types::GatedVerbEnvelope,
-}
-
 // ─── Stage 7 — Runbook compilation ────────────────────────────────────────────
-
-/// Stage 7 input: one or more envelopes from stage 6.
-#[derive(Debug, Clone)]
-pub struct RunbookCompilationInput {
-    pub trace_id: TraceId,
-    pub envelopes: Vec<ob_poc_types::GatedVerbEnvelope>,
-}
 
 /// Stage 7 output: an ordered runbook the dispatch loop can iterate.
 ///
@@ -383,21 +300,6 @@ pub struct RunbookCompilationOutput {
 
 // ─── Stage 8 — Dispatch loop ──────────────────────────────────────────────────
 
-/// Stage 8 input: a compiled runbook + a transaction scope handle the
-/// dispatch loop will pass into each step.
-///
-/// `scope_id` is the correlation id; the actual `&mut dyn TransactionScope`
-/// lives in the dispatch fn's closure scope, not in this input shape
-/// (it would require lifetime parameters that defeat the typed-fixture
-/// determinism harness).
-#[derive(Debug, Clone)]
-pub struct DispatchLoopInput {
-    pub trace_id: TraceId,
-    pub session_id: Uuid,
-    pub runbook_id: Uuid,
-    pub scope_id: ob_poc_types::TransactionScopeId,
-}
-
 /// Stage 8 output: per-step outcomes + cumulative
 /// `PendingStateAdvance` totals.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -410,15 +312,6 @@ pub struct DispatchLoopOutput {
 
 // ─── Stage 9a — Commit ────────────────────────────────────────────────────────
 
-/// Stage 9a input: the scope handle the dispatch loop owned during
-/// stage 8.
-#[derive(Debug, Clone)]
-pub struct CommitInput {
-    pub trace_id: TraceId,
-    pub scope_id: ob_poc_types::TransactionScopeId,
-    pub dispatch_summary: DispatchLoopOutput,
-}
-
 /// Stage 9a output: commit confirmation + the outbox row count that
 /// will be drained in stage 9b.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -429,15 +322,6 @@ pub struct CommitOutput {
 }
 
 // ─── Stage 9b — Post-commit (drainer) ─────────────────────────────────────────
-
-/// Stage 9b input: the trace anchor and the count of rows the commit
-/// emitted. The drainer is a long-running task; this "input" shape is
-/// the per-commit handoff signal it processes.
-#[derive(Debug, Clone)]
-pub struct PostCommitDrainInput {
-    pub trace_id: TraceId,
-    pub committed_outbox_count: usize,
-}
 
 /// Stage 9b output: roll-up of drainer outcomes for this trace.
 ///
@@ -629,23 +513,13 @@ impl NlpMatchOutput {
     }
 }
 
-// ─── Stage 6 — Gate decision (extracted) ──────────────────────────────────────
-
-impl GateDecisionOutput {
-    /// Wrap an existing `GatedVerbEnvelope`. Stage 6's primary work
-    /// produces this envelope already; the typed Stage 6 output is
-    /// just the boundary projection.
-    pub fn from_envelope(envelope: ob_poc_types::GatedVerbEnvelope) -> Self {
-        Self { envelope }
-    }
-}
-
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
 /// Union of every stage's failure mode (§8.3). Each variant is named
 /// after the stage it can fire from; the wrapped data is the
 /// minimum context the harness or the operator needs to attribute the
 /// failure.
+#[allow(dead_code)] // kept for tests
 #[derive(Debug, thiserror::Error)]
 pub enum StageError {
     #[error("stage 2a — utterance interpretation failed: {0}")]
@@ -792,7 +666,6 @@ mod tests {
                 "deal.read".into(),
                 "agent.start".into(),
             ],
-            pack_id: "onboarding-request".into(),
             pack_verbs: vec![
                 "deal.read".into(),
                 "cbu.read".into(),
@@ -820,7 +693,6 @@ mod tests {
     fn stage_4_sem_os_with_pack_dedupes_overlap() {
         let comp = VerbSurfaceComposition::SemOsAvailableWithPack {
             legal_verbs: vec!["cbu.read".into(), "deal.read".into()],
-            pack_id: "onboarding-request".into(),
             pack_verbs: vec!["cbu.read".into(), "deal.read".into()],
             fingerprint: Some("v1:xyz".into()),
             pruned_count: 5,
@@ -836,7 +708,6 @@ mod tests {
     #[test]
     fn stage_4_pack_fallback_uses_pack_verbs() {
         let comp = VerbSurfaceComposition::SemOsUnavailableWithPack {
-            pack_id: "book-setup".into(),
             pack_verbs: vec!["cbu.create".into(), "structure.setup".into()],
         };
         let out = comp.run();
@@ -923,12 +794,6 @@ mod tests {
         assert_eq!(out.arg_bindings, bindings);
         assert!((out.match_score - 0.87).abs() < f64::EPSILON);
     }
-
-    // ── Stage 6 ────────────────────────────────────────────────────
-    // GateDecisionOutput::from_envelope is exercised at the
-    // integration boundary; the unit-level pin is the trivial
-    // wrapper round-trip. We don't fabricate a GatedVerbEnvelope
-    // here because its fixture lives in the gated_envelope module.
 
     // ── Stage 7 ────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jwZAy6JizwHaqUjmIwEoAKYsfenFvdVGFc8LJixjWQ2f8EcRROMnoBLWlK3ePyS
+\restrict BiqxqYlBXSng96Lb6lYSHl3VIc78Y1Rc5tJkfONKzE9fEpUQjtdDUL43bIqSWif
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -441,98 +441,6 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".add_learned_pattern(p_verb_full_name text, p_pattern text) IS 'Add a learned pattern to dsl_verbs.intent_patterns - called by learning loop';
-
-
---
--- Name: apply_case_decision(uuid, character varying, character varying, text); Type: FUNCTION; Schema: ob-poc; Owner: -
---
-
-CREATE FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text DEFAULT NULL::text) RETURNS boolean
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_current_status VARCHAR(30);
-    v_latest_eval RECORD;
-    v_new_status VARCHAR(30);
-BEGIN
-    -- Get current case status
-    SELECT status INTO v_current_status
-    FROM kyc.cases WHERE case_id = p_case_id;
-    
-    -- Get latest evaluation
-    SELECT * INTO v_latest_eval
-    FROM "ob-poc".case_evaluation_snapshots
-    WHERE case_id = p_case_id
-    ORDER BY evaluated_at DESC
-    LIMIT 1;
-    
-    -- Validate decision against recommendation
-    IF v_latest_eval.has_hard_stop AND p_decision NOT IN ('DO_NOT_ONBOARD', 'REJECT', 'REFER_TO_REGULATOR') THEN
-        RAISE EXCEPTION 'Cannot approve case with unresolved hard stops. Recommended: %', v_latest_eval.recommended_action;
-    END IF;
-    
-    -- Map decision to case status
-    v_new_status := CASE p_decision
-        WHEN 'APPROVE' THEN 'APPROVED'
-        WHEN 'APPROVE_WITH_CONDITIONS' THEN 'APPROVED'
-        WHEN 'REJECT' THEN 'REJECTED'
-        WHEN 'DO_NOT_ONBOARD' THEN 'DO_NOT_ONBOARD'
-        WHEN 'REFER_TO_REGULATOR' THEN 'REFER_TO_REGULATOR'
-        WHEN 'ESCALATE' THEN 'REVIEW'  -- Stay in review but escalate
-        ELSE v_current_status
-    END;
-    
-    -- Update evaluation snapshot with decision
-    UPDATE "ob-poc".case_evaluation_snapshots
-    SET decision_made = p_decision,
-        decision_made_at = now(),
-        decision_made_by = p_decided_by,
-        decision_notes = p_notes
-    WHERE snapshot_id = v_latest_eval.snapshot_id;
-    
-    -- Update case status if changed
-    IF v_new_status != v_current_status THEN
-        UPDATE kyc.cases
-        SET status = v_new_status,
-            last_activity_at = now()
-        WHERE case_id = p_case_id;
-        
-        -- If closing, set closed_at
-        IF v_new_status IN ('APPROVED', 'REJECTED', 'DO_NOT_ONBOARD') THEN
-            UPDATE kyc.cases
-            SET closed_at = now()
-            WHERE case_id = p_case_id;
-        END IF;
-    END IF;
-    
-    -- Log case event
-    INSERT INTO kyc.case_events (
-        case_id, event_type, event_data, actor_type, comment
-    ) VALUES (
-        p_case_id, 
-        'DECISION_APPLIED',
-        jsonb_build_object(
-            'decision', p_decision,
-            'previous_status', v_current_status,
-            'new_status', v_new_status,
-            'evaluation_snapshot_id', v_latest_eval.snapshot_id,
-            'total_score', v_latest_eval.total_score,
-            'has_hard_stop', v_latest_eval.has_hard_stop
-        ),
-        'USER',
-        p_notes
-    );
-    
-    RETURN true;
-END;
-$$;
-
-
---
--- Name: FUNCTION apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text); Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON FUNCTION "ob-poc".apply_case_decision(p_case_id uuid, p_decision character varying, p_decided_by character varying, p_notes text) IS 'Applies decision to case with validation';
 
 
 --
@@ -1944,73 +1852,6 @@ $$;
 
 
 --
--- Name: evaluate_case_decision(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
---
-
-CREATE FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying DEFAULT NULL::character varying) RETURNS uuid
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    v_scores RECORD;
-    v_threshold RECORD;
-    v_snapshot_id UUID;
-BEGIN
-    -- Get current scores
-    SELECT * INTO v_scores
-    FROM "ob-poc".compute_case_redflag_score(p_case_id);
-    
-    -- Find matching threshold (priority: hard_stop > escalate > score-based)
-    IF v_scores.has_hard_stop THEN
-        SELECT * INTO v_threshold
-        FROM "ob-poc".case_decision_thresholds
-        WHERE has_hard_stop = true AND is_active = true
-        LIMIT 1;
-    ELSIF v_scores.escalate_count > 0 THEN
-        SELECT * INTO v_threshold
-        FROM "ob-poc".case_decision_thresholds
-        WHERE threshold_name = 'escalate_flags' AND is_active = true
-        LIMIT 1;
-    ELSE
-        SELECT * INTO v_threshold
-        FROM "ob-poc".case_decision_thresholds
-        WHERE is_active = true
-          AND has_hard_stop = false
-          AND (min_score IS NULL OR v_scores.total_score >= min_score)
-          AND (max_score IS NULL OR v_scores.total_score <= max_score)
-        ORDER BY COALESCE(min_score, 0) DESC
-        LIMIT 1;
-    END IF;
-    
-    -- Create evaluation snapshot
-    INSERT INTO "ob-poc".case_evaluation_snapshots (
-        case_id,
-        soft_count, escalate_count, hard_stop_count,
-        soft_score, escalate_score, has_hard_stop, total_score,
-        open_flags, mitigated_flags, waived_flags,
-        matched_threshold_id, recommended_action, required_escalation_level,
-        evaluated_by
-    ) VALUES (
-        p_case_id,
-        v_scores.soft_count, v_scores.escalate_count, v_scores.hard_stop_count,
-        v_scores.soft_score, v_scores.escalate_score, v_scores.has_hard_stop, v_scores.total_score,
-        v_scores.open_flags, v_scores.mitigated_flags, v_scores.waived_flags,
-        v_threshold.threshold_id, v_threshold.recommended_action, v_threshold.escalation_level,
-        p_evaluator
-    ) RETURNING snapshot_id INTO v_snapshot_id;
-    
-    RETURN v_snapshot_id;
-END;
-$$;
-
-
---
--- Name: FUNCTION evaluate_case_decision(p_case_id uuid, p_evaluator character varying); Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator character varying) IS 'Evaluates case and creates recommendation snapshot';
-
-
---
 -- Name: expire_pending_outcomes(integer); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3338,44 +3179,6 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".is_natural_person(entity_id uuid) IS 'Returns true if entity is a natural person (PERSON category)';
-
-
---
--- Name: is_valid_cbu_transition(character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
---
-
-CREATE FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) RETURNS boolean
-    LANGUAGE plpgsql IMMUTABLE
-    AS $$
-BEGIN
-    -- Same status is always valid (no-op)
-    IF p_from_status = p_to_status THEN
-        RETURN true;
-    END IF;
-    
-    RETURN CASE p_from_status
-        WHEN 'DISCOVERED' THEN 
-            p_to_status IN ('VALIDATION_PENDING', 'VALIDATION_FAILED')
-        WHEN 'VALIDATION_PENDING' THEN 
-            p_to_status IN ('VALIDATED', 'VALIDATION_FAILED', 'DISCOVERED')
-        WHEN 'VALIDATED' THEN 
-            p_to_status IN ('UPDATE_PENDING_PROOF')  -- Material change triggers re-validation
-        WHEN 'UPDATE_PENDING_PROOF' THEN 
-            p_to_status IN ('VALIDATED', 'VALIDATION_FAILED')
-        WHEN 'VALIDATION_FAILED' THEN 
-            p_to_status IN ('VALIDATION_PENDING', 'DISCOVERED')  -- Retry or start over
-        ELSE 
-            false
-    END;
-END;
-$$;
-
-
---
--- Name: FUNCTION is_valid_cbu_transition(p_from_status character varying, p_to_status character varying); Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON FUNCTION "ob-poc".is_valid_cbu_transition(p_from_status character varying, p_to_status character varying) IS 'Validates CBU status transitions';
 
 
 --
@@ -5151,64 +4954,6 @@ $$;
 
 
 --
--- Name: set_bods_interest_type(); Type: FUNCTION; Schema: ob-poc; Owner: -
---
-
-CREATE FUNCTION "ob-poc".set_bods_interest_type() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.bods_interest_type IS NULL THEN
-        NEW.bods_interest_type := CASE NEW.edge_type
-            WHEN 'HOLDS_SHARES' THEN 'shareholding'
-            WHEN 'HOLDS_VOTING_RIGHTS' THEN 'voting-rights'
-            WHEN 'APPOINTS_BOARD' THEN 'appointment-of-board'
-            WHEN 'EXERCISES_INFLUENCE' THEN 'other-influence-or-control'
-            WHEN 'IS_SENIOR_MANAGER' THEN 'senior-managing-official'
-            WHEN 'IS_SETTLOR' THEN 'settlor-of-trust'
-            WHEN 'IS_TRUSTEE' THEN 'trustee-of-trust'
-            WHEN 'IS_PROTECTOR' THEN 'protector-of-trust'
-            WHEN 'IS_BENEFICIARY' THEN 'beneficiary-of-trust'
-            WHEN 'HAS_DISSOLUTION_RIGHTS' THEN 'rights-to-surplus-assets-on-dissolution'
-            WHEN 'HAS_PROFIT_RIGHTS' THEN 'rights-to-profit-or-income'
-            ELSE NULL
-        END;
-    END IF;
-
-    -- Auto-set GLEIF relationship type
-    IF NEW.gleif_relationship_type IS NULL THEN
-        NEW.gleif_relationship_type := CASE NEW.edge_type
-            WHEN 'CONSOLIDATED_BY' THEN 'IS_DIRECTLY_CONSOLIDATED_BY'
-            WHEN 'ULTIMATELY_CONSOLIDATED_BY' THEN 'IS_ULTIMATELY_CONSOLIDATED_BY'
-            WHEN 'MANAGED_BY' THEN 'IS_FUND_MANAGED_BY'
-            WHEN 'SUBFUND_OF' THEN 'IS_SUBFUND_OF'
-            WHEN 'FEEDS_INTO' THEN 'IS_FEEDER_TO'
-            ELSE NULL
-        END;
-    END IF;
-
-    -- Auto-set PSC category based on edge type + percentage
-    IF NEW.psc_category IS NULL AND NEW.percentage IS NOT NULL THEN
-        NEW.psc_category := CASE
-            WHEN NEW.edge_type = 'HOLDS_SHARES' AND NEW.percentage > 75 THEN 'ownership-of-shares-75-to-100'
-            WHEN NEW.edge_type = 'HOLDS_SHARES' AND NEW.percentage > 50 THEN 'ownership-of-shares-50-to-75'
-            WHEN NEW.edge_type = 'HOLDS_SHARES' AND NEW.percentage > 25 THEN 'ownership-of-shares-25-to-50'
-            WHEN NEW.edge_type = 'HOLDS_VOTING_RIGHTS' AND NEW.percentage > 75 THEN 'voting-rights-75-to-100'
-            WHEN NEW.edge_type = 'HOLDS_VOTING_RIGHTS' AND NEW.percentage > 50 THEN 'voting-rights-50-to-75'
-            WHEN NEW.edge_type = 'HOLDS_VOTING_RIGHTS' AND NEW.percentage > 25 THEN 'voting-rights-25-to-50'
-            WHEN NEW.edge_type = 'APPOINTS_BOARD' AND NEW.percentage > 50 THEN 'appoints-majority-of-board'
-            WHEN NEW.edge_type = 'EXERCISES_INFLUENCE' THEN 'significant-influence-or-control'
-            ELSE NULL
-        END;
-    END IF;
-
-    NEW.updated_at := NOW();
-    RETURN NEW;
-END;
-$$;
-
-
---
 -- Name: stage_command(uuid, text, text, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -6687,64 +6432,6 @@ BEGIN
     RETURN endpoint_url;
 END;
 $_$;
-
-
---
--- Name: set_bods_interest_type(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.set_bods_interest_type() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    IF NEW.bods_interest_type IS NULL THEN
-        NEW.bods_interest_type := CASE NEW.edge_type
-            WHEN 'HOLDS_SHARES' THEN 'shareholding'
-            WHEN 'HOLDS_VOTING_RIGHTS' THEN 'voting-rights'
-            WHEN 'APPOINTS_BOARD' THEN 'appointment-of-board'
-            WHEN 'EXERCISES_INFLUENCE' THEN 'other-influence-or-control'
-            WHEN 'IS_SENIOR_MANAGER' THEN 'senior-managing-official'
-            WHEN 'IS_SETTLOR' THEN 'settlor-of-trust'
-            WHEN 'IS_TRUSTEE' THEN 'trustee-of-trust'
-            WHEN 'IS_PROTECTOR' THEN 'protector-of-trust'
-            WHEN 'IS_BENEFICIARY' THEN 'beneficiary-of-trust'
-            WHEN 'HAS_DISSOLUTION_RIGHTS' THEN 'rights-to-surplus-assets-on-dissolution'
-            WHEN 'HAS_PROFIT_RIGHTS' THEN 'rights-to-profit-or-income'
-            ELSE NULL
-        END;
-    END IF;
-
-    -- Auto-set GLEIF relationship type
-    IF NEW.gleif_relationship_type IS NULL THEN
-        NEW.gleif_relationship_type := CASE NEW.edge_type
-            WHEN 'CONSOLIDATED_BY' THEN 'IS_DIRECTLY_CONSOLIDATED_BY'
-            WHEN 'ULTIMATELY_CONSOLIDATED_BY' THEN 'IS_ULTIMATELY_CONSOLIDATED_BY'
-            WHEN 'MANAGED_BY' THEN 'IS_FUND_MANAGED_BY'
-            WHEN 'SUBFUND_OF' THEN 'IS_SUBFUND_OF'
-            WHEN 'FEEDS_INTO' THEN 'IS_FEEDER_TO'
-            ELSE NULL
-        END;
-    END IF;
-
-    -- Auto-set PSC category based on edge type + percentage
-    IF NEW.psc_category IS NULL AND NEW.percentage IS NOT NULL THEN
-        NEW.psc_category := CASE
-            WHEN NEW.edge_type = 'HOLDS_SHARES' AND NEW.percentage > 75 THEN 'ownership-of-shares-75-to-100'
-            WHEN NEW.edge_type = 'HOLDS_SHARES' AND NEW.percentage > 50 THEN 'ownership-of-shares-50-to-75'
-            WHEN NEW.edge_type = 'HOLDS_SHARES' AND NEW.percentage > 25 THEN 'ownership-of-shares-25-to-50'
-            WHEN NEW.edge_type = 'HOLDS_VOTING_RIGHTS' AND NEW.percentage > 75 THEN 'voting-rights-75-to-100'
-            WHEN NEW.edge_type = 'HOLDS_VOTING_RIGHTS' AND NEW.percentage > 50 THEN 'voting-rights-50-to-75'
-            WHEN NEW.edge_type = 'HOLDS_VOTING_RIGHTS' AND NEW.percentage > 25 THEN 'voting-rights-25-to-50'
-            WHEN NEW.edge_type = 'APPOINTS_BOARD' AND NEW.percentage > 50 THEN 'appoints-majority-of-board'
-            WHEN NEW.edge_type = 'EXERCISES_INFLUENCE' THEN 'significant-influence-or-control'
-            ELSE NULL
-        END;
-    END IF;
-
-    NEW.updated_at := NOW();
-    RETURN NEW;
-END;
-$$;
 
 
 --
@@ -8263,7 +7950,7 @@ CREATE TABLE "ob-poc".cases (
     due_date date,
     escalation_date date,
     row_version bigint DEFAULT 1 NOT NULL,
-    CONSTRAINT cases_chk_case_status CHECK (((status)::text = ANY ((ARRAY['INTAKE'::character varying, 'DISCOVERY'::character varying, 'ASSESSMENT'::character varying, 'REVIEW'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'BLOCKED'::character varying, 'WITHDRAWN'::character varying, 'DO_NOT_ONBOARD'::character varying])::text[]))),
+    CONSTRAINT cases_chk_case_status CHECK (((status)::text = ANY ((ARRAY['INTAKE'::character varying, 'DISCOVERY'::character varying, 'ASSESSMENT'::character varying, 'REVIEW'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'BLOCKED'::character varying, 'WITHDRAWN'::character varying, 'DO_NOT_ONBOARD'::character varying, 'EXPIRED'::character varying, 'REFER_TO_REGULATOR'::character varying])::text[]))),
     CONSTRAINT cases_chk_case_type CHECK (((case_type)::text = ANY (ARRAY[('NEW_CLIENT'::character varying)::text, ('PERIODIC_REVIEW'::character varying)::text, ('EVENT_DRIVEN'::character varying)::text, ('REMEDIATION'::character varying)::text]))),
     CONSTRAINT cases_chk_escalation_level CHECK (((escalation_level)::text = ANY (ARRAY[('STANDARD'::character varying)::text, ('SENIOR_COMPLIANCE'::character varying)::text, ('EXECUTIVE'::character varying)::text, ('BOARD'::character varying)::text]))),
     CONSTRAINT cases_chk_risk_rating CHECK (((risk_rating IS NULL) OR ((risk_rating)::text = ANY (ARRAY[('LOW'::character varying)::text, ('MEDIUM'::character varying)::text, ('HIGH'::character varying)::text, ('VERY_HIGH'::character varying)::text, ('PROHIBITED'::character varying)::text]))))
@@ -9202,7 +8889,7 @@ CREATE TABLE "ob-poc".cbu_product_subscriptions (
     config jsonb DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT cbu_product_subscriptions_status_check CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('TERMINATED'::character varying)::text])))
+    CONSTRAINT cbu_product_subscriptions_status_check CHECK (((status)::text = 'ACTIVE'::text))
 );
 
 
@@ -9783,7 +9470,7 @@ CREATE TABLE "ob-poc".cbu_trading_activity (
 -- Name: TABLE cbu_trading_activity; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".cbu_trading_activity IS 'Per-CBU trading-activity signal (R-4 IM slot trading_activity). Drives overall_lifecycle.actively_trading phase and CBU operationally_active tollgate. Populated by settlement pipeline / trade-posting events.';
+COMMENT ON TABLE "ob-poc".cbu_trading_activity IS 'DEPRECATED (state-graph remediation Phase 7b, 2026-07-02): zero writers, zero live rows. The trading_activity DAG slot (instrument_matrix_dag.yaml) that referenced it as source_entity has been removed. Table retained (not dropped) pending the W1-proper cutover.';
 
 
 --
@@ -9943,7 +9630,7 @@ CREATE TABLE "ob-poc".cbus (
     CONSTRAINT chk_cbu_discovery_state CHECK (((cbu_discovery_state)::text = ANY (ARRAY['PENDING'::text, 'DISCOVERING'::text, 'ROLLUP'::text, 'POPULATE'::text, 'PROVISION'::text, 'READY'::text, 'FAILED'::text, 'BLOCKED'::text]))),
     CONSTRAINT chk_cbu_disposition_status CHECK (((disposition_status)::text = ANY (ARRAY[('active'::character varying)::text, ('under_remediation'::character varying)::text, ('soft_deleted'::character varying)::text, ('hard_deleted'::character varying)::text]))),
     CONSTRAINT chk_cbu_operational_status CHECK (((operational_status IS NULL) OR ((operational_status)::text = ANY ((ARRAY['dormant'::character varying, 'trade_permissioned'::character varying, 'actively_trading'::character varying, 'restricted'::character varying, 'suspended'::character varying, 'winding_down'::character varying, 'offboarded'::character varying, 'archived'::character varying])::text[])))),
-    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY (ARRAY[('DISCOVERED'::character varying)::text, ('VALIDATION_PENDING'::character varying)::text, ('VALIDATED'::character varying)::text, ('UPDATE_PENDING_PROOF'::character varying)::text, ('VALIDATION_FAILED'::character varying)::text, ('SUSPENDED'::character varying)::text, ('ARCHIVED'::character varying)::text])))
+    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
 );
 
 
@@ -10734,7 +10421,7 @@ CREATE TABLE "ob-poc".control_edges (
 -- Name: TABLE control_edges; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".control_edges IS 'Ownership/voting/control edges with BODS/GLEIF/PSC standards alignment';
+COMMENT ON TABLE "ob-poc".control_edges IS 'DEPRECATED (state-graph remediation Phase 6c, 2026-07-02): zero writers -- the ubo/control write verbs that populated this table were deleted in the W4 rip. Superseded by "ob-poc".kyc_control_edge_projection (dsl.kyc stream fold, K-34). Table retained (not dropped) pending the W1-proper cutover.';
 
 
 --
@@ -10980,7 +10667,6 @@ CREATE TABLE "ob-poc".deals (
     updated_at timestamp with time zone DEFAULT now(),
     sponsor_entity_id uuid,
     rm_entity_id uuid,
-    coverage_banker_entity_id uuid,
     parent_deal_id uuid,
     operational_status text,
     bac_status text,
@@ -11004,7 +10690,7 @@ COMMENT ON TABLE "ob-poc".deals IS 'Hub entity for commercial origination - link
 -- Name: COLUMN deals.deal_status; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON COLUMN "ob-poc".deals.deal_status IS 'PROSPECT | QUALIFYING | NEGOTIATING | KYC_CLEARANCE | CONTRACTED | ONBOARDING | ACTIVE | WINDING_DOWN | OFFBOARDED | CANCELLED';
+COMMENT ON COLUMN "ob-poc".deals.deal_status IS 'PROSPECT | QUALIFYING | NEGOTIATING | IN_CLEARANCE | CONTRACTED | LOST | REJECTED | WITHDRAWN | CANCELLED';
 
 
 --
@@ -11019,13 +10705,6 @@ COMMENT ON COLUMN "ob-poc".deals.sponsor_entity_id IS 'Internal deal sponsor —
 --
 
 COMMENT ON COLUMN "ob-poc".deals.rm_entity_id IS 'Relationship manager — owns client relationship. R-5 G-8.';
-
-
---
--- Name: COLUMN deals.coverage_banker_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".deals.coverage_banker_entity_id IS 'Coverage banker — cross-sell owner. R-5 G-8.';
 
 
 --
@@ -11278,7 +10957,7 @@ COMMENT ON TABLE "ob-poc".deal_rate_cards IS 'Negotiated product pricing per dea
 -- Name: COLUMN deal_rate_cards.status; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON COLUMN "ob-poc".deal_rate_cards.status IS 'DRAFT | PROPOSED | COUNTER_OFFERED | AGREED | SUPERSEDED | CANCELLED';
+COMMENT ON COLUMN "ob-poc".deal_rate_cards.status IS 'DRAFT | PENDING_INTERNAL_APPROVAL | APPROVED_INTERNALLY | PROPOSED | COUNTER_PROPOSED | AGREED | SUPERSEDED | CANCELLED';
 
 
 --
@@ -11290,7 +10969,7 @@ CREATE TABLE "ob-poc".deal_slas (
     deal_id uuid NOT NULL,
     contract_id uuid,
     product_id uuid,
-    service_id uuid,
+    service_attribute_id uuid,
     sla_name character varying(255) NOT NULL,
     sla_type character varying(50),
     metric_name character varying(100) NOT NULL,
@@ -11302,6 +10981,7 @@ CREATE TABLE "ob-poc".deal_slas (
     effective_to date,
     created_at timestamp with time zone DEFAULT now(),
     sla_status character varying(30) DEFAULT 'NEGOTIATED'::character varying NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT deal_slas_sla_status_check CHECK (((sla_status IS NULL) OR ((sla_status)::text = ANY ((ARRAY['NEGOTIATED'::character varying, 'ACTIVE'::character varying, 'BREACHED'::character varying, 'IN_REMEDIATION'::character varying, 'RESOLVED'::character varying, 'WAIVED'::character varying])::text[]))))
 );
 
@@ -12253,7 +11933,8 @@ CREATE TABLE "ob-poc".dsl_verbs (
     compiled_hash bytea,
     compiler_version character varying(50),
     compiled_at timestamp with time zone,
-    yaml_intent_patterns text[] DEFAULT ARRAY[]::text[]
+    yaml_intent_patterns text[] DEFAULT ARRAY[]::text[],
+    lexicon_hash text
 );
 
 
@@ -12318,6 +11999,13 @@ COMMENT ON COLUMN "ob-poc".dsl_verbs.compiled_at IS 'Timestamp when compiled_jso
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_verbs.yaml_intent_patterns IS 'Intent patterns from YAML invocation_phrases - synced on startup, safe to overwrite';
+
+
+--
+-- Name: COLUMN dsl_verbs.lexicon_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.lexicon_hash IS 'SHA-256 hex content-address of the substrate LexiconEntry (Q7). Null for verbs outside the dsl.kyc determination vocabulary. Matches IntentEvent.lexicon_hash persisted in kyc_intent_events. EOP-DD-KYCUBO-001 §8.1.';
 
 
 --
@@ -13651,7 +13339,7 @@ CREATE TABLE "ob-poc".fee_billing_periods (
     approved_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT fee_billing_periods_calc_status_check CHECK (((calc_status)::text = ANY ((ARRAY['PENDING'::character varying, 'CALCULATED'::character varying, 'REVIEWED'::character varying, 'APPROVED'::character varying, 'DISPUTED'::character varying, 'INVOICED'::character varying])::text[])))
+    CONSTRAINT fee_billing_periods_calc_status_check CHECK (((calc_status)::text = ANY ((ARRAY['PENDING'::character varying, 'CALCULATING'::character varying, 'CALCULATED'::character varying, 'REVIEWED'::character varying, 'APPROVED'::character varying, 'DISPUTED'::character varying, 'INVOICED'::character varying])::text[])))
 );
 
 
@@ -14555,6 +14243,32 @@ CREATE VIEW "ob-poc".jurisdictions AS
 
 
 --
+-- Name: kyc_control_edge_projection; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_control_edge_projection (
+    subject_root uuid NOT NULL,
+    edge_id uuid NOT NULL,
+    edge_kind jsonb NOT NULL,
+    from_entity_id uuid NOT NULL,
+    to_entity_id uuid NOT NULL,
+    percentage double precision,
+    status text NOT NULL,
+    evidence_event_id uuid,
+    originating_event_id uuid NOT NULL,
+    projected_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT kyc_control_edge_projection_status_check CHECK ((status = ANY (ARRAY['Asserted'::text, 'Evidenced'::text, 'Verified'::text, 'Superseded'::text])))
+);
+
+
+--
+-- Name: TABLE kyc_control_edge_projection; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_control_edge_projection IS 'Disposable fold of control edges from kyc_intent_events (K-34). Written only by the projector; rebuildable from the stream. EOP-DD-KYCUBO-002 §5.';
+
+
+--
 -- Name: kyc_decisions; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14584,6 +14298,87 @@ COMMENT ON TABLE "ob-poc".kyc_decisions IS 'Final KYC decisions with complete ev
 
 
 --
+-- Name: kyc_intent_events; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_intent_events (
+    subject_root uuid NOT NULL,
+    seq bigint NOT NULL,
+    event_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    lexicon_hash text NOT NULL,
+    actor jsonb NOT NULL,
+    authority text NOT NULL,
+    target jsonb NOT NULL,
+    payload jsonb NOT NULL,
+    payload_hash text NOT NULL,
+    idempotency_key text NOT NULL,
+    causation_id uuid,
+    correlation_id uuid NOT NULL,
+    as_of timestamp with time zone NOT NULL,
+    committed_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    captured_effects jsonb DEFAULT '[]'::jsonb NOT NULL
+);
+
+
+--
+-- Name: TABLE kyc_intent_events; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_intent_events IS 'KYC/UBO authoritative verb stream (K-16). Append-only; per-subject ordered (Q6). Projections fold over this. EOP-DD-KYCUBO-002 §2.';
+
+
+--
+-- Name: kyc_lexicon_manifest; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_lexicon_manifest (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    manifest_hash text NOT NULL,
+    entry_count integer NOT NULL,
+    entry_hashes jsonb NOT NULL,
+    published_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    published_by text
+);
+
+
+--
+-- Name: TABLE kyc_lexicon_manifest; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_lexicon_manifest IS 'Whole-lexicon version history (Q7). Each row is an immutable content-addressed snapshot of the dsl.kyc LexiconManifest. DeterminationPin.lexicon_manifest_hash references a row here. EOP-DD-KYCUBO-001 §8.1 / W2.';
+
+
+--
+-- Name: kyc_obligation_projection; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_obligation_projection (
+    subject_root uuid NOT NULL,
+    obligation_id uuid NOT NULL,
+    basis_role text NOT NULL,
+    basis_jurisdiction text,
+    basis_cbu_role text,
+    basis_source_event_id uuid NOT NULL,
+    identity_state text DEFAULT 'Pending'::text NOT NULL,
+    screening_state text DEFAULT 'Pending'::text NOT NULL,
+    risk_state text DEFAULT 'Pending'::text NOT NULL,
+    originating_event_id uuid NOT NULL,
+    projected_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT kyc_obligation_projection_identity_state_check CHECK ((identity_state = ANY (ARRAY['Pending'::text, 'InProgress'::text, 'Satisfied'::text, 'Waived'::text, 'Deferred'::text, 'Expired'::text, 'Rejected'::text]))),
+    CONSTRAINT kyc_obligation_projection_risk_state_check CHECK ((risk_state = ANY (ARRAY['Pending'::text, 'InProgress'::text, 'Satisfied'::text, 'Waived'::text, 'Deferred'::text, 'Expired'::text, 'Rejected'::text]))),
+    CONSTRAINT kyc_obligation_projection_screening_state_check CHECK ((screening_state = ANY (ARRAY['Pending'::text, 'InProgress'::text, 'Satisfied'::text, 'Waived'::text, 'Deferred'::text, 'Expired'::text, 'Rejected'::text])))
+);
+
+
+--
+-- Name: TABLE kyc_obligation_projection; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_obligation_projection IS 'Disposable fold of obligation tracks from kyc_intent_events (K-34). Written only by the obligation projector; rebuildable. EOP-DD-KYCUBO-001 §4.2 / W6.';
+
+
+--
 -- Name: kyc_service_agreements; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14602,6 +14397,49 @@ CREATE TABLE "ob-poc".kyc_service_agreements (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: kyc_subject_rollup_projection; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_subject_rollup_projection (
+    subject_root uuid NOT NULL,
+    overall_state text DEFAULT 'InProgress'::text NOT NULL,
+    obligation_count integer DEFAULT 0 NOT NULL,
+    all_terminal boolean DEFAULT false NOT NULL,
+    decision_event_id uuid,
+    projected_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT kyc_subject_rollup_projection_overall_state_check CHECK ((overall_state = ANY (ARRAY['InProgress'::text, 'AllTerminal'::text, 'Approved'::text, 'Rejected'::text])))
+);
+
+
+--
+-- Name: TABLE kyc_subject_rollup_projection; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_subject_rollup_projection IS 'Per-subject overall KYC state (fold over obligation tracks, Q4). Disposable. EOP-DD-KYCUBO-001 §4.2 / W6.';
+
+
+--
+-- Name: kyc_subject_streams; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".kyc_subject_streams (
+    subject_root uuid NOT NULL,
+    next_seq bigint DEFAULT 0 NOT NULL,
+    checkpoint_seq bigint,
+    checkpoint_state jsonb,
+    checkpoint_lexicon_manifest text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE kyc_subject_streams; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".kyc_subject_streams IS 'Per-subject seq allocator + fold checkpoint. The FOR UPDATE lock on a row is the per-subject ordering domain. EOP-DD-KYCUBO-002 §3.';
 
 
 --
@@ -15955,11 +15793,17 @@ CREATE TABLE "ob-poc".product_service_conditions (
     condition_id uuid DEFAULT uuidv7() NOT NULL,
     condition_key text NOT NULL,
     description text,
-    predicate jsonb NOT NULL,
+    predicate jsonb,
     predicate_dsl text,
     lifecycle_status text DEFAULT 'active'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    product_id uuid,
+    service_id uuid,
+    is_mandatory boolean DEFAULT false,
+    is_default boolean DEFAULT false,
+    display_order integer,
+    configuration jsonb DEFAULT '{}'::jsonb,
     CONSTRAINT product_service_conditions_lifecycle_status_check CHECK ((lifecycle_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text])))
 );
 
@@ -15969,6 +15813,20 @@ CREATE TABLE "ob-poc".product_service_conditions (
 --
 
 COMMENT ON TABLE "ob-poc".product_service_conditions IS 'Structured predicates for conditional product-service and option applicability. predicate_dsl is governance/readability text; predicate JSONB is execution input.';
+
+
+--
+-- Name: COLUMN product_service_conditions.product_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".product_service_conditions.product_id IS 'Optional product key when the condition represents conditional service membership.';
+
+
+--
+-- Name: COLUMN product_service_conditions.service_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".product_service_conditions.service_id IS 'Optional service key when the condition represents conditional service membership.';
 
 
 --
@@ -16037,8 +15895,26 @@ CREATE TABLE "ob-poc".products (
     requires_kyc boolean DEFAULT true,
     product_family text,
     effective_from timestamp with time zone DEFAULT now(),
-    effective_to timestamp with time zone
+    effective_to timestamp with time zone,
+    owner_principal_fqn text,
+    governance_status text DEFAULT 'active'::text NOT NULL,
+    created_by text,
+    CONSTRAINT products_governance_status_check CHECK ((governance_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text])))
 );
+
+
+--
+-- Name: COLUMN products.owner_principal_fqn; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".products.owner_principal_fqn IS 'Resource-owner principal that governs this product catalogue entry.';
+
+
+--
+-- Name: COLUMN products.governance_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".products.governance_status IS 'Catalogue governance status, matching service_resource_types.governance_status.';
 
 
 --
@@ -17631,6 +17507,10 @@ CREATE TABLE "ob-poc".services (
     is_active boolean DEFAULT true,
     lifecycle_tags text[] DEFAULT '{}'::text[],
     lifecycle_status character varying(20) DEFAULT 'ungoverned'::character varying NOT NULL,
+    owner_principal_fqn text,
+    governance_status text DEFAULT 'active'::text NOT NULL,
+    created_by text,
+    CONSTRAINT services_governance_status_check CHECK ((governance_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text]))),
     CONSTRAINT services_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['ungoverned'::character varying, 'draft'::character varying, 'active'::character varying, 'deprecated'::character varying, 'retired'::character varying])::text[])))
 );
 
@@ -17640,6 +17520,20 @@ CREATE TABLE "ob-poc".services (
 --
 
 COMMENT ON COLUMN "ob-poc".services.lifecycle_status IS 'Service catalogue lifecycle (R2). 5 states: ungoverned (entry), draft, active (published in changeset), deprecated, retired (terminal). Cross-workspace constraint in cbu_dag.yaml requires active for cbu.service_consumption.proposed → provisioned.';
+
+
+--
+-- Name: COLUMN services.owner_principal_fqn; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".services.owner_principal_fqn IS 'Resource-owner principal that governs this service catalogue entry.';
+
+
+--
+-- Name: COLUMN services.governance_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".services.governance_status IS 'Catalogue governance status, matching service_resource_types.governance_status.';
 
 
 --
@@ -26442,6 +26336,14 @@ ALTER TABLE ONLY "ob-poc".kyc_clearance_mandates
 
 
 --
+-- Name: kyc_control_edge_projection kyc_control_edge_projection_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_control_edge_projection
+    ADD CONSTRAINT kyc_control_edge_projection_pkey PRIMARY KEY (subject_root, edge_id);
+
+
+--
 -- Name: kyc_decisions kyc_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -26450,11 +26352,67 @@ ALTER TABLE ONLY "ob-poc".kyc_decisions
 
 
 --
+-- Name: kyc_intent_events kyc_intent_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_intent_events
+    ADD CONSTRAINT kyc_intent_events_pkey PRIMARY KEY (subject_root, seq);
+
+
+--
+-- Name: kyc_intent_events kyc_intent_events_subject_root_idempotency_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_intent_events
+    ADD CONSTRAINT kyc_intent_events_subject_root_idempotency_key_key UNIQUE (subject_root, idempotency_key);
+
+
+--
+-- Name: kyc_lexicon_manifest kyc_lexicon_manifest_manifest_hash_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_lexicon_manifest
+    ADD CONSTRAINT kyc_lexicon_manifest_manifest_hash_key UNIQUE (manifest_hash);
+
+
+--
+-- Name: kyc_lexicon_manifest kyc_lexicon_manifest_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_lexicon_manifest
+    ADD CONSTRAINT kyc_lexicon_manifest_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: kyc_obligation_projection kyc_obligation_projection_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_obligation_projection
+    ADD CONSTRAINT kyc_obligation_projection_pkey PRIMARY KEY (subject_root, obligation_id);
+
+
+--
 -- Name: kyc_service_agreements kyc_service_agreements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".kyc_service_agreements
     ADD CONSTRAINT kyc_service_agreements_pkey PRIMARY KEY (agreement_id);
+
+
+--
+-- Name: kyc_subject_rollup_projection kyc_subject_rollup_projection_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_subject_rollup_projection
+    ADD CONSTRAINT kyc_subject_rollup_projection_pkey PRIMARY KEY (subject_root);
+
+
+--
+-- Name: kyc_subject_streams kyc_subject_streams_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".kyc_subject_streams
+    ADD CONSTRAINT kyc_subject_streams_pkey PRIMARY KEY (subject_root);
 
 
 --
@@ -32941,6 +32899,20 @@ CREATE UNIQUE INDEX idx_phrase_blocklist_unique ON "ob-poc".phrase_blocklist USI
 
 
 --
+-- Name: idx_product_service_conditions_active_edge; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_product_service_conditions_active_edge ON "ob-poc".product_service_conditions USING btree (product_id, lifecycle_status) WHERE ((product_id IS NOT NULL) AND (service_id IS NOT NULL));
+
+
+--
+-- Name: idx_product_service_conditions_edge_key; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_product_service_conditions_edge_key ON "ob-poc".product_service_conditions USING btree (product_id, service_id, condition_key) WHERE ((product_id IS NOT NULL) AND (service_id IS NOT NULL));
+
+
+--
 -- Name: idx_product_service_option_overrides_condition; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -32955,6 +32927,13 @@ CREATE UNIQUE INDEX idx_product_service_option_overrides_current ON "ob-poc".pro
 
 
 --
+-- Name: idx_products_governance_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_products_governance_status ON "ob-poc".products USING btree (governance_status);
+
+
+--
 -- Name: idx_products_is_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -32966,6 +32945,13 @@ CREATE INDEX idx_products_is_active ON "ob-poc".products USING btree (is_active)
 --
 
 CREATE INDEX idx_products_name ON "ob-poc".products USING btree (name);
+
+
+--
+-- Name: idx_products_owner_principal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_products_owner_principal ON "ob-poc".products USING btree (owner_principal_fqn) WHERE (owner_principal_fqn IS NOT NULL);
 
 
 --
@@ -33662,6 +33648,13 @@ CREATE INDEX idx_service_versions_status ON "ob-poc".service_versions USING btre
 
 
 --
+-- Name: idx_services_governance_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_services_governance_status ON "ob-poc".services USING btree (governance_status);
+
+
+--
 -- Name: idx_services_is_active; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -33680,6 +33673,13 @@ CREATE INDEX idx_services_lifecycle_status ON "ob-poc".services USING btree (lif
 --
 
 CREATE INDEX idx_services_name ON "ob-poc".services USING btree (name);
+
+
+--
+-- Name: idx_services_owner_principal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_services_owner_principal ON "ob-poc".services USING btree (owner_principal_fqn) WHERE (owner_principal_fqn IS NOT NULL);
 
 
 --
@@ -34583,6 +34583,48 @@ CREATE INDEX issuer_control_config_idx_control_config_issuer ON "ob-poc".issuer_
 --
 
 CREATE INDEX ix_dsl_verbs_compiled_hash ON "ob-poc".dsl_verbs USING btree (compiled_hash) WHERE (compiled_hash IS NOT NULL);
+
+
+--
+-- Name: kyc_control_edge_projection_status_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX kyc_control_edge_projection_status_idx ON "ob-poc".kyc_control_edge_projection USING btree (subject_root, status);
+
+
+--
+-- Name: kyc_intent_events_committed_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX kyc_intent_events_committed_idx ON "ob-poc".kyc_intent_events USING btree (subject_root, committed_at);
+
+
+--
+-- Name: kyc_intent_events_corr_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX kyc_intent_events_corr_idx ON "ob-poc".kyc_intent_events USING btree (correlation_id);
+
+
+--
+-- Name: kyc_intent_events_event_id_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX kyc_intent_events_event_id_idx ON "ob-poc".kyc_intent_events USING btree (event_id);
+
+
+--
+-- Name: kyc_lexicon_manifest_published_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX kyc_lexicon_manifest_published_idx ON "ob-poc".kyc_lexicon_manifest USING btree (published_at DESC);
+
+
+--
+-- Name: kyc_obligation_projection_state_idx; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX kyc_obligation_projection_state_idx ON "ob-poc".kyc_obligation_projection USING btree (subject_root, identity_state, screening_state, risk_state);
 
 
 --
@@ -35549,13 +35591,6 @@ CREATE TRIGGER trg_client_group_bump_row_version BEFORE UPDATE ON "ob-poc".clien
 --
 
 CREATE TRIGGER trg_compiled_runbooks_immutable BEFORE DELETE OR UPDATE ON "ob-poc".compiled_runbooks FOR EACH ROW EXECUTE FUNCTION "ob-poc".compiled_runbooks_immutable();
-
-
---
--- Name: control_edges trg_control_edges_set_standards; Type: TRIGGER; Schema: ob-poc; Owner: -
---
-
-CREATE TRIGGER trg_control_edges_set_standards BEFORE INSERT OR UPDATE ON "ob-poc".control_edges FOR EACH ROW EXECUTE FUNCTION "ob-poc".set_bods_interest_type();
 
 
 --
@@ -37696,7 +37731,7 @@ ALTER TABLE ONLY "ob-poc".deal_slas
 --
 
 ALTER TABLE ONLY "ob-poc".deal_slas
-    ADD CONSTRAINT deal_slas_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id);
+    ADD CONSTRAINT deal_slas_service_id_fkey FOREIGN KEY (service_attribute_id) REFERENCES "ob-poc".services(service_id);
 
 
 --
@@ -39436,6 +39471,22 @@ ALTER TABLE ONLY "ob-poc".phrase_bank
 
 
 --
+-- Name: product_service_conditions product_service_conditions_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_conditions
+    ADD CONSTRAINT product_service_conditions_product_id_fkey FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_service_conditions product_service_conditions_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".product_service_conditions
+    ADD CONSTRAINT product_service_conditions_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
 -- Name: product_service_option_overrides product_service_option_overrides_activation_condition_ref_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -39489,6 +39540,14 @@ ALTER TABLE ONLY "ob-poc".product_services
 
 ALTER TABLE ONLY "ob-poc".product_services
     ADD CONSTRAINT product_services_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: products products_owner_principal_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".products
+    ADD CONSTRAINT products_owner_principal_fkey FOREIGN KEY (owner_principal_fqn) REFERENCES "ob-poc".resource_owner_principals(owner_principal_fqn) ON DELETE SET NULL;
 
 
 --
@@ -39953,6 +40012,14 @@ ALTER TABLE ONLY "ob-poc".service_resource_types
 
 ALTER TABLE ONLY "ob-poc".service_versions
     ADD CONSTRAINT service_versions_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id) ON DELETE CASCADE;
+
+
+--
+-- Name: services services_owner_principal_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".services
+    ADD CONSTRAINT services_owner_principal_fkey FOREIGN KEY (owner_principal_fqn) REFERENCES "ob-poc".resource_owner_principals(owner_principal_fqn) ON DELETE SET NULL;
 
 
 --
@@ -40935,5 +41002,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jwZAy6JizwHaqUjmIwEoAKYsfenFvdVGFc8LJixjWQ2f8EcRROMnoBLWlK3ePyS
+\unrestrict BiqxqYlBXSng96Lb6lYSHl3VIc78Y1Rc5tJkfONKzE9fEpUQjtdDUL43bIqSWif
 

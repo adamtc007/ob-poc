@@ -91,7 +91,7 @@ domains:
         returns:
           type: uuid
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -195,6 +195,7 @@ domains:
 
       retire-type:
         flavour: discretionary
+        audit_class: service_resource_retire_type
         description: Retire a governed service resource type
         effect_class: read_modify_write
         role_guard:
@@ -225,7 +226,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation
@@ -295,7 +296,7 @@ domains:
         returns:
           type: uuid
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -372,6 +373,7 @@ domains:
 
       remove-capability:
         flavour: discretionary
+        audit_class: service_resource_remove_capability
         description: Remove a service-resource capability mapping from active use
         effect_class: read_modify_write
         role_guard:
@@ -414,7 +416,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation

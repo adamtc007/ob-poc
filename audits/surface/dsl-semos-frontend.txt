@@ -1,0 +1,4 @@
+# dsl-semos-frontend | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:23Z
+pub mod dsl_semos_frontend
+pub mod dsl_semos_frontend::loader
+pub fn dsl_semos_frontend::loader::load_verbs_from_dsl_dir(&std::path::Path, &mut dsl_diagnostics::diagnostic::DiagnosticBag) -> dsl_core::config::types::VerbsConfig

@@ -5,7 +5,8 @@ edition = "2021"
 description = "Semantic voice command matching using Candle ML and pgvector"
 
 [features]
-default = []
+default = ["database"]
+database = []
 metal = ["candle-core/metal", "candle-nn/metal", "candle-transformers/metal"]
 
 [dependencies]

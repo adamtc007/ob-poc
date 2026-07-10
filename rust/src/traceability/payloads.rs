@@ -84,53 +84,6 @@ pub fn build_trace_scaffold_payload(
     })
 }
 
-/// Build the common finalized trace payload for an utterance trace.
-///
-/// This keeps the terminal phase layout consistent across entrypoints while
-/// allowing callers to extend the object with entrypoint-specific metadata.
-///
-/// # Examples
-/// ```rust
-/// use ob_poc::sage::SageContext;
-/// use ob_poc::traceability::{
-///     build_phase2_unavailable_payload, build_phase3_unavailable_payload,
-///     build_phase4_unavailable_payload, build_phase5_unavailable_payload,
-///     build_final_trace_payload,
-/// };
-///
-/// let payload = build_final_trace_payload(
-///     "open the case",
-///     &SageContext::default(),
-///     build_phase2_unavailable_payload("example"),
-///     build_phase3_unavailable_payload("example"),
-///     build_phase4_unavailable_payload("example"),
-///     build_phase5_unavailable_payload("example"),
-///     "example",
-/// );
-/// assert_eq!(payload["phase_4"]["status"], "unavailable");
-/// ```
-#[cfg(feature = "database")]
-pub fn build_final_trace_payload(
-    utterance: &str,
-    ctx: &crate::sage::SageContext,
-    phase2_payload: serde_json::Value,
-    phase3_payload: serde_json::Value,
-    phase4_payload: serde_json::Value,
-    phase5_payload: serde_json::Value,
-    entrypoint: &str,
-) -> serde_json::Value {
-    let phase_payload = build_phase_trace_payload(utterance, ctx);
-    json!({
-        "phase_0": phase_payload["phase_0"].clone(),
-        "phase_1": phase_payload["phase_1"].clone(),
-        "phase_2": phase2_payload,
-        "phase_3": phase3_payload,
-        "phase_4": phase4_payload,
-        "phase_5": phase5_payload,
-        "entrypoint": entrypoint,
-    })
-}
-
 /// Builds a Phase 2 trace payload from current lookup and Sem OS legality data.
 ///
 /// # Examples

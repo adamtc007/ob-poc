@@ -2,7 +2,7 @@
 //!
 //! Each submodule defines one tool. Tools delegate to
 //! [`crate::bridge::SemOsBridge`] for the actual substrate calls;
-//! the binary integrator wires either `StubBridge` (hermetic) or a
+//! the binary integrator wires either `NullBridge` (hermetic) or a
 //! real `SemOsClient`-backed bridge (Phase 4.3).
 
 pub mod constellation_walk;
@@ -38,11 +38,11 @@ pub fn build_registry(bridge: Arc<dyn SemOsBridge>) -> ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::StubBridge;
+    use crate::bridge::NullBridge;
 
     #[tokio::test]
     async fn build_registry_registers_five_tools() {
-        let registry = build_registry(Arc::new(StubBridge::new()));
+        let registry = build_registry(Arc::new(NullBridge::new()));
         assert_eq!(registry.len(), 5);
         for name in [
             "entity_resolve",

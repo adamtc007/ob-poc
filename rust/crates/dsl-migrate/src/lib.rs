@@ -1,6 +1,7 @@
 //! `dsl-migrate` — Camunda 8 BPMN XML → bpmn-lite DSL migration tool.
 //!
 //! No runtime deps, no database, no Sage. Pure XML-in, DSL-out.
+#![deny(unreachable_pub)]
 
 pub mod emitter;
 pub mod feel_parser;

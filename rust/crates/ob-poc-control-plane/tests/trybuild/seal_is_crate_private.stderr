@@ -1,0 +1,16 @@
+error[E0624]: associated function `seal` is private
+ --> tests/trybuild/seal_is_crate_private.rs:8:64
+  |
+8 |       let _ = ob_poc_control_plane::envelope::ExecutionEnvelope::seal;
+  |                                                                  ^^^^ private associated function
+  |
+ ::: src/envelope.rs
+  |
+  | /     pub(crate) fn seal(
+  | |         intent: AdmittedIntent,
+  | |         binding: BoundEntities,
+  | |         pack: ResolvedPack,
+... |
+  | |         validity: ValidityWindow,
+  | |     ) -> ExecutionEnvelope {
+  | |__________________________- private associated function defined here

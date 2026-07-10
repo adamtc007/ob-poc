@@ -53,6 +53,7 @@
 //! // Start gRPC server
 //! let service = EntityGatewayService::new(registry);
 //! ```
+#![deny(unreachable_pub)]
 
 mod config;
 mod index;

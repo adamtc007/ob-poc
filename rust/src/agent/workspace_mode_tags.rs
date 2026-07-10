@@ -60,9 +60,7 @@ pub fn workspace_accepts_any_mode_tag(workspace: &str, tags: &[String]) -> bool 
     match workspace_accepted_mode_tags(workspace) {
         WorkspaceModeTags::All => true,
         WorkspaceModeTags::Unknown => false,
-        WorkspaceModeTags::Tags(accepted) => {
-            tags.iter().any(|t| accepted.contains(&t.as_str()))
-        }
+        WorkspaceModeTags::Tags(accepted) => tags.iter().any(|t| accepted.contains(&t.as_str())),
     }
 }
 
@@ -105,13 +103,14 @@ fn macro_mode_tag_table() -> &'static [(String, Vec<String>)] {
 /// accepted set (or the workspace is the umbrella `on_boarding`). Macros with no
 /// mode-tags are owned by no workspace (they cannot be admitted by membership).
 pub fn workspace_owned_macro_fqns(workspace: &str) -> HashSet<String> {
-    let accepts_all =
-        matches!(workspace_accepted_mode_tags(workspace), WorkspaceModeTags::All);
+    let accepts_all = matches!(
+        workspace_accepted_mode_tags(workspace),
+        WorkspaceModeTags::All
+    );
     macro_mode_tag_table()
         .iter()
         .filter(|(_, tags)| {
-            (accepts_all && !tags.is_empty())
-                || workspace_accepts_any_mode_tag(workspace, tags)
+            (accepts_all && !tags.is_empty()) || workspace_accepts_any_mode_tag(workspace, tags)
         })
         .map(|(fqn, _)| fqn.clone())
         .collect()
@@ -123,17 +122,26 @@ mod tests {
 
     #[test]
     fn cbu_accepts_structure_onboarding_trading() {
-        assert!(workspace_accepts_any_mode_tag("cbu", &["onboarding".into()]));
+        assert!(workspace_accepts_any_mode_tag(
+            "cbu",
+            &["onboarding".into()]
+        ));
         assert!(workspace_accepts_any_mode_tag("cbu", &["structure".into()]));
         assert!(workspace_accepts_any_mode_tag("cbu", &["trading".into()]));
         // cbu does NOT accept stewardship/kyc.
-        assert!(!workspace_accepts_any_mode_tag("cbu", &["stewardship".into()]));
+        assert!(!workspace_accepts_any_mode_tag(
+            "cbu",
+            &["stewardship".into()]
+        ));
         assert!(!workspace_accepts_any_mode_tag("cbu", &["kyc".into()]));
     }
 
     #[test]
     fn unknown_workspace_fails_closed() {
-        assert!(!workspace_accepts_any_mode_tag("nonsense", &["onboarding".into()]));
+        assert!(!workspace_accepts_any_mode_tag(
+            "nonsense",
+            &["onboarding".into()]
+        ));
     }
 
     #[test]
@@ -142,7 +150,10 @@ mod tests {
         // predicate regardless of tags. The "empty-tag macro is owned by nobody"
         // rule is enforced one level up in `workspace_owned_macro_fqns`
         // (`accepts_all && !tags.is_empty()`), not in this predicate.
-        assert!(workspace_accepts_any_mode_tag("on_boarding", &["anything".into()]));
+        assert!(workspace_accepts_any_mode_tag(
+            "on_boarding",
+            &["anything".into()]
+        ));
         assert!(workspace_accepts_any_mode_tag("on_boarding", &[]));
     }
 

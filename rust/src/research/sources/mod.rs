@@ -56,15 +56,6 @@ pub mod sec_edgar;
 pub mod traits;
 
 // Re-exports
-pub use normalized::{
-    EntityStatus, EntityType, HolderType, NormalizedAddress, NormalizedControlHolder,
-    NormalizedEntity, NormalizedOfficer, NormalizedRelationship, OfficerRole, RelationshipType,
-};
-pub use registry::{SourceInfo, SourceRegistry};
-pub use traits::{
-    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, FetchParentChainOptions,
-    SearchCandidate, SearchOptions, SourceDataType, SourceLoader,
-};
 
 // Source loader implementations
 pub use companies_house::CompaniesHouseLoader;

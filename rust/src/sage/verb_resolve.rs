@@ -109,18 +109,6 @@ impl StructuredVerbScorer {
     /// Access the underlying metadata index.
     ///
     /// # Examples
-    /// ```ignore
-    /// use ob_poc::sage::verb_index::VerbMetadataIndex;
-    /// use ob_poc::sage::verb_resolve::StructuredVerbScorer;
-    ///
-    /// let scorer = StructuredVerbScorer::new(VerbMetadataIndex::load()?);
-    /// assert!(scorer.index().len() > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    pub fn index(&self) -> &VerbMetadataIndex {
-        &self.index
-    }
-
     /// Diagnose how many candidates survive each pre-score filter stage.
     ///
     /// # Examples
@@ -566,11 +554,9 @@ mod tests {
 
     use dsl_core::{ActionClass, HarmClass};
 
+    use crate::sage::outcome::{Clarification, DrafterHandoff, EntityRef, SageExplain, UtteranceHints};
     use crate::sage::verb_index::VerbMeta;
-    use crate::sage::{
-        Clarification, DrafterHandoff, EntityRef, IntentPolarity, ObservationPlane, OutcomeAction,
-        OutcomeStep, SageConfidence, SageExplain, UtteranceHints,
-    };
+    use crate::sage::{IntentPolarity, ObservationPlane, OutcomeAction, OutcomeStep, SageConfidence};
 
     fn index_with(entries: Vec<VerbMeta>) -> VerbMetadataIndex {
         let mut by_fqn = HashMap::new();
@@ -595,13 +581,6 @@ mod tests {
             domain: domain.to_string(),
             verb_name: verb_name.to_string(),
             polarity,
-            side_effects: Some(
-                match polarity {
-                    IntentPolarity::Read | IntentPolarity::Ambiguous => "facts_only",
-                    IntentPolarity::Write => "state_write",
-                }
-                .to_string(),
-            ),
             harm_class: match polarity {
                 IntentPolarity::Read | IntentPolarity::Ambiguous => HarmClass::ReadOnly,
                 IntentPolarity::Write => HarmClass::Reversible,
@@ -618,7 +597,6 @@ mod tests {
             },
             subject_kinds: vec![],
             phase_tags: vec![],
-            requires_subject: true,
             planes,
             action_tags: action_tags.iter().map(|s| s.to_string()).collect(),
             param_names: params.iter().map(|s| s.to_string()).collect(),

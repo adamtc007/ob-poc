@@ -34,6 +34,12 @@ ob-poc = { path = "../..", features = ["server"] }
 # Shared API types (single source of truth for all boundaries)
 ob-poc-types = { path = "../ob-poc-types" }
 
+# Phase 3 slice A (2026-07-01): direct deps for the 3 real hub-re-export
+# consumers migrated off `ob_poc::{entity_linking,lexicon,acp_session_input_draft_mode}`.
+ob-poc-entity-linking = { path = "../ob-poc-entity-linking" }
+ob-poc-authoring = { path = "../ob-poc-authoring" }
+ob-poc-boundary = { path = "../ob-poc-boundary" }
+
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
 

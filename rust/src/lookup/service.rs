@@ -3,9 +3,9 @@
 //! Combines verb discovery and entity resolution in a single pass,
 //! using verb schema to constrain entity kinds.
 
-use crate::entity_linking::{EntityLinkingService, EntityResolution};
-use crate::lexicon::LexiconService;
 use crate::mcp::verb_search::{HybridVerbSearcher, VerbSearchResult};
+use ob_poc_authoring::lexicon::LexiconService;
+use ob_poc_entity_linking::{EntityLinkingService, EntityResolution};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -316,8 +316,8 @@ impl LookupService {
 #[cfg(test)]
 /// Create a stub lookup service for testing
 pub fn stub_lookup_service() -> LookupService {
-    use crate::entity_linking::StubEntityLinkingService;
-    LookupService::new(Arc::new(StubEntityLinkingService))
+    use ob_poc_entity_linking::NullEntityLinkingService;
+    LookupService::new(Arc::new(NullEntityLinkingService))
 }
 
 #[cfg(test)]

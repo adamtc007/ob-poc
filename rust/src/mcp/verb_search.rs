@@ -49,11 +49,11 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 use crate::dsl_v2::macros::MacroRegistry;
 use crate::dsl_v2::runtime_registry::runtime_registry;
-use crate::lexicon::LexiconService;
 use crate::mcp::compound_intent::extract_compound_signals;
 use crate::mcp::macro_index::{MacroIndex, MacroResolveOutcome};
 use crate::mcp::scenario_index::{ResolvedRoute, ScenarioIndex, ScenarioResolveOutcome};
 use dsl_analysis::entity_kind::canonicalize as canonicalize_entity_kind;
+use ob_poc_authoring::lexicon::LexiconService;
 
 /// Shared lexicon service type alias
 pub type SharedLexicon = Arc<dyn LexiconService>;
@@ -242,7 +242,8 @@ impl VerbSearchResult {
 /// of `search()`, never from inside it. This is how Intent Trace records the
 /// soft-stage flow without instrumenting (and risking) the search body.
 pub fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
-    let mut by_source: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+    let mut by_source: std::collections::BTreeMap<String, usize> =
+        std::collections::BTreeMap::new();
     let mut by_tier: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for r in results {
         *by_source.entry(format!("{:?}", r.source)).or_insert(0) += 1;

@@ -10,6 +10,9 @@ mod definition;
 mod registry;
 
 #[allow(deprecated)]
-pub use definition::*;
+pub use definition::{
+    MacroArgDef, MacroArgs, MacroEnumValue, MacroExpansion, MacroPrereq, MacroRouting,
+    MacroStateSet, MacroSummary, MacroTarget, MacroUi, OperatorMacroDef,
+};
 #[allow(deprecated)]
-pub use registry::*;
+pub use registry::{DomainNode, MacroFilter, MacroNode, MacroTaxonomy, OperatorMacroRegistry};

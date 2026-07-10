@@ -1,0 +1,216 @@
+# dsl-parser | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:18Z
+pub mod dsl_parser
+pub enum dsl_parser::RawValue
+pub dsl_parser::RawValue::Atom(dsl_parser::RawAtom)
+pub dsl_parser::RawValue::BoolLit(bool)
+pub dsl_parser::RawValue::FloatLit(f64)
+pub dsl_parser::RawValue::ForEach
+pub dsl_parser::RawValue::ForEach::body: alloc::vec::Vec<dsl_parser::RawValue>
+pub dsl_parser::RawValue::ForEach::list_param: alloc::string::String
+pub dsl_parser::RawValue::ForEach::var: alloc::string::String
+pub dsl_parser::RawValue::InsertionMarker(alloc::string::String)
+pub dsl_parser::RawValue::IntLit(i64)
+pub dsl_parser::RawValue::List(alloc::vec::Vec<dsl_parser::RawValue>)
+pub dsl_parser::RawValue::Map(alloc::vec::Vec<(alloc::string::String, dsl_parser::RawValue)>)
+pub dsl_parser::RawValue::QualifiedName
+pub dsl_parser::RawValue::QualifiedName::atom: alloc::string::String
+pub dsl_parser::RawValue::QualifiedName::pack: alloc::string::String
+pub dsl_parser::RawValue::SlotRef(alloc::string::String)
+pub dsl_parser::RawValue::StringLit(alloc::string::String)
+pub dsl_parser::RawValue::Symbol(alloc::string::String)
+pub dsl_parser::RawValue::TemplateSplice(alloc::string::String)
+pub dsl_parser::RawValue::TemplateSubst(alloc::string::String)
+impl core::clone::Clone for dsl_parser::RawValue
+pub fn dsl_parser::RawValue::clone(&self) -> dsl_parser::RawValue
+impl core::cmp::PartialEq for dsl_parser::RawValue
+pub fn dsl_parser::RawValue::eq(&self, &dsl_parser::RawValue) -> bool
+impl core::fmt::Debug for dsl_parser::RawValue
+pub fn dsl_parser::RawValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_parser::RawValue
+impl serde_core::ser::Serialize for dsl_parser::RawValue
+pub fn dsl_parser::RawValue::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_parser::RawValue
+pub fn dsl_parser::RawValue::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_parser::RawValue
+impl core::marker::Send for dsl_parser::RawValue
+impl core::marker::Sync for dsl_parser::RawValue
+impl core::marker::Unpin for dsl_parser::RawValue
+impl core::marker::UnsafeUnpin for dsl_parser::RawValue
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_parser::RawValue
+impl core::panic::unwind_safe::UnwindSafe for dsl_parser::RawValue
+impl<T, U> core::convert::Into<U> for dsl_parser::RawValue where U: core::convert::From<T>
+pub fn dsl_parser::RawValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_parser::RawValue where U: core::convert::Into<T>
+pub type dsl_parser::RawValue::Error = core::convert::Infallible
+pub fn dsl_parser::RawValue::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_parser::RawValue where U: core::convert::TryFrom<T>
+pub type dsl_parser::RawValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_parser::RawValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_parser::RawValue where T: core::clone::Clone
+pub type dsl_parser::RawValue::Owned = T
+pub fn dsl_parser::RawValue::clone_into(&self, &mut T)
+pub fn dsl_parser::RawValue::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_parser::RawValue where T: 'static + ?core::marker::Sized
+pub fn dsl_parser::RawValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_parser::RawValue where T: ?core::marker::Sized
+pub fn dsl_parser::RawValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_parser::RawValue where T: ?core::marker::Sized
+pub fn dsl_parser::RawValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_parser::RawValue where T: core::clone::Clone
+pub unsafe fn dsl_parser::RawValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_parser::RawValue
+pub fn dsl_parser::RawValue::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_parser::RawValue where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_parser::Token
+pub dsl_parser::Token::Arrow
+pub dsl_parser::Token::BoolLit(bool)
+pub dsl_parser::Token::CloseBrace
+pub dsl_parser::Token::CloseBracket
+pub dsl_parser::Token::CloseParen
+pub dsl_parser::Token::Comment
+pub dsl_parser::Token::FloatLit(f64)
+pub dsl_parser::Token::InsertionMarker(alloc::string::String)
+pub dsl_parser::Token::IntLit(i64)
+pub dsl_parser::Token::Keyword(alloc::string::String)
+pub dsl_parser::Token::OpenBrace
+pub dsl_parser::Token::OpenBracket
+pub dsl_parser::Token::OpenParen
+pub dsl_parser::Token::StringLit(alloc::string::String)
+pub dsl_parser::Token::Symbol(alloc::string::String)
+pub dsl_parser::Token::TemplateSplice(alloc::string::String)
+pub dsl_parser::Token::TemplateSubst(alloc::string::String)
+pub dsl_parser::Token::Whitespace
+impl core::clone::Clone for dsl_parser::Token
+pub fn dsl_parser::Token::clone(&self) -> dsl_parser::Token
+impl core::cmp::PartialEq for dsl_parser::Token
+pub fn dsl_parser::Token::eq(&self, &dsl_parser::Token) -> bool
+impl core::fmt::Debug for dsl_parser::Token
+pub fn dsl_parser::Token::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_parser::Token
+impl<'s> logos::Logos<'s> for dsl_parser::Token
+pub type dsl_parser::Token::Error = ()
+pub type dsl_parser::Token::Extras = ()
+pub type dsl_parser::Token::Source = str
+pub fn dsl_parser::Token::lex(&mut logos::lexer::Lexer<'s, Self>)
+impl core::marker::Freeze for dsl_parser::Token
+impl core::marker::Send for dsl_parser::Token
+impl core::marker::Sync for dsl_parser::Token
+impl core::marker::Unpin for dsl_parser::Token
+impl core::marker::UnsafeUnpin for dsl_parser::Token
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_parser::Token
+impl core::panic::unwind_safe::UnwindSafe for dsl_parser::Token
+impl<T, U> core::convert::Into<U> for dsl_parser::Token where U: core::convert::From<T>
+pub fn dsl_parser::Token::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_parser::Token where U: core::convert::Into<T>
+pub type dsl_parser::Token::Error = core::convert::Infallible
+pub fn dsl_parser::Token::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_parser::Token where U: core::convert::TryFrom<T>
+pub type dsl_parser::Token::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_parser::Token::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_parser::Token where T: core::clone::Clone
+pub type dsl_parser::Token::Owned = T
+pub fn dsl_parser::Token::clone_into(&self, &mut T)
+pub fn dsl_parser::Token::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_parser::Token where T: 'static + ?core::marker::Sized
+pub fn dsl_parser::Token::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_parser::Token where T: ?core::marker::Sized
+pub fn dsl_parser::Token::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_parser::Token where T: ?core::marker::Sized
+pub fn dsl_parser::Token::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_parser::Token where T: core::clone::Clone
+pub unsafe fn dsl_parser::Token::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_parser::Token
+pub fn dsl_parser::Token::from(T) -> T
+pub struct dsl_parser::RawAtom
+pub dsl_parser::RawAtom::kind: alloc::string::String
+pub dsl_parser::RawAtom::name: core::option::Option<alloc::string::String>
+pub dsl_parser::RawAtom::slots: alloc::vec::Vec<(alloc::string::String, dsl_parser::RawValue)>
+pub dsl_parser::RawAtom::span: core::option::Option<dsl_diagnostics::diagnostic::Span>
+impl core::clone::Clone for dsl_parser::RawAtom
+pub fn dsl_parser::RawAtom::clone(&self) -> dsl_parser::RawAtom
+impl core::cmp::PartialEq for dsl_parser::RawAtom
+pub fn dsl_parser::RawAtom::eq(&self, &dsl_parser::RawAtom) -> bool
+impl core::fmt::Debug for dsl_parser::RawAtom
+pub fn dsl_parser::RawAtom::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_parser::RawAtom
+impl serde_core::ser::Serialize for dsl_parser::RawAtom
+pub fn dsl_parser::RawAtom::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_parser::RawAtom
+pub fn dsl_parser::RawAtom::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_parser::RawAtom
+impl core::marker::Send for dsl_parser::RawAtom
+impl core::marker::Sync for dsl_parser::RawAtom
+impl core::marker::Unpin for dsl_parser::RawAtom
+impl core::marker::UnsafeUnpin for dsl_parser::RawAtom
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_parser::RawAtom
+impl core::panic::unwind_safe::UnwindSafe for dsl_parser::RawAtom
+impl<T, U> core::convert::Into<U> for dsl_parser::RawAtom where U: core::convert::From<T>
+pub fn dsl_parser::RawAtom::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_parser::RawAtom where U: core::convert::Into<T>
+pub type dsl_parser::RawAtom::Error = core::convert::Infallible
+pub fn dsl_parser::RawAtom::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_parser::RawAtom where U: core::convert::TryFrom<T>
+pub type dsl_parser::RawAtom::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_parser::RawAtom::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_parser::RawAtom where T: core::clone::Clone
+pub type dsl_parser::RawAtom::Owned = T
+pub fn dsl_parser::RawAtom::clone_into(&self, &mut T)
+pub fn dsl_parser::RawAtom::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_parser::RawAtom where T: 'static + ?core::marker::Sized
+pub fn dsl_parser::RawAtom::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_parser::RawAtom where T: ?core::marker::Sized
+pub fn dsl_parser::RawAtom::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_parser::RawAtom where T: ?core::marker::Sized
+pub fn dsl_parser::RawAtom::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_parser::RawAtom where T: core::clone::Clone
+pub unsafe fn dsl_parser::RawAtom::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_parser::RawAtom
+pub fn dsl_parser::RawAtom::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_parser::RawAtom where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_parser::SourceFile
+pub dsl_parser::SourceFile::atoms: alloc::vec::Vec<dsl_parser::RawAtom>
+impl core::clone::Clone for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::clone(&self) -> dsl_parser::SourceFile
+impl core::cmp::PartialEq for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::eq(&self, &dsl_parser::SourceFile) -> bool
+impl core::default::Default for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::default() -> dsl_parser::SourceFile
+impl core::fmt::Debug for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_parser::SourceFile
+impl serde_core::ser::Serialize for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_parser::SourceFile
+impl core::marker::Send for dsl_parser::SourceFile
+impl core::marker::Sync for dsl_parser::SourceFile
+impl core::marker::Unpin for dsl_parser::SourceFile
+impl core::marker::UnsafeUnpin for dsl_parser::SourceFile
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_parser::SourceFile
+impl core::panic::unwind_safe::UnwindSafe for dsl_parser::SourceFile
+impl<T, U> core::convert::Into<U> for dsl_parser::SourceFile where U: core::convert::From<T>
+pub fn dsl_parser::SourceFile::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_parser::SourceFile where U: core::convert::Into<T>
+pub type dsl_parser::SourceFile::Error = core::convert::Infallible
+pub fn dsl_parser::SourceFile::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_parser::SourceFile where U: core::convert::TryFrom<T>
+pub type dsl_parser::SourceFile::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_parser::SourceFile::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_parser::SourceFile where T: core::clone::Clone
+pub type dsl_parser::SourceFile::Owned = T
+pub fn dsl_parser::SourceFile::clone_into(&self, &mut T)
+pub fn dsl_parser::SourceFile::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_parser::SourceFile where T: 'static + ?core::marker::Sized
+pub fn dsl_parser::SourceFile::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_parser::SourceFile where T: ?core::marker::Sized
+pub fn dsl_parser::SourceFile::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_parser::SourceFile where T: ?core::marker::Sized
+pub fn dsl_parser::SourceFile::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_parser::SourceFile where T: core::clone::Clone
+pub unsafe fn dsl_parser::SourceFile::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_parser::SourceFile
+pub fn dsl_parser::SourceFile::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_parser::SourceFile where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn dsl_parser::lex(&str) -> alloc::vec::Vec<core::result::Result<dsl_parser::Token, ()>>
+pub fn dsl_parser::parse(&str) -> (dsl_parser::SourceFile, dsl_diagnostics::diagnostic::DiagnosticBag)

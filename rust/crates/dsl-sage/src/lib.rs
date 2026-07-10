@@ -26,6 +26,7 @@
 //! accuracy.  Plugging in the BGE-small-en-v1.5 model from `ob-semantic-matcher`
 //! is expected to push that to ≥ 80%.  The evaluation harness in
 //! `tests/pack_matching_eval.rs` targets 50% as the BoW baseline.
+#![deny(unreachable_pub)]
 
 pub mod audit;
 pub mod confirmation;
@@ -39,9 +40,11 @@ pub mod types;
 
 // Tranche 1
 pub use context::context_from_session;
+#[cfg(any(test, feature = "test-util"))]
+pub use matcher::MockLlmClient;
 pub use matcher::{
     match_packs, match_packs_embedding_only, BagOfWordsEmbedder, LlmClient, LlmRankEntry,
-    MockLlmClient, PackEmbedder, PackSummary,
+    PackEmbedder, PackSummary,
 };
 // Tranche 2
 pub use confirmation::{ConfirmationSession, ConfirmationState, ParameterEdit};

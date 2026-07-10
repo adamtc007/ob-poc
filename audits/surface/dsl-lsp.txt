@@ -1,0 +1,71 @@
+# dsl-lsp | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:14Z
+pub mod dsl_lsp
+pub mod dsl_lsp::analysis
+pub mod dsl_lsp::analysis::document
+pub struct dsl_lsp::analysis::document::DocumentState
+impl core::clone::Clone for dsl_lsp::analysis::document::DocumentState
+pub fn dsl_lsp::analysis::document::DocumentState::clone(&self) -> dsl_lsp::analysis::document::DocumentState
+impl core::fmt::Debug for dsl_lsp::analysis::document::DocumentState
+pub fn dsl_lsp::analysis::document::DocumentState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_lsp::analysis::document::DocumentState
+impl core::marker::Send for dsl_lsp::analysis::document::DocumentState
+impl core::marker::Sync for dsl_lsp::analysis::document::DocumentState
+impl core::marker::Unpin for dsl_lsp::analysis::document::DocumentState
+impl core::marker::UnsafeUnpin for dsl_lsp::analysis::document::DocumentState
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lsp::analysis::document::DocumentState
+impl core::panic::unwind_safe::UnwindSafe for dsl_lsp::analysis::document::DocumentState
+impl<T, U> core::convert::Into<U> for dsl_lsp::analysis::document::DocumentState where U: core::convert::From<T>
+pub fn dsl_lsp::analysis::document::DocumentState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lsp::analysis::document::DocumentState where U: core::convert::Into<T>
+pub type dsl_lsp::analysis::document::DocumentState::Error = core::convert::Infallible
+pub fn dsl_lsp::analysis::document::DocumentState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lsp::analysis::document::DocumentState where U: core::convert::TryFrom<T>
+pub type dsl_lsp::analysis::document::DocumentState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lsp::analysis::document::DocumentState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lsp::analysis::document::DocumentState where T: core::clone::Clone
+pub type dsl_lsp::analysis::document::DocumentState::Owned = T
+pub fn dsl_lsp::analysis::document::DocumentState::clone_into(&self, &mut T)
+pub fn dsl_lsp::analysis::document::DocumentState::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for dsl_lsp::analysis::document::DocumentState where T: core::clone::Clone
+pub fn dsl_lsp::analysis::document::DocumentState::from_ref(&T) -> T
+impl<T> core::any::Any for dsl_lsp::analysis::document::DocumentState where T: 'static + ?core::marker::Sized
+pub fn dsl_lsp::analysis::document::DocumentState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lsp::analysis::document::DocumentState where T: ?core::marker::Sized
+pub fn dsl_lsp::analysis::document::DocumentState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lsp::analysis::document::DocumentState where T: ?core::marker::Sized
+pub fn dsl_lsp::analysis::document::DocumentState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lsp::analysis::document::DocumentState where T: core::clone::Clone
+pub unsafe fn dsl_lsp::analysis::document::DocumentState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lsp::analysis::document::DocumentState
+pub fn dsl_lsp::analysis::document::DocumentState::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for dsl_lsp::analysis::document::DocumentState
+pub type dsl_lsp::analysis::document::DocumentState::Init = T
+pub const dsl_lsp::analysis::document::DocumentState::ALIGN: usize
+pub unsafe fn dsl_lsp::analysis::document::DocumentState::deref<'a>(usize) -> &'a T
+pub unsafe fn dsl_lsp::analysis::document::DocumentState::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn dsl_lsp::analysis::document::DocumentState::drop(usize)
+pub unsafe fn dsl_lsp::analysis::document::DocumentState::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for dsl_lsp::analysis::document::DocumentState where T: core::any::Any
+pub fn dsl_lsp::analysis::document::DocumentState::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn dsl_lsp::analysis::document::DocumentState::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn dsl_lsp::analysis::document::DocumentState::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn dsl_lsp::analysis::document::DocumentState::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for dsl_lsp::analysis::document::DocumentState where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn dsl_lsp::analysis::document::DocumentState::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for dsl_lsp::analysis::document::DocumentState
+impl<T> tantivy::collector::Fruit for dsl_lsp::analysis::document::DocumentState where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for dsl_lsp::analysis::document::DocumentState
+pub fn dsl_lsp::analysis::document::DocumentState::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for dsl_lsp::analysis::document::DocumentState
+impl<T> tracing::instrument::WithSubscriber for dsl_lsp::analysis::document::DocumentState
+impl<T> typenum::type_operators::Same for dsl_lsp::analysis::document::DocumentState
+pub type dsl_lsp::analysis::document::DocumentState::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for dsl_lsp::analysis::document::DocumentState where V: ppv_lite86::types::MultiLane<T>
+pub fn dsl_lsp::analysis::document::DocumentState::vzip(self) -> V
+pub mod dsl_lsp::encoding
+pub mod dsl_lsp::entity_client
+pub mod dsl_lsp::handlers
+pub mod dsl_lsp::handlers::diagnostics
+pub fn dsl_lsp::handlers::diagnostics::analyze_document(&str) -> (dsl_lsp::analysis::document::DocumentState, alloc::vec::Vec<lsp_types::Diagnostic>)
+pub mod dsl_lsp::server
+pub fn dsl_lsp::analyze_document(&str) -> (dsl_lsp::analysis::document::DocumentState, alloc::vec::Vec<lsp_types::Diagnostic>)

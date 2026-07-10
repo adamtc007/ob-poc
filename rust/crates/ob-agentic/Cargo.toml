@@ -43,6 +43,9 @@ tonic = { version = "0.12", optional = true }
 default = []
 cli = ["dep:clap"]
 gateway = ["dep:entity-gateway", "dep:tonic"]
+# Exposes lexicon::test_harness (batch stress-testing utility, uses
+# MockEntityResolver) to external consumers. Not for production use.
+test-util = []
 
 [dev-dependencies]
 clap = { version = "4", features = ["derive"] }

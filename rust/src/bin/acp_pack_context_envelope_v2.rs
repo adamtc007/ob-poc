@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use ob_poc::acp_pack_context_envelope_v2::build_acp_pack_context_artifact_bytes_v2;
-use ob_poc::acp_registry_projection::build_slice1_acp_registry_projection;
+use ob_poc_boundary::acp_pack_context_envelope_v2::build_acp_pack_context_artifact_bytes_v2;
+use ob_poc_boundary::acp_registry_projection::build_slice1_acp_registry_projection;
 use std::io::Write;
 use std::path::PathBuf;
 

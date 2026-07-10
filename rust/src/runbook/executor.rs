@@ -116,6 +116,49 @@ pub enum ExecutionError {
 
     #[error("Step execution failed: {0}")]
     StepFailed(String),
+
+    /// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022): a non-empty
+    /// write_set was submitted for execution with no database pool to
+    /// acquire advisory locks on. Production refuses this outright —
+    /// silently skipping locks masks concurrent-write corruption. Test code
+    /// that genuinely wants unlocked execution must go through
+    /// `execute_runbook_unlocked_for_tests` with an explicit
+    /// `UnlockedExecutionToken`.
+    #[error(
+        "locking required: runbook {runbook_id} has a non-empty write_set \
+         ({write_set_size} entities) but no database pool was supplied to \
+         acquire advisory locks"
+    )]
+    LockingRequired {
+        runbook_id: CompiledRunbookId,
+        write_set_size: usize,
+    },
+}
+
+// ---------------------------------------------------------------------------
+// UnlockedExecutionToken (T0.3, closes C-022)
+// ---------------------------------------------------------------------------
+
+/// Explicit, hard-to-forge opt-in for running `execute_runbook` with a
+/// non-empty write_set and no database pool to acquire advisory locks on.
+///
+/// Production code has no way to construct one — the only constructor,
+/// [`UnlockedExecutionToken::allow_unlocked_execution_for_tests`], is
+/// `#[cfg(test)]`-gated and therefore does not exist in a release binary.
+/// This makes "I forgot to wire a pool" a compile-time-unreachable excuse
+/// for silently skipping locks in production; only a test that explicitly
+/// asks for unlocked execution can get it.
+#[derive(Debug, Clone, Copy)]
+pub struct UnlockedExecutionToken(());
+
+#[cfg(test)]
+impl UnlockedExecutionToken {
+    /// TEST-ONLY: explicitly opt into skipping advisory-lock acquisition
+    /// even though the write_set is non-empty. See
+    /// `execute_runbook_unlocked_for_tests`.
+    pub fn allow_unlocked_execution_for_tests() -> Self {
+        UnlockedExecutionToken(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -778,6 +821,14 @@ async fn acquire_advisory_locks(
 /// entity UUIDs in the write set before execution begins. Locks are released
 /// when the transaction commits or rolls back.
 ///
+/// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022): when `pool` is `None`
+/// and the write_set is non-empty, execution is refused UNLESS an explicit
+/// `UnlockedExecutionToken` was supplied. Production code has no way to
+/// construct one — its only constructor is `#[cfg(test)]`-gated. This
+/// replaces the prior silent "warn and skip locks" behaviour: a Sequencer
+/// built without `.with_pool(...)` used to execute concurrent-write-unsafe
+/// runbooks unlocked with only a log line to notice by.
+///
 /// In Phase 0 (no database), locking is skipped and execution proceeds
 /// directly.
 pub async fn execute_runbook(
@@ -786,7 +837,22 @@ pub async fn execute_runbook(
     cursor: Option<StepCursor>,
     executor: &dyn StepExecutor,
 ) -> Result<RunbookExecutionResult, ExecutionError> {
-    execute_runbook_with_pool(store, runbook_id, cursor, executor, None).await
+    execute_runbook_with_pool_and_token(store, runbook_id, cursor, executor, None, None).await
+}
+
+/// TEST-ONLY (T0.3): `execute_runbook()` with an explicit, hard-to-forge
+/// opt-in to skip advisory-lock acquisition on a non-empty write_set. See
+/// [`UnlockedExecutionToken`].
+#[cfg(test)]
+pub async fn execute_runbook_unlocked_for_tests(
+    store: &dyn RunbookStoreBackend,
+    runbook_id: CompiledRunbookId,
+    cursor: Option<StepCursor>,
+    executor: &dyn StepExecutor,
+    token: UnlockedExecutionToken,
+) -> Result<RunbookExecutionResult, ExecutionError> {
+    execute_runbook_with_pool_and_token(store, runbook_id, cursor, executor, None, Some(token))
+        .await
 }
 
 /// Execute a compiled runbook with optional advisory locking.
@@ -795,7 +861,9 @@ pub async fn execute_runbook(
 /// using timeout-based locking (INV-10: 30s timeout). Locks are sorted by UUID
 /// to prevent deadlocks and auto-release on tx commit/rollback.
 ///
-/// When `pool` is `None` (tests, in-memory mode), locking is skipped.
+/// When `pool` is `None` and the write_set is non-empty, execution is
+/// refused (`ExecutionError::LockingRequired`) — see
+/// [`execute_runbook_unlocked_for_tests`] for the explicit test-only bypass.
 ///
 /// The store backend handles event emission: the Postgres backend appends
 /// status_change events on `update_status()` and persists lock/step events
@@ -806,6 +874,19 @@ pub async fn execute_runbook_with_pool(
     cursor: Option<StepCursor>,
     executor: &dyn StepExecutor,
     pool: Option<&sqlx::PgPool>,
+) -> Result<RunbookExecutionResult, ExecutionError> {
+    execute_runbook_with_pool_and_token(store, runbook_id, cursor, executor, pool, None).await
+}
+
+/// T0.3: the actual implementation behind [`execute_runbook`],
+/// [`execute_runbook_with_pool`], and [`execute_runbook_unlocked_for_tests`].
+async fn execute_runbook_with_pool_and_token(
+    store: &dyn RunbookStoreBackend,
+    runbook_id: CompiledRunbookId,
+    cursor: Option<StepCursor>,
+    executor: &dyn StepExecutor,
+    pool: Option<&sqlx::PgPool>,
+    unlocked_token: Option<UnlockedExecutionToken>,
 ) -> Result<RunbookExecutionResult, ExecutionError> {
     let start = std::time::Instant::now();
 
@@ -875,13 +956,14 @@ pub async fn execute_runbook_with_pool(
                 .await;
 
             (Some(tx), stats)
-        } else {
+        } else if unlocked_token.is_some() {
+            // T0.3: explicit test-only opt-in — see `UnlockedExecutionToken`.
             tracing::warn!(
                 runbook_id = %runbook_id,
                 write_set_size = write_set.len(),
-                "Executing with non-empty write_set but no database pool — \
-                 advisory locks NOT acquired. Safe in tests; indicates \
-                 misconfiguration in production."
+                "Executing with non-empty write_set and no database pool — \
+                 advisory locks NOT acquired. Explicitly allowed via \
+                 UnlockedExecutionToken (test-only, T0.3, closes C-022)."
             );
             (
                 None,
@@ -890,6 +972,13 @@ pub async fn execute_runbook_with_pool(
                     lock_wait_ms: 0,
                 },
             )
+        } else {
+            // T0.3 (closes C-022): no pool, no explicit opt-in — refuse
+            // rather than silently execute a concurrent-write-unsafe runbook.
+            return Err(ExecutionError::LockingRequired {
+                runbook_id,
+                write_set_size: write_set.len(),
+            });
         }
     } else {
         (None, LockStats::default())
@@ -1706,6 +1795,66 @@ mod tests {
         ));
         // Step 0 skipped (before cursor), steps 1 and 2 completed
         assert_eq!(result.step_results.len(), 3);
+    }
+
+    fn make_step_with_write_set(verb: &str, write_set: Vec<Uuid>) -> CompiledStep {
+        let mut step = make_step(verb);
+        step.write_set = write_set;
+        step
+    }
+
+    /// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022) — exit criterion
+    /// "test proving error": a non-empty write_set with no pool and no
+    /// explicit `UnlockedExecutionToken` must be refused, not silently
+    /// executed unlocked.
+    #[tokio::test]
+    async fn test_no_pool_no_token_is_refused() {
+        let store = RunbookStore::new();
+        let step = make_step_with_write_set("cbu.rename", vec![Uuid::new_v4()]);
+        let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![step], ReplayEnvelope::empty());
+        let id = rb.id;
+        store.insert(&rb).await.unwrap();
+
+        let result = execute_runbook(&store, id, None, &SuccessExecutor).await;
+        assert!(
+            matches!(result, Err(ExecutionError::LockingRequired { .. })),
+            "non-empty write_set + no pool + no token must be refused, got {result:?}"
+        );
+
+        // The runbook must not have been silently executed: status stays
+        // at Compiled (never transitioned to Executing/Completed).
+        let stored = store.get(&id).await.unwrap().unwrap();
+        assert!(
+            matches!(stored.status, CompiledRunbookStatus::Compiled),
+            "refused execution must not mutate runbook status, got {:?}",
+            stored.status
+        );
+    }
+
+    /// T0.3: the explicit `UnlockedExecutionToken` bypass still works — the
+    /// same scenario as above, but via `execute_runbook_unlocked_for_tests`.
+    #[tokio::test]
+    async fn test_no_pool_with_token_executes_unlocked() {
+        let store = RunbookStore::new();
+        let step = make_step_with_write_set("cbu.rename", vec![Uuid::new_v4()]);
+        let rb = CompiledRunbook::new(Uuid::new_v4(), 1, vec![step], ReplayEnvelope::empty());
+        let id = rb.id;
+        store.insert(&rb).await.unwrap();
+
+        let result = execute_runbook_unlocked_for_tests(
+            &store,
+            id,
+            None,
+            &SuccessExecutor,
+            UnlockedExecutionToken::allow_unlocked_execution_for_tests(),
+        )
+        .await
+        .expect("explicit token must permit unlocked execution");
+        assert!(matches!(
+            result.final_status,
+            CompiledRunbookStatus::Completed { .. }
+        ));
+        assert_eq!(result.lock_stats.locks_acquired, 0);
     }
 
     #[test]

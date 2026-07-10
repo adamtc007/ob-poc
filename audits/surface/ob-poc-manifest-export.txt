@@ -1,0 +1,78 @@
+# ob-poc-manifest-export | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:57Z
+pub mod ob_poc_manifest_export
+pub struct ob_poc_manifest_export::Allowlist
+pub ob_poc_manifest_export::Allowlist::public_decisions: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_manifest_export::Allowlist::public_verbs: alloc::vec::Vec<alloc::string::String>
+impl ob_poc_manifest_export::Allowlist
+pub fn ob_poc_manifest_export::Allowlist::from_path(impl core::convert::AsRef<std::path::Path>) -> anyhow::Result<Self>
+impl core::fmt::Debug for ob_poc_manifest_export::Allowlist
+pub fn ob_poc_manifest_export::Allowlist::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_manifest_export::Allowlist
+pub fn ob_poc_manifest_export::Allowlist::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_manifest_export::Allowlist
+impl core::marker::Send for ob_poc_manifest_export::Allowlist
+impl core::marker::Sync for ob_poc_manifest_export::Allowlist
+impl core::marker::Unpin for ob_poc_manifest_export::Allowlist
+impl core::marker::UnsafeUnpin for ob_poc_manifest_export::Allowlist
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_manifest_export::Allowlist
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_manifest_export::Allowlist
+impl<T, U> core::convert::Into<U> for ob_poc_manifest_export::Allowlist where U: core::convert::From<T>
+pub fn ob_poc_manifest_export::Allowlist::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_manifest_export::Allowlist where U: core::convert::Into<T>
+pub type ob_poc_manifest_export::Allowlist::Error = core::convert::Infallible
+pub fn ob_poc_manifest_export::Allowlist::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_manifest_export::Allowlist where U: core::convert::TryFrom<T>
+pub type ob_poc_manifest_export::Allowlist::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_manifest_export::Allowlist::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_manifest_export::Allowlist where T: 'static + ?core::marker::Sized
+pub fn ob_poc_manifest_export::Allowlist::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_manifest_export::Allowlist where T: ?core::marker::Sized
+pub fn ob_poc_manifest_export::Allowlist::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_manifest_export::Allowlist where T: ?core::marker::Sized
+pub fn ob_poc_manifest_export::Allowlist::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_manifest_export::Allowlist
+pub fn ob_poc_manifest_export::Allowlist::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_manifest_export::Allowlist where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_manifest_export::ExporterConfig
+pub ob_poc_manifest_export::ExporterConfig::catalogue_version: alloc::string::String
+pub ob_poc_manifest_export::ExporterConfig::domain: alloc::string::String
+pub ob_poc_manifest_export::ExporterConfig::generated_at: alloc::string::String
+pub ob_poc_manifest_export::ExporterConfig::manifest_version: alloc::string::String
+pub ob_poc_manifest_export::ExporterConfig::min_consumer_manifest_version: core::option::Option<alloc::string::String>
+impl ob_poc_manifest_export::ExporterConfig
+pub fn ob_poc_manifest_export::ExporterConfig::new(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for ob_poc_manifest_export::ExporterConfig
+pub fn ob_poc_manifest_export::ExporterConfig::clone(&self) -> ob_poc_manifest_export::ExporterConfig
+impl core::fmt::Debug for ob_poc_manifest_export::ExporterConfig
+pub fn ob_poc_manifest_export::ExporterConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_manifest_export::ExporterConfig
+impl core::marker::Send for ob_poc_manifest_export::ExporterConfig
+impl core::marker::Sync for ob_poc_manifest_export::ExporterConfig
+impl core::marker::Unpin for ob_poc_manifest_export::ExporterConfig
+impl core::marker::UnsafeUnpin for ob_poc_manifest_export::ExporterConfig
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_manifest_export::ExporterConfig
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_manifest_export::ExporterConfig
+impl<T, U> core::convert::Into<U> for ob_poc_manifest_export::ExporterConfig where U: core::convert::From<T>
+pub fn ob_poc_manifest_export::ExporterConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_manifest_export::ExporterConfig where U: core::convert::Into<T>
+pub type ob_poc_manifest_export::ExporterConfig::Error = core::convert::Infallible
+pub fn ob_poc_manifest_export::ExporterConfig::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_manifest_export::ExporterConfig where U: core::convert::TryFrom<T>
+pub type ob_poc_manifest_export::ExporterConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_manifest_export::ExporterConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_manifest_export::ExporterConfig where T: core::clone::Clone
+pub type ob_poc_manifest_export::ExporterConfig::Owned = T
+pub fn ob_poc_manifest_export::ExporterConfig::clone_into(&self, &mut T)
+pub fn ob_poc_manifest_export::ExporterConfig::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_manifest_export::ExporterConfig where T: 'static + ?core::marker::Sized
+pub fn ob_poc_manifest_export::ExporterConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_manifest_export::ExporterConfig where T: ?core::marker::Sized
+pub fn ob_poc_manifest_export::ExporterConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_manifest_export::ExporterConfig where T: ?core::marker::Sized
+pub fn ob_poc_manifest_export::ExporterConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_manifest_export::ExporterConfig where T: core::clone::Clone
+pub unsafe fn ob_poc_manifest_export::ExporterConfig::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_manifest_export::ExporterConfig
+pub fn ob_poc_manifest_export::ExporterConfig::from(T) -> T
+pub fn ob_poc_manifest_export::export_to_path(&std::path::Path, &std::path::Path, &std::path::Path, &str, &str) -> anyhow::Result<std::path::PathBuf>
+pub fn ob_poc_manifest_export::export_to_yaml(&std::path::Path, &ob_poc_manifest_export::Allowlist, &ob_poc_manifest_export::ExporterConfig) -> anyhow::Result<alloc::string::String>

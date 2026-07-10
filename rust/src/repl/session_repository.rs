@@ -652,10 +652,10 @@ mod tests {
                 entity_count: 7,
             },
             verbs: Vec::new(),
-            entities: vec![crate::entity_linking::EntityResolution {
+            entities: vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, 7),
                 mention_text: "Allianz".to_string(),
-                candidates: vec![crate::entity_linking::EntityCandidate {
+                candidates: vec![ob_poc_entity_linking::EntityCandidate {
                     entity_id,
                     entity_kind: "cbu".to_string(),
                     canonical_name: "Allianz Fund".to_string(),

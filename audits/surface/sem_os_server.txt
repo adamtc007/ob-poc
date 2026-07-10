@@ -1,0 +1,74 @@
+# sem_os_server | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:18Z
+pub mod sem_os_server
+pub struct sem_os_server::JwtConfig
+impl sem_os_server::JwtConfig
+pub fn sem_os_server::JwtConfig::from_secret(&[u8]) -> Self
+impl core::clone::Clone for sem_os_server::JwtConfig
+pub fn sem_os_server::JwtConfig::clone(&self) -> sem_os_server::JwtConfig
+impl core::marker::Freeze for sem_os_server::JwtConfig
+impl core::marker::Send for sem_os_server::JwtConfig
+impl core::marker::Sync for sem_os_server::JwtConfig
+impl core::marker::Unpin for sem_os_server::JwtConfig
+impl core::marker::UnsafeUnpin for sem_os_server::JwtConfig
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_server::JwtConfig
+impl core::panic::unwind_safe::UnwindSafe for sem_os_server::JwtConfig
+impl<T, U> core::convert::Into<U> for sem_os_server::JwtConfig where U: core::convert::From<T>
+pub fn sem_os_server::JwtConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_server::JwtConfig where U: core::convert::Into<T>
+pub type sem_os_server::JwtConfig::Error = core::convert::Infallible
+pub fn sem_os_server::JwtConfig::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_server::JwtConfig where U: core::convert::TryFrom<T>
+pub type sem_os_server::JwtConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_server::JwtConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_server::JwtConfig where T: core::clone::Clone
+pub type sem_os_server::JwtConfig::Owned = T
+pub fn sem_os_server::JwtConfig::clone_into(&self, &mut T)
+pub fn sem_os_server::JwtConfig::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for sem_os_server::JwtConfig where T: core::clone::Clone
+pub fn sem_os_server::JwtConfig::from_ref(&T) -> T
+impl<T> core::any::Any for sem_os_server::JwtConfig where T: 'static + ?core::marker::Sized
+pub fn sem_os_server::JwtConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_server::JwtConfig where T: ?core::marker::Sized
+pub fn sem_os_server::JwtConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_server::JwtConfig where T: ?core::marker::Sized
+pub fn sem_os_server::JwtConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_server::JwtConfig where T: core::clone::Clone
+pub unsafe fn sem_os_server::JwtConfig::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_server::JwtConfig
+pub fn sem_os_server::JwtConfig::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_server::JwtConfig
+impl<T> tracing::instrument::WithSubscriber for sem_os_server::JwtConfig
+impl<T> typenum::type_operators::Same for sem_os_server::JwtConfig
+pub type sem_os_server::JwtConfig::Output = T
+pub struct sem_os_server::OutboxDispatcher
+impl sem_os_server::OutboxDispatcher
+pub fn sem_os_server::OutboxDispatcher::new(alloc::sync::Arc<dyn sem_os_core::ports::OutboxStore>, alloc::sync::Arc<dyn sem_os_core::ports::ProjectionWriter>, core::time::Duration, u32) -> Self
+pub async fn sem_os_server::OutboxDispatcher::run(&self)
+impl core::marker::Freeze for sem_os_server::OutboxDispatcher
+impl core::marker::Send for sem_os_server::OutboxDispatcher
+impl core::marker::Sync for sem_os_server::OutboxDispatcher
+impl core::marker::Unpin for sem_os_server::OutboxDispatcher
+impl core::marker::UnsafeUnpin for sem_os_server::OutboxDispatcher
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_server::OutboxDispatcher
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_server::OutboxDispatcher
+impl<T, U> core::convert::Into<U> for sem_os_server::OutboxDispatcher where U: core::convert::From<T>
+pub fn sem_os_server::OutboxDispatcher::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_server::OutboxDispatcher where U: core::convert::Into<T>
+pub type sem_os_server::OutboxDispatcher::Error = core::convert::Infallible
+pub fn sem_os_server::OutboxDispatcher::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_server::OutboxDispatcher where U: core::convert::TryFrom<T>
+pub type sem_os_server::OutboxDispatcher::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_server::OutboxDispatcher::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_server::OutboxDispatcher where T: 'static + ?core::marker::Sized
+pub fn sem_os_server::OutboxDispatcher::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_server::OutboxDispatcher where T: ?core::marker::Sized
+pub fn sem_os_server::OutboxDispatcher::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_server::OutboxDispatcher where T: ?core::marker::Sized
+pub fn sem_os_server::OutboxDispatcher::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_server::OutboxDispatcher
+pub fn sem_os_server::OutboxDispatcher::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_server::OutboxDispatcher
+impl<T> tracing::instrument::WithSubscriber for sem_os_server::OutboxDispatcher
+impl<T> typenum::type_operators::Same for sem_os_server::OutboxDispatcher
+pub type sem_os_server::OutboxDispatcher::Output = T
+pub fn sem_os_server::build_router(alloc::sync::Arc<dyn sem_os_policy::service::CoreService>, sem_os_server::JwtConfig) -> axum::routing::Router

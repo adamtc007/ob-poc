@@ -3,6 +3,7 @@
 use thiserror::Error;
 
 /// Errors that can occur during research macro operations
+#[allow(dead_code)] // kept for future use / error completeness
 #[derive(Debug, Error)]
 pub enum ResearchError {
     #[error("Unknown research macro: {0}")]

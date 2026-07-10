@@ -15,15 +15,15 @@ use uuid::Uuid;
 use super::service::ServiceResourcePipelineService;
 use super::srdef_loader::SrdefRegistry;
 use super::types::*;
-use crate::derived_attributes::repository::{
-    acquire_derivation_lock, compute_content_hash, get_current, get_current_tx,
-    get_recompute_queue, insert_dependencies_tx, insert_derived_value_tx, supersede_current_tx,
-    BatchRecomputeResult, ContentHashInput, DependencyRowInput, DerivedValueRowInput,
-};
 use crate::sem_reg::{DerivationFunctionRegistry, DerivationSpecBody};
 use crate::services::attribute_identity_service::AttributeIdentityService;
 use crate::services::attribute_registry_enrichment::ensure_semos_registry_bridge;
 use dsl_analysis::entity_kind;
+use ob_poc_derived_attributes::derived_attributes::repository::{
+    acquire_derivation_lock, compute_content_hash, get_current, get_current_tx,
+    get_recompute_queue, insert_dependencies_tx, insert_derived_value_tx, supersede_current_tx,
+    BatchRecomputeResult, ContentHashInput, DependencyRowInput, DerivedValueRowInput,
+};
 
 // =============================================================================
 // DISCOVERY ENGINE
@@ -546,6 +546,7 @@ struct EffectiveAttrValue {
 pub enum RecomputeOutcome {
     Recomputed,
     StillStale,
+    #[allow(dead_code)] // kept for future use
     UnsupportedEntityType,
 }
 

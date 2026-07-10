@@ -34,6 +34,7 @@ use super::errors::AssemblyError;
 
 /// Result of plan assembly — steps with resolved dependencies and phases.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // kept for tests
 pub struct PlanAssemblyResult {
     /// Steps in dependency order (topologically sorted).
     pub steps: Vec<CompiledStep>,
@@ -48,6 +49,7 @@ pub struct PlanAssemblyResult {
 
 /// An execution phase — group of steps at the same DAG depth.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // kept for tests
 pub struct ExecutionPhase {
     /// Phase depth (0 = roots, 1 = depends on roots, …).
     pub depth: usize,
@@ -57,12 +59,13 @@ pub struct ExecutionPhase {
 
 /// Informational diagnostic from assembly.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // kept for tests
 pub struct AssemblyDiagnostic {
     pub kind: DiagnosticKind,
-    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)] // kept for tests
 pub enum DiagnosticKind {
     /// Steps were reordered to satisfy dependencies.
     Reordered,
@@ -121,7 +124,6 @@ pub fn assemble_plan(steps: Vec<CompiledStep>) -> Result<PlanAssemblyResult, Ass
     if reordered {
         diagnostics.push(AssemblyDiagnostic {
             kind: DiagnosticKind::Reordered,
-            message: "Steps were reordered to satisfy binding dependencies.".into(),
         });
     }
 
@@ -255,10 +257,6 @@ fn build_dependency_graph(
             } else {
                 diagnostics.push(AssemblyDiagnostic {
                     kind: DiagnosticKind::UnresolvedBinding,
-                    message: format!(
-                        "Binding @{} referenced but not produced by any step",
-                        consumed
-                    ),
                 });
             }
         }

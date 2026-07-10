@@ -22,6 +22,7 @@
 //! - `shapes` — SVG shape primitives, layout types
 //! - `renderer` — main `render_dsl` / `render_graph` functions
 //! - `style` — embedded CSS styles
+#![deny(unreachable_pub)]
 
 pub mod layout;
 pub mod renderer;

@@ -27,7 +27,7 @@ domains:
         crud:
           operation: insert
           table: case_events
-          schema: kyc
+          schema: ob-poc
           returning: event_id
         args:
         - name: case-id
@@ -37,7 +37,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: workstream-id
@@ -47,7 +47,7 @@ domains:
           lookup:
             table: entity_workstreams
             entity_type: entity_workstream
-            schema: kyc
+            schema: ob-poc
             search_key: workstream_id
             primary_key: workstream_id
         - name: event-type
@@ -116,7 +116,7 @@ domains:
         crud:
           operation: list_by_fk
           table: case_events
-          schema: kyc
+          schema: ob-poc
           fk_col: case_id
         args:
         - name: case-id
@@ -125,7 +125,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: event-type

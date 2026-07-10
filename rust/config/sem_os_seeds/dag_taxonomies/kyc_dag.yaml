@@ -42,6 +42,44 @@ dsl_verb_reconciliation:
     - screening.sanctions
     - screening.sanctions-check
 
+stream_governed:
+  id: kyc_ubo_determination_stream
+  description: >
+    UBO/KYC determination verbs are governed by the stream lexicon and fold
+    preconditions, not by DAG from-state/to-state slots. The DAG intentionally
+    has no lifecycle slot for these stream-backed verb families.
+  verb_families:
+    - ubo.edge.*
+    - ubo.determination.*
+    - kyc.subject.*
+    - kyc.role.*
+    - kyc.obligation.*
+    - kyc.person.*
+  stream_tables:
+    - kyc_intent_events
+    - kyc_subject_streams
+    - kyc_control_edge_projection
+    - kyc_obligation_projection
+    - kyc_subject_rollup_projection
+  governance:
+    dag_slots: intentionally_absent
+    declaration: >
+      Current state is derived from kyc_intent_events by folds/projections.
+      Edge status is fold-output-only (K-11); no verb sets it directly.
+    content_addressed_lexicon_manifest:
+      table: kyc_lexicon_manifest
+      enforcement_refs:
+        - rust/crates/ob-poc-kyc-store/src/manifest.rs
+    fold_preconditions:
+      keys: [K-11]
+      enforcement_refs:
+        - rust/crates/ob-poc-kyc-substrate/src/lexicon.rs
+        - rust/crates/ob-poc-kyc-store/src/store.rs
+    approval_gate:
+      key: K-23
+      enforcement_refs:
+        - rust/src/domain_ops/kyc_stream_ops.rs
+
 # =============================================================================
 # 1. OVERALL KYC-CASE LIFECYCLE (per case, derived)
 # =============================================================================
@@ -78,7 +116,7 @@ overall_lifecycle:
       progression_verbs:
         - kyc-case.update-status
         - entity-workstream.update-status
-        - doc-request.create
+        - document.create-request
         - ubo-registry.discover
       next_phase: screening_in_flight
 
@@ -133,7 +171,7 @@ overall_lifecycle:
         Case proceeds to approval, rejection, referral, or closure.
       derivation:
         any_of:
-          - "cases.status IN ('APPROVED', 'REJECTED', 'BLOCKED', 'WITHDRAWN', 'DO_NOT_ONBOARD')"
+          - "cases.status IN ('APPROVED', 'REJECTED', 'WITHDRAWN', 'DO_NOT_ONBOARD', 'EXPIRED', 'REFER_TO_REGULATOR')"
           - "EXISTS kyc_decisions WHERE case_id = this.case_id AND status IN ('CLEARED', 'REJECTED', 'CONDITIONAL')"
       progression_verbs:
         - kyc-case.close
@@ -224,12 +262,14 @@ slots:
           description: "Case approved; CBU cleared for onboarding."
           green_when: |
             every evidence_requirement exists
-            AND every evidence_requirement.state = VERIFIED
+            AND every evidence_requirement.verification_status = VERIFIED
             AND every ubo_registry_entry exists
-            AND every ubo_registry_entry.state in {APPROVED, WAIVED}
-            AND no red_flag exists with state = OPEN
+            AND every ubo_registry_entry.status != PENDING
+            AND every ubo_registry_entry.status != REJECTED
+            AND every ubo_registry_entry.status != EXPIRED
+            AND count(red_flag where red_flag.status = OPEN) = 0
             AND every screening_run exists
-            AND every screening_run.state = CLEAN
+            AND every screening_run.status = CLEAN
         - id: REJECTED
           description: "Case rejected; CBU cannot onboard under this case."
         - id: BLOCKED
@@ -277,7 +317,7 @@ slots:
           via: kyc-case.reject (with do-not-onboard flag)
         - from: "(any non-terminal)"
           to: REFER_TO_REGULATOR
-          via: kyc-case.escalate
+          via: [kyc-case.escalate, kyc-case.refer]
         - from: APPROVED
           to: DISCOVERY
           via: kyc-case.reopen (for periodic review)
@@ -288,7 +328,7 @@ slots:
     state_machine:
       id: entity_kyc_lifecycle
       source_entity: "(derived — tracks entity journey through case workstreams)"
-      state_column: (derived from entity_workstreams.status + kyc_ubo_registry.status)
+      state_column: (derived from entity_workstreams.status + stream projections)
       description: |
         Entity-level KYC journey (reconcile-existing from
         state_machines/entity_kyc_lifecycle.yaml). Tracks an entity's
@@ -395,10 +435,14 @@ slots:
           via: red-flag.escalate
         - from: "(any non-terminal)"
           to: REFERRED
-          via: kyc-case.escalate
+          # Retargeted (state-graph remediation Phase 5e): kyc-case.escalate
+          # only ever wrote cases.escalation_level/status -- it never
+          # touched entity_workstreams. kyc-case.refer is the dedicated verb
+          # that actually cascades non-terminal workstreams to REFERRED.
+          via: kyc-case.refer
         - from: "(any non-terminal)"
           to: PROHIBITED
-          via: kyc-case.reject (cascading)
+          via: kyc-case.reject
       terminal_states: [COMPLETE, PROHIBITED]
 
   - id: screening
@@ -482,114 +526,16 @@ slots:
         - from: VERIFIED
           to: EXPIRED
           via: "(time-decay)"
-        - from: EXPIRED
-          to: PENDING
-          via: evidence.require  # re-collection
       terminal_states: [REJECTED]
 
-  - id: kyc_ubo_registry
-    stateless: false
-    state_machine:
-      id: kyc_ubo_registry_lifecycle
-      source_entity: '"ob-poc".kyc_ubo_registry'
-      state_column: status
-      description: |
-        UBO promotion lifecycle within a KYC case. 9 states tracking
-        the UBO's journey from candidate through formal declaration.
-      predicate_bindings:
-        - entity: entity_match
-          source_kind: dag_entity
-          source_entity: entity_match
-          scope: attached_to this UBO
-        - entity: ownership_percentage
-          source_kind: dag_entity
-          source_entity: ownership_percentage
-          scope: attached_to this UBO
-          value_column: value
-        - entity: evidence_requirement
-          source_kind: dag_entity
-          source_entity: evidence_requirement
-          scope: attached_to this UBO
-          required_universe:
-            source_kind: dag_entity
-            source_entity: ubo_evidence_requirement
-        - entity: ubo_taxonomy
-          source_kind: dag_entity
-          source_entity: ubo_taxonomy
-          scope: parent case
-        - entity: red_flag
-          source_kind: dag_entity
-          source_entity: red_flag
-          scope: attached_to this UBO
-      states:
-        - id: CANDIDATE
-          entry: true
-          description: "Identified as potential UBO."
-        - id: IDENTIFIED
-          description: "Formally identified as UBO."
-          green_when: |
-            entity_match exists
-            AND entity_match.state = THRESHOLD_PASSED
-            AND ownership_percentage exists
-            AND ownership_percentage.value >= registration_threshold
-        - id: PROVABLE
-          description: "Evidence path exists to prove UBO status."
-          green_when: |
-            every required evidence_requirement exists for this UBO
-        - id: PROVED
-          description: "Evidence collected and verified."
-          green_when: |
-            every required evidence_requirement exists for this UBO
-            AND every required evidence_requirement.state = VERIFIED
-        - id: REVIEWED
-          description: "Reviewed by compliance."
-        - id: APPROVED
-          description: "Approved as UBO in the case."
-          green_when: |
-            every required evidence_requirement exists for this UBO
-            AND every required evidence_requirement.state = VERIFIED
-            AND ubo_taxonomy exists for parent case
-            AND ubo_taxonomy.state = COMPLETE
-            AND no red_flag exists with state = OPEN AND attached_to this UBO
-        - id: WAIVED
-          description: "Waived — compliance accepts non-UBO outcome."
-        - id: REJECTED
-          description: "Rejected — not a UBO."
-        - id: EXPIRED
-          description: "Stale; periodic review required."
-      transitions:
-        # State-node green-switch model (v1.4): each transition's
-        # destination state declares its green_when predicate. Verbs
-        # run while source is green and make changes that satisfy
-        # the destination's green_when.
-        - from: CANDIDATE
-          to: IDENTIFIED
-          via: ubo.registry.promote
-        - from: IDENTIFIED
-          to: PROVABLE
-          via: ubo.registry.advance
-        - from: PROVABLE
-          to: PROVED
-          via: ubo.registry.advance
-        - from: PROVED
-          to: REVIEWED
-          via: "(compliance review)"
-        - from: REVIEWED
-          to: APPROVED
-          via: ubo.registry.advance
-        - from: REVIEWED
-          to: WAIVED
-          via: "(compliance waiver)"
-        - from: REVIEWED
-          to: REJECTED
-          via: ubo.registry.reject
-        - from: APPROVED
-          to: EXPIRED
-          via: "(time-decay)"
-        - from: EXPIRED
-          to: CANDIDATE
-          via: "(periodic review: ubo.registry.expire then re-enter as candidate)"
-      terminal_states: [APPROVED, WAIVED, REJECTED]
+  # kyc_ubo_registry slot DELETED (state-graph remediation Phase 6a): the
+  # entire ubo.registry.* verb family it depended on (promote/advance/
+  # waive/reject/expire) has been deleted -- every op phantom-wrote
+  # nonexistent columns against the live kyc_ubo_registry/kyc_ubo_evidence
+  # schema and never successfully executed. The dsl.kyc/ubo.edge.*/
+  # ubo.determination.* verbs govern UBO determination now, deliberately
+  # with no DAG slot (governance is lexicon + fold-precondition + K-23, not
+  # a from-state/to-state FSM).
 
   - id: kyc_ubo_evidence
     stateless: false
@@ -601,32 +547,52 @@ slots:
       states:
         - id: REQUIRED
           entry: true
+        # wire-later (state-graph remediation Phase 7d): the legacy document
+        # request verb domain does not exist in this codebase; document.yaml
+        # declares only the live `document:` domain. REQUESTED
+        # was never reachable via any verb.
         - id: REQUESTED
+          entry_via:
+            signal:
+              source: document_request_dispatch
         - id: RECEIVED
         - id: VERIFIED
         - id: REJECTED
+          description: "Not terminal -- evidence.attach-document accepts a re-attach from REJECTED (see transitions)."
         - id: WAIVED
+        # wire-later: no time-decay job exists; VERIFIED never expires today.
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: evidence-expiry
       transitions:
+        # REQUIRED to REQUESTED and REQUESTED to RECEIVED rows
+        # deleted (POLICY): the legacy send/verify verbs do not exist.
+        # The real code path (evidence.rs do_link, verb
+        # evidence.attach-document) accepts REQUIRED directly, with no
+        # REQUESTED intermediate step.
         - from: REQUIRED
-          to: REQUESTED
-          via: doc-request.send
-        - from: REQUESTED
           to: RECEIVED
-          via: doc-request.verify
+          via: evidence.attach-document
         - from: RECEIVED
           to: VERIFIED
           via: evidence.mark-verified
         - from: RECEIVED
           to: REJECTED
           via: evidence.mark-rejected
+        # Added (state-graph remediation Phase 7d, ratified 7.14): code
+        # (evidence.rs do_link) allows re-attaching a document after
+        # rejection, contradicting REJECTED's old terminal_states
+        # membership. Code wins.
+        - from: REJECTED
+          to: RECEIVED
+          via: evidence.attach-document
         - from: "(any non-terminal)"
           to: WAIVED
           via: evidence.mark-waived
-        - from: VERIFIED
-          to: EXPIRED
-          via: "(time-decay)"
-      terminal_states: [REJECTED, WAIVED]
+        # from: VERIFIED to: EXPIRED (via: "(time-decay)") row deleted
+        # (POLICY): no time-decay job exists in this codebase.
+      terminal_states: [WAIVED]
 
   - id: red_flag
     stateless: false
@@ -691,19 +657,19 @@ slots:
       transitions:
         - from: DRAFT
           to: REQUIRED
-          via: doc-request.create
+          via: document.create-request
         - from: REQUIRED
           to: REQUESTED
-          via: doc-request.send
+          via: document.mark-requested
         - from: REQUESTED
           to: RECEIVED
-          via: doc-request.verify
+          via: document.mark-received
         - from: RECEIVED
           to: UNDER_REVIEW
           via: "(compliance review)"
         - from: UNDER_REVIEW
           to: VERIFIED
-          via: evidence.mark-verified
+          via: document.verify-request
         - from: UNDER_REVIEW
           to: REJECTED
           via: evidence.mark-rejected
@@ -972,9 +938,11 @@ slots:
         - from: PENDING
           to: MANUAL_REQUIRED
           via: "(backend: pipeline failure)"
-        - from: MANUAL_REQUIRED
-          to: DISCOVERED
-          via: ubo.registry.promote  # cross-workspace from KYC
+        # from: MANUAL_REQUIRED to: DISCOVERED row deleted (state-graph
+        # remediation Phase 6a, POLICY): the promotion verb no longer
+        # exists (the whole ubo.registry.* family was deleted --
+        # phantom-writing ops that never successfully executed). wire-later:
+        # no verb currently resolves a manual UBO-discovery override.
       terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
 
   - id: investor
@@ -1211,8 +1179,8 @@ slots:
           description: "Manco cleared to manage new mandates."
           green_when: |
             every regulatory_licence exists
-            AND every regulatory_licence.state = CURRENT
-            AND no investigation exists with state = OPEN
+            AND every regulatory_licence.status = CURRENT
+            AND count(investigation where investigation.status = OPEN) = 0
             AND periodic_review exists
             AND periodic_review.state = COMPLETE
             AND credit_risk_assessment exists
@@ -1285,13 +1253,6 @@ cross_slot_constraints:
            OR EXISTS red_flags WHERE source = 'screening' AND status = 'MITIGATED'
     severity: error
 
-  - id: ubo_approved_requires_provable_evidence_chain
-    description: "kyc_ubo_registry.status = APPROVED requires at least one ubo_evidence.verification_status = VERIFIED."
-    rule: |
-      kyc_ubo_registry.status = 'APPROVED'
-        → EXISTS ubo_evidence WHERE ubo_id = this.ubo_id AND verification_status = 'VERIFIED'
-    severity: error
-
   - id: doc_request_verified_triggers_workstream_advance
     description: |
       When all required doc_requests for a workstream are VERIFIED / WAIVED,
@@ -1302,19 +1263,14 @@ cross_slot_constraints:
         → entity_workstream.status advances VERIFY → SCREEN
     severity: informational
 
-  - id: kyc_service_agreement_active_required_for_sponsored_cases
-    description: "KYC-as-a-Service sponsored cases require ACTIVE service agreement."
-    rule: |
-      cases.kyc_context = 'SPONSORED'
-        → EXISTS kyc_service_agreements WHERE sponsor_id = this.sponsor_cbu_id AND status = 'ACTIVE'
-    severity: error
-
-  - id: periodic_review_cases_must_reference_predecessor
-    description: "cases.case_type = PERIODIC_REVIEW must link to the predecessor case."
-    rule: |
-      cases.case_type = 'PERIODIC_REVIEW'
-        → cases.predecessor_case_id IS NOT NULL
-    severity: error
+  # kyc_service_agreement_active_required_for_sponsored_cases and
+  # periodic_review_cases_must_reference_predecessor deleted (state-graph
+  # remediation Phase 5f): both referenced columns that do not exist on the
+  # live "ob-poc".cases table (cases.kyc_context, cases.predecessor_case_id)
+  # -- dead constraints, unenforceable by construction. cases.service_context
+  # and cases.client_group_id exist and may be the intended live equivalents,
+  # but re-authoring the rules against them is out of this remediation's
+  # ratified scope.
 
 # =============================================================================
 # 4. PRODUCT-MODULE GATES
@@ -1329,7 +1285,6 @@ product_module_gates:
     - entity_workstream
     - screening
     - ubo_evidence
-    - kyc_ubo_registry
     - kyc_ubo_evidence
     - red_flag
     - doc_request

@@ -18,6 +18,7 @@
 //!     assert_eq!(result.status().await, InstanceStatus::Completed);
 //! }
 //! ```
+#![deny(unreachable_pub)]
 
 // Bring dsl-resolution into scope so instantiate_pack can call validate_bpmn.
 pub use dsl_resolution;

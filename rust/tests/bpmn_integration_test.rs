@@ -767,7 +767,7 @@ async fn b3_11_early_signal() {
 #[tokio::test]
 #[ignore]
 async fn b3_12_dispatcher_direct_routing() {
-    use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, StubExecutor};
+    use ob_poc::sequencer::{DslExecutionOutcome, DslExecutorV2, NullDslExecutor};
 
     let pool = test_pool().await;
     let client = bpmn_client().await;
@@ -776,7 +776,7 @@ async fn b3_12_dispatcher_direct_routing() {
     let parked_token_store = ParkedTokenStore::new(pool.clone());
     let request_state_store = RequestStateStore::new(pool.clone());
 
-    let inner: Arc<dyn DslExecutorV2> = Arc::new(StubExecutor);
+    let inner: Arc<dyn DslExecutorV2> = Arc::new(NullDslExecutor);
     let dispatcher = WorkflowDispatcher::new(
         inner,
         Arc::new(config),
@@ -787,7 +787,7 @@ async fn b3_12_dispatcher_direct_routing() {
         request_state_store,
     );
 
-    // Direct verb should delegate to inner executor (StubExecutor returns Completed).
+    // Direct verb should delegate to inner executor (NullDslExecutor returns Completed).
     let result = dispatcher
         .execute_v2("(session.info)", Uuid::new_v4(), Uuid::new_v4(), None)
         .await;

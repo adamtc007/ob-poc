@@ -1137,21 +1137,8 @@ domains:
       kyc-case.reopen:
         reads: [cases]
         writes: [cases]
-      ubo.registry.create:
-        reads: [cases, entities]
-        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
-      ubo.registry.promote:
-        reads: [kyc_ubo_registry]
-        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
-      ubo.registry.advance:
-        reads: [kyc_ubo_registry, kyc_ubo_evidence]
-        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
-      ubo.registry.reject:
-        reads: [kyc_ubo_registry]
-        writes: [kyc_ubo_registry, ubo_assertion_log, case_events]
-      ubo.registry.expire:
-        reads: [kyc_ubo_registry]
-        writes: [kyc_ubo_registry, ubo_assertion_log]
+      # ubo.registry.{create,promote,advance,reject,expire} deleted
+      # (state-graph remediation Phase 6a) along with the verb family.
       evidence.create-requirement:
         reads: [kyc_ubo_registry]
         writes: [kyc_ubo_evidence, case_events]

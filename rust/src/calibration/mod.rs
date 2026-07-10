@@ -22,7 +22,9 @@ pub use pre_screen::pre_screen_utterances;
 pub use seed::{build_scenario_seed, compute_situation_signature, derive_operational_phase};
 pub use types::{
     CalibrationDrift, CalibrationExecutionShape, CalibrationFixtureTransition, CalibrationMode,
-    CalibrationPortfolioEntry, CalibrationRun, CalibrationScenario, CalibrationScenarioBundle,
-    CalibrationUtteranceReviewRow, CalibrationWriteThroughSummary, ProposedGapEntry,
+    CalibrationOutcome, CalibrationPortfolioEntry, CalibrationRun, CalibrationScenario,
+    CalibrationScenarioBundle, CalibrationUtteranceReviewRow, CalibrationVerdict,
+    CalibrationWriteThroughSummary, ConfusionRisk, EmbeddingPreScreen, ExpectedOutcome,
+    GeneratedUtterance, GovernanceStatus, NearNeighbourVerb, PreScreenStratum, ProposedGapEntry,
     SuggestedClarification,
 };

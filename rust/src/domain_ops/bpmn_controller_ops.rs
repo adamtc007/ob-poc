@@ -1,10 +1,15 @@
 //! bpmn-controller plugin verbs (7 ops) — Pattern B bridges to the
 //! `bpmn-controller` crate (`loader.*` + `bpmn-controller.*`).
 //!
-//! All ops follow the pre_fetch → execute pattern from bpmn_lite_ops:
+//! Read/provisioning ops follow the pre_fetch → execute pattern from
+//! bpmn_lite_ops:
 //! - `pre_fetch` performs the actual work against bpmn-lite's DB (+ K8s for
 //!   pool mutations) outside the ob-poc transaction scope.
 //! - `execute` reads the pre-fetched result from args and returns the outcome.
+//!
+//! T0.4 (EOP-PLAN-CONTROLPLANE-001, closes C-037) exception:
+//! `bpmn-controller.start-instance` does its write in `execute`, not
+//! `pre_fetch` — see the note on `BpmnControllerStartInstance` below.
 //!
 //! Runtime requirement: `BPMN_LITE_DATABASE_URL` must point to bpmn-lite's
 //! Postgres instance (with migrations 001–032 applied). Pool mutating verbs
@@ -271,7 +276,20 @@ impl SemOsVerbOp for LoaderListPools {
 }
 
 // ── bpmn-controller.start-instance ───────────────────────────────────────────
-
+//
+// T0.4 (EOP-PLAN-CONTROLPLANE-001, closes C-037): the ONE exception to this
+// file's module-level "work happens in pre_fetch" pattern. Every other op
+// here is a read (or a pool-provisioning op out of T0.4's scope); this one
+// is a write with a durable side effect (`process_instances` row in
+// bpmn-lite's DB). Per the `SemOsVerbOp::pre_fetch` contract ("do HTTP in
+// pre_fetch, DB writes in execute"), the write belongs in `execute` — it
+// used to run in `pre_fetch`, which the dispatcher calls BEFORE the
+// execute-scope even opens, so a failure anywhere else in the op's
+// lifecycle could never see, correlate with, or compensate the already-
+// started bpmn-lite instance. `start_instance`'s idempotency-key check
+// (`bpmn-controller/src/instance.rs:L100-L190`) still protects retries —
+// this relocation doesn't add new safety there, it just puts the write in
+// the phase the framework actually intends for writes.
 pub(super) struct BpmnControllerStartInstance;
 
 #[async_trait]
@@ -280,12 +298,14 @@ impl SemOsVerbOp for BpmnControllerStartInstance {
         "bpmn-controller.start-instance"
     }
 
-    async fn pre_fetch(
+    // No pre_fetch override — see the T0.4 note above.
+
+    async fn execute(
         &self,
         args: &serde_json::Value,
         _ctx: &mut VerbExecutionContext,
-        _pool: &sqlx::PgPool,
-    ) -> Result<Option<serde_json::Value>> {
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
         let pg = bpmn_lite_pool()?;
 
         let tenant_id = extract_str(args, "tenant-id")?;
@@ -299,23 +319,7 @@ impl SemOsVerbOp for BpmnControllerStartInstance {
         let instance_id =
             start_instance(pg, tenant_id, process_key, payload, idempotency_key).await?;
 
-        Ok(Some(serde_json::json!({
-            "_instance_id": instance_id.to_string()
-        })))
-    }
-
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        _ctx: &mut VerbExecutionContext,
-        _scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let id_str = args
-            .get("_instance_id")
-            .and_then(|v| v.as_str())
-            .context("bpmn-controller.start-instance: pre_fetch result missing")?;
-        let id = Uuid::parse_str(id_str).context("bpmn-controller.start-instance: invalid UUID")?;
-        Ok(VerbExecutionOutcome::Uuid(id))
+        Ok(VerbExecutionOutcome::Uuid(instance_id))
     }
 }
 
@@ -397,5 +401,140 @@ impl SemOsVerbOp for BpmnControllerListInstances {
             .context("bpmn-controller.list-instances: pre_fetch result missing")?
             .clone();
         Ok(VerbExecutionOutcome::RecordSet(rows))
+    }
+}
+
+// ── T0.4 tests (EOP-PLAN-CONTROLPLANE-001, closes C-037) ────────────────────
+
+#[cfg(test)]
+mod t0_4_tests {
+    use super::*;
+
+    /// `TransactionScope` double: `BpmnControllerStartInstance::execute`
+    /// never calls `scope.executor()`/`transaction()`/`pool()` (its write
+    /// goes through `bpmn_lite_pool()`, a separate connection pool from the
+    /// ob-poc scope) — a panic on any of those methods is itself part of
+    /// the assertion that the op doesn't misuse the ob-poc transaction.
+    struct PanicScope;
+
+    impl TransactionScope for PanicScope {
+        fn scope_id(&self) -> ob_poc_types::TransactionScopeId {
+            ob_poc_types::TransactionScopeId::new()
+        }
+        fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
+            panic!("PanicScope: transaction() reached — this op must not touch the ob-poc scope")
+        }
+        fn pool(&self) -> &sqlx::PgPool {
+            panic!("PanicScope: pool() reached — this op must not touch the ob-poc scope")
+        }
+    }
+
+    async fn seed_tenant(pg: &sqlx::PgPool, tenant_id: &str) {
+        sqlx::query("INSERT INTO tenants (tenant_id) VALUES ($1) ON CONFLICT DO NOTHING")
+            .bind(tenant_id)
+            .execute(pg)
+            .await
+            .unwrap();
+    }
+
+    /// Insert a minimal published workflow_template for test use.
+    /// 64-char hex string — fake but structurally valid (decimal digits are
+    /// valid hex), matching `bpmn-controller/tests/integration_test.rs`.
+    async fn seed_template(pg: &sqlx::PgPool, process_key: &str) -> String {
+        let bytecode_hex = format!("{:0>64}", process_key.len());
+        sqlx::query(
+            "INSERT INTO workflow_templates \
+             (template_key, template_version, process_key, bytecode_version, \
+              state, dto_snapshot, task_manifest) \
+             VALUES ($1, 1, $2, $3, 'published', '{}'::jsonb, '[]'::jsonb) \
+             ON CONFLICT DO NOTHING",
+        )
+        .bind(format!("t0-4-test-{}", process_key))
+        .bind(process_key)
+        .bind(&bytecode_hex)
+        .execute(pg)
+        .await
+        .unwrap();
+        bytecode_hex
+    }
+
+    async fn count_instances_for_correlation(pg: &sqlx::PgPool, correlation_id: &str) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM process_instances WHERE correlation_id = $1")
+            .bind(correlation_id)
+            .fetch_one(pg)
+            .await
+            .unwrap()
+    }
+
+    /// T0.4 exit criterion — "op failure after execute-start leaves no
+    /// process_instances row (or a compensated one)":
+    ///
+    /// 1. `pre_fetch` is now the trait default (no override) — proves the
+    ///    write no longer happens before the execute-scope opens: calling
+    ///    it creates zero rows.
+    /// 2. `execute` performs the write and returns the real instance id.
+    /// 3. Retrying `execute` with the SAME idempotency key (simulating a
+    ///    caller retry after some unrelated failure downstream of this
+    ///    op's own return) is compensated by `start_instance`'s existing
+    ///    idempotency check — same id, no second row.
+    #[tokio::test]
+    #[ignore = "requires BPMN_LITE_DATABASE_URL (bpmn-lite schema)"]
+    async fn t0_4_write_moved_to_execute_and_retry_is_compensated() {
+        let url = std::env::var("BPMN_LITE_DATABASE_URL")
+            .expect("BPMN_LITE_DATABASE_URL must be set");
+        let pg = sqlx::PgPool::connect(&url).await.expect("connect");
+
+        let tenant_id = "t0-4-test-tenant";
+        let process_key = "t0-4-test-process";
+        let idempotency_key = format!("t0-4-idem-{}", Uuid::new_v4());
+        seed_tenant(&pg, tenant_id).await;
+        seed_template(&pg, process_key).await;
+
+        let op = BpmnControllerStartInstance;
+        let args = serde_json::json!({
+            "tenant-id": tenant_id,
+            "process-key": process_key,
+            "payload": {"amount": 1},
+            "idempotency-key": idempotency_key,
+        });
+
+        // 1. pre_fetch is the trait default — no DB write.
+        let mut ctx = VerbExecutionContext::default();
+        let pre = op.pre_fetch(&args, &mut ctx, &pg).await.unwrap();
+        assert!(
+            pre.is_none(),
+            "pre_fetch must be a no-op post-T0.4 (write relocated to execute)"
+        );
+        assert_eq!(
+            count_instances_for_correlation(&pg, &idempotency_key).await,
+            0,
+            "pre_fetch must not have created a process_instances row"
+        );
+
+        // 2. execute performs the write.
+        let mut scope = PanicScope;
+        let outcome1 = op.execute(&args, &mut ctx, &mut scope).await.unwrap();
+        let id1 = match outcome1 {
+            VerbExecutionOutcome::Uuid(id) => id,
+            other => panic!("expected Uuid outcome, got {other:?}"),
+        };
+        assert_eq!(
+            count_instances_for_correlation(&pg, &idempotency_key).await,
+            1,
+            "execute must have created exactly one process_instances row"
+        );
+
+        // 3. Retry with the same idempotency key — compensated, not duplicated.
+        let outcome2 = op.execute(&args, &mut ctx, &mut scope).await.unwrap();
+        let id2 = match outcome2 {
+            VerbExecutionOutcome::Uuid(id) => id,
+            other => panic!("expected Uuid outcome, got {other:?}"),
+        };
+        assert_eq!(id1, id2, "retry with same idempotency key must return the same instance");
+        assert_eq!(
+            count_instances_for_correlation(&pg, &idempotency_key).await,
+            1,
+            "retry must not create a second process_instances row (compensated)"
+        );
     }
 }

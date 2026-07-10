@@ -3,6 +3,7 @@
 //! Provides `Span`, `Diagnostic`, `DiagnosticSeverity`, `DiagnosticBag`, and
 //! well-known diagnostic code constants used across the parsing and lowering
 //! pipeline.
+#![deny(unreachable_pub)]
 
 mod diagnostic;
 

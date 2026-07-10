@@ -1,12 +1,12 @@
 //! DictionaryService implementation for attribute validation and management
 
-use crate::data_dictionary::{
-    AttributeId, DbAttributeDefinition, DictionaryService, SinkConfig, SourceConfig,
-};
 use crate::services::attribute_identity_service::{
     AttributeIdentityService, ResolvedAttributeIdentity,
 };
 use async_trait::async_trait;
+use ob_poc_authoring::data_dictionary::{
+    AttributeId, DbAttributeDefinition, DictionaryService, SinkConfig, SourceConfig,
+};
 use sqlx::PgPool;
 
 pub struct DictionaryServiceImpl {

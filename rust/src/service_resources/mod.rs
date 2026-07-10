@@ -45,91 +45,25 @@
 pub mod discovery;
 pub mod onboarding_data_request;
 pub mod provisioning;
-pub mod resolve;
+
 pub mod service;
 pub mod srdef_loader;
 pub mod types;
 
 // Re-export main types
-pub use types::{
-    AttributeConflict,
-    // Report types
-    AttributeGapReport,
-    AttributeSource,
-    BlockingReason,
-    BlockingReasonType,
-
-    CbuAttrValue,
-    // Readiness types
-    CbuServiceReadiness,
-    // Attribute types
-    CbuUnifiedAttrRequirement,
-    DiscoveredSrdef,
-    DiscoveryResponse,
-    EventDirection,
-    EventKind,
-    EvidenceRef,
-    ExplainRef,
-
-    MissingAttribute,
-    NewProvisioningRequest,
-    NewServiceIntent,
-    NewSrdefDiscovery,
-
-    OwnerProvisioningResult,
-    ProvisioningEvent,
-    ProvisioningPayload,
-    // Provisioning types
-    ProvisioningRequest,
-    ProvisioningStatus,
-    ProvisioningStrategy,
-    ReadinessResponse,
-    ReadinessStatus,
-    ReadinessSummary,
-    RequestedBy,
-    RequirementStrength,
-    ResultExplanation,
-
-    ServiceIntent,
-    // API response types
-    ServiceIntentResponse,
-    ServiceIntentStatus,
-
-    ServiceReadinessDetail,
-    SetCbuAttrValue,
-    // SRDEF types
-    Srdef,
-    SrdefDiscoveryReason,
-    SrdefReadinessCheck,
-};
+pub use types::{AttributeSource, EvidenceRef, NewServiceIntent, SetCbuAttrValue};
 
 pub use service::ServiceResourcePipelineService;
 
-pub use onboarding_data_request::{
-    CancellationResult, CompileDataRequestResult, ConfirmProvisioningResult,
-    DispatchReadySlicesResult, OnboardingDataRequestService,
-};
-
-pub use resolve::{
-    resolve, ResolvedDependencies, ResourceDictionaryAttribute, ResourceTypeWithDictionary, Service,
-};
+pub use onboarding_data_request::OnboardingDataRequestService;
 
 // Re-export loader types
-pub use srdef_loader::{
-    load_and_sync_srdefs, load_srdefs_from_config, LoadedSrdef, LoadedSrdefAttribute,
-    SrdefConfigFile, SrdefLoader, SrdefRegistry, SyncResult,
-};
+pub use srdef_loader::{load_and_sync_srdefs, load_srdefs_from_config};
 
 // Re-export discovery engine types
 pub use discovery::{
-    run_discovery_pipeline, run_discovery_pipeline_in, AttributeRollupEngine, DiscoveredSrdefInfo,
-    DiscoveryResult, PipelineResult, PopulationEngine, PopulationResult, ResourceDiscoveryEngine,
-    RollupResult,
+    run_discovery_pipeline, run_discovery_pipeline_in, AttributeRollupEngine, PopulationEngine,
 };
 
 // Re-export provisioning types
-pub use provisioning::{
-    run_provisioning_pipeline, FullPipelineResult, ProvisionResult, ProvisioningOrchestrator,
-    ProvisioningOrchestratorResult, ReadinessComputeResult, ReadinessEngine, ResourceProvisioner,
-    StubProvisioner,
-};
+pub use provisioning::{run_provisioning_pipeline, ReadinessEngine};

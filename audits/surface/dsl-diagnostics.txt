@@ -1,0 +1,207 @@
+# dsl-diagnostics | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:13Z
+pub mod dsl_diagnostics
+pub enum dsl_diagnostics::DiagnosticSeverity
+pub dsl_diagnostics::DiagnosticSeverity::Error
+pub dsl_diagnostics::DiagnosticSeverity::Note
+pub dsl_diagnostics::DiagnosticSeverity::Warning
+impl core::clone::Clone for dsl_diagnostics::DiagnosticSeverity
+pub fn dsl_diagnostics::DiagnosticSeverity::clone(&self) -> dsl_diagnostics::DiagnosticSeverity
+impl core::cmp::Eq for dsl_diagnostics::DiagnosticSeverity
+impl core::cmp::PartialEq for dsl_diagnostics::DiagnosticSeverity
+pub fn dsl_diagnostics::DiagnosticSeverity::eq(&self, &dsl_diagnostics::DiagnosticSeverity) -> bool
+impl core::fmt::Debug for dsl_diagnostics::DiagnosticSeverity
+pub fn dsl_diagnostics::DiagnosticSeverity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_diagnostics::DiagnosticSeverity
+impl serde_core::ser::Serialize for dsl_diagnostics::DiagnosticSeverity
+pub fn dsl_diagnostics::DiagnosticSeverity::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_diagnostics::DiagnosticSeverity
+pub fn dsl_diagnostics::DiagnosticSeverity::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_diagnostics::DiagnosticSeverity
+impl core::marker::Send for dsl_diagnostics::DiagnosticSeverity
+impl core::marker::Sync for dsl_diagnostics::DiagnosticSeverity
+impl core::marker::Unpin for dsl_diagnostics::DiagnosticSeverity
+impl core::marker::UnsafeUnpin for dsl_diagnostics::DiagnosticSeverity
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_diagnostics::DiagnosticSeverity
+impl core::panic::unwind_safe::UnwindSafe for dsl_diagnostics::DiagnosticSeverity
+impl<T, U> core::convert::Into<U> for dsl_diagnostics::DiagnosticSeverity where U: core::convert::From<T>
+pub fn dsl_diagnostics::DiagnosticSeverity::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_diagnostics::DiagnosticSeverity where U: core::convert::Into<T>
+pub type dsl_diagnostics::DiagnosticSeverity::Error = core::convert::Infallible
+pub fn dsl_diagnostics::DiagnosticSeverity::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_diagnostics::DiagnosticSeverity where U: core::convert::TryFrom<T>
+pub type dsl_diagnostics::DiagnosticSeverity::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_diagnostics::DiagnosticSeverity::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_diagnostics::DiagnosticSeverity where T: core::clone::Clone
+pub type dsl_diagnostics::DiagnosticSeverity::Owned = T
+pub fn dsl_diagnostics::DiagnosticSeverity::clone_into(&self, &mut T)
+pub fn dsl_diagnostics::DiagnosticSeverity::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_diagnostics::DiagnosticSeverity where T: 'static + ?core::marker::Sized
+pub fn dsl_diagnostics::DiagnosticSeverity::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_diagnostics::DiagnosticSeverity where T: ?core::marker::Sized
+pub fn dsl_diagnostics::DiagnosticSeverity::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_diagnostics::DiagnosticSeverity where T: ?core::marker::Sized
+pub fn dsl_diagnostics::DiagnosticSeverity::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_diagnostics::DiagnosticSeverity where T: core::clone::Clone
+pub unsafe fn dsl_diagnostics::DiagnosticSeverity::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_diagnostics::DiagnosticSeverity
+pub fn dsl_diagnostics::DiagnosticSeverity::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_diagnostics::DiagnosticSeverity where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_diagnostics::Diagnostic
+pub dsl_diagnostics::Diagnostic::code: core::option::Option<alloc::string::String>
+pub dsl_diagnostics::Diagnostic::message: alloc::string::String
+pub dsl_diagnostics::Diagnostic::severity: dsl_diagnostics::DiagnosticSeverity
+pub dsl_diagnostics::Diagnostic::span: core::option::Option<dsl_diagnostics::Span>
+impl dsl_diagnostics::Diagnostic
+pub fn dsl_diagnostics::Diagnostic::error(impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dsl_diagnostics::Diagnostic::error_with_code(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dsl_diagnostics::Diagnostic::note(impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dsl_diagnostics::Diagnostic::warning(impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dsl_diagnostics::Diagnostic::with_code(self, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn dsl_diagnostics::Diagnostic::with_span(self, dsl_diagnostics::Span) -> Self
+impl core::clone::Clone for dsl_diagnostics::Diagnostic
+pub fn dsl_diagnostics::Diagnostic::clone(&self) -> dsl_diagnostics::Diagnostic
+impl core::fmt::Debug for dsl_diagnostics::Diagnostic
+pub fn dsl_diagnostics::Diagnostic::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_diagnostics::Diagnostic
+pub fn dsl_diagnostics::Diagnostic::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_diagnostics::Diagnostic
+pub fn dsl_diagnostics::Diagnostic::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_diagnostics::Diagnostic
+impl core::marker::Send for dsl_diagnostics::Diagnostic
+impl core::marker::Sync for dsl_diagnostics::Diagnostic
+impl core::marker::Unpin for dsl_diagnostics::Diagnostic
+impl core::marker::UnsafeUnpin for dsl_diagnostics::Diagnostic
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_diagnostics::Diagnostic
+impl core::panic::unwind_safe::UnwindSafe for dsl_diagnostics::Diagnostic
+impl<T, U> core::convert::Into<U> for dsl_diagnostics::Diagnostic where U: core::convert::From<T>
+pub fn dsl_diagnostics::Diagnostic::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_diagnostics::Diagnostic where U: core::convert::Into<T>
+pub type dsl_diagnostics::Diagnostic::Error = core::convert::Infallible
+pub fn dsl_diagnostics::Diagnostic::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_diagnostics::Diagnostic where U: core::convert::TryFrom<T>
+pub type dsl_diagnostics::Diagnostic::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_diagnostics::Diagnostic::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_diagnostics::Diagnostic where T: core::clone::Clone
+pub type dsl_diagnostics::Diagnostic::Owned = T
+pub fn dsl_diagnostics::Diagnostic::clone_into(&self, &mut T)
+pub fn dsl_diagnostics::Diagnostic::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_diagnostics::Diagnostic where T: 'static + ?core::marker::Sized
+pub fn dsl_diagnostics::Diagnostic::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_diagnostics::Diagnostic where T: ?core::marker::Sized
+pub fn dsl_diagnostics::Diagnostic::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_diagnostics::Diagnostic where T: ?core::marker::Sized
+pub fn dsl_diagnostics::Diagnostic::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_diagnostics::Diagnostic where T: core::clone::Clone
+pub unsafe fn dsl_diagnostics::Diagnostic::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_diagnostics::Diagnostic
+pub fn dsl_diagnostics::Diagnostic::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_diagnostics::Diagnostic where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_diagnostics::DiagnosticBag
+pub dsl_diagnostics::DiagnosticBag::diagnostics: alloc::vec::Vec<dsl_diagnostics::Diagnostic>
+impl dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::errors(&self) -> impl core::iter::traits::iterator::Iterator<Item = &dsl_diagnostics::Diagnostic>
+pub fn dsl_diagnostics::DiagnosticBag::has_errors(&self) -> bool
+pub fn dsl_diagnostics::DiagnosticBag::new() -> Self
+pub fn dsl_diagnostics::DiagnosticBag::push(&mut self, dsl_diagnostics::Diagnostic)
+pub fn dsl_diagnostics::DiagnosticBag::warnings(&self) -> impl core::iter::traits::iterator::Iterator<Item = &dsl_diagnostics::Diagnostic>
+impl core::clone::Clone for dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::clone(&self) -> dsl_diagnostics::DiagnosticBag
+impl core::default::Default for dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::default() -> dsl_diagnostics::DiagnosticBag
+impl core::fmt::Debug for dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_diagnostics::DiagnosticBag
+impl core::marker::Send for dsl_diagnostics::DiagnosticBag
+impl core::marker::Sync for dsl_diagnostics::DiagnosticBag
+impl core::marker::Unpin for dsl_diagnostics::DiagnosticBag
+impl core::marker::UnsafeUnpin for dsl_diagnostics::DiagnosticBag
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_diagnostics::DiagnosticBag
+impl core::panic::unwind_safe::UnwindSafe for dsl_diagnostics::DiagnosticBag
+impl<T, U> core::convert::Into<U> for dsl_diagnostics::DiagnosticBag where U: core::convert::From<T>
+pub fn dsl_diagnostics::DiagnosticBag::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_diagnostics::DiagnosticBag where U: core::convert::Into<T>
+pub type dsl_diagnostics::DiagnosticBag::Error = core::convert::Infallible
+pub fn dsl_diagnostics::DiagnosticBag::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_diagnostics::DiagnosticBag where U: core::convert::TryFrom<T>
+pub type dsl_diagnostics::DiagnosticBag::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_diagnostics::DiagnosticBag::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_diagnostics::DiagnosticBag where T: core::clone::Clone
+pub type dsl_diagnostics::DiagnosticBag::Owned = T
+pub fn dsl_diagnostics::DiagnosticBag::clone_into(&self, &mut T)
+pub fn dsl_diagnostics::DiagnosticBag::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_diagnostics::DiagnosticBag where T: 'static + ?core::marker::Sized
+pub fn dsl_diagnostics::DiagnosticBag::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_diagnostics::DiagnosticBag where T: ?core::marker::Sized
+pub fn dsl_diagnostics::DiagnosticBag::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_diagnostics::DiagnosticBag where T: ?core::marker::Sized
+pub fn dsl_diagnostics::DiagnosticBag::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_diagnostics::DiagnosticBag where T: core::clone::Clone
+pub unsafe fn dsl_diagnostics::DiagnosticBag::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_diagnostics::DiagnosticBag
+pub fn dsl_diagnostics::DiagnosticBag::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_diagnostics::DiagnosticBag where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_diagnostics::Span
+pub dsl_diagnostics::Span::end_col: u32
+pub dsl_diagnostics::Span::end_line: u32
+pub dsl_diagnostics::Span::file: alloc::string::String
+pub dsl_diagnostics::Span::start_col: u32
+pub dsl_diagnostics::Span::start_line: u32
+impl core::clone::Clone for dsl_diagnostics::Span
+pub fn dsl_diagnostics::Span::clone(&self) -> dsl_diagnostics::Span
+impl core::cmp::Eq for dsl_diagnostics::Span
+impl core::cmp::PartialEq for dsl_diagnostics::Span
+pub fn dsl_diagnostics::Span::eq(&self, &dsl_diagnostics::Span) -> bool
+impl core::fmt::Debug for dsl_diagnostics::Span
+pub fn dsl_diagnostics::Span::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_diagnostics::Span
+impl serde_core::ser::Serialize for dsl_diagnostics::Span
+pub fn dsl_diagnostics::Span::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_diagnostics::Span
+pub fn dsl_diagnostics::Span::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_diagnostics::Span
+impl core::marker::Send for dsl_diagnostics::Span
+impl core::marker::Sync for dsl_diagnostics::Span
+impl core::marker::Unpin for dsl_diagnostics::Span
+impl core::marker::UnsafeUnpin for dsl_diagnostics::Span
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_diagnostics::Span
+impl core::panic::unwind_safe::UnwindSafe for dsl_diagnostics::Span
+impl<T, U> core::convert::Into<U> for dsl_diagnostics::Span where U: core::convert::From<T>
+pub fn dsl_diagnostics::Span::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_diagnostics::Span where U: core::convert::Into<T>
+pub type dsl_diagnostics::Span::Error = core::convert::Infallible
+pub fn dsl_diagnostics::Span::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_diagnostics::Span where U: core::convert::TryFrom<T>
+pub type dsl_diagnostics::Span::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_diagnostics::Span::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_diagnostics::Span where T: core::clone::Clone
+pub type dsl_diagnostics::Span::Owned = T
+pub fn dsl_diagnostics::Span::clone_into(&self, &mut T)
+pub fn dsl_diagnostics::Span::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_diagnostics::Span where T: 'static + ?core::marker::Sized
+pub fn dsl_diagnostics::Span::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_diagnostics::Span where T: ?core::marker::Sized
+pub fn dsl_diagnostics::Span::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_diagnostics::Span where T: ?core::marker::Sized
+pub fn dsl_diagnostics::Span::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_diagnostics::Span where T: core::clone::Clone
+pub unsafe fn dsl_diagnostics::Span::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_diagnostics::Span
+pub fn dsl_diagnostics::Span::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_diagnostics::Span where T: for<'de> serde_core::de::Deserialize<'de>
+pub const dsl_diagnostics::DEPRECATED_PACK_VERSION: &str
+pub const dsl_diagnostics::INVALID_PARAMETER_NAME: &str
+pub const dsl_diagnostics::MERGE_CONFLICT: &str
+pub const dsl_diagnostics::MISSING_REQUIRED_SLOT: &str
+pub const dsl_diagnostics::RETIRED_PACK_VERSION: &str
+pub const dsl_diagnostics::UNDECLARED_MERGE: &str
+pub const dsl_diagnostics::UNKNOWN_ATOM_KIND: &str
+pub const dsl_diagnostics::UNKNOWN_DECLARATIVE_KIND: &str
+pub const dsl_diagnostics::UNKNOWN_LOOP_VARIABLE: &str
+pub const dsl_diagnostics::UNKNOWN_PACK_REFERENCE: &str
+pub const dsl_diagnostics::UNKNOWN_TEMPLATE_PARAMETER: &str
+pub const dsl_diagnostics::UNRESOLVED_INSERTION_MARKER: &str
+pub const dsl_diagnostics::UNRESOLVED_NAME_REF: &str

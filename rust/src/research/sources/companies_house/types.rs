@@ -104,6 +104,7 @@ impl ChCompanyProfile {
     }
 
     /// Check if company is active
+    #[allow(dead_code)] // kept for tests
     pub fn is_active(&self) -> bool {
         matches!(self.status(), EntityStatus::Active)
     }

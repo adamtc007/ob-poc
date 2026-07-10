@@ -50,13 +50,6 @@ impl SecCompanySubmissions {
     pub fn cik_padded(&self) -> String {
         format!("{:0>10}", self.cik.trim_start_matches('0'))
     }
-
-    /// Check if this is an operating company (vs investment company, etc.)
-    pub fn is_operating_company(&self) -> bool {
-        self.entity_type
-            .as_ref()
-            .is_none_or(|t| t.to_lowercase() == "operating")
-    }
 }
 
 // =============================================================================
@@ -100,11 +93,6 @@ impl SecRecentFilings {
             accession_number: self.accession_number.get(index)?.clone(),
             form: self.form.get(index).cloned().unwrap_or_default(),
             filing_date: self.filing_date.get(index).cloned().unwrap_or_default(),
-            primary_document: self
-                .primary_document
-                .get(index)
-                .cloned()
-                .unwrap_or_default(),
         })
     }
 
@@ -127,7 +115,6 @@ pub struct SecFilingInfo {
     pub accession_number: String,
     pub form: String,
     pub filing_date: String,
-    pub primary_document: String,
 }
 
 impl SecFilingInfo {
@@ -240,7 +227,6 @@ mod tests {
             accession_number: "0001234567-24-000001".into(),
             form: "SC 13D".into(),
             filing_date: "2024-01-15".into(),
-            primary_document: "sc13d.htm".into(),
         };
         assert!(filing.is_beneficial_ownership_filing());
 
@@ -248,7 +234,6 @@ mod tests {
             accession_number: "0001234567-24-000002".into(),
             form: "10-K".into(),
             filing_date: "2024-01-15".into(),
-            primary_document: "10k.htm".into(),
         };
         assert!(!filing.is_beneficial_ownership_filing());
     }

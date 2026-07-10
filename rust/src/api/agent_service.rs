@@ -314,9 +314,9 @@ pub struct AgentService {
     lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
     /// Entity linking service for in-memory entity mention extraction and resolution
     /// Used by LookupService for verb-first entity resolution
-    entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
+    entity_linker: Option<Arc<dyn ob_poc_entity_linking::EntityLinkingService>>,
     /// Server-side policy enforcement for single-pipeline invariants
-    policy_gate: Arc<crate::policy::PolicyGate>,
+    policy_gate: Arc<ob_poc_boundary::policy::PolicyGate>,
     /// Semantic OS client — when set, routes sem_reg calls through DI boundary
     sem_os_client: Option<Arc<dyn sem_os_client::SemOsClient>>,
     /// MacroIndex for deterministic Tier -2B macro search parity
@@ -389,7 +389,7 @@ impl AgentService {
             learned_data,
             lexicon,
             entity_linker: None,
-            policy_gate: Arc::new(crate::policy::PolicyGate::from_env()),
+            policy_gate: Arc::new(ob_poc_boundary::policy::PolicyGate::from_env()),
             sem_os_client: None,
             macro_index: None,
             scenario_index: None,
@@ -403,7 +403,7 @@ impl AgentService {
     /// Set entity linker for in-memory entity resolution
     pub fn with_entity_linker(
         mut self,
-        entity_linker: Arc<dyn crate::entity_linking::EntityLinkingService>,
+        entity_linker: Arc<dyn ob_poc_entity_linking::EntityLinkingService>,
     ) -> Self {
         self.entity_linker = Some(entity_linker);
         self

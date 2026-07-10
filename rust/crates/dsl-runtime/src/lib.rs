@@ -47,6 +47,7 @@
 //! Explicit allowlist only — no wildcard `pub use`. Every new public
 //! surface is added here deliberately so the plane boundary is reviewable
 //! at a glance.
+#![deny(unreachable_pub)]
 
 // dsl-runtime is now the data plane only. The 13 analyser-tier modules
 // (validation, verb_registry, runtime_registry, catalogue_loader,
@@ -149,3 +150,6 @@ pub use cross_workspace::test_harness::{self, LiveScenarioRunner, ScenarioRunner
 
 #[cfg(test)]
 pub use port::test_support;
+
+#[cfg(test)]
+mod integration_tests;

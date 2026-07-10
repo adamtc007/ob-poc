@@ -1,0 +1,382 @@
+# ob-poc-semtaxonomy | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:00Z
+pub mod ob_poc_semtaxonomy
+pub struct ob_poc_semtaxonomy::DomainStateSummary
+pub ob_poc_semtaxonomy::DomainStateSummary::active_count: usize
+pub ob_poc_semtaxonomy::DomainStateSummary::blocked_count: usize
+pub ob_poc_semtaxonomy::DomainStateSummary::domain: alloc::string::String
+pub ob_poc_semtaxonomy::DomainStateSummary::next_action_candidates: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_semtaxonomy::DomainStateSummary::notable_gaps: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for ob_poc_semtaxonomy::DomainStateSummary
+pub fn ob_poc_semtaxonomy::DomainStateSummary::clone(&self) -> ob_poc_semtaxonomy::DomainStateSummary
+impl core::fmt::Debug for ob_poc_semtaxonomy::DomainStateSummary
+pub fn ob_poc_semtaxonomy::DomainStateSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::DomainStateSummary
+pub fn ob_poc_semtaxonomy::DomainStateSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::DomainStateSummary
+pub fn ob_poc_semtaxonomy::DomainStateSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::DomainStateSummary
+impl core::marker::Send for ob_poc_semtaxonomy::DomainStateSummary
+impl core::marker::Sync for ob_poc_semtaxonomy::DomainStateSummary
+impl core::marker::Unpin for ob_poc_semtaxonomy::DomainStateSummary
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::DomainStateSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::DomainStateSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::DomainStateSummary
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::DomainStateSummary where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::DomainStateSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::DomainStateSummary where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::DomainStateSummary::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::DomainStateSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::DomainStateSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::DomainStateSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::DomainStateSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::DomainStateSummary where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::DomainStateSummary::Owned = T
+pub fn ob_poc_semtaxonomy::DomainStateSummary::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::DomainStateSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::DomainStateSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::DomainStateSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::DomainStateSummary where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::DomainStateSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::DomainStateSummary where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::DomainStateSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::DomainStateSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::DomainStateSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::DomainStateSummary
+pub fn ob_poc_semtaxonomy::DomainStateSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::DomainStateSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::EntityCandidate
+pub ob_poc_semtaxonomy::EntityCandidate::candidate_for_cbu: bool
+pub ob_poc_semtaxonomy::EntityCandidate::entity_id: uuid::Uuid
+pub ob_poc_semtaxonomy::EntityCandidate::entity_type: alloc::string::String
+pub ob_poc_semtaxonomy::EntityCandidate::has_active_workflow: bool
+pub ob_poc_semtaxonomy::EntityCandidate::is_onboarding_member: bool
+pub ob_poc_semtaxonomy::EntityCandidate::lifecycle_populated: bool
+pub ob_poc_semtaxonomy::EntityCandidate::linked_cbu_ids: alloc::vec::Vec<uuid::Uuid>
+pub ob_poc_semtaxonomy::EntityCandidate::linked_entity_count: usize
+pub ob_poc_semtaxonomy::EntityCandidate::match_field: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::EntityCandidate::match_score: f64
+pub ob_poc_semtaxonomy::EntityCandidate::name: alloc::string::String
+pub ob_poc_semtaxonomy::EntityCandidate::source_kind: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::EntityCandidate::summary: core::option::Option<serde_json::value::Value>
+impl core::clone::Clone for ob_poc_semtaxonomy::EntityCandidate
+pub fn ob_poc_semtaxonomy::EntityCandidate::clone(&self) -> ob_poc_semtaxonomy::EntityCandidate
+impl core::fmt::Debug for ob_poc_semtaxonomy::EntityCandidate
+pub fn ob_poc_semtaxonomy::EntityCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::EntityCandidate
+pub fn ob_poc_semtaxonomy::EntityCandidate::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::EntityCandidate
+pub fn ob_poc_semtaxonomy::EntityCandidate::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::EntityCandidate
+impl core::marker::Send for ob_poc_semtaxonomy::EntityCandidate
+impl core::marker::Sync for ob_poc_semtaxonomy::EntityCandidate
+impl core::marker::Unpin for ob_poc_semtaxonomy::EntityCandidate
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::EntityCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::EntityCandidate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::EntityCandidate
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::EntityCandidate where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::EntityCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::EntityCandidate where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::EntityCandidate::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::EntityCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::EntityCandidate where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::EntityCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::EntityCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::EntityCandidate where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::EntityCandidate::Owned = T
+pub fn ob_poc_semtaxonomy::EntityCandidate::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::EntityCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::EntityCandidate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::EntityCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::EntityCandidate where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::EntityCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::EntityCandidate where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::EntityCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::EntityCandidate where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::EntityCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::EntityCandidate
+pub fn ob_poc_semtaxonomy::EntityCandidate::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::EntityCandidate where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::EntityRef
+pub ob_poc_semtaxonomy::EntityRef::entity_id: uuid::Uuid
+pub ob_poc_semtaxonomy::EntityRef::entity_type: alloc::string::String
+pub ob_poc_semtaxonomy::EntityRef::name: alloc::string::String
+impl core::clone::Clone for ob_poc_semtaxonomy::EntityRef
+pub fn ob_poc_semtaxonomy::EntityRef::clone(&self) -> ob_poc_semtaxonomy::EntityRef
+impl core::fmt::Debug for ob_poc_semtaxonomy::EntityRef
+pub fn ob_poc_semtaxonomy::EntityRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::EntityRef
+pub fn ob_poc_semtaxonomy::EntityRef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::EntityRef
+pub fn ob_poc_semtaxonomy::EntityRef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::EntityRef
+impl core::marker::Send for ob_poc_semtaxonomy::EntityRef
+impl core::marker::Sync for ob_poc_semtaxonomy::EntityRef
+impl core::marker::Unpin for ob_poc_semtaxonomy::EntityRef
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::EntityRef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::EntityRef
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::EntityRef
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::EntityRef where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::EntityRef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::EntityRef where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::EntityRef::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::EntityRef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::EntityRef where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::EntityRef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::EntityRef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::EntityRef where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::EntityRef::Owned = T
+pub fn ob_poc_semtaxonomy::EntityRef::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::EntityRef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::EntityRef where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::EntityRef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::EntityRef where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::EntityRef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::EntityRef where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::EntityRef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::EntityRef where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::EntityRef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::EntityRef
+pub fn ob_poc_semtaxonomy::EntityRef::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::EntityRef where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::IntentHint
+pub ob_poc_semtaxonomy::IntentHint::confidence: alloc::string::String
+pub ob_poc_semtaxonomy::IntentHint::intent: alloc::string::String
+pub ob_poc_semtaxonomy::IntentHint::reason: alloc::string::String
+impl core::clone::Clone for ob_poc_semtaxonomy::IntentHint
+pub fn ob_poc_semtaxonomy::IntentHint::clone(&self) -> ob_poc_semtaxonomy::IntentHint
+impl core::fmt::Debug for ob_poc_semtaxonomy::IntentHint
+pub fn ob_poc_semtaxonomy::IntentHint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::IntentHint
+pub fn ob_poc_semtaxonomy::IntentHint::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::IntentHint
+pub fn ob_poc_semtaxonomy::IntentHint::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::IntentHint
+impl core::marker::Send for ob_poc_semtaxonomy::IntentHint
+impl core::marker::Sync for ob_poc_semtaxonomy::IntentHint
+impl core::marker::Unpin for ob_poc_semtaxonomy::IntentHint
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::IntentHint
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::IntentHint
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::IntentHint
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::IntentHint where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::IntentHint::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::IntentHint where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::IntentHint::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::IntentHint::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::IntentHint where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::IntentHint::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::IntentHint::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::IntentHint where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::IntentHint::Owned = T
+pub fn ob_poc_semtaxonomy::IntentHint::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::IntentHint::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::IntentHint where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::IntentHint::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::IntentHint where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::IntentHint::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::IntentHint where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::IntentHint::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::IntentHint where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::IntentHint::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::IntentHint
+pub fn ob_poc_semtaxonomy::IntentHint::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::IntentHint where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::SageSession
+pub ob_poc_semtaxonomy::SageSession::active_entity: core::option::Option<ob_poc_semtaxonomy::EntityRef>
+pub ob_poc_semtaxonomy::SageSession::aspect: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSession::cascade_result: core::option::Option<serde_json::value::Value>
+pub ob_poc_semtaxonomy::SageSession::data_snapshots: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub ob_poc_semtaxonomy::SageSession::domain_scope: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSession::domain_state_summaries: alloc::vec::Vec<ob_poc_semtaxonomy::DomainStateSummary>
+pub ob_poc_semtaxonomy::SageSession::entity_candidates: alloc::vec::Vec<ob_poc_semtaxonomy::EntityCandidate>
+pub ob_poc_semtaxonomy::SageSession::entity_state: core::option::Option<serde_json::value::Value>
+pub ob_poc_semtaxonomy::SageSession::grounding_confidence: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSession::grounding_strategy: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSession::likely_intents: alloc::vec::Vec<ob_poc_semtaxonomy::IntentHint>
+pub ob_poc_semtaxonomy::SageSession::research_cache: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub ob_poc_semtaxonomy::SageSession::session_id: uuid::Uuid
+pub ob_poc_semtaxonomy::SageSession::started_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_semtaxonomy::SageSession::utterance_history: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSession::verb_surface: alloc::vec::Vec<ob_poc_semtaxonomy::VerbSurfaceEntry>
+impl core::clone::Clone for ob_poc_semtaxonomy::SageSession
+pub fn ob_poc_semtaxonomy::SageSession::clone(&self) -> ob_poc_semtaxonomy::SageSession
+impl core::default::Default for ob_poc_semtaxonomy::SageSession
+pub fn ob_poc_semtaxonomy::SageSession::default() -> ob_poc_semtaxonomy::SageSession
+impl core::fmt::Debug for ob_poc_semtaxonomy::SageSession
+pub fn ob_poc_semtaxonomy::SageSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::SageSession
+pub fn ob_poc_semtaxonomy::SageSession::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::SageSession
+pub fn ob_poc_semtaxonomy::SageSession::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::SageSession
+impl core::marker::Send for ob_poc_semtaxonomy::SageSession
+impl core::marker::Sync for ob_poc_semtaxonomy::SageSession
+impl core::marker::Unpin for ob_poc_semtaxonomy::SageSession
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::SageSession
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::SageSession
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::SageSession
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::SageSession where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::SageSession::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::SageSession where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::SageSession::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::SageSession::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::SageSession where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::SageSession::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::SageSession::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::SageSession where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::SageSession::Owned = T
+pub fn ob_poc_semtaxonomy::SageSession::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::SageSession::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::SageSession where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::SageSession::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::SageSession where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::SageSession::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::SageSession where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::SageSession::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::SageSession where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::SageSession::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::SageSession
+pub fn ob_poc_semtaxonomy::SageSession::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::SageSession where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::SageSessionHydration
+pub ob_poc_semtaxonomy::SageSessionHydration::active_entity: core::option::Option<ob_poc_semtaxonomy::EntityRef>
+pub ob_poc_semtaxonomy::SageSessionHydration::aspect: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSessionHydration::cascade_result: core::option::Option<serde_json::value::Value>
+pub ob_poc_semtaxonomy::SageSessionHydration::domain_scope: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSessionHydration::domain_state_summaries: alloc::vec::Vec<ob_poc_semtaxonomy::DomainStateSummary>
+pub ob_poc_semtaxonomy::SageSessionHydration::entity_candidates: alloc::vec::Vec<ob_poc_semtaxonomy::EntityCandidate>
+pub ob_poc_semtaxonomy::SageSessionHydration::entity_state: core::option::Option<serde_json::value::Value>
+pub ob_poc_semtaxonomy::SageSessionHydration::grounding_confidence: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSessionHydration::grounding_strategy: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::SageSessionHydration::intent_hints: alloc::vec::Vec<ob_poc_semtaxonomy::IntentHint>
+pub ob_poc_semtaxonomy::SageSessionHydration::verb_surface: alloc::vec::Vec<ob_poc_semtaxonomy::VerbSurfaceEntry>
+impl core::clone::Clone for ob_poc_semtaxonomy::SageSessionHydration
+pub fn ob_poc_semtaxonomy::SageSessionHydration::clone(&self) -> ob_poc_semtaxonomy::SageSessionHydration
+impl core::default::Default for ob_poc_semtaxonomy::SageSessionHydration
+pub fn ob_poc_semtaxonomy::SageSessionHydration::default() -> ob_poc_semtaxonomy::SageSessionHydration
+impl core::fmt::Debug for ob_poc_semtaxonomy::SageSessionHydration
+pub fn ob_poc_semtaxonomy::SageSessionHydration::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::SageSessionHydration
+pub fn ob_poc_semtaxonomy::SageSessionHydration::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::SageSessionHydration
+pub fn ob_poc_semtaxonomy::SageSessionHydration::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::SageSessionHydration
+impl core::marker::Send for ob_poc_semtaxonomy::SageSessionHydration
+impl core::marker::Sync for ob_poc_semtaxonomy::SageSessionHydration
+impl core::marker::Unpin for ob_poc_semtaxonomy::SageSessionHydration
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::SageSessionHydration
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::SageSessionHydration
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::SageSessionHydration
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::SageSessionHydration where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::SageSessionHydration::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::SageSessionHydration where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::SageSessionHydration::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::SageSessionHydration::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::SageSessionHydration where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::SageSessionHydration::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::SageSessionHydration::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::SageSessionHydration where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::SageSessionHydration::Owned = T
+pub fn ob_poc_semtaxonomy::SageSessionHydration::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::SageSessionHydration::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::SageSessionHydration where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::SageSessionHydration::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::SageSessionHydration where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::SageSessionHydration::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::SageSessionHydration where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::SageSessionHydration::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::SageSessionHydration where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::SageSessionHydration::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::SageSessionHydration
+pub fn ob_poc_semtaxonomy::SageSessionHydration::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::SageSessionHydration where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::VerbParameter
+pub ob_poc_semtaxonomy::VerbParameter::description: core::option::Option<alloc::string::String>
+pub ob_poc_semtaxonomy::VerbParameter::name: alloc::string::String
+pub ob_poc_semtaxonomy::VerbParameter::required: bool
+impl core::clone::Clone for ob_poc_semtaxonomy::VerbParameter
+pub fn ob_poc_semtaxonomy::VerbParameter::clone(&self) -> ob_poc_semtaxonomy::VerbParameter
+impl core::fmt::Debug for ob_poc_semtaxonomy::VerbParameter
+pub fn ob_poc_semtaxonomy::VerbParameter::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::VerbParameter
+pub fn ob_poc_semtaxonomy::VerbParameter::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::VerbParameter
+pub fn ob_poc_semtaxonomy::VerbParameter::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::VerbParameter
+impl core::marker::Send for ob_poc_semtaxonomy::VerbParameter
+impl core::marker::Sync for ob_poc_semtaxonomy::VerbParameter
+impl core::marker::Unpin for ob_poc_semtaxonomy::VerbParameter
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::VerbParameter
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::VerbParameter
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::VerbParameter
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::VerbParameter where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::VerbParameter::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::VerbParameter where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::VerbParameter::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::VerbParameter::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::VerbParameter where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::VerbParameter::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::VerbParameter::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::VerbParameter where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::VerbParameter::Owned = T
+pub fn ob_poc_semtaxonomy::VerbParameter::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::VerbParameter::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::VerbParameter where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::VerbParameter::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::VerbParameter where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::VerbParameter::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::VerbParameter where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::VerbParameter::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::VerbParameter where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::VerbParameter::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::VerbParameter
+pub fn ob_poc_semtaxonomy::VerbParameter::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::VerbParameter where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_semtaxonomy::VerbSurfaceEntry
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::description: alloc::string::String
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::domain: alloc::string::String
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::name: alloc::string::String
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::parameters: alloc::vec::Vec<ob_poc_semtaxonomy::VerbParameter>
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::phase_tags: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::polarity: alloc::string::String
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::subject_kinds: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_semtaxonomy::VerbSurfaceEntry::verb_id: alloc::string::String
+impl core::clone::Clone for ob_poc_semtaxonomy::VerbSurfaceEntry
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::clone(&self) -> ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::fmt::Debug for ob_poc_semtaxonomy::VerbSurfaceEntry
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_semtaxonomy::VerbSurfaceEntry
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_semtaxonomy::VerbSurfaceEntry
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::marker::Send for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::marker::Sync for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::marker::Unpin for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::marker::UnsafeUnpin for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_semtaxonomy::VerbSurfaceEntry
+impl<T, U> core::convert::Into<U> for ob_poc_semtaxonomy::VerbSurfaceEntry where U: core::convert::From<T>
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_semtaxonomy::VerbSurfaceEntry where U: core::convert::Into<T>
+pub type ob_poc_semtaxonomy::VerbSurfaceEntry::Error = core::convert::Infallible
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_semtaxonomy::VerbSurfaceEntry where U: core::convert::TryFrom<T>
+pub type ob_poc_semtaxonomy::VerbSurfaceEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_semtaxonomy::VerbSurfaceEntry where T: core::clone::Clone
+pub type ob_poc_semtaxonomy::VerbSurfaceEntry::Owned = T
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::clone_into(&self, &mut T)
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_semtaxonomy::VerbSurfaceEntry where T: 'static + ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_semtaxonomy::VerbSurfaceEntry where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_semtaxonomy::VerbSurfaceEntry where T: ?core::marker::Sized
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_semtaxonomy::VerbSurfaceEntry where T: core::clone::Clone
+pub unsafe fn ob_poc_semtaxonomy::VerbSurfaceEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_semtaxonomy::VerbSurfaceEntry
+pub fn ob_poc_semtaxonomy::VerbSurfaceEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_semtaxonomy::VerbSurfaceEntry where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn ob_poc_semtaxonomy::extract_entity_candidates(&str) -> alloc::vec::Vec<alloc::string::String>
+pub fn ob_poc_semtaxonomy::hydrate_sage_session(&mut ob_poc_semtaxonomy::SageSession, ob_poc_semtaxonomy::SageSessionHydration)

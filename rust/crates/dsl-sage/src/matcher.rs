@@ -384,8 +384,10 @@ pub async fn match_packs(
 ///
 /// Returns candidates in the same order as input, each with rank = position + 1
 /// and rationale = `"mock"`.
+#[cfg(any(test, feature = "test-util"))]
 pub struct MockLlmClient;
 
+#[cfg(any(test, feature = "test-util"))]
 #[async_trait]
 impl LlmClient for MockLlmClient {
     async fn rank_packs(

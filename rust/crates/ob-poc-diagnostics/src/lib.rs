@@ -8,6 +8,7 @@
 //! Phase 3 Slice 1a (2026-05-12) — scaffold + `error.rs` extracted from
 //! ob-poc. Subsequent slices will land `events/` and additional telemetry
 //! helpers.
+#![deny(unreachable_pub)]
 
 pub mod error;
 pub mod events;

@@ -1,0 +1,969 @@
+# sem_os_mcp | features=all | HEAD=217954a4313fb495ffedf04f9c7f97fd8faf1a80 | 2026-07-01T14:48:56Z
+pub mod sem_os_mcp
+pub mod sem_os_mcp::bridge
+pub enum sem_os_mcp::bridge::BridgeError
+pub sem_os_mcp::bridge::BridgeError::Substrate(alloc::string::String)
+pub sem_os_mcp::bridge::BridgeError::Unsupported(alloc::string::String)
+impl core::error::Error for sem_os_mcp::bridge::BridgeError
+impl core::fmt::Debug for sem_os_mcp::bridge::BridgeError
+pub fn sem_os_mcp::bridge::BridgeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for sem_os_mcp::bridge::BridgeError
+pub fn sem_os_mcp::bridge::BridgeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for sem_os_mcp::bridge::BridgeError
+impl core::marker::Send for sem_os_mcp::bridge::BridgeError
+impl core::marker::Sync for sem_os_mcp::bridge::BridgeError
+impl core::marker::Unpin for sem_os_mcp::bridge::BridgeError
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::BridgeError
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::BridgeError
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::BridgeError
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::BridgeError where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::BridgeError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::BridgeError where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::BridgeError::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::BridgeError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::BridgeError where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::BridgeError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::BridgeError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for sem_os_mcp::bridge::BridgeError where T: core::fmt::Display + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::BridgeError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for sem_os_mcp::bridge::BridgeError where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::BridgeError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::BridgeError where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::BridgeError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::BridgeError where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::BridgeError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::BridgeError
+pub fn sem_os_mcp::bridge::BridgeError::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::BridgeError
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::BridgeError
+pub struct sem_os_mcp::bridge::ActiveVerb
+pub sem_os_mcp::bridge::ActiveVerb::description: alloc::string::String
+pub sem_os_mcp::bridge::ActiveVerb::fqn: alloc::string::String
+pub sem_os_mcp::bridge::ActiveVerb::preconditions_met: bool
+impl core::clone::Clone for sem_os_mcp::bridge::ActiveVerb
+pub fn sem_os_mcp::bridge::ActiveVerb::clone(&self) -> sem_os_mcp::bridge::ActiveVerb
+impl core::fmt::Debug for sem_os_mcp::bridge::ActiveVerb
+pub fn sem_os_mcp::bridge::ActiveVerb::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_mcp::bridge::ActiveVerb
+pub fn sem_os_mcp::bridge::ActiveVerb::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::bridge::ActiveVerb
+pub fn sem_os_mcp::bridge::ActiveVerb::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::bridge::ActiveVerb
+impl core::marker::Send for sem_os_mcp::bridge::ActiveVerb
+impl core::marker::Sync for sem_os_mcp::bridge::ActiveVerb
+impl core::marker::Unpin for sem_os_mcp::bridge::ActiveVerb
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::ActiveVerb
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::ActiveVerb
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::ActiveVerb
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::ActiveVerb where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::ActiveVerb::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::ActiveVerb where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::ActiveVerb::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::ActiveVerb::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::ActiveVerb where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::ActiveVerb::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::ActiveVerb::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::ActiveVerb where T: core::clone::Clone
+pub type sem_os_mcp::bridge::ActiveVerb::Owned = T
+pub fn sem_os_mcp::bridge::ActiveVerb::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::ActiveVerb::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::ActiveVerb where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::ActiveVerb::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::ActiveVerb where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::ActiveVerb::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::ActiveVerb where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::ActiveVerb::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::ActiveVerb where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::ActiveVerb::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::ActiveVerb
+pub fn sem_os_mcp::bridge::ActiveVerb::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::ActiveVerb where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::ActiveVerb
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::ActiveVerb
+pub struct sem_os_mcp::bridge::ConstellationSlot
+pub sem_os_mcp::bridge::ConstellationSlot::children: alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>
+pub sem_os_mcp::bridge::ConstellationSlot::kind: alloc::string::String
+pub sem_os_mcp::bridge::ConstellationSlot::slot_id: alloc::string::String
+pub sem_os_mcp::bridge::ConstellationSlot::state: alloc::string::String
+impl core::clone::Clone for sem_os_mcp::bridge::ConstellationSlot
+pub fn sem_os_mcp::bridge::ConstellationSlot::clone(&self) -> sem_os_mcp::bridge::ConstellationSlot
+impl core::fmt::Debug for sem_os_mcp::bridge::ConstellationSlot
+pub fn sem_os_mcp::bridge::ConstellationSlot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_mcp::bridge::ConstellationSlot
+pub fn sem_os_mcp::bridge::ConstellationSlot::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::bridge::ConstellationSlot
+pub fn sem_os_mcp::bridge::ConstellationSlot::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::bridge::ConstellationSlot
+impl core::marker::Send for sem_os_mcp::bridge::ConstellationSlot
+impl core::marker::Sync for sem_os_mcp::bridge::ConstellationSlot
+impl core::marker::Unpin for sem_os_mcp::bridge::ConstellationSlot
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::ConstellationSlot
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::ConstellationSlot
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::ConstellationSlot
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::ConstellationSlot where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::ConstellationSlot::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::ConstellationSlot where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::ConstellationSlot::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::ConstellationSlot::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::ConstellationSlot where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::ConstellationSlot::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::ConstellationSlot::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::ConstellationSlot where T: core::clone::Clone
+pub type sem_os_mcp::bridge::ConstellationSlot::Owned = T
+pub fn sem_os_mcp::bridge::ConstellationSlot::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::ConstellationSlot::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::ConstellationSlot where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::ConstellationSlot::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::ConstellationSlot where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::ConstellationSlot::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::ConstellationSlot where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::ConstellationSlot::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::ConstellationSlot where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::ConstellationSlot::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::ConstellationSlot
+pub fn sem_os_mcp::bridge::ConstellationSlot::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::ConstellationSlot where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::ConstellationSlot
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::ConstellationSlot
+pub struct sem_os_mcp::bridge::EntityMatch
+pub sem_os_mcp::bridge::EntityMatch::confidence: f32
+pub sem_os_mcp::bridge::EntityMatch::display_name: alloc::string::String
+pub sem_os_mcp::bridge::EntityMatch::id: alloc::string::String
+pub sem_os_mcp::bridge::EntityMatch::kind: alloc::string::String
+impl core::clone::Clone for sem_os_mcp::bridge::EntityMatch
+pub fn sem_os_mcp::bridge::EntityMatch::clone(&self) -> sem_os_mcp::bridge::EntityMatch
+impl core::fmt::Debug for sem_os_mcp::bridge::EntityMatch
+pub fn sem_os_mcp::bridge::EntityMatch::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_mcp::bridge::EntityMatch
+pub fn sem_os_mcp::bridge::EntityMatch::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::bridge::EntityMatch
+pub fn sem_os_mcp::bridge::EntityMatch::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::bridge::EntityMatch
+impl core::marker::Send for sem_os_mcp::bridge::EntityMatch
+impl core::marker::Sync for sem_os_mcp::bridge::EntityMatch
+impl core::marker::Unpin for sem_os_mcp::bridge::EntityMatch
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::EntityMatch
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::EntityMatch
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::EntityMatch
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::EntityMatch where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::EntityMatch::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::EntityMatch where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::EntityMatch::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::EntityMatch::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::EntityMatch where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::EntityMatch::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::EntityMatch::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::EntityMatch where T: core::clone::Clone
+pub type sem_os_mcp::bridge::EntityMatch::Owned = T
+pub fn sem_os_mcp::bridge::EntityMatch::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::EntityMatch::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::EntityMatch where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::EntityMatch::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::EntityMatch where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::EntityMatch::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::EntityMatch where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::EntityMatch::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::EntityMatch where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::EntityMatch::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::EntityMatch
+pub fn sem_os_mcp::bridge::EntityMatch::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::EntityMatch where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::EntityMatch
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::EntityMatch
+pub struct sem_os_mcp::bridge::FsmTransition
+pub sem_os_mcp::bridge::FsmTransition::from_state: alloc::string::String
+pub sem_os_mcp::bridge::FsmTransition::to_state: alloc::string::String
+pub sem_os_mcp::bridge::FsmTransition::trigger_verb_fqn: alloc::string::String
+impl core::clone::Clone for sem_os_mcp::bridge::FsmTransition
+pub fn sem_os_mcp::bridge::FsmTransition::clone(&self) -> sem_os_mcp::bridge::FsmTransition
+impl core::fmt::Debug for sem_os_mcp::bridge::FsmTransition
+pub fn sem_os_mcp::bridge::FsmTransition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_mcp::bridge::FsmTransition
+pub fn sem_os_mcp::bridge::FsmTransition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::bridge::FsmTransition
+pub fn sem_os_mcp::bridge::FsmTransition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::bridge::FsmTransition
+impl core::marker::Send for sem_os_mcp::bridge::FsmTransition
+impl core::marker::Sync for sem_os_mcp::bridge::FsmTransition
+impl core::marker::Unpin for sem_os_mcp::bridge::FsmTransition
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::FsmTransition
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::FsmTransition
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::FsmTransition
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::FsmTransition where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::FsmTransition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::FsmTransition where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::FsmTransition::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::FsmTransition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::FsmTransition where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::FsmTransition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::FsmTransition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::FsmTransition where T: core::clone::Clone
+pub type sem_os_mcp::bridge::FsmTransition::Owned = T
+pub fn sem_os_mcp::bridge::FsmTransition::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::FsmTransition::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::FsmTransition where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::FsmTransition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::FsmTransition where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::FsmTransition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::FsmTransition where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::FsmTransition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::FsmTransition where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::FsmTransition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::FsmTransition
+pub fn sem_os_mcp::bridge::FsmTransition::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::FsmTransition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::FsmTransition
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::FsmTransition
+pub struct sem_os_mcp::bridge::NullBridge
+impl sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::new() -> Self
+pub fn sem_os_mcp::bridge::NullBridge::with_label(impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::clone(&self) -> sem_os_mcp::bridge::NullBridge
+impl core::default::Default for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::default() -> sem_os_mcp::bridge::NullBridge
+impl core::fmt::Debug for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl sem_os_mcp::bridge::SemOsBridge for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::provider_label(&self) -> &str
+impl core::marker::Freeze for sem_os_mcp::bridge::NullBridge
+impl core::marker::Send for sem_os_mcp::bridge::NullBridge
+impl core::marker::Sync for sem_os_mcp::bridge::NullBridge
+impl core::marker::Unpin for sem_os_mcp::bridge::NullBridge
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::NullBridge
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::NullBridge
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::NullBridge
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::NullBridge where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::NullBridge::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::NullBridge where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::NullBridge::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::NullBridge::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::NullBridge where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::NullBridge::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::NullBridge::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::NullBridge where T: core::clone::Clone
+pub type sem_os_mcp::bridge::NullBridge::Owned = T
+pub fn sem_os_mcp::bridge::NullBridge::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::NullBridge::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::NullBridge where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::NullBridge::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::NullBridge where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::NullBridge::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::NullBridge where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::NullBridge::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::NullBridge where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::NullBridge::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::NullBridge
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::NullBridge
+pub struct sem_os_mcp::bridge::PackEntry
+pub sem_os_mcp::bridge::PackEntry::id: alloc::string::String
+pub sem_os_mcp::bridge::PackEntry::name: alloc::string::String
+pub sem_os_mcp::bridge::PackEntry::version: alloc::string::String
+pub sem_os_mcp::bridge::PackEntry::workspace: alloc::string::String
+impl core::clone::Clone for sem_os_mcp::bridge::PackEntry
+pub fn sem_os_mcp::bridge::PackEntry::clone(&self) -> sem_os_mcp::bridge::PackEntry
+impl core::fmt::Debug for sem_os_mcp::bridge::PackEntry
+pub fn sem_os_mcp::bridge::PackEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_mcp::bridge::PackEntry
+pub fn sem_os_mcp::bridge::PackEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::bridge::PackEntry
+pub fn sem_os_mcp::bridge::PackEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::bridge::PackEntry
+impl core::marker::Send for sem_os_mcp::bridge::PackEntry
+impl core::marker::Sync for sem_os_mcp::bridge::PackEntry
+impl core::marker::Unpin for sem_os_mcp::bridge::PackEntry
+impl core::marker::UnsafeUnpin for sem_os_mcp::bridge::PackEntry
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::bridge::PackEntry
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::bridge::PackEntry
+impl<T, U> core::convert::Into<U> for sem_os_mcp::bridge::PackEntry where U: core::convert::From<T>
+pub fn sem_os_mcp::bridge::PackEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::bridge::PackEntry where U: core::convert::Into<T>
+pub type sem_os_mcp::bridge::PackEntry::Error = core::convert::Infallible
+pub fn sem_os_mcp::bridge::PackEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::bridge::PackEntry where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::bridge::PackEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::bridge::PackEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::bridge::PackEntry where T: core::clone::Clone
+pub type sem_os_mcp::bridge::PackEntry::Owned = T
+pub fn sem_os_mcp::bridge::PackEntry::clone_into(&self, &mut T)
+pub fn sem_os_mcp::bridge::PackEntry::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::bridge::PackEntry where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::bridge::PackEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::bridge::PackEntry where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::PackEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::bridge::PackEntry where T: ?core::marker::Sized
+pub fn sem_os_mcp::bridge::PackEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::bridge::PackEntry where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::bridge::PackEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::bridge::PackEntry
+pub fn sem_os_mcp::bridge::PackEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::bridge::PackEntry where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::bridge::PackEntry
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::bridge::PackEntry
+pub trait sem_os_mcp::bridge::SemOsBridge: core::marker::Send + core::marker::Sync
+pub fn sem_os_mcp::bridge::SemOsBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn sem_os_mcp::bridge::SemOsBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::SemOsBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::SemOsBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::SemOsBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn sem_os_mcp::bridge::SemOsBridge::provider_label(&self) -> &str
+impl sem_os_mcp::bridge::SemOsBridge for sem_os_mcp::bridge::NullBridge
+pub fn sem_os_mcp::bridge::NullBridge::active_verb_surface_at_state<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 str, &'life2 str, &'life3 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ActiveVerb>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::constellation_walk<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::ConstellationSlot>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::entity_resolve<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, core::option::Option<&'life1 str>, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::EntityMatch>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::fsm_transitions<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::FsmTransition>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::pack_catalogue<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<alloc::vec::Vec<sem_os_mcp::bridge::PackEntry>, sem_os_mcp::bridge::BridgeError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn sem_os_mcp::bridge::NullBridge::provider_label(&self) -> &str
+pub mod sem_os_mcp::protocol
+pub struct sem_os_mcp::protocol::JsonRpcError
+pub sem_os_mcp::protocol::JsonRpcError::code: i64
+pub sem_os_mcp::protocol::JsonRpcError::data: core::option::Option<serde_json::value::Value>
+pub sem_os_mcp::protocol::JsonRpcError::message: alloc::string::String
+impl core::clone::Clone for sem_os_mcp::protocol::JsonRpcError
+pub fn sem_os_mcp::protocol::JsonRpcError::clone(&self) -> sem_os_mcp::protocol::JsonRpcError
+impl core::cmp::PartialEq for sem_os_mcp::protocol::JsonRpcError
+pub fn sem_os_mcp::protocol::JsonRpcError::eq(&self, &sem_os_mcp::protocol::JsonRpcError) -> bool
+impl core::fmt::Debug for sem_os_mcp::protocol::JsonRpcError
+pub fn sem_os_mcp::protocol::JsonRpcError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for sem_os_mcp::protocol::JsonRpcError
+impl serde_core::ser::Serialize for sem_os_mcp::protocol::JsonRpcError
+pub fn sem_os_mcp::protocol::JsonRpcError::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::protocol::JsonRpcError
+pub fn sem_os_mcp::protocol::JsonRpcError::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::protocol::JsonRpcError
+impl core::marker::Send for sem_os_mcp::protocol::JsonRpcError
+impl core::marker::Sync for sem_os_mcp::protocol::JsonRpcError
+impl core::marker::Unpin for sem_os_mcp::protocol::JsonRpcError
+impl core::marker::UnsafeUnpin for sem_os_mcp::protocol::JsonRpcError
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::protocol::JsonRpcError
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::protocol::JsonRpcError
+impl<T, U> core::convert::Into<U> for sem_os_mcp::protocol::JsonRpcError where U: core::convert::From<T>
+pub fn sem_os_mcp::protocol::JsonRpcError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::protocol::JsonRpcError where U: core::convert::Into<T>
+pub type sem_os_mcp::protocol::JsonRpcError::Error = core::convert::Infallible
+pub fn sem_os_mcp::protocol::JsonRpcError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::protocol::JsonRpcError where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::protocol::JsonRpcError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::protocol::JsonRpcError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::protocol::JsonRpcError where T: core::clone::Clone
+pub type sem_os_mcp::protocol::JsonRpcError::Owned = T
+pub fn sem_os_mcp::protocol::JsonRpcError::clone_into(&self, &mut T)
+pub fn sem_os_mcp::protocol::JsonRpcError::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::protocol::JsonRpcError where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::protocol::JsonRpcError where T: ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::protocol::JsonRpcError where T: ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::protocol::JsonRpcError where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::protocol::JsonRpcError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::protocol::JsonRpcError
+pub fn sem_os_mcp::protocol::JsonRpcError::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::protocol::JsonRpcError where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::protocol::JsonRpcError
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::protocol::JsonRpcError
+pub struct sem_os_mcp::protocol::JsonRpcRequest
+pub sem_os_mcp::protocol::JsonRpcRequest::id: core::option::Option<serde_json::value::Value>
+pub sem_os_mcp::protocol::JsonRpcRequest::jsonrpc: alloc::string::String
+pub sem_os_mcp::protocol::JsonRpcRequest::method: alloc::string::String
+pub sem_os_mcp::protocol::JsonRpcRequest::params: serde_json::value::Value
+impl core::clone::Clone for sem_os_mcp::protocol::JsonRpcRequest
+pub fn sem_os_mcp::protocol::JsonRpcRequest::clone(&self) -> sem_os_mcp::protocol::JsonRpcRequest
+impl core::cmp::PartialEq for sem_os_mcp::protocol::JsonRpcRequest
+pub fn sem_os_mcp::protocol::JsonRpcRequest::eq(&self, &sem_os_mcp::protocol::JsonRpcRequest) -> bool
+impl core::fmt::Debug for sem_os_mcp::protocol::JsonRpcRequest
+pub fn sem_os_mcp::protocol::JsonRpcRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for sem_os_mcp::protocol::JsonRpcRequest
+impl serde_core::ser::Serialize for sem_os_mcp::protocol::JsonRpcRequest
+pub fn sem_os_mcp::protocol::JsonRpcRequest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::protocol::JsonRpcRequest
+pub fn sem_os_mcp::protocol::JsonRpcRequest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::protocol::JsonRpcRequest
+impl core::marker::Send for sem_os_mcp::protocol::JsonRpcRequest
+impl core::marker::Sync for sem_os_mcp::protocol::JsonRpcRequest
+impl core::marker::Unpin for sem_os_mcp::protocol::JsonRpcRequest
+impl core::marker::UnsafeUnpin for sem_os_mcp::protocol::JsonRpcRequest
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::protocol::JsonRpcRequest
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::protocol::JsonRpcRequest
+impl<T, U> core::convert::Into<U> for sem_os_mcp::protocol::JsonRpcRequest where U: core::convert::From<T>
+pub fn sem_os_mcp::protocol::JsonRpcRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::protocol::JsonRpcRequest where U: core::convert::Into<T>
+pub type sem_os_mcp::protocol::JsonRpcRequest::Error = core::convert::Infallible
+pub fn sem_os_mcp::protocol::JsonRpcRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::protocol::JsonRpcRequest where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::protocol::JsonRpcRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::protocol::JsonRpcRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::protocol::JsonRpcRequest where T: core::clone::Clone
+pub type sem_os_mcp::protocol::JsonRpcRequest::Owned = T
+pub fn sem_os_mcp::protocol::JsonRpcRequest::clone_into(&self, &mut T)
+pub fn sem_os_mcp::protocol::JsonRpcRequest::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::protocol::JsonRpcRequest where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::protocol::JsonRpcRequest where T: ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::protocol::JsonRpcRequest where T: ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::protocol::JsonRpcRequest where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::protocol::JsonRpcRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::protocol::JsonRpcRequest
+pub fn sem_os_mcp::protocol::JsonRpcRequest::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::protocol::JsonRpcRequest where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::protocol::JsonRpcRequest
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::protocol::JsonRpcRequest
+pub struct sem_os_mcp::protocol::JsonRpcResponse
+pub sem_os_mcp::protocol::JsonRpcResponse::error: core::option::Option<sem_os_mcp::protocol::JsonRpcError>
+pub sem_os_mcp::protocol::JsonRpcResponse::id: core::option::Option<serde_json::value::Value>
+pub sem_os_mcp::protocol::JsonRpcResponse::jsonrpc: alloc::string::String
+pub sem_os_mcp::protocol::JsonRpcResponse::result: core::option::Option<serde_json::value::Value>
+impl sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::error(core::option::Option<serde_json::value::Value>, i64, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn sem_os_mcp::protocol::JsonRpcResponse::error_with_data(core::option::Option<serde_json::value::Value>, i64, impl core::convert::Into<alloc::string::String>, serde_json::value::Value) -> Self
+pub fn sem_os_mcp::protocol::JsonRpcResponse::success(core::option::Option<serde_json::value::Value>, serde_json::value::Value) -> Self
+impl core::clone::Clone for sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::clone(&self) -> sem_os_mcp::protocol::JsonRpcResponse
+impl core::cmp::PartialEq for sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::eq(&self, &sem_os_mcp::protocol::JsonRpcResponse) -> bool
+impl core::fmt::Debug for sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for sem_os_mcp::protocol::JsonRpcResponse
+impl serde_core::ser::Serialize for sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::protocol::JsonRpcResponse
+impl core::marker::Send for sem_os_mcp::protocol::JsonRpcResponse
+impl core::marker::Sync for sem_os_mcp::protocol::JsonRpcResponse
+impl core::marker::Unpin for sem_os_mcp::protocol::JsonRpcResponse
+impl core::marker::UnsafeUnpin for sem_os_mcp::protocol::JsonRpcResponse
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::protocol::JsonRpcResponse
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::protocol::JsonRpcResponse
+impl<T, U> core::convert::Into<U> for sem_os_mcp::protocol::JsonRpcResponse where U: core::convert::From<T>
+pub fn sem_os_mcp::protocol::JsonRpcResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::protocol::JsonRpcResponse where U: core::convert::Into<T>
+pub type sem_os_mcp::protocol::JsonRpcResponse::Error = core::convert::Infallible
+pub fn sem_os_mcp::protocol::JsonRpcResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::protocol::JsonRpcResponse where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::protocol::JsonRpcResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::protocol::JsonRpcResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::protocol::JsonRpcResponse where T: core::clone::Clone
+pub type sem_os_mcp::protocol::JsonRpcResponse::Owned = T
+pub fn sem_os_mcp::protocol::JsonRpcResponse::clone_into(&self, &mut T)
+pub fn sem_os_mcp::protocol::JsonRpcResponse::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::protocol::JsonRpcResponse where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::protocol::JsonRpcResponse where T: ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::protocol::JsonRpcResponse where T: ?core::marker::Sized
+pub fn sem_os_mcp::protocol::JsonRpcResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::protocol::JsonRpcResponse where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::protocol::JsonRpcResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::protocol::JsonRpcResponse::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::protocol::JsonRpcResponse where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::protocol::JsonRpcResponse
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::protocol::JsonRpcResponse
+pub const sem_os_mcp::protocol::INTERNAL_ERROR: i64
+pub const sem_os_mcp::protocol::INVALID_PARAMS: i64
+pub const sem_os_mcp::protocol::INVALID_REQUEST: i64
+pub const sem_os_mcp::protocol::METHOD_NOT_FOUND: i64
+pub const sem_os_mcp::protocol::PARSE_ERROR: i64
+pub mod sem_os_mcp::server
+pub struct sem_os_mcp::server::McpServer
+impl sem_os_mcp::server::McpServer
+pub async fn sem_os_mcp::server::McpServer::handle_request(&self, sem_os_mcp::protocol::JsonRpcRequest) -> sem_os_mcp::protocol::JsonRpcResponse
+pub fn sem_os_mcp::server::McpServer::new(sem_os_mcp::tools::ToolRegistry) -> Self
+pub fn sem_os_mcp::server::McpServer::registry(&self) -> &sem_os_mcp::tools::ToolRegistry
+impl core::marker::Freeze for sem_os_mcp::server::McpServer
+impl core::marker::Send for sem_os_mcp::server::McpServer
+impl core::marker::Sync for sem_os_mcp::server::McpServer
+impl core::marker::Unpin for sem_os_mcp::server::McpServer
+impl core::marker::UnsafeUnpin for sem_os_mcp::server::McpServer
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::server::McpServer
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::server::McpServer
+impl<T, U> core::convert::Into<U> for sem_os_mcp::server::McpServer where U: core::convert::From<T>
+pub fn sem_os_mcp::server::McpServer::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::server::McpServer where U: core::convert::Into<T>
+pub type sem_os_mcp::server::McpServer::Error = core::convert::Infallible
+pub fn sem_os_mcp::server::McpServer::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::server::McpServer where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::server::McpServer::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::server::McpServer::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::server::McpServer where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::server::McpServer::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::server::McpServer where T: ?core::marker::Sized
+pub fn sem_os_mcp::server::McpServer::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::server::McpServer where T: ?core::marker::Sized
+pub fn sem_os_mcp::server::McpServer::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::server::McpServer
+pub fn sem_os_mcp::server::McpServer::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::server::McpServer
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::server::McpServer
+pub const sem_os_mcp::server::PROTOCOL_VERSION: &str
+pub const sem_os_mcp::server::SERVER_NAME: &str
+pub const sem_os_mcp::server::SERVER_VERSION: &str
+pub mod sem_os_mcp::tool_impls
+pub mod sem_os_mcp::tool_impls::constellation_walk
+pub struct sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::Send for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub mod sem_os_mcp::tool_impls::entity_resolve
+pub struct sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::Send for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub mod sem_os_mcp::tool_impls::fsm_transitions
+pub struct sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::Send for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub mod sem_os_mcp::tool_impls::pack_catalogue
+pub struct sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::Send for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub mod sem_os_mcp::tool_impls::verb_surface
+pub struct sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::Send for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub struct sem_os_mcp::tool_impls::ActiveVerbSurfaceTool
+impl sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::Send for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub struct sem_os_mcp::tool_impls::ConstellationWalkTool
+impl sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::Send for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub struct sem_os_mcp::tool_impls::EntityResolveTool
+impl sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::Send for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub struct sem_os_mcp::tool_impls::FsmTransitionsTool
+impl sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::Send for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub struct sem_os_mcp::tool_impls::PackCatalogueTool
+impl sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::new(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> Self
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::marker::Freeze for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::Send for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::Sync for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::Unpin for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl core::marker::UnsafeUnpin for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where U: core::convert::From<T>
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where U: core::convert::Into<T>
+pub type sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::Error = core::convert::Infallible
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool where T: ?core::marker::Sized
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::build_registry(alloc::sync::Arc<dyn sem_os_mcp::bridge::SemOsBridge>) -> sem_os_mcp::tools::ToolRegistry
+pub mod sem_os_mcp::tools
+pub enum sem_os_mcp::tools::ToolError
+pub sem_os_mcp::tools::ToolError::InvalidArguments(alloc::string::String)
+pub sem_os_mcp::tools::ToolError::Transport(alloc::string::String)
+pub sem_os_mcp::tools::ToolError::Unsupported(alloc::string::String)
+impl core::error::Error for sem_os_mcp::tools::ToolError
+impl core::fmt::Debug for sem_os_mcp::tools::ToolError
+pub fn sem_os_mcp::tools::ToolError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for sem_os_mcp::tools::ToolError
+pub fn sem_os_mcp::tools::ToolError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for sem_os_mcp::tools::ToolError
+impl core::marker::Send for sem_os_mcp::tools::ToolError
+impl core::marker::Sync for sem_os_mcp::tools::ToolError
+impl core::marker::Unpin for sem_os_mcp::tools::ToolError
+impl core::marker::UnsafeUnpin for sem_os_mcp::tools::ToolError
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tools::ToolError
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tools::ToolError
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tools::ToolError where U: core::convert::From<T>
+pub fn sem_os_mcp::tools::ToolError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tools::ToolError where U: core::convert::Into<T>
+pub type sem_os_mcp::tools::ToolError::Error = core::convert::Infallible
+pub fn sem_os_mcp::tools::ToolError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tools::ToolError where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tools::ToolError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tools::ToolError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for sem_os_mcp::tools::ToolError where T: core::fmt::Display + ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for sem_os_mcp::tools::ToolError where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tools::ToolError where T: ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tools::ToolError where T: ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_mcp::tools::ToolError
+pub fn sem_os_mcp::tools::ToolError::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tools::ToolError
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tools::ToolError
+pub struct sem_os_mcp::tools::ToolRegistry
+impl sem_os_mcp::tools::ToolRegistry
+pub fn sem_os_mcp::tools::ToolRegistry::get(&self, &str) -> core::option::Option<&alloc::sync::Arc<dyn sem_os_mcp::tools::KnowledgeTool>>
+pub fn sem_os_mcp::tools::ToolRegistry::is_empty(&self) -> bool
+pub fn sem_os_mcp::tools::ToolRegistry::len(&self) -> usize
+pub fn sem_os_mcp::tools::ToolRegistry::new() -> Self
+pub fn sem_os_mcp::tools::ToolRegistry::register(&mut self, alloc::sync::Arc<dyn sem_os_mcp::tools::KnowledgeTool>)
+pub fn sem_os_mcp::tools::ToolRegistry::specs(&self) -> alloc::vec::Vec<sem_os_mcp::tools::ToolSpec>
+impl core::clone::Clone for sem_os_mcp::tools::ToolRegistry
+pub fn sem_os_mcp::tools::ToolRegistry::clone(&self) -> sem_os_mcp::tools::ToolRegistry
+impl core::default::Default for sem_os_mcp::tools::ToolRegistry
+pub fn sem_os_mcp::tools::ToolRegistry::default() -> sem_os_mcp::tools::ToolRegistry
+impl core::marker::Freeze for sem_os_mcp::tools::ToolRegistry
+impl core::marker::Send for sem_os_mcp::tools::ToolRegistry
+impl core::marker::Sync for sem_os_mcp::tools::ToolRegistry
+impl core::marker::Unpin for sem_os_mcp::tools::ToolRegistry
+impl core::marker::UnsafeUnpin for sem_os_mcp::tools::ToolRegistry
+impl !core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tools::ToolRegistry
+impl !core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tools::ToolRegistry
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tools::ToolRegistry where U: core::convert::From<T>
+pub fn sem_os_mcp::tools::ToolRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tools::ToolRegistry where U: core::convert::Into<T>
+pub type sem_os_mcp::tools::ToolRegistry::Error = core::convert::Infallible
+pub fn sem_os_mcp::tools::ToolRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tools::ToolRegistry where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tools::ToolRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tools::ToolRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::tools::ToolRegistry where T: core::clone::Clone
+pub type sem_os_mcp::tools::ToolRegistry::Owned = T
+pub fn sem_os_mcp::tools::ToolRegistry::clone_into(&self, &mut T)
+pub fn sem_os_mcp::tools::ToolRegistry::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::tools::ToolRegistry where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tools::ToolRegistry where T: ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tools::ToolRegistry where T: ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::tools::ToolRegistry where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::tools::ToolRegistry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::tools::ToolRegistry
+pub fn sem_os_mcp::tools::ToolRegistry::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tools::ToolRegistry
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tools::ToolRegistry
+pub struct sem_os_mcp::tools::ToolSpec
+pub sem_os_mcp::tools::ToolSpec::description: alloc::string::String
+pub sem_os_mcp::tools::ToolSpec::input_schema: serde_json::value::Value
+pub sem_os_mcp::tools::ToolSpec::name: alloc::string::String
+impl core::clone::Clone for sem_os_mcp::tools::ToolSpec
+pub fn sem_os_mcp::tools::ToolSpec::clone(&self) -> sem_os_mcp::tools::ToolSpec
+impl core::fmt::Debug for sem_os_mcp::tools::ToolSpec
+pub fn sem_os_mcp::tools::ToolSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_mcp::tools::ToolSpec
+pub fn sem_os_mcp::tools::ToolSpec::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_mcp::tools::ToolSpec
+pub fn sem_os_mcp::tools::ToolSpec::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_mcp::tools::ToolSpec
+impl core::marker::Send for sem_os_mcp::tools::ToolSpec
+impl core::marker::Sync for sem_os_mcp::tools::ToolSpec
+impl core::marker::Unpin for sem_os_mcp::tools::ToolSpec
+impl core::marker::UnsafeUnpin for sem_os_mcp::tools::ToolSpec
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_mcp::tools::ToolSpec
+impl core::panic::unwind_safe::UnwindSafe for sem_os_mcp::tools::ToolSpec
+impl<T, U> core::convert::Into<U> for sem_os_mcp::tools::ToolSpec where U: core::convert::From<T>
+pub fn sem_os_mcp::tools::ToolSpec::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_mcp::tools::ToolSpec where U: core::convert::Into<T>
+pub type sem_os_mcp::tools::ToolSpec::Error = core::convert::Infallible
+pub fn sem_os_mcp::tools::ToolSpec::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_mcp::tools::ToolSpec where U: core::convert::TryFrom<T>
+pub type sem_os_mcp::tools::ToolSpec::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_mcp::tools::ToolSpec::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_mcp::tools::ToolSpec where T: core::clone::Clone
+pub type sem_os_mcp::tools::ToolSpec::Owned = T
+pub fn sem_os_mcp::tools::ToolSpec::clone_into(&self, &mut T)
+pub fn sem_os_mcp::tools::ToolSpec::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_mcp::tools::ToolSpec where T: 'static + ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolSpec::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_mcp::tools::ToolSpec where T: ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolSpec::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_mcp::tools::ToolSpec where T: ?core::marker::Sized
+pub fn sem_os_mcp::tools::ToolSpec::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_mcp::tools::ToolSpec where T: core::clone::Clone
+pub unsafe fn sem_os_mcp::tools::ToolSpec::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_mcp::tools::ToolSpec
+pub fn sem_os_mcp::tools::ToolSpec::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_mcp::tools::ToolSpec where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_mcp::tools::ToolSpec
+impl<T> tracing::instrument::WithSubscriber for sem_os_mcp::tools::ToolSpec
+pub trait sem_os_mcp::tools::KnowledgeTool: core::marker::Send + core::marker::Sync
+pub fn sem_os_mcp::tools::KnowledgeTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tools::KnowledgeTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::constellation_walk::ConstellationWalkTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::entity_resolve::EntityResolveTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::fsm_transitions::FsmTransitionsTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::pack_catalogue::PackCatalogueTool::spec(&self) -> sem_os_mcp::tools::ToolSpec
+impl sem_os_mcp::tools::KnowledgeTool for sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::invoke<'life0, 'async_trait>(&'life0 self, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<serde_json::value::Value, sem_os_mcp::tools::ToolError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn sem_os_mcp::tool_impls::verb_surface::ActiveVerbSurfaceTool::spec(&self) -> sem_os_mcp::tools::ToolSpec

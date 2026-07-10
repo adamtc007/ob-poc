@@ -21,6 +21,7 @@ impl ServiceResourcePipelineService {
         Self { pool }
     }
 
+    #[allow(dead_code)] // kept for external access
     pub fn pool(&self) -> &PgPool {
         &self.pool
     }
@@ -99,6 +100,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get a specific service intent
+    #[allow(dead_code)] // kept for future use
     pub async fn get_service_intent(&self, intent_id: Uuid) -> Result<Option<ServiceIntent>> {
         sqlx::query_as::<_, ServiceIntent>(
             r#"
@@ -386,6 +388,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get one effective CBU attribute value (connection-based).
+    #[allow(dead_code)] // kept for future use
     pub(crate) async fn get_cbu_attr_value_in(
         conn: &mut PgConnection,
         cbu_id: Uuid,
@@ -426,6 +429,7 @@ impl ServiceResourcePipelineService {
     ///
     /// Derived rows resolve from the canonical projection view rather than the
     /// legacy `cbu_attr_values` table.
+    #[allow(dead_code)] // kept for future use
     pub async fn get_cbu_attr_value(
         &self,
         cbu_id: Uuid,
@@ -475,6 +479,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get provisioning requests for a CBU
+    #[allow(dead_code)] // kept for future use
     pub async fn get_provisioning_requests(
         &self,
         cbu_id: Uuid,
@@ -496,6 +501,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get pending provisioning requests
+    #[allow(dead_code)] // kept for future use
     pub async fn get_pending_requests(&self) -> Result<Vec<ProvisioningRequest>> {
         sqlx::query_as::<_, ProvisioningRequest>(
             r#"
@@ -511,7 +517,6 @@ impl ServiceResourcePipelineService {
         .await
         .context("Failed to get pending requests")
     }
-
 
     // =========================================================================
     // PROVISIONING EVENTS
@@ -553,6 +558,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get events for a request
+    #[allow(dead_code)] // kept for future use
     pub async fn get_request_events(&self, request_id: Uuid) -> Result<Vec<ProvisioningEvent>> {
         sqlx::query_as::<_, ProvisioningEvent>(
             r#"
@@ -569,6 +575,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Check if event hash exists (for deduplication)
+    #[allow(dead_code)] // kept for future use
     pub async fn event_hash_exists(&self, content_hash: &str) -> Result<bool> {
         let result = sqlx::query_scalar::<_, i64>(
             r#"
@@ -655,6 +662,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get stale readiness records (need recomputation)
+    #[allow(dead_code)] // kept for future use
     pub async fn get_stale_readiness(&self) -> Result<Vec<(Uuid, Uuid, Uuid)>> {
         sqlx::query_as::<_, (Uuid, Uuid, Uuid)>(
             r#"
@@ -689,6 +697,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get all active SRDEFs
+    #[allow(dead_code)] // kept for future use
     pub async fn get_all_srdefs(&self) -> Result<Vec<Srdef>> {
         sqlx::query_as::<_, Srdef>(
             r#"

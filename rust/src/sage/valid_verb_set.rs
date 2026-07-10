@@ -15,15 +15,27 @@ use chrono::Utc;
 use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use sem_os_ontology::{
     constellation_map_def::{
-        Cardinality, ConstellationMapDefBody, DependencyEntry as CoreDependencyEntry,
-        JoinDef as CoreJoinDef, SlotDef as CoreSlotDef, SlotType as CoreSlotType,
-        VerbAvailability as CoreVerbAvailability, VerbPaletteEntry as CoreVerbPaletteEntry,
+        ConstellationMapDefBody,
+        SlotDef as CoreSlotDef,
+        VerbPaletteEntry as CoreVerbPaletteEntry,
     },
     state_machine_def::{ReducerDef, StateMachineDefBody, TransitionDef},
 };
 use sem_os_policy::grounding::{compute_slot_action_surface, ConstellationModel};
+
+#[cfg(test)]
+use sem_os_ontology::constellation_map_def::{
+    Cardinality, DependencyEntry as CoreDependencyEntry,
+    JoinDef as CoreJoinDef, SlotType as CoreSlotType,
+    VerbAvailability as CoreVerbAvailability,
+};
+
 use uuid::Uuid;
 
+#[cfg(test)]
+use crate::sem_os_runtime::constellation_runtime;
+
+#[cfg(test)]
 use crate::sem_os_runtime::constellation_runtime::{
     ConstellationMapDef, DependencyEntry as RuntimeDependencyEntry, SlotDef as RuntimeSlotDef,
     SlotType as RuntimeSlotType, VerbAvailability as RuntimeVerbAvailability,
@@ -64,19 +76,12 @@ struct StateMachineSeed {
     reducer: Option<ReducerDef>,
 }
 
+#[cfg(test)]
 fn constellation_maps_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/sem_os_seeds/constellation_maps")
 }
 
-/// Load a raw constellation definition by constellation ID.
-///
-/// # Examples
-/// ```rust
-/// use ob_poc::sage::valid_verb_set::load_constellation_by_id;
-///
-/// let map = load_constellation_by_id("group.ownership").unwrap();
-/// assert_eq!(map.constellation, "group.ownership");
-/// ```
+#[cfg(test)]
 pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
     for entry in std::fs::read_dir(constellation_maps_dir())? {
         let path = entry?.path();
@@ -89,7 +94,7 @@ pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
         }
 
         let content = std::fs::read_to_string(&path)?;
-        let map: ConstellationMapDef = serde_yaml::from_str(&content)?;
+        let map: constellation_runtime::ConstellationMapDef = serde_yaml::from_str(&content)?;
         if map.constellation == id {
             return Ok(to_core_constellation_map(map));
         }
@@ -158,6 +163,7 @@ fn cached_resolver_inputs() -> Result<ResolverInputs> {
 /// 2. For constellation slots with no entity, add creation verbs if dependencies are met
 /// 3. Add observation verbs (read, list) for all existing entities
 /// 4. Sort by priority, dedup
+#[cfg(test)]
 pub fn compute_valid_verb_set(
     entity_states: &[EntityState],
     constellation: &ConstellationMapDefBody,
@@ -575,14 +581,6 @@ fn is_observation_verb(verb_fqn: &str) -> bool {
     )
 }
 
-/// Extract keywords from a verb FQN for keyword matching.
-///
-/// Splits on dots and hyphens. e.g., "document.solicit" → ["document", "solicit"]
-/// Public accessor for tests.
-pub fn extract_keywords_for_verb_pub(verb_fqn: &str) -> Vec<String> {
-    extract_keywords_for_verb(verb_fqn)
-}
-
 fn extract_keywords_for_verb(verb_fqn: &str) -> Vec<String> {
     let index = VERB_KEYWORDS.get_or_init(load_verb_keyword_index);
     if let Some(keywords) = index.get(verb_fqn) {
@@ -722,6 +720,7 @@ fn extract_keywords_from_phrases(verb_fqn: &str, phrases: &[String]) -> Vec<Stri
 }
 
 /// Add verbs from child slots for an existing entity.
+#[cfg(test)]
 fn to_core_constellation_map(map: ConstellationMapDef) -> ConstellationMapDefBody {
     ConstellationMapDefBody {
         fqn: map.constellation.clone(),
@@ -736,6 +735,7 @@ fn to_core_constellation_map(map: ConstellationMapDef) -> ConstellationMapDefBod
     }
 }
 
+#[cfg(test)]
 fn to_core_slot(slot: RuntimeSlotDef) -> CoreSlotDef {
     CoreSlotDef {
         slot_type: match slot.slot_type {
@@ -822,35 +822,6 @@ fn to_core_slot(slot: RuntimeSlotDef) -> CoreSlotDef {
         justification_required: None,
         audit_class: None,
         completeness_assertion: None,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Engine impl — Phase 2.3 (2026-05-13)
-// ---------------------------------------------------------------------------
-
-/// Default `ValidVerbSetEngine` impl: loads the constellation stack via
-/// `load_constellation_stack_for_workspace` and computes the verb set
-/// via `compute_valid_verb_set_for_constellations`. Lives in ob-poc
-/// because the underlying functions reach `dsl_core::resolver` +
-/// `sem_os_core::constellation_map_def` + the constellation runtime.
-/// The agent integrator wires this impl into the Sage ACP runtime at
-/// startup.
-pub struct DefaultValidVerbSetEngine;
-
-#[async_trait::async_trait]
-impl ob_poc_sage::engine::ValidVerbSetEngine for DefaultValidVerbSetEngine {
-    async fn compute(
-        &self,
-        scope: ob_poc_sage::engine::ValidVerbSetScope<'_>,
-    ) -> Result<ValidVerbSet> {
-        let stack =
-            load_constellation_stack_for_workspace(scope.constellation_id, scope.workspace)?;
-        Ok(compute_valid_verb_set_for_constellations(
-            scope.entity_states,
-            &stack,
-            scope.client_group_id,
-        ))
     }
 }
 

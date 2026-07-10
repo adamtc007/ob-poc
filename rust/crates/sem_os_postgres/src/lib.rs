@@ -12,6 +12,7 @@
 //! moved to `dsl-runtime` because CRUD interpretation is a data-plane
 //! concern. `sem_os_postgres` retains only metadata-loading and
 //! store-implementation code.
+#![deny(unreachable_pub)]
 
 pub(crate) mod authoring;
 pub(crate) mod cleanup;
@@ -65,3 +66,6 @@ impl PgStores {
         }
     }
 }
+
+#[cfg(test)]
+mod integration_tests;

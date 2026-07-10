@@ -87,8 +87,16 @@ pub use executor::PostgresRunbookStore;
 pub use executor::{
     acquire_advisory_locks_on_scope, compute_write_set, execute_runbook, execute_runbook_in_scope,
     ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, RunbookStore,
-    RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome,
+    RunbookStoreBackend, StepExecutionResult, StepExecutor, StepOutcome, UnlockedExecutionToken,
 };
+// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022): test-only bypass for
+// `execute_runbook` with a non-empty write_set and no pool. Re-exported
+// unconditionally (not `#[cfg(test)]`) because `mod.rs` itself has no test
+// cfg to gate on here; the symbol is only constructible/callable at all
+// where `executor::execute_runbook_unlocked_for_tests` is compiled, i.e.
+// under `#[cfg(test)]` in the defining module.
+#[cfg(test)]
+pub use executor::execute_runbook_unlocked_for_tests;
 pub use kyc_dry_run::{
     build_kyc_update_status_dry_run, build_kyc_update_status_dry_run_with_manifest,
     KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal,

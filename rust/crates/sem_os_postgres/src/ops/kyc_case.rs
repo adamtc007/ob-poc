@@ -434,6 +434,29 @@ async fn close_with_status(
         ));
     }
 
+    // Enforce kyc_dag.yaml's case_cannot_approve_without_workstreams_complete
+    // cross-slot constraint (state-graph remediation Phase 5c, severity:
+    // error): the DAG declared this but nothing checked it -- APPROVED could
+    // be reached with an incomplete workstream. APPROVED path only; REJECTED
+    // / DO_NOT_ONBOARD are negative outcomes and are not gated on workstream
+    // completeness.
+    if target_status == "APPROVED" {
+        let incomplete_count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".entity_workstreams
+               WHERE case_id = $1 AND status <> 'COMPLETE'"#,
+        )
+        .bind(case_id)
+        .fetch_one(scope.executor())
+        .await?;
+        if incomplete_count > 0 {
+            return Err(anyhow!(
+                "KYC case {} cannot be approved: {} entity_workstream(s) are not COMPLETE",
+                case_id,
+                incomplete_count
+            ));
+        }
+    }
+
     let closed_at: String = sqlx::query_scalar(
         r#"UPDATE "ob-poc".cases
            SET status = $2,
@@ -533,7 +556,116 @@ impl SemOsVerbOp for Reject {
         } else {
             "REJECTED"
         };
-        close_with_status(ctx, scope, self.fqn(), case_id, target_status, Some(reason)).await
+        let outcome =
+            close_with_status(ctx, scope, self.fqn(), case_id, target_status, Some(reason)).await?;
+
+        // Cascade (state-graph remediation Phase 5e): kyc_dag.yaml declares
+        // "(any non-terminal) -> PROHIBITED via: kyc-case.reject" on the
+        // entity_workstream slot -- previously declared but unimplemented.
+        sqlx::query(
+            r#"UPDATE "ob-poc".entity_workstreams
+               SET status = 'PROHIBITED', updated_at = NOW()
+               WHERE case_id = $1 AND status NOT IN ('COMPLETE', 'PROHIBITED')"#,
+        )
+        .bind(case_id)
+        .execute(scope.executor())
+        .await?;
+
+        Ok(outcome)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// kyc-case.refer
+// ---------------------------------------------------------------------------
+
+/// Dedicated regulator-referral verb (state-graph remediation Phase 5e).
+///
+/// `red-flag.escalate`'s own doc comment anticipated this: "the case-level
+/// side of the cascade (case -> REFERRED) requires a cases.status enum
+/// extension and is deferred to a dedicated verb." Sets cases.status =
+/// REFER_TO_REGULATOR and cascades non-terminal entity_workstreams to
+/// REFERRED. Callable from any non-terminal case status (kyc_dag.yaml).
+pub struct Refer;
+
+#[async_trait]
+impl SemOsVerbOp for Refer {
+    fn fqn(&self) -> &str {
+        "kyc-case.refer"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let case_id = json_extract_uuid(args, ctx, "case-id")?;
+        let reason = json_extract_string(args, "reason")?;
+
+        const TERMINAL_STATUSES: &[&str] = &[
+            "APPROVED",
+            "REJECTED",
+            "WITHDRAWN",
+            "DO_NOT_ONBOARD",
+            "EXPIRED",
+            "REFER_TO_REGULATOR",
+        ];
+        let current_status: String =
+            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".cases WHERE case_id = $1"#)
+                .bind(case_id)
+                .fetch_optional(scope.executor())
+                .await?
+                .ok_or_else(|| anyhow!("KYC case not found: {}", case_id))?;
+        if TERMINAL_STATUSES.contains(&current_status.as_str()) {
+            return Err(anyhow!(
+                "KYC case {} is already terminal ({}), cannot refer to regulator",
+                case_id,
+                current_status
+            ));
+        }
+
+        let closed_at: String = sqlx::query_scalar(
+            r#"UPDATE "ob-poc".cases
+               SET status = 'REFER_TO_REGULATOR',
+                   notes = COALESCE(notes, '') || E'\n[REFERRED] ' || $2,
+                   closed_at = NOW(),
+                   updated_at = NOW()
+               WHERE case_id = $1
+               RETURNING to_char(closed_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')"#,
+        )
+        .bind(case_id)
+        .bind(&reason)
+        .fetch_one(scope.executor())
+        .await?;
+
+        sqlx::query(
+            r#"UPDATE "ob-poc".entity_workstreams
+               SET status = 'REFERRED', updated_at = NOW()
+               WHERE case_id = $1 AND status NOT IN ('COMPLETE', 'PROHIBITED')"#,
+        )
+        .bind(case_id)
+        .execute(scope.executor())
+        .await?;
+
+        dsl_runtime::emit_pending_state_advance(
+            ctx,
+            case_id,
+            "kyc-case:refer_to_regulator",
+            "kyc-case/workstream",
+            &format!(
+                "kyc-case.refer — {} → REFER_TO_REGULATOR ({})",
+                current_status, reason
+            ),
+        );
+
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(
+            KycCaseCloseResult {
+                case_id,
+                status: "REFER_TO_REGULATOR".to_string(),
+                closed_at,
+                deal_gate_updated: false,
+            },
+        )?))
     }
 }
 
@@ -585,29 +717,59 @@ impl SemOsVerbOp for Escalate {
             ));
         }
 
-        let affected = sqlx::query(
-            r#"UPDATE "ob-poc".cases
-               SET escalation_level = $2,
-                   notes = COALESCE($3, notes),
-                   last_activity_at = NOW(),
-                   updated_at = NOW()
-               WHERE case_id = $1"#,
-        )
-        .bind(case_id)
-        .bind(&escalation_level)
-        .bind(&notes)
-        .execute(scope.executor())
-        .await?
-        .rows_affected();
+        // BOARD is the top escalation tier -- kyc_dag.yaml declares
+        // "(any non-terminal) -> REFER_TO_REGULATOR via: kyc-case.escalate"
+        // (state-graph remediation Phase 5d). Previously this verb only
+        // ever wrote escalation_level and never actually performed the
+        // declared status transition.
+        let refers_to_regulator = escalation_level == "BOARD";
+
+        let affected = if refers_to_regulator {
+            sqlx::query(
+                r#"UPDATE "ob-poc".cases
+                   SET escalation_level = $2,
+                       status = 'REFER_TO_REGULATOR',
+                       notes = COALESCE($3, notes),
+                       last_activity_at = NOW(),
+                       updated_at = NOW()
+                   WHERE case_id = $1"#,
+            )
+            .bind(case_id)
+            .bind(&escalation_level)
+            .bind(&notes)
+            .execute(scope.executor())
+            .await?
+            .rows_affected()
+        } else {
+            sqlx::query(
+                r#"UPDATE "ob-poc".cases
+                   SET escalation_level = $2,
+                       notes = COALESCE($3, notes),
+                       last_activity_at = NOW(),
+                       updated_at = NOW()
+                   WHERE case_id = $1"#,
+            )
+            .bind(case_id)
+            .bind(&escalation_level)
+            .bind(&notes)
+            .execute(scope.executor())
+            .await?
+            .rows_affected()
+        };
 
         if affected == 0 {
             return Err(anyhow!("KYC case not found: {}", case_id));
         }
 
+        let to_node = if refers_to_regulator {
+            "kyc-case:refer_to_regulator".to_string()
+        } else {
+            "kyc-case:escalated".to_string()
+        };
         dsl_runtime::emit_pending_state_advance(
             ctx,
             case_id,
-            "kyc-case:escalated",
+            &to_node,
             "kyc-case/workstream",
             &format!("kyc-case.escalate — escalation_level={}", escalation_level),
         );

@@ -43,6 +43,7 @@
 //! gated behind the `database` feature (used by `session_context`). Does
 //! NOT depend on `dsl-core`, `dsl-runtime`, `sem_os_*`,
 //! `ob-poc-boundary`, or any execution-tier surface in ob-poc.
+#![deny(unreachable_pub)]
 
 pub mod context;
 pub mod disposition;

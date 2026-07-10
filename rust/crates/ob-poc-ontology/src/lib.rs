@@ -15,6 +15,7 @@
 //! 1. `entity_taxonomy.yaml` - Entity definitions
 //! 2. `semantic_stage_map.yaml` - Onboarding stage definitions
 //! 3. Verb YAML files - Verb lifecycle semantics (via runtime_registry)
+#![deny(unreachable_pub)]
 
 mod lifecycle;
 mod semantic_stage;

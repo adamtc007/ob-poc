@@ -48,6 +48,11 @@ entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"
 
 [dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[features]
+default = ["database"]
+database = []
 
 [lints.rust]
 unreachable_pub = "deny"

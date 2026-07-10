@@ -1776,6 +1776,7 @@ dependencies = [
  "dsl-parser",
  "dsl-render",
  "dsl-resolution",
+ "dsl-sage",
  "serde",
  "serde_json",
  "tokio",
@@ -4151,6 +4152,9 @@ dependencies = [
  "ob-poc-diagnostics",
  "ob-poc-entity-linking",
  "ob-poc-journey",
+ "ob-poc-kyc-seam",
+ "ob-poc-kyc-store",
+ "ob-poc-kyc-substrate",
  "ob-poc-macros",
  "ob-poc-ontology",
  "ob-poc-sage",
@@ -4331,6 +4335,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ob-poc-control-plane"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "trybuild",
+ "uuid",
+]
+
+[[package]]
 name = "ob-poc-deal"
 version = "0.1.0"
 dependencies = [
@@ -4355,6 +4373,7 @@ dependencies = [
  "sha2 0.10.9",
  "sqlx",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "uuid",
 ]
@@ -4392,6 +4411,7 @@ dependencies = [
  "smallvec",
  "sqlx",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
  "unicode-normalization",
  "uuid",
@@ -4417,6 +4437,53 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2 0.10.9",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "ob-poc-kyc-seam"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dsl-runtime",
+ "ob-poc-kyc-store",
+ "ob-poc-kyc-substrate",
+ "ob-poc-types",
+ "sem_os_core",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "ob-poc-kyc-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "hex",
+ "ob-poc-kyc-substrate",
+ "serde_json",
+ "sha2 0.10.9",
+ "sqlx",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "ob-poc-kyc-substrate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "smallvec",
  "thiserror 1.0.69",
  "uuid",
 ]
@@ -4496,12 +4563,14 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "ob-poc-types",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "serde_yaml",
  "sqlx",
  "thiserror 1.0.69",
  "tokio",
+ "toml 0.8.23",
  "uuid",
 ]
 
@@ -4518,6 +4587,7 @@ dependencies = [
  "sha2 0.10.9",
  "sqlx",
  "thiserror 1.0.69",
+ "tokio",
  "uuid",
 ]
 
@@ -4552,7 +4622,10 @@ dependencies = [
  "futures",
  "http 1.4.0",
  "ob-poc",
+ "ob-poc-authoring",
+ "ob-poc-boundary",
  "ob-poc-bus-handler",
+ "ob-poc-entity-linking",
  "ob-poc-types",
  "ob-semantic-matcher",
  "sem_os_client",
@@ -6110,14 +6183,20 @@ name = "sem_os_obpoc_adapter"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "chrono",
  "dsl-core",
  "sem_os_core",
  "sem_os_ontology",
+ "sem_os_policy",
  "sem_os_types",
  "serde",
  "serde_json",
  "serde_yaml",
+ "tokio",
+ "toml 0.8.23",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -8668,7 +8747,9 @@ dependencies = [
  "ob-agentic",
  "ob-poc",
  "ob-poc-agent",
+ "ob-poc-authoring",
  "ob-poc-boundary",
+ "ob-poc-entity-linking",
  "ob-poc-eval-fixtures",
  "ob-poc-types",
  "playbook-core",

@@ -5,16 +5,12 @@
 # reviewing whether the mirror is still justified.
 # Run `cargo run -p xtask -- audit` to fail on new mirrors.
 
-# bpmn-runtime::VerbOutput — runtime-internal to bpmn-lite's verb invocation engine.
-# ob-poc consumes bpmn over gRPC; this type never crosses into ob-poc's type system.
-# Re-evaluate if bpmn↔ob-poc integration reads VerbOutput fields directly (not via gRPC).
-# Ruled (a) runtime-internal 2026-05-26.
 crates/bpmn-runtime/src/verb.rs:55:VerbOutput
 crates/ob-poc-taxonomy/src/taxonomy/rules.rs:523:EdgeType
 crates/ob-poc-taxonomy/src/taxonomy/types.rs:109:NodeType
 crates/ob-poc-types/src/galaxy.rs:1417:NodeType
-crates/ob-poc-types/src/lib.rs:788:GraphNode
-crates/ob-poc-types/src/lib.rs:892:GraphEdge
+crates/ob-poc-types/src/lib.rs:789:GraphNode
+crates/ob-poc-types/src/lib.rs:893:GraphEdge
 crates/ob-workflow/src/definition.rs:160:TransitionDef
 src/api/capital_routes.rs:255:GraphNode
 src/api/capital_routes.rs:263:GraphEdge

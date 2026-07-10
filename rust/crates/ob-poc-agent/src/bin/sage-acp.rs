@@ -53,7 +53,7 @@ use ob_poc_agent::repl_channel::{LocalRunbookChannel, ReplChannelClient};
 use ob_poc_agent::runbook_handler::try_handle_runbook;
 use ob_poc_boundary::acp_protocol::{AcpJsonRpcAgent, JsonRpcOutgoing, JsonRpcRequest};
 use ob_poc_types::session::kinds::WorkspaceKind;
-use sem_os_mcp::bridge::StubBridge;
+use sem_os_mcp::bridge::NullBridge;
 use sem_os_mcp::server::McpServer;
 use sem_os_mcp::tool_impls::build_registry;
 
@@ -97,10 +97,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Phase 4.3 — knowledge + hydration now ride the sem_os_mcp
     // protocol surface. The MCP server is constructed in-process
-    // with the StubBridge for the spike; production deployments
+    // with the NullBridge for the spike; production deployments
     // swap the bridge for a sem_os_client-backed impl without
     // touching this binary.
-    let mcp_bridge = Arc::new(StubBridge::with_label("phase-4-spike"));
+    let mcp_bridge = Arc::new(NullBridge::with_label("phase-4-spike"));
     let mcp_server = Arc::new(McpServer::new(build_registry(mcp_bridge.clone())));
     eprintln!(
         "[sage-acp] SemOS MCP server constructed (bridge: {}, {} tools)",

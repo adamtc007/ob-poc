@@ -42,4 +42,7 @@ pub use promotion::{
 pub use repository::FeedbackRepository;
 pub use sanitize::sanitize_input;
 pub use service::FeedbackService;
-pub use types::*;
+pub use types::{
+    Alternative, AnalysisResult, InputSource, IntentFeedback, MatchConfidence, Outcome,
+    OutcomeUpdate,
+};

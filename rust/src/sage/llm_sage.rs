@@ -20,7 +20,7 @@ use super::outcome::{
 use super::pre_classify::{pre_classify, SagePreClassification};
 use super::{IntentPolarity, SageEngine};
 
-pub const SAGE_LLM_PROMPT_TEMPLATE_VERSION: &str = "sage_outcome_classifier_v2_sonnet_4_6";
+
 
 const READ_DOMAINS: &[&str] = &[
     "cbu",

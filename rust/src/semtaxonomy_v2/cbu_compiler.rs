@@ -85,8 +85,6 @@ pub fn supports_cbu_compiler_slice(input: &CompilerInputEnvelope) -> bool {
                 "cbu"
                     | "entity"
                     | "kyc-case"
-                    | "ubo"
-                    | "ubo.registry"
                     | "deal"
                     | "contract"
                     | "trading-profile"
@@ -264,12 +262,7 @@ impl super::compiler::BindingResolver for CbuBindingResolver {
             | "kyc-case.set-risk-rating"
             | "kyc-case.escalate"
             | "kyc-case.close"
-            | "kyc-case.reopen"
-            | "ubo.registry.create"
-            | "ubo.registry.promote"
-            | "ubo.registry.advance"
-            | "ubo.registry.waive"
-            | "ubo.registry.reject" => {
+            | "kyc-case.reopen" => {
                 bindings = passthrough_bindings(step);
                 ensure_primary_binding(step, &mut bindings, &verb)?;
             }
@@ -397,9 +390,8 @@ fn resolve_minimal_slice_verb(step: &SemanticStep) -> Result<&'static str> {
         "contract" => resolve_contract_verb(step),
         "trading-profile" => resolve_trading_profile_verb(step),
         "kyc-case" => resolve_kyc_case_verb(step),
-        "ubo" | "ubo.registry" => resolve_ubo_registry_verb(step),
         other => Err(anyhow!(
-            "minimal compiler only supports cbu, entity, deal, contract, trading-profile, kyc-case, and ubo.registry, got {other}"
+            "minimal compiler only supports cbu, entity, deal, contract, trading-profile, and kyc-case, got {other}"
         )),
     }
 }
@@ -677,32 +669,6 @@ fn resolve_kyc_case_verb(step: &SemanticStep) -> Result<&'static str> {
     }
 }
 
-fn resolve_ubo_registry_verb(step: &SemanticStep) -> Result<&'static str> {
-    match step.action.as_str() {
-        "create" => Ok("ubo.registry.create"),
-        "update" => {
-            if has_parameter(step, "new-status") {
-                Ok("ubo.registry.advance")
-            } else if has_parameter(step, "authority") {
-                Ok("ubo.registry.waive")
-            } else if has_parameter(step, "reason")
-                && qualifier_mentions_any(step, &["reject", "not confirmed"])
-            {
-                Ok("ubo.registry.reject")
-            } else if qualifier_mentions_any(step, &["promote", "identify", "confirm"]) {
-                Ok("ubo.registry.promote")
-            } else {
-                Err(anyhow!(
-                    "ubo.registry compiler slice only supports create and update intents for promote, advance, waive, or reject"
-                ))
-            }
-        }
-        other => Err(anyhow!(
-            "ubo.registry compiler slice only supports create/update actions, got {other}"
-        )),
-    }
-}
-
 fn resolve_cbu_id(step: &SemanticStep) -> std::result::Result<String, String> {
     if let Some(target) = &step.target {
         if let Some(identifier) = &target.identifier {
@@ -769,7 +735,6 @@ fn supports_entity_action(entity: &str, action: &str) -> bool {
         "cbu" | "entity" | "deal" | "contract" | "trading-profile" | "kyc-case" => {
             matches!(action, "create" | "read" | "update")
         }
-        "ubo" | "ubo.registry" => matches!(action, "create" | "update"),
         _ => false,
     }
 }
@@ -807,10 +772,6 @@ fn ensure_primary_binding(
         | "kyc-case.close"
         | "kyc-case.reopen" => Some(("case-id", "kyc case")),
         "kyc-case.list-by-cbu" => Some(("cbu-id", "cbu")),
-        "ubo.registry.promote"
-        | "ubo.registry.advance"
-        | "ubo.registry.waive"
-        | "ubo.registry.reject" => Some(("registry-id", "ubo registry")),
         _ => None,
     };
 

@@ -16,6 +16,7 @@
 //! 1. All API types live here - no inline struct definitions in handlers
 //! 2. Tagged enums only: `#[serde(tag = "type")]`
 //! 3. UUIDs as strings for JSON compatibility
+#![deny(unreachable_pub)]
 
 pub mod batch_control;
 pub mod bpmn_controller;

@@ -16,13 +16,13 @@ use std::collections::BTreeMap;
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::acp_facade::load_ob_poc_kyc_domain_pack;
 use crate::api::repl_routes_v2::{handle_repl_acp_request, ReplV2RouteState};
+use ob_poc_boundary::acp_facade::load_ob_poc_kyc_domain_pack;
 
 pub(crate) async fn acp_prompt_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
     session_id: Uuid,
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
     response_id: Value,
 ) -> AcpPromptStateAnchorProviderOutcome {
     let Some(selection) = acp_prompt_state_anchor_provider_selection(prompt) else {
@@ -63,7 +63,7 @@ pub(crate) async fn acp_prompt_state_anchor_provider_outcome(
 }
 
 pub(crate) fn acp_prompt_supported_provider_task(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> Option<&'static str> {
     match acp_prompt_state_anchor_provider_selection(prompt) {
         Some(AcpPromptStateAnchorProviderSelection::Provider(provider)) => Some(provider.task()),
@@ -74,7 +74,7 @@ pub(crate) fn acp_prompt_supported_provider_task(
 async fn acp_prompt_kyc_update_status_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
     session_id: Uuid,
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> AcpPromptStateAnchorProviderOutcome {
     let mut report = AcpPromptStateAnchorProviderReport::for_provider(
         AcpPromptStateAnchorProvider::KycUpdateStatus,
@@ -128,7 +128,7 @@ async fn acp_prompt_kyc_update_status_state_anchor_provider_outcome(
 async fn acp_prompt_deal_update_status_state_anchor_provider_outcome(
     state: &ReplV2RouteState,
     session_id: Uuid,
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
     response_id: Value,
 ) -> AcpPromptStateAnchorProviderOutcome {
     let started_at = Instant::now();
@@ -308,7 +308,7 @@ enum AcpPromptStateAnchorProviderSelection {
 }
 
 fn acp_prompt_state_anchor_provider_selection(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> Option<AcpPromptStateAnchorProviderSelection> {
     if acp_prompt_looks_like_kyc_update_status(prompt) {
         return Some(AcpPromptStateAnchorProviderSelection::Provider(
@@ -330,7 +330,7 @@ fn acp_prompt_unsupported_state_anchor_provider_outgoing(
     session_id: Uuid,
     response_id: Value,
     report: &AcpPromptStateAnchorProviderReport,
-) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
+) -> Vec<ob_poc_boundary::acp_protocol::JsonRpcOutgoing> {
     let supported = report.supported_tasks.join(", ");
     let message = format!(
         "I can see a state-transition style request, but this SemOS state-anchor provider is not wired yet. I need a supported task-specific provider and language pack before drafting a workbook. Supported now: {supported}. No dry-run or mutation has run."
@@ -389,15 +389,15 @@ fn acp_prompt_unsupported_state_anchor_provider_outgoing(
     }
 
     vec![
-        crate::acp_protocol::JsonRpcOutgoing::Notification(
-            crate::acp_protocol::JsonRpcNotification {
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+            ob_poc_boundary::acp_protocol::JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "session/update".to_string(),
                 params: json!({
                     "sessionId": session_id.to_string(),
                     "update": {
                         "sessionUpdate": "plan",
-                        "persona": crate::acp::AcpPersonaMode::SagePlanning.as_str(),
+                        "persona": ob_poc_boundary::acp::AcpPersonaMode::SagePlanning.as_str(),
                         "workflowPhase": "discovery",
                         "goalProposalTrace": result,
                         "entries": [
@@ -409,8 +409,8 @@ fn acp_prompt_unsupported_state_anchor_provider_outgoing(
                 }),
             },
         ),
-        crate::acp_protocol::JsonRpcOutgoing::Notification(
-            crate::acp_protocol::JsonRpcNotification {
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+            ob_poc_boundary::acp_protocol::JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "session/update".to_string(),
                 params: json!({
@@ -422,12 +422,14 @@ fn acp_prompt_unsupported_state_anchor_provider_outgoing(
                 }),
             },
         ),
-        crate::acp_protocol::JsonRpcOutgoing::Response(crate::acp_protocol::JsonRpcResponse {
-            jsonrpc: "2.0".to_string(),
-            id: Some(response_id),
-            result: Some(result),
-            error: None,
-        }),
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(
+            ob_poc_boundary::acp_protocol::JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: Some(response_id),
+                result: Some(result),
+                error: None,
+            },
+        ),
     ]
 }
 
@@ -585,15 +587,15 @@ async fn acp_prompt_live_deal_state(
 fn acp_prompt_live_case_state_discovery_request(
     session_id: Uuid,
     case_state: AcpPromptLiveCaseState,
-) -> crate::acp_protocol::JsonRpcRequest {
-    crate::acp_protocol::JsonRpcRequest {
+) -> ob_poc_boundary::acp_protocol::JsonRpcRequest {
+    ob_poc_boundary::acp_protocol::JsonRpcRequest {
         jsonrpc: "2.0".to_string(),
         id: Some(json!("live-case-state-discovery")),
         method: "obpoc/kyc_case_state/discover".to_string(),
         params: json!({
             "session_id": session_id,
             "sessionId": session_id,
-            "adapter": crate::acp::AcpAdapterKind::Zed,
+            "adapter": ob_poc_boundary::acp::AcpAdapterKind::Zed,
             "subject_id": case_state.subject_id,
             "observations": [
                 {"key": "case.status", "value": case_state.current_state, "classification": "internal"},
@@ -610,8 +612,8 @@ fn acp_prompt_live_case_state_discovery_request(
 
 pub(crate) fn acp_prompt_blocks_from_params(
     params: &Value,
-) -> Option<Vec<crate::acp_protocol::AcpContentBlock>> {
-    serde_json::from_value::<crate::acp_protocol::AcpPromptRequest>(params.clone())
+) -> Option<Vec<ob_poc_boundary::acp_protocol::AcpContentBlock>> {
+    serde_json::from_value::<ob_poc_boundary::acp_protocol::AcpPromptRequest>(params.clone())
         .ok()
         .map(|request| request.prompt)
 }
@@ -653,7 +655,7 @@ fn contains_word(text: &str, word: &str) -> bool {
 }
 
 fn acp_prompt_looks_like_kyc_update_status(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
     (contains_word(&lower, "kyc") || lower.contains("kyc-case.update-status"))
@@ -661,7 +663,7 @@ fn acp_prompt_looks_like_kyc_update_status(
 }
 
 fn acp_prompt_looks_like_deal_update_status(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
     (contains_word(&lower, "deal") || lower.contains(DEAL_UPDATE_STATUS_TASK))
@@ -669,7 +671,7 @@ fn acp_prompt_looks_like_deal_update_status(
 }
 
 fn acp_prompt_looks_like_stateful_transition_request(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> bool {
     let lower = acp_prompt_text(prompt).to_ascii_lowercase();
     let has_state_subject = contains_word(&lower, "case")
@@ -692,10 +694,10 @@ fn acp_prompt_has_state_transition_intent(lower: &str) -> bool {
 }
 
 fn acp_prompt_has_read_only_case_state_anchor(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> bool {
     prompt.iter().any(|block| match block {
-        crate::acp_protocol::AcpContentBlock::EmbeddedResource { text, .. } => text
+        ob_poc_boundary::acp_protocol::AcpContentBlock::EmbeddedResource { text, .. } => text
             .as_deref()
             .and_then(|text| serde_json::from_str::<Value>(text).ok())
             .map(|value| {
@@ -706,16 +708,16 @@ fn acp_prompt_has_read_only_case_state_anchor(
                     == Some("kyc-case.read-state")
             })
             .unwrap_or(false),
-        crate::acp_protocol::AcpContentBlock::Text { .. }
-        | crate::acp_protocol::AcpContentBlock::ResourceLink { .. } => false,
+        ob_poc_boundary::acp_protocol::AcpContentBlock::Text { .. }
+        | ob_poc_boundary::acp_protocol::AcpContentBlock::ResourceLink { .. } => false,
     })
 }
 
 fn acp_prompt_has_read_only_deal_state_anchor(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> bool {
     prompt.iter().any(|block| match block {
-        crate::acp_protocol::AcpContentBlock::EmbeddedResource { text, .. } => text
+        ob_poc_boundary::acp_protocol::AcpContentBlock::EmbeddedResource { text, .. } => text
             .as_deref()
             .and_then(|text| serde_json::from_str::<Value>(text).ok())
             .map(|value| {
@@ -726,26 +728,34 @@ fn acp_prompt_has_read_only_deal_state_anchor(
                     == Some("deal.read-state")
             })
             .unwrap_or(false),
-        crate::acp_protocol::AcpContentBlock::Text { .. }
-        | crate::acp_protocol::AcpContentBlock::ResourceLink { .. } => false,
+        ob_poc_boundary::acp_protocol::AcpContentBlock::Text { .. }
+        | ob_poc_boundary::acp_protocol::AcpContentBlock::ResourceLink { .. } => false,
     })
 }
 
-fn acp_prompt_case_id_from_prompt(prompt: &[crate::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+fn acp_prompt_case_id_from_prompt(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<Uuid> {
     acp_subject_id_from_prompt(prompt)
 }
 
-fn acp_prompt_deal_id_from_prompt(prompt: &[crate::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+fn acp_prompt_deal_id_from_prompt(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<Uuid> {
     acp_subject_id_from_prompt(prompt)
 }
 
-fn acp_subject_id_from_prompt(prompt: &[crate::acp_protocol::AcpContentBlock]) -> Option<Uuid> {
+fn acp_subject_id_from_prompt(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<Uuid> {
     prompt.iter().find_map(|block| match block {
-        crate::acp_protocol::AcpContentBlock::Text { text } => acp_extract_first_uuid(text),
-        crate::acp_protocol::AcpContentBlock::ResourceLink { uri, .. } => {
+        ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text } => {
+            acp_extract_first_uuid(text)
+        }
+        ob_poc_boundary::acp_protocol::AcpContentBlock::ResourceLink { uri, .. } => {
             acp_entity_uuid_from_uri(uri).or_else(|| acp_extract_first_uuid(uri))
         }
-        crate::acp_protocol::AcpContentBlock::EmbeddedResource { uri, text, .. } => text
+        ob_poc_boundary::acp_protocol::AcpContentBlock::EmbeddedResource { uri, text, .. } => text
             .as_deref()
             .and_then(acp_subject_id_from_embedded_resource_text)
             .or_else(|| acp_entity_uuid_from_uri(uri))
@@ -777,13 +787,13 @@ fn acp_extract_first_uuid(text: &str) -> Option<Uuid> {
         .find_map(|token| Uuid::parse_str(token).ok())
 }
 
-fn acp_prompt_text(prompt: &[crate::acp_protocol::AcpContentBlock]) -> String {
+fn acp_prompt_text(prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock]) -> String {
     prompt
         .iter()
         .filter_map(|block| match block {
-            crate::acp_protocol::AcpContentBlock::Text { text } => Some(text.as_str()),
-            crate::acp_protocol::AcpContentBlock::ResourceLink { .. }
-            | crate::acp_protocol::AcpContentBlock::EmbeddedResource { .. } => None,
+            ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text } => Some(text.as_str()),
+            ob_poc_boundary::acp_protocol::AcpContentBlock::ResourceLink { .. }
+            | ob_poc_boundary::acp_protocol::AcpContentBlock::EmbeddedResource { .. } => None,
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -813,7 +823,7 @@ fn deal_update_status_transition(
 }
 
 fn acp_prompt_explicit_current_deal_state(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> Option<String> {
     let text = normalize_prompt_for_state_matching(&acp_prompt_text(prompt));
     state_after_marker(&text, "from")
@@ -822,7 +832,7 @@ fn acp_prompt_explicit_current_deal_state(
 }
 
 fn acp_prompt_requested_deal_state(
-    prompt: &[crate::acp_protocol::AcpContentBlock],
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
 ) -> Option<String> {
     let text = normalize_prompt_for_state_matching(&acp_prompt_text(prompt));
     state_after_marker(&text, "to")
@@ -855,7 +865,9 @@ fn normalize_deal_state(value: &str) -> String {
     value.trim().replace(['-', ' '], "_").to_ascii_uppercase()
 }
 
-fn acp_prompt_evidence_digest(prompt: &[crate::acp_protocol::AcpContentBlock]) -> Option<String> {
+fn acp_prompt_evidence_digest(
+    prompt: &[ob_poc_boundary::acp_protocol::AcpContentBlock],
+) -> Option<String> {
     let text = acp_prompt_text(prompt);
     let start = text.find("sha256:")?;
     let digest = text[start..]
@@ -1416,7 +1428,7 @@ fn acp_state_anchor_structured_outgoing(
     title: &str,
     result: Value,
     message: impl Into<String>,
-) -> Vec<crate::acp_protocol::JsonRpcOutgoing> {
+) -> Vec<ob_poc_boundary::acp_protocol::JsonRpcOutgoing> {
     let trace_projection = result
         .get("traceProjection")
         .cloned()
@@ -1442,8 +1454,8 @@ fn acp_state_anchor_structured_outgoing(
 
     let mut outgoing = Vec::new();
     if let Some(subject_id) = &subject_id {
-        outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Notification(
-            crate::acp_protocol::JsonRpcNotification {
+        outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+            ob_poc_boundary::acp_protocol::JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "session/update".to_string(),
                 params: json!({
@@ -1453,7 +1465,7 @@ fn acp_state_anchor_structured_outgoing(
                         "toolCallId": format!("tool:deal-state-discovery:{subject_id}"),
                         "status": "completed",
                         "kind": "read",
-                        "persona": crate::acp::AcpPersonaMode::SagePlanning.as_str(),
+                        "persona": ob_poc_boundary::acp::AcpPersonaMode::SagePlanning.as_str(),
                         "workflowPhase": "discovery",
                         "title": "Deal state discovery",
                         "traceProjection": trace_projection,
@@ -1469,40 +1481,42 @@ fn acp_state_anchor_structured_outgoing(
         ));
     }
     if let Some(uri) = language_pack_uri {
-        outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Notification(
-            crate::acp_protocol::JsonRpcNotification {
-                jsonrpc: "2.0".to_string(),
-                method: "session/update".to_string(),
-                params: json!({
-                    "sessionId": session_id.to_string(),
-                    "update": {
-                        "sessionUpdate": "tool_call_update",
-                        "toolCallId": format!("tool:language-pack:{session_id}"),
-                        "status": "completed",
-                        "kind": "read",
-                        "persona": crate::acp::AcpPersonaMode::SagePlanning.as_str(),
-                        "workflowPhase": "discovery",
-                        "title": "SemOS language pack",
-                        "content": {
-                            "type": "resource_link",
-                            "uri": uri,
-                            "name": "Deal update-status language pack",
-                            "description": "Bounded private DSL context for deal.update-status"
+        outgoing.push(
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+                ob_poc_boundary::acp_protocol::JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "tool_call_update",
+                            "toolCallId": format!("tool:language-pack:{session_id}"),
+                            "status": "completed",
+                            "kind": "read",
+                            "persona": ob_poc_boundary::acp::AcpPersonaMode::SagePlanning.as_str(),
+                            "workflowPhase": "discovery",
+                            "title": "SemOS language pack",
+                            "content": {
+                                "type": "resource_link",
+                                "uri": uri,
+                                "name": "Deal update-status language pack",
+                                "description": "Bounded private DSL context for deal.update-status"
+                            }
                         }
-                    }
-                }),
-            },
-        ));
+                    }),
+                },
+            ),
+        );
     }
-    outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Notification(
-        crate::acp_protocol::JsonRpcNotification {
+    outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+        ob_poc_boundary::acp_protocol::JsonRpcNotification {
             jsonrpc: "2.0".to_string(),
             method: "session/update".to_string(),
             params: json!({
                 "sessionId": session_id.to_string(),
                 "update": {
                     "sessionUpdate": "plan",
-                    "persona": crate::acp::AcpPersonaMode::SagePlanning.as_str(),
+                    "persona": ob_poc_boundary::acp::AcpPersonaMode::SagePlanning.as_str(),
                     "workflowPhase": "planning",
                     "goalProposalTrace": result,
                     "entries": [
@@ -1515,63 +1529,69 @@ fn acp_state_anchor_structured_outgoing(
             }),
         },
     ));
-    outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Notification(
-        crate::acp_protocol::JsonRpcNotification {
-            jsonrpc: "2.0".to_string(),
-            method: "session/update".to_string(),
-            params: json!({
-                "sessionId": session_id.to_string(),
-                "update": {
-                    "sessionUpdate": "tool_call_update",
-                    "toolCallId": format!("tool:language-loop:{session_id}"),
-                    "status": validation_status,
-                    "kind": "think",
-                    "persona": crate::acp::AcpPersonaMode::SageExecution.as_str(),
-                    "workflowPhase": "planning",
-                    "title": title,
-                    "traceProjection": result["traceProjection"].clone()
-                }
-            }),
-        },
-    ));
-    if let Some(dry_run) = result
-        .get("output")
-        .and_then(|output| output.get("dry_run"))
-    {
-        outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Notification(
-            crate::acp_protocol::JsonRpcNotification {
+    outgoing.push(
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+            ob_poc_boundary::acp_protocol::JsonRpcNotification {
                 jsonrpc: "2.0".to_string(),
                 method: "session/update".to_string(),
                 params: json!({
                     "sessionId": session_id.to_string(),
                     "update": {
-                        "sessionUpdate": "semantic_diff",
-                        "persona": crate::acp::AcpPersonaMode::SageExecution.as_str(),
-                        "semanticDiffId": dry_run["semantic_diff_uri"].clone(),
-                        "fallbackSummary": ["resource_link"],
-                        "diff": dry_run["semantic_diff"]["semantic_diff"].clone(),
-                        "transitionRef": dry_run["transition_ref"].clone(),
-                        "validationTrace": dry_run["validation_trace"].clone()
+                        "sessionUpdate": "tool_call_update",
+                        "toolCallId": format!("tool:language-loop:{session_id}"),
+                        "status": validation_status,
+                        "kind": "think",
+                        "persona": ob_poc_boundary::acp::AcpPersonaMode::SageExecution.as_str(),
+                        "workflowPhase": "planning",
+                        "title": title,
+                        "traceProjection": result["traceProjection"].clone()
                     }
                 }),
             },
-        ));
+        ),
+    );
+    if let Some(dry_run) = result
+        .get("output")
+        .and_then(|output| output.get("dry_run"))
+    {
+        outgoing.push(
+            ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+                ob_poc_boundary::acp_protocol::JsonRpcNotification {
+                    jsonrpc: "2.0".to_string(),
+                    method: "session/update".to_string(),
+                    params: json!({
+                        "sessionId": session_id.to_string(),
+                        "update": {
+                            "sessionUpdate": "semantic_diff",
+                            "persona": ob_poc_boundary::acp::AcpPersonaMode::SageExecution.as_str(),
+                            "semanticDiffId": dry_run["semantic_diff_uri"].clone(),
+                            "fallbackSummary": ["resource_link"],
+                            "diff": dry_run["semantic_diff"]["semantic_diff"].clone(),
+                            "transitionRef": dry_run["transition_ref"].clone(),
+                            "validationTrace": dry_run["validation_trace"].clone()
+                        }
+                    }),
+                },
+            ),
+        );
     }
-    outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Notification(
-        crate::acp_protocol::JsonRpcNotification {
-            jsonrpc: "2.0".to_string(),
-            method: "session/update".to_string(),
-            params: json!({
-                "sessionId": session_id.to_string(),
-                "update": {
-                    "sessionUpdate": "agent_message_chunk",
-                    "content": {"type": "text", "text": message.into()}
-                }
-            }),
-        },
-    ));
-    outgoing.push(crate::acp_protocol::JsonRpcOutgoing::Response(
-        crate::acp_protocol::JsonRpcResponse {
+    outgoing.push(
+        ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Notification(
+            ob_poc_boundary::acp_protocol::JsonRpcNotification {
+                jsonrpc: "2.0".to_string(),
+                method: "session/update".to_string(),
+                params: json!({
+                    "sessionId": session_id.to_string(),
+                    "update": {
+                        "sessionUpdate": "agent_message_chunk",
+                        "content": {"type": "text", "text": message.into()}
+                    }
+                }),
+            },
+        ),
+    );
+    outgoing.push(ob_poc_boundary::acp_protocol::JsonRpcOutgoing::Response(
+        ob_poc_boundary::acp_protocol::JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id: Some(response_id),
             result: Some(result),
@@ -1631,16 +1651,16 @@ mod tests {
     const SESSION_ID: Uuid = uuid!("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     const SUBJECT_ID: Uuid = uuid!("11111111-1111-1111-1111-111111111111");
 
-    fn text_prompt(text: impl Into<String>) -> Vec<crate::acp_protocol::AcpContentBlock> {
-        vec![crate::acp_protocol::AcpContentBlock::Text { text: text.into() }]
+    fn text_prompt(text: impl Into<String>) -> Vec<ob_poc_boundary::acp_protocol::AcpContentBlock> {
+        vec![ob_poc_boundary::acp_protocol::AcpContentBlock::Text { text: text.into() }]
     }
 
     fn discovery_resource(
         current_state: &str,
         configuration_version: &str,
         state_snapshot_id: &str,
-    ) -> crate::acp_protocol::AcpContentBlock {
-        crate::acp_protocol::AcpContentBlock::EmbeddedResource {
+    ) -> ob_poc_boundary::acp_protocol::AcpContentBlock {
+        ob_poc_boundary::acp_protocol::AcpContentBlock::EmbeddedResource {
             uri: format!("semos://entity/{SUBJECT_ID}"),
             name: Some("KYC case-state discovery".to_string()),
             mime_type: Some("application/json".to_string()),
@@ -1711,7 +1731,7 @@ mod tests {
     #[test]
     fn kyc_case_id_extraction_and_anchor_detection_are_preserved() {
         let prompt = vec![
-            crate::acp_protocol::AcpContentBlock::Text {
+            ob_poc_boundary::acp_protocol::AcpContentBlock::Text {
                 text: format!(
                     "Advance KYC case {SUBJECT_ID} to ASSESSMENT with evidence sha256:evidence"
                 ),

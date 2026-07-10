@@ -1,0 +1,25 @@
+[package]
+name = "ob-poc-kyc-seam"
+version = "0.1.0"
+edition = "2021"
+description = "KYC/UBO runtime<->store seam. The §3.6 append chokepoint + VerbExecutionContext identity -> IntentEvent mapping. Isolates dsl-runtime coupling so the store stays a pure Postgres membrane. EOP-DD-KYCUBO-002 §4."
+
+# Seam: bridges the Sequencer's TransactionScope (dsl-runtime) to the durable
+# store (ob-poc-kyc-store), and maps the runtime principal to the substrate's.
+# This is the ONLY KYC crate that touches dsl-runtime — the store does not.
+[dependencies]
+ob-poc-kyc-substrate = { path = "../ob-poc-kyc-substrate" }
+ob-poc-kyc-store = { path = "../ob-poc-kyc-store" }
+dsl-runtime = { path = "../dsl-runtime" }
+sem_os_core.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.4", features = ["v4", "v5", "serde"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+sqlx = { version = ">=0.8.6, <0.9", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+ob-poc-types = { path = "../ob-poc-types" }
+
+[lints.rust]
+unreachable_pub = "deny"

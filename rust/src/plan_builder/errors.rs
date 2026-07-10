@@ -6,10 +6,10 @@
 //! |-------|----------|
 //! | `ClassificationError` | `OrchestratorResponse::Clarification` |
 //! | `AssemblyError` | `OrchestratorResponse::Clarification` (diagnostic) |
-//! | `ConstraintError` | `OrchestratorResponse::ConstraintViolation` |
+
 
 use crate::runbook::response::{
-    ClarificationContext, ClarificationRequest, ConstraintViolationDetail, OrchestratorResponse,
+    ClarificationContext, ClarificationRequest, OrchestratorResponse,
 };
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,7 @@ use crate::runbook::response::{
 ///
 /// Maps to `OrchestratorResponse::Clarification`.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // kept for tests
 pub struct ClassificationError {
     /// The verb name that failed classification.
     pub verb_name: String,
@@ -30,6 +31,7 @@ pub struct ClassificationError {
 }
 
 impl ClassificationError {
+    #[allow(dead_code)] // kept for tests
     pub fn unknown(verb_name: impl Into<String>) -> Self {
         let name = verb_name.into();
         Self {
@@ -39,12 +41,14 @@ impl ClassificationError {
         }
     }
 
+    #[allow(dead_code)] // kept for tests
     pub fn with_suggestions(mut self, suggestions: Vec<String>) -> Self {
         self.suggestions = suggestions;
         self
     }
 
     /// Convert to the OrchestratorResponse representation.
+    #[allow(dead_code)] // kept for tests
     pub fn into_response(self) -> OrchestratorResponse {
         OrchestratorResponse::Clarification(ClarificationRequest {
             question: self.reason,
@@ -73,13 +77,6 @@ pub enum AssemblyError {
         /// Verbs involved in the cycle.
         cycle: Vec<String>,
     },
-    /// A step references a binding that no prior step produces.
-    UnresolvedBinding {
-        /// The `@binding` name that couldn't be resolved.
-        binding: String,
-        /// The verb that references this binding.
-        referencing_verb: String,
-    },
     /// No steps to assemble.
     EmptyPlan,
 }
@@ -90,16 +87,6 @@ impl std::fmt::Display for AssemblyError {
             AssemblyError::CyclicDependency { cycle } => {
                 write!(f, "Circular dependency: {}", cycle.join(" → "))
             }
-            AssemblyError::UnresolvedBinding {
-                binding,
-                referencing_verb,
-            } => {
-                write!(
-                    f,
-                    "Step '{}' references binding @{} which no prior step produces",
-                    referencing_verb, binding
-                )
-            }
             AssemblyError::EmptyPlan => write!(f, "No steps to assemble"),
         }
     }
@@ -109,6 +96,7 @@ impl std::error::Error for AssemblyError {}
 
 impl AssemblyError {
     /// Convert to the OrchestratorResponse representation.
+    #[allow(dead_code)] // kept for tests
     pub fn into_response(self) -> OrchestratorResponse {
         OrchestratorResponse::Clarification(ClarificationRequest {
             question: format!("Plan assembly error: {}", self),
@@ -123,23 +111,6 @@ impl AssemblyError {
 }
 
 // ---------------------------------------------------------------------------
-// ConstraintError — pack constraint violation
-// ---------------------------------------------------------------------------
-
-/// Error returned when pack constraints reject expanded verbs.
-///
-/// Wraps `ConstraintViolationDetail` and maps to
-/// `OrchestratorResponse::ConstraintViolation`.
-#[derive(Debug, Clone)]
-pub struct ConstraintError(pub ConstraintViolationDetail);
-
-impl ConstraintError {
-    pub fn into_response(self) -> OrchestratorResponse {
-        OrchestratorResponse::ConstraintViolation(self.0)
-    }
-}
-
-// ---------------------------------------------------------------------------
 // PlanBuilderError — unified error type
 // ---------------------------------------------------------------------------
 
@@ -150,16 +121,15 @@ impl ConstraintError {
 pub enum PlanBuilderError {
     Classification(ClassificationError),
     Assembly(AssemblyError),
-    Constraint(ConstraintError),
 }
 
 impl PlanBuilderError {
     /// Convert to the `OrchestratorResponse` representation.
+    #[allow(dead_code)] // kept for tests
     pub fn into_response(self) -> OrchestratorResponse {
         match self {
             PlanBuilderError::Classification(e) => e.into_response(),
             PlanBuilderError::Assembly(e) => e.into_response(),
-            PlanBuilderError::Constraint(e) => e.into_response(),
         }
     }
 }
@@ -173,18 +143,6 @@ impl From<ClassificationError> for PlanBuilderError {
 impl From<AssemblyError> for PlanBuilderError {
     fn from(e: AssemblyError) -> Self {
         PlanBuilderError::Assembly(e)
-    }
-}
-
-impl From<ConstraintError> for PlanBuilderError {
-    fn from(e: ConstraintError) -> Self {
-        PlanBuilderError::Constraint(e)
-    }
-}
-
-impl From<ConstraintViolationDetail> for PlanBuilderError {
-    fn from(detail: ConstraintViolationDetail) -> Self {
-        PlanBuilderError::Constraint(ConstraintError(detail))
     }
 }
 

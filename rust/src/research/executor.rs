@@ -101,6 +101,7 @@ impl<C: ResearchLlmClient> ResearchExecutor<C> {
     }
 
     /// Disable LEI validation (useful for testing)
+    #[allow(dead_code)] // kept for tests
     pub fn without_lei_validation(mut self) -> Self {
         self.validate_leis = false;
         self
@@ -529,21 +530,7 @@ That's all!"#;
             Ok(LlmResponse {
                 content: r#"{"test": true}"#.to_string(),
                 sources: vec![],
-                tool_calls: vec![],
             })
-        }
-
-        async fn complete_json(
-            &self,
-            _system: &str,
-            _user: &str,
-            _schema: &Value,
-        ) -> Result<Value> {
-            Ok(serde_json::json!({"test": true}))
-        }
-
-        fn model_name(&self) -> &str {
-            "mock"
         }
     }
 }

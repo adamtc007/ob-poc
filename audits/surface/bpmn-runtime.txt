@@ -1,0 +1,1358 @@
+# bpmn-runtime | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:06Z
+pub mod bpmn_runtime
+pub enum bpmn_runtime::EventKind
+pub bpmn_runtime::EventKind::CancellationTriggered
+pub bpmn_runtime::EventKind::ErrorRaised
+pub bpmn_runtime::EventKind::HumanTaskComplete
+pub bpmn_runtime::EventKind::InstanceStart
+pub bpmn_runtime::EventKind::MessageArrived
+pub bpmn_runtime::EventKind::SubProcessComplete
+pub bpmn_runtime::EventKind::SwitchDecisionReply
+pub bpmn_runtime::EventKind::TimerFired
+pub bpmn_runtime::EventKind::VerbCompletion
+impl core::clone::Clone for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::clone(&self) -> bpmn_runtime::EventKind
+impl core::cmp::Eq for bpmn_runtime::EventKind
+impl core::cmp::PartialEq for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::eq(&self, &bpmn_runtime::EventKind) -> bool
+impl core::fmt::Debug for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for bpmn_runtime::EventKind
+impl core::str::traits::FromStr for bpmn_runtime::EventKind
+pub type bpmn_runtime::EventKind::Err = alloc::string::String
+pub fn bpmn_runtime::EventKind::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::EventKind
+impl core::marker::Send for bpmn_runtime::EventKind
+impl core::marker::Sync for bpmn_runtime::EventKind
+impl core::marker::Unpin for bpmn_runtime::EventKind
+impl core::marker::UnsafeUnpin for bpmn_runtime::EventKind
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::EventKind
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::EventKind
+impl<Q, K> equivalent::Equivalent<K> for bpmn_runtime::EventKind where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn bpmn_runtime::EventKind::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for bpmn_runtime::EventKind where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn bpmn_runtime::EventKind::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for bpmn_runtime::EventKind where U: core::convert::From<T>
+pub fn bpmn_runtime::EventKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::EventKind where U: core::convert::Into<T>
+pub type bpmn_runtime::EventKind::Error = core::convert::Infallible
+pub fn bpmn_runtime::EventKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::EventKind where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::EventKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::EventKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::EventKind where T: core::clone::Clone
+pub type bpmn_runtime::EventKind::Owned = T
+pub fn bpmn_runtime::EventKind::clone_into(&self, &mut T)
+pub fn bpmn_runtime::EventKind::to_owned(&self) -> T
+impl<T> alloc::string::ToString for bpmn_runtime::EventKind where T: core::fmt::Display + ?core::marker::Sized
+pub fn bpmn_runtime::EventKind::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for bpmn_runtime::EventKind where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::EventKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::EventKind where T: ?core::marker::Sized
+pub fn bpmn_runtime::EventKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::EventKind where T: ?core::marker::Sized
+pub fn bpmn_runtime::EventKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::EventKind where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::EventKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::EventKind
+pub fn bpmn_runtime::EventKind::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::EventKind
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::EventKind where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::EventKind
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::EventKind
+impl<T> typenum::type_operators::Same for bpmn_runtime::EventKind
+pub type bpmn_runtime::EventKind::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::EventKind where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::EventKind::vzip(self) -> V
+pub enum bpmn_runtime::InstanceStatus
+pub bpmn_runtime::InstanceStatus::Active
+pub bpmn_runtime::InstanceStatus::Cancelled
+pub bpmn_runtime::InstanceStatus::Completed
+pub bpmn_runtime::InstanceStatus::Failed
+impl core::clone::Clone for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::clone(&self) -> bpmn_runtime::InstanceStatus
+impl core::cmp::Eq for bpmn_runtime::InstanceStatus
+impl core::cmp::PartialEq for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::eq(&self, &bpmn_runtime::InstanceStatus) -> bool
+impl core::fmt::Debug for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for bpmn_runtime::InstanceStatus
+impl core::str::traits::FromStr for bpmn_runtime::InstanceStatus
+pub type bpmn_runtime::InstanceStatus::Err = alloc::string::String
+pub fn bpmn_runtime::InstanceStatus::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::InstanceStatus
+impl core::marker::Send for bpmn_runtime::InstanceStatus
+impl core::marker::Sync for bpmn_runtime::InstanceStatus
+impl core::marker::Unpin for bpmn_runtime::InstanceStatus
+impl core::marker::UnsafeUnpin for bpmn_runtime::InstanceStatus
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::InstanceStatus
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::InstanceStatus
+impl<Q, K> equivalent::Equivalent<K> for bpmn_runtime::InstanceStatus where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn bpmn_runtime::InstanceStatus::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for bpmn_runtime::InstanceStatus where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn bpmn_runtime::InstanceStatus::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for bpmn_runtime::InstanceStatus where U: core::convert::From<T>
+pub fn bpmn_runtime::InstanceStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::InstanceStatus where U: core::convert::Into<T>
+pub type bpmn_runtime::InstanceStatus::Error = core::convert::Infallible
+pub fn bpmn_runtime::InstanceStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::InstanceStatus where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::InstanceStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::InstanceStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::InstanceStatus where T: core::clone::Clone
+pub type bpmn_runtime::InstanceStatus::Owned = T
+pub fn bpmn_runtime::InstanceStatus::clone_into(&self, &mut T)
+pub fn bpmn_runtime::InstanceStatus::to_owned(&self) -> T
+impl<T> alloc::string::ToString for bpmn_runtime::InstanceStatus where T: core::fmt::Display + ?core::marker::Sized
+pub fn bpmn_runtime::InstanceStatus::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for bpmn_runtime::InstanceStatus where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::InstanceStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::InstanceStatus where T: ?core::marker::Sized
+pub fn bpmn_runtime::InstanceStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::InstanceStatus where T: ?core::marker::Sized
+pub fn bpmn_runtime::InstanceStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::InstanceStatus where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::InstanceStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::InstanceStatus
+pub fn bpmn_runtime::InstanceStatus::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::InstanceStatus
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::InstanceStatus where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::InstanceStatus
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::InstanceStatus
+impl<T> typenum::type_operators::Same for bpmn_runtime::InstanceStatus
+pub type bpmn_runtime::InstanceStatus::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::InstanceStatus where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::InstanceStatus::vzip(self) -> V
+pub enum bpmn_runtime::MergeResult
+pub bpmn_runtime::MergeResult::Conflict
+pub bpmn_runtime::MergeResult::Conflict::location: alloc::string::String
+pub bpmn_runtime::MergeResult::Conflict::values: alloc::vec::Vec<serde_json::value::Value>
+pub bpmn_runtime::MergeResult::Ok(std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>)
+impl core::marker::Freeze for bpmn_runtime::MergeResult
+impl core::marker::Send for bpmn_runtime::MergeResult
+impl core::marker::Sync for bpmn_runtime::MergeResult
+impl core::marker::Unpin for bpmn_runtime::MergeResult
+impl core::marker::UnsafeUnpin for bpmn_runtime::MergeResult
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::MergeResult
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::MergeResult
+impl<T, U> core::convert::Into<U> for bpmn_runtime::MergeResult where U: core::convert::From<T>
+pub fn bpmn_runtime::MergeResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::MergeResult where U: core::convert::Into<T>
+pub type bpmn_runtime::MergeResult::Error = core::convert::Infallible
+pub fn bpmn_runtime::MergeResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::MergeResult where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::MergeResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::MergeResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::MergeResult where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::MergeResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::MergeResult where T: ?core::marker::Sized
+pub fn bpmn_runtime::MergeResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::MergeResult where T: ?core::marker::Sized
+pub fn bpmn_runtime::MergeResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::MergeResult
+pub fn bpmn_runtime::MergeResult::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::MergeResult
+impl<T> tracing::instrument::Instrument for bpmn_runtime::MergeResult
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::MergeResult
+impl<T> typenum::type_operators::Same for bpmn_runtime::MergeResult
+pub type bpmn_runtime::MergeResult::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::MergeResult where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::MergeResult::vzip(self) -> V
+pub enum bpmn_runtime::SwitchError
+pub bpmn_runtime::SwitchError::AdaptorError(alloc::string::String)
+pub bpmn_runtime::SwitchError::NoBranchSelected
+pub bpmn_runtime::SwitchError::NoBranchSelected::gateway: alloc::string::String
+impl core::error::Error for bpmn_runtime::SwitchError
+impl core::fmt::Debug for bpmn_runtime::SwitchError
+pub fn bpmn_runtime::SwitchError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for bpmn_runtime::SwitchError
+pub fn bpmn_runtime::SwitchError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::SwitchError
+impl core::marker::Send for bpmn_runtime::SwitchError
+impl core::marker::Sync for bpmn_runtime::SwitchError
+impl core::marker::Unpin for bpmn_runtime::SwitchError
+impl core::marker::UnsafeUnpin for bpmn_runtime::SwitchError
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::SwitchError
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::SwitchError
+impl<T, U> core::convert::Into<U> for bpmn_runtime::SwitchError where U: core::convert::From<T>
+pub fn bpmn_runtime::SwitchError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::SwitchError where U: core::convert::Into<T>
+pub type bpmn_runtime::SwitchError::Error = core::convert::Infallible
+pub fn bpmn_runtime::SwitchError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::SwitchError where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::SwitchError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::SwitchError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for bpmn_runtime::SwitchError where T: core::fmt::Display + ?core::marker::Sized
+pub fn bpmn_runtime::SwitchError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for bpmn_runtime::SwitchError where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::SwitchError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::SwitchError where T: ?core::marker::Sized
+pub fn bpmn_runtime::SwitchError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::SwitchError where T: ?core::marker::Sized
+pub fn bpmn_runtime::SwitchError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::SwitchError
+pub fn bpmn_runtime::SwitchError::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::SwitchError
+impl<T> tracing::instrument::Instrument for bpmn_runtime::SwitchError
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::SwitchError
+impl<T> typenum::type_operators::Same for bpmn_runtime::SwitchError
+pub type bpmn_runtime::SwitchError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::SwitchError where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::SwitchError::vzip(self) -> V
+pub enum bpmn_runtime::VerbEffect
+pub bpmn_runtime::VerbEffect::RaiseError
+pub bpmn_runtime::VerbEffect::RaiseError::code: alloc::string::String
+pub bpmn_runtime::VerbEffect::RaiseError::message: alloc::string::String
+pub bpmn_runtime::VerbEffect::RequestHumanTask
+pub bpmn_runtime::VerbEffect::RequestHumanTask::form_data: serde_json::value::Value
+pub bpmn_runtime::VerbEffect::RequestHumanTask::role: alloc::string::String
+pub bpmn_runtime::VerbEffect::ScheduleTimer
+pub bpmn_runtime::VerbEffect::ScheduleTimer::duration_seconds: u64
+pub bpmn_runtime::VerbEffect::SendMessage
+pub bpmn_runtime::VerbEffect::SendMessage::payload: serde_json::value::Value
+pub bpmn_runtime::VerbEffect::SendMessage::target: alloc::string::String
+pub bpmn_runtime::VerbEffect::WriteData
+pub bpmn_runtime::VerbEffect::WriteData::location: alloc::string::String
+pub bpmn_runtime::VerbEffect::WriteData::value: serde_json::value::Value
+impl core::clone::Clone for bpmn_runtime::VerbEffect
+pub fn bpmn_runtime::VerbEffect::clone(&self) -> bpmn_runtime::VerbEffect
+impl core::fmt::Debug for bpmn_runtime::VerbEffect
+pub fn bpmn_runtime::VerbEffect::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::VerbEffect
+impl core::marker::Send for bpmn_runtime::VerbEffect
+impl core::marker::Sync for bpmn_runtime::VerbEffect
+impl core::marker::Unpin for bpmn_runtime::VerbEffect
+impl core::marker::UnsafeUnpin for bpmn_runtime::VerbEffect
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::VerbEffect
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::VerbEffect
+impl<T, U> core::convert::Into<U> for bpmn_runtime::VerbEffect where U: core::convert::From<T>
+pub fn bpmn_runtime::VerbEffect::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::VerbEffect where U: core::convert::Into<T>
+pub type bpmn_runtime::VerbEffect::Error = core::convert::Infallible
+pub fn bpmn_runtime::VerbEffect::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::VerbEffect where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::VerbEffect::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::VerbEffect::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::VerbEffect where T: core::clone::Clone
+pub type bpmn_runtime::VerbEffect::Owned = T
+pub fn bpmn_runtime::VerbEffect::clone_into(&self, &mut T)
+pub fn bpmn_runtime::VerbEffect::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::VerbEffect where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::VerbEffect::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::VerbEffect where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbEffect::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::VerbEffect where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbEffect::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::VerbEffect where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::VerbEffect::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::VerbEffect
+pub fn bpmn_runtime::VerbEffect::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::VerbEffect
+impl<T> tracing::instrument::Instrument for bpmn_runtime::VerbEffect
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::VerbEffect
+impl<T> typenum::type_operators::Same for bpmn_runtime::VerbEffect
+pub type bpmn_runtime::VerbEffect::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::VerbEffect where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::VerbEffect::vzip(self) -> V
+pub enum bpmn_runtime::VerbError
+pub bpmn_runtime::VerbError::Domain
+pub bpmn_runtime::VerbError::Domain::code: alloc::string::String
+pub bpmn_runtime::VerbError::Domain::message: alloc::string::String
+pub bpmn_runtime::VerbError::Internal(anyhow::Error)
+impl core::convert::From<anyhow::Error> for bpmn_runtime::VerbError
+pub fn bpmn_runtime::VerbError::from(anyhow::Error) -> Self
+impl core::error::Error for bpmn_runtime::VerbError
+pub fn bpmn_runtime::VerbError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for bpmn_runtime::VerbError
+pub fn bpmn_runtime::VerbError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for bpmn_runtime::VerbError
+pub fn bpmn_runtime::VerbError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::VerbError
+impl core::marker::Send for bpmn_runtime::VerbError
+impl core::marker::Sync for bpmn_runtime::VerbError
+impl core::marker::Unpin for bpmn_runtime::VerbError
+impl core::marker::UnsafeUnpin for bpmn_runtime::VerbError
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::VerbError
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::VerbError
+impl<T, U> core::convert::Into<U> for bpmn_runtime::VerbError where U: core::convert::From<T>
+pub fn bpmn_runtime::VerbError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::VerbError where U: core::convert::Into<T>
+pub type bpmn_runtime::VerbError::Error = core::convert::Infallible
+pub fn bpmn_runtime::VerbError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::VerbError where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::VerbError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::VerbError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for bpmn_runtime::VerbError where T: core::fmt::Display + ?core::marker::Sized
+pub fn bpmn_runtime::VerbError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for bpmn_runtime::VerbError where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::VerbError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::VerbError where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::VerbError where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::VerbError
+pub fn bpmn_runtime::VerbError::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::VerbError
+impl<T> tracing::instrument::Instrument for bpmn_runtime::VerbError
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::VerbError
+impl<T> typenum::type_operators::Same for bpmn_runtime::VerbError
+pub type bpmn_runtime::VerbError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::VerbError where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::VerbError::vzip(self) -> V
+pub struct bpmn_runtime::ActiveToken
+pub bpmn_runtime::ActiveToken::branch_lineage: alloc::vec::Vec<alloc::string::String>
+pub bpmn_runtime::ActiveToken::current_node: alloc::string::String
+pub bpmn_runtime::ActiveToken::fork_ref: core::option::Option<uuid::Uuid>
+pub bpmn_runtime::ActiveToken::id: bpmn_runtime::TokenId
+pub bpmn_runtime::ActiveToken::instance_id: bpmn_runtime::InstanceId
+pub bpmn_runtime::ActiveToken::write_log: alloc::vec::Vec<bpmn_runtime::WriteLogEntry>
+impl core::clone::Clone for bpmn_runtime::ActiveToken
+pub fn bpmn_runtime::ActiveToken::clone(&self) -> bpmn_runtime::ActiveToken
+impl core::fmt::Debug for bpmn_runtime::ActiveToken
+pub fn bpmn_runtime::ActiveToken::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::ActiveToken
+pub fn bpmn_runtime::ActiveToken::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::ActiveToken
+pub fn bpmn_runtime::ActiveToken::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::ActiveToken
+impl core::marker::Send for bpmn_runtime::ActiveToken
+impl core::marker::Sync for bpmn_runtime::ActiveToken
+impl core::marker::Unpin for bpmn_runtime::ActiveToken
+impl core::marker::UnsafeUnpin for bpmn_runtime::ActiveToken
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::ActiveToken
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::ActiveToken
+impl<T, U> core::convert::Into<U> for bpmn_runtime::ActiveToken where U: core::convert::From<T>
+pub fn bpmn_runtime::ActiveToken::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::ActiveToken where U: core::convert::Into<T>
+pub type bpmn_runtime::ActiveToken::Error = core::convert::Infallible
+pub fn bpmn_runtime::ActiveToken::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::ActiveToken where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::ActiveToken::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::ActiveToken::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::ActiveToken where T: core::clone::Clone
+pub type bpmn_runtime::ActiveToken::Owned = T
+pub fn bpmn_runtime::ActiveToken::clone_into(&self, &mut T)
+pub fn bpmn_runtime::ActiveToken::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::ActiveToken where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::ActiveToken::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::ActiveToken where T: ?core::marker::Sized
+pub fn bpmn_runtime::ActiveToken::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::ActiveToken where T: ?core::marker::Sized
+pub fn bpmn_runtime::ActiveToken::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::ActiveToken where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::ActiveToken::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::ActiveToken
+pub fn bpmn_runtime::ActiveToken::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::ActiveToken
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::ActiveToken where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::ActiveToken
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::ActiveToken
+impl<T> typenum::type_operators::Same for bpmn_runtime::ActiveToken
+pub type bpmn_runtime::ActiveToken::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::ActiveToken where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::ActiveToken::vzip(self) -> V
+pub struct bpmn_runtime::DslFormHandler
+impl bpmn_runtime::VerbHandler for bpmn_runtime::DslFormHandler
+pub fn bpmn_runtime::DslFormHandler::invoke<'life0, 'async_trait>(&'life0 self, bpmn_runtime::VerbContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<bpmn_runtime::VerbOutput, bpmn_runtime::VerbError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::DslFormHandler::verb_ref(&self) -> &str
+impl core::marker::Freeze for bpmn_runtime::DslFormHandler
+impl core::marker::Send for bpmn_runtime::DslFormHandler
+impl core::marker::Sync for bpmn_runtime::DslFormHandler
+impl core::marker::Unpin for bpmn_runtime::DslFormHandler
+impl core::marker::UnsafeUnpin for bpmn_runtime::DslFormHandler
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::DslFormHandler
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::DslFormHandler
+impl<T, U> core::convert::Into<U> for bpmn_runtime::DslFormHandler where U: core::convert::From<T>
+pub fn bpmn_runtime::DslFormHandler::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::DslFormHandler where U: core::convert::Into<T>
+pub type bpmn_runtime::DslFormHandler::Error = core::convert::Infallible
+pub fn bpmn_runtime::DslFormHandler::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::DslFormHandler where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::DslFormHandler::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::DslFormHandler::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::DslFormHandler where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::DslFormHandler::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::DslFormHandler where T: ?core::marker::Sized
+pub fn bpmn_runtime::DslFormHandler::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::DslFormHandler where T: ?core::marker::Sized
+pub fn bpmn_runtime::DslFormHandler::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::DslFormHandler
+pub fn bpmn_runtime::DslFormHandler::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::DslFormHandler
+impl<T> tracing::instrument::Instrument for bpmn_runtime::DslFormHandler
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::DslFormHandler
+impl<T> typenum::type_operators::Same for bpmn_runtime::DslFormHandler
+pub type bpmn_runtime::DslFormHandler::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::DslFormHandler where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::DslFormHandler::vzip(self) -> V
+pub struct bpmn_runtime::EdgeInfo
+pub bpmn_runtime::EdgeInfo::condition: core::option::Option<alloc::string::String>
+pub bpmn_runtime::EdgeInfo::is_default: bool
+pub bpmn_runtime::EdgeInfo::target: alloc::string::String
+impl core::clone::Clone for bpmn_runtime::EdgeInfo
+pub fn bpmn_runtime::EdgeInfo::clone(&self) -> bpmn_runtime::EdgeInfo
+impl core::fmt::Debug for bpmn_runtime::EdgeInfo
+pub fn bpmn_runtime::EdgeInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::EdgeInfo
+pub fn bpmn_runtime::EdgeInfo::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::EdgeInfo
+pub fn bpmn_runtime::EdgeInfo::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::EdgeInfo
+impl core::marker::Send for bpmn_runtime::EdgeInfo
+impl core::marker::Sync for bpmn_runtime::EdgeInfo
+impl core::marker::Unpin for bpmn_runtime::EdgeInfo
+impl core::marker::UnsafeUnpin for bpmn_runtime::EdgeInfo
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::EdgeInfo
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::EdgeInfo
+impl<T, U> core::convert::Into<U> for bpmn_runtime::EdgeInfo where U: core::convert::From<T>
+pub fn bpmn_runtime::EdgeInfo::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::EdgeInfo where U: core::convert::Into<T>
+pub type bpmn_runtime::EdgeInfo::Error = core::convert::Infallible
+pub fn bpmn_runtime::EdgeInfo::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::EdgeInfo where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::EdgeInfo::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::EdgeInfo::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::EdgeInfo where T: core::clone::Clone
+pub type bpmn_runtime::EdgeInfo::Owned = T
+pub fn bpmn_runtime::EdgeInfo::clone_into(&self, &mut T)
+pub fn bpmn_runtime::EdgeInfo::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::EdgeInfo where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::EdgeInfo::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::EdgeInfo where T: ?core::marker::Sized
+pub fn bpmn_runtime::EdgeInfo::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::EdgeInfo where T: ?core::marker::Sized
+pub fn bpmn_runtime::EdgeInfo::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::EdgeInfo where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::EdgeInfo::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::EdgeInfo
+pub fn bpmn_runtime::EdgeInfo::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::EdgeInfo
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::EdgeInfo where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::EdgeInfo
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::EdgeInfo
+impl<T> typenum::type_operators::Same for bpmn_runtime::EdgeInfo
+pub type bpmn_runtime::EdgeInfo::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::EdgeInfo where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::EdgeInfo::vzip(self) -> V
+pub struct bpmn_runtime::EventEnvelope
+pub bpmn_runtime::EventEnvelope::event_kind: bpmn_runtime::EventKind
+pub bpmn_runtime::EventEnvelope::id: bpmn_runtime::EventId
+pub bpmn_runtime::EventEnvelope::instance_id: bpmn_runtime::InstanceId
+pub bpmn_runtime::EventEnvelope::payload: serde_json::value::Value
+impl core::clone::Clone for bpmn_runtime::EventEnvelope
+pub fn bpmn_runtime::EventEnvelope::clone(&self) -> bpmn_runtime::EventEnvelope
+impl core::fmt::Debug for bpmn_runtime::EventEnvelope
+pub fn bpmn_runtime::EventEnvelope::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::EventEnvelope
+pub fn bpmn_runtime::EventEnvelope::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::EventEnvelope
+pub fn bpmn_runtime::EventEnvelope::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::EventEnvelope
+impl core::marker::Send for bpmn_runtime::EventEnvelope
+impl core::marker::Sync for bpmn_runtime::EventEnvelope
+impl core::marker::Unpin for bpmn_runtime::EventEnvelope
+impl core::marker::UnsafeUnpin for bpmn_runtime::EventEnvelope
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::EventEnvelope
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::EventEnvelope
+impl<T, U> core::convert::Into<U> for bpmn_runtime::EventEnvelope where U: core::convert::From<T>
+pub fn bpmn_runtime::EventEnvelope::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::EventEnvelope where U: core::convert::Into<T>
+pub type bpmn_runtime::EventEnvelope::Error = core::convert::Infallible
+pub fn bpmn_runtime::EventEnvelope::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::EventEnvelope where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::EventEnvelope::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::EventEnvelope::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::EventEnvelope where T: core::clone::Clone
+pub type bpmn_runtime::EventEnvelope::Owned = T
+pub fn bpmn_runtime::EventEnvelope::clone_into(&self, &mut T)
+pub fn bpmn_runtime::EventEnvelope::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::EventEnvelope where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::EventEnvelope::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::EventEnvelope where T: ?core::marker::Sized
+pub fn bpmn_runtime::EventEnvelope::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::EventEnvelope where T: ?core::marker::Sized
+pub fn bpmn_runtime::EventEnvelope::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::EventEnvelope where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::EventEnvelope::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::EventEnvelope
+pub fn bpmn_runtime::EventEnvelope::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::EventEnvelope
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::EventEnvelope where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::EventEnvelope
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::EventEnvelope
+impl<T> typenum::type_operators::Same for bpmn_runtime::EventEnvelope
+pub type bpmn_runtime::EventEnvelope::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::EventEnvelope where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::EventEnvelope::vzip(self) -> V
+pub struct bpmn_runtime::InMemoryJourneyStore
+impl bpmn_runtime::InMemoryJourneyStore
+pub fn bpmn_runtime::InMemoryJourneyStore::new() -> Self
+impl bpmn_runtime::JourneyStore for bpmn_runtime::InMemoryJourneyStore
+pub fn bpmn_runtime::InMemoryJourneyStore::ack_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::EventId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::advance_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::append_journey_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::JourneyLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::append_to_write_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, bpmn_runtime::WriteLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::archive_instance_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_instance<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::WorkflowInstance>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_pending_wait<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, core::option::Option<alloc::string::String>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>, core::option::Option<serde_json::value::Value>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_switch_request<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, core::option::Option<uuid::Uuid>, alloc::vec::Vec<alloc::string::String>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::ActiveToken>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::delete_token<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::dequeue_events<'life0, 'async_trait>(&'life0 self, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::EventEnvelope>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::enqueue_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::EventKind, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::EventId>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::find_archivable_instances<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 bpmn_runtime::RetentionPolicy) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::InstanceId>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::find_pending_wait_by_correlation<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::PendingWaitInfo>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<usize>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::WorkflowInstance>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_tokens_at_join<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_tokens_for_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::read_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<serde_json::value::Value>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::record_join_arrival<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::reduce_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::set_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::update_instance_status<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::InstanceStatus, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::write_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+impl core::default::Default for bpmn_runtime::InMemoryJourneyStore
+pub fn bpmn_runtime::InMemoryJourneyStore::default() -> Self
+impl core::marker::Freeze for bpmn_runtime::InMemoryJourneyStore
+impl core::marker::Send for bpmn_runtime::InMemoryJourneyStore
+impl core::marker::Sync for bpmn_runtime::InMemoryJourneyStore
+impl core::marker::Unpin for bpmn_runtime::InMemoryJourneyStore
+impl core::marker::UnsafeUnpin for bpmn_runtime::InMemoryJourneyStore
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::InMemoryJourneyStore
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::InMemoryJourneyStore
+impl<T, U> core::convert::Into<U> for bpmn_runtime::InMemoryJourneyStore where U: core::convert::From<T>
+pub fn bpmn_runtime::InMemoryJourneyStore::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::InMemoryJourneyStore where U: core::convert::Into<T>
+pub type bpmn_runtime::InMemoryJourneyStore::Error = core::convert::Infallible
+pub fn bpmn_runtime::InMemoryJourneyStore::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::InMemoryJourneyStore where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::InMemoryJourneyStore::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::InMemoryJourneyStore::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::InMemoryJourneyStore where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::InMemoryJourneyStore::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::InMemoryJourneyStore where T: ?core::marker::Sized
+pub fn bpmn_runtime::InMemoryJourneyStore::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::InMemoryJourneyStore where T: ?core::marker::Sized
+pub fn bpmn_runtime::InMemoryJourneyStore::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::InMemoryJourneyStore
+pub fn bpmn_runtime::InMemoryJourneyStore::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::InMemoryJourneyStore
+impl<T> tracing::instrument::Instrument for bpmn_runtime::InMemoryJourneyStore
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::InMemoryJourneyStore
+impl<T> typenum::type_operators::Same for bpmn_runtime::InMemoryJourneyStore
+pub type bpmn_runtime::InMemoryJourneyStore::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::InMemoryJourneyStore where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::InMemoryJourneyStore::vzip(self) -> V
+pub struct bpmn_runtime::JourneyLogEntry
+pub bpmn_runtime::JourneyLogEntry::data_delta: core::option::Option<serde_json::value::Value>
+pub bpmn_runtime::JourneyLogEntry::event_kind: alloc::string::String
+pub bpmn_runtime::JourneyLogEntry::from_node: core::option::Option<alloc::string::String>
+pub bpmn_runtime::JourneyLogEntry::instance_id: bpmn_runtime::InstanceId
+pub bpmn_runtime::JourneyLogEntry::to_node: core::option::Option<alloc::string::String>
+pub bpmn_runtime::JourneyLogEntry::token_id: core::option::Option<bpmn_runtime::TokenId>
+impl core::clone::Clone for bpmn_runtime::JourneyLogEntry
+pub fn bpmn_runtime::JourneyLogEntry::clone(&self) -> bpmn_runtime::JourneyLogEntry
+impl core::fmt::Debug for bpmn_runtime::JourneyLogEntry
+pub fn bpmn_runtime::JourneyLogEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::JourneyLogEntry
+impl core::marker::Send for bpmn_runtime::JourneyLogEntry
+impl core::marker::Sync for bpmn_runtime::JourneyLogEntry
+impl core::marker::Unpin for bpmn_runtime::JourneyLogEntry
+impl core::marker::UnsafeUnpin for bpmn_runtime::JourneyLogEntry
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::JourneyLogEntry
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::JourneyLogEntry
+impl<T, U> core::convert::Into<U> for bpmn_runtime::JourneyLogEntry where U: core::convert::From<T>
+pub fn bpmn_runtime::JourneyLogEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::JourneyLogEntry where U: core::convert::Into<T>
+pub type bpmn_runtime::JourneyLogEntry::Error = core::convert::Infallible
+pub fn bpmn_runtime::JourneyLogEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::JourneyLogEntry where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::JourneyLogEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::JourneyLogEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::JourneyLogEntry where T: core::clone::Clone
+pub type bpmn_runtime::JourneyLogEntry::Owned = T
+pub fn bpmn_runtime::JourneyLogEntry::clone_into(&self, &mut T)
+pub fn bpmn_runtime::JourneyLogEntry::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::JourneyLogEntry where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::JourneyLogEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::JourneyLogEntry where T: ?core::marker::Sized
+pub fn bpmn_runtime::JourneyLogEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::JourneyLogEntry where T: ?core::marker::Sized
+pub fn bpmn_runtime::JourneyLogEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::JourneyLogEntry where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::JourneyLogEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::JourneyLogEntry
+pub fn bpmn_runtime::JourneyLogEntry::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::JourneyLogEntry
+impl<T> tracing::instrument::Instrument for bpmn_runtime::JourneyLogEntry
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::JourneyLogEntry
+impl<T> typenum::type_operators::Same for bpmn_runtime::JourneyLogEntry
+pub type bpmn_runtime::JourneyLogEntry::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::JourneyLogEntry where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::JourneyLogEntry::vzip(self) -> V
+pub struct bpmn_runtime::MetricsSnapshot
+pub bpmn_runtime::MetricsSnapshot::events_processed: u64
+pub bpmn_runtime::MetricsSnapshot::gateway_decisions: u64
+pub bpmn_runtime::MetricsSnapshot::human_tasks_completed: u64
+pub bpmn_runtime::MetricsSnapshot::instances_cancelled: u64
+pub bpmn_runtime::MetricsSnapshot::instances_completed: u64
+pub bpmn_runtime::MetricsSnapshot::instances_failed: u64
+pub bpmn_runtime::MetricsSnapshot::instances_started: u64
+pub bpmn_runtime::MetricsSnapshot::joins_fired: u64
+pub bpmn_runtime::MetricsSnapshot::merge_conflicts: u64
+pub bpmn_runtime::MetricsSnapshot::parallel_forks: u64
+pub bpmn_runtime::MetricsSnapshot::timer_events_fired: u64
+pub bpmn_runtime::MetricsSnapshot::verbs_invoked: u64
+impl core::clone::Clone for bpmn_runtime::MetricsSnapshot
+pub fn bpmn_runtime::MetricsSnapshot::clone(&self) -> bpmn_runtime::MetricsSnapshot
+impl core::fmt::Debug for bpmn_runtime::MetricsSnapshot
+pub fn bpmn_runtime::MetricsSnapshot::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::MetricsSnapshot
+pub fn bpmn_runtime::MetricsSnapshot::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for bpmn_runtime::MetricsSnapshot
+impl core::marker::Send for bpmn_runtime::MetricsSnapshot
+impl core::marker::Sync for bpmn_runtime::MetricsSnapshot
+impl core::marker::Unpin for bpmn_runtime::MetricsSnapshot
+impl core::marker::UnsafeUnpin for bpmn_runtime::MetricsSnapshot
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::MetricsSnapshot
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::MetricsSnapshot
+impl<T, U> core::convert::Into<U> for bpmn_runtime::MetricsSnapshot where U: core::convert::From<T>
+pub fn bpmn_runtime::MetricsSnapshot::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::MetricsSnapshot where U: core::convert::Into<T>
+pub type bpmn_runtime::MetricsSnapshot::Error = core::convert::Infallible
+pub fn bpmn_runtime::MetricsSnapshot::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::MetricsSnapshot where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::MetricsSnapshot::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::MetricsSnapshot::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::MetricsSnapshot where T: core::clone::Clone
+pub type bpmn_runtime::MetricsSnapshot::Owned = T
+pub fn bpmn_runtime::MetricsSnapshot::clone_into(&self, &mut T)
+pub fn bpmn_runtime::MetricsSnapshot::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::MetricsSnapshot where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::MetricsSnapshot::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::MetricsSnapshot where T: ?core::marker::Sized
+pub fn bpmn_runtime::MetricsSnapshot::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::MetricsSnapshot where T: ?core::marker::Sized
+pub fn bpmn_runtime::MetricsSnapshot::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::MetricsSnapshot where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::MetricsSnapshot::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::MetricsSnapshot
+pub fn bpmn_runtime::MetricsSnapshot::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::MetricsSnapshot
+impl<T> tracing::instrument::Instrument for bpmn_runtime::MetricsSnapshot
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::MetricsSnapshot
+impl<T> typenum::type_operators::Same for bpmn_runtime::MetricsSnapshot
+pub type bpmn_runtime::MetricsSnapshot::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::MetricsSnapshot where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::MetricsSnapshot::vzip(self) -> V
+pub struct bpmn_runtime::PendingWaitInfo
+pub bpmn_runtime::PendingWaitInfo::id: uuid::Uuid
+pub bpmn_runtime::PendingWaitInfo::instance_id: bpmn_runtime::InstanceId
+pub bpmn_runtime::PendingWaitInfo::node_name: alloc::string::String
+pub bpmn_runtime::PendingWaitInfo::payload: core::option::Option<serde_json::value::Value>
+pub bpmn_runtime::PendingWaitInfo::token_id: bpmn_runtime::TokenId
+impl core::clone::Clone for bpmn_runtime::PendingWaitInfo
+pub fn bpmn_runtime::PendingWaitInfo::clone(&self) -> bpmn_runtime::PendingWaitInfo
+impl core::fmt::Debug for bpmn_runtime::PendingWaitInfo
+pub fn bpmn_runtime::PendingWaitInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::PendingWaitInfo
+impl core::marker::Send for bpmn_runtime::PendingWaitInfo
+impl core::marker::Sync for bpmn_runtime::PendingWaitInfo
+impl core::marker::Unpin for bpmn_runtime::PendingWaitInfo
+impl core::marker::UnsafeUnpin for bpmn_runtime::PendingWaitInfo
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::PendingWaitInfo
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::PendingWaitInfo
+impl<T, U> core::convert::Into<U> for bpmn_runtime::PendingWaitInfo where U: core::convert::From<T>
+pub fn bpmn_runtime::PendingWaitInfo::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::PendingWaitInfo where U: core::convert::Into<T>
+pub type bpmn_runtime::PendingWaitInfo::Error = core::convert::Infallible
+pub fn bpmn_runtime::PendingWaitInfo::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::PendingWaitInfo where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::PendingWaitInfo::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::PendingWaitInfo::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::PendingWaitInfo where T: core::clone::Clone
+pub type bpmn_runtime::PendingWaitInfo::Owned = T
+pub fn bpmn_runtime::PendingWaitInfo::clone_into(&self, &mut T)
+pub fn bpmn_runtime::PendingWaitInfo::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::PendingWaitInfo where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::PendingWaitInfo::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::PendingWaitInfo where T: ?core::marker::Sized
+pub fn bpmn_runtime::PendingWaitInfo::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::PendingWaitInfo where T: ?core::marker::Sized
+pub fn bpmn_runtime::PendingWaitInfo::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::PendingWaitInfo where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::PendingWaitInfo::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::PendingWaitInfo
+pub fn bpmn_runtime::PendingWaitInfo::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::PendingWaitInfo
+impl<T> tracing::instrument::Instrument for bpmn_runtime::PendingWaitInfo
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::PendingWaitInfo
+impl<T> typenum::type_operators::Same for bpmn_runtime::PendingWaitInfo
+pub type bpmn_runtime::PendingWaitInfo::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::PendingWaitInfo where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::PendingWaitInfo::vzip(self) -> V
+pub struct bpmn_runtime::PostgresJourneyStore
+impl bpmn_runtime::PostgresJourneyStore
+pub fn bpmn_runtime::PostgresJourneyStore::new(sqlx_postgres::PgPool) -> Self
+pub fn bpmn_runtime::PostgresJourneyStore::pool(&self) -> &sqlx_postgres::PgPool
+impl bpmn_runtime::JourneyStore for bpmn_runtime::PostgresJourneyStore
+pub fn bpmn_runtime::PostgresJourneyStore::ack_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::EventId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::advance_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::append_journey_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::JourneyLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::append_to_write_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, bpmn_runtime::WriteLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::archive_instance_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_instance<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::WorkflowInstance>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_pending_wait<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, core::option::Option<alloc::string::String>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>, core::option::Option<serde_json::value::Value>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_switch_request<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, core::option::Option<uuid::Uuid>, alloc::vec::Vec<alloc::string::String>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::ActiveToken>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::delete_token<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::dequeue_events<'life0, 'async_trait>(&'life0 self, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::EventEnvelope>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::enqueue_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::EventKind, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::EventId>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::find_archivable_instances<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 bpmn_runtime::RetentionPolicy) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::InstanceId>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::find_pending_wait_by_correlation<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::PendingWaitInfo>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<usize>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::WorkflowInstance>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_tokens_at_join<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_tokens_for_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::read_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<serde_json::value::Value>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::record_join_arrival<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::reduce_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::set_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::update_instance_status<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::InstanceStatus, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::write_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+impl core::marker::Freeze for bpmn_runtime::PostgresJourneyStore
+impl core::marker::Send for bpmn_runtime::PostgresJourneyStore
+impl core::marker::Sync for bpmn_runtime::PostgresJourneyStore
+impl core::marker::Unpin for bpmn_runtime::PostgresJourneyStore
+impl core::marker::UnsafeUnpin for bpmn_runtime::PostgresJourneyStore
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::PostgresJourneyStore
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_runtime::PostgresJourneyStore
+impl<T, U> core::convert::Into<U> for bpmn_runtime::PostgresJourneyStore where U: core::convert::From<T>
+pub fn bpmn_runtime::PostgresJourneyStore::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::PostgresJourneyStore where U: core::convert::Into<T>
+pub type bpmn_runtime::PostgresJourneyStore::Error = core::convert::Infallible
+pub fn bpmn_runtime::PostgresJourneyStore::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::PostgresJourneyStore where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::PostgresJourneyStore::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::PostgresJourneyStore::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::PostgresJourneyStore where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::PostgresJourneyStore::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::PostgresJourneyStore where T: ?core::marker::Sized
+pub fn bpmn_runtime::PostgresJourneyStore::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::PostgresJourneyStore where T: ?core::marker::Sized
+pub fn bpmn_runtime::PostgresJourneyStore::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::PostgresJourneyStore
+pub fn bpmn_runtime::PostgresJourneyStore::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::PostgresJourneyStore
+impl<T> tracing::instrument::Instrument for bpmn_runtime::PostgresJourneyStore
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::PostgresJourneyStore
+impl<T> typenum::type_operators::Same for bpmn_runtime::PostgresJourneyStore
+pub type bpmn_runtime::PostgresJourneyStore::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::PostgresJourneyStore where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::PostgresJourneyStore::vzip(self) -> V
+pub struct bpmn_runtime::RetentionPolicy
+pub bpmn_runtime::RetentionPolicy::archive_after_days: u64
+pub bpmn_runtime::RetentionPolicy::cold_storage_after_years: u64
+impl core::clone::Clone for bpmn_runtime::RetentionPolicy
+pub fn bpmn_runtime::RetentionPolicy::clone(&self) -> bpmn_runtime::RetentionPolicy
+impl core::default::Default for bpmn_runtime::RetentionPolicy
+pub fn bpmn_runtime::RetentionPolicy::default() -> Self
+impl core::fmt::Debug for bpmn_runtime::RetentionPolicy
+pub fn bpmn_runtime::RetentionPolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::RetentionPolicy
+impl core::marker::Send for bpmn_runtime::RetentionPolicy
+impl core::marker::Sync for bpmn_runtime::RetentionPolicy
+impl core::marker::Unpin for bpmn_runtime::RetentionPolicy
+impl core::marker::UnsafeUnpin for bpmn_runtime::RetentionPolicy
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::RetentionPolicy
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::RetentionPolicy
+impl<T, U> core::convert::Into<U> for bpmn_runtime::RetentionPolicy where U: core::convert::From<T>
+pub fn bpmn_runtime::RetentionPolicy::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::RetentionPolicy where U: core::convert::Into<T>
+pub type bpmn_runtime::RetentionPolicy::Error = core::convert::Infallible
+pub fn bpmn_runtime::RetentionPolicy::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::RetentionPolicy where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::RetentionPolicy::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::RetentionPolicy::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::RetentionPolicy where T: core::clone::Clone
+pub type bpmn_runtime::RetentionPolicy::Owned = T
+pub fn bpmn_runtime::RetentionPolicy::clone_into(&self, &mut T)
+pub fn bpmn_runtime::RetentionPolicy::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::RetentionPolicy where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::RetentionPolicy::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::RetentionPolicy where T: ?core::marker::Sized
+pub fn bpmn_runtime::RetentionPolicy::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::RetentionPolicy where T: ?core::marker::Sized
+pub fn bpmn_runtime::RetentionPolicy::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::RetentionPolicy where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::RetentionPolicy::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::RetentionPolicy
+pub fn bpmn_runtime::RetentionPolicy::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::RetentionPolicy
+impl<T> tracing::instrument::Instrument for bpmn_runtime::RetentionPolicy
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::RetentionPolicy
+impl<T> typenum::type_operators::Same for bpmn_runtime::RetentionPolicy
+pub type bpmn_runtime::RetentionPolicy::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::RetentionPolicy where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::RetentionPolicy::vzip(self) -> V
+pub struct bpmn_runtime::RuntimeEngine
+pub bpmn_runtime::RuntimeEngine::spec: alloc::sync::Arc<dsl_lowering::bpmn::JourneySpec>
+pub bpmn_runtime::RuntimeEngine::store: alloc::sync::Arc<dyn bpmn_runtime::JourneyStore>
+pub bpmn_runtime::RuntimeEngine::switch_adaptor: alloc::sync::Arc<dyn bpmn_runtime::SwitchAdaptor>
+pub bpmn_runtime::RuntimeEngine::verb_registry: alloc::sync::Arc<bpmn_runtime::VerbRegistry>
+impl bpmn_runtime::RuntimeEngine
+pub async fn bpmn_runtime::RuntimeEngine::complete_task(&self, bpmn_runtime::InstanceId, &str, uuid::Uuid, serde_json::value::Value) -> anyhow::Result<()>
+pub async fn bpmn_runtime::RuntimeEngine::fire_timer(&self, bpmn_runtime::InstanceId, uuid::Uuid, &str) -> anyhow::Result<()>
+pub async fn bpmn_runtime::RuntimeEngine::gateway_reply(&self, bpmn_runtime::InstanceId, &str, uuid::Uuid, alloc::vec::Vec<alloc::string::String>) -> anyhow::Result<()>
+pub async fn bpmn_runtime::RuntimeEngine::get_instance_status(&self, bpmn_runtime::InstanceId) -> anyhow::Result<core::option::Option<bpmn_runtime::InstanceStatus>>
+pub async fn bpmn_runtime::RuntimeEngine::get_tokens(&self, bpmn_runtime::InstanceId) -> anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>
+pub async fn bpmn_runtime::RuntimeEngine::human_task_complete(&self, bpmn_runtime::InstanceId, &str, uuid::Uuid, serde_json::value::Value) -> anyhow::Result<()>
+pub fn bpmn_runtime::RuntimeEngine::metrics(&self) -> &bpmn_runtime::RuntimeMetrics
+pub fn bpmn_runtime::RuntimeEngine::new(alloc::sync::Arc<dyn bpmn_runtime::JourneyStore>, alloc::sync::Arc<dsl_lowering::bpmn::JourneySpec>, alloc::sync::Arc<bpmn_runtime::VerbRegistry>, alloc::sync::Arc<dyn bpmn_runtime::SwitchAdaptor>) -> Self
+pub async fn bpmn_runtime::RuntimeEngine::run_to_quiescence(&self, bpmn_runtime::InstanceId) -> anyhow::Result<()>
+pub async fn bpmn_runtime::RuntimeEngine::start_instance(&self, serde_json::value::Value) -> anyhow::Result<bpmn_runtime::InstanceId>
+impl core::marker::Freeze for bpmn_runtime::RuntimeEngine
+impl core::marker::Send for bpmn_runtime::RuntimeEngine
+impl core::marker::Sync for bpmn_runtime::RuntimeEngine
+impl core::marker::Unpin for bpmn_runtime::RuntimeEngine
+impl core::marker::UnsafeUnpin for bpmn_runtime::RuntimeEngine
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::RuntimeEngine
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_runtime::RuntimeEngine
+impl<T, U> core::convert::Into<U> for bpmn_runtime::RuntimeEngine where U: core::convert::From<T>
+pub fn bpmn_runtime::RuntimeEngine::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::RuntimeEngine where U: core::convert::Into<T>
+pub type bpmn_runtime::RuntimeEngine::Error = core::convert::Infallible
+pub fn bpmn_runtime::RuntimeEngine::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::RuntimeEngine where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::RuntimeEngine::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::RuntimeEngine::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::RuntimeEngine where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::RuntimeEngine::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::RuntimeEngine where T: ?core::marker::Sized
+pub fn bpmn_runtime::RuntimeEngine::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::RuntimeEngine where T: ?core::marker::Sized
+pub fn bpmn_runtime::RuntimeEngine::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::RuntimeEngine
+pub fn bpmn_runtime::RuntimeEngine::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::RuntimeEngine
+impl<T> tracing::instrument::Instrument for bpmn_runtime::RuntimeEngine
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::RuntimeEngine
+impl<T> typenum::type_operators::Same for bpmn_runtime::RuntimeEngine
+pub type bpmn_runtime::RuntimeEngine::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::RuntimeEngine where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::RuntimeEngine::vzip(self) -> V
+pub struct bpmn_runtime::RuntimeMetrics
+pub bpmn_runtime::RuntimeMetrics::events_processed: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::gateway_decisions: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::human_tasks_completed: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::instances_cancelled: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::instances_completed: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::instances_failed: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::instances_started: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::joins_fired: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::merge_conflicts: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::parallel_forks: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::timer_events_fired: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+pub bpmn_runtime::RuntimeMetrics::verbs_invoked: alloc::sync::Arc<core::sync::atomic::AtomicU64>
+impl bpmn_runtime::RuntimeMetrics
+pub fn bpmn_runtime::RuntimeMetrics::increment(&alloc::sync::Arc<core::sync::atomic::AtomicU64>)
+pub fn bpmn_runtime::RuntimeMetrics::new() -> Self
+pub fn bpmn_runtime::RuntimeMetrics::prometheus_text(&self) -> alloc::string::String
+pub fn bpmn_runtime::RuntimeMetrics::snapshot(&self) -> bpmn_runtime::MetricsSnapshot
+impl core::clone::Clone for bpmn_runtime::RuntimeMetrics
+pub fn bpmn_runtime::RuntimeMetrics::clone(&self) -> bpmn_runtime::RuntimeMetrics
+impl core::default::Default for bpmn_runtime::RuntimeMetrics
+pub fn bpmn_runtime::RuntimeMetrics::default() -> bpmn_runtime::RuntimeMetrics
+impl core::marker::Freeze for bpmn_runtime::RuntimeMetrics
+impl core::marker::Send for bpmn_runtime::RuntimeMetrics
+impl core::marker::Sync for bpmn_runtime::RuntimeMetrics
+impl core::marker::Unpin for bpmn_runtime::RuntimeMetrics
+impl core::marker::UnsafeUnpin for bpmn_runtime::RuntimeMetrics
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::RuntimeMetrics
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::RuntimeMetrics
+impl<T, U> core::convert::Into<U> for bpmn_runtime::RuntimeMetrics where U: core::convert::From<T>
+pub fn bpmn_runtime::RuntimeMetrics::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::RuntimeMetrics where U: core::convert::Into<T>
+pub type bpmn_runtime::RuntimeMetrics::Error = core::convert::Infallible
+pub fn bpmn_runtime::RuntimeMetrics::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::RuntimeMetrics where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::RuntimeMetrics::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::RuntimeMetrics::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::RuntimeMetrics where T: core::clone::Clone
+pub type bpmn_runtime::RuntimeMetrics::Owned = T
+pub fn bpmn_runtime::RuntimeMetrics::clone_into(&self, &mut T)
+pub fn bpmn_runtime::RuntimeMetrics::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::RuntimeMetrics where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::RuntimeMetrics::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::RuntimeMetrics where T: ?core::marker::Sized
+pub fn bpmn_runtime::RuntimeMetrics::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::RuntimeMetrics where T: ?core::marker::Sized
+pub fn bpmn_runtime::RuntimeMetrics::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::RuntimeMetrics where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::RuntimeMetrics::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::RuntimeMetrics
+pub fn bpmn_runtime::RuntimeMetrics::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::RuntimeMetrics
+impl<T> tracing::instrument::Instrument for bpmn_runtime::RuntimeMetrics
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::RuntimeMetrics
+impl<T> typenum::type_operators::Same for bpmn_runtime::RuntimeMetrics
+pub type bpmn_runtime::RuntimeMetrics::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::RuntimeMetrics where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::RuntimeMetrics::vzip(self) -> V
+pub struct bpmn_runtime::ScriptedAdaptor
+impl bpmn_runtime::ScriptedAdaptor
+pub fn bpmn_runtime::ScriptedAdaptor::new() -> Self
+pub fn bpmn_runtime::ScriptedAdaptor::set_reply(&mut self, &str, alloc::vec::Vec<alloc::string::String>)
+impl bpmn_runtime::SwitchAdaptor for bpmn_runtime::ScriptedAdaptor
+pub fn bpmn_runtime::ScriptedAdaptor::handle<'life0, 'async_trait>(&'life0 self, bpmn_runtime::SwitchRequest) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<bpmn_runtime::SwitchReply, bpmn_runtime::SwitchError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+impl core::default::Default for bpmn_runtime::ScriptedAdaptor
+pub fn bpmn_runtime::ScriptedAdaptor::default() -> Self
+impl core::marker::Freeze for bpmn_runtime::ScriptedAdaptor
+impl core::marker::Send for bpmn_runtime::ScriptedAdaptor
+impl core::marker::Sync for bpmn_runtime::ScriptedAdaptor
+impl core::marker::Unpin for bpmn_runtime::ScriptedAdaptor
+impl core::marker::UnsafeUnpin for bpmn_runtime::ScriptedAdaptor
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::ScriptedAdaptor
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::ScriptedAdaptor
+impl<T, U> core::convert::Into<U> for bpmn_runtime::ScriptedAdaptor where U: core::convert::From<T>
+pub fn bpmn_runtime::ScriptedAdaptor::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::ScriptedAdaptor where U: core::convert::Into<T>
+pub type bpmn_runtime::ScriptedAdaptor::Error = core::convert::Infallible
+pub fn bpmn_runtime::ScriptedAdaptor::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::ScriptedAdaptor where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::ScriptedAdaptor::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::ScriptedAdaptor::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::ScriptedAdaptor where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::ScriptedAdaptor::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::ScriptedAdaptor where T: ?core::marker::Sized
+pub fn bpmn_runtime::ScriptedAdaptor::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::ScriptedAdaptor where T: ?core::marker::Sized
+pub fn bpmn_runtime::ScriptedAdaptor::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::ScriptedAdaptor
+pub fn bpmn_runtime::ScriptedAdaptor::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::ScriptedAdaptor
+impl<T> tracing::instrument::Instrument for bpmn_runtime::ScriptedAdaptor
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::ScriptedAdaptor
+impl<T> typenum::type_operators::Same for bpmn_runtime::ScriptedAdaptor
+pub type bpmn_runtime::ScriptedAdaptor::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::ScriptedAdaptor where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::ScriptedAdaptor::vzip(self) -> V
+pub struct bpmn_runtime::SwitchReply
+pub bpmn_runtime::SwitchReply::selected_targets: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for bpmn_runtime::SwitchReply
+pub fn bpmn_runtime::SwitchReply::clone(&self) -> bpmn_runtime::SwitchReply
+impl core::fmt::Debug for bpmn_runtime::SwitchReply
+pub fn bpmn_runtime::SwitchReply::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::SwitchReply
+pub fn bpmn_runtime::SwitchReply::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::SwitchReply
+pub fn bpmn_runtime::SwitchReply::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::SwitchReply
+impl core::marker::Send for bpmn_runtime::SwitchReply
+impl core::marker::Sync for bpmn_runtime::SwitchReply
+impl core::marker::Unpin for bpmn_runtime::SwitchReply
+impl core::marker::UnsafeUnpin for bpmn_runtime::SwitchReply
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::SwitchReply
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::SwitchReply
+impl<T, U> core::convert::Into<U> for bpmn_runtime::SwitchReply where U: core::convert::From<T>
+pub fn bpmn_runtime::SwitchReply::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::SwitchReply where U: core::convert::Into<T>
+pub type bpmn_runtime::SwitchReply::Error = core::convert::Infallible
+pub fn bpmn_runtime::SwitchReply::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::SwitchReply where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::SwitchReply::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::SwitchReply::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::SwitchReply where T: core::clone::Clone
+pub type bpmn_runtime::SwitchReply::Owned = T
+pub fn bpmn_runtime::SwitchReply::clone_into(&self, &mut T)
+pub fn bpmn_runtime::SwitchReply::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::SwitchReply where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::SwitchReply::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::SwitchReply where T: ?core::marker::Sized
+pub fn bpmn_runtime::SwitchReply::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::SwitchReply where T: ?core::marker::Sized
+pub fn bpmn_runtime::SwitchReply::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::SwitchReply where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::SwitchReply::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::SwitchReply
+pub fn bpmn_runtime::SwitchReply::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::SwitchReply
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::SwitchReply where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::SwitchReply
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::SwitchReply
+impl<T> typenum::type_operators::Same for bpmn_runtime::SwitchReply
+pub type bpmn_runtime::SwitchReply::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::SwitchReply where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::SwitchReply::vzip(self) -> V
+pub struct bpmn_runtime::SwitchRequest
+pub bpmn_runtime::SwitchRequest::context_data: serde_json::value::Value
+pub bpmn_runtime::SwitchRequest::gateway_kind: alloc::string::String
+pub bpmn_runtime::SwitchRequest::gateway_name: alloc::string::String
+pub bpmn_runtime::SwitchRequest::instance_id: bpmn_runtime::InstanceId
+pub bpmn_runtime::SwitchRequest::outgoing_edges: alloc::vec::Vec<bpmn_runtime::EdgeInfo>
+impl core::clone::Clone for bpmn_runtime::SwitchRequest
+pub fn bpmn_runtime::SwitchRequest::clone(&self) -> bpmn_runtime::SwitchRequest
+impl core::fmt::Debug for bpmn_runtime::SwitchRequest
+pub fn bpmn_runtime::SwitchRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::SwitchRequest
+pub fn bpmn_runtime::SwitchRequest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::SwitchRequest
+pub fn bpmn_runtime::SwitchRequest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::SwitchRequest
+impl core::marker::Send for bpmn_runtime::SwitchRequest
+impl core::marker::Sync for bpmn_runtime::SwitchRequest
+impl core::marker::Unpin for bpmn_runtime::SwitchRequest
+impl core::marker::UnsafeUnpin for bpmn_runtime::SwitchRequest
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::SwitchRequest
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::SwitchRequest
+impl<T, U> core::convert::Into<U> for bpmn_runtime::SwitchRequest where U: core::convert::From<T>
+pub fn bpmn_runtime::SwitchRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::SwitchRequest where U: core::convert::Into<T>
+pub type bpmn_runtime::SwitchRequest::Error = core::convert::Infallible
+pub fn bpmn_runtime::SwitchRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::SwitchRequest where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::SwitchRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::SwitchRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::SwitchRequest where T: core::clone::Clone
+pub type bpmn_runtime::SwitchRequest::Owned = T
+pub fn bpmn_runtime::SwitchRequest::clone_into(&self, &mut T)
+pub fn bpmn_runtime::SwitchRequest::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::SwitchRequest where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::SwitchRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::SwitchRequest where T: ?core::marker::Sized
+pub fn bpmn_runtime::SwitchRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::SwitchRequest where T: ?core::marker::Sized
+pub fn bpmn_runtime::SwitchRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::SwitchRequest where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::SwitchRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::SwitchRequest
+pub fn bpmn_runtime::SwitchRequest::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::SwitchRequest
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::SwitchRequest where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::SwitchRequest
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::SwitchRequest
+impl<T> typenum::type_operators::Same for bpmn_runtime::SwitchRequest
+pub type bpmn_runtime::SwitchRequest::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::SwitchRequest where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::SwitchRequest::vzip(self) -> V
+pub struct bpmn_runtime::VerbContext
+pub bpmn_runtime::VerbContext::at_slots: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+pub bpmn_runtime::VerbContext::effects: alloc::vec::Vec<bpmn_runtime::VerbEffect>
+pub bpmn_runtime::VerbContext::inputs: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+pub bpmn_runtime::VerbContext::instance_id: bpmn_runtime::InstanceId
+pub bpmn_runtime::VerbContext::outputs: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+pub bpmn_runtime::VerbContext::token_id: bpmn_runtime::TokenId
+impl core::marker::Freeze for bpmn_runtime::VerbContext
+impl core::marker::Send for bpmn_runtime::VerbContext
+impl core::marker::Sync for bpmn_runtime::VerbContext
+impl core::marker::Unpin for bpmn_runtime::VerbContext
+impl core::marker::UnsafeUnpin for bpmn_runtime::VerbContext
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::VerbContext
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::VerbContext
+impl<T, U> core::convert::Into<U> for bpmn_runtime::VerbContext where U: core::convert::From<T>
+pub fn bpmn_runtime::VerbContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::VerbContext where U: core::convert::Into<T>
+pub type bpmn_runtime::VerbContext::Error = core::convert::Infallible
+pub fn bpmn_runtime::VerbContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::VerbContext where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::VerbContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::VerbContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::VerbContext where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::VerbContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::VerbContext where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::VerbContext where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::VerbContext
+pub fn bpmn_runtime::VerbContext::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::VerbContext
+impl<T> tracing::instrument::Instrument for bpmn_runtime::VerbContext
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::VerbContext
+impl<T> typenum::type_operators::Same for bpmn_runtime::VerbContext
+pub type bpmn_runtime::VerbContext::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::VerbContext where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::VerbContext::vzip(self) -> V
+pub struct bpmn_runtime::VerbOutput
+pub bpmn_runtime::VerbOutput::data: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+pub bpmn_runtime::VerbOutput::effects: alloc::vec::Vec<bpmn_runtime::VerbEffect>
+impl core::clone::Clone for bpmn_runtime::VerbOutput
+pub fn bpmn_runtime::VerbOutput::clone(&self) -> bpmn_runtime::VerbOutput
+impl core::fmt::Debug for bpmn_runtime::VerbOutput
+pub fn bpmn_runtime::VerbOutput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_runtime::VerbOutput
+impl core::marker::Send for bpmn_runtime::VerbOutput
+impl core::marker::Sync for bpmn_runtime::VerbOutput
+impl core::marker::Unpin for bpmn_runtime::VerbOutput
+impl core::marker::UnsafeUnpin for bpmn_runtime::VerbOutput
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::VerbOutput
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::VerbOutput
+impl<T, U> core::convert::Into<U> for bpmn_runtime::VerbOutput where U: core::convert::From<T>
+pub fn bpmn_runtime::VerbOutput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::VerbOutput where U: core::convert::Into<T>
+pub type bpmn_runtime::VerbOutput::Error = core::convert::Infallible
+pub fn bpmn_runtime::VerbOutput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::VerbOutput where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::VerbOutput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::VerbOutput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::VerbOutput where T: core::clone::Clone
+pub type bpmn_runtime::VerbOutput::Owned = T
+pub fn bpmn_runtime::VerbOutput::clone_into(&self, &mut T)
+pub fn bpmn_runtime::VerbOutput::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::VerbOutput where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::VerbOutput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::VerbOutput where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbOutput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::VerbOutput where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbOutput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::VerbOutput where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::VerbOutput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::VerbOutput
+pub fn bpmn_runtime::VerbOutput::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::VerbOutput
+impl<T> tracing::instrument::Instrument for bpmn_runtime::VerbOutput
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::VerbOutput
+impl<T> typenum::type_operators::Same for bpmn_runtime::VerbOutput
+pub type bpmn_runtime::VerbOutput::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::VerbOutput where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::VerbOutput::vzip(self) -> V
+pub struct bpmn_runtime::VerbRegistry
+impl bpmn_runtime::VerbRegistry
+pub fn bpmn_runtime::VerbRegistry::get(&self, &str) -> core::option::Option<&dyn bpmn_runtime::VerbHandler>
+pub fn bpmn_runtime::VerbRegistry::new() -> Self
+pub fn bpmn_runtime::VerbRegistry::register(&mut self, alloc::boxed::Box<dyn bpmn_runtime::VerbHandler>)
+impl core::default::Default for bpmn_runtime::VerbRegistry
+pub fn bpmn_runtime::VerbRegistry::default() -> Self
+impl core::marker::Freeze for bpmn_runtime::VerbRegistry
+impl core::marker::Send for bpmn_runtime::VerbRegistry
+impl core::marker::Sync for bpmn_runtime::VerbRegistry
+impl core::marker::Unpin for bpmn_runtime::VerbRegistry
+impl core::marker::UnsafeUnpin for bpmn_runtime::VerbRegistry
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::VerbRegistry
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_runtime::VerbRegistry
+impl<T, U> core::convert::Into<U> for bpmn_runtime::VerbRegistry where U: core::convert::From<T>
+pub fn bpmn_runtime::VerbRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::VerbRegistry where U: core::convert::Into<T>
+pub type bpmn_runtime::VerbRegistry::Error = core::convert::Infallible
+pub fn bpmn_runtime::VerbRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::VerbRegistry where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::VerbRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::VerbRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_runtime::VerbRegistry where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::VerbRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::VerbRegistry where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::VerbRegistry where T: ?core::marker::Sized
+pub fn bpmn_runtime::VerbRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_runtime::VerbRegistry
+pub fn bpmn_runtime::VerbRegistry::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::VerbRegistry
+impl<T> tracing::instrument::Instrument for bpmn_runtime::VerbRegistry
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::VerbRegistry
+impl<T> typenum::type_operators::Same for bpmn_runtime::VerbRegistry
+pub type bpmn_runtime::VerbRegistry::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::VerbRegistry where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::VerbRegistry::vzip(self) -> V
+pub struct bpmn_runtime::WorkflowInstance
+pub bpmn_runtime::WorkflowInstance::completed_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub bpmn_runtime::WorkflowInstance::data: serde_json::value::Value
+pub bpmn_runtime::WorkflowInstance::id: bpmn_runtime::InstanceId
+pub bpmn_runtime::WorkflowInstance::journey_name: alloc::string::String
+pub bpmn_runtime::WorkflowInstance::started_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub bpmn_runtime::WorkflowInstance::status: bpmn_runtime::InstanceStatus
+pub bpmn_runtime::WorkflowInstance::version: i32
+impl core::clone::Clone for bpmn_runtime::WorkflowInstance
+pub fn bpmn_runtime::WorkflowInstance::clone(&self) -> bpmn_runtime::WorkflowInstance
+impl core::fmt::Debug for bpmn_runtime::WorkflowInstance
+pub fn bpmn_runtime::WorkflowInstance::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::WorkflowInstance
+pub fn bpmn_runtime::WorkflowInstance::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::WorkflowInstance
+pub fn bpmn_runtime::WorkflowInstance::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::WorkflowInstance
+impl core::marker::Send for bpmn_runtime::WorkflowInstance
+impl core::marker::Sync for bpmn_runtime::WorkflowInstance
+impl core::marker::Unpin for bpmn_runtime::WorkflowInstance
+impl core::marker::UnsafeUnpin for bpmn_runtime::WorkflowInstance
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::WorkflowInstance
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::WorkflowInstance
+impl<T, U> core::convert::Into<U> for bpmn_runtime::WorkflowInstance where U: core::convert::From<T>
+pub fn bpmn_runtime::WorkflowInstance::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::WorkflowInstance where U: core::convert::Into<T>
+pub type bpmn_runtime::WorkflowInstance::Error = core::convert::Infallible
+pub fn bpmn_runtime::WorkflowInstance::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::WorkflowInstance where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::WorkflowInstance::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::WorkflowInstance::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::WorkflowInstance where T: core::clone::Clone
+pub type bpmn_runtime::WorkflowInstance::Owned = T
+pub fn bpmn_runtime::WorkflowInstance::clone_into(&self, &mut T)
+pub fn bpmn_runtime::WorkflowInstance::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::WorkflowInstance where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::WorkflowInstance::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::WorkflowInstance where T: ?core::marker::Sized
+pub fn bpmn_runtime::WorkflowInstance::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::WorkflowInstance where T: ?core::marker::Sized
+pub fn bpmn_runtime::WorkflowInstance::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::WorkflowInstance where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::WorkflowInstance::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::WorkflowInstance
+pub fn bpmn_runtime::WorkflowInstance::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::WorkflowInstance
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::WorkflowInstance where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::WorkflowInstance
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::WorkflowInstance
+impl<T> typenum::type_operators::Same for bpmn_runtime::WorkflowInstance
+pub type bpmn_runtime::WorkflowInstance::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::WorkflowInstance where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::WorkflowInstance::vzip(self) -> V
+pub struct bpmn_runtime::WriteLogEntry
+pub bpmn_runtime::WriteLogEntry::location: alloc::string::String
+pub bpmn_runtime::WriteLogEntry::value: serde_json::value::Value
+impl core::clone::Clone for bpmn_runtime::WriteLogEntry
+pub fn bpmn_runtime::WriteLogEntry::clone(&self) -> bpmn_runtime::WriteLogEntry
+impl core::fmt::Debug for bpmn_runtime::WriteLogEntry
+pub fn bpmn_runtime::WriteLogEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for bpmn_runtime::WriteLogEntry
+pub fn bpmn_runtime::WriteLogEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for bpmn_runtime::WriteLogEntry
+pub fn bpmn_runtime::WriteLogEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for bpmn_runtime::WriteLogEntry
+impl core::marker::Send for bpmn_runtime::WriteLogEntry
+impl core::marker::Sync for bpmn_runtime::WriteLogEntry
+impl core::marker::Unpin for bpmn_runtime::WriteLogEntry
+impl core::marker::UnsafeUnpin for bpmn_runtime::WriteLogEntry
+impl core::panic::unwind_safe::RefUnwindSafe for bpmn_runtime::WriteLogEntry
+impl core::panic::unwind_safe::UnwindSafe for bpmn_runtime::WriteLogEntry
+impl<T, U> core::convert::Into<U> for bpmn_runtime::WriteLogEntry where U: core::convert::From<T>
+pub fn bpmn_runtime::WriteLogEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_runtime::WriteLogEntry where U: core::convert::Into<T>
+pub type bpmn_runtime::WriteLogEntry::Error = core::convert::Infallible
+pub fn bpmn_runtime::WriteLogEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_runtime::WriteLogEntry where U: core::convert::TryFrom<T>
+pub type bpmn_runtime::WriteLogEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_runtime::WriteLogEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for bpmn_runtime::WriteLogEntry where T: core::clone::Clone
+pub type bpmn_runtime::WriteLogEntry::Owned = T
+pub fn bpmn_runtime::WriteLogEntry::clone_into(&self, &mut T)
+pub fn bpmn_runtime::WriteLogEntry::to_owned(&self) -> T
+impl<T> core::any::Any for bpmn_runtime::WriteLogEntry where T: 'static + ?core::marker::Sized
+pub fn bpmn_runtime::WriteLogEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_runtime::WriteLogEntry where T: ?core::marker::Sized
+pub fn bpmn_runtime::WriteLogEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_runtime::WriteLogEntry where T: ?core::marker::Sized
+pub fn bpmn_runtime::WriteLogEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for bpmn_runtime::WriteLogEntry where T: core::clone::Clone
+pub unsafe fn bpmn_runtime::WriteLogEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for bpmn_runtime::WriteLogEntry
+pub fn bpmn_runtime::WriteLogEntry::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_runtime::WriteLogEntry
+impl<T> serde_core::de::DeserializeOwned for bpmn_runtime::WriteLogEntry where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for bpmn_runtime::WriteLogEntry
+impl<T> tracing::instrument::WithSubscriber for bpmn_runtime::WriteLogEntry
+impl<T> typenum::type_operators::Same for bpmn_runtime::WriteLogEntry
+pub type bpmn_runtime::WriteLogEntry::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_runtime::WriteLogEntry where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_runtime::WriteLogEntry::vzip(self) -> V
+pub trait bpmn_runtime::JourneyStore: core::marker::Send + core::marker::Sync
+pub fn bpmn_runtime::JourneyStore::ack_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::EventId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::advance_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::append_journey_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::JourneyLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::append_to_write_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, bpmn_runtime::WriteLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::archive_instance_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::create_instance<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::WorkflowInstance>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::create_pending_wait<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, core::option::Option<alloc::string::String>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>, core::option::Option<serde_json::value::Value>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::JourneyStore::create_switch_request<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::JourneyStore::create_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, core::option::Option<uuid::Uuid>, alloc::vec::Vec<alloc::string::String>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::ActiveToken>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::delete_token<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::dequeue_events<'life0, 'async_trait>(&'life0 self, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::EventEnvelope>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::enqueue_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::EventKind, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::EventId>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::find_archivable_instances<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 bpmn_runtime::RetentionPolicy) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::InstanceId>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::find_pending_wait_by_correlation<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::PendingWaitInfo>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::JourneyStore::get_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<usize>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::get_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::WorkflowInstance>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::get_tokens_at_join<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::get_tokens_for_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::read_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<serde_json::value::Value>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::record_join_arrival<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::reduce_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::set_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::JourneyStore::update_instance_status<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::InstanceStatus, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::JourneyStore::write_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+impl bpmn_runtime::JourneyStore for bpmn_runtime::InMemoryJourneyStore
+pub fn bpmn_runtime::InMemoryJourneyStore::ack_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::EventId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::advance_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::append_journey_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::JourneyLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::append_to_write_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, bpmn_runtime::WriteLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::archive_instance_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_instance<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::WorkflowInstance>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_pending_wait<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, core::option::Option<alloc::string::String>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>, core::option::Option<serde_json::value::Value>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_switch_request<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::create_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, core::option::Option<uuid::Uuid>, alloc::vec::Vec<alloc::string::String>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::ActiveToken>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::delete_token<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::dequeue_events<'life0, 'async_trait>(&'life0 self, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::EventEnvelope>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::enqueue_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::EventKind, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::EventId>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::find_archivable_instances<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 bpmn_runtime::RetentionPolicy) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::InstanceId>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::find_pending_wait_by_correlation<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::PendingWaitInfo>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<usize>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::WorkflowInstance>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_tokens_at_join<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::get_tokens_for_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::read_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<serde_json::value::Value>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::record_join_arrival<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::reduce_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::set_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::update_instance_status<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::InstanceStatus, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::InMemoryJourneyStore::write_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+impl bpmn_runtime::JourneyStore for bpmn_runtime::PostgresJourneyStore
+pub fn bpmn_runtime::PostgresJourneyStore::ack_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::EventId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::advance_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::append_journey_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::JourneyLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::append_to_write_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId, bpmn_runtime::WriteLogEntry) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::archive_instance_log<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_instance<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::WorkflowInstance>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_pending_wait<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, core::option::Option<alloc::string::String>, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>, core::option::Option<serde_json::value::Value>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_switch_request<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::TokenId, &'life1 str, &'life2 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<uuid::Uuid>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::create_token<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, core::option::Option<uuid::Uuid>, alloc::vec::Vec<alloc::string::String>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::ActiveToken>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::delete_token<'life0, 'async_trait>(&'life0 self, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::dequeue_events<'life0, 'async_trait>(&'life0 self, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::EventEnvelope>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::enqueue_event<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::EventKind, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<bpmn_runtime::EventId>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::find_archivable_instances<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 bpmn_runtime::RetentionPolicy) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::InstanceId>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::find_pending_wait_by_correlation<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::PendingWaitInfo>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<usize>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<bpmn_runtime::WorkflowInstance>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_tokens_at_join<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::get_tokens_for_instance<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<bpmn_runtime::ActiveToken>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::read_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<core::option::Option<serde_json::value::Value>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::record_join_arrival<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, bpmn_runtime::TokenId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::reduce_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<usize>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::set_expected_join_count<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 str, bpmn_runtime::InstanceId, usize) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::update_instance_status<'life0, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, bpmn_runtime::InstanceStatus, core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::PostgresJourneyStore::write_instance_data<'life0, 'life1, 'async_trait>(&'life0 self, bpmn_runtime::InstanceId, &'life1 str, serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<()>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub trait bpmn_runtime::SwitchAdaptor: core::marker::Send + core::marker::Sync
+pub fn bpmn_runtime::SwitchAdaptor::handle<'life0, 'async_trait>(&'life0 self, bpmn_runtime::SwitchRequest) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<bpmn_runtime::SwitchReply, bpmn_runtime::SwitchError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+impl bpmn_runtime::SwitchAdaptor for bpmn_runtime::ScriptedAdaptor
+pub fn bpmn_runtime::ScriptedAdaptor::handle<'life0, 'async_trait>(&'life0 self, bpmn_runtime::SwitchRequest) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<bpmn_runtime::SwitchReply, bpmn_runtime::SwitchError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub trait bpmn_runtime::VerbHandler: core::marker::Send + core::marker::Sync
+pub fn bpmn_runtime::VerbHandler::invoke<'life0, 'async_trait>(&'life0 self, bpmn_runtime::VerbContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<bpmn_runtime::VerbOutput, bpmn_runtime::VerbError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::VerbHandler::verb_ref(&self) -> &str
+impl bpmn_runtime::VerbHandler for bpmn_runtime::DslFormHandler
+pub fn bpmn_runtime::DslFormHandler::invoke<'life0, 'async_trait>(&'life0 self, bpmn_runtime::VerbContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<bpmn_runtime::VerbOutput, bpmn_runtime::VerbError>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn bpmn_runtime::DslFormHandler::verb_ref(&self) -> &str
+pub fn bpmn_runtime::apply_merge_protocol(&[bpmn_runtime::ActiveToken], core::option::Option<&dsl_lowering::bpmn::JourneyParallelJoin>) -> bpmn_runtime::MergeResult
+pub fn bpmn_runtime::register_builtins(&mut bpmn_runtime::VerbRegistry)
+pub type bpmn_runtime::EventId = uuid::Uuid
+pub type bpmn_runtime::InstanceId = uuid::Uuid
+pub type bpmn_runtime::TokenId = uuid::Uuid

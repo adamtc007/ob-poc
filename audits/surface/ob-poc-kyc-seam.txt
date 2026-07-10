@@ -1,0 +1,44 @@
+# ob-poc-kyc-seam | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:53Z
+pub mod ob_poc_kyc_seam
+pub struct ob_poc_kyc_seam::IntentEventDraft
+pub ob_poc_kyc_seam::IntentEventDraft::as_of: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_kyc_seam::IntentEventDraft::authority: ob_poc_kyc_substrate::types::AuthorityRef
+pub ob_poc_kyc_seam::IntentEventDraft::lexicon_hash: ob_poc_kyc_substrate::types::Hash
+pub ob_poc_kyc_seam::IntentEventDraft::payload: serde_json::value::Value
+pub ob_poc_kyc_seam::IntentEventDraft::subject_root: ob_poc_kyc_substrate::types::SubjectId
+pub ob_poc_kyc_seam::IntentEventDraft::target: ob_poc_kyc_substrate::types::TargetBinding
+pub ob_poc_kyc_seam::IntentEventDraft::verb_fqn: ob_poc_kyc_substrate::types::VerbFqn
+impl ob_poc_kyc_seam::IntentEventDraft
+pub fn ob_poc_kyc_seam::IntentEventDraft::into_event(self, &sem_os_core::principal::Principal, uuid::Uuid, uuid::Uuid) -> ob_poc_kyc_substrate::event::IntentEvent
+impl core::marker::Freeze for ob_poc_kyc_seam::IntentEventDraft
+impl core::marker::Send for ob_poc_kyc_seam::IntentEventDraft
+impl core::marker::Sync for ob_poc_kyc_seam::IntentEventDraft
+impl core::marker::Unpin for ob_poc_kyc_seam::IntentEventDraft
+impl core::marker::UnsafeUnpin for ob_poc_kyc_seam::IntentEventDraft
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_kyc_seam::IntentEventDraft
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_kyc_seam::IntentEventDraft
+impl<T, U> core::convert::Into<U> for ob_poc_kyc_seam::IntentEventDraft where U: core::convert::From<T>
+pub fn ob_poc_kyc_seam::IntentEventDraft::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_kyc_seam::IntentEventDraft where U: core::convert::Into<T>
+pub type ob_poc_kyc_seam::IntentEventDraft::Error = core::convert::Infallible
+pub fn ob_poc_kyc_seam::IntentEventDraft::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_kyc_seam::IntentEventDraft where U: core::convert::TryFrom<T>
+pub type ob_poc_kyc_seam::IntentEventDraft::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_kyc_seam::IntentEventDraft::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_kyc_seam::IntentEventDraft where T: 'static + ?core::marker::Sized
+pub fn ob_poc_kyc_seam::IntentEventDraft::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_kyc_seam::IntentEventDraft where T: ?core::marker::Sized
+pub fn ob_poc_kyc_seam::IntentEventDraft::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_kyc_seam::IntentEventDraft where T: ?core::marker::Sized
+pub fn ob_poc_kyc_seam::IntentEventDraft::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_kyc_seam::IntentEventDraft
+pub fn ob_poc_kyc_seam::IntentEventDraft::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_kyc_seam::IntentEventDraft
+impl<T> tracing::instrument::Instrument for ob_poc_kyc_seam::IntentEventDraft
+impl<T> tracing::instrument::WithSubscriber for ob_poc_kyc_seam::IntentEventDraft
+impl<T> typenum::type_operators::Same for ob_poc_kyc_seam::IntentEventDraft
+pub type ob_poc_kyc_seam::IntentEventDraft::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_kyc_seam::IntentEventDraft where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_kyc_seam::IntentEventDraft::vzip(self) -> V
+pub async fn ob_poc_kyc_seam::append_in_scope<V>(&mut dyn dsl_runtime::tx::TransactionScope, &ob_poc_kyc_substrate::fold::registry::FoldRegistry, &ob_poc_kyc_substrate::event::IntentEvent, V) -> core::result::Result<ob_poc_kyc_store::store::AppendOutcome, ob_poc_kyc_store::error::StoreError> where V: core::ops::function::FnOnce(&ob_poc_kyc_substrate::fold::control::ControlState) -> core::result::Result<(), ob_poc_kyc_substrate::error::KycError>
+pub fn ob_poc_kyc_seam::map_principal(&sem_os_core::principal::Principal) -> ob_poc_kyc_substrate::types::Principal

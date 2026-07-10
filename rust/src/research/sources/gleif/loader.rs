@@ -2,13 +2,13 @@
 //!
 //! Adapts `GleifClient` to the `SourceLoader` trait.
 
-use super::normalize::{normalize_lei_record, normalize_relationship};
+use super::normalize::normalize_lei_record;
 use crate::gleif::GleifClient;
 use crate::research::sources::normalized::{
-    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer, NormalizedRelationship,
+    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer,
 };
 use crate::research::sources::traits::{
-    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, FetchParentChainOptions,
+    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
     SearchCandidate, SearchOptions, SourceDataType, SourceLoader,
 };
 use anyhow::Result;
@@ -31,6 +31,7 @@ impl GleifLoader {
     }
 
     /// Create with an existing client (for testing or shared client)
+    #[allow(dead_code)] // kept for tests
     pub fn with_client(client: GleifClient) -> Self {
         Self { client }
     }
@@ -147,63 +148,6 @@ impl SourceLoader for GleifLoader {
     ) -> Result<Vec<NormalizedOfficer>> {
         // GLEIF doesn't provide officer data
         Ok(vec![])
-    }
-
-    async fn fetch_parent_chain(
-        &self,
-        key: &str,
-        options: Option<FetchParentChainOptions>,
-    ) -> Result<Vec<NormalizedRelationship>> {
-        let opts = options.unwrap_or_default();
-        let max_depth = opts.max_depth.unwrap_or(10);
-
-        let mut relationships = Vec::new();
-        let mut current_lei = key.to_string();
-        let mut depth = 0;
-
-        // Get the starting entity name
-        let start_record = self.client.get_lei_record(key).await?;
-        let mut child_name = start_record.legal_name().to_string();
-
-        while depth < max_depth {
-            // Try to get direct parent
-            let parent_rel = self.client.get_direct_parent(&current_lei).await?;
-
-            match parent_rel {
-                Some(rel) => {
-                    // Fetch parent entity to get its name
-                    let parent_lei = &rel.attributes.relationship.end_node.id;
-                    let parent_record = self.client.get_lei_record(parent_lei).await?;
-                    let parent_name = parent_record.legal_name().to_string();
-
-                    relationships.push(normalize_relationship(&rel, &child_name, &parent_name));
-
-                    // Move up the chain
-                    current_lei = parent_lei.clone();
-                    child_name = parent_name;
-                    depth += 1;
-                }
-                None => {
-                    // No more parents - check for ultimate parent if we haven't found any
-                    if relationships.is_empty() {
-                        if let Some(ult_rel) = self.client.get_ultimate_parent(key).await? {
-                            let parent_lei = &ult_rel.attributes.relationship.end_node.id;
-                            let parent_record = self.client.get_lei_record(parent_lei).await?;
-                            let parent_name = parent_record.legal_name().to_string();
-
-                            relationships.push(normalize_relationship(
-                                &ult_rel,
-                                &child_name,
-                                &parent_name,
-                            ));
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-
-        Ok(relationships)
     }
 }
 

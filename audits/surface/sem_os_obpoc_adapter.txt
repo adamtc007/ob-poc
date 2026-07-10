@@ -1,0 +1,533 @@
+# sem_os_obpoc_adapter | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:14Z
+pub mod sem_os_obpoc_adapter
+pub mod sem_os_obpoc_adapter::metadata
+pub enum sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub sem_os_obpoc_adapter::metadata::ClassificationLabel::Confidential
+pub sem_os_obpoc_adapter::metadata::ClassificationLabel::Internal
+pub sem_os_obpoc_adapter::metadata::ClassificationLabel::Public
+pub sem_os_obpoc_adapter::metadata::ClassificationLabel::Restricted
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::clone(&self) -> sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::cmp::Eq for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::cmp::PartialEq for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::eq(&self, &sem_os_obpoc_adapter::metadata::ClassificationLabel) -> bool
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl serde_core::ser::Serialize for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl<Q, K> equivalent::Equivalent<K> for sem_os_obpoc_adapter::metadata::ClassificationLabel where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for sem_os_obpoc_adapter::metadata::ClassificationLabel where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::ClassificationLabel where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::ClassificationLabel where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::ClassificationLabel::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::ClassificationLabel where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::ClassificationLabel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::ClassificationLabel where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::ClassificationLabel::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::ClassificationLabel where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::ClassificationLabel where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::ClassificationLabel where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::ClassificationLabel where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::ClassificationLabel::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub fn sem_os_obpoc_adapter::metadata::ClassificationLabel::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_obpoc_adapter::metadata::ClassificationLabel where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::ClassificationLabel
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub type sem_os_obpoc_adapter::metadata::ClassificationLabel::Output = T
+pub enum sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub sem_os_obpoc_adapter::metadata::GovernanceTierLabel::Governed
+pub sem_os_obpoc_adapter::metadata::GovernanceTierLabel::Operational
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::clone(&self) -> sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::cmp::Eq for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::cmp::PartialEq for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::eq(&self, &sem_os_obpoc_adapter::metadata::GovernanceTierLabel) -> bool
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl serde_core::ser::Serialize for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl<Q, K> equivalent::Equivalent<K> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::GovernanceTierLabel::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::GovernanceTierLabel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::GovernanceTierLabel::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub fn sem_os_obpoc_adapter::metadata::GovernanceTierLabel::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_obpoc_adapter::metadata::GovernanceTierLabel where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub type sem_os_obpoc_adapter::metadata::GovernanceTierLabel::Output = T
+pub struct sem_os_obpoc_adapter::metadata::DomainEntry
+pub sem_os_obpoc_adapter::metadata::DomainEntry::description: alloc::string::String
+pub sem_os_obpoc_adapter::metadata::DomainEntry::tables: alloc::collections::btree::map::BTreeMap<alloc::string::String, sem_os_obpoc_adapter::metadata::TableMetadata>
+pub sem_os_obpoc_adapter::metadata::DomainEntry::verb_data_footprint: alloc::collections::btree::map::BTreeMap<alloc::string::String, sem_os_obpoc_adapter::metadata::VerbFootprint>
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::DomainEntry
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::clone(&self) -> sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::DomainEntry
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_obpoc_adapter::metadata::DomainEntry
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_obpoc_adapter::metadata::DomainEntry
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::DomainEntry
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::DomainEntry
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::DomainEntry where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::DomainEntry where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::DomainEntry::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::DomainEntry where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::DomainEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::DomainEntry where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::DomainEntry::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::DomainEntry where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::DomainEntry where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::DomainEntry where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::DomainEntry where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::DomainEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::DomainEntry
+pub fn sem_os_obpoc_adapter::metadata::DomainEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_obpoc_adapter::metadata::DomainEntry where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::DomainEntry
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::DomainEntry
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::DomainEntry
+pub type sem_os_obpoc_adapter::metadata::DomainEntry::Output = T
+pub struct sem_os_obpoc_adapter::metadata::DomainMetadata
+pub sem_os_obpoc_adapter::metadata::DomainMetadata::domains: alloc::collections::btree::map::BTreeMap<alloc::string::String, sem_os_obpoc_adapter::metadata::DomainEntry>
+pub sem_os_obpoc_adapter::metadata::DomainMetadata::reverse_index: sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl sem_os_obpoc_adapter::metadata::DomainMetadata
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::find_table(&self, &str) -> core::option::Option<(&str, &sem_os_obpoc_adapter::metadata::TableMetadata)>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::find_table_qualified(&self, core::option::Option<&str>, &str) -> core::option::Option<(&str, &sem_os_obpoc_adapter::metadata::TableMetadata)>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::find_verb_footprint(&self, &str) -> core::option::Option<&sem_os_obpoc_adapter::metadata::VerbFootprint>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::from_file(&std::path::Path) -> anyhow::Result<Self>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::from_yaml(&str) -> core::result::Result<Self, serde_yaml::error::Error>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::verbs_reading(&self, &str) -> alloc::vec::Vec<&str>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::verbs_writing(&self, &str) -> alloc::vec::Vec<&str>
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::DomainMetadata
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::clone(&self) -> sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::DomainMetadata
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::DomainMetadata where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::DomainMetadata where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::DomainMetadata::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::DomainMetadata where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::DomainMetadata::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::DomainMetadata where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::DomainMetadata::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::DomainMetadata where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::DomainMetadata where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::DomainMetadata where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::DomainMetadata where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::DomainMetadata::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::DomainMetadata
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadata::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::DomainMetadata
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::DomainMetadata
+pub type sem_os_obpoc_adapter::metadata::DomainMetadata::Output = T
+pub struct sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub sem_os_obpoc_adapter::metadata::DomainMetadataFile::domains: alloc::collections::btree::map::BTreeMap<alloc::string::String, sem_os_obpoc_adapter::metadata::DomainEntry>
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::clone(&self) -> sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::DomainMetadataFile where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::DomainMetadataFile where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::DomainMetadataFile::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::DomainMetadataFile where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::DomainMetadataFile::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::DomainMetadataFile where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::DomainMetadataFile::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::DomainMetadataFile where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::DomainMetadataFile where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::DomainMetadataFile where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::DomainMetadataFile where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub fn sem_os_obpoc_adapter::metadata::DomainMetadataFile::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_obpoc_adapter::metadata::DomainMetadataFile where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::DomainMetadataFile
+pub type sem_os_obpoc_adapter::metadata::DomainMetadataFile::Output = T
+pub struct sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+pub sem_os_obpoc_adapter::metadata::ReverseVerbIndex::read_by: std::collections::hash::map::HashMap<alloc::string::String, std::collections::hash::set::HashSet<alloc::string::String>>
+pub sem_os_obpoc_adapter::metadata::ReverseVerbIndex::written_by: std::collections::hash::map::HashMap<alloc::string::String, std::collections::hash::set::HashSet<alloc::string::String>>
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::clone(&self) -> sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::default::Default for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::default() -> sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::ReverseVerbIndex::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::ReverseVerbIndex::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::ReverseVerbIndex::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::ReverseVerbIndex where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+pub fn sem_os_obpoc_adapter::metadata::ReverseVerbIndex::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::ReverseVerbIndex
+pub type sem_os_obpoc_adapter::metadata::ReverseVerbIndex::Output = T
+pub struct sem_os_obpoc_adapter::metadata::TableMetadata
+pub sem_os_obpoc_adapter::metadata::TableMetadata::classification: sem_os_obpoc_adapter::metadata::ClassificationLabel
+pub sem_os_obpoc_adapter::metadata::TableMetadata::description: alloc::string::String
+pub sem_os_obpoc_adapter::metadata::TableMetadata::governance_tier: sem_os_obpoc_adapter::metadata::GovernanceTierLabel
+pub sem_os_obpoc_adapter::metadata::TableMetadata::pii: bool
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::TableMetadata
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::clone(&self) -> sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::TableMetadata
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_obpoc_adapter::metadata::TableMetadata
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_obpoc_adapter::metadata::TableMetadata
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::TableMetadata
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::TableMetadata
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::TableMetadata where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::TableMetadata where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::TableMetadata::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::TableMetadata where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::TableMetadata::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::TableMetadata where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::TableMetadata::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::TableMetadata where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::TableMetadata where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::TableMetadata where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::TableMetadata where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::TableMetadata::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::TableMetadata
+pub fn sem_os_obpoc_adapter::metadata::TableMetadata::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_obpoc_adapter::metadata::TableMetadata where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::TableMetadata
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::TableMetadata
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::TableMetadata
+pub type sem_os_obpoc_adapter::metadata::TableMetadata::Output = T
+pub struct sem_os_obpoc_adapter::metadata::VerbFootprint
+pub sem_os_obpoc_adapter::metadata::VerbFootprint::constellation_families: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::metadata::VerbFootprint::node_state_gates: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::metadata::VerbFootprint::reads: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::metadata::VerbFootprint::subject_kinds: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::metadata::VerbFootprint::workspace_affinity: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::metadata::VerbFootprint::writes: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for sem_os_obpoc_adapter::metadata::VerbFootprint
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::clone(&self) -> sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::fmt::Debug for sem_os_obpoc_adapter::metadata::VerbFootprint
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for sem_os_obpoc_adapter::metadata::VerbFootprint
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for sem_os_obpoc_adapter::metadata::VerbFootprint
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::marker::Send for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::marker::Sync for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::marker::Unpin for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::metadata::VerbFootprint where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::metadata::VerbFootprint where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::metadata::VerbFootprint::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::metadata::VerbFootprint where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::metadata::VerbFootprint::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for sem_os_obpoc_adapter::metadata::VerbFootprint where T: core::clone::Clone
+pub type sem_os_obpoc_adapter::metadata::VerbFootprint::Owned = T
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::clone_into(&self, &mut T)
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::to_owned(&self) -> T
+impl<T> core::any::Any for sem_os_obpoc_adapter::metadata::VerbFootprint where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::metadata::VerbFootprint where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::metadata::VerbFootprint where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for sem_os_obpoc_adapter::metadata::VerbFootprint where T: core::clone::Clone
+pub unsafe fn sem_os_obpoc_adapter::metadata::VerbFootprint::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::metadata::VerbFootprint
+pub fn sem_os_obpoc_adapter::metadata::VerbFootprint::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for sem_os_obpoc_adapter::metadata::VerbFootprint where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::metadata::VerbFootprint
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::metadata::VerbFootprint
+pub type sem_os_obpoc_adapter::metadata::VerbFootprint::Output = T
+pub mod sem_os_obpoc_adapter::onboarding
+pub mod sem_os_obpoc_adapter::onboarding::defaults
+pub fn sem_os_obpoc_adapter::onboarding::defaults::columns_for_entity_in_view(&sem_os_ontology::entity_type_def::EntityTypeDefBody, &str) -> alloc::vec::Vec<sem_os_ontology::view_def::ViewColumn>
+pub fn sem_os_obpoc_adapter::onboarding::defaults::default_attributes_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<sem_os_ontology::attribute_def::AttributeDefBody>
+pub fn sem_os_obpoc_adapter::onboarding::defaults::default_taxonomy_fqns_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<alloc::string::String>
+pub fn sem_os_obpoc_adapter::onboarding::defaults::default_verb_contracts_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<sem_os_ontology::verb_contract::VerbContractBody>
+pub fn sem_os_obpoc_adapter::onboarding::defaults::default_view_fqns_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<alloc::string::String>
+pub fn sem_os_obpoc_adapter::onboarding::defaults::membership_rule_for_entity_in_taxonomy(&str, &str) -> sem_os_ontology::membership::MembershipRuleBody
+pub mod sem_os_obpoc_adapter::onboarding::validators
+pub struct sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::attributes: alloc::vec::Vec<sem_os_ontology::attribute_def::AttributeDefBody>
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::created_by: alloc::string::String
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::dry_run: bool
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::entity_type: sem_os_ontology::entity_type_def::EntityTypeDefBody
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::evidence_requirements: alloc::vec::Vec<sem_os_ontology::evidence::EvidenceRequirementBody>
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::taxonomy_fqns: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::verb_contracts: alloc::vec::Vec<sem_os_ontology::verb_contract::VerbContractBody>
+pub sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::view_fqns: alloc::vec::Vec<alloc::string::String>
+impl core::marker::Freeze for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::Send for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::Sync for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::Unpin for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+pub type sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::Output = T
+pub fn sem_os_obpoc_adapter::onboarding::validators::validate_request(&sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest) -> anyhow::Result<()>
+pub struct sem_os_obpoc_adapter::onboarding::OnboardingRequest
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::attributes: alloc::vec::Vec<sem_os_ontology::attribute_def::AttributeDefBody>
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::created_by: alloc::string::String
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::dry_run: bool
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::entity_type: sem_os_ontology::entity_type_def::EntityTypeDefBody
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::evidence_requirements: alloc::vec::Vec<sem_os_ontology::evidence::EvidenceRequirementBody>
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::taxonomy_fqns: alloc::vec::Vec<alloc::string::String>
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::verb_contracts: alloc::vec::Vec<sem_os_ontology::verb_contract::VerbContractBody>
+pub sem_os_obpoc_adapter::onboarding::OnboardingRequest::view_fqns: alloc::vec::Vec<alloc::string::String>
+impl core::marker::Freeze for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::Send for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::Sync for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::Unpin for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::marker::UnsafeUnpin for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::panic::unwind_safe::RefUnwindSafe for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl core::panic::unwind_safe::UnwindSafe for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl<T, U> core::convert::Into<U> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where U: core::convert::From<T>
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where U: core::convert::Into<T>
+pub type sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::Error = core::convert::Infallible
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where U: core::convert::TryFrom<T>
+pub type sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where T: 'static + ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest where T: ?core::marker::Sized
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+pub fn sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::from(T) -> T
+impl<T> tracing::instrument::Instrument for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl<T> tracing::instrument::WithSubscriber for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+impl<T> typenum::type_operators::Same for sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest
+pub type sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest::Output = T
+pub fn sem_os_obpoc_adapter::onboarding::columns_for_entity_in_view(&sem_os_ontology::entity_type_def::EntityTypeDefBody, &str) -> alloc::vec::Vec<sem_os_ontology::view_def::ViewColumn>
+pub fn sem_os_obpoc_adapter::onboarding::default_attributes_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<sem_os_ontology::attribute_def::AttributeDefBody>
+pub fn sem_os_obpoc_adapter::onboarding::default_taxonomy_fqns_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<alloc::string::String>
+pub fn sem_os_obpoc_adapter::onboarding::default_verb_contracts_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<sem_os_ontology::verb_contract::VerbContractBody>
+pub fn sem_os_obpoc_adapter::onboarding::default_view_fqns_for_entity_type(&sem_os_ontology::entity_type_def::EntityTypeDefBody) -> alloc::vec::Vec<alloc::string::String>
+pub fn sem_os_obpoc_adapter::onboarding::membership_rule_for_entity_in_taxonomy(&str, &str) -> sem_os_ontology::membership::MembershipRuleBody
+pub fn sem_os_obpoc_adapter::onboarding::validate_request(&sem_os_obpoc_adapter::onboarding::validators::OnboardingRequest) -> anyhow::Result<()>
+pub mod sem_os_obpoc_adapter::scanner
+pub fn sem_os_obpoc_adapter::scanner::arg_type_to_attribute_type(&dsl_core::config::types::ArgConfig) -> sem_os_ontology::attribute_def::AttributeDataType
+pub fn sem_os_obpoc_adapter::scanner::enrich_entity_types(&mut [sem_os_ontology::entity_type_def::EntityTypeDefBody], &sem_os_obpoc_adapter::metadata::DomainMetadata)
+pub fn sem_os_obpoc_adapter::scanner::enrich_verb_contracts(&mut [sem_os_ontology::verb_contract::VerbContractBody], &sem_os_obpoc_adapter::metadata::DomainMetadata)
+pub fn sem_os_obpoc_adapter::scanner::generate_seed_domain_macro_calls(&dsl_core::config::types::VerbsConfig, &str) -> alloc::vec::Vec<alloc::string::String>
+pub fn sem_os_obpoc_adapter::scanner::infer_attributes_from_verbs(&dsl_core::config::types::VerbsConfig, &[sem_os_ontology::entity_type_def::EntityTypeDefBody]) -> alloc::vec::Vec<sem_os_ontology::attribute_def::AttributeDefBody>
+pub fn sem_os_obpoc_adapter::scanner::infer_entity_types_from_verbs(&dsl_core::config::types::VerbsConfig) -> alloc::vec::Vec<sem_os_ontology::entity_type_def::EntityTypeDefBody>
+pub fn sem_os_obpoc_adapter::scanner::scan_verb_contracts(&dsl_core::config::types::VerbsConfig) -> alloc::vec::Vec<sem_os_ontology::verb_contract::VerbContractBody>
+pub fn sem_os_obpoc_adapter::scanner::suggest_security_label(&str, &str, &[alloc::string::String]) -> sem_os_types::SecurityLabel
+pub fn sem_os_obpoc_adapter::scanner::title_case(&str) -> alloc::string::String
+pub fn sem_os_obpoc_adapter::scanner::to_wire_str<T: serde_core::ser::Serialize>(&T) -> alloc::string::String
+pub fn sem_os_obpoc_adapter::scanner::verb_config_to_contract(&str, &str, &dsl_core::config::types::VerbConfig) -> sem_os_ontology::verb_contract::VerbContractBody
+pub mod sem_os_obpoc_adapter::seeds
+pub mod sem_os_obpoc_adapter::seeds::derivation_seeds
+pub fn sem_os_obpoc_adapter::seeds::derivation_seeds::aggregate_aum_derivation() -> sem_os_ontology::derivation_spec::DerivationSpecBody
+pub fn sem_os_obpoc_adapter::seeds::derivation_seeds::beneficial_ownership_flag_derivation() -> sem_os_ontology::derivation_spec::DerivationSpecBody
+pub fn sem_os_obpoc_adapter::seeds::derivation_seeds::composite_risk_score_derivation() -> sem_os_ontology::derivation_spec::DerivationSpecBody
+pub fn sem_os_obpoc_adapter::seeds::derivation_seeds::core_derivation_specs() -> alloc::vec::Vec<sem_os_ontology::derivation_spec::DerivationSpecBody>
+pub fn sem_os_obpoc_adapter::seeds::derivation_seeds::document_completeness_derivation() -> sem_os_ontology::derivation_spec::DerivationSpecBody
+pub fn sem_os_obpoc_adapter::seeds::derivation_seeds::ubo_percentage_derivation() -> sem_os_ontology::derivation_spec::DerivationSpecBody
+pub mod sem_os_obpoc_adapter::seeds::policy_seeds
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::core_policies() -> alloc::vec::Vec<sem_os_ontology::policy_rule::PolicyRuleBody>
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::governed_approval_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::operator_full_access_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::pep_enhanced_dd_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::pii_masking_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::proof_evidence_governance_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::review_cycle_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::sanctions_restricted_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub fn sem_os_obpoc_adapter::seeds::policy_seeds::viewer_read_only_policy() -> sem_os_ontology::policy_rule::PolicyRuleBody
+pub mod sem_os_obpoc_adapter::seeds::taxonomy_seeds
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::core_taxonomies() -> alloc::vec::Vec<(sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)>
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::document_class_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::domain_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::entity_classification_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::governance_tier_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::instrument_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::jurisdiction_regime_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::jurisdiction_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::risk_tier_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub fn sem_os_obpoc_adapter::seeds::taxonomy_seeds::subject_category_taxonomy() -> (sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)
+pub mod sem_os_obpoc_adapter::seeds::view_seeds
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::core_views() -> alloc::vec::Vec<sem_os_ontology::view_def::ViewDefBody>
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::deal_management_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::document_collection_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::entity_detail_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::governance_review_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::kyc_case_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::onboarding_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::screening_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::view_seeds::trading_overview_view() -> sem_os_ontology::view_def::ViewDefBody
+pub fn sem_os_obpoc_adapter::seeds::core_derivation_specs() -> alloc::vec::Vec<sem_os_ontology::derivation_spec::DerivationSpecBody>
+pub fn sem_os_obpoc_adapter::seeds::core_policies() -> alloc::vec::Vec<sem_os_ontology::policy_rule::PolicyRuleBody>
+pub fn sem_os_obpoc_adapter::seeds::core_taxonomies() -> alloc::vec::Vec<(sem_os_ontology::taxonomy_def::TaxonomyDefBody, alloc::vec::Vec<sem_os_ontology::taxonomy_def::TaxonomyNodeBody>)>
+pub fn sem_os_obpoc_adapter::seeds::core_views() -> alloc::vec::Vec<sem_os_ontology::view_def::ViewDefBody>
+pub fn sem_os_obpoc_adapter::build_seed_bundle(&dsl_core::config::types::VerbsConfig) -> sem_os_core::seeds::SeedBundle
+pub fn sem_os_obpoc_adapter::build_seed_bundle_with_metadata(&dsl_core::config::types::VerbsConfig, core::option::Option<&sem_os_obpoc_adapter::metadata::DomainMetadata>) -> sem_os_core::seeds::SeedBundle

@@ -4,8 +4,8 @@
 //! - document_metadata: doc_id, attribute_id (uuid), value (jsonb)
 //! - attribute_values_typed: entity_id, attribute_id (text), value_text/value_number/value_boolean/value_json
 
-use crate::data_dictionary::{AttributeId, DbAttributeDefinition};
 use async_trait::async_trait;
+use ob_poc_authoring::data_dictionary::{AttributeId, DbAttributeDefinition};
 use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;

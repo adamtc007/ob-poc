@@ -154,6 +154,7 @@ pub mod helpers;
 // (multi-namespace UNION query over dictionary, registry, SemOS defs).
 // Registration flows through inventory; external ob-poc code does not
 // import these types directly.
+pub mod kyc_stream_ops;
 mod onboarding;
 mod onboarding_data_request;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
@@ -294,7 +295,7 @@ mod trading_profile;
 // `dsl-runtime::domain_ops::trading_profile_ca_ops` consuming the new
 // `dyn TradingProfileDocument` trait via the ServiceRegistry.
 // `ObPocTradingProfileDocument` in ob-poc bridges to
-// `crate::trading_profile::ast_db::{load_document, save_document}`.
+// `ob_poc_trading_profile::ast_db::{load_document, save_document}`.
 // `TradingMatrixDocument` already lives in `ob_poc_types::trading_matrix`
 // (boundary crate), so the trait can use it directly without
 // types-extraction. Registration flows through inventory; external
@@ -311,7 +312,7 @@ mod trading_profile;
 // (`config/verbs/view.yaml`, 15 verbs). Single-method `dyn ViewService`
 // trait dispatches all 15 verbs through the bridge in
 // `crate::services::view_service_impl`, which keeps the heavy
-// `crate::session::ViewState` + `crate::taxonomy::*` modules in
+// `crate::session::ViewState` + `ob_poc_taxonomy::taxonomy::*` modules in
 // ob-poc (both are 5000+ LOC multi-consumer mega-modules).
 
 // Re-export DSL types for use by operation implementations
@@ -404,7 +405,7 @@ pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 /// Phase 5c-migrate Phase B Pattern B slice (#72+) ports ops that reach
 /// into ob-poc internals from `CustomOperation` + `inventory` to
 /// `SemOsVerbOp`, but keeps the op bodies inside `rust/src/domain_ops/`
-/// because the internals (`crate::database::*`, `crate::ontology::*`,
+/// because the internals (`crate::database::*`, `ob_poc_ontology::*`,
 /// `crate::dsl_v2::*`, `crate::sem_os_runtime::*`) can't be inverted
 /// behind a service trait without a disproportionate refactor. This
 /// function is called from `ob-poc-web::main` right after
@@ -413,8 +414,38 @@ pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry) {
     use std::sync::Arc;
 
+    // dsl.kyc stream-backed determination verbs (EOP-DD-KYCUBO-002 rip-and-replace R1/R2).
+    // Domain: ubo.edge.* (6), ubo.determination.* (4), kyc.subject.* (2).
+    // YAML: config/verbs/kyc/dsl-kyc.yaml.
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertControl));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeAssertEconomicInterest));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeAttachEvidence));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeVerify));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeSupersede));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgeReconcileConflict));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationSelectStrategy));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationComputeFold));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationApplySmoFallback));
+    registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
+    // D3 (ratified): board-controller override is a stream verb, not a side-effecting table write
+    registry.register(Arc::new(kyc_stream_ops::UboBoardControllerOverride));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
+    registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
+    // W3: role-basis recording
+    registry.register(Arc::new(kyc_stream_ops::KycRoleAssign));
+    registry.register(Arc::new(kyc_stream_ops::KycRoleWithdraw));
+    // W5: obligation lifecycle
+    registry.register(Arc::new(kyc_stream_ops::KycObligationCreate));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateIdentity));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateScreening));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateRisk));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationSatisfy));
+    registry.register(Arc::new(kyc_stream_ops::KycObligationWaive));
+    registry.register(Arc::new(kyc_stream_ops::KycPersonApprove));
+    registry.register(Arc::new(kyc_stream_ops::KycPersonReject));
+
     // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
-    // crate::database::derive_semantic_state + crate::ontology::SemanticStageRegistry
+    // crate::database::derive_semantic_state + ob_poc_ontology::SemanticStageRegistry
     // + crate::dsl_v2::executor::DslExecutor).
     registry.register(Arc::new(onboarding::OnboardingAutoComplete));
     registry.register(Arc::new(onboarding_data_request::CompileDataRequest));
@@ -519,7 +550,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // Phase B Pattern B slice #79: trading-profile.* (36 verbs — full
     // draft→submit→approve→activate→materialize→archive lifecycle,
     // component CRUD dispatchers, ISDA/CSA/SSI/IM config, validation).
-    // Bridges to crate::trading_profile::{ast_db, document_ops}.
+    // Bridges to ob_poc_trading_profile::{ast_db, document_ops}.
     registry.register(Arc::new(trading_profile::TradingProfileImportVerb));
     registry.register(Arc::new(trading_profile::TradingProfileGetActive));
     registry.register(Arc::new(trading_profile::TradingProfileActivate));

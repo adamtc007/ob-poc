@@ -67,7 +67,7 @@ domains:
         returns:
           type: record
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_confirmation
@@ -133,6 +133,7 @@ domains:
 
       unlink:
         flavour: discretionary
+        audit_class: product_service_unlink
         description: Unlink a product-service catalogue mapping
         effect_class: read_modify_write
         role_guard:
@@ -173,7 +174,7 @@ domains:
         returns:
           type: affected
         three_axis:
-          state_effect: transition
+          state_effect: preserving
           external_effects: [emitting]
           consequence:
             baseline: requires_explicit_authorisation

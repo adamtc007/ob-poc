@@ -304,12 +304,12 @@ slots:
           description: "Stewards approved; awaiting publish trigger."
           green_when: |
             every required steward_approval exists
-            AND every required steward_approval.state = APPROVED
+            AND every required steward_approval.status = APPROVED
             AND validation_run exists
             AND validation_run.state = PASSED
             AND impact_analysis exists
             AND impact_analysis.state = REVIEWED
-            AND no objection exists with state = BLOCKING
+            AND count(objection where objection.status = BLOCKING) = 0
         - id: published
           description: "Published to registry; consumers see the change."
         - id: rejected

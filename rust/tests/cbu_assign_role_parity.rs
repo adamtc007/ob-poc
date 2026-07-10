@@ -43,8 +43,8 @@ use dsl_runtime::{
     SemOsChildDispatcher, ServiceRegistryBuilder, TransactionScope, VerbExecutionContext,
     VerbExecutionOutcome,
 };
-use sem_os_core::principal::Principal;
 use ob_poc::sequencer_tx::PgTransactionScope;
+use sem_os_core::principal::Principal;
 use sem_os_postgres::ops::cbu_role::{
     AssignControl, AssignFundRole, AssignOwnership, AssignRole, AssignServiceProvider,
     AssignSignatory, AssignTrustRole,
@@ -117,6 +117,7 @@ fn rel_id(outcome: &VerbExecutionOutcome) -> Option<String> {
 /// One role-type parity case: (label, dispatcher role-type, the specialist op,
 /// the role name, whether an entity_relationships edge is expected, and the
 /// per-CBU arg builder).
+#[allow(dead_code)]
 struct Case {
     label: &'static str,
     role_type: Option<&'static str>,
@@ -236,9 +237,7 @@ async fn assign_role_dispatch_parity_matrix() {
             specialist: Arc::new(AssignRole),
             role: "DIRECTOR",
             expects_edge: false,
-            build_args: |cbu, entity, _unused| {
-                json!({ "cbu-id": cbu, "entity-id": entity, "role": "DIRECTOR" })
-            },
+            build_args: |cbu, entity, _unused| json!({ "cbu-id": cbu, "entity-id": entity, "role": "DIRECTOR" }),
         },
     ];
 
@@ -251,7 +250,8 @@ async fn assign_role_dispatch_parity_matrix() {
         let cbu_a = insert_cbu(&mut scope, &format!("parity-{}-A", case.label)).await;
         let cbu_b = insert_cbu(&mut scope, &format!("parity-{}-B", case.label)).await;
         // Shared entities so the two role rows differ ONLY by cbu_id.
-        let primary = insert_entity(&mut scope, type_id, &format!("p-{}-primary", case.label)).await;
+        let primary =
+            insert_entity(&mut scope, type_id, &format!("p-{}-primary", case.label)).await;
         let target = insert_entity(&mut scope, type_id, &format!("p-{}-target", case.label)).await;
 
         // Dispatcher path on CBU-A.
@@ -299,7 +299,11 @@ async fn assign_role_dispatch_parity_matrix() {
         eprintln!(
             "[parity OK] {:<16} dispatcher==specialist on cbu_entity_roles{}",
             case.label,
-            if case.expects_edge { " + same edge" } else { "" }
+            if case.expects_edge {
+                " + same edge"
+            } else {
+                ""
+            }
         );
         checked += 1;
         // scope dropped here → ROLLBACK (no commit). Nothing persisted.

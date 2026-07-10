@@ -46,7 +46,6 @@ allowed_verbs:
   - structure.product-suite-full
   - structure.remove-all-products
   # Structure/onboarding macros
-  - mandate.create
   - mandate.list
   - mandate.add-product
   - mandate.set-instruments

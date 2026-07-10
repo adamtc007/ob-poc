@@ -40,7 +40,7 @@ use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::tooling::SemanticValidator;
 use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
-use crate::ontology::SemanticStageRegistry;
+use ob_poc_ontology::SemanticStageRegistry;
 use ob_poc_types::{DslState, SessionInputRequest, SessionInputResponse};
 use std::time::Instant;
 
@@ -223,12 +223,12 @@ async fn session_input(
 /// Returns `Some(ReplResponseV2)` if a V2 REPL session exists; returns
 /// `None` if it doesn't (caller returns 404).
 // R8 single-path unification (2026-05-11, §13.1):
-//   `AcpSessionInputDraftMode` moved to `crate::acp_session_input_draft_mode`
+//   `AcpSessionInputDraftMode` moved to `ob_poc_boundary::acp_session_input_draft_mode`
 //   and is now an `ReplOrchestratorV2` field. The env-var read fires once at
 //   orchestrator construction (see `ReplOrchestratorV2::with_acp_draft_mode`
 //   + `AcpSessionInputDraftMode::from_env`). HTTP callers consult the
 //   orchestrator instead of reading env per request.
-use crate::acp_session_input_draft_mode::AcpSessionInputDraftMode;
+use ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode;
 
 /// R8 Phase B bundle returned to the orchestrator. Carries the typed
 /// resolution (with `route_metadata` populated) alongside the message
@@ -237,7 +237,7 @@ use crate::acp_session_input_draft_mode::AcpSessionInputDraftMode;
 /// `ReplResponseV2` from this bundle, and the adapter projects to
 /// `ChatResponse` from typed sources.
 pub(crate) struct AcpResolvedBundle {
-    pub resolution: crate::acp_dag_semantic::AcpDagSemanticResolution,
+    pub resolution: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution,
     pub message: String,
     pub dsl: Option<ob_poc_types::DslState>,
     pub session_feedback: Option<serde_json::Value>,
@@ -268,7 +268,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     if prompt_text.is_empty() {
         return None;
     }
-    let prompt = vec![crate::acp_protocol::AcpContentBlock::Text {
+    let prompt = vec![ob_poc_boundary::acp_protocol::AcpContentBlock::Text {
         text: prompt_text.to_string(),
     }];
     let supported_provider_task =
@@ -320,7 +320,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
                     crate::api::repl_routes_v2::process_acp_prompt_deterministic_envelope(
                         &route_state,
                         session_id,
-                        vec![crate::acp_protocol::AcpContentBlock::Text {
+                        vec![ob_poc_boundary::acp_protocol::AcpContentBlock::Text {
                             text: prompt_text.to_string(),
                         }],
                         serde_json::json!("session-input-acp"),
@@ -402,11 +402,14 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     // path we synthesize a stub resolution and use `override_status` to
     // carry the language-pack outcome through the typed chat-trace.
     let mut resolution = match result.get("dag_semantic").and_then(|v| {
-        serde_json::from_value::<crate::acp_dag_semantic::AcpDagSemanticResolution>(v.clone()).ok()
+        serde_json::from_value::<ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution>(
+            v.clone(),
+        )
+        .ok()
     }) {
         Some(r) => r,
-        None => crate::acp_dag_semantic::AcpDagSemanticResolution {
-            status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+        None => ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+            status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
             utterance: prompt_text.to_string(),
             selected_dispatch: None,
             selected_verb: None,
@@ -451,7 +454,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     let effective_draft_source =
         value_string(&envelope, &["session_input", "effective_draft_source"])
             .unwrap_or_else(|| effective_draft_mode.as_str().to_string());
-    resolution.route_metadata = Some(crate::acp_dag_semantic::AcpRouteMetadata {
+    resolution.route_metadata = Some(ob_poc_boundary::acp_dag_semantic::AcpRouteMetadata {
         route: "session_input".to_string(),
         provider_task: task.clone(),
         requested_draft_source: requested_draft_mode.as_str().to_string(),
@@ -466,7 +469,7 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
     resolution.state_anchor_provider = envelope
         .get("state_anchor_provider")
         .and_then(|v| serde_json::from_value(v.clone()).ok());
-    resolution.observability = Some(crate::acp_dag_semantic::AcpObservabilitySummary {
+    resolution.observability = Some(ob_poc_boundary::acp_dag_semantic::AcpObservabilitySummary {
         structured_failure_mode: value_string(
             result,
             &[
@@ -2098,7 +2101,7 @@ async fn execute_session_dsl_raw(
         // Sem OS verb validation: check all verb FQNs in parsed AST are allowed
         if let Some(ref client) = state.sem_os_client {
             use dsl_core::Statement;
-            let actor = crate::policy::ActorResolver::from_env();
+            let actor = ob_poc_boundary::policy::ActorResolver::from_env();
             let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
                 client.as_ref(),
                 &actor,
@@ -2110,7 +2113,7 @@ async fn execute_session_dsl_raw(
             let phase2 = crate::traceability::Phase2Service::evaluate_from_envelope(envelope);
             match phase2.halt_reason_code {
                 Some("sem_os_unavailable") => {
-                    let policy_gate = crate::policy::PolicyGate::from_env();
+                    let policy_gate = ob_poc_boundary::policy::PolicyGate::from_env();
                     if policy_gate.semreg_fail_closed() {
                         tracing::warn!(
                             session = %session_id,
@@ -3606,7 +3609,7 @@ async fn get_enriched_dsl(
 mod tests {
     use super::*;
     use crate::journey::router::PackRouter;
-    use crate::sequencer::{ReplOrchestratorV2, StubExecutor};
+    use crate::sequencer::{NullDslExecutor, ReplOrchestratorV2};
     use std::sync::Arc;
 
     #[test]
@@ -3694,7 +3697,7 @@ mod tests {
     async fn test_supported_acp_prompt_routes_before_repl_on_normal_input() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
-            Arc::new(StubExecutor),
+            Arc::new(NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
 
@@ -3707,7 +3710,8 @@ mod tests {
         .expect("supported ACP prompt should route through ACP");
 
         assert!(bundle.message.contains("validated a dry-run workbook"));
-        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        let trace =
+            ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
         assert_eq!(trace["status"], "dry_run_validated");
         assert_eq!(trace["route"], "session_input");
         assert_eq!(trace["provider_task"], "deal.update-status");
@@ -3741,7 +3745,7 @@ mod tests {
     async fn test_live_llm_session_input_mode_is_task_bounded_for_deal_provider() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
-            Arc::new(StubExecutor),
+            Arc::new(NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
 
@@ -3754,7 +3758,8 @@ mod tests {
         .await
         .expect("supported deal prompt should still route through ACP");
 
-        let trace = crate::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
+        let trace =
+            ob_poc_boundary::acp_dag_semantic::acp_chat_trace_summary_typed(&bundle.resolution);
         assert_eq!(trace["status"], "dry_run_validated");
         assert_eq!(trace["provider_task"], "deal.update-status");
         assert_eq!(trace["requested_draft_source"], "llm_tool_call");
@@ -3766,7 +3771,7 @@ mod tests {
     async fn test_non_authored_prompt_still_falls_through_to_repl_input_path() {
         let orchestrator = Arc::new(ReplOrchestratorV2::new(
             PackRouter::new(vec![]),
-            Arc::new(StubExecutor),
+            Arc::new(NullDslExecutor),
         ));
         let session_id = orchestrator.create_session().await;
 

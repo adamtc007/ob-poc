@@ -1,5 +1,6 @@
 //! SemOsClient trait — the sole API boundary between ob-poc and Semantic OS.
 //! ob-poc depends on this crate, never on sem_os_postgres or sem_os_server.
+#![deny(unreachable_pub)]
 
 pub mod http;
 pub mod inprocess;

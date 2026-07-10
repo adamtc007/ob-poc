@@ -1,0 +1,1951 @@
+# dsl-sage | features=all | HEAD=217954a4313fb495ffedf04f9c7f97fd8faf1a80 | 2026-07-01T14:48:57Z
+pub mod dsl_sage
+pub mod dsl_sage::audit
+pub struct dsl_sage::audit::SageAuditEntry
+pub dsl_sage::audit::SageAuditEntry::details: serde_json::value::Value
+pub dsl_sage::audit::SageAuditEntry::session_id: alloc::string::String
+pub dsl_sage::audit::SageAuditEntry::timestamp: alloc::string::String
+pub dsl_sage::audit::SageAuditEntry::transition: alloc::string::String
+impl core::clone::Clone for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::clone(&self) -> dsl_sage::audit::SageAuditEntry
+impl core::fmt::Debug for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::audit::SageAuditEntry
+impl core::marker::Send for dsl_sage::audit::SageAuditEntry
+impl core::marker::Sync for dsl_sage::audit::SageAuditEntry
+impl core::marker::Unpin for dsl_sage::audit::SageAuditEntry
+impl core::marker::UnsafeUnpin for dsl_sage::audit::SageAuditEntry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::audit::SageAuditEntry
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::audit::SageAuditEntry
+impl<T, U> core::convert::Into<U> for dsl_sage::audit::SageAuditEntry where U: core::convert::From<T>
+pub fn dsl_sage::audit::SageAuditEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::audit::SageAuditEntry where U: core::convert::Into<T>
+pub type dsl_sage::audit::SageAuditEntry::Error = core::convert::Infallible
+pub fn dsl_sage::audit::SageAuditEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::audit::SageAuditEntry where U: core::convert::TryFrom<T>
+pub type dsl_sage::audit::SageAuditEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::audit::SageAuditEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::audit::SageAuditEntry where T: core::clone::Clone
+pub type dsl_sage::audit::SageAuditEntry::Owned = T
+pub fn dsl_sage::audit::SageAuditEntry::clone_into(&self, &mut T)
+pub fn dsl_sage::audit::SageAuditEntry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::audit::SageAuditEntry where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::audit::SageAuditEntry where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::audit::SageAuditEntry where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::audit::SageAuditEntry where T: core::clone::Clone
+pub unsafe fn dsl_sage::audit::SageAuditEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::audit::SageAuditEntry where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::audit::SageAuditLog
+impl dsl_sage::audit::SageAuditLog
+pub fn dsl_sage::audit::SageAuditLog::entries_for_session(&self, &str) -> alloc::vec::Vec<dsl_sage::audit::SageAuditEntry>
+pub fn dsl_sage::audit::SageAuditLog::new() -> Self
+pub fn dsl_sage::audit::SageAuditLog::record(&self, &str, &str, serde_json::value::Value)
+impl core::default::Default for dsl_sage::audit::SageAuditLog
+pub fn dsl_sage::audit::SageAuditLog::default() -> Self
+impl !core::marker::Freeze for dsl_sage::audit::SageAuditLog
+impl core::marker::Send for dsl_sage::audit::SageAuditLog
+impl core::marker::Sync for dsl_sage::audit::SageAuditLog
+impl core::marker::Unpin for dsl_sage::audit::SageAuditLog
+impl core::marker::UnsafeUnpin for dsl_sage::audit::SageAuditLog
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::audit::SageAuditLog
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::audit::SageAuditLog
+impl<T, U> core::convert::Into<U> for dsl_sage::audit::SageAuditLog where U: core::convert::From<T>
+pub fn dsl_sage::audit::SageAuditLog::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::audit::SageAuditLog where U: core::convert::Into<T>
+pub type dsl_sage::audit::SageAuditLog::Error = core::convert::Infallible
+pub fn dsl_sage::audit::SageAuditLog::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::audit::SageAuditLog where U: core::convert::TryFrom<T>
+pub type dsl_sage::audit::SageAuditLog::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::audit::SageAuditLog::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::audit::SageAuditLog where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditLog::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::audit::SageAuditLog where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditLog::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::audit::SageAuditLog where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditLog::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::audit::SageAuditLog
+pub fn dsl_sage::audit::SageAuditLog::from(T) -> T
+pub mod dsl_sage::confirmation
+pub enum dsl_sage::confirmation::ConfirmationState
+pub dsl_sage::confirmation::ConfirmationState::Accepted
+pub dsl_sage::confirmation::ConfirmationState::Cancelled
+pub dsl_sage::confirmation::ConfirmationState::Pending
+pub dsl_sage::confirmation::ConfirmationState::Rejected
+impl core::clone::Clone for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::clone(&self) -> dsl_sage::confirmation::ConfirmationState
+impl core::cmp::Eq for dsl_sage::confirmation::ConfirmationState
+impl core::cmp::PartialEq for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::eq(&self, &dsl_sage::confirmation::ConfirmationState) -> bool
+impl core::fmt::Debug for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::confirmation::ConfirmationState
+impl serde_core::ser::Serialize for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::confirmation::ConfirmationState
+impl core::marker::Send for dsl_sage::confirmation::ConfirmationState
+impl core::marker::Sync for dsl_sage::confirmation::ConfirmationState
+impl core::marker::Unpin for dsl_sage::confirmation::ConfirmationState
+impl core::marker::UnsafeUnpin for dsl_sage::confirmation::ConfirmationState
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::confirmation::ConfirmationState
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::confirmation::ConfirmationState
+impl<T, U> core::convert::Into<U> for dsl_sage::confirmation::ConfirmationState where U: core::convert::From<T>
+pub fn dsl_sage::confirmation::ConfirmationState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::confirmation::ConfirmationState where U: core::convert::Into<T>
+pub type dsl_sage::confirmation::ConfirmationState::Error = core::convert::Infallible
+pub fn dsl_sage::confirmation::ConfirmationState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::confirmation::ConfirmationState where U: core::convert::TryFrom<T>
+pub type dsl_sage::confirmation::ConfirmationState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::confirmation::ConfirmationState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::confirmation::ConfirmationState where T: core::clone::Clone
+pub type dsl_sage::confirmation::ConfirmationState::Owned = T
+pub fn dsl_sage::confirmation::ConfirmationState::clone_into(&self, &mut T)
+pub fn dsl_sage::confirmation::ConfirmationState::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::confirmation::ConfirmationState where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::confirmation::ConfirmationState where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::confirmation::ConfirmationState where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::confirmation::ConfirmationState where T: core::clone::Clone
+pub unsafe fn dsl_sage::confirmation::ConfirmationState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::confirmation::ConfirmationState where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::confirmation::ConfirmationSession
+pub dsl_sage::confirmation::ConfirmationSession::edit_history: alloc::vec::Vec<dsl_sage::confirmation::ParameterEdit>
+pub dsl_sage::confirmation::ConfirmationSession::request: dsl_sage::types::ConfirmationRequest
+pub dsl_sage::confirmation::ConfirmationSession::session_id: alloc::string::String
+pub dsl_sage::confirmation::ConfirmationSession::state: dsl_sage::confirmation::ConfirmationState
+impl dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::apply_response(&mut self, dsl_sage::types::ConfirmationResponse) -> dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationSession::confirmed_parameters(&self) -> core::option::Option<std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>>
+pub fn dsl_sage::confirmation::ConfirmationSession::is_terminal(&self) -> bool
+pub fn dsl_sage::confirmation::ConfirmationSession::new(dsl_sage::types::ConfirmationRequest) -> Self
+pub fn dsl_sage::confirmation::ConfirmationSession::proposed_parameters(&self) -> &[dsl_sage::types::ParameterProposal]
+impl core::clone::Clone for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::clone(&self) -> dsl_sage::confirmation::ConfirmationSession
+impl core::cmp::PartialEq for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::eq(&self, &dsl_sage::confirmation::ConfirmationSession) -> bool
+impl core::fmt::Debug for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::confirmation::ConfirmationSession
+impl serde_core::ser::Serialize for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::Send for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::Sync for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::Unpin for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::UnsafeUnpin for dsl_sage::confirmation::ConfirmationSession
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::confirmation::ConfirmationSession
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::confirmation::ConfirmationSession
+impl<T, U> core::convert::Into<U> for dsl_sage::confirmation::ConfirmationSession where U: core::convert::From<T>
+pub fn dsl_sage::confirmation::ConfirmationSession::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::confirmation::ConfirmationSession where U: core::convert::Into<T>
+pub type dsl_sage::confirmation::ConfirmationSession::Error = core::convert::Infallible
+pub fn dsl_sage::confirmation::ConfirmationSession::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::confirmation::ConfirmationSession where U: core::convert::TryFrom<T>
+pub type dsl_sage::confirmation::ConfirmationSession::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::confirmation::ConfirmationSession::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::confirmation::ConfirmationSession where T: core::clone::Clone
+pub type dsl_sage::confirmation::ConfirmationSession::Owned = T
+pub fn dsl_sage::confirmation::ConfirmationSession::clone_into(&self, &mut T)
+pub fn dsl_sage::confirmation::ConfirmationSession::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::confirmation::ConfirmationSession where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationSession::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::confirmation::ConfirmationSession where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationSession::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::confirmation::ConfirmationSession where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationSession::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::confirmation::ConfirmationSession where T: core::clone::Clone
+pub unsafe fn dsl_sage::confirmation::ConfirmationSession::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::confirmation::ConfirmationSession where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::confirmation::ParameterEdit
+pub dsl_sage::confirmation::ParameterEdit::new_value: serde_json::value::Value
+pub dsl_sage::confirmation::ParameterEdit::old_value: serde_json::value::Value
+pub dsl_sage::confirmation::ParameterEdit::parameter_name: alloc::string::String
+pub dsl_sage::confirmation::ParameterEdit::timestamp: alloc::string::String
+impl core::clone::Clone for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::clone(&self) -> dsl_sage::confirmation::ParameterEdit
+impl core::cmp::PartialEq for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::eq(&self, &dsl_sage::confirmation::ParameterEdit) -> bool
+impl core::fmt::Debug for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::confirmation::ParameterEdit
+impl serde_core::ser::Serialize for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::confirmation::ParameterEdit
+impl core::marker::Send for dsl_sage::confirmation::ParameterEdit
+impl core::marker::Sync for dsl_sage::confirmation::ParameterEdit
+impl core::marker::Unpin for dsl_sage::confirmation::ParameterEdit
+impl core::marker::UnsafeUnpin for dsl_sage::confirmation::ParameterEdit
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::confirmation::ParameterEdit
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::confirmation::ParameterEdit
+impl<T, U> core::convert::Into<U> for dsl_sage::confirmation::ParameterEdit where U: core::convert::From<T>
+pub fn dsl_sage::confirmation::ParameterEdit::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::confirmation::ParameterEdit where U: core::convert::Into<T>
+pub type dsl_sage::confirmation::ParameterEdit::Error = core::convert::Infallible
+pub fn dsl_sage::confirmation::ParameterEdit::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::confirmation::ParameterEdit where U: core::convert::TryFrom<T>
+pub type dsl_sage::confirmation::ParameterEdit::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::confirmation::ParameterEdit::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::confirmation::ParameterEdit where T: core::clone::Clone
+pub type dsl_sage::confirmation::ParameterEdit::Owned = T
+pub fn dsl_sage::confirmation::ParameterEdit::clone_into(&self, &mut T)
+pub fn dsl_sage::confirmation::ParameterEdit::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::confirmation::ParameterEdit where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::confirmation::ParameterEdit::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::confirmation::ParameterEdit where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ParameterEdit::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::confirmation::ParameterEdit where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ParameterEdit::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::confirmation::ParameterEdit where T: core::clone::Clone
+pub unsafe fn dsl_sage::confirmation::ParameterEdit::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::confirmation::ParameterEdit where T: for<'de> serde_core::de::Deserialize<'de>
+pub mod dsl_sage::context
+pub fn dsl_sage::context::context_from_session(core::option::Option<&str>) -> dsl_sage::types::SageContext
+pub mod dsl_sage::extractor
+pub struct dsl_sage::extractor::HeuristicExtractor
+impl dsl_sage::extractor::HeuristicExtractor
+pub fn dsl_sage::extractor::HeuristicExtractor::extract(&str, &dsl_resolution::pack_registry::DecisionPack) -> alloc::vec::Vec<dsl_sage::types::ParameterProposal>
+impl core::marker::Freeze for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::Send for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::Sync for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::Unpin for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::UnsafeUnpin for dsl_sage::extractor::HeuristicExtractor
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::extractor::HeuristicExtractor
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::extractor::HeuristicExtractor
+impl<T, U> core::convert::Into<U> for dsl_sage::extractor::HeuristicExtractor where U: core::convert::From<T>
+pub fn dsl_sage::extractor::HeuristicExtractor::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::extractor::HeuristicExtractor where U: core::convert::Into<T>
+pub type dsl_sage::extractor::HeuristicExtractor::Error = core::convert::Infallible
+pub fn dsl_sage::extractor::HeuristicExtractor::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::extractor::HeuristicExtractor where U: core::convert::TryFrom<T>
+pub type dsl_sage::extractor::HeuristicExtractor::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::extractor::HeuristicExtractor::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::extractor::HeuristicExtractor where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::extractor::HeuristicExtractor::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::extractor::HeuristicExtractor where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::HeuristicExtractor::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::extractor::HeuristicExtractor where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::HeuristicExtractor::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::extractor::HeuristicExtractor
+pub fn dsl_sage::extractor::HeuristicExtractor::from(T) -> T
+pub struct dsl_sage::extractor::PackSummaryWithParams
+pub dsl_sage::extractor::PackSummaryWithParams::description: alloc::string::String
+pub dsl_sage::extractor::PackSummaryWithParams::name: alloc::string::String
+pub dsl_sage::extractor::PackSummaryWithParams::parameters: alloc::vec::Vec<dsl_resolution::pack_registry::PackParam>
+impl core::clone::Clone for dsl_sage::extractor::PackSummaryWithParams
+pub fn dsl_sage::extractor::PackSummaryWithParams::clone(&self) -> dsl_sage::extractor::PackSummaryWithParams
+impl core::fmt::Debug for dsl_sage::extractor::PackSummaryWithParams
+pub fn dsl_sage::extractor::PackSummaryWithParams::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::Send for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::Sync for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::Unpin for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::UnsafeUnpin for dsl_sage::extractor::PackSummaryWithParams
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::extractor::PackSummaryWithParams
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::extractor::PackSummaryWithParams
+impl<T, U> core::convert::Into<U> for dsl_sage::extractor::PackSummaryWithParams where U: core::convert::From<T>
+pub fn dsl_sage::extractor::PackSummaryWithParams::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::extractor::PackSummaryWithParams where U: core::convert::Into<T>
+pub type dsl_sage::extractor::PackSummaryWithParams::Error = core::convert::Infallible
+pub fn dsl_sage::extractor::PackSummaryWithParams::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::extractor::PackSummaryWithParams where U: core::convert::TryFrom<T>
+pub type dsl_sage::extractor::PackSummaryWithParams::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::extractor::PackSummaryWithParams::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::extractor::PackSummaryWithParams where T: core::clone::Clone
+pub type dsl_sage::extractor::PackSummaryWithParams::Owned = T
+pub fn dsl_sage::extractor::PackSummaryWithParams::clone_into(&self, &mut T)
+pub fn dsl_sage::extractor::PackSummaryWithParams::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::extractor::PackSummaryWithParams where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::extractor::PackSummaryWithParams::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::extractor::PackSummaryWithParams where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::PackSummaryWithParams::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::extractor::PackSummaryWithParams where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::PackSummaryWithParams::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::extractor::PackSummaryWithParams where T: core::clone::Clone
+pub unsafe fn dsl_sage::extractor::PackSummaryWithParams::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::extractor::PackSummaryWithParams
+pub fn dsl_sage::extractor::PackSummaryWithParams::from(T) -> T
+pub trait dsl_sage::extractor::LlmExtractor: core::marker::Send + core::marker::Sync
+pub fn dsl_sage::extractor::LlmExtractor::extract_parameters<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 dsl_sage::extractor::PackSummaryWithParams) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::types::ParameterProposal>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub async fn dsl_sage::extractor::extract_parameters(&str, &str, &str, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry, core::option::Option<&dyn dsl_sage::extractor::LlmExtractor>) -> anyhow::Result<dsl_sage::types::ConfirmationRequest>
+pub mod dsl_sage::instantiator
+pub struct dsl_sage::instantiator::InstantiationResult
+pub dsl_sage::instantiator::InstantiationResult::atom_names: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::instantiator::InstantiationResult::dsl_source: alloc::string::String
+pub dsl_sage::instantiator::InstantiationResult::pack_name: alloc::string::String
+pub dsl_sage::instantiator::InstantiationResult::pack_version: alloc::string::String
+pub dsl_sage::instantiator::InstantiationResult::parameters: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub dsl_sage::instantiator::InstantiationResult::structural_dsl: alloc::string::String
+impl core::clone::Clone for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::clone(&self) -> dsl_sage::instantiator::InstantiationResult
+impl core::cmp::PartialEq for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::eq(&self, &dsl_sage::instantiator::InstantiationResult) -> bool
+impl core::fmt::Debug for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::instantiator::InstantiationResult
+impl serde_core::ser::Serialize for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::instantiator::InstantiationResult
+impl core::marker::Send for dsl_sage::instantiator::InstantiationResult
+impl core::marker::Sync for dsl_sage::instantiator::InstantiationResult
+impl core::marker::Unpin for dsl_sage::instantiator::InstantiationResult
+impl core::marker::UnsafeUnpin for dsl_sage::instantiator::InstantiationResult
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::instantiator::InstantiationResult
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::instantiator::InstantiationResult
+impl<T, U> core::convert::Into<U> for dsl_sage::instantiator::InstantiationResult where U: core::convert::From<T>
+pub fn dsl_sage::instantiator::InstantiationResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::instantiator::InstantiationResult where U: core::convert::Into<T>
+pub type dsl_sage::instantiator::InstantiationResult::Error = core::convert::Infallible
+pub fn dsl_sage::instantiator::InstantiationResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::instantiator::InstantiationResult where U: core::convert::TryFrom<T>
+pub type dsl_sage::instantiator::InstantiationResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::instantiator::InstantiationResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::instantiator::InstantiationResult where T: core::clone::Clone
+pub type dsl_sage::instantiator::InstantiationResult::Owned = T
+pub fn dsl_sage::instantiator::InstantiationResult::clone_into(&self, &mut T)
+pub fn dsl_sage::instantiator::InstantiationResult::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::instantiator::InstantiationResult where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::instantiator::InstantiationResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::instantiator::InstantiationResult where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::InstantiationResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::instantiator::InstantiationResult where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::InstantiationResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::instantiator::InstantiationResult where T: core::clone::Clone
+pub unsafe fn dsl_sage::instantiator::InstantiationResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::instantiator::InstantiationResult where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::instantiator::ValidationSummary
+pub dsl_sage::instantiator::ValidationSummary::diagnostics: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::instantiator::ValidationSummary::edge_count: usize
+pub dsl_sage::instantiator::ValidationSummary::has_errors: bool
+pub dsl_sage::instantiator::ValidationSummary::node_count: usize
+impl core::clone::Clone for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::clone(&self) -> dsl_sage::instantiator::ValidationSummary
+impl core::cmp::PartialEq for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::eq(&self, &dsl_sage::instantiator::ValidationSummary) -> bool
+impl core::fmt::Debug for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::instantiator::ValidationSummary
+impl serde_core::ser::Serialize for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::instantiator::ValidationSummary
+impl core::marker::Send for dsl_sage::instantiator::ValidationSummary
+impl core::marker::Sync for dsl_sage::instantiator::ValidationSummary
+impl core::marker::Unpin for dsl_sage::instantiator::ValidationSummary
+impl core::marker::UnsafeUnpin for dsl_sage::instantiator::ValidationSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::instantiator::ValidationSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::instantiator::ValidationSummary
+impl<T, U> core::convert::Into<U> for dsl_sage::instantiator::ValidationSummary where U: core::convert::From<T>
+pub fn dsl_sage::instantiator::ValidationSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::instantiator::ValidationSummary where U: core::convert::Into<T>
+pub type dsl_sage::instantiator::ValidationSummary::Error = core::convert::Infallible
+pub fn dsl_sage::instantiator::ValidationSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::instantiator::ValidationSummary where U: core::convert::TryFrom<T>
+pub type dsl_sage::instantiator::ValidationSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::instantiator::ValidationSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::instantiator::ValidationSummary where T: core::clone::Clone
+pub type dsl_sage::instantiator::ValidationSummary::Owned = T
+pub fn dsl_sage::instantiator::ValidationSummary::clone_into(&self, &mut T)
+pub fn dsl_sage::instantiator::ValidationSummary::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::instantiator::ValidationSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::instantiator::ValidationSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::instantiator::ValidationSummary where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::ValidationSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::instantiator::ValidationSummary where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::ValidationSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::instantiator::ValidationSummary where T: core::clone::Clone
+pub unsafe fn dsl_sage::instantiator::ValidationSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::instantiator::ValidationSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn dsl_sage::instantiator::expand_template(&dsl_resolution::pack_registry::DecisionPack, &std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>, core::option::Option<&str>) -> anyhow::Result<(alloc::string::String, alloc::vec::Vec<alloc::string::String>)>
+pub fn dsl_sage::instantiator::instantiate(&str, &str, &std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>, core::option::Option<&str>, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry) -> anyhow::Result<dsl_sage::instantiator::InstantiationResult>
+pub fn dsl_sage::instantiator::validate_instantiation(&str) -> anyhow::Result<dsl_sage::instantiator::ValidationSummary>
+pub mod dsl_sage::matcher
+pub struct dsl_sage::matcher::BagOfWordsEmbedder
+impl dsl_sage::matcher::PackEmbedder for dsl_sage::matcher::BagOfWordsEmbedder
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::similarity(&self, &str, &str) -> f32
+impl core::marker::Freeze for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::Send for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::Sync for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::Unpin for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::BagOfWordsEmbedder
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::BagOfWordsEmbedder where U: core::convert::From<T>
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::BagOfWordsEmbedder where U: core::convert::Into<T>
+pub type dsl_sage::matcher::BagOfWordsEmbedder::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::BagOfWordsEmbedder where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::BagOfWordsEmbedder::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::matcher::BagOfWordsEmbedder where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::BagOfWordsEmbedder where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::BagOfWordsEmbedder where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::matcher::BagOfWordsEmbedder
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::from(T) -> T
+pub struct dsl_sage::matcher::LlmRankEntry
+pub dsl_sage::matcher::LlmRankEntry::pack_name: alloc::string::String
+pub dsl_sage::matcher::LlmRankEntry::rank: usize
+pub dsl_sage::matcher::LlmRankEntry::rationale: alloc::string::String
+impl core::clone::Clone for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::clone(&self) -> dsl_sage::matcher::LlmRankEntry
+impl core::fmt::Debug for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::matcher::LlmRankEntry
+impl core::marker::Send for dsl_sage::matcher::LlmRankEntry
+impl core::marker::Sync for dsl_sage::matcher::LlmRankEntry
+impl core::marker::Unpin for dsl_sage::matcher::LlmRankEntry
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::LlmRankEntry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::LlmRankEntry
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::LlmRankEntry
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::LlmRankEntry where U: core::convert::From<T>
+pub fn dsl_sage::matcher::LlmRankEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::LlmRankEntry where U: core::convert::Into<T>
+pub type dsl_sage::matcher::LlmRankEntry::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::LlmRankEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::LlmRankEntry where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::LlmRankEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::LlmRankEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::matcher::LlmRankEntry where T: core::clone::Clone
+pub type dsl_sage::matcher::LlmRankEntry::Owned = T
+pub fn dsl_sage::matcher::LlmRankEntry::clone_into(&self, &mut T)
+pub fn dsl_sage::matcher::LlmRankEntry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::matcher::LlmRankEntry where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::LlmRankEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::LlmRankEntry where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::LlmRankEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::LlmRankEntry where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::LlmRankEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::matcher::LlmRankEntry where T: core::clone::Clone
+pub unsafe fn dsl_sage::matcher::LlmRankEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::matcher::LlmRankEntry where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::matcher::MockLlmClient
+impl dsl_sage::matcher::LlmClient for dsl_sage::matcher::MockLlmClient
+pub fn dsl_sage::matcher::MockLlmClient::rank_packs<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 [dsl_sage::matcher::PackSummary]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::matcher::LlmRankEntry>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+impl core::marker::Freeze for dsl_sage::matcher::MockLlmClient
+impl core::marker::Send for dsl_sage::matcher::MockLlmClient
+impl core::marker::Sync for dsl_sage::matcher::MockLlmClient
+impl core::marker::Unpin for dsl_sage::matcher::MockLlmClient
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::MockLlmClient
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::MockLlmClient
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::MockLlmClient
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::MockLlmClient where U: core::convert::From<T>
+pub fn dsl_sage::matcher::MockLlmClient::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::MockLlmClient where U: core::convert::Into<T>
+pub type dsl_sage::matcher::MockLlmClient::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::MockLlmClient::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::MockLlmClient where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::MockLlmClient::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::MockLlmClient::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::matcher::MockLlmClient where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::MockLlmClient::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::MockLlmClient where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::MockLlmClient::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::MockLlmClient where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::MockLlmClient::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::matcher::MockLlmClient
+pub fn dsl_sage::matcher::MockLlmClient::from(T) -> T
+pub struct dsl_sage::matcher::PackSummary
+pub dsl_sage::matcher::PackSummary::description: alloc::string::String
+pub dsl_sage::matcher::PackSummary::example_utterances: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::matcher::PackSummary::name: alloc::string::String
+impl core::clone::Clone for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::clone(&self) -> dsl_sage::matcher::PackSummary
+impl core::fmt::Debug for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::matcher::PackSummary
+impl core::marker::Send for dsl_sage::matcher::PackSummary
+impl core::marker::Sync for dsl_sage::matcher::PackSummary
+impl core::marker::Unpin for dsl_sage::matcher::PackSummary
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::PackSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::PackSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::PackSummary
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::PackSummary where U: core::convert::From<T>
+pub fn dsl_sage::matcher::PackSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::PackSummary where U: core::convert::Into<T>
+pub type dsl_sage::matcher::PackSummary::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::PackSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::PackSummary where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::PackSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::PackSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::matcher::PackSummary where T: core::clone::Clone
+pub type dsl_sage::matcher::PackSummary::Owned = T
+pub fn dsl_sage::matcher::PackSummary::clone_into(&self, &mut T)
+pub fn dsl_sage::matcher::PackSummary::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::matcher::PackSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::PackSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::PackSummary where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::PackSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::PackSummary where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::PackSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::matcher::PackSummary where T: core::clone::Clone
+pub unsafe fn dsl_sage::matcher::PackSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::matcher::PackSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub trait dsl_sage::matcher::LlmClient: core::marker::Send + core::marker::Sync
+pub fn dsl_sage::matcher::LlmClient::rank_packs<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 [dsl_sage::matcher::PackSummary]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::matcher::LlmRankEntry>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+impl dsl_sage::matcher::LlmClient for dsl_sage::matcher::MockLlmClient
+pub fn dsl_sage::matcher::MockLlmClient::rank_packs<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 [dsl_sage::matcher::PackSummary]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::matcher::LlmRankEntry>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub trait dsl_sage::matcher::PackEmbedder: core::marker::Send + core::marker::Sync
+pub fn dsl_sage::matcher::PackEmbedder::similarity(&self, &str, &str) -> f32
+impl dsl_sage::matcher::PackEmbedder for dsl_sage::matcher::BagOfWordsEmbedder
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::similarity(&self, &str, &str) -> f32
+pub async fn dsl_sage::matcher::match_packs(&str, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry, &dyn dsl_sage::matcher::PackEmbedder, core::option::Option<&dyn dsl_sage::matcher::LlmClient>) -> anyhow::Result<alloc::vec::Vec<dsl_sage::types::RankedCandidate>>
+pub fn dsl_sage::matcher::match_packs_embedding_only(&str, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry, &dyn dsl_sage::matcher::PackEmbedder) -> alloc::vec::Vec<dsl_sage::types::RankedCandidate>
+pub mod dsl_sage::orchestrator
+pub enum dsl_sage::orchestrator::SageInput
+pub dsl_sage::orchestrator::SageInput::Cancel
+pub dsl_sage::orchestrator::SageInput::Confirm(dsl_sage::types::ConfirmationResponse)
+pub dsl_sage::orchestrator::SageInput::Deploy
+pub dsl_sage::orchestrator::SageInput::Deploy::workflow_name: alloc::string::String
+pub dsl_sage::orchestrator::SageInput::SelectPack
+pub dsl_sage::orchestrator::SageInput::SelectPack::pack_name: alloc::string::String
+pub dsl_sage::orchestrator::SageInput::Utterance(alloc::string::String)
+impl core::clone::Clone for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::clone(&self) -> dsl_sage::orchestrator::SageInput
+impl core::fmt::Debug for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::orchestrator::SageInput
+impl core::marker::Send for dsl_sage::orchestrator::SageInput
+impl core::marker::Sync for dsl_sage::orchestrator::SageInput
+impl core::marker::Unpin for dsl_sage::orchestrator::SageInput
+impl core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageInput
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageInput
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageInput
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageInput where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageInput where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageInput::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageInput where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::orchestrator::SageInput where T: core::clone::Clone
+pub type dsl_sage::orchestrator::SageInput::Owned = T
+pub fn dsl_sage::orchestrator::SageInput::clone_into(&self, &mut T)
+pub fn dsl_sage::orchestrator::SageInput::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::orchestrator::SageInput where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageInput where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageInput where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::orchestrator::SageInput where T: core::clone::Clone
+pub unsafe fn dsl_sage::orchestrator::SageInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::orchestrator::SageInput where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_sage::orchestrator::SageState
+pub dsl_sage::orchestrator::SageState::Cancelled
+pub dsl_sage::orchestrator::SageState::Confirming
+pub dsl_sage::orchestrator::SageState::Confirming::session: dsl_sage::confirmation::ConfirmationSession
+pub dsl_sage::orchestrator::SageState::Deployed
+pub dsl_sage::orchestrator::SageState::Deployed::workflow_id: alloc::string::String
+pub dsl_sage::orchestrator::SageState::Failed
+pub dsl_sage::orchestrator::SageState::Failed::reason: alloc::string::String
+pub dsl_sage::orchestrator::SageState::Instantiated
+pub dsl_sage::orchestrator::SageState::Instantiated::result: dsl_sage::instantiator::InstantiationResult
+pub dsl_sage::orchestrator::SageState::Instantiated::validation: dsl_sage::instantiator::ValidationSummary
+pub dsl_sage::orchestrator::SageState::Listening
+pub dsl_sage::orchestrator::SageState::Matching
+pub dsl_sage::orchestrator::SageState::Matching::candidates: alloc::vec::Vec<dsl_sage::types::RankedCandidate>
+impl core::clone::Clone for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::clone(&self) -> dsl_sage::orchestrator::SageState
+impl core::cmp::PartialEq for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::eq(&self, &dsl_sage::orchestrator::SageState) -> bool
+impl core::fmt::Debug for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::orchestrator::SageState
+impl serde_core::ser::Serialize for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::orchestrator::SageState
+impl core::marker::Send for dsl_sage::orchestrator::SageState
+impl core::marker::Sync for dsl_sage::orchestrator::SageState
+impl core::marker::Unpin for dsl_sage::orchestrator::SageState
+impl core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageState
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageState
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageState
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageState where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageState where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageState::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageState where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::orchestrator::SageState where T: core::clone::Clone
+pub type dsl_sage::orchestrator::SageState::Owned = T
+pub fn dsl_sage::orchestrator::SageState::clone_into(&self, &mut T)
+pub fn dsl_sage::orchestrator::SageState::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::orchestrator::SageState where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageState where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageState where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::orchestrator::SageState where T: core::clone::Clone
+pub unsafe fn dsl_sage::orchestrator::SageState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::orchestrator::SageState where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> dsl_sage::orchestrator::SageOrchestrator<'a>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::audit_entries(&self, &str) -> alloc::vec::Vec<dsl_sage::audit::SageAuditEntry>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::new(&'a dsl_resolution::pack_registry::PackRegistry) -> Self
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::should_auto_select(&[dsl_sage::types::RankedCandidate], f32) -> core::option::Option<alloc::string::String>
+pub async fn dsl_sage::orchestrator::SageOrchestrator<'a>::step<'b>(&self, &'b mut dsl_sage::orchestrator::SageSession, dsl_sage::orchestrator::SageInput) -> anyhow::Result<&'b dsl_sage::orchestrator::SageState>
+impl<'a> !core::marker::Freeze for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::Send for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::Sync for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::Unpin for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageOrchestrator<'a> where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageOrchestrator<'a> where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageOrchestrator<'a>::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageOrchestrator<'a> where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageOrchestrator<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::orchestrator::SageOrchestrator<'a> where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageOrchestrator<'a> where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageOrchestrator<'a> where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageOrchestrator<'a>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::from(T) -> T
+pub struct dsl_sage::orchestrator::SageSession
+pub dsl_sage::orchestrator::SageSession::context: dsl_sage::types::SageContext
+pub dsl_sage::orchestrator::SageSession::session_id: alloc::string::String
+pub dsl_sage::orchestrator::SageSession::state: dsl_sage::orchestrator::SageState
+pub dsl_sage::orchestrator::SageSession::transition_log: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::orchestrator::SageSession::utterance: core::option::Option<alloc::string::String>
+impl dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::new(dsl_sage::types::SageContext) -> Self
+impl core::clone::Clone for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::clone(&self) -> dsl_sage::orchestrator::SageSession
+impl core::fmt::Debug for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::orchestrator::SageSession
+impl core::marker::Send for dsl_sage::orchestrator::SageSession
+impl core::marker::Sync for dsl_sage::orchestrator::SageSession
+impl core::marker::Unpin for dsl_sage::orchestrator::SageSession
+impl core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageSession
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageSession
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageSession
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageSession where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageSession::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageSession where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageSession::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageSession::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageSession where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageSession::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageSession::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::orchestrator::SageSession where T: core::clone::Clone
+pub type dsl_sage::orchestrator::SageSession::Owned = T
+pub fn dsl_sage::orchestrator::SageSession::clone_into(&self, &mut T)
+pub fn dsl_sage::orchestrator::SageSession::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::orchestrator::SageSession where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageSession::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageSession where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageSession::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageSession where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageSession::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::orchestrator::SageSession where T: core::clone::Clone
+pub unsafe fn dsl_sage::orchestrator::SageSession::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::orchestrator::SageSession where T: for<'de> serde_core::de::Deserialize<'de>
+pub mod dsl_sage::repl
+pub struct dsl_sage::repl::SageSessionStore
+impl dsl_sage::repl::SageSessionStore
+pub fn dsl_sage::repl::SageSessionStore::create_session(&self, dsl_sage::types::SageContext) -> alloc::string::String
+pub fn dsl_sage::repl::SageSessionStore::get_session_log(&self, &str) -> alloc::vec::Vec<alloc::string::String>
+pub fn dsl_sage::repl::SageSessionStore::get_session_state(&self, &str) -> core::option::Option<dsl_sage::orchestrator::SageState>
+pub fn dsl_sage::repl::SageSessionStore::new() -> Self
+pub fn dsl_sage::repl::SageSessionStore::step_sync(&self, &str, dsl_sage::orchestrator::SageInput, &dsl_resolution::pack_registry::PackRegistry) -> core::result::Result<dsl_sage::orchestrator::SageState, alloc::string::String>
+impl core::default::Default for dsl_sage::repl::SageSessionStore
+pub fn dsl_sage::repl::SageSessionStore::default() -> Self
+impl !core::marker::Freeze for dsl_sage::repl::SageSessionStore
+impl core::marker::Send for dsl_sage::repl::SageSessionStore
+impl core::marker::Sync for dsl_sage::repl::SageSessionStore
+impl core::marker::Unpin for dsl_sage::repl::SageSessionStore
+impl core::marker::UnsafeUnpin for dsl_sage::repl::SageSessionStore
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::repl::SageSessionStore
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::repl::SageSessionStore
+impl<T, U> core::convert::Into<U> for dsl_sage::repl::SageSessionStore where U: core::convert::From<T>
+pub fn dsl_sage::repl::SageSessionStore::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::repl::SageSessionStore where U: core::convert::Into<T>
+pub type dsl_sage::repl::SageSessionStore::Error = core::convert::Infallible
+pub fn dsl_sage::repl::SageSessionStore::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::repl::SageSessionStore where U: core::convert::TryFrom<T>
+pub type dsl_sage::repl::SageSessionStore::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::repl::SageSessionStore::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::repl::SageSessionStore where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::repl::SageSessionStore::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::repl::SageSessionStore where T: ?core::marker::Sized
+pub fn dsl_sage::repl::SageSessionStore::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::repl::SageSessionStore where T: ?core::marker::Sized
+pub fn dsl_sage::repl::SageSessionStore::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::repl::SageSessionStore
+pub fn dsl_sage::repl::SageSessionStore::from(T) -> T
+pub mod dsl_sage::types
+pub enum dsl_sage::types::ConfirmationResponse
+pub dsl_sage::types::ConfirmationResponse::Accept
+pub dsl_sage::types::ConfirmationResponse::Cancel
+pub dsl_sage::types::ConfirmationResponse::EditParameter
+pub dsl_sage::types::ConfirmationResponse::EditParameter::name: alloc::string::String
+pub dsl_sage::types::ConfirmationResponse::EditParameter::new_value: serde_json::value::Value
+pub dsl_sage::types::ConfirmationResponse::RejectPack
+impl core::clone::Clone for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::clone(&self) -> dsl_sage::types::ConfirmationResponse
+impl core::cmp::PartialEq for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::eq(&self, &dsl_sage::types::ConfirmationResponse) -> bool
+impl core::fmt::Debug for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::ConfirmationResponse
+impl serde_core::ser::Serialize for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::ConfirmationResponse
+impl core::marker::Send for dsl_sage::types::ConfirmationResponse
+impl core::marker::Sync for dsl_sage::types::ConfirmationResponse
+impl core::marker::Unpin for dsl_sage::types::ConfirmationResponse
+impl core::marker::UnsafeUnpin for dsl_sage::types::ConfirmationResponse
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::ConfirmationResponse
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::ConfirmationResponse
+impl<T, U> core::convert::Into<U> for dsl_sage::types::ConfirmationResponse where U: core::convert::From<T>
+pub fn dsl_sage::types::ConfirmationResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::ConfirmationResponse where U: core::convert::Into<T>
+pub type dsl_sage::types::ConfirmationResponse::Error = core::convert::Infallible
+pub fn dsl_sage::types::ConfirmationResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::ConfirmationResponse where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::ConfirmationResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::ConfirmationResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::ConfirmationResponse where T: core::clone::Clone
+pub type dsl_sage::types::ConfirmationResponse::Owned = T
+pub fn dsl_sage::types::ConfirmationResponse::clone_into(&self, &mut T)
+pub fn dsl_sage::types::ConfirmationResponse::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::ConfirmationResponse where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::ConfirmationResponse where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::ConfirmationResponse where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::ConfirmationResponse where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::ConfirmationResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::ConfirmationResponse where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::types::ConfirmationRequest
+pub dsl_sage::types::ConfirmationRequest::pack_name: alloc::string::String
+pub dsl_sage::types::ConfirmationRequest::pack_version: alloc::string::String
+pub dsl_sage::types::ConfirmationRequest::preview_dsl: alloc::string::String
+pub dsl_sage::types::ConfirmationRequest::proposed_parameters: alloc::vec::Vec<dsl_sage::types::ParameterProposal>
+impl core::clone::Clone for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::clone(&self) -> dsl_sage::types::ConfirmationRequest
+impl core::cmp::PartialEq for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::eq(&self, &dsl_sage::types::ConfirmationRequest) -> bool
+impl core::fmt::Debug for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::ConfirmationRequest
+impl serde_core::ser::Serialize for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::ConfirmationRequest
+impl core::marker::Send for dsl_sage::types::ConfirmationRequest
+impl core::marker::Sync for dsl_sage::types::ConfirmationRequest
+impl core::marker::Unpin for dsl_sage::types::ConfirmationRequest
+impl core::marker::UnsafeUnpin for dsl_sage::types::ConfirmationRequest
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::ConfirmationRequest
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::ConfirmationRequest
+impl<T, U> core::convert::Into<U> for dsl_sage::types::ConfirmationRequest where U: core::convert::From<T>
+pub fn dsl_sage::types::ConfirmationRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::ConfirmationRequest where U: core::convert::Into<T>
+pub type dsl_sage::types::ConfirmationRequest::Error = core::convert::Infallible
+pub fn dsl_sage::types::ConfirmationRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::ConfirmationRequest where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::ConfirmationRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::ConfirmationRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::ConfirmationRequest where T: core::clone::Clone
+pub type dsl_sage::types::ConfirmationRequest::Owned = T
+pub fn dsl_sage::types::ConfirmationRequest::clone_into(&self, &mut T)
+pub fn dsl_sage::types::ConfirmationRequest::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::ConfirmationRequest where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::ConfirmationRequest where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::ConfirmationRequest where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::ConfirmationRequest where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::ConfirmationRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::ConfirmationRequest where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::types::ParameterProposal
+pub dsl_sage::types::ParameterProposal::confidence: f32
+pub dsl_sage::types::ParameterProposal::parameter_name: alloc::string::String
+pub dsl_sage::types::ParameterProposal::proposed_value: serde_json::value::Value
+pub dsl_sage::types::ParameterProposal::rationale: alloc::string::String
+pub dsl_sage::types::ParameterProposal::source_phrase: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::clone(&self) -> dsl_sage::types::ParameterProposal
+impl core::cmp::PartialEq for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::eq(&self, &dsl_sage::types::ParameterProposal) -> bool
+impl core::fmt::Debug for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::ParameterProposal
+impl serde_core::ser::Serialize for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::ParameterProposal
+impl core::marker::Send for dsl_sage::types::ParameterProposal
+impl core::marker::Sync for dsl_sage::types::ParameterProposal
+impl core::marker::Unpin for dsl_sage::types::ParameterProposal
+impl core::marker::UnsafeUnpin for dsl_sage::types::ParameterProposal
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::ParameterProposal
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::ParameterProposal
+impl<T, U> core::convert::Into<U> for dsl_sage::types::ParameterProposal where U: core::convert::From<T>
+pub fn dsl_sage::types::ParameterProposal::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::ParameterProposal where U: core::convert::Into<T>
+pub type dsl_sage::types::ParameterProposal::Error = core::convert::Infallible
+pub fn dsl_sage::types::ParameterProposal::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::ParameterProposal where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::ParameterProposal::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::ParameterProposal::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::ParameterProposal where T: core::clone::Clone
+pub type dsl_sage::types::ParameterProposal::Owned = T
+pub fn dsl_sage::types::ParameterProposal::clone_into(&self, &mut T)
+pub fn dsl_sage::types::ParameterProposal::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::ParameterProposal where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::ParameterProposal::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::ParameterProposal where T: ?core::marker::Sized
+pub fn dsl_sage::types::ParameterProposal::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::ParameterProposal where T: ?core::marker::Sized
+pub fn dsl_sage::types::ParameterProposal::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::ParameterProposal where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::ParameterProposal::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::ParameterProposal where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::types::RankedCandidate
+pub dsl_sage::types::RankedCandidate::confidence: f32
+pub dsl_sage::types::RankedCandidate::embedding_score: f32
+pub dsl_sage::types::RankedCandidate::llm_rank: core::option::Option<usize>
+pub dsl_sage::types::RankedCandidate::pack_name: alloc::string::String
+pub dsl_sage::types::RankedCandidate::pack_version: alloc::string::String
+pub dsl_sage::types::RankedCandidate::rationale: alloc::string::String
+impl core::clone::Clone for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::clone(&self) -> dsl_sage::types::RankedCandidate
+impl core::cmp::PartialEq for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::eq(&self, &dsl_sage::types::RankedCandidate) -> bool
+impl core::fmt::Debug for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::RankedCandidate
+impl serde_core::ser::Serialize for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::RankedCandidate
+impl core::marker::Send for dsl_sage::types::RankedCandidate
+impl core::marker::Sync for dsl_sage::types::RankedCandidate
+impl core::marker::Unpin for dsl_sage::types::RankedCandidate
+impl core::marker::UnsafeUnpin for dsl_sage::types::RankedCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::RankedCandidate
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::RankedCandidate
+impl<T, U> core::convert::Into<U> for dsl_sage::types::RankedCandidate where U: core::convert::From<T>
+pub fn dsl_sage::types::RankedCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::RankedCandidate where U: core::convert::Into<T>
+pub type dsl_sage::types::RankedCandidate::Error = core::convert::Infallible
+pub fn dsl_sage::types::RankedCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::RankedCandidate where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::RankedCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::RankedCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::RankedCandidate where T: core::clone::Clone
+pub type dsl_sage::types::RankedCandidate::Owned = T
+pub fn dsl_sage::types::RankedCandidate::clone_into(&self, &mut T)
+pub fn dsl_sage::types::RankedCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::RankedCandidate where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::RankedCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::RankedCandidate where T: ?core::marker::Sized
+pub fn dsl_sage::types::RankedCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::RankedCandidate where T: ?core::marker::Sized
+pub fn dsl_sage::types::RankedCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::RankedCandidate where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::RankedCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::RankedCandidate where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::types::SageContext
+pub dsl_sage::types::SageContext::domain: core::option::Option<alloc::string::String>
+pub dsl_sage::types::SageContext::history: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::types::SageContext::process_name: core::option::Option<alloc::string::String>
+impl dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::empty() -> Self
+pub fn dsl_sage::types::SageContext::with_domain(impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::clone(&self) -> dsl_sage::types::SageContext
+impl core::fmt::Debug for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::SageContext
+impl core::marker::Send for dsl_sage::types::SageContext
+impl core::marker::Sync for dsl_sage::types::SageContext
+impl core::marker::Unpin for dsl_sage::types::SageContext
+impl core::marker::UnsafeUnpin for dsl_sage::types::SageContext
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::SageContext
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::SageContext
+impl<T, U> core::convert::Into<U> for dsl_sage::types::SageContext where U: core::convert::From<T>
+pub fn dsl_sage::types::SageContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::SageContext where U: core::convert::Into<T>
+pub type dsl_sage::types::SageContext::Error = core::convert::Infallible
+pub fn dsl_sage::types::SageContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::SageContext where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::SageContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::SageContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::SageContext where T: core::clone::Clone
+pub type dsl_sage::types::SageContext::Owned = T
+pub fn dsl_sage::types::SageContext::clone_into(&self, &mut T)
+pub fn dsl_sage::types::SageContext::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::SageContext where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::SageContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::SageContext where T: ?core::marker::Sized
+pub fn dsl_sage::types::SageContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::SageContext where T: ?core::marker::Sized
+pub fn dsl_sage::types::SageContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::SageContext where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::SageContext::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::SageContext where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_sage::ConfirmationResponse
+pub dsl_sage::ConfirmationResponse::Accept
+pub dsl_sage::ConfirmationResponse::Cancel
+pub dsl_sage::ConfirmationResponse::EditParameter
+pub dsl_sage::ConfirmationResponse::EditParameter::name: alloc::string::String
+pub dsl_sage::ConfirmationResponse::EditParameter::new_value: serde_json::value::Value
+pub dsl_sage::ConfirmationResponse::RejectPack
+impl core::clone::Clone for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::clone(&self) -> dsl_sage::types::ConfirmationResponse
+impl core::cmp::PartialEq for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::eq(&self, &dsl_sage::types::ConfirmationResponse) -> bool
+impl core::fmt::Debug for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::ConfirmationResponse
+impl serde_core::ser::Serialize for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::ConfirmationResponse
+impl core::marker::Send for dsl_sage::types::ConfirmationResponse
+impl core::marker::Sync for dsl_sage::types::ConfirmationResponse
+impl core::marker::Unpin for dsl_sage::types::ConfirmationResponse
+impl core::marker::UnsafeUnpin for dsl_sage::types::ConfirmationResponse
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::ConfirmationResponse
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::ConfirmationResponse
+impl<T, U> core::convert::Into<U> for dsl_sage::types::ConfirmationResponse where U: core::convert::From<T>
+pub fn dsl_sage::types::ConfirmationResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::ConfirmationResponse where U: core::convert::Into<T>
+pub type dsl_sage::types::ConfirmationResponse::Error = core::convert::Infallible
+pub fn dsl_sage::types::ConfirmationResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::ConfirmationResponse where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::ConfirmationResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::ConfirmationResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::ConfirmationResponse where T: core::clone::Clone
+pub type dsl_sage::types::ConfirmationResponse::Owned = T
+pub fn dsl_sage::types::ConfirmationResponse::clone_into(&self, &mut T)
+pub fn dsl_sage::types::ConfirmationResponse::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::ConfirmationResponse where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::ConfirmationResponse where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::ConfirmationResponse where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::ConfirmationResponse where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::ConfirmationResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::ConfirmationResponse
+pub fn dsl_sage::types::ConfirmationResponse::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::ConfirmationResponse where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_sage::ConfirmationState
+pub dsl_sage::ConfirmationState::Accepted
+pub dsl_sage::ConfirmationState::Cancelled
+pub dsl_sage::ConfirmationState::Pending
+pub dsl_sage::ConfirmationState::Rejected
+impl core::clone::Clone for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::clone(&self) -> dsl_sage::confirmation::ConfirmationState
+impl core::cmp::Eq for dsl_sage::confirmation::ConfirmationState
+impl core::cmp::PartialEq for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::eq(&self, &dsl_sage::confirmation::ConfirmationState) -> bool
+impl core::fmt::Debug for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::confirmation::ConfirmationState
+impl serde_core::ser::Serialize for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::confirmation::ConfirmationState
+impl core::marker::Send for dsl_sage::confirmation::ConfirmationState
+impl core::marker::Sync for dsl_sage::confirmation::ConfirmationState
+impl core::marker::Unpin for dsl_sage::confirmation::ConfirmationState
+impl core::marker::UnsafeUnpin for dsl_sage::confirmation::ConfirmationState
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::confirmation::ConfirmationState
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::confirmation::ConfirmationState
+impl<T, U> core::convert::Into<U> for dsl_sage::confirmation::ConfirmationState where U: core::convert::From<T>
+pub fn dsl_sage::confirmation::ConfirmationState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::confirmation::ConfirmationState where U: core::convert::Into<T>
+pub type dsl_sage::confirmation::ConfirmationState::Error = core::convert::Infallible
+pub fn dsl_sage::confirmation::ConfirmationState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::confirmation::ConfirmationState where U: core::convert::TryFrom<T>
+pub type dsl_sage::confirmation::ConfirmationState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::confirmation::ConfirmationState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::confirmation::ConfirmationState where T: core::clone::Clone
+pub type dsl_sage::confirmation::ConfirmationState::Owned = T
+pub fn dsl_sage::confirmation::ConfirmationState::clone_into(&self, &mut T)
+pub fn dsl_sage::confirmation::ConfirmationState::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::confirmation::ConfirmationState where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::confirmation::ConfirmationState where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::confirmation::ConfirmationState where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::confirmation::ConfirmationState where T: core::clone::Clone
+pub unsafe fn dsl_sage::confirmation::ConfirmationState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationState::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::confirmation::ConfirmationState where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_sage::SageInput
+pub dsl_sage::SageInput::Cancel
+pub dsl_sage::SageInput::Confirm(dsl_sage::types::ConfirmationResponse)
+pub dsl_sage::SageInput::Deploy
+pub dsl_sage::SageInput::Deploy::workflow_name: alloc::string::String
+pub dsl_sage::SageInput::SelectPack
+pub dsl_sage::SageInput::SelectPack::pack_name: alloc::string::String
+pub dsl_sage::SageInput::Utterance(alloc::string::String)
+impl core::clone::Clone for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::clone(&self) -> dsl_sage::orchestrator::SageInput
+impl core::fmt::Debug for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::orchestrator::SageInput
+impl core::marker::Send for dsl_sage::orchestrator::SageInput
+impl core::marker::Sync for dsl_sage::orchestrator::SageInput
+impl core::marker::Unpin for dsl_sage::orchestrator::SageInput
+impl core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageInput
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageInput
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageInput
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageInput where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageInput where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageInput::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageInput where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::orchestrator::SageInput where T: core::clone::Clone
+pub type dsl_sage::orchestrator::SageInput::Owned = T
+pub fn dsl_sage::orchestrator::SageInput::clone_into(&self, &mut T)
+pub fn dsl_sage::orchestrator::SageInput::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::orchestrator::SageInput where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageInput where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageInput where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::orchestrator::SageInput where T: core::clone::Clone
+pub unsafe fn dsl_sage::orchestrator::SageInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageInput
+pub fn dsl_sage::orchestrator::SageInput::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::orchestrator::SageInput where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum dsl_sage::SageState
+pub dsl_sage::SageState::Cancelled
+pub dsl_sage::SageState::Confirming
+pub dsl_sage::SageState::Confirming::session: dsl_sage::confirmation::ConfirmationSession
+pub dsl_sage::SageState::Deployed
+pub dsl_sage::SageState::Deployed::workflow_id: alloc::string::String
+pub dsl_sage::SageState::Failed
+pub dsl_sage::SageState::Failed::reason: alloc::string::String
+pub dsl_sage::SageState::Instantiated
+pub dsl_sage::SageState::Instantiated::result: dsl_sage::instantiator::InstantiationResult
+pub dsl_sage::SageState::Instantiated::validation: dsl_sage::instantiator::ValidationSummary
+pub dsl_sage::SageState::Listening
+pub dsl_sage::SageState::Matching
+pub dsl_sage::SageState::Matching::candidates: alloc::vec::Vec<dsl_sage::types::RankedCandidate>
+impl core::clone::Clone for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::clone(&self) -> dsl_sage::orchestrator::SageState
+impl core::cmp::PartialEq for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::eq(&self, &dsl_sage::orchestrator::SageState) -> bool
+impl core::fmt::Debug for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::orchestrator::SageState
+impl serde_core::ser::Serialize for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::orchestrator::SageState
+impl core::marker::Send for dsl_sage::orchestrator::SageState
+impl core::marker::Sync for dsl_sage::orchestrator::SageState
+impl core::marker::Unpin for dsl_sage::orchestrator::SageState
+impl core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageState
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageState
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageState
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageState where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageState where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageState::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageState where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::orchestrator::SageState where T: core::clone::Clone
+pub type dsl_sage::orchestrator::SageState::Owned = T
+pub fn dsl_sage::orchestrator::SageState::clone_into(&self, &mut T)
+pub fn dsl_sage::orchestrator::SageState::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::orchestrator::SageState where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageState where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageState where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::orchestrator::SageState where T: core::clone::Clone
+pub unsafe fn dsl_sage::orchestrator::SageState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageState
+pub fn dsl_sage::orchestrator::SageState::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::orchestrator::SageState where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::BagOfWordsEmbedder
+impl dsl_sage::matcher::PackEmbedder for dsl_sage::matcher::BagOfWordsEmbedder
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::similarity(&self, &str, &str) -> f32
+impl core::marker::Freeze for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::Send for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::Sync for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::Unpin for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::BagOfWordsEmbedder
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::BagOfWordsEmbedder
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::BagOfWordsEmbedder where U: core::convert::From<T>
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::BagOfWordsEmbedder where U: core::convert::Into<T>
+pub type dsl_sage::matcher::BagOfWordsEmbedder::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::BagOfWordsEmbedder where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::BagOfWordsEmbedder::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::matcher::BagOfWordsEmbedder where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::BagOfWordsEmbedder where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::BagOfWordsEmbedder where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::matcher::BagOfWordsEmbedder
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::from(T) -> T
+pub struct dsl_sage::ConfirmationRequest
+pub dsl_sage::ConfirmationRequest::pack_name: alloc::string::String
+pub dsl_sage::ConfirmationRequest::pack_version: alloc::string::String
+pub dsl_sage::ConfirmationRequest::preview_dsl: alloc::string::String
+pub dsl_sage::ConfirmationRequest::proposed_parameters: alloc::vec::Vec<dsl_sage::types::ParameterProposal>
+impl core::clone::Clone for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::clone(&self) -> dsl_sage::types::ConfirmationRequest
+impl core::cmp::PartialEq for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::eq(&self, &dsl_sage::types::ConfirmationRequest) -> bool
+impl core::fmt::Debug for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::ConfirmationRequest
+impl serde_core::ser::Serialize for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::ConfirmationRequest
+impl core::marker::Send for dsl_sage::types::ConfirmationRequest
+impl core::marker::Sync for dsl_sage::types::ConfirmationRequest
+impl core::marker::Unpin for dsl_sage::types::ConfirmationRequest
+impl core::marker::UnsafeUnpin for dsl_sage::types::ConfirmationRequest
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::ConfirmationRequest
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::ConfirmationRequest
+impl<T, U> core::convert::Into<U> for dsl_sage::types::ConfirmationRequest where U: core::convert::From<T>
+pub fn dsl_sage::types::ConfirmationRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::ConfirmationRequest where U: core::convert::Into<T>
+pub type dsl_sage::types::ConfirmationRequest::Error = core::convert::Infallible
+pub fn dsl_sage::types::ConfirmationRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::ConfirmationRequest where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::ConfirmationRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::ConfirmationRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::ConfirmationRequest where T: core::clone::Clone
+pub type dsl_sage::types::ConfirmationRequest::Owned = T
+pub fn dsl_sage::types::ConfirmationRequest::clone_into(&self, &mut T)
+pub fn dsl_sage::types::ConfirmationRequest::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::ConfirmationRequest where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::ConfirmationRequest where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::ConfirmationRequest where T: ?core::marker::Sized
+pub fn dsl_sage::types::ConfirmationRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::ConfirmationRequest where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::ConfirmationRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::ConfirmationRequest
+pub fn dsl_sage::types::ConfirmationRequest::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::ConfirmationRequest where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::ConfirmationSession
+pub dsl_sage::ConfirmationSession::edit_history: alloc::vec::Vec<dsl_sage::confirmation::ParameterEdit>
+pub dsl_sage::ConfirmationSession::request: dsl_sage::types::ConfirmationRequest
+pub dsl_sage::ConfirmationSession::session_id: alloc::string::String
+pub dsl_sage::ConfirmationSession::state: dsl_sage::confirmation::ConfirmationState
+impl dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::apply_response(&mut self, dsl_sage::types::ConfirmationResponse) -> dsl_sage::confirmation::ConfirmationState
+pub fn dsl_sage::confirmation::ConfirmationSession::confirmed_parameters(&self) -> core::option::Option<std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>>
+pub fn dsl_sage::confirmation::ConfirmationSession::is_terminal(&self) -> bool
+pub fn dsl_sage::confirmation::ConfirmationSession::new(dsl_sage::types::ConfirmationRequest) -> Self
+pub fn dsl_sage::confirmation::ConfirmationSession::proposed_parameters(&self) -> &[dsl_sage::types::ParameterProposal]
+impl core::clone::Clone for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::clone(&self) -> dsl_sage::confirmation::ConfirmationSession
+impl core::cmp::PartialEq for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::eq(&self, &dsl_sage::confirmation::ConfirmationSession) -> bool
+impl core::fmt::Debug for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::confirmation::ConfirmationSession
+impl serde_core::ser::Serialize for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::Send for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::Sync for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::Unpin for dsl_sage::confirmation::ConfirmationSession
+impl core::marker::UnsafeUnpin for dsl_sage::confirmation::ConfirmationSession
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::confirmation::ConfirmationSession
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::confirmation::ConfirmationSession
+impl<T, U> core::convert::Into<U> for dsl_sage::confirmation::ConfirmationSession where U: core::convert::From<T>
+pub fn dsl_sage::confirmation::ConfirmationSession::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::confirmation::ConfirmationSession where U: core::convert::Into<T>
+pub type dsl_sage::confirmation::ConfirmationSession::Error = core::convert::Infallible
+pub fn dsl_sage::confirmation::ConfirmationSession::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::confirmation::ConfirmationSession where U: core::convert::TryFrom<T>
+pub type dsl_sage::confirmation::ConfirmationSession::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::confirmation::ConfirmationSession::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::confirmation::ConfirmationSession where T: core::clone::Clone
+pub type dsl_sage::confirmation::ConfirmationSession::Owned = T
+pub fn dsl_sage::confirmation::ConfirmationSession::clone_into(&self, &mut T)
+pub fn dsl_sage::confirmation::ConfirmationSession::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::confirmation::ConfirmationSession where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationSession::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::confirmation::ConfirmationSession where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationSession::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::confirmation::ConfirmationSession where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ConfirmationSession::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::confirmation::ConfirmationSession where T: core::clone::Clone
+pub unsafe fn dsl_sage::confirmation::ConfirmationSession::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::confirmation::ConfirmationSession
+pub fn dsl_sage::confirmation::ConfirmationSession::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::confirmation::ConfirmationSession where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::HeuristicExtractor
+impl dsl_sage::extractor::HeuristicExtractor
+pub fn dsl_sage::extractor::HeuristicExtractor::extract(&str, &dsl_resolution::pack_registry::DecisionPack) -> alloc::vec::Vec<dsl_sage::types::ParameterProposal>
+impl core::marker::Freeze for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::Send for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::Sync for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::Unpin for dsl_sage::extractor::HeuristicExtractor
+impl core::marker::UnsafeUnpin for dsl_sage::extractor::HeuristicExtractor
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::extractor::HeuristicExtractor
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::extractor::HeuristicExtractor
+impl<T, U> core::convert::Into<U> for dsl_sage::extractor::HeuristicExtractor where U: core::convert::From<T>
+pub fn dsl_sage::extractor::HeuristicExtractor::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::extractor::HeuristicExtractor where U: core::convert::Into<T>
+pub type dsl_sage::extractor::HeuristicExtractor::Error = core::convert::Infallible
+pub fn dsl_sage::extractor::HeuristicExtractor::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::extractor::HeuristicExtractor where U: core::convert::TryFrom<T>
+pub type dsl_sage::extractor::HeuristicExtractor::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::extractor::HeuristicExtractor::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::extractor::HeuristicExtractor where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::extractor::HeuristicExtractor::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::extractor::HeuristicExtractor where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::HeuristicExtractor::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::extractor::HeuristicExtractor where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::HeuristicExtractor::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::extractor::HeuristicExtractor
+pub fn dsl_sage::extractor::HeuristicExtractor::from(T) -> T
+pub struct dsl_sage::InstantiationResult
+pub dsl_sage::InstantiationResult::atom_names: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::InstantiationResult::dsl_source: alloc::string::String
+pub dsl_sage::InstantiationResult::pack_name: alloc::string::String
+pub dsl_sage::InstantiationResult::pack_version: alloc::string::String
+pub dsl_sage::InstantiationResult::parameters: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub dsl_sage::InstantiationResult::structural_dsl: alloc::string::String
+impl core::clone::Clone for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::clone(&self) -> dsl_sage::instantiator::InstantiationResult
+impl core::cmp::PartialEq for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::eq(&self, &dsl_sage::instantiator::InstantiationResult) -> bool
+impl core::fmt::Debug for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::instantiator::InstantiationResult
+impl serde_core::ser::Serialize for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::instantiator::InstantiationResult
+impl core::marker::Send for dsl_sage::instantiator::InstantiationResult
+impl core::marker::Sync for dsl_sage::instantiator::InstantiationResult
+impl core::marker::Unpin for dsl_sage::instantiator::InstantiationResult
+impl core::marker::UnsafeUnpin for dsl_sage::instantiator::InstantiationResult
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::instantiator::InstantiationResult
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::instantiator::InstantiationResult
+impl<T, U> core::convert::Into<U> for dsl_sage::instantiator::InstantiationResult where U: core::convert::From<T>
+pub fn dsl_sage::instantiator::InstantiationResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::instantiator::InstantiationResult where U: core::convert::Into<T>
+pub type dsl_sage::instantiator::InstantiationResult::Error = core::convert::Infallible
+pub fn dsl_sage::instantiator::InstantiationResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::instantiator::InstantiationResult where U: core::convert::TryFrom<T>
+pub type dsl_sage::instantiator::InstantiationResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::instantiator::InstantiationResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::instantiator::InstantiationResult where T: core::clone::Clone
+pub type dsl_sage::instantiator::InstantiationResult::Owned = T
+pub fn dsl_sage::instantiator::InstantiationResult::clone_into(&self, &mut T)
+pub fn dsl_sage::instantiator::InstantiationResult::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::instantiator::InstantiationResult where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::instantiator::InstantiationResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::instantiator::InstantiationResult where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::InstantiationResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::instantiator::InstantiationResult where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::InstantiationResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::instantiator::InstantiationResult where T: core::clone::Clone
+pub unsafe fn dsl_sage::instantiator::InstantiationResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::instantiator::InstantiationResult
+pub fn dsl_sage::instantiator::InstantiationResult::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::instantiator::InstantiationResult where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::LlmRankEntry
+pub dsl_sage::LlmRankEntry::pack_name: alloc::string::String
+pub dsl_sage::LlmRankEntry::rank: usize
+pub dsl_sage::LlmRankEntry::rationale: alloc::string::String
+impl core::clone::Clone for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::clone(&self) -> dsl_sage::matcher::LlmRankEntry
+impl core::fmt::Debug for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::matcher::LlmRankEntry
+impl core::marker::Send for dsl_sage::matcher::LlmRankEntry
+impl core::marker::Sync for dsl_sage::matcher::LlmRankEntry
+impl core::marker::Unpin for dsl_sage::matcher::LlmRankEntry
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::LlmRankEntry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::LlmRankEntry
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::LlmRankEntry
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::LlmRankEntry where U: core::convert::From<T>
+pub fn dsl_sage::matcher::LlmRankEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::LlmRankEntry where U: core::convert::Into<T>
+pub type dsl_sage::matcher::LlmRankEntry::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::LlmRankEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::LlmRankEntry where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::LlmRankEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::LlmRankEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::matcher::LlmRankEntry where T: core::clone::Clone
+pub type dsl_sage::matcher::LlmRankEntry::Owned = T
+pub fn dsl_sage::matcher::LlmRankEntry::clone_into(&self, &mut T)
+pub fn dsl_sage::matcher::LlmRankEntry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::matcher::LlmRankEntry where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::LlmRankEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::LlmRankEntry where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::LlmRankEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::LlmRankEntry where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::LlmRankEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::matcher::LlmRankEntry where T: core::clone::Clone
+pub unsafe fn dsl_sage::matcher::LlmRankEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::matcher::LlmRankEntry
+pub fn dsl_sage::matcher::LlmRankEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::matcher::LlmRankEntry where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::MockLlmClient
+impl dsl_sage::matcher::LlmClient for dsl_sage::matcher::MockLlmClient
+pub fn dsl_sage::matcher::MockLlmClient::rank_packs<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 [dsl_sage::matcher::PackSummary]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::matcher::LlmRankEntry>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+impl core::marker::Freeze for dsl_sage::matcher::MockLlmClient
+impl core::marker::Send for dsl_sage::matcher::MockLlmClient
+impl core::marker::Sync for dsl_sage::matcher::MockLlmClient
+impl core::marker::Unpin for dsl_sage::matcher::MockLlmClient
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::MockLlmClient
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::MockLlmClient
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::MockLlmClient
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::MockLlmClient where U: core::convert::From<T>
+pub fn dsl_sage::matcher::MockLlmClient::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::MockLlmClient where U: core::convert::Into<T>
+pub type dsl_sage::matcher::MockLlmClient::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::MockLlmClient::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::MockLlmClient where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::MockLlmClient::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::MockLlmClient::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::matcher::MockLlmClient where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::MockLlmClient::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::MockLlmClient where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::MockLlmClient::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::MockLlmClient where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::MockLlmClient::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::matcher::MockLlmClient
+pub fn dsl_sage::matcher::MockLlmClient::from(T) -> T
+pub struct dsl_sage::PackSummary
+pub dsl_sage::PackSummary::description: alloc::string::String
+pub dsl_sage::PackSummary::example_utterances: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::PackSummary::name: alloc::string::String
+impl core::clone::Clone for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::clone(&self) -> dsl_sage::matcher::PackSummary
+impl core::fmt::Debug for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::matcher::PackSummary
+impl core::marker::Send for dsl_sage::matcher::PackSummary
+impl core::marker::Sync for dsl_sage::matcher::PackSummary
+impl core::marker::Unpin for dsl_sage::matcher::PackSummary
+impl core::marker::UnsafeUnpin for dsl_sage::matcher::PackSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::matcher::PackSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::matcher::PackSummary
+impl<T, U> core::convert::Into<U> for dsl_sage::matcher::PackSummary where U: core::convert::From<T>
+pub fn dsl_sage::matcher::PackSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::matcher::PackSummary where U: core::convert::Into<T>
+pub type dsl_sage::matcher::PackSummary::Error = core::convert::Infallible
+pub fn dsl_sage::matcher::PackSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::matcher::PackSummary where U: core::convert::TryFrom<T>
+pub type dsl_sage::matcher::PackSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::matcher::PackSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::matcher::PackSummary where T: core::clone::Clone
+pub type dsl_sage::matcher::PackSummary::Owned = T
+pub fn dsl_sage::matcher::PackSummary::clone_into(&self, &mut T)
+pub fn dsl_sage::matcher::PackSummary::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::matcher::PackSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::matcher::PackSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::matcher::PackSummary where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::PackSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::matcher::PackSummary where T: ?core::marker::Sized
+pub fn dsl_sage::matcher::PackSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::matcher::PackSummary where T: core::clone::Clone
+pub unsafe fn dsl_sage::matcher::PackSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::matcher::PackSummary
+pub fn dsl_sage::matcher::PackSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::matcher::PackSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::PackSummaryWithParams
+pub dsl_sage::PackSummaryWithParams::description: alloc::string::String
+pub dsl_sage::PackSummaryWithParams::name: alloc::string::String
+pub dsl_sage::PackSummaryWithParams::parameters: alloc::vec::Vec<dsl_resolution::pack_registry::PackParam>
+impl core::clone::Clone for dsl_sage::extractor::PackSummaryWithParams
+pub fn dsl_sage::extractor::PackSummaryWithParams::clone(&self) -> dsl_sage::extractor::PackSummaryWithParams
+impl core::fmt::Debug for dsl_sage::extractor::PackSummaryWithParams
+pub fn dsl_sage::extractor::PackSummaryWithParams::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::Send for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::Sync for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::Unpin for dsl_sage::extractor::PackSummaryWithParams
+impl core::marker::UnsafeUnpin for dsl_sage::extractor::PackSummaryWithParams
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::extractor::PackSummaryWithParams
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::extractor::PackSummaryWithParams
+impl<T, U> core::convert::Into<U> for dsl_sage::extractor::PackSummaryWithParams where U: core::convert::From<T>
+pub fn dsl_sage::extractor::PackSummaryWithParams::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::extractor::PackSummaryWithParams where U: core::convert::Into<T>
+pub type dsl_sage::extractor::PackSummaryWithParams::Error = core::convert::Infallible
+pub fn dsl_sage::extractor::PackSummaryWithParams::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::extractor::PackSummaryWithParams where U: core::convert::TryFrom<T>
+pub type dsl_sage::extractor::PackSummaryWithParams::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::extractor::PackSummaryWithParams::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::extractor::PackSummaryWithParams where T: core::clone::Clone
+pub type dsl_sage::extractor::PackSummaryWithParams::Owned = T
+pub fn dsl_sage::extractor::PackSummaryWithParams::clone_into(&self, &mut T)
+pub fn dsl_sage::extractor::PackSummaryWithParams::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::extractor::PackSummaryWithParams where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::extractor::PackSummaryWithParams::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::extractor::PackSummaryWithParams where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::PackSummaryWithParams::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::extractor::PackSummaryWithParams where T: ?core::marker::Sized
+pub fn dsl_sage::extractor::PackSummaryWithParams::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::extractor::PackSummaryWithParams where T: core::clone::Clone
+pub unsafe fn dsl_sage::extractor::PackSummaryWithParams::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::extractor::PackSummaryWithParams
+pub fn dsl_sage::extractor::PackSummaryWithParams::from(T) -> T
+pub struct dsl_sage::ParameterEdit
+pub dsl_sage::ParameterEdit::new_value: serde_json::value::Value
+pub dsl_sage::ParameterEdit::old_value: serde_json::value::Value
+pub dsl_sage::ParameterEdit::parameter_name: alloc::string::String
+pub dsl_sage::ParameterEdit::timestamp: alloc::string::String
+impl core::clone::Clone for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::clone(&self) -> dsl_sage::confirmation::ParameterEdit
+impl core::cmp::PartialEq for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::eq(&self, &dsl_sage::confirmation::ParameterEdit) -> bool
+impl core::fmt::Debug for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::confirmation::ParameterEdit
+impl serde_core::ser::Serialize for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::confirmation::ParameterEdit
+impl core::marker::Send for dsl_sage::confirmation::ParameterEdit
+impl core::marker::Sync for dsl_sage::confirmation::ParameterEdit
+impl core::marker::Unpin for dsl_sage::confirmation::ParameterEdit
+impl core::marker::UnsafeUnpin for dsl_sage::confirmation::ParameterEdit
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::confirmation::ParameterEdit
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::confirmation::ParameterEdit
+impl<T, U> core::convert::Into<U> for dsl_sage::confirmation::ParameterEdit where U: core::convert::From<T>
+pub fn dsl_sage::confirmation::ParameterEdit::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::confirmation::ParameterEdit where U: core::convert::Into<T>
+pub type dsl_sage::confirmation::ParameterEdit::Error = core::convert::Infallible
+pub fn dsl_sage::confirmation::ParameterEdit::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::confirmation::ParameterEdit where U: core::convert::TryFrom<T>
+pub type dsl_sage::confirmation::ParameterEdit::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::confirmation::ParameterEdit::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::confirmation::ParameterEdit where T: core::clone::Clone
+pub type dsl_sage::confirmation::ParameterEdit::Owned = T
+pub fn dsl_sage::confirmation::ParameterEdit::clone_into(&self, &mut T)
+pub fn dsl_sage::confirmation::ParameterEdit::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::confirmation::ParameterEdit where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::confirmation::ParameterEdit::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::confirmation::ParameterEdit where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ParameterEdit::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::confirmation::ParameterEdit where T: ?core::marker::Sized
+pub fn dsl_sage::confirmation::ParameterEdit::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::confirmation::ParameterEdit where T: core::clone::Clone
+pub unsafe fn dsl_sage::confirmation::ParameterEdit::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::confirmation::ParameterEdit
+pub fn dsl_sage::confirmation::ParameterEdit::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::confirmation::ParameterEdit where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::ParameterProposal
+pub dsl_sage::ParameterProposal::confidence: f32
+pub dsl_sage::ParameterProposal::parameter_name: alloc::string::String
+pub dsl_sage::ParameterProposal::proposed_value: serde_json::value::Value
+pub dsl_sage::ParameterProposal::rationale: alloc::string::String
+pub dsl_sage::ParameterProposal::source_phrase: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::clone(&self) -> dsl_sage::types::ParameterProposal
+impl core::cmp::PartialEq for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::eq(&self, &dsl_sage::types::ParameterProposal) -> bool
+impl core::fmt::Debug for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::ParameterProposal
+impl serde_core::ser::Serialize for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::ParameterProposal
+impl core::marker::Send for dsl_sage::types::ParameterProposal
+impl core::marker::Sync for dsl_sage::types::ParameterProposal
+impl core::marker::Unpin for dsl_sage::types::ParameterProposal
+impl core::marker::UnsafeUnpin for dsl_sage::types::ParameterProposal
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::ParameterProposal
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::ParameterProposal
+impl<T, U> core::convert::Into<U> for dsl_sage::types::ParameterProposal where U: core::convert::From<T>
+pub fn dsl_sage::types::ParameterProposal::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::ParameterProposal where U: core::convert::Into<T>
+pub type dsl_sage::types::ParameterProposal::Error = core::convert::Infallible
+pub fn dsl_sage::types::ParameterProposal::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::ParameterProposal where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::ParameterProposal::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::ParameterProposal::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::ParameterProposal where T: core::clone::Clone
+pub type dsl_sage::types::ParameterProposal::Owned = T
+pub fn dsl_sage::types::ParameterProposal::clone_into(&self, &mut T)
+pub fn dsl_sage::types::ParameterProposal::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::ParameterProposal where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::ParameterProposal::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::ParameterProposal where T: ?core::marker::Sized
+pub fn dsl_sage::types::ParameterProposal::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::ParameterProposal where T: ?core::marker::Sized
+pub fn dsl_sage::types::ParameterProposal::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::ParameterProposal where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::ParameterProposal::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::ParameterProposal
+pub fn dsl_sage::types::ParameterProposal::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::ParameterProposal where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::RankedCandidate
+pub dsl_sage::RankedCandidate::confidence: f32
+pub dsl_sage::RankedCandidate::embedding_score: f32
+pub dsl_sage::RankedCandidate::llm_rank: core::option::Option<usize>
+pub dsl_sage::RankedCandidate::pack_name: alloc::string::String
+pub dsl_sage::RankedCandidate::pack_version: alloc::string::String
+pub dsl_sage::RankedCandidate::rationale: alloc::string::String
+impl core::clone::Clone for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::clone(&self) -> dsl_sage::types::RankedCandidate
+impl core::cmp::PartialEq for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::eq(&self, &dsl_sage::types::RankedCandidate) -> bool
+impl core::fmt::Debug for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::types::RankedCandidate
+impl serde_core::ser::Serialize for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::RankedCandidate
+impl core::marker::Send for dsl_sage::types::RankedCandidate
+impl core::marker::Sync for dsl_sage::types::RankedCandidate
+impl core::marker::Unpin for dsl_sage::types::RankedCandidate
+impl core::marker::UnsafeUnpin for dsl_sage::types::RankedCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::RankedCandidate
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::RankedCandidate
+impl<T, U> core::convert::Into<U> for dsl_sage::types::RankedCandidate where U: core::convert::From<T>
+pub fn dsl_sage::types::RankedCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::RankedCandidate where U: core::convert::Into<T>
+pub type dsl_sage::types::RankedCandidate::Error = core::convert::Infallible
+pub fn dsl_sage::types::RankedCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::RankedCandidate where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::RankedCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::RankedCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::RankedCandidate where T: core::clone::Clone
+pub type dsl_sage::types::RankedCandidate::Owned = T
+pub fn dsl_sage::types::RankedCandidate::clone_into(&self, &mut T)
+pub fn dsl_sage::types::RankedCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::RankedCandidate where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::RankedCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::RankedCandidate where T: ?core::marker::Sized
+pub fn dsl_sage::types::RankedCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::RankedCandidate where T: ?core::marker::Sized
+pub fn dsl_sage::types::RankedCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::RankedCandidate where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::RankedCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::RankedCandidate
+pub fn dsl_sage::types::RankedCandidate::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::RankedCandidate where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::SageAuditEntry
+pub dsl_sage::SageAuditEntry::details: serde_json::value::Value
+pub dsl_sage::SageAuditEntry::session_id: alloc::string::String
+pub dsl_sage::SageAuditEntry::timestamp: alloc::string::String
+pub dsl_sage::SageAuditEntry::transition: alloc::string::String
+impl core::clone::Clone for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::clone(&self) -> dsl_sage::audit::SageAuditEntry
+impl core::fmt::Debug for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::audit::SageAuditEntry
+impl core::marker::Send for dsl_sage::audit::SageAuditEntry
+impl core::marker::Sync for dsl_sage::audit::SageAuditEntry
+impl core::marker::Unpin for dsl_sage::audit::SageAuditEntry
+impl core::marker::UnsafeUnpin for dsl_sage::audit::SageAuditEntry
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::audit::SageAuditEntry
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::audit::SageAuditEntry
+impl<T, U> core::convert::Into<U> for dsl_sage::audit::SageAuditEntry where U: core::convert::From<T>
+pub fn dsl_sage::audit::SageAuditEntry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::audit::SageAuditEntry where U: core::convert::Into<T>
+pub type dsl_sage::audit::SageAuditEntry::Error = core::convert::Infallible
+pub fn dsl_sage::audit::SageAuditEntry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::audit::SageAuditEntry where U: core::convert::TryFrom<T>
+pub type dsl_sage::audit::SageAuditEntry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::audit::SageAuditEntry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::audit::SageAuditEntry where T: core::clone::Clone
+pub type dsl_sage::audit::SageAuditEntry::Owned = T
+pub fn dsl_sage::audit::SageAuditEntry::clone_into(&self, &mut T)
+pub fn dsl_sage::audit::SageAuditEntry::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::audit::SageAuditEntry where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditEntry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::audit::SageAuditEntry where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditEntry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::audit::SageAuditEntry where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditEntry::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::audit::SageAuditEntry where T: core::clone::Clone
+pub unsafe fn dsl_sage::audit::SageAuditEntry::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::audit::SageAuditEntry
+pub fn dsl_sage::audit::SageAuditEntry::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::audit::SageAuditEntry where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::SageAuditLog
+impl dsl_sage::audit::SageAuditLog
+pub fn dsl_sage::audit::SageAuditLog::entries_for_session(&self, &str) -> alloc::vec::Vec<dsl_sage::audit::SageAuditEntry>
+pub fn dsl_sage::audit::SageAuditLog::new() -> Self
+pub fn dsl_sage::audit::SageAuditLog::record(&self, &str, &str, serde_json::value::Value)
+impl core::default::Default for dsl_sage::audit::SageAuditLog
+pub fn dsl_sage::audit::SageAuditLog::default() -> Self
+impl !core::marker::Freeze for dsl_sage::audit::SageAuditLog
+impl core::marker::Send for dsl_sage::audit::SageAuditLog
+impl core::marker::Sync for dsl_sage::audit::SageAuditLog
+impl core::marker::Unpin for dsl_sage::audit::SageAuditLog
+impl core::marker::UnsafeUnpin for dsl_sage::audit::SageAuditLog
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::audit::SageAuditLog
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::audit::SageAuditLog
+impl<T, U> core::convert::Into<U> for dsl_sage::audit::SageAuditLog where U: core::convert::From<T>
+pub fn dsl_sage::audit::SageAuditLog::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::audit::SageAuditLog where U: core::convert::Into<T>
+pub type dsl_sage::audit::SageAuditLog::Error = core::convert::Infallible
+pub fn dsl_sage::audit::SageAuditLog::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::audit::SageAuditLog where U: core::convert::TryFrom<T>
+pub type dsl_sage::audit::SageAuditLog::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::audit::SageAuditLog::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::audit::SageAuditLog where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditLog::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::audit::SageAuditLog where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditLog::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::audit::SageAuditLog where T: ?core::marker::Sized
+pub fn dsl_sage::audit::SageAuditLog::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::audit::SageAuditLog
+pub fn dsl_sage::audit::SageAuditLog::from(T) -> T
+pub struct dsl_sage::SageContext
+pub dsl_sage::SageContext::domain: core::option::Option<alloc::string::String>
+pub dsl_sage::SageContext::history: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::SageContext::process_name: core::option::Option<alloc::string::String>
+impl dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::empty() -> Self
+pub fn dsl_sage::types::SageContext::with_domain(impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::clone(&self) -> dsl_sage::types::SageContext
+impl core::fmt::Debug for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::types::SageContext
+impl core::marker::Send for dsl_sage::types::SageContext
+impl core::marker::Sync for dsl_sage::types::SageContext
+impl core::marker::Unpin for dsl_sage::types::SageContext
+impl core::marker::UnsafeUnpin for dsl_sage::types::SageContext
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::types::SageContext
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::types::SageContext
+impl<T, U> core::convert::Into<U> for dsl_sage::types::SageContext where U: core::convert::From<T>
+pub fn dsl_sage::types::SageContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::types::SageContext where U: core::convert::Into<T>
+pub type dsl_sage::types::SageContext::Error = core::convert::Infallible
+pub fn dsl_sage::types::SageContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::types::SageContext where U: core::convert::TryFrom<T>
+pub type dsl_sage::types::SageContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::types::SageContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::types::SageContext where T: core::clone::Clone
+pub type dsl_sage::types::SageContext::Owned = T
+pub fn dsl_sage::types::SageContext::clone_into(&self, &mut T)
+pub fn dsl_sage::types::SageContext::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::types::SageContext where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::types::SageContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::types::SageContext where T: ?core::marker::Sized
+pub fn dsl_sage::types::SageContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::types::SageContext where T: ?core::marker::Sized
+pub fn dsl_sage::types::SageContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::types::SageContext where T: core::clone::Clone
+pub unsafe fn dsl_sage::types::SageContext::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::types::SageContext
+pub fn dsl_sage::types::SageContext::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::types::SageContext where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::SageOrchestrator<'a>
+impl<'a> dsl_sage::orchestrator::SageOrchestrator<'a>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::audit_entries(&self, &str) -> alloc::vec::Vec<dsl_sage::audit::SageAuditEntry>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::new(&'a dsl_resolution::pack_registry::PackRegistry) -> Self
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::should_auto_select(&[dsl_sage::types::RankedCandidate], f32) -> core::option::Option<alloc::string::String>
+pub async fn dsl_sage::orchestrator::SageOrchestrator<'a>::step<'b>(&self, &'b mut dsl_sage::orchestrator::SageSession, dsl_sage::orchestrator::SageInput) -> anyhow::Result<&'b dsl_sage::orchestrator::SageState>
+impl<'a> !core::marker::Freeze for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::Send for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::Sync for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::Unpin for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageOrchestrator<'a>
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageOrchestrator<'a> where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageOrchestrator<'a> where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageOrchestrator<'a>::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageOrchestrator<'a> where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageOrchestrator<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::orchestrator::SageOrchestrator<'a> where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageOrchestrator<'a> where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageOrchestrator<'a> where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageOrchestrator<'a>
+pub fn dsl_sage::orchestrator::SageOrchestrator<'a>::from(T) -> T
+pub struct dsl_sage::SageSession
+pub dsl_sage::SageSession::context: dsl_sage::types::SageContext
+pub dsl_sage::SageSession::session_id: alloc::string::String
+pub dsl_sage::SageSession::state: dsl_sage::orchestrator::SageState
+pub dsl_sage::SageSession::transition_log: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::SageSession::utterance: core::option::Option<alloc::string::String>
+impl dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::new(dsl_sage::types::SageContext) -> Self
+impl core::clone::Clone for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::clone(&self) -> dsl_sage::orchestrator::SageSession
+impl core::fmt::Debug for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::orchestrator::SageSession
+impl core::marker::Send for dsl_sage::orchestrator::SageSession
+impl core::marker::Sync for dsl_sage::orchestrator::SageSession
+impl core::marker::Unpin for dsl_sage::orchestrator::SageSession
+impl core::marker::UnsafeUnpin for dsl_sage::orchestrator::SageSession
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::orchestrator::SageSession
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::orchestrator::SageSession
+impl<T, U> core::convert::Into<U> for dsl_sage::orchestrator::SageSession where U: core::convert::From<T>
+pub fn dsl_sage::orchestrator::SageSession::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::orchestrator::SageSession where U: core::convert::Into<T>
+pub type dsl_sage::orchestrator::SageSession::Error = core::convert::Infallible
+pub fn dsl_sage::orchestrator::SageSession::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::orchestrator::SageSession where U: core::convert::TryFrom<T>
+pub type dsl_sage::orchestrator::SageSession::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::orchestrator::SageSession::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::orchestrator::SageSession where T: core::clone::Clone
+pub type dsl_sage::orchestrator::SageSession::Owned = T
+pub fn dsl_sage::orchestrator::SageSession::clone_into(&self, &mut T)
+pub fn dsl_sage::orchestrator::SageSession::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::orchestrator::SageSession where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageSession::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::orchestrator::SageSession where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageSession::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::orchestrator::SageSession where T: ?core::marker::Sized
+pub fn dsl_sage::orchestrator::SageSession::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::orchestrator::SageSession where T: core::clone::Clone
+pub unsafe fn dsl_sage::orchestrator::SageSession::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::orchestrator::SageSession
+pub fn dsl_sage::orchestrator::SageSession::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::orchestrator::SageSession where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_sage::SageSessionStore
+impl dsl_sage::repl::SageSessionStore
+pub fn dsl_sage::repl::SageSessionStore::create_session(&self, dsl_sage::types::SageContext) -> alloc::string::String
+pub fn dsl_sage::repl::SageSessionStore::get_session_log(&self, &str) -> alloc::vec::Vec<alloc::string::String>
+pub fn dsl_sage::repl::SageSessionStore::get_session_state(&self, &str) -> core::option::Option<dsl_sage::orchestrator::SageState>
+pub fn dsl_sage::repl::SageSessionStore::new() -> Self
+pub fn dsl_sage::repl::SageSessionStore::step_sync(&self, &str, dsl_sage::orchestrator::SageInput, &dsl_resolution::pack_registry::PackRegistry) -> core::result::Result<dsl_sage::orchestrator::SageState, alloc::string::String>
+impl core::default::Default for dsl_sage::repl::SageSessionStore
+pub fn dsl_sage::repl::SageSessionStore::default() -> Self
+impl !core::marker::Freeze for dsl_sage::repl::SageSessionStore
+impl core::marker::Send for dsl_sage::repl::SageSessionStore
+impl core::marker::Sync for dsl_sage::repl::SageSessionStore
+impl core::marker::Unpin for dsl_sage::repl::SageSessionStore
+impl core::marker::UnsafeUnpin for dsl_sage::repl::SageSessionStore
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::repl::SageSessionStore
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::repl::SageSessionStore
+impl<T, U> core::convert::Into<U> for dsl_sage::repl::SageSessionStore where U: core::convert::From<T>
+pub fn dsl_sage::repl::SageSessionStore::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::repl::SageSessionStore where U: core::convert::Into<T>
+pub type dsl_sage::repl::SageSessionStore::Error = core::convert::Infallible
+pub fn dsl_sage::repl::SageSessionStore::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::repl::SageSessionStore where U: core::convert::TryFrom<T>
+pub type dsl_sage::repl::SageSessionStore::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::repl::SageSessionStore::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for dsl_sage::repl::SageSessionStore where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::repl::SageSessionStore::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::repl::SageSessionStore where T: ?core::marker::Sized
+pub fn dsl_sage::repl::SageSessionStore::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::repl::SageSessionStore where T: ?core::marker::Sized
+pub fn dsl_sage::repl::SageSessionStore::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for dsl_sage::repl::SageSessionStore
+pub fn dsl_sage::repl::SageSessionStore::from(T) -> T
+pub struct dsl_sage::ValidationSummary
+pub dsl_sage::ValidationSummary::diagnostics: alloc::vec::Vec<alloc::string::String>
+pub dsl_sage::ValidationSummary::edge_count: usize
+pub dsl_sage::ValidationSummary::has_errors: bool
+pub dsl_sage::ValidationSummary::node_count: usize
+impl core::clone::Clone for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::clone(&self) -> dsl_sage::instantiator::ValidationSummary
+impl core::cmp::PartialEq for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::eq(&self, &dsl_sage::instantiator::ValidationSummary) -> bool
+impl core::fmt::Debug for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for dsl_sage::instantiator::ValidationSummary
+impl serde_core::ser::Serialize for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_sage::instantiator::ValidationSummary
+impl core::marker::Send for dsl_sage::instantiator::ValidationSummary
+impl core::marker::Sync for dsl_sage::instantiator::ValidationSummary
+impl core::marker::Unpin for dsl_sage::instantiator::ValidationSummary
+impl core::marker::UnsafeUnpin for dsl_sage::instantiator::ValidationSummary
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_sage::instantiator::ValidationSummary
+impl core::panic::unwind_safe::UnwindSafe for dsl_sage::instantiator::ValidationSummary
+impl<T, U> core::convert::Into<U> for dsl_sage::instantiator::ValidationSummary where U: core::convert::From<T>
+pub fn dsl_sage::instantiator::ValidationSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_sage::instantiator::ValidationSummary where U: core::convert::Into<T>
+pub type dsl_sage::instantiator::ValidationSummary::Error = core::convert::Infallible
+pub fn dsl_sage::instantiator::ValidationSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_sage::instantiator::ValidationSummary where U: core::convert::TryFrom<T>
+pub type dsl_sage::instantiator::ValidationSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_sage::instantiator::ValidationSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_sage::instantiator::ValidationSummary where T: core::clone::Clone
+pub type dsl_sage::instantiator::ValidationSummary::Owned = T
+pub fn dsl_sage::instantiator::ValidationSummary::clone_into(&self, &mut T)
+pub fn dsl_sage::instantiator::ValidationSummary::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_sage::instantiator::ValidationSummary where T: 'static + ?core::marker::Sized
+pub fn dsl_sage::instantiator::ValidationSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_sage::instantiator::ValidationSummary where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::ValidationSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_sage::instantiator::ValidationSummary where T: ?core::marker::Sized
+pub fn dsl_sage::instantiator::ValidationSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_sage::instantiator::ValidationSummary where T: core::clone::Clone
+pub unsafe fn dsl_sage::instantiator::ValidationSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_sage::instantiator::ValidationSummary
+pub fn dsl_sage::instantiator::ValidationSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_sage::instantiator::ValidationSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub trait dsl_sage::LlmClient: core::marker::Send + core::marker::Sync
+pub fn dsl_sage::LlmClient::rank_packs<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 [dsl_sage::matcher::PackSummary]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::matcher::LlmRankEntry>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+impl dsl_sage::matcher::LlmClient for dsl_sage::matcher::MockLlmClient
+pub fn dsl_sage::matcher::MockLlmClient::rank_packs<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 [dsl_sage::matcher::PackSummary]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::matcher::LlmRankEntry>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub trait dsl_sage::LlmExtractor: core::marker::Send + core::marker::Sync
+pub fn dsl_sage::LlmExtractor::extract_parameters<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 dsl_sage::extractor::PackSummaryWithParams) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<alloc::vec::Vec<dsl_sage::types::ParameterProposal>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub trait dsl_sage::PackEmbedder: core::marker::Send + core::marker::Sync
+pub fn dsl_sage::PackEmbedder::similarity(&self, &str, &str) -> f32
+impl dsl_sage::matcher::PackEmbedder for dsl_sage::matcher::BagOfWordsEmbedder
+pub fn dsl_sage::matcher::BagOfWordsEmbedder::similarity(&self, &str, &str) -> f32
+pub fn dsl_sage::context_from_session(core::option::Option<&str>) -> dsl_sage::types::SageContext
+pub fn dsl_sage::expand_template(&dsl_resolution::pack_registry::DecisionPack, &std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>, core::option::Option<&str>) -> anyhow::Result<(alloc::string::String, alloc::vec::Vec<alloc::string::String>)>
+pub async fn dsl_sage::extract_parameters(&str, &str, &str, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry, core::option::Option<&dyn dsl_sage::extractor::LlmExtractor>) -> anyhow::Result<dsl_sage::types::ConfirmationRequest>
+pub fn dsl_sage::instantiate(&str, &str, &std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>, core::option::Option<&str>, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry) -> anyhow::Result<dsl_sage::instantiator::InstantiationResult>
+pub async fn dsl_sage::match_packs(&str, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry, &dyn dsl_sage::matcher::PackEmbedder, core::option::Option<&dyn dsl_sage::matcher::LlmClient>) -> anyhow::Result<alloc::vec::Vec<dsl_sage::types::RankedCandidate>>
+pub fn dsl_sage::match_packs_embedding_only(&str, &dsl_sage::types::SageContext, &dsl_resolution::pack_registry::PackRegistry, &dyn dsl_sage::matcher::PackEmbedder) -> alloc::vec::Vec<dsl_sage::types::RankedCandidate>
+pub fn dsl_sage::validate_instantiation(&str) -> anyhow::Result<dsl_sage::instantiator::ValidationSummary>

@@ -4,7 +4,7 @@
 //! `config/verbs/view.yaml`. Lives entirely in ob-poc because it
 //! consumes the heavy session + taxonomy modules:
 //!  - `crate::session::{ViewState, Refinement}` (10934 LOC, multi-consumer)
-//!  - `crate::taxonomy::{Filter, Status, Metaphor, TaxonomyBuilder, TaxonomyContext}`
+//!  - `ob_poc_taxonomy::taxonomy::{Filter, Status, Metaphor, TaxonomyBuilder, TaxonomyContext}`
 //!    (5345 LOC, multi-consumer)
 //!
 //! Dispatch table is verbatim the previous handler bodies from
@@ -21,7 +21,7 @@ use uuid::Uuid;
 use dsl_runtime::ViewService;
 
 use crate::session::{Refinement, ViewState};
-use crate::taxonomy::{Filter, Metaphor, Status, TaxonomyBuilder, TaxonomyContext};
+use ob_poc_taxonomy::taxonomy::{Filter, Metaphor, Status, TaxonomyBuilder, TaxonomyContext};
 
 const EXT_KEY_SELECTION: &str = "_selection";
 const EXT_KEY_PENDING_VIEW: &str = "_pending_view_state";

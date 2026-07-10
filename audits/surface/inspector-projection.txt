@@ -1,0 +1,1180 @@
+# inspector-projection | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:25Z
+pub mod inspector_projection
+pub mod inspector_projection::generator
+pub mod inspector_projection::generator::cbu
+pub struct inspector_projection::generator::cbu::CbuGenerator
+impl inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::generate(&self, &str, &str, core::option::Option<&str>, core::option::Option<&str>, &[inspector_projection::generator::cbu::GraphNodeInput], &[inspector_projection::generator::cbu::GraphEdgeInput], &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::generator::cbu::CbuGenerator::new() -> Self
+pub fn inspector_projection::generator::cbu::CbuGenerator::with_edges(self, bool) -> Self
+impl core::default::Default for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::default() -> inspector_projection::generator::cbu::CbuGenerator
+impl core::fmt::Debug for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Send for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Sync for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Unpin for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::UnsafeUnpin for inspector_projection::generator::cbu::CbuGenerator
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::generator::cbu::CbuGenerator
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::generator::cbu::CbuGenerator
+impl<T, U> core::convert::Into<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::From<T>
+pub fn inspector_projection::generator::cbu::CbuGenerator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::Into<T>
+pub type inspector_projection::generator::cbu::CbuGenerator::Error = core::convert::Infallible
+pub fn inspector_projection::generator::cbu::CbuGenerator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::TryFrom<T>
+pub type inspector_projection::generator::cbu::CbuGenerator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::generator::cbu::CbuGenerator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for inspector_projection::generator::cbu::CbuGenerator where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::generator::cbu::CbuGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::generator::cbu::CbuGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::from(T) -> T
+pub struct inspector_projection::generator::cbu::GraphEdgeInput
+pub inspector_projection::generator::cbu::GraphEdgeInput::edge_type: alloc::string::String
+pub inspector_projection::generator::cbu::GraphEdgeInput::id: alloc::string::String
+pub inspector_projection::generator::cbu::GraphEdgeInput::label: core::option::Option<alloc::string::String>
+pub inspector_projection::generator::cbu::GraphEdgeInput::source: alloc::string::String
+pub inspector_projection::generator::cbu::GraphEdgeInput::target: alloc::string::String
+pub inspector_projection::generator::cbu::GraphEdgeInput::verification_status: core::option::Option<alloc::string::String>
+pub inspector_projection::generator::cbu::GraphEdgeInput::weight: core::option::Option<f32>
+impl inspector_projection::generator::cbu::GraphEdgeInput
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::from_graph_edge(&ob_poc_types::GraphEdge) -> Self
+impl core::clone::Clone for inspector_projection::generator::cbu::GraphEdgeInput
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::clone(&self) -> inspector_projection::generator::cbu::GraphEdgeInput
+impl core::fmt::Debug for inspector_projection::generator::cbu::GraphEdgeInput
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::generator::cbu::GraphEdgeInput
+impl core::marker::Send for inspector_projection::generator::cbu::GraphEdgeInput
+impl core::marker::Sync for inspector_projection::generator::cbu::GraphEdgeInput
+impl core::marker::Unpin for inspector_projection::generator::cbu::GraphEdgeInput
+impl core::marker::UnsafeUnpin for inspector_projection::generator::cbu::GraphEdgeInput
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::generator::cbu::GraphEdgeInput
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::generator::cbu::GraphEdgeInput
+impl<T, U> core::convert::Into<U> for inspector_projection::generator::cbu::GraphEdgeInput where U: core::convert::From<T>
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::generator::cbu::GraphEdgeInput where U: core::convert::Into<T>
+pub type inspector_projection::generator::cbu::GraphEdgeInput::Error = core::convert::Infallible
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::generator::cbu::GraphEdgeInput where U: core::convert::TryFrom<T>
+pub type inspector_projection::generator::cbu::GraphEdgeInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::generator::cbu::GraphEdgeInput where T: core::clone::Clone
+pub type inspector_projection::generator::cbu::GraphEdgeInput::Owned = T
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::clone_into(&self, &mut T)
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::generator::cbu::GraphEdgeInput where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::generator::cbu::GraphEdgeInput where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::generator::cbu::GraphEdgeInput where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::generator::cbu::GraphEdgeInput where T: core::clone::Clone
+pub unsafe fn inspector_projection::generator::cbu::GraphEdgeInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::generator::cbu::GraphEdgeInput
+pub fn inspector_projection::generator::cbu::GraphEdgeInput::from(T) -> T
+pub struct inspector_projection::generator::cbu::GraphNodeInput
+pub inspector_projection::generator::cbu::GraphNodeInput::id: alloc::string::String
+pub inspector_projection::generator::cbu::GraphNodeInput::jurisdiction: core::option::Option<alloc::string::String>
+pub inspector_projection::generator::cbu::GraphNodeInput::label: alloc::string::String
+pub inspector_projection::generator::cbu::GraphNodeInput::layer: alloc::string::String
+pub inspector_projection::generator::cbu::GraphNodeInput::node_type: alloc::string::String
+pub inspector_projection::generator::cbu::GraphNodeInput::ownership_pct: core::option::Option<f64>
+pub inspector_projection::generator::cbu::GraphNodeInput::primary_role: core::option::Option<alloc::string::String>
+pub inspector_projection::generator::cbu::GraphNodeInput::roles: alloc::vec::Vec<alloc::string::String>
+pub inspector_projection::generator::cbu::GraphNodeInput::status: core::option::Option<alloc::string::String>
+pub inspector_projection::generator::cbu::GraphNodeInput::sublabel: core::option::Option<alloc::string::String>
+impl inspector_projection::generator::cbu::GraphNodeInput
+pub fn inspector_projection::generator::cbu::GraphNodeInput::from_graph_node(&ob_poc_types::GraphNode) -> Self
+impl core::clone::Clone for inspector_projection::generator::cbu::GraphNodeInput
+pub fn inspector_projection::generator::cbu::GraphNodeInput::clone(&self) -> inspector_projection::generator::cbu::GraphNodeInput
+impl core::fmt::Debug for inspector_projection::generator::cbu::GraphNodeInput
+pub fn inspector_projection::generator::cbu::GraphNodeInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::generator::cbu::GraphNodeInput
+impl core::marker::Send for inspector_projection::generator::cbu::GraphNodeInput
+impl core::marker::Sync for inspector_projection::generator::cbu::GraphNodeInput
+impl core::marker::Unpin for inspector_projection::generator::cbu::GraphNodeInput
+impl core::marker::UnsafeUnpin for inspector_projection::generator::cbu::GraphNodeInput
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::generator::cbu::GraphNodeInput
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::generator::cbu::GraphNodeInput
+impl<T, U> core::convert::Into<U> for inspector_projection::generator::cbu::GraphNodeInput where U: core::convert::From<T>
+pub fn inspector_projection::generator::cbu::GraphNodeInput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::generator::cbu::GraphNodeInput where U: core::convert::Into<T>
+pub type inspector_projection::generator::cbu::GraphNodeInput::Error = core::convert::Infallible
+pub fn inspector_projection::generator::cbu::GraphNodeInput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::generator::cbu::GraphNodeInput where U: core::convert::TryFrom<T>
+pub type inspector_projection::generator::cbu::GraphNodeInput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::generator::cbu::GraphNodeInput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::generator::cbu::GraphNodeInput where T: core::clone::Clone
+pub type inspector_projection::generator::cbu::GraphNodeInput::Owned = T
+pub fn inspector_projection::generator::cbu::GraphNodeInput::clone_into(&self, &mut T)
+pub fn inspector_projection::generator::cbu::GraphNodeInput::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::generator::cbu::GraphNodeInput where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::GraphNodeInput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::generator::cbu::GraphNodeInput where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::GraphNodeInput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::generator::cbu::GraphNodeInput where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::GraphNodeInput::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::generator::cbu::GraphNodeInput where T: core::clone::Clone
+pub unsafe fn inspector_projection::generator::cbu::GraphNodeInput::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::generator::cbu::GraphNodeInput
+pub fn inspector_projection::generator::cbu::GraphNodeInput::from(T) -> T
+pub fn inspector_projection::generator::cbu::generate_from_cbu_graph(&ob_poc_types::CbuGraphResponse, &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub struct inspector_projection::generator::CbuGenerator
+impl inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::generate(&self, &str, &str, core::option::Option<&str>, core::option::Option<&str>, &[inspector_projection::generator::cbu::GraphNodeInput], &[inspector_projection::generator::cbu::GraphEdgeInput], &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::generator::cbu::CbuGenerator::new() -> Self
+pub fn inspector_projection::generator::cbu::CbuGenerator::with_edges(self, bool) -> Self
+impl core::default::Default for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::default() -> inspector_projection::generator::cbu::CbuGenerator
+impl core::fmt::Debug for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Send for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Sync for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Unpin for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::UnsafeUnpin for inspector_projection::generator::cbu::CbuGenerator
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::generator::cbu::CbuGenerator
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::generator::cbu::CbuGenerator
+impl<T, U> core::convert::Into<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::From<T>
+pub fn inspector_projection::generator::cbu::CbuGenerator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::Into<T>
+pub type inspector_projection::generator::cbu::CbuGenerator::Error = core::convert::Infallible
+pub fn inspector_projection::generator::cbu::CbuGenerator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::TryFrom<T>
+pub type inspector_projection::generator::cbu::CbuGenerator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::generator::cbu::CbuGenerator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for inspector_projection::generator::cbu::CbuGenerator where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::generator::cbu::CbuGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::generator::cbu::CbuGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::from(T) -> T
+pub struct inspector_projection::generator::MatrixGenerator
+impl inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::generate(&self, &str, &str, &[inspector_projection::generator::matrix::MatrixNodeInput], &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::MatrixGenerator::new() -> Self
+pub fn inspector_projection::MatrixGenerator::with_empty_categories(self, bool) -> Self
+impl core::default::Default for inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::default() -> inspector_projection::MatrixGenerator
+impl core::fmt::Debug for inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::MatrixGenerator
+impl core::marker::Send for inspector_projection::MatrixGenerator
+impl core::marker::Sync for inspector_projection::MatrixGenerator
+impl core::marker::Unpin for inspector_projection::MatrixGenerator
+impl core::marker::UnsafeUnpin for inspector_projection::MatrixGenerator
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::MatrixGenerator
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::MatrixGenerator
+impl<T, U> core::convert::Into<U> for inspector_projection::MatrixGenerator where U: core::convert::From<T>
+pub fn inspector_projection::MatrixGenerator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::MatrixGenerator where U: core::convert::Into<T>
+pub type inspector_projection::MatrixGenerator::Error = core::convert::Infallible
+pub fn inspector_projection::MatrixGenerator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::MatrixGenerator where U: core::convert::TryFrom<T>
+pub type inspector_projection::MatrixGenerator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::MatrixGenerator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for inspector_projection::MatrixGenerator where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::MatrixGenerator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::MatrixGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::MatrixGenerator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::MatrixGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::MatrixGenerator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::from(T) -> T
+pub trait inspector_projection::generator::ProjectionGenerator
+pub type inspector_projection::generator::ProjectionGenerator::Source
+pub fn inspector_projection::generator::ProjectionGenerator::generate(&self, &Self::Source, &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::generator::ProjectionGenerator::generate_with_defaults(&self, &Self::Source) -> inspector_projection::InspectorProjection
+pub enum inspector_projection::NodeIdError
+pub inspector_projection::NodeIdError::Empty
+pub inspector_projection::NodeIdError::InvalidFormat(alloc::string::String)
+impl core::clone::Clone for inspector_projection::NodeIdError
+pub fn inspector_projection::NodeIdError::clone(&self) -> inspector_projection::NodeIdError
+impl core::error::Error for inspector_projection::NodeIdError
+impl core::fmt::Debug for inspector_projection::NodeIdError
+pub fn inspector_projection::NodeIdError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for inspector_projection::NodeIdError
+pub fn inspector_projection::NodeIdError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::NodeIdError
+impl core::marker::Send for inspector_projection::NodeIdError
+impl core::marker::Sync for inspector_projection::NodeIdError
+impl core::marker::Unpin for inspector_projection::NodeIdError
+impl core::marker::UnsafeUnpin for inspector_projection::NodeIdError
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::NodeIdError
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::NodeIdError
+impl<T, U> core::convert::Into<U> for inspector_projection::NodeIdError where U: core::convert::From<T>
+pub fn inspector_projection::NodeIdError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::NodeIdError where U: core::convert::Into<T>
+pub type inspector_projection::NodeIdError::Error = core::convert::Infallible
+pub fn inspector_projection::NodeIdError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::NodeIdError where U: core::convert::TryFrom<T>
+pub type inspector_projection::NodeIdError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::NodeIdError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::NodeIdError where T: core::clone::Clone
+pub type inspector_projection::NodeIdError::Owned = T
+pub fn inspector_projection::NodeIdError::clone_into(&self, &mut T)
+pub fn inspector_projection::NodeIdError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for inspector_projection::NodeIdError where T: core::fmt::Display + ?core::marker::Sized
+pub fn inspector_projection::NodeIdError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for inspector_projection::NodeIdError where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::NodeIdError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::NodeIdError where T: ?core::marker::Sized
+pub fn inspector_projection::NodeIdError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::NodeIdError where T: ?core::marker::Sized
+pub fn inspector_projection::NodeIdError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::NodeIdError where T: core::clone::Clone
+pub unsafe fn inspector_projection::NodeIdError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::NodeIdError
+pub fn inspector_projection::NodeIdError::from(T) -> T
+pub enum inspector_projection::NodeKind
+pub inspector_projection::NodeKind::Cbu
+pub inspector_projection::NodeKind::ControlEdge
+pub inspector_projection::NodeKind::ControlNode
+pub inspector_projection::NodeKind::ControlRegister
+pub inspector_projection::NodeKind::ControlTree
+pub inspector_projection::NodeKind::Deal
+pub inspector_projection::NodeKind::DealContract
+pub inspector_projection::NodeKind::DealContractList
+pub inspector_projection::NodeKind::DealOnboardingRequest
+pub inspector_projection::NodeKind::DealOnboardingRequestList
+pub inspector_projection::NodeKind::DealParticipant
+pub inspector_projection::NodeKind::DealParticipantList
+pub inspector_projection::NodeKind::DealProduct
+pub inspector_projection::NodeKind::DealProductList
+pub inspector_projection::NodeKind::DealRateCard
+pub inspector_projection::NodeKind::DealRateCardLine
+pub inspector_projection::NodeKind::DealRateCardList
+pub inspector_projection::NodeKind::Entity
+pub inspector_projection::NodeKind::HoldingEdge
+pub inspector_projection::NodeKind::HoldingEdgeList
+pub inspector_projection::NodeKind::InstrumentMatrix
+pub inspector_projection::NodeKind::InvestorRegister
+pub inspector_projection::NodeKind::MatrixSlice
+pub inspector_projection::NodeKind::MemberList
+pub inspector_projection::NodeKind::PageToken
+pub inspector_projection::NodeKind::Product
+pub inspector_projection::NodeKind::ProductBinding
+pub inspector_projection::NodeKind::ProductTree
+pub inspector_projection::NodeKind::Resource
+pub inspector_projection::NodeKind::Service
+pub inspector_projection::NodeKind::SparseCellPage
+impl inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::can_have_children(&self) -> bool
+pub fn inspector_projection::NodeKind::default_glyph(&self) -> &'static str
+pub fn inspector_projection::NodeKind::requires_provenance(&self) -> bool
+impl core::clone::Clone for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::clone(&self) -> inspector_projection::NodeKind
+impl core::cmp::Eq for inspector_projection::NodeKind
+impl core::cmp::PartialEq for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::eq(&self, &inspector_projection::NodeKind) -> bool
+impl core::fmt::Debug for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for inspector_projection::NodeKind
+impl core::marker::StructuralPartialEq for inspector_projection::NodeKind
+impl serde_core::ser::Serialize for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::NodeKind
+impl core::marker::Send for inspector_projection::NodeKind
+impl core::marker::Sync for inspector_projection::NodeKind
+impl core::marker::Unpin for inspector_projection::NodeKind
+impl core::marker::UnsafeUnpin for inspector_projection::NodeKind
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::NodeKind
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::NodeKind
+impl<T, U> core::convert::Into<U> for inspector_projection::NodeKind where U: core::convert::From<T>
+pub fn inspector_projection::NodeKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::NodeKind where U: core::convert::Into<T>
+pub type inspector_projection::NodeKind::Error = core::convert::Infallible
+pub fn inspector_projection::NodeKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::NodeKind where U: core::convert::TryFrom<T>
+pub type inspector_projection::NodeKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::NodeKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::NodeKind where T: core::clone::Clone
+pub type inspector_projection::NodeKind::Owned = T
+pub fn inspector_projection::NodeKind::clone_into(&self, &mut T)
+pub fn inspector_projection::NodeKind::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::NodeKind where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::NodeKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::NodeKind where T: ?core::marker::Sized
+pub fn inspector_projection::NodeKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::NodeKind where T: ?core::marker::Sized
+pub fn inspector_projection::NodeKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::NodeKind where T: core::clone::Clone
+pub unsafe fn inspector_projection::NodeKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::NodeKind
+pub fn inspector_projection::NodeKind::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::NodeKind where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum inspector_projection::RefOrList
+pub inspector_projection::RefOrList::List(inspector_projection::PagingList)
+pub inspector_projection::RefOrList::Single(inspector_projection::RefValue)
+impl inspector_projection::RefOrList
+pub fn inspector_projection::RefOrList::targets(&self) -> alloc::vec::Vec<&inspector_projection::NodeId>
+impl core::clone::Clone for inspector_projection::RefOrList
+pub fn inspector_projection::RefOrList::clone(&self) -> inspector_projection::RefOrList
+impl core::fmt::Debug for inspector_projection::RefOrList
+pub fn inspector_projection::RefOrList::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::RefOrList
+pub fn inspector_projection::RefOrList::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::RefOrList
+pub fn inspector_projection::RefOrList::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::RefOrList
+impl core::marker::Send for inspector_projection::RefOrList
+impl core::marker::Sync for inspector_projection::RefOrList
+impl core::marker::Unpin for inspector_projection::RefOrList
+impl core::marker::UnsafeUnpin for inspector_projection::RefOrList
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::RefOrList
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::RefOrList
+impl<T, U> core::convert::Into<U> for inspector_projection::RefOrList where U: core::convert::From<T>
+pub fn inspector_projection::RefOrList::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::RefOrList where U: core::convert::Into<T>
+pub type inspector_projection::RefOrList::Error = core::convert::Infallible
+pub fn inspector_projection::RefOrList::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::RefOrList where U: core::convert::TryFrom<T>
+pub type inspector_projection::RefOrList::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::RefOrList::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::RefOrList where T: core::clone::Clone
+pub type inspector_projection::RefOrList::Owned = T
+pub fn inspector_projection::RefOrList::clone_into(&self, &mut T)
+pub fn inspector_projection::RefOrList::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::RefOrList where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::RefOrList::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::RefOrList where T: ?core::marker::Sized
+pub fn inspector_projection::RefOrList::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::RefOrList where T: ?core::marker::Sized
+pub fn inspector_projection::RefOrList::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::RefOrList where T: core::clone::Clone
+pub unsafe fn inspector_projection::RefOrList::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::RefOrList
+pub fn inspector_projection::RefOrList::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::RefOrList where T: for<'de> serde_core::de::Deserialize<'de>
+pub enum inspector_projection::ValidationError
+pub inspector_projection::ValidationError::CycleDetected
+pub inspector_projection::ValidationError::CycleDetected::path: alloc::vec::Vec<inspector_projection::NodeId>
+pub inspector_projection::ValidationError::DanglingRef
+pub inspector_projection::ValidationError::DanglingRef::source_node: inspector_projection::NodeId
+pub inspector_projection::ValidationError::DanglingRef::target: inspector_projection::NodeId
+pub inspector_projection::ValidationError::EmptyProvenanceSources
+pub inspector_projection::ValidationError::EmptyProvenanceSources::node_id: inspector_projection::NodeId
+pub inspector_projection::ValidationError::IdMismatch
+pub inspector_projection::ValidationError::IdMismatch::key: inspector_projection::NodeId
+pub inspector_projection::ValidationError::IdMismatch::node_id: inspector_projection::NodeId
+pub inspector_projection::ValidationError::InvalidConfidence
+pub inspector_projection::ValidationError::InvalidConfidence::node_id: inspector_projection::NodeId
+pub inspector_projection::ValidationError::InvalidConfidence::value: f64
+pub inspector_projection::ValidationError::MissingAssertedAt
+pub inspector_projection::ValidationError::MissingAssertedAt::node_id: inspector_projection::NodeId
+pub inspector_projection::ValidationError::MissingProvenance
+pub inspector_projection::ValidationError::MissingProvenance::kind: inspector_projection::NodeKind
+pub inspector_projection::ValidationError::MissingProvenance::node_id: inspector_projection::NodeId
+pub inspector_projection::ValidationError::MissingRoot
+pub inspector_projection::ValidationError::MissingRoot::chamber: alloc::string::String
+pub inspector_projection::ValidationError::MissingRoot::target: inspector_projection::NodeId
+pub inspector_projection::ValidationError::UnsupportedSchemaVersion
+pub inspector_projection::ValidationError::UnsupportedSchemaVersion::max_supported: u32
+pub inspector_projection::ValidationError::UnsupportedSchemaVersion::version: u32
+impl inspector_projection::ValidationError
+pub fn inspector_projection::ValidationError::code(&self) -> &'static str
+pub fn inspector_projection::ValidationError::is_blocking(&self) -> bool
+impl core::clone::Clone for inspector_projection::ValidationError
+pub fn inspector_projection::ValidationError::clone(&self) -> inspector_projection::ValidationError
+impl core::error::Error for inspector_projection::ValidationError
+impl core::fmt::Debug for inspector_projection::ValidationError
+pub fn inspector_projection::ValidationError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for inspector_projection::ValidationError
+pub fn inspector_projection::ValidationError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::ValidationError
+impl core::marker::Send for inspector_projection::ValidationError
+impl core::marker::Sync for inspector_projection::ValidationError
+impl core::marker::Unpin for inspector_projection::ValidationError
+impl core::marker::UnsafeUnpin for inspector_projection::ValidationError
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::ValidationError
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::ValidationError
+impl<T, U> core::convert::Into<U> for inspector_projection::ValidationError where U: core::convert::From<T>
+pub fn inspector_projection::ValidationError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::ValidationError where U: core::convert::Into<T>
+pub type inspector_projection::ValidationError::Error = core::convert::Infallible
+pub fn inspector_projection::ValidationError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::ValidationError where U: core::convert::TryFrom<T>
+pub type inspector_projection::ValidationError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::ValidationError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::ValidationError where T: core::clone::Clone
+pub type inspector_projection::ValidationError::Owned = T
+pub fn inspector_projection::ValidationError::clone_into(&self, &mut T)
+pub fn inspector_projection::ValidationError::to_owned(&self) -> T
+impl<T> alloc::string::ToString for inspector_projection::ValidationError where T: core::fmt::Display + ?core::marker::Sized
+pub fn inspector_projection::ValidationError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for inspector_projection::ValidationError where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::ValidationError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::ValidationError where T: ?core::marker::Sized
+pub fn inspector_projection::ValidationError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::ValidationError where T: ?core::marker::Sized
+pub fn inspector_projection::ValidationError::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::ValidationError where T: core::clone::Clone
+pub unsafe fn inspector_projection::ValidationError::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::ValidationError
+pub fn inspector_projection::ValidationError::from(T) -> T
+pub struct inspector_projection::CbuGenerator
+impl inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::generate(&self, &str, &str, core::option::Option<&str>, core::option::Option<&str>, &[inspector_projection::generator::cbu::GraphNodeInput], &[inspector_projection::generator::cbu::GraphEdgeInput], &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::generator::cbu::CbuGenerator::new() -> Self
+pub fn inspector_projection::generator::cbu::CbuGenerator::with_edges(self, bool) -> Self
+impl core::default::Default for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::default() -> inspector_projection::generator::cbu::CbuGenerator
+impl core::fmt::Debug for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Send for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Sync for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::Unpin for inspector_projection::generator::cbu::CbuGenerator
+impl core::marker::UnsafeUnpin for inspector_projection::generator::cbu::CbuGenerator
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::generator::cbu::CbuGenerator
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::generator::cbu::CbuGenerator
+impl<T, U> core::convert::Into<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::From<T>
+pub fn inspector_projection::generator::cbu::CbuGenerator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::Into<T>
+pub type inspector_projection::generator::cbu::CbuGenerator::Error = core::convert::Infallible
+pub fn inspector_projection::generator::cbu::CbuGenerator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::generator::cbu::CbuGenerator where U: core::convert::TryFrom<T>
+pub type inspector_projection::generator::cbu::CbuGenerator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::generator::cbu::CbuGenerator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for inspector_projection::generator::cbu::CbuGenerator where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::generator::cbu::CbuGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::generator::cbu::CbuGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::generator::cbu::CbuGenerator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for inspector_projection::generator::cbu::CbuGenerator
+pub fn inspector_projection::generator::cbu::CbuGenerator::from(T) -> T
+pub struct inspector_projection::InspectorProjection
+pub inspector_projection::InspectorProjection::nodes: alloc::collections::btree::map::BTreeMap<inspector_projection::NodeId, inspector_projection::Node>
+pub inspector_projection::InspectorProjection::render_policy: inspector_projection::RenderPolicy
+pub inspector_projection::InspectorProjection::root: alloc::collections::btree::map::BTreeMap<alloc::string::String, inspector_projection::RefValue>
+pub inspector_projection::InspectorProjection::snapshot: inspector_projection::SnapshotMeta
+pub inspector_projection::InspectorProjection::ui_hints: inspector_projection::UiHints
+impl inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::get_node(&self, &inspector_projection::NodeId) -> core::option::Option<&inspector_projection::Node>
+pub fn inspector_projection::InspectorProjection::insert_node(&mut self, inspector_projection::Node)
+pub fn inspector_projection::InspectorProjection::new() -> Self
+pub fn inspector_projection::InspectorProjection::resolve_ref(&self, &inspector_projection::RefValue) -> core::option::Option<&inspector_projection::Node>
+pub fn inspector_projection::InspectorProjection::set_root(&mut self, impl core::convert::Into<alloc::string::String>, inspector_projection::NodeId)
+impl core::clone::Clone for inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::clone(&self) -> inspector_projection::InspectorProjection
+impl core::default::Default for inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::default() -> inspector_projection::InspectorProjection
+impl core::fmt::Debug for inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::InspectorProjection
+impl core::marker::Send for inspector_projection::InspectorProjection
+impl core::marker::Sync for inspector_projection::InspectorProjection
+impl core::marker::Unpin for inspector_projection::InspectorProjection
+impl core::marker::UnsafeUnpin for inspector_projection::InspectorProjection
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::InspectorProjection
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::InspectorProjection
+impl<T, U> core::convert::Into<U> for inspector_projection::InspectorProjection where U: core::convert::From<T>
+pub fn inspector_projection::InspectorProjection::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::InspectorProjection where U: core::convert::Into<T>
+pub type inspector_projection::InspectorProjection::Error = core::convert::Infallible
+pub fn inspector_projection::InspectorProjection::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::InspectorProjection where U: core::convert::TryFrom<T>
+pub type inspector_projection::InspectorProjection::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::InspectorProjection::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::InspectorProjection where T: core::clone::Clone
+pub type inspector_projection::InspectorProjection::Owned = T
+pub fn inspector_projection::InspectorProjection::clone_into(&self, &mut T)
+pub fn inspector_projection::InspectorProjection::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::InspectorProjection where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::InspectorProjection::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::InspectorProjection where T: ?core::marker::Sized
+pub fn inspector_projection::InspectorProjection::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::InspectorProjection where T: ?core::marker::Sized
+pub fn inspector_projection::InspectorProjection::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::InspectorProjection where T: core::clone::Clone
+pub unsafe fn inspector_projection::InspectorProjection::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::InspectorProjection
+pub fn inspector_projection::InspectorProjection::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::InspectorProjection where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::MatrixGenerator
+impl inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::generate(&self, &str, &str, &[inspector_projection::generator::matrix::MatrixNodeInput], &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::MatrixGenerator::new() -> Self
+pub fn inspector_projection::MatrixGenerator::with_empty_categories(self, bool) -> Self
+impl core::default::Default for inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::default() -> inspector_projection::MatrixGenerator
+impl core::fmt::Debug for inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::MatrixGenerator
+impl core::marker::Send for inspector_projection::MatrixGenerator
+impl core::marker::Sync for inspector_projection::MatrixGenerator
+impl core::marker::Unpin for inspector_projection::MatrixGenerator
+impl core::marker::UnsafeUnpin for inspector_projection::MatrixGenerator
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::MatrixGenerator
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::MatrixGenerator
+impl<T, U> core::convert::Into<U> for inspector_projection::MatrixGenerator where U: core::convert::From<T>
+pub fn inspector_projection::MatrixGenerator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::MatrixGenerator where U: core::convert::Into<T>
+pub type inspector_projection::MatrixGenerator::Error = core::convert::Infallible
+pub fn inspector_projection::MatrixGenerator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::MatrixGenerator where U: core::convert::TryFrom<T>
+pub type inspector_projection::MatrixGenerator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::MatrixGenerator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for inspector_projection::MatrixGenerator where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::MatrixGenerator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::MatrixGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::MatrixGenerator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::MatrixGenerator where T: ?core::marker::Sized
+pub fn inspector_projection::MatrixGenerator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for inspector_projection::MatrixGenerator
+pub fn inspector_projection::MatrixGenerator::from(T) -> T
+pub struct inspector_projection::Node
+pub inspector_projection::Node::attributes: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+pub inspector_projection::Node::branches: alloc::collections::btree::map::BTreeMap<alloc::string::String, inspector_projection::RefOrList>
+pub inspector_projection::Node::glyph: core::option::Option<alloc::string::String>
+pub inspector_projection::Node::id: inspector_projection::NodeId
+pub inspector_projection::Node::kind: inspector_projection::NodeKind
+pub inspector_projection::Node::label_full: core::option::Option<alloc::string::String>
+pub inspector_projection::Node::label_short: alloc::string::String
+pub inspector_projection::Node::links: alloc::vec::Vec<inspector_projection::RefValue>
+pub inspector_projection::Node::provenance: core::option::Option<inspector_projection::Provenance>
+pub inspector_projection::Node::summary: core::option::Option<inspector_projection::NodeSummary>
+impl inspector_projection::Node
+pub fn inspector_projection::Node::default_glyph(&self) -> &'static str
+pub fn inspector_projection::Node::has_children(&self) -> bool
+pub fn inspector_projection::Node::new(inspector_projection::NodeId, inspector_projection::NodeKind, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn inspector_projection::Node::with_attribute(self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<serde_json::value::Value>) -> Self
+pub fn inspector_projection::Node::with_branch(self, impl core::convert::Into<alloc::string::String>, inspector_projection::NodeId) -> Self
+pub fn inspector_projection::Node::with_branch_list(self, impl core::convert::Into<alloc::string::String>, inspector_projection::PagingList) -> Self
+pub fn inspector_projection::Node::with_glyph(self, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn inspector_projection::Node::with_label_full(self, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn inspector_projection::Node::with_link(self, inspector_projection::NodeId) -> Self
+pub fn inspector_projection::Node::with_provenance(self, inspector_projection::Provenance) -> Self
+pub fn inspector_projection::Node::with_summary(self, inspector_projection::NodeSummary) -> Self
+impl core::clone::Clone for inspector_projection::Node
+pub fn inspector_projection::Node::clone(&self) -> inspector_projection::Node
+impl core::fmt::Debug for inspector_projection::Node
+pub fn inspector_projection::Node::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::Node
+pub fn inspector_projection::Node::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::Node
+pub fn inspector_projection::Node::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::Node
+impl core::marker::Send for inspector_projection::Node
+impl core::marker::Sync for inspector_projection::Node
+impl core::marker::Unpin for inspector_projection::Node
+impl core::marker::UnsafeUnpin for inspector_projection::Node
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::Node
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::Node
+impl<T, U> core::convert::Into<U> for inspector_projection::Node where U: core::convert::From<T>
+pub fn inspector_projection::Node::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::Node where U: core::convert::Into<T>
+pub type inspector_projection::Node::Error = core::convert::Infallible
+pub fn inspector_projection::Node::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::Node where U: core::convert::TryFrom<T>
+pub type inspector_projection::Node::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::Node::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::Node where T: core::clone::Clone
+pub type inspector_projection::Node::Owned = T
+pub fn inspector_projection::Node::clone_into(&self, &mut T)
+pub fn inspector_projection::Node::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::Node where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::Node::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::Node where T: ?core::marker::Sized
+pub fn inspector_projection::Node::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::Node where T: ?core::marker::Sized
+pub fn inspector_projection::Node::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::Node where T: core::clone::Clone
+pub unsafe fn inspector_projection::Node::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::Node
+pub fn inspector_projection::Node::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::Node where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::NodeId(_)
+impl inspector_projection::NodeId
+pub fn inspector_projection::NodeId::as_str(&self) -> &str
+pub fn inspector_projection::NodeId::child(&self, &str) -> Self
+pub fn inspector_projection::NodeId::depth(&self) -> usize
+pub fn inspector_projection::NodeId::from_parts(&str, &str) -> Self
+pub fn inspector_projection::NodeId::kind(&self) -> &str
+pub fn inspector_projection::NodeId::new(impl core::convert::Into<alloc::string::String>) -> core::result::Result<Self, inspector_projection::NodeIdError>
+pub fn inspector_projection::NodeId::parent(&self) -> core::option::Option<Self>
+pub fn inspector_projection::NodeId::qualifier(&self) -> &str
+pub fn inspector_projection::NodeId::segments(&self) -> impl core::iter::traits::iterator::Iterator<Item = &str>
+impl core::clone::Clone for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::clone(&self) -> inspector_projection::NodeId
+impl core::cmp::Eq for inspector_projection::NodeId
+impl core::cmp::Ord for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::eq(&self, &inspector_projection::NodeId) -> bool
+impl core::cmp::PartialOrd for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<inspector_projection::NodeId> for alloc::string::String
+pub fn alloc::string::String::from(inspector_projection::NodeId) -> Self
+impl core::convert::From<inspector_projection::NodeId> for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::from(inspector_projection::NodeId) -> Self
+impl core::convert::TryFrom<&str> for inspector_projection::NodeId
+pub type inspector_projection::NodeId::Error = inspector_projection::NodeIdError
+pub fn inspector_projection::NodeId::try_from(&str) -> core::result::Result<Self, Self::Error>
+impl core::convert::TryFrom<alloc::string::String> for inspector_projection::NodeId
+pub type inspector_projection::NodeId::Error = inspector_projection::NodeIdError
+pub fn inspector_projection::NodeId::try_from(alloc::string::String) -> core::result::Result<Self, Self::Error>
+impl core::fmt::Debug for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for inspector_projection::NodeId
+impl serde_core::ser::Serialize for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::NodeId
+impl core::marker::Send for inspector_projection::NodeId
+impl core::marker::Sync for inspector_projection::NodeId
+impl core::marker::Unpin for inspector_projection::NodeId
+impl core::marker::UnsafeUnpin for inspector_projection::NodeId
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::NodeId
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::NodeId
+impl<T, U> core::convert::Into<U> for inspector_projection::NodeId where U: core::convert::From<T>
+pub fn inspector_projection::NodeId::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::NodeId where U: core::convert::Into<T>
+pub type inspector_projection::NodeId::Error = core::convert::Infallible
+pub fn inspector_projection::NodeId::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::NodeId where U: core::convert::TryFrom<T>
+pub type inspector_projection::NodeId::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::NodeId::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::NodeId where T: core::clone::Clone
+pub type inspector_projection::NodeId::Owned = T
+pub fn inspector_projection::NodeId::clone_into(&self, &mut T)
+pub fn inspector_projection::NodeId::to_owned(&self) -> T
+impl<T> alloc::string::ToString for inspector_projection::NodeId where T: core::fmt::Display + ?core::marker::Sized
+pub fn inspector_projection::NodeId::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for inspector_projection::NodeId where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::NodeId::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::NodeId where T: ?core::marker::Sized
+pub fn inspector_projection::NodeId::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::NodeId where T: ?core::marker::Sized
+pub fn inspector_projection::NodeId::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::NodeId where T: core::clone::Clone
+pub unsafe fn inspector_projection::NodeId::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::NodeId
+pub fn inspector_projection::NodeId::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::NodeId where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::NodeSummary
+pub inspector_projection::NodeSummary::item_count: usize
+pub inspector_projection::NodeSummary::status: core::option::Option<alloc::string::String>
+impl inspector_projection::NodeSummary
+pub fn inspector_projection::NodeSummary::count(usize) -> Self
+pub fn inspector_projection::NodeSummary::with_status(usize, impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for inspector_projection::NodeSummary
+pub fn inspector_projection::NodeSummary::clone(&self) -> inspector_projection::NodeSummary
+impl core::fmt::Debug for inspector_projection::NodeSummary
+pub fn inspector_projection::NodeSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::NodeSummary
+pub fn inspector_projection::NodeSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::NodeSummary
+pub fn inspector_projection::NodeSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::NodeSummary
+impl core::marker::Send for inspector_projection::NodeSummary
+impl core::marker::Sync for inspector_projection::NodeSummary
+impl core::marker::Unpin for inspector_projection::NodeSummary
+impl core::marker::UnsafeUnpin for inspector_projection::NodeSummary
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::NodeSummary
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::NodeSummary
+impl<T, U> core::convert::Into<U> for inspector_projection::NodeSummary where U: core::convert::From<T>
+pub fn inspector_projection::NodeSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::NodeSummary where U: core::convert::Into<T>
+pub type inspector_projection::NodeSummary::Error = core::convert::Infallible
+pub fn inspector_projection::NodeSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::NodeSummary where U: core::convert::TryFrom<T>
+pub type inspector_projection::NodeSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::NodeSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::NodeSummary where T: core::clone::Clone
+pub type inspector_projection::NodeSummary::Owned = T
+pub fn inspector_projection::NodeSummary::clone_into(&self, &mut T)
+pub fn inspector_projection::NodeSummary::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::NodeSummary where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::NodeSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::NodeSummary where T: ?core::marker::Sized
+pub fn inspector_projection::NodeSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::NodeSummary where T: ?core::marker::Sized
+pub fn inspector_projection::NodeSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::NodeSummary where T: core::clone::Clone
+pub unsafe fn inspector_projection::NodeSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::NodeSummary
+pub fn inspector_projection::NodeSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::NodeSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::PagingInfo
+pub inspector_projection::PagingInfo::limit: usize
+pub inspector_projection::PagingInfo::next: core::option::Option<inspector_projection::NodeId>
+pub inspector_projection::PagingInfo::total: core::option::Option<usize>
+impl core::clone::Clone for inspector_projection::PagingInfo
+pub fn inspector_projection::PagingInfo::clone(&self) -> inspector_projection::PagingInfo
+impl core::fmt::Debug for inspector_projection::PagingInfo
+pub fn inspector_projection::PagingInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::PagingInfo
+pub fn inspector_projection::PagingInfo::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::PagingInfo
+pub fn inspector_projection::PagingInfo::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::PagingInfo
+impl core::marker::Send for inspector_projection::PagingInfo
+impl core::marker::Sync for inspector_projection::PagingInfo
+impl core::marker::Unpin for inspector_projection::PagingInfo
+impl core::marker::UnsafeUnpin for inspector_projection::PagingInfo
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::PagingInfo
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::PagingInfo
+impl<T, U> core::convert::Into<U> for inspector_projection::PagingInfo where U: core::convert::From<T>
+pub fn inspector_projection::PagingInfo::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::PagingInfo where U: core::convert::Into<T>
+pub type inspector_projection::PagingInfo::Error = core::convert::Infallible
+pub fn inspector_projection::PagingInfo::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::PagingInfo where U: core::convert::TryFrom<T>
+pub type inspector_projection::PagingInfo::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::PagingInfo::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::PagingInfo where T: core::clone::Clone
+pub type inspector_projection::PagingInfo::Owned = T
+pub fn inspector_projection::PagingInfo::clone_into(&self, &mut T)
+pub fn inspector_projection::PagingInfo::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::PagingInfo where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::PagingInfo::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::PagingInfo where T: ?core::marker::Sized
+pub fn inspector_projection::PagingInfo::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::PagingInfo where T: ?core::marker::Sized
+pub fn inspector_projection::PagingInfo::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::PagingInfo where T: core::clone::Clone
+pub unsafe fn inspector_projection::PagingInfo::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::PagingInfo
+pub fn inspector_projection::PagingInfo::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::PagingInfo where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::PagingList
+pub inspector_projection::PagingList::items: alloc::vec::Vec<inspector_projection::RefValue>
+pub inspector_projection::PagingList::paging: inspector_projection::PagingInfo
+impl inspector_projection::PagingList
+pub fn inspector_projection::PagingList::new(alloc::vec::Vec<inspector_projection::RefValue>, usize, core::option::Option<inspector_projection::NodeId>) -> Self
+impl core::clone::Clone for inspector_projection::PagingList
+pub fn inspector_projection::PagingList::clone(&self) -> inspector_projection::PagingList
+impl core::fmt::Debug for inspector_projection::PagingList
+pub fn inspector_projection::PagingList::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::PagingList
+pub fn inspector_projection::PagingList::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::PagingList
+pub fn inspector_projection::PagingList::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::PagingList
+impl core::marker::Send for inspector_projection::PagingList
+impl core::marker::Sync for inspector_projection::PagingList
+impl core::marker::Unpin for inspector_projection::PagingList
+impl core::marker::UnsafeUnpin for inspector_projection::PagingList
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::PagingList
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::PagingList
+impl<T, U> core::convert::Into<U> for inspector_projection::PagingList where U: core::convert::From<T>
+pub fn inspector_projection::PagingList::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::PagingList where U: core::convert::Into<T>
+pub type inspector_projection::PagingList::Error = core::convert::Infallible
+pub fn inspector_projection::PagingList::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::PagingList where U: core::convert::TryFrom<T>
+pub type inspector_projection::PagingList::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::PagingList::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::PagingList where T: core::clone::Clone
+pub type inspector_projection::PagingList::Owned = T
+pub fn inspector_projection::PagingList::clone_into(&self, &mut T)
+pub fn inspector_projection::PagingList::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::PagingList where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::PagingList::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::PagingList where T: ?core::marker::Sized
+pub fn inspector_projection::PagingList::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::PagingList where T: ?core::marker::Sized
+pub fn inspector_projection::PagingList::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::PagingList where T: core::clone::Clone
+pub unsafe fn inspector_projection::PagingList::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::PagingList
+pub fn inspector_projection::PagingList::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::PagingList where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::Provenance
+pub inspector_projection::Provenance::asserted_at: alloc::string::String
+pub inspector_projection::Provenance::confidence: core::option::Option<f64>
+pub inspector_projection::Provenance::evidence_refs: alloc::vec::Vec<inspector_projection::RefValue>
+pub inspector_projection::Provenance::notes: core::option::Option<alloc::string::String>
+pub inspector_projection::Provenance::sources: alloc::vec::Vec<alloc::string::String>
+impl inspector_projection::Provenance
+pub fn inspector_projection::Provenance::new(alloc::vec::Vec<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn inspector_projection::Provenance::with_confidence(self, f64) -> Self
+pub fn inspector_projection::Provenance::with_notes(self, impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for inspector_projection::Provenance
+pub fn inspector_projection::Provenance::clone(&self) -> inspector_projection::Provenance
+impl core::fmt::Debug for inspector_projection::Provenance
+pub fn inspector_projection::Provenance::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::Provenance
+pub fn inspector_projection::Provenance::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::Provenance
+pub fn inspector_projection::Provenance::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::Provenance
+impl core::marker::Send for inspector_projection::Provenance
+impl core::marker::Sync for inspector_projection::Provenance
+impl core::marker::Unpin for inspector_projection::Provenance
+impl core::marker::UnsafeUnpin for inspector_projection::Provenance
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::Provenance
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::Provenance
+impl<T, U> core::convert::Into<U> for inspector_projection::Provenance where U: core::convert::From<T>
+pub fn inspector_projection::Provenance::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::Provenance where U: core::convert::Into<T>
+pub type inspector_projection::Provenance::Error = core::convert::Infallible
+pub fn inspector_projection::Provenance::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::Provenance where U: core::convert::TryFrom<T>
+pub type inspector_projection::Provenance::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::Provenance::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::Provenance where T: core::clone::Clone
+pub type inspector_projection::Provenance::Owned = T
+pub fn inspector_projection::Provenance::clone_into(&self, &mut T)
+pub fn inspector_projection::Provenance::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::Provenance where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::Provenance::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::Provenance where T: ?core::marker::Sized
+pub fn inspector_projection::Provenance::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::Provenance where T: ?core::marker::Sized
+pub fn inspector_projection::Provenance::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::Provenance where T: core::clone::Clone
+pub unsafe fn inspector_projection::Provenance::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::Provenance
+pub fn inspector_projection::Provenance::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::Provenance where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::PruneFilter
+pub inspector_projection::PruneFilter::exclude_paths: alloc::vec::Vec<alloc::string::String>
+pub inspector_projection::PruneFilter::filters: alloc::collections::btree::map::BTreeMap<alloc::string::String, serde_json::value::Value>
+impl core::clone::Clone for inspector_projection::PruneFilter
+pub fn inspector_projection::PruneFilter::clone(&self) -> inspector_projection::PruneFilter
+impl core::default::Default for inspector_projection::PruneFilter
+pub fn inspector_projection::PruneFilter::default() -> inspector_projection::PruneFilter
+impl core::fmt::Debug for inspector_projection::PruneFilter
+pub fn inspector_projection::PruneFilter::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::PruneFilter
+pub fn inspector_projection::PruneFilter::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::PruneFilter
+pub fn inspector_projection::PruneFilter::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::PruneFilter
+impl core::marker::Send for inspector_projection::PruneFilter
+impl core::marker::Sync for inspector_projection::PruneFilter
+impl core::marker::Unpin for inspector_projection::PruneFilter
+impl core::marker::UnsafeUnpin for inspector_projection::PruneFilter
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::PruneFilter
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::PruneFilter
+impl<T, U> core::convert::Into<U> for inspector_projection::PruneFilter where U: core::convert::From<T>
+pub fn inspector_projection::PruneFilter::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::PruneFilter where U: core::convert::Into<T>
+pub type inspector_projection::PruneFilter::Error = core::convert::Infallible
+pub fn inspector_projection::PruneFilter::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::PruneFilter where U: core::convert::TryFrom<T>
+pub type inspector_projection::PruneFilter::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::PruneFilter::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::PruneFilter where T: core::clone::Clone
+pub type inspector_projection::PruneFilter::Owned = T
+pub fn inspector_projection::PruneFilter::clone_into(&self, &mut T)
+pub fn inspector_projection::PruneFilter::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::PruneFilter where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::PruneFilter::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::PruneFilter where T: ?core::marker::Sized
+pub fn inspector_projection::PruneFilter::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::PruneFilter where T: ?core::marker::Sized
+pub fn inspector_projection::PruneFilter::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::PruneFilter where T: core::clone::Clone
+pub unsafe fn inspector_projection::PruneFilter::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::PruneFilter
+pub fn inspector_projection::PruneFilter::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::PruneFilter where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::RefValue
+pub inspector_projection::RefValue::target: inspector_projection::NodeId
+impl inspector_projection::RefValue
+pub fn inspector_projection::RefValue::new(inspector_projection::NodeId) -> Self
+pub fn inspector_projection::RefValue::parse(&str) -> core::result::Result<Self, inspector_projection::NodeIdError>
+pub fn inspector_projection::RefValue::target(&self) -> &inspector_projection::NodeId
+impl core::clone::Clone for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::clone(&self) -> inspector_projection::RefValue
+impl core::cmp::Eq for inspector_projection::RefValue
+impl core::cmp::PartialEq for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::eq(&self, &inspector_projection::RefValue) -> bool
+impl core::convert::From<inspector_projection::NodeId> for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::from(inspector_projection::NodeId) -> Self
+impl core::fmt::Debug for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for inspector_projection::RefValue
+impl serde_core::ser::Serialize for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::RefValue
+impl core::marker::Send for inspector_projection::RefValue
+impl core::marker::Sync for inspector_projection::RefValue
+impl core::marker::Unpin for inspector_projection::RefValue
+impl core::marker::UnsafeUnpin for inspector_projection::RefValue
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::RefValue
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::RefValue
+impl<T, U> core::convert::Into<U> for inspector_projection::RefValue where U: core::convert::From<T>
+pub fn inspector_projection::RefValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::RefValue where U: core::convert::Into<T>
+pub type inspector_projection::RefValue::Error = core::convert::Infallible
+pub fn inspector_projection::RefValue::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::RefValue where U: core::convert::TryFrom<T>
+pub type inspector_projection::RefValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::RefValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::RefValue where T: core::clone::Clone
+pub type inspector_projection::RefValue::Owned = T
+pub fn inspector_projection::RefValue::clone_into(&self, &mut T)
+pub fn inspector_projection::RefValue::to_owned(&self) -> T
+impl<T> alloc::string::ToString for inspector_projection::RefValue where T: core::fmt::Display + ?core::marker::Sized
+pub fn inspector_projection::RefValue::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for inspector_projection::RefValue where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::RefValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::RefValue where T: ?core::marker::Sized
+pub fn inspector_projection::RefValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::RefValue where T: ?core::marker::Sized
+pub fn inspector_projection::RefValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::RefValue where T: core::clone::Clone
+pub unsafe fn inspector_projection::RefValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::RefValue
+pub fn inspector_projection::RefValue::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::RefValue where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::RenderPolicy
+pub inspector_projection::RenderPolicy::lod: u8
+pub inspector_projection::RenderPolicy::max_depth: u8
+pub inspector_projection::RenderPolicy::max_items_per_list: usize
+pub inspector_projection::RenderPolicy::prune: inspector_projection::PruneFilter
+pub inspector_projection::RenderPolicy::show: inspector_projection::ShowFilter
+impl inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::field_visible(&self, &str) -> bool
+pub fn inspector_projection::RenderPolicy::is_pruned(&self, &str) -> bool
+pub fn inspector_projection::RenderPolicy::minimal() -> Self
+pub fn inspector_projection::RenderPolicy::policy_hash(&self) -> alloc::string::String
+pub fn inspector_projection::RenderPolicy::should_auto_expand(&self, usize) -> bool
+pub fn inspector_projection::RenderPolicy::verbose() -> Self
+impl core::clone::Clone for inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::clone(&self) -> inspector_projection::RenderPolicy
+impl core::default::Default for inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::default() -> Self
+impl core::fmt::Debug for inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::RenderPolicy
+impl core::marker::Send for inspector_projection::RenderPolicy
+impl core::marker::Sync for inspector_projection::RenderPolicy
+impl core::marker::Unpin for inspector_projection::RenderPolicy
+impl core::marker::UnsafeUnpin for inspector_projection::RenderPolicy
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::RenderPolicy
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::RenderPolicy
+impl<T, U> core::convert::Into<U> for inspector_projection::RenderPolicy where U: core::convert::From<T>
+pub fn inspector_projection::RenderPolicy::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::RenderPolicy where U: core::convert::Into<T>
+pub type inspector_projection::RenderPolicy::Error = core::convert::Infallible
+pub fn inspector_projection::RenderPolicy::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::RenderPolicy where U: core::convert::TryFrom<T>
+pub type inspector_projection::RenderPolicy::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::RenderPolicy::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::RenderPolicy where T: core::clone::Clone
+pub type inspector_projection::RenderPolicy::Owned = T
+pub fn inspector_projection::RenderPolicy::clone_into(&self, &mut T)
+pub fn inspector_projection::RenderPolicy::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::RenderPolicy where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::RenderPolicy::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::RenderPolicy where T: ?core::marker::Sized
+pub fn inspector_projection::RenderPolicy::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::RenderPolicy where T: ?core::marker::Sized
+pub fn inspector_projection::RenderPolicy::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::RenderPolicy where T: core::clone::Clone
+pub unsafe fn inspector_projection::RenderPolicy::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::RenderPolicy
+pub fn inspector_projection::RenderPolicy::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::RenderPolicy where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::ShowFilter
+pub inspector_projection::ShowFilter::branches: alloc::vec::Vec<alloc::string::String>
+pub inspector_projection::ShowFilter::chambers: alloc::vec::Vec<alloc::string::String>
+pub inspector_projection::ShowFilter::node_kinds: alloc::vec::Vec<alloc::string::String>
+impl inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::branch_visible(&self, &str) -> bool
+pub fn inspector_projection::ShowFilter::chamber_visible(&self, &str) -> bool
+impl core::clone::Clone for inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::clone(&self) -> inspector_projection::ShowFilter
+impl core::default::Default for inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::default() -> inspector_projection::ShowFilter
+impl core::fmt::Debug for inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::ShowFilter
+impl core::marker::Send for inspector_projection::ShowFilter
+impl core::marker::Sync for inspector_projection::ShowFilter
+impl core::marker::Unpin for inspector_projection::ShowFilter
+impl core::marker::UnsafeUnpin for inspector_projection::ShowFilter
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::ShowFilter
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::ShowFilter
+impl<T, U> core::convert::Into<U> for inspector_projection::ShowFilter where U: core::convert::From<T>
+pub fn inspector_projection::ShowFilter::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::ShowFilter where U: core::convert::Into<T>
+pub type inspector_projection::ShowFilter::Error = core::convert::Infallible
+pub fn inspector_projection::ShowFilter::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::ShowFilter where U: core::convert::TryFrom<T>
+pub type inspector_projection::ShowFilter::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::ShowFilter::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::ShowFilter where T: core::clone::Clone
+pub type inspector_projection::ShowFilter::Owned = T
+pub fn inspector_projection::ShowFilter::clone_into(&self, &mut T)
+pub fn inspector_projection::ShowFilter::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::ShowFilter where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::ShowFilter::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::ShowFilter where T: ?core::marker::Sized
+pub fn inspector_projection::ShowFilter::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::ShowFilter where T: ?core::marker::Sized
+pub fn inspector_projection::ShowFilter::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::ShowFilter where T: core::clone::Clone
+pub unsafe fn inspector_projection::ShowFilter::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::ShowFilter
+pub fn inspector_projection::ShowFilter::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::ShowFilter where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::SnapshotMeta
+pub inspector_projection::SnapshotMeta::created_at: alloc::string::String
+pub inspector_projection::SnapshotMeta::policy_hash: alloc::string::String
+pub inspector_projection::SnapshotMeta::schema_version: u32
+pub inspector_projection::SnapshotMeta::source_hash: alloc::string::String
+impl core::clone::Clone for inspector_projection::SnapshotMeta
+pub fn inspector_projection::SnapshotMeta::clone(&self) -> inspector_projection::SnapshotMeta
+impl core::default::Default for inspector_projection::SnapshotMeta
+pub fn inspector_projection::SnapshotMeta::default() -> Self
+impl core::fmt::Debug for inspector_projection::SnapshotMeta
+pub fn inspector_projection::SnapshotMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::SnapshotMeta
+pub fn inspector_projection::SnapshotMeta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::SnapshotMeta
+pub fn inspector_projection::SnapshotMeta::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::SnapshotMeta
+impl core::marker::Send for inspector_projection::SnapshotMeta
+impl core::marker::Sync for inspector_projection::SnapshotMeta
+impl core::marker::Unpin for inspector_projection::SnapshotMeta
+impl core::marker::UnsafeUnpin for inspector_projection::SnapshotMeta
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::SnapshotMeta
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::SnapshotMeta
+impl<T, U> core::convert::Into<U> for inspector_projection::SnapshotMeta where U: core::convert::From<T>
+pub fn inspector_projection::SnapshotMeta::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::SnapshotMeta where U: core::convert::Into<T>
+pub type inspector_projection::SnapshotMeta::Error = core::convert::Infallible
+pub fn inspector_projection::SnapshotMeta::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::SnapshotMeta where U: core::convert::TryFrom<T>
+pub type inspector_projection::SnapshotMeta::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::SnapshotMeta::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::SnapshotMeta where T: core::clone::Clone
+pub type inspector_projection::SnapshotMeta::Owned = T
+pub fn inspector_projection::SnapshotMeta::clone_into(&self, &mut T)
+pub fn inspector_projection::SnapshotMeta::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::SnapshotMeta where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::SnapshotMeta::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::SnapshotMeta where T: ?core::marker::Sized
+pub fn inspector_projection::SnapshotMeta::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::SnapshotMeta where T: ?core::marker::Sized
+pub fn inspector_projection::SnapshotMeta::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::SnapshotMeta where T: core::clone::Clone
+pub unsafe fn inspector_projection::SnapshotMeta::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::SnapshotMeta
+pub fn inspector_projection::SnapshotMeta::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::SnapshotMeta where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::UiHints
+pub inspector_projection::UiHints::breadcrumb: bool
+pub inspector_projection::UiHints::history: bool
+pub inspector_projection::UiHints::shorthand_labels: bool
+impl core::clone::Clone for inspector_projection::UiHints
+pub fn inspector_projection::UiHints::clone(&self) -> inspector_projection::UiHints
+impl core::default::Default for inspector_projection::UiHints
+pub fn inspector_projection::UiHints::default() -> Self
+impl core::fmt::Debug for inspector_projection::UiHints
+pub fn inspector_projection::UiHints::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for inspector_projection::UiHints
+pub fn inspector_projection::UiHints::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for inspector_projection::UiHints
+pub fn inspector_projection::UiHints::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for inspector_projection::UiHints
+impl core::marker::Send for inspector_projection::UiHints
+impl core::marker::Sync for inspector_projection::UiHints
+impl core::marker::Unpin for inspector_projection::UiHints
+impl core::marker::UnsafeUnpin for inspector_projection::UiHints
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::UiHints
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::UiHints
+impl<T, U> core::convert::Into<U> for inspector_projection::UiHints where U: core::convert::From<T>
+pub fn inspector_projection::UiHints::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::UiHints where U: core::convert::Into<T>
+pub type inspector_projection::UiHints::Error = core::convert::Infallible
+pub fn inspector_projection::UiHints::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::UiHints where U: core::convert::TryFrom<T>
+pub type inspector_projection::UiHints::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::UiHints::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for inspector_projection::UiHints where T: core::clone::Clone
+pub type inspector_projection::UiHints::Owned = T
+pub fn inspector_projection::UiHints::clone_into(&self, &mut T)
+pub fn inspector_projection::UiHints::to_owned(&self) -> T
+impl<T> core::any::Any for inspector_projection::UiHints where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::UiHints::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::UiHints where T: ?core::marker::Sized
+pub fn inspector_projection::UiHints::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::UiHints where T: ?core::marker::Sized
+pub fn inspector_projection::UiHints::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for inspector_projection::UiHints where T: core::clone::Clone
+pub unsafe fn inspector_projection::UiHints::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for inspector_projection::UiHints
+pub fn inspector_projection::UiHints::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for inspector_projection::UiHints where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct inspector_projection::ValidationResult
+pub inspector_projection::ValidationResult::errors: alloc::vec::Vec<inspector_projection::ValidationError>
+pub inspector_projection::ValidationResult::warnings: alloc::vec::Vec<inspector_projection::ValidationError>
+impl inspector_projection::ValidationResult
+pub fn inspector_projection::ValidationResult::add(&mut self, inspector_projection::ValidationError)
+pub fn inspector_projection::ValidationResult::is_valid(&self) -> bool
+pub fn inspector_projection::ValidationResult::issue_count(&self) -> usize
+pub fn inspector_projection::ValidationResult::new() -> Self
+impl core::default::Default for inspector_projection::ValidationResult
+pub fn inspector_projection::ValidationResult::default() -> inspector_projection::ValidationResult
+impl core::fmt::Debug for inspector_projection::ValidationResult
+pub fn inspector_projection::ValidationResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for inspector_projection::ValidationResult
+impl core::marker::Send for inspector_projection::ValidationResult
+impl core::marker::Sync for inspector_projection::ValidationResult
+impl core::marker::Unpin for inspector_projection::ValidationResult
+impl core::marker::UnsafeUnpin for inspector_projection::ValidationResult
+impl core::panic::unwind_safe::RefUnwindSafe for inspector_projection::ValidationResult
+impl core::panic::unwind_safe::UnwindSafe for inspector_projection::ValidationResult
+impl<T, U> core::convert::Into<U> for inspector_projection::ValidationResult where U: core::convert::From<T>
+pub fn inspector_projection::ValidationResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for inspector_projection::ValidationResult where U: core::convert::Into<T>
+pub type inspector_projection::ValidationResult::Error = core::convert::Infallible
+pub fn inspector_projection::ValidationResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for inspector_projection::ValidationResult where U: core::convert::TryFrom<T>
+pub type inspector_projection::ValidationResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn inspector_projection::ValidationResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for inspector_projection::ValidationResult where T: 'static + ?core::marker::Sized
+pub fn inspector_projection::ValidationResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for inspector_projection::ValidationResult where T: ?core::marker::Sized
+pub fn inspector_projection::ValidationResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for inspector_projection::ValidationResult where T: ?core::marker::Sized
+pub fn inspector_projection::ValidationResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for inspector_projection::ValidationResult
+pub fn inspector_projection::ValidationResult::from(T) -> T
+pub trait inspector_projection::ProjectionGenerator
+pub type inspector_projection::ProjectionGenerator::Source
+pub fn inspector_projection::ProjectionGenerator::generate(&self, &Self::Source, &inspector_projection::RenderPolicy) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::ProjectionGenerator::generate_with_defaults(&self, &Self::Source) -> inspector_projection::InspectorProjection
+pub fn inspector_projection::validate(&inspector_projection::InspectorProjection) -> inspector_projection::ValidationResult

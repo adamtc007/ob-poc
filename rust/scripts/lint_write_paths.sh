@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
-# CI lint: verify P1 catalogue-table writes stay on sanctioned governed paths.
+# CI lint: verify governed catalogue/snapshot writes stay on sanctioned paths.
+#
+# Guarantees:
+# - Direct Rust SQL statements of the form INSERT/UPDATE/DELETE against
+#   `"ob-poc".<catalogue_table>` or `sem_reg.snapshots` must live in a sanctioned
+#   backing path and must match the checked-in baseline.
+# - Mutator-looking methods in the catalogue store modules under `src/database/`
+#   must not be bare `pub`; constructors/read APIs may stay public.
+#
+# Limits:
+# - This is source scanning, not call-graph analysis. It does not prove that an
+#   arbitrary indirect caller is verb-mediated, and it only sees direct SQL text
+#   matching the patterns below.
 #
 # Usage:
 #   ./scripts/lint_write_paths.sh           # Check for new or unsanctioned writers
 #   ./scripts/lint_write_paths.sh --update  # Regenerate the sanctioned writer baseline
+#   ./scripts/lint_write_paths.sh --self-test # Prove the public mutator guard trips
 
 set -euo pipefail
 
@@ -23,6 +36,7 @@ P1_TABLES=(
     "attribute_registry"
     "product_service_conditions"
     "product_service_option_overrides"
+    "sem_reg.snapshots"
 )
 
 SCAN_ROOTS=(
@@ -30,7 +44,13 @@ SCAN_ROOTS=(
     "crates"
 )
 
-WRITE_PATTERN='(INSERT[[:space:]]+INTO|UPDATE|DELETE[[:space:]]+FROM)[[:space:]]+"ob-poc"\.([A-Za-z_][A-Za-z0-9_]*)'
+CATALOGUE_STORE_MODULES=(
+    "src/database/product_service.rs"
+    "src/database/service_service.rs"
+    "src/database/service_resource_service.rs"
+)
+
+WRITE_PATTERN='(INSERT[[:space:]]+INTO|UPDATE|DELETE[[:space:]]+FROM)[[:space:]]+(("ob-poc")|sem_reg)\.([A-Za-z_][A-Za-z0-9_]*)'
 
 is_p1_table() {
     local table="$1"
@@ -41,6 +61,17 @@ is_p1_table() {
         fi
     done
     return 1
+}
+
+normalize_table() {
+    local schema="$1"
+    local table="$2"
+
+    if [ "$schema" = "sem_reg" ]; then
+        printf 'sem_reg.%s' "$table"
+    else
+        printf '%s' "$table"
+    fi
 }
 
 is_sanctioned_path_for_table() {
@@ -77,6 +108,12 @@ is_sanctioned_path_for_table() {
         product_service_conditions:src/domain_ops/catalogue_maintenance_ops.rs) return 0 ;;
 
         product_service_option_overrides:crates/sem_os_postgres/src/ops/service_options.rs) return 0 ;;
+
+        sem_reg.snapshots:src/services/attribute_service_impl.rs) return 0 ;;
+        sem_reg.snapshots:src/services/phrase_service_impl.rs) return 0 ;;
+        sem_reg.snapshots:src/sem_reg/store.rs) return 0 ;;
+        sem_reg.snapshots:src/sem_reg/stewardship/tools_phase0.rs) return 0 ;;
+        sem_reg.snapshots:crates/sem_os_postgres/src/store.rs) return 0 ;;
     esac
 
     return 1
@@ -109,6 +146,65 @@ is_public_database_writer() {
     [[ "$signature" =~ ^[[:space:]]*pub[[:space:]]+ ]]
 }
 
+is_allowed_public_catalogue_store_method() {
+    local fn_name="$1"
+
+    case "$fn_name" in
+        new|pool|get_*|list_*) return 0 ;;
+    esac
+
+    return 1
+}
+
+scan_public_catalogue_store_methods() {
+    local module
+    for module in "${CATALOGUE_STORE_MODULES[@]}"; do
+        [ -f "$module" ] || continue
+        rg --no-heading -n '^[[:space:]]*pub[[:space:]]+(async[[:space:]]+)?fn[[:space:]]+[A-Za-z_][A-Za-z0-9_]*' "$module" \
+            | while IFS= read -r hit; do
+                [ -n "$hit" ] || continue
+                path="${hit%%:*}"
+                rest="${hit#*:}"
+                line_no="${rest%%:*}"
+                source="${rest#*:}"
+                if [[ "$source" =~ fn[[:space:]]+([A-Za-z_][A-Za-z0-9_]*) ]]; then
+                    fn_name="${BASH_REMATCH[1]}"
+                else
+                    continue
+                fi
+                if ! is_allowed_public_catalogue_store_method "$fn_name"; then
+                    printf '%s:%s public catalogue store mutator `%s`; use pub(crate)\n' \
+                        "$path" "$line_no" "$fn_name"
+                fi
+            done
+    done
+}
+
+run_self_test() {
+    local tmp
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' RETURN
+    mkdir -p "$tmp/src/database"
+    cat > "$tmp/src/database/product_service.rs" <<'EOF'
+pub struct ProductService;
+impl ProductService {
+    pub fn new() -> Self { Self }
+    pub async fn create_product(&self) {}
+    pub(crate) async fn update_product(&self) {}
+}
+EOF
+    (
+        cd "$tmp"
+        CATALOGUE_STORE_MODULES=("src/database/product_service.rs")
+        if scan_public_catalogue_store_methods | grep -q 'create_product'; then
+            echo "✓ lint self-test passed: bare-public catalogue mutator was rejected"
+            exit 0
+        fi
+        echo "✗ lint self-test failed: bare-public catalogue mutator was not detected"
+        exit 1
+    )
+}
+
 normalize_op() {
     case "$1" in
         INSERT*) printf 'INSERT' ;;
@@ -126,6 +222,11 @@ scan_catalogue_writers() {
     rg --pcre2 --no-heading -n "$WRITE_PATTERN" "${SCAN_ROOTS[@]}" --glob '*.rs' 2>/dev/null || true
 }
 
+if [ "${1:-}" = "--self-test" ]; then
+    run_self_test
+    exit $?
+fi
+
 cd "$ROOT"
 
 CURRENT_KEYS="$(mktemp)"
@@ -141,9 +242,9 @@ while IFS= read -r hit; do
     line_no="${rest%%:*}"
     source="${rest#*:}"
 
-    if [[ "$source" =~ (INSERT[[:space:]]+INTO|UPDATE|DELETE[[:space:]]+FROM)[[:space:]]+\"ob-poc\"\.([A-Za-z_][A-Za-z0-9_]*) ]]; then
+    if [[ "$source" =~ (INSERT[[:space:]]+INTO|UPDATE|DELETE[[:space:]]+FROM)[[:space:]]+(\"ob-poc\"|sem_reg)\.([A-Za-z_][A-Za-z0-9_]*) ]]; then
         op="$(normalize_op "${BASH_REMATCH[1]}")"
-        table="${BASH_REMATCH[2]}"
+        table="$(normalize_table "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")"
     else
         continue
     fi
@@ -169,6 +270,8 @@ while IFS= read -r hit; do
     printf '%s\n' "$key" >> "$CURRENT_KEYS"
     printf '%s\t%s:%s\n' "$key" "$path" "$line_no" >> "$CURRENT_DETAILS"
 done < <(scan_catalogue_writers)
+
+scan_public_catalogue_store_methods >> "$HARD_VIOLATIONS"
 
 sort -u "$CURRENT_KEYS" -o "$CURRENT_KEYS"
 sort -u "$CURRENT_DETAILS" -o "$CURRENT_DETAILS"

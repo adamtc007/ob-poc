@@ -1,0 +1,261 @@
+# dsl-lowering | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:14Z
+pub mod dsl_lowering
+pub struct dsl_lowering::JourneyBoundaryAttachment
+pub dsl_lowering::JourneyBoundaryAttachment::event_kind: alloc::string::String
+pub dsl_lowering::JourneyBoundaryAttachment::event_name: alloc::string::String
+pub dsl_lowering::JourneyBoundaryAttachment::host_node: alloc::string::String
+pub dsl_lowering::JourneyBoundaryAttachment::interrupting: bool
+impl core::clone::Clone for dsl_lowering::JourneyBoundaryAttachment
+pub fn dsl_lowering::JourneyBoundaryAttachment::clone(&self) -> dsl_lowering::JourneyBoundaryAttachment
+impl core::fmt::Debug for dsl_lowering::JourneyBoundaryAttachment
+pub fn dsl_lowering::JourneyBoundaryAttachment::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_lowering::JourneyBoundaryAttachment
+pub fn dsl_lowering::JourneyBoundaryAttachment::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_lowering::JourneyBoundaryAttachment
+pub fn dsl_lowering::JourneyBoundaryAttachment::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_lowering::JourneyBoundaryAttachment
+impl core::marker::Send for dsl_lowering::JourneyBoundaryAttachment
+impl core::marker::Sync for dsl_lowering::JourneyBoundaryAttachment
+impl core::marker::Unpin for dsl_lowering::JourneyBoundaryAttachment
+impl core::marker::UnsafeUnpin for dsl_lowering::JourneyBoundaryAttachment
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lowering::JourneyBoundaryAttachment
+impl core::panic::unwind_safe::UnwindSafe for dsl_lowering::JourneyBoundaryAttachment
+impl<T, U> core::convert::Into<U> for dsl_lowering::JourneyBoundaryAttachment where U: core::convert::From<T>
+pub fn dsl_lowering::JourneyBoundaryAttachment::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lowering::JourneyBoundaryAttachment where U: core::convert::Into<T>
+pub type dsl_lowering::JourneyBoundaryAttachment::Error = core::convert::Infallible
+pub fn dsl_lowering::JourneyBoundaryAttachment::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lowering::JourneyBoundaryAttachment where U: core::convert::TryFrom<T>
+pub type dsl_lowering::JourneyBoundaryAttachment::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lowering::JourneyBoundaryAttachment::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lowering::JourneyBoundaryAttachment where T: core::clone::Clone
+pub type dsl_lowering::JourneyBoundaryAttachment::Owned = T
+pub fn dsl_lowering::JourneyBoundaryAttachment::clone_into(&self, &mut T)
+pub fn dsl_lowering::JourneyBoundaryAttachment::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_lowering::JourneyBoundaryAttachment where T: 'static + ?core::marker::Sized
+pub fn dsl_lowering::JourneyBoundaryAttachment::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lowering::JourneyBoundaryAttachment where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyBoundaryAttachment::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lowering::JourneyBoundaryAttachment where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyBoundaryAttachment::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lowering::JourneyBoundaryAttachment where T: core::clone::Clone
+pub unsafe fn dsl_lowering::JourneyBoundaryAttachment::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lowering::JourneyBoundaryAttachment
+pub fn dsl_lowering::JourneyBoundaryAttachment::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_lowering::JourneyBoundaryAttachment where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_lowering::JourneyEdge
+pub dsl_lowering::JourneyEdge::condition: core::option::Option<alloc::string::String>
+pub dsl_lowering::JourneyEdge::is_default: bool
+pub dsl_lowering::JourneyEdge::source: alloc::string::String
+pub dsl_lowering::JourneyEdge::target: alloc::string::String
+impl core::clone::Clone for dsl_lowering::JourneyEdge
+pub fn dsl_lowering::JourneyEdge::clone(&self) -> dsl_lowering::JourneyEdge
+impl core::fmt::Debug for dsl_lowering::JourneyEdge
+pub fn dsl_lowering::JourneyEdge::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_lowering::JourneyEdge
+pub fn dsl_lowering::JourneyEdge::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_lowering::JourneyEdge
+pub fn dsl_lowering::JourneyEdge::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_lowering::JourneyEdge
+impl core::marker::Send for dsl_lowering::JourneyEdge
+impl core::marker::Sync for dsl_lowering::JourneyEdge
+impl core::marker::Unpin for dsl_lowering::JourneyEdge
+impl core::marker::UnsafeUnpin for dsl_lowering::JourneyEdge
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lowering::JourneyEdge
+impl core::panic::unwind_safe::UnwindSafe for dsl_lowering::JourneyEdge
+impl<T, U> core::convert::Into<U> for dsl_lowering::JourneyEdge where U: core::convert::From<T>
+pub fn dsl_lowering::JourneyEdge::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lowering::JourneyEdge where U: core::convert::Into<T>
+pub type dsl_lowering::JourneyEdge::Error = core::convert::Infallible
+pub fn dsl_lowering::JourneyEdge::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lowering::JourneyEdge where U: core::convert::TryFrom<T>
+pub type dsl_lowering::JourneyEdge::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lowering::JourneyEdge::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lowering::JourneyEdge where T: core::clone::Clone
+pub type dsl_lowering::JourneyEdge::Owned = T
+pub fn dsl_lowering::JourneyEdge::clone_into(&self, &mut T)
+pub fn dsl_lowering::JourneyEdge::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_lowering::JourneyEdge where T: 'static + ?core::marker::Sized
+pub fn dsl_lowering::JourneyEdge::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lowering::JourneyEdge where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyEdge::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lowering::JourneyEdge where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyEdge::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lowering::JourneyEdge where T: core::clone::Clone
+pub unsafe fn dsl_lowering::JourneyEdge::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lowering::JourneyEdge
+pub fn dsl_lowering::JourneyEdge::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_lowering::JourneyEdge where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_lowering::JourneyMergeClause
+pub dsl_lowering::JourneyMergeClause::custom_verb: core::option::Option<alloc::string::String>
+pub dsl_lowering::JourneyMergeClause::location: alloc::string::String
+pub dsl_lowering::JourneyMergeClause::operator: alloc::string::String
+impl core::clone::Clone for dsl_lowering::JourneyMergeClause
+pub fn dsl_lowering::JourneyMergeClause::clone(&self) -> dsl_lowering::JourneyMergeClause
+impl core::fmt::Debug for dsl_lowering::JourneyMergeClause
+pub fn dsl_lowering::JourneyMergeClause::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_lowering::JourneyMergeClause
+pub fn dsl_lowering::JourneyMergeClause::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_lowering::JourneyMergeClause
+pub fn dsl_lowering::JourneyMergeClause::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_lowering::JourneyMergeClause
+impl core::marker::Send for dsl_lowering::JourneyMergeClause
+impl core::marker::Sync for dsl_lowering::JourneyMergeClause
+impl core::marker::Unpin for dsl_lowering::JourneyMergeClause
+impl core::marker::UnsafeUnpin for dsl_lowering::JourneyMergeClause
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lowering::JourneyMergeClause
+impl core::panic::unwind_safe::UnwindSafe for dsl_lowering::JourneyMergeClause
+impl<T, U> core::convert::Into<U> for dsl_lowering::JourneyMergeClause where U: core::convert::From<T>
+pub fn dsl_lowering::JourneyMergeClause::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lowering::JourneyMergeClause where U: core::convert::Into<T>
+pub type dsl_lowering::JourneyMergeClause::Error = core::convert::Infallible
+pub fn dsl_lowering::JourneyMergeClause::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lowering::JourneyMergeClause where U: core::convert::TryFrom<T>
+pub type dsl_lowering::JourneyMergeClause::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lowering::JourneyMergeClause::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lowering::JourneyMergeClause where T: core::clone::Clone
+pub type dsl_lowering::JourneyMergeClause::Owned = T
+pub fn dsl_lowering::JourneyMergeClause::clone_into(&self, &mut T)
+pub fn dsl_lowering::JourneyMergeClause::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_lowering::JourneyMergeClause where T: 'static + ?core::marker::Sized
+pub fn dsl_lowering::JourneyMergeClause::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lowering::JourneyMergeClause where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyMergeClause::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lowering::JourneyMergeClause where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyMergeClause::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lowering::JourneyMergeClause where T: core::clone::Clone
+pub unsafe fn dsl_lowering::JourneyMergeClause::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lowering::JourneyMergeClause
+pub fn dsl_lowering::JourneyMergeClause::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_lowering::JourneyMergeClause where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_lowering::JourneyNode
+pub dsl_lowering::JourneyNode::kind: alloc::string::String
+pub dsl_lowering::JourneyNode::name: alloc::string::String
+pub dsl_lowering::JourneyNode::verb_ref: core::option::Option<alloc::string::String>
+impl core::clone::Clone for dsl_lowering::JourneyNode
+pub fn dsl_lowering::JourneyNode::clone(&self) -> dsl_lowering::JourneyNode
+impl core::fmt::Debug for dsl_lowering::JourneyNode
+pub fn dsl_lowering::JourneyNode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_lowering::JourneyNode
+pub fn dsl_lowering::JourneyNode::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_lowering::JourneyNode
+pub fn dsl_lowering::JourneyNode::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_lowering::JourneyNode
+impl core::marker::Send for dsl_lowering::JourneyNode
+impl core::marker::Sync for dsl_lowering::JourneyNode
+impl core::marker::Unpin for dsl_lowering::JourneyNode
+impl core::marker::UnsafeUnpin for dsl_lowering::JourneyNode
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lowering::JourneyNode
+impl core::panic::unwind_safe::UnwindSafe for dsl_lowering::JourneyNode
+impl<T, U> core::convert::Into<U> for dsl_lowering::JourneyNode where U: core::convert::From<T>
+pub fn dsl_lowering::JourneyNode::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lowering::JourneyNode where U: core::convert::Into<T>
+pub type dsl_lowering::JourneyNode::Error = core::convert::Infallible
+pub fn dsl_lowering::JourneyNode::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lowering::JourneyNode where U: core::convert::TryFrom<T>
+pub type dsl_lowering::JourneyNode::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lowering::JourneyNode::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lowering::JourneyNode where T: core::clone::Clone
+pub type dsl_lowering::JourneyNode::Owned = T
+pub fn dsl_lowering::JourneyNode::clone_into(&self, &mut T)
+pub fn dsl_lowering::JourneyNode::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_lowering::JourneyNode where T: 'static + ?core::marker::Sized
+pub fn dsl_lowering::JourneyNode::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lowering::JourneyNode where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyNode::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lowering::JourneyNode where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyNode::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lowering::JourneyNode where T: core::clone::Clone
+pub unsafe fn dsl_lowering::JourneyNode::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lowering::JourneyNode
+pub fn dsl_lowering::JourneyNode::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_lowering::JourneyNode where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_lowering::JourneyParallelJoin
+pub dsl_lowering::JourneyParallelJoin::expects: alloc::vec::Vec<alloc::string::String>
+pub dsl_lowering::JourneyParallelJoin::merge: alloc::vec::Vec<dsl_lowering::JourneyMergeClause>
+pub dsl_lowering::JourneyParallelJoin::name: alloc::string::String
+impl core::clone::Clone for dsl_lowering::JourneyParallelJoin
+pub fn dsl_lowering::JourneyParallelJoin::clone(&self) -> dsl_lowering::JourneyParallelJoin
+impl core::fmt::Debug for dsl_lowering::JourneyParallelJoin
+pub fn dsl_lowering::JourneyParallelJoin::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_lowering::JourneyParallelJoin
+pub fn dsl_lowering::JourneyParallelJoin::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_lowering::JourneyParallelJoin
+pub fn dsl_lowering::JourneyParallelJoin::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_lowering::JourneyParallelJoin
+impl core::marker::Send for dsl_lowering::JourneyParallelJoin
+impl core::marker::Sync for dsl_lowering::JourneyParallelJoin
+impl core::marker::Unpin for dsl_lowering::JourneyParallelJoin
+impl core::marker::UnsafeUnpin for dsl_lowering::JourneyParallelJoin
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lowering::JourneyParallelJoin
+impl core::panic::unwind_safe::UnwindSafe for dsl_lowering::JourneyParallelJoin
+impl<T, U> core::convert::Into<U> for dsl_lowering::JourneyParallelJoin where U: core::convert::From<T>
+pub fn dsl_lowering::JourneyParallelJoin::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lowering::JourneyParallelJoin where U: core::convert::Into<T>
+pub type dsl_lowering::JourneyParallelJoin::Error = core::convert::Infallible
+pub fn dsl_lowering::JourneyParallelJoin::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lowering::JourneyParallelJoin where U: core::convert::TryFrom<T>
+pub type dsl_lowering::JourneyParallelJoin::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lowering::JourneyParallelJoin::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lowering::JourneyParallelJoin where T: core::clone::Clone
+pub type dsl_lowering::JourneyParallelJoin::Owned = T
+pub fn dsl_lowering::JourneyParallelJoin::clone_into(&self, &mut T)
+pub fn dsl_lowering::JourneyParallelJoin::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_lowering::JourneyParallelJoin where T: 'static + ?core::marker::Sized
+pub fn dsl_lowering::JourneyParallelJoin::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lowering::JourneyParallelJoin where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyParallelJoin::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lowering::JourneyParallelJoin where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneyParallelJoin::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lowering::JourneyParallelJoin where T: core::clone::Clone
+pub unsafe fn dsl_lowering::JourneyParallelJoin::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lowering::JourneyParallelJoin
+pub fn dsl_lowering::JourneyParallelJoin::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_lowering::JourneyParallelJoin where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct dsl_lowering::JourneySpec
+pub dsl_lowering::JourneySpec::boundary_attachments: alloc::vec::Vec<dsl_lowering::JourneyBoundaryAttachment>
+pub dsl_lowering::JourneySpec::edges: alloc::vec::Vec<dsl_lowering::JourneyEdge>
+pub dsl_lowering::JourneySpec::name: alloc::string::String
+pub dsl_lowering::JourneySpec::nodes: alloc::vec::Vec<dsl_lowering::JourneyNode>
+pub dsl_lowering::JourneySpec::parallel_joins: alloc::vec::Vec<dsl_lowering::JourneyParallelJoin>
+pub dsl_lowering::JourneySpec::start_node: alloc::string::String
+pub dsl_lowering::JourneySpec::version: u32
+impl core::clone::Clone for dsl_lowering::JourneySpec
+pub fn dsl_lowering::JourneySpec::clone(&self) -> dsl_lowering::JourneySpec
+impl core::fmt::Debug for dsl_lowering::JourneySpec
+pub fn dsl_lowering::JourneySpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for dsl_lowering::JourneySpec
+pub fn dsl_lowering::JourneySpec::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for dsl_lowering::JourneySpec
+pub fn dsl_lowering::JourneySpec::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for dsl_lowering::JourneySpec
+impl core::marker::Send for dsl_lowering::JourneySpec
+impl core::marker::Sync for dsl_lowering::JourneySpec
+impl core::marker::Unpin for dsl_lowering::JourneySpec
+impl core::marker::UnsafeUnpin for dsl_lowering::JourneySpec
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_lowering::JourneySpec
+impl core::panic::unwind_safe::UnwindSafe for dsl_lowering::JourneySpec
+impl<T, U> core::convert::Into<U> for dsl_lowering::JourneySpec where U: core::convert::From<T>
+pub fn dsl_lowering::JourneySpec::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_lowering::JourneySpec where U: core::convert::Into<T>
+pub type dsl_lowering::JourneySpec::Error = core::convert::Infallible
+pub fn dsl_lowering::JourneySpec::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_lowering::JourneySpec where U: core::convert::TryFrom<T>
+pub type dsl_lowering::JourneySpec::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_lowering::JourneySpec::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_lowering::JourneySpec where T: core::clone::Clone
+pub type dsl_lowering::JourneySpec::Owned = T
+pub fn dsl_lowering::JourneySpec::clone_into(&self, &mut T)
+pub fn dsl_lowering::JourneySpec::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_lowering::JourneySpec where T: 'static + ?core::marker::Sized
+pub fn dsl_lowering::JourneySpec::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_lowering::JourneySpec where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneySpec::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_lowering::JourneySpec where T: ?core::marker::Sized
+pub fn dsl_lowering::JourneySpec::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_lowering::JourneySpec where T: core::clone::Clone
+pub unsafe fn dsl_lowering::JourneySpec::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_lowering::JourneySpec
+pub fn dsl_lowering::JourneySpec::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for dsl_lowering::JourneySpec where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn dsl_lowering::lower(&dsl_bpmn_frontend::railway::RailwayGraph, &str) -> dsl_lowering::JourneySpec

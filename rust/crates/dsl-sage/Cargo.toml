@@ -24,6 +24,19 @@ chrono         = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+# Self-dependency so `tests/*.rs` (a separate compilation unit that
+# links this crate as an external dependency) can see MockLlmClient,
+# which is gated behind `test-util` to keep it off the normal public
+# API surface (charter-reconciliation-v1 §8).
+dsl-sage = { path = ".", features = ["test-util"] }
+
+[features]
+default = []
+# Exposes test-only doubles (MockLlmClient) to external consumers —
+# specifically this crate's own `tests/` integration harness, which
+# compiles the lib as a plain dependency and so never sees
+# `#[cfg(test)]` items. Not for production use.
+test-util = []
 
 [lints.rust]
 unreachable_pub = "deny"

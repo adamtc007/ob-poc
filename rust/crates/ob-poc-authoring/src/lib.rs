@@ -57,6 +57,7 @@
 //! This crate is the destination for Phase 5 of the capability-crate
 //! restructure (`docs/todo/capability-crate-restructure-v1.md`). Phase 5
 //! moves eight modules out of `ob-poc-boundary::*` into this crate.
+#![deny(unreachable_pub)]
 
 // Phase 5.1 (2026-05-13): three independent authoring modules
 // relocated from ob-poc-boundary. Charter-aligned: each module is an

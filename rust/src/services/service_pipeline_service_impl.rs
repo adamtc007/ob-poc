@@ -51,9 +51,7 @@ impl ServicePipelineService for ObPocServicePipelineService {
             // Critical write paths — run on the ambient transaction's connection
             // so a rollback unwinds them (atomicity fix). discovery.run also
             // needs the pool for static-registry reads inside the engines.
-            ("service-intent", "create") => {
-                service_intent_create(scope.executor(), args).await
-            }
+            ("service-intent", "create") => service_intent_create(scope.executor(), args).await,
             ("discovery", "run") => {
                 let pool = scope.pool().clone();
                 discovery_run(scope.executor(), &pool, args).await
@@ -504,6 +502,16 @@ async fn service_resource_sync_definitions(pool: &PgPool) -> Result<VerbExecutio
     Ok(VerbExecutionOutcome::Record(json!({
         "inserted": sync_result.inserted,
         "updated": sync_result.updated,
+        "unchanged": sync_result.unchanged,
+        "recorded_transitions": sync_result.recorded_transitions(),
+        "owner_inserted": sync_result.owner_inserted,
+        "owner_updated": sync_result.owner_updated,
+        "owner_unchanged": sync_result.owner_unchanged,
+        "attribute_inserted": sync_result.attribute_inserted,
+        "attribute_updated": sync_result.attribute_updated,
+        "attribute_unchanged": sync_result.attribute_unchanged,
+        "attribute_missing_defs": sync_result.attribute_missing_defs,
+        "attribute_conflicts": sync_result.attribute_conflicts,
         "errors": sync_result.errors,
     })))
 }

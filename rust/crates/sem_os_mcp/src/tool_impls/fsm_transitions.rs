@@ -70,11 +70,11 @@ impl KnowledgeTool for FsmTransitionsTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::StubBridge;
+    use crate::bridge::NullBridge;
 
     #[tokio::test]
     async fn stub_returns_empty_transitions() {
-        let tool = FsmTransitionsTool::new(Arc::new(StubBridge::new()));
+        let tool = FsmTransitionsTool::new(Arc::new(NullBridge::new()));
         let out = tool
             .invoke(json!({"entity_kind": "cbu", "from_state": "draft"}))
             .await
@@ -84,7 +84,7 @@ mod tests {
 
     #[tokio::test]
     async fn missing_field_returns_invalid_arguments() {
-        let tool = FsmTransitionsTool::new(Arc::new(StubBridge::new()));
+        let tool = FsmTransitionsTool::new(Arc::new(NullBridge::new()));
         let err = tool
             .invoke(json!({"entity_kind": "cbu"}))
             .await

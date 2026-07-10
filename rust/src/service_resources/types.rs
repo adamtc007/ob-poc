@@ -44,25 +44,6 @@ pub struct NewServiceIntent {
     pub created_by: Option<String>,
 }
 
-/// Service intent status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ServiceIntentStatus {
-    Active,
-    Suspended,
-    Cancelled,
-}
-
-impl std::fmt::Display for ServiceIntentStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Active => write!(f, "active"),
-            Self::Suspended => write!(f, "suspended"),
-            Self::Cancelled => write!(f, "cancelled"),
-        }
-    }
-}
-
 // =============================================================================
 // SRDEF (ServiceResourceDefinition)
 // =============================================================================
@@ -82,29 +63,6 @@ pub struct Srdef {
     pub provisioning_strategy: Option<String>,
     pub depends_on: Option<JsonValue>,
     pub is_active: Option<bool>,
-}
-
-/// How to obtain a resource
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum ProvisioningStrategy {
-    /// We create it directly
-    #[default]
-    Create,
-    /// We request it from an owner system
-    Request,
-    /// We discover/bind to an existing resource
-    Discover,
-}
-
-impl std::fmt::Display for ProvisioningStrategy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Create => write!(f, "create"),
-            Self::Request => write!(f, "request"),
-            Self::Discover => write!(f, "discover"),
-        }
-    }
 }
 
 // =============================================================================
@@ -156,26 +114,6 @@ pub struct CbuUnifiedAttrRequirement {
     pub conflict: Option<JsonValue>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
-}
-
-/// Requirement strength
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum RequirementStrength {
-    #[default]
-    Required,
-    Optional,
-    Conditional,
-}
-
-impl std::fmt::Display for RequirementStrength {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Required => write!(f, "required"),
-            Self::Optional => write!(f, "optional"),
-            Self::Conditional => write!(f, "conditional"),
-        }
-    }
 }
 
 /// Attribute source (where value came from)
@@ -255,7 +193,9 @@ pub struct ExplainRef {
 // =============================================================================
 
 /// A provisioning request to an owner system.
+// kept for sqlx query_as
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[allow(dead_code)]
 pub struct ProvisioningRequest {
     pub request_id: Uuid,
     pub cbu_id: Uuid,
@@ -303,31 +243,6 @@ impl std::fmt::Display for RequestedBy {
     }
 }
 
-/// Provisioning request status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ProvisioningStatus {
-    Queued,
-    Sent,
-    Ack,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
-impl std::fmt::Display for ProvisioningStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Queued => write!(f, "queued"),
-            Self::Sent => write!(f, "sent"),
-            Self::Ack => write!(f, "ack"),
-            Self::Completed => write!(f, "completed"),
-            Self::Failed => write!(f, "failed"),
-            Self::Cancelled => write!(f, "cancelled"),
-        }
-    }
-}
-
 /// Payload for a provisioning request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvisioningPayload {
@@ -342,7 +257,9 @@ pub struct ProvisioningPayload {
 // =============================================================================
 
 /// An event in the provisioning lifecycle.
+// kept for sqlx query_as
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+#[allow(dead_code)]
 pub struct ProvisioningEvent {
     pub event_id: Uuid,
     pub request_id: Uuid,
@@ -394,26 +311,6 @@ impl std::fmt::Display for EventKind {
             Self::Retry => write!(f, "RETRY"),
         }
     }
-}
-
-/// Result payload from owner system
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OwnerProvisioningResult {
-    pub status: String, // "active", "pending", "rejected", "failed"
-    pub srid: Option<String>,
-    pub native_key: Option<String>,
-    pub native_key_type: Option<String>,
-    pub resource_url: Option<String>,
-    pub owner_ticket_id: Option<String>,
-    pub explain: Option<ResultExplanation>,
-    pub timestamp: Option<DateTime<Utc>>,
-}
-
-/// Explanation for result (especially failures)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResultExplanation {
-    pub message: Option<String>,
-    pub codes: Option<Vec<String>>,
 }
 
 // =============================================================================
@@ -489,117 +386,4 @@ impl std::fmt::Display for BlockingReasonType {
             Self::DependencyNotReady => write!(f, "dependency_not_ready"),
         }
     }
-}
-
-// =============================================================================
-// ATTRIBUTE GAP REPORT
-// =============================================================================
-
-/// Report of missing attributes for a CBU
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeGapReport {
-    pub cbu_id: Uuid,
-    pub total_required: usize,
-    pub populated: usize,
-    pub missing: Vec<MissingAttribute>,
-    pub conflicts: Vec<AttributeConflict>,
-    pub pct_complete: f64,
-}
-
-/// A missing required attribute
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MissingAttribute {
-    pub attr_id: Uuid,
-    pub attr_code: String,
-    pub attr_name: String,
-    pub category: String,
-    pub required_by_srdefs: Vec<String>,
-    pub preferred_source: Option<String>,
-}
-
-/// A conflict in attribute requirements
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeConflict {
-    pub attr_id: Uuid,
-    pub attr_name: String,
-    pub conflicting_srdefs: Vec<String>,
-    pub conflict_type: String,
-    pub details: JsonValue,
-}
-
-// =============================================================================
-// SRDEF READINESS CHECK
-// =============================================================================
-
-/// Result of checking if a single SRDEF is ready
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SrdefReadinessCheck {
-    pub srdef_id: String,
-    pub is_ready: bool,
-    pub missing_attrs: Vec<Uuid>,
-    pub instance_status: Option<String>,
-    pub blocking_reason: Option<String>,
-}
-
-// =============================================================================
-// API RESPONSE TYPES
-// =============================================================================
-
-/// Response for service intent operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceIntentResponse {
-    pub intent_id: Uuid,
-    pub cbu_id: Uuid,
-    pub product_name: String,
-    pub service_name: String,
-    pub options: JsonValue,
-    pub status: String,
-}
-
-/// Response for discovery operation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscoveryResponse {
-    pub cbu_id: Uuid,
-    pub discovered_srdefs: Vec<DiscoveredSrdef>,
-    pub total_discovered: usize,
-}
-
-/// A discovered SRDEF with reason
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscoveredSrdef {
-    pub srdef_id: String,
-    pub resource_name: String,
-    pub discovery_rule: String,
-    pub triggered_by: Vec<String>,
-    pub parameters: Option<JsonValue>,
-}
-
-/// Response for readiness query
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadinessResponse {
-    pub cbu_id: Uuid,
-    pub cbu_name: String,
-    pub services: Vec<ServiceReadinessDetail>,
-    pub summary: ReadinessSummary,
-}
-
-/// Detail for a single service's readiness
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceReadinessDetail {
-    pub product_name: String,
-    pub service_name: String,
-    pub status: ReadinessStatus,
-    pub blocking_reasons: Vec<BlockingReason>,
-    pub required_srdefs: Vec<String>,
-    pub active_instances: Vec<String>,
-}
-
-/// Summary statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadinessSummary {
-    pub total_services: usize,
-    pub ready: usize,
-    pub partial: usize,
-    pub blocked: usize,
-    pub pct_ready: f64,
 }

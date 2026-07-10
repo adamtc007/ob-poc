@@ -522,8 +522,8 @@ impl From<&crate::lookup::LookupResult> for SessionEntityResolutionFeedback {
     }
 }
 
-impl From<&crate::entity_linking::EntityCandidate> for SessionEntityCandidateFeedback {
-    fn from(candidate: &crate::entity_linking::EntityCandidate) -> Self {
+impl From<&ob_poc_entity_linking::EntityCandidate> for SessionEntityCandidateFeedback {
+    fn from(candidate: &ob_poc_entity_linking::EntityCandidate) -> Self {
         Self {
             entity_id: candidate.entity_id,
             entity_kind: candidate.entity_kind.clone(),

@@ -126,11 +126,18 @@ pub trait DslExecutor: Send + Sync {
     }
 }
 
-/// Stub executor that returns success for all DSL.
-pub struct StubExecutor;
+/// Executor that returns success for all DSL without dispatching it.
+///
+/// Real production null-object — `mcp/handlers/core.rs::dsl_generate`
+/// falls back to it when no orchestrator is configured — and also the
+/// standard executor for `rust/tests/bpmn_*.rs` and this crate's own
+/// test suite. Named off `Stub*` (charter-reconciliation-v1 §8):
+/// it's `pub`, not `pub(crate)`, because those external test harnesses
+/// need it, so it can't be hidden — only correctly named.
+pub struct NullDslExecutor;
 
 #[async_trait::async_trait]
-impl DslExecutor for StubExecutor {
+impl DslExecutor for NullDslExecutor {
     async fn execute(&self, _dsl: &str) -> Result<serde_json::Value, String> {
         Ok(serde_json::json!({"status": "stub_success"}))
     }
@@ -185,9 +192,11 @@ impl<T: DslExecutor> DslExecutorV2 for T {
     }
 }
 
-#[allow(dead_code)] // Used by integration tests (rust/tests/repl_v2_phase*.rs)
 /// Test executor that parks entries whose DSL contains ":park" or ":durable" markers.
-pub struct ParkableStubExecutor;
+/// Same-crate test-only (verified — no external crate consumer); `pub(crate)`
+/// keeps it off the public API surface.
+#[allow(dead_code)] // kept for tests
+pub(crate) struct ParkableStubExecutor;
 
 #[async_trait::async_trait]
 impl DslExecutorV2 for ParkableStubExecutor {
@@ -265,10 +274,11 @@ pub struct ReplOrchestratorV2 {
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
     /// R8 single-path unification (2026-05-11): ACP session-input draft-mode
     /// selection. Configured once at orchestrator construction (typically
-    /// via [`crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
+    /// via [`ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
     /// rather than read per request. Used by the orchestrator's internal
     /// ACP resolution step (R8 §13.5).
-    acp_session_input_draft_mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+    acp_session_input_draft_mode:
+        ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode,
     /// Maximum time a single runbook step may spend inside the execution
     /// bridge before the REPL marks it failed and returns control to the
     /// caller. This protects `/run` from indefinitely-held HTTP requests.
@@ -279,6 +289,13 @@ pub struct ReplOrchestratorV2 {
     nlci_compiler: Option<Arc<dyn IntentCompiler>>,
     /// Optional verb searcher for dsl_generate / process_intent_only pipeline.
     verb_searcher: Option<Arc<HybridVerbSearcher>>,
+    /// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022) follow-up: explicit,
+    /// hard-to-forge opt-in for running `execute_runbook` without a pool
+    /// (advisory locks skipped) even when a step declares a non-empty
+    /// write_set. Always `None` in production — the token's only
+    /// constructor is `#[cfg(test)]`-gated. Set via
+    /// `with_test_only_unlocked_execution()`.
+    unlocked_execution_token: Option<crate::runbook::UnlockedExecutionToken>,
 }
 
 impl ReplOrchestratorV2 {
@@ -310,12 +327,27 @@ impl ReplOrchestratorV2 {
             orchestrated_verbs: HashSet::new(),
             gate_pipeline: None,
             acp_session_input_draft_mode:
-                crate::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
+                ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
             runbook_step_timeout: std::time::Duration::from_secs(5),
             sage_engine: None,
             nlci_compiler: None,
             verb_searcher: None,
+            unlocked_execution_token: None,
         }
+    }
+
+    /// TEST-ONLY (T0.3): explicitly opt this orchestrator into running
+    /// `execute_runbook` unlocked (no advisory locks) when no pool is
+    /// configured, even for steps with a non-empty write_set. Without this,
+    /// such a step now hard-errors (`ExecutionError::LockingRequired`) —
+    /// see `runbook::UnlockedExecutionToken`. For fast, DB-free orchestrator
+    /// tests (`NullDslExecutor`, no `.with_pool(...)`) that genuinely
+    /// exercise a write-set-declaring verb.
+    #[cfg(test)]
+    pub fn with_test_only_unlocked_execution(mut self) -> Self {
+        self.unlocked_execution_token =
+            Some(crate::runbook::UnlockedExecutionToken::allow_unlocked_execution_for_tests());
+        self
     }
 
     /// Configure the orchestrator's ACP session-input draft mode (R8).
@@ -327,7 +359,7 @@ impl ReplOrchestratorV2 {
     /// startup.
     pub fn with_acp_draft_mode(
         mut self,
-        mode: crate::acp_session_input_draft_mode::AcpSessionInputDraftMode,
+        mode: ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode,
     ) -> Self {
         self.acp_session_input_draft_mode = mode;
         self
@@ -336,7 +368,7 @@ impl ReplOrchestratorV2 {
     /// Return the configured ACP session-input draft mode.
     pub fn acp_session_input_draft_mode(
         &self,
-    ) -> crate::acp_session_input_draft_mode::AcpSessionInputDraftMode {
+    ) -> ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode {
         self.acp_session_input_draft_mode
     }
 
@@ -1212,8 +1244,8 @@ impl ReplOrchestratorV2 {
         session_id: Option<Uuid>,
         input: &str,
     ) -> Result<crate::mcp::intent_pipeline::PipelineResult, OrchestratorError> {
-        let actor = crate::policy::ActorResolver::from_env();
-        let policy_gate = Arc::new(crate::policy::PolicyGate::from_env());
+        let actor = ob_poc_boundary::policy::ActorResolver::from_env();
+        let policy_gate = Arc::new(ob_poc_boundary::policy::PolicyGate::from_env());
 
         let searcher = self.verb_searcher.clone().ok_or_else(|| {
             OrchestratorError::Configuration("verb_searcher is not configured".to_string())
@@ -4766,7 +4798,7 @@ impl ReplOrchestratorV2 {
         let constellation_family = tos.map(|f| f.constellation_family.clone());
         let constellation_map = tos.map(|f| f.constellation_map.clone());
         let allowed_verbs = if let Some(ref client) = self.sem_os_client {
-            let actor = crate::policy::ActorResolver::from_env();
+            let actor = ob_poc_boundary::policy::ActorResolver::from_env();
             let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
                 client.as_ref(),
                 &actor,
@@ -5010,17 +5042,17 @@ impl ReplOrchestratorV2 {
                     .dsl
                     .clone();
                 let summary = format!("Auto-confirmed (quick): {}", sentence);
-                let acp_dag_semantic = Some(crate::acp_dag_semantic::AcpDagSemanticResolution {
-                    status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+                let acp_dag_semantic = Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+                    status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
                     utterance: sentence.clone(),
                     selected_dispatch: Some(
-                        crate::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
+                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
                             dispatch_kind:
-                                crate::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
                             fqn: verb.clone(),
                             confidence: 1.0,
                             confidence_band:
-                                crate::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
                             matched_phrase: Some(sentence.clone()),
                             description: None,
                         },
@@ -5275,7 +5307,7 @@ impl ReplOrchestratorV2 {
         // deterministic output construction.
         let composition: crate::sequencer_stages::VerbSurfaceComposition =
             if let Some(ref client) = self.sem_os_client {
-                let actor = crate::policy::ActorResolver::from_env();
+                let actor = ob_poc_boundary::policy::ActorResolver::from_env();
                 let tos = session.workspace_stack.last();
                 let constellation_family = tos.map(|f| f.constellation_family.clone());
                 let constellation_map = tos.map(|f| f.constellation_map.clone());
@@ -5315,7 +5347,6 @@ impl ReplOrchestratorV2 {
                     );
                     crate::sequencer_stages::VerbSurfaceComposition::SemOsAvailableWithPack {
                         legal_verbs: phase2.legal_verbs_or_empty.clone().into_iter().collect(),
-                        pack_id: pack.id.to_string(),
                         pack_verbs: pack.allowed_verbs.to_vec(),
                         fingerprint: phase2.fingerprint(),
                         pruned_count: phase2.pruned_verb_count(),
@@ -5336,7 +5367,6 @@ impl ReplOrchestratorV2 {
                 );
                 session.pending_sem_os_envelope = None;
                 crate::sequencer_stages::VerbSurfaceComposition::SemOsUnavailableWithPack {
-                    pack_id: pack.id.to_string(),
                     pack_verbs: pack.allowed_verbs.to_vec(),
                 }
             } else {
@@ -5706,17 +5736,17 @@ impl ReplOrchestratorV2 {
 
                     let summary = format!("Auto-confirmed (quick): {}", sentence);
                     let acp_dag_semantic =
-                        Some(crate::acp_dag_semantic::AcpDagSemanticResolution {
-                            status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+                        Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+                            status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
                             utterance: sentence.clone(),
                             selected_dispatch: Some(
-                                crate::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
                                     dispatch_kind:
-                                        crate::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
                                     fqn: verb.clone(),
                                     confidence: 1.0,
                                     confidence_band:
-                                        crate::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
                                     matched_phrase: Some(sentence.clone()),
                                     description: None,
                                 },
@@ -6071,17 +6101,17 @@ impl ReplOrchestratorV2 {
 
                     let summary = format!("Auto-confirmed (quick): {}", sentence);
                     let acp_dag_semantic =
-                        Some(crate::acp_dag_semantic::AcpDagSemanticResolution {
-                            status: crate::acp_dag_semantic::AcpDagSemanticStatus::Matched,
+                        Some(ob_poc_boundary::acp_dag_semantic::AcpDagSemanticResolution {
+                            status: ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Matched,
                             utterance: sentence.clone(),
                             selected_dispatch: Some(
-                                crate::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
+                                ob_poc_boundary::acp_dag_semantic::AcpDagSemanticSelectedDispatch {
                                     dispatch_kind:
-                                        crate::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticDispatchKind::Verb,
                                     fqn: verb.clone(),
                                     confidence: 1.0,
                                     confidence_band:
-                                        crate::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
+                                        ob_poc_boundary::acp_dag_semantic::AcpDagSemanticConfidenceBand::High,
                                     matched_phrase: Some(sentence.clone()),
                                     description: None,
                                 },
@@ -7690,7 +7720,7 @@ impl ReplOrchestratorV2 {
         let tos = session.workspace_stack.last();
         let constellation_family = tos.map(|f| f.constellation_family.clone());
         let constellation_map = tos.map(|f| f.constellation_map.clone());
-        let actor = crate::policy::ActorResolver::from_env();
+        let actor = ob_poc_boundary::policy::ActorResolver::from_env();
         let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
             client.as_ref(),
             &actor,
@@ -7714,8 +7744,8 @@ impl ReplOrchestratorV2 {
         // spec says stage 6 produces. Shadow-only — does not gate dispatch.
         // Phase B (F6) replaces the existing recheck-returns-failure path
         // with envelope-primary dispatch.
-        let shadow_envelope = crate::envelope_builder::build_shadow_envelope(
-            &crate::envelope_builder::EnvelopeInputs {
+        let shadow_envelope = ob_poc_boundary::envelope_builder::build_shadow_envelope(
+            &ob_poc_boundary::envelope_builder::EnvelopeInputs {
                 session_id: session.id,
                 verb_fqn: &entry.verb,
                 args: serde_json::json!({
@@ -7932,6 +7962,49 @@ impl ReplOrchestratorV2 {
                 })
         };
 
+        // T0.3: dispatch to the pool path, or — TEST-ONLY — the explicit
+        // unlocked path when an `UnlockedExecutionToken` was supplied via
+        // `with_test_only_unlocked_execution`. Two cfg-gated variants
+        // because `execute_runbook_unlocked_for_tests` itself only exists
+        // under `#[cfg(test)]`; the token can only be `Some` under test
+        // anyway (its constructor is `#[cfg(test)]`-gated), so the
+        // `cfg(not(test))` variant never actually needs the unlocked path.
+        #[cfg(test)]
+        async fn dispatch_no_scope(
+            store: &dyn RunbookStoreBackend,
+            compiled_id: CompiledRunbookId,
+            bridge: &dyn crate::runbook::StepExecutor,
+            pool: Option<&sqlx::PgPool>,
+            unlocked_token: Option<crate::runbook::UnlockedExecutionToken>,
+        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
+        {
+            match (pool, unlocked_token) {
+                (None, Some(token)) => {
+                    crate::runbook::execute_runbook_unlocked_for_tests(
+                        store,
+                        compiled_id,
+                        None,
+                        bridge,
+                        token,
+                    )
+                    .await
+                }
+                _ => execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await,
+            }
+        }
+
+        #[cfg(not(test))]
+        async fn dispatch_no_scope(
+            store: &dyn RunbookStoreBackend,
+            compiled_id: CompiledRunbookId,
+            bridge: &dyn crate::runbook::StepExecutor,
+            pool: Option<&sqlx::PgPool>,
+            _unlocked_token: Option<crate::runbook::UnlockedExecutionToken>,
+        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
+        {
+            execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await
+        }
+
         // Dispatch helper: picks between in-scope and with-pool paths.
         async fn run_through_gate(
             store: &dyn RunbookStoreBackend,
@@ -7939,6 +8012,7 @@ impl ReplOrchestratorV2 {
             bridge: &dyn crate::runbook::StepExecutor,
             scope: Option<&mut dyn TransactionScope>,
             pool: Option<&sqlx::PgPool>,
+            unlocked_token: Option<crate::runbook::UnlockedExecutionToken>,
         ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
         {
             match scope {
@@ -7946,7 +8020,7 @@ impl ReplOrchestratorV2 {
                     crate::runbook::execute_runbook_in_scope(store, compiled_id, None, bridge, s)
                         .await
                 }
-                None => execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await,
+                None => dispatch_no_scope(store, compiled_id, bridge, pool, unlocked_token).await,
             }
         }
 
@@ -7954,7 +8028,16 @@ impl ReplOrchestratorV2 {
             if let Some(ref exec) = self.executor_v2 {
                 let bridge =
                     DslExecutorV2StepExecutor::new(exec.clone(), runbook_id, session_stack);
-                match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+                match run_through_gate(
+                    store,
+                    compiled_id,
+                    &bridge,
+                    scope,
+                    self.pool(),
+                    self.unlocked_execution_token,
+                )
+                .await
+                {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
                         error: format!("Execution gate error: {}", e),
@@ -7963,7 +8046,16 @@ impl ReplOrchestratorV2 {
             } else {
                 // No V2 executor — fall back to sync bridge (never parks).
                 let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-                match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+                match run_through_gate(
+                    store,
+                    compiled_id,
+                    &bridge,
+                    scope,
+                    self.pool(),
+                    self.unlocked_execution_token,
+                )
+                .await
+                {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
                         error: format!("Execution gate error: {}", e),
@@ -7983,7 +8075,16 @@ impl ReplOrchestratorV2 {
             if let Some(pipeline) = self.gate_pipeline.clone() {
                 bridge = bridge.with_gate_pipeline(pipeline);
             }
-            match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+            match run_through_gate(
+                store,
+                compiled_id,
+                &bridge,
+                scope,
+                self.pool(),
+                self.unlocked_execution_token,
+            )
+            .await
+            {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),
@@ -7991,7 +8092,16 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+            match run_through_gate(
+                store,
+                compiled_id,
+                &bridge,
+                scope,
+                self.pool(),
+                self.unlocked_execution_token,
+            )
+            .await
+            {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),
@@ -9062,7 +9172,7 @@ mod tests {
         entities: std::collections::HashMap<String, Uuid>,
     }
 
-    impl crate::entity_linking::EntityLinkingService for SingleEntityLinker {
+    impl ob_poc_entity_linking::EntityLinkingService for SingleEntityLinker {
         fn snapshot_hash(&self) -> &str {
             "test-snapshot"
         }
@@ -9081,11 +9191,11 @@ mod tests {
             _expected_kinds: Option<&[String]>,
             _context_concepts: Option<&[String]>,
             _limit: usize,
-        ) -> Vec<crate::entity_linking::EntityResolution> {
-            vec![crate::entity_linking::EntityResolution {
+        ) -> Vec<ob_poc_entity_linking::EntityResolution> {
+            vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, utterance.len()),
                 mention_text: utterance.to_string(),
-                candidates: vec![crate::entity_linking::EntityCandidate {
+                candidates: vec![ob_poc_entity_linking::EntityCandidate {
                     entity_id: self.entity_id,
                     entity_kind: "cbu".to_string(),
                     canonical_name: "Allianz Fund".to_string(),
@@ -9103,7 +9213,7 @@ mod tests {
         }
     }
 
-    impl crate::entity_linking::EntityLinkingService for NamedEntityLinker {
+    impl ob_poc_entity_linking::EntityLinkingService for NamedEntityLinker {
         fn snapshot_hash(&self) -> &str {
             "test-snapshot"
         }
@@ -9122,7 +9232,7 @@ mod tests {
             _expected_kinds: Option<&[String]>,
             _context_concepts: Option<&[String]>,
             _limit: usize,
-        ) -> Vec<crate::entity_linking::EntityResolution> {
+        ) -> Vec<ob_poc_entity_linking::EntityResolution> {
             let Some((name, entity_id)) = self
                 .entities
                 .iter()
@@ -9131,10 +9241,10 @@ mod tests {
                 return Vec::new();
             };
 
-            vec![crate::entity_linking::EntityResolution {
+            vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, utterance.len()),
                 mention_text: utterance.to_string(),
-                candidates: vec![crate::entity_linking::EntityCandidate {
+                candidates: vec![ob_poc_entity_linking::EntityCandidate {
                     entity_id: *entity_id,
                     entity_kind: "cbu".to_string(),
                     canonical_name: name.clone(),
@@ -9206,7 +9316,7 @@ definition_of_done:
         let (manifest, hash) = load_pack_from_bytes(onboarding_yaml().as_bytes()).unwrap();
         let packs = vec![(Arc::new(manifest), hash)];
         let router = PackRouter::new(packs);
-        ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+        ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
     }
 
     #[tokio::test]
@@ -10144,7 +10254,7 @@ definition_of_done:
 
     #[tokio::test]
     async fn test_stub_executor_adapts_to_v2() {
-        let stub = StubExecutor;
+        let stub = NullDslExecutor;
         let result = stub
             .execute_v2(
                 "(cbu.create :name \"test\")",
@@ -10218,7 +10328,13 @@ definition_of_done:
         let (manifest, hash) = load_pack_from_bytes(kyc_yaml()).unwrap();
         let packs = vec![(Arc::new(manifest), hash)];
         let router = PackRouter::new(packs);
-        ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+        // T0.3 (closes C-022): this orchestrator has no pool (NullDslExecutor,
+        // in-memory) but drives real write-set-declaring verbs (e.g.
+        // kyc-case.create) through Run — explicitly opt into unlocked
+        // execution rather than silently relying on the old skip-locking
+        // default.
+        ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
+            .with_test_only_unlocked_execution()
     }
 
     /// Phase H acceptance test: full KYC case flow.
@@ -10569,18 +10685,18 @@ definition_of_done:
                 entity_count: 2,
             },
             verbs: vec![],
-            entities: vec![crate::entity_linking::EntityResolution {
+            entities: vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, 7),
                 mention_text: "Allianz".to_string(),
                 candidates: vec![
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "company".to_string(),
                         canonical_name: "Allianz SE".to_string(),
                         score: 0.81,
                         evidence: vec![],
                     },
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "fund".to_string(),
                         canonical_name: "Allianz Fund".to_string(),
@@ -10623,7 +10739,7 @@ definition_of_done:
 
     #[test]
     fn test_phase2_gate_response_uses_sem_os_deny_all_message() {
-        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
+        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(NullDslExecutor));
         let mut session = ReplSessionV2::new();
         let mut envelope = crate::agent::sem_os_context_envelope::SemOsContextEnvelope::deny_all();
         envelope.grounded_action_surface = Some(
@@ -10671,7 +10787,7 @@ definition_of_done:
     #[test]
     fn test_phase2_gate_response_defers_lookup_ambiguity() {
         // Entity ambiguity is now deferred to downstream verb matching (not a hard block).
-        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(StubExecutor));
+        let orch = ReplOrchestratorV2::new(PackRouter::new(vec![]), Arc::new(NullDslExecutor));
         let mut session = ReplSessionV2::new();
         session.pending_lookup_result = Some(crate::lookup::LookupResult {
             entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
@@ -10680,18 +10796,18 @@ definition_of_done:
                 entity_count: 2,
             },
             verbs: vec![],
-            entities: vec![crate::entity_linking::EntityResolution {
+            entities: vec![ob_poc_entity_linking::EntityResolution {
                 mention_span: (0, 7),
                 mention_text: "Allianz".to_string(),
                 candidates: vec![
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "company".to_string(),
                         canonical_name: "Allianz SE".to_string(),
                         score: 0.81,
                         evidence: vec![],
                     },
-                    crate::entity_linking::EntityCandidate {
+                    ob_poc_entity_linking::EntityCandidate {
                         entity_id: Uuid::new_v4(),
                         entity_kind: "fund".to_string(),
                         canonical_name: "Allianz Fund".to_string(),

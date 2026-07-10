@@ -67,7 +67,7 @@ pub mod constellation_runtime_impl;
 
 // Phase 5a composite-blocker #11 — ob-poc-side impl of
 // `TradingProfileDocument`; bridges to
-// `crate::trading_profile::ast_db::{load_document, save_document}`.
+// `ob_poc_trading_profile::ast_db::{load_document, save_document}`.
 pub mod trading_profile_document_impl;
 
 // Phase 5a composite-blocker #24 — ob-poc-side impl of
@@ -77,7 +77,7 @@ pub mod sem_os_context_resolver_impl;
 
 // Phase 5a composite-blocker #25 — ob-poc-side impl of
 // `SchemaIntrospectionAccess`; bridges to
-// `crate::ontology::ontology()`, `crate::dsl_v2::verb_registry::registry()`,
+// `ob_poc_ontology::ontology()`, `crate::dsl_v2::verb_registry::registry()`,
 // and `crate::sem_reg::store::SnapshotStore` for the 5 structure-
 // semantics verbs in `sem_os_schema_ops`.
 pub mod schema_introspection_impl;
@@ -85,7 +85,7 @@ pub mod schema_introspection_impl;
 // Phase 5a composite-blocker #26 — ob-poc-side impl of
 // `ViewService`; single-method dispatch
 // for all 15 `view.*` verbs. Bridges to `crate::session::ViewState`
-// + `crate::taxonomy::*` (both multi-consumer mega-modules that stay
+// + `ob_poc_taxonomy::taxonomy::*` (both multi-consumer mega-modules that stay
 // in ob-poc).
 pub mod view_service_impl;
 

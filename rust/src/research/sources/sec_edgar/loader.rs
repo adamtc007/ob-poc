@@ -4,10 +4,10 @@ use super::client::SecEdgarClient;
 use super::types::SecAddress;
 use crate::research::sources::normalized::{
     EntityStatus, EntityType, HolderType, NormalizedAddress, NormalizedControlHolder,
-    NormalizedEntity, NormalizedOfficer, NormalizedRelationship,
+    NormalizedEntity, NormalizedOfficer,
 };
 use crate::research::sources::traits::{
-    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, FetchParentChainOptions,
+    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
     SearchCandidate, SearchOptions, SourceDataType, SourceLoader,
 };
 use anyhow::{anyhow, Result};
@@ -27,6 +27,7 @@ impl SecEdgarLoader {
     }
 
     /// Create with an existing client
+    #[allow(dead_code)] // kept for tests
     pub fn with_client(client: SecEdgarClient) -> Self {
         Self { client }
     }
@@ -180,15 +181,6 @@ impl SourceLoader for SecEdgarLoader {
     ) -> Result<Vec<NormalizedOfficer>> {
         // SEC doesn't provide officer data via the submissions API
         // Would need to parse DEF 14A proxy statements
-        Ok(vec![])
-    }
-
-    async fn fetch_parent_chain(
-        &self,
-        _key: &str,
-        _options: Option<FetchParentChainOptions>,
-    ) -> Result<Vec<NormalizedRelationship>> {
-        // SEC doesn't provide parent chain data
         Ok(vec![])
     }
 }

@@ -35,6 +35,7 @@
 //! │  Capture → Analyze → Learn → Rebuild    │
 //! └─────────────────────────────────────────┘
 //! ```
+#![deny(unreachable_pub)]
 
 pub mod centroid;
 pub mod client_group_resolver;
@@ -57,3 +58,6 @@ pub use feedback::{
     MatchConfidence, Outcome, PatternLearner, PipelineStatus, PromotableCandidate, PromotionReport,
     PromotionService, ReviewCandidate, WeeklyHealthMetrics,
 };
+
+#[cfg(test)]
+mod integration_tests;

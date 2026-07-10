@@ -136,7 +136,8 @@ impl ServiceResourceService {
         Ok(result.rows_affected() > 0)
     }
 
-    pub async fn link_service(&self, resource_id: Uuid, service_id: Uuid) -> Result<()> {
+    #[allow(dead_code)]
+    pub(crate) async fn link_service(&self, resource_id: Uuid, service_id: Uuid) -> Result<()> {
         sqlx::query(r#"INSERT INTO "ob-poc".service_resources (service_id, resource_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"#)
             .bind(service_id).bind(resource_id).execute(&self.pool).await.context("Failed to link service resource to service")?;
         info!(

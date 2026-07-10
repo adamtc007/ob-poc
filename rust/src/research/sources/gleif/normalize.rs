@@ -2,10 +2,9 @@
 //!
 //! Converts GLEIF API types to normalized structures.
 
-use crate::gleif::types::{Address, EntityCategory, EntityStatus, LeiRecord, RelationshipRecord};
+use crate::gleif::types::{Address, EntityCategory, EntityStatus, LeiRecord};
 use crate::research::sources::normalized::{
     EntityStatus as NormEntityStatus, EntityType, NormalizedAddress, NormalizedEntity,
-    NormalizedRelationship, RelationshipType,
 };
 
 /// Normalize a GLEIF LEI record to a NormalizedEntity
@@ -79,33 +78,6 @@ fn normalize_address(addr: &Address) -> NormalizedAddress {
         region: addr.region.clone(),
         postal_code: addr.postal_code.clone(),
         country: addr.country.clone(),
-    }
-}
-
-/// Normalize a GLEIF relationship record to NormalizedRelationship
-pub(super) fn normalize_relationship(
-    rel: &RelationshipRecord,
-    child_name: &str,
-    parent_name: &str,
-) -> NormalizedRelationship {
-    let rel_type = match rel.attributes.relationship.relationship_type.as_str() {
-        "IS_DIRECTLY_CONSOLIDATED_BY" => RelationshipType::DirectParent,
-        "IS_ULTIMATELY_CONSOLIDATED_BY" => RelationshipType::UltimateParent,
-        "IS_FUND-MANAGED_BY" => RelationshipType::FundManagedBy,
-        "IS_SUBFUND_OF" => RelationshipType::SubfundOf,
-        _ => RelationshipType::DirectParent, // Default for unknown types
-    };
-
-    let is_direct = matches!(rel_type, RelationshipType::DirectParent);
-
-    NormalizedRelationship {
-        parent_key: rel.attributes.relationship.end_node.id.clone(),
-        parent_name: parent_name.to_string(),
-        child_key: rel.attributes.relationship.start_node.id.clone(),
-        child_name: child_name.to_string(),
-        relationship_type: rel_type,
-        ownership_pct: None, // GLEIF doesn't provide ownership percentages
-        is_direct,
     }
 }
 

@@ -7,6 +7,17 @@
 //!   role-profile-aware stop conditions.
 //! - `economic-exposure.summary` — aggregates direct holdings with
 //!   look-through computation per investor.
+//!
+//! # H1-b: `fn_compute_economic_exposure` is a read-only projection helper
+//!
+//! EOP-DD-KYCUBO-002 §7 H1-b (verified against the tree): `fn_compute_economic_exposure`
+//! is a STABLE SQL function (K-32: determination logic in SQL). Per the DD the fix
+//! is "demote to a read-only projection helper, do NOT delete" (live callers exist).
+//! This module IS that demoted form: the CTE reads from `entity_relationships` as a
+//! read-only look-through; it NEVER writes authoritative state. H1-b is closed —
+//! the function is already a pure read; no verb writes derived rows to domain tables
+//! based on its output. The live callers (`capital_routes.rs` + this file) are
+//! unchanged and remain read-only. (M-c: economic CTE has live callers, demote not delete.)
 
 use anyhow::Result;
 use async_trait::async_trait;

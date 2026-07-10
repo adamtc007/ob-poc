@@ -15,7 +15,6 @@ use std::time::{Duration, Instant};
 use tokio::time::sleep;
 
 const SEC_API_BASE: &str = "https://data.sec.gov";
-const SEC_ARCHIVES_BASE: &str = "https://www.sec.gov/Archives/edgar/data";
 const RATE_LIMIT_DELAY_MS: u64 = 100; // 10 req/sec
 
 /// SEC EDGAR API client
@@ -93,40 +92,6 @@ impl SecEdgarClient {
     pub async fn get_beneficial_ownership_filings(&self, cik: &str) -> Result<Vec<SecFilingInfo>> {
         let submissions = self.get_company(cik).await?;
         Ok(submissions.filings.recent.beneficial_ownership_filings())
-    }
-
-    /// Fetch a filing document
-    pub async fn fetch_filing_document(
-        &self,
-        cik: &str,
-        accession_number: &str,
-        document: &str,
-    ) -> Result<String> {
-        self.rate_limit().await;
-
-        let cik_padded = pad_cik(cik);
-        let accession_clean = accession_number.replace('-', "");
-        let url = format!(
-            "{}/{}/{}/{}",
-            SEC_ARCHIVES_BASE, cik_padded, accession_clean, document
-        );
-
-        let response = self
-            .http
-            .get(&url)
-            .send()
-            .await
-            .with_context(|| format!("Failed to fetch filing document {}", document))?;
-
-        let status = response.status();
-        if !status.is_success() {
-            return Err(anyhow!("SEC EDGAR error {}: {}", status, url));
-        }
-
-        response
-            .text()
-            .await
-            .with_context(|| format!("Failed to read filing document {}", document))
     }
 }
 

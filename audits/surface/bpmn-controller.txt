@@ -1,0 +1,192 @@
+# bpmn-controller | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:05Z
+pub mod bpmn_controller
+pub mod bpmn_controller::error
+pub enum bpmn_controller::error::BpmnControllerError
+pub bpmn_controller::error::BpmnControllerError::CannotDeprovisionDefaultPool
+pub bpmn_controller::error::BpmnControllerError::Database(sqlx_core::error::Error)
+pub bpmn_controller::error::BpmnControllerError::InstanceNotFound(alloc::string::String)
+pub bpmn_controller::error::BpmnControllerError::PoolAlreadyExists(alloc::string::String)
+pub bpmn_controller::error::BpmnControllerError::PoolHasTenants(alloc::string::String)
+pub bpmn_controller::error::BpmnControllerError::PoolNotFound(alloc::string::String)
+pub bpmn_controller::error::BpmnControllerError::ProcessDefinitionNotFound(alloc::string::String)
+pub bpmn_controller::error::BpmnControllerError::TenantNotFound(alloc::string::String)
+impl core::convert::From<sqlx_core::error::Error> for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::from(sqlx_core::error::Error) -> Self
+impl core::error::Error for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_controller::error::BpmnControllerError
+impl core::marker::Send for bpmn_controller::error::BpmnControllerError
+impl core::marker::Sync for bpmn_controller::error::BpmnControllerError
+impl core::marker::Unpin for bpmn_controller::error::BpmnControllerError
+impl core::marker::UnsafeUnpin for bpmn_controller::error::BpmnControllerError
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_controller::error::BpmnControllerError
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_controller::error::BpmnControllerError
+impl<T, U> core::convert::Into<U> for bpmn_controller::error::BpmnControllerError where U: core::convert::From<T>
+pub fn bpmn_controller::error::BpmnControllerError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_controller::error::BpmnControllerError where U: core::convert::Into<T>
+pub type bpmn_controller::error::BpmnControllerError::Error = core::convert::Infallible
+pub fn bpmn_controller::error::BpmnControllerError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_controller::error::BpmnControllerError where U: core::convert::TryFrom<T>
+pub type bpmn_controller::error::BpmnControllerError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_controller::error::BpmnControllerError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for bpmn_controller::error::BpmnControllerError where T: core::fmt::Display + ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for bpmn_controller::error::BpmnControllerError where T: 'static + ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_controller::error::BpmnControllerError where T: ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_controller::error::BpmnControllerError where T: ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_controller::error::BpmnControllerError
+impl<T> tracing::instrument::Instrument for bpmn_controller::error::BpmnControllerError
+impl<T> tracing::instrument::WithSubscriber for bpmn_controller::error::BpmnControllerError
+impl<T> typenum::type_operators::Same for bpmn_controller::error::BpmnControllerError
+pub type bpmn_controller::error::BpmnControllerError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_controller::error::BpmnControllerError where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_controller::error::BpmnControllerError::vzip(self) -> V
+pub mod bpmn_controller::instance
+pub async fn bpmn_controller::instance::instance_status(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<ob_poc_types::bpmn_controller::InstanceStatus>
+pub async fn bpmn_controller::instance::list_tenant_instances(&sqlx_postgres::PgPool, &str) -> anyhow::Result<alloc::vec::Vec<ob_poc_types::bpmn_controller::InstanceSummary>>
+pub async fn bpmn_controller::instance::start_instance(&sqlx_postgres::PgPool, &str, &str, serde_json::value::Value, core::option::Option<&str>) -> anyhow::Result<uuid::Uuid>
+pub mod bpmn_controller::k8s
+pub struct bpmn_controller::k8s::K8sClient
+impl bpmn_controller::k8s::K8sClient
+pub async fn bpmn_controller::k8s::K8sClient::from_infer() -> anyhow::Result<Self>
+pub fn bpmn_controller::k8s::K8sClient::is_connected(&self) -> bool
+pub fn bpmn_controller::k8s::K8sClient::namespace(&self) -> &str
+pub fn bpmn_controller::k8s::K8sClient::placeholder() -> Self
+impl core::marker::Freeze for bpmn_controller::k8s::K8sClient
+impl core::marker::Send for bpmn_controller::k8s::K8sClient
+impl core::marker::Sync for bpmn_controller::k8s::K8sClient
+impl core::marker::Unpin for bpmn_controller::k8s::K8sClient
+impl core::marker::UnsafeUnpin for bpmn_controller::k8s::K8sClient
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_controller::k8s::K8sClient
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_controller::k8s::K8sClient
+impl<T, U> core::convert::Into<U> for bpmn_controller::k8s::K8sClient where U: core::convert::From<T>
+pub fn bpmn_controller::k8s::K8sClient::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_controller::k8s::K8sClient where U: core::convert::Into<T>
+pub type bpmn_controller::k8s::K8sClient::Error = core::convert::Infallible
+pub fn bpmn_controller::k8s::K8sClient::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_controller::k8s::K8sClient where U: core::convert::TryFrom<T>
+pub type bpmn_controller::k8s::K8sClient::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_controller::k8s::K8sClient::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_controller::k8s::K8sClient where T: 'static + ?core::marker::Sized
+pub fn bpmn_controller::k8s::K8sClient::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_controller::k8s::K8sClient where T: ?core::marker::Sized
+pub fn bpmn_controller::k8s::K8sClient::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_controller::k8s::K8sClient where T: ?core::marker::Sized
+pub fn bpmn_controller::k8s::K8sClient::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_controller::k8s::K8sClient
+pub fn bpmn_controller::k8s::K8sClient::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_controller::k8s::K8sClient
+impl<T> tracing::instrument::Instrument for bpmn_controller::k8s::K8sClient
+impl<T> tracing::instrument::WithSubscriber for bpmn_controller::k8s::K8sClient
+impl<T> typenum::type_operators::Same for bpmn_controller::k8s::K8sClient
+pub type bpmn_controller::k8s::K8sClient::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_controller::k8s::K8sClient where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_controller::k8s::K8sClient::vzip(self) -> V
+pub mod bpmn_controller::loader
+pub async fn bpmn_controller::loader::deprovision_pool(&sqlx_postgres::PgPool, &bpmn_controller::k8s::K8sClient, &str) -> anyhow::Result<()>
+pub async fn bpmn_controller::loader::list_pool_tenants(&sqlx_postgres::PgPool, &str) -> anyhow::Result<alloc::vec::Vec<alloc::string::String>>
+pub async fn bpmn_controller::loader::list_pools(&sqlx_postgres::PgPool) -> anyhow::Result<alloc::vec::Vec<ob_poc_types::bpmn_controller::Pool>>
+pub async fn bpmn_controller::loader::pool_status(&sqlx_postgres::PgPool, &bpmn_controller::k8s::K8sClient, &str) -> anyhow::Result<ob_poc_types::bpmn_controller::PoolStatus>
+pub async fn bpmn_controller::loader::provision_pool(&sqlx_postgres::PgPool, &bpmn_controller::k8s::K8sClient, &str, ob_poc_types::bpmn_controller::PoolType, &[alloc::string::String], ob_poc_types::bpmn_controller::PoolConfig) -> anyhow::Result<()>
+pub enum bpmn_controller::BpmnControllerError
+pub bpmn_controller::BpmnControllerError::CannotDeprovisionDefaultPool
+pub bpmn_controller::BpmnControllerError::Database(sqlx_core::error::Error)
+pub bpmn_controller::BpmnControllerError::InstanceNotFound(alloc::string::String)
+pub bpmn_controller::BpmnControllerError::PoolAlreadyExists(alloc::string::String)
+pub bpmn_controller::BpmnControllerError::PoolHasTenants(alloc::string::String)
+pub bpmn_controller::BpmnControllerError::PoolNotFound(alloc::string::String)
+pub bpmn_controller::BpmnControllerError::ProcessDefinitionNotFound(alloc::string::String)
+pub bpmn_controller::BpmnControllerError::TenantNotFound(alloc::string::String)
+impl core::convert::From<sqlx_core::error::Error> for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::from(sqlx_core::error::Error) -> Self
+impl core::error::Error for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for bpmn_controller::error::BpmnControllerError
+impl core::marker::Send for bpmn_controller::error::BpmnControllerError
+impl core::marker::Sync for bpmn_controller::error::BpmnControllerError
+impl core::marker::Unpin for bpmn_controller::error::BpmnControllerError
+impl core::marker::UnsafeUnpin for bpmn_controller::error::BpmnControllerError
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_controller::error::BpmnControllerError
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_controller::error::BpmnControllerError
+impl<T, U> core::convert::Into<U> for bpmn_controller::error::BpmnControllerError where U: core::convert::From<T>
+pub fn bpmn_controller::error::BpmnControllerError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_controller::error::BpmnControllerError where U: core::convert::Into<T>
+pub type bpmn_controller::error::BpmnControllerError::Error = core::convert::Infallible
+pub fn bpmn_controller::error::BpmnControllerError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_controller::error::BpmnControllerError where U: core::convert::TryFrom<T>
+pub type bpmn_controller::error::BpmnControllerError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_controller::error::BpmnControllerError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for bpmn_controller::error::BpmnControllerError where T: core::fmt::Display + ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for bpmn_controller::error::BpmnControllerError where T: 'static + ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_controller::error::BpmnControllerError where T: ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_controller::error::BpmnControllerError where T: ?core::marker::Sized
+pub fn bpmn_controller::error::BpmnControllerError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_controller::error::BpmnControllerError
+pub fn bpmn_controller::error::BpmnControllerError::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_controller::error::BpmnControllerError
+impl<T> tracing::instrument::Instrument for bpmn_controller::error::BpmnControllerError
+impl<T> tracing::instrument::WithSubscriber for bpmn_controller::error::BpmnControllerError
+impl<T> typenum::type_operators::Same for bpmn_controller::error::BpmnControllerError
+pub type bpmn_controller::error::BpmnControllerError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_controller::error::BpmnControllerError where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_controller::error::BpmnControllerError::vzip(self) -> V
+pub struct bpmn_controller::K8sClient
+impl bpmn_controller::k8s::K8sClient
+pub async fn bpmn_controller::k8s::K8sClient::from_infer() -> anyhow::Result<Self>
+pub fn bpmn_controller::k8s::K8sClient::is_connected(&self) -> bool
+pub fn bpmn_controller::k8s::K8sClient::namespace(&self) -> &str
+pub fn bpmn_controller::k8s::K8sClient::placeholder() -> Self
+impl core::marker::Freeze for bpmn_controller::k8s::K8sClient
+impl core::marker::Send for bpmn_controller::k8s::K8sClient
+impl core::marker::Sync for bpmn_controller::k8s::K8sClient
+impl core::marker::Unpin for bpmn_controller::k8s::K8sClient
+impl core::marker::UnsafeUnpin for bpmn_controller::k8s::K8sClient
+impl !core::panic::unwind_safe::RefUnwindSafe for bpmn_controller::k8s::K8sClient
+impl !core::panic::unwind_safe::UnwindSafe for bpmn_controller::k8s::K8sClient
+impl<T, U> core::convert::Into<U> for bpmn_controller::k8s::K8sClient where U: core::convert::From<T>
+pub fn bpmn_controller::k8s::K8sClient::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for bpmn_controller::k8s::K8sClient where U: core::convert::Into<T>
+pub type bpmn_controller::k8s::K8sClient::Error = core::convert::Infallible
+pub fn bpmn_controller::k8s::K8sClient::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for bpmn_controller::k8s::K8sClient where U: core::convert::TryFrom<T>
+pub type bpmn_controller::k8s::K8sClient::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn bpmn_controller::k8s::K8sClient::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for bpmn_controller::k8s::K8sClient where T: 'static + ?core::marker::Sized
+pub fn bpmn_controller::k8s::K8sClient::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for bpmn_controller::k8s::K8sClient where T: ?core::marker::Sized
+pub fn bpmn_controller::k8s::K8sClient::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for bpmn_controller::k8s::K8sClient where T: ?core::marker::Sized
+pub fn bpmn_controller::k8s::K8sClient::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for bpmn_controller::k8s::K8sClient
+pub fn bpmn_controller::k8s::K8sClient::from(T) -> T
+impl<T> either::into_either::IntoEither for bpmn_controller::k8s::K8sClient
+impl<T> tracing::instrument::Instrument for bpmn_controller::k8s::K8sClient
+impl<T> tracing::instrument::WithSubscriber for bpmn_controller::k8s::K8sClient
+impl<T> typenum::type_operators::Same for bpmn_controller::k8s::K8sClient
+pub type bpmn_controller::k8s::K8sClient::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for bpmn_controller::k8s::K8sClient where V: ppv_lite86::types::MultiLane<T>
+pub fn bpmn_controller::k8s::K8sClient::vzip(self) -> V
+pub async fn bpmn_controller::deprovision_pool(&sqlx_postgres::PgPool, &bpmn_controller::k8s::K8sClient, &str) -> anyhow::Result<()>
+pub async fn bpmn_controller::instance_status(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<ob_poc_types::bpmn_controller::InstanceStatus>
+pub async fn bpmn_controller::list_pool_tenants(&sqlx_postgres::PgPool, &str) -> anyhow::Result<alloc::vec::Vec<alloc::string::String>>
+pub async fn bpmn_controller::list_pools(&sqlx_postgres::PgPool) -> anyhow::Result<alloc::vec::Vec<ob_poc_types::bpmn_controller::Pool>>
+pub async fn bpmn_controller::list_tenant_instances(&sqlx_postgres::PgPool, &str) -> anyhow::Result<alloc::vec::Vec<ob_poc_types::bpmn_controller::InstanceSummary>>
+pub async fn bpmn_controller::pool_status(&sqlx_postgres::PgPool, &bpmn_controller::k8s::K8sClient, &str) -> anyhow::Result<ob_poc_types::bpmn_controller::PoolStatus>
+pub async fn bpmn_controller::provision_pool(&sqlx_postgres::PgPool, &bpmn_controller::k8s::K8sClient, &str, ob_poc_types::bpmn_controller::PoolType, &[alloc::string::String], ob_poc_types::bpmn_controller::PoolConfig) -> anyhow::Result<()>
+pub async fn bpmn_controller::start_instance(&sqlx_postgres::PgPool, &str, &str, serde_json::value::Value, core::option::Option<&str>) -> anyhow::Result<uuid::Uuid>

@@ -12,16 +12,16 @@ use crate::agent::learning::warmup::LearningWarmup;
 use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::GenerationLogRepository;
 use crate::dsl_v2::execution::DslExecutor;
-use crate::entity_linking::{
-    EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
+use ob_poc_entity_linking::{
+    EntityLinkingService, EntityLinkingServiceImpl, NullEntityLinkingService,
 };
 
 use axum::Router;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use crate::policy::PolicyGate;
 use crate::sage::{DeterministicSage, LlmSage, SageEngine};
+use ob_poc_boundary::policy::PolicyGate;
 
 // ============================================================================
 // State
@@ -154,7 +154,7 @@ impl AgentState {
         // Load lexicon snapshot for fast in-memory lexical verb search (Phase A of 072)
         // This runs BEFORE semantic search for exact label/token matches
         let lexicon: Option<crate::mcp::verb_search::SharedLexicon> = {
-            use crate::lexicon::{LexiconServiceImpl, LexiconSnapshot};
+            use ob_poc_authoring::lexicon::{LexiconServiceImpl, LexiconSnapshot};
             use std::path::Path;
 
             // Look for snapshot in standard locations
@@ -177,7 +177,7 @@ impl AgentState {
                                 path.display()
                             );
                             loaded = Some(Arc::new(LexiconServiceImpl::new(Arc::new(snapshot)))
-                                as Arc<dyn crate::lexicon::LexiconService>);
+                                as Arc<dyn ob_poc_authoring::lexicon::LexiconService>);
                             break;
                         }
                         Err(e) => {
@@ -246,7 +246,7 @@ impl AgentState {
                     "Entity snapshot not found. Entity linking disabled. \
                      Run `cargo xtask entity compile` to generate."
                 );
-                Arc::new(StubEntityLinkingService::new())
+                Arc::new(NullEntityLinkingService::new())
             })
         };
 

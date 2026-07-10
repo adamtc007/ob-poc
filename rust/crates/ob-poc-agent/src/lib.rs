@@ -62,6 +62,7 @@
 //!   - 2.8: SemOS knowledge query trait + temporary impl
 //!   - 2.9: audit emission (JSONL)
 //!   - 2.10: hard-coded GoalFrame for the spike
+#![deny(unreachable_pub)]
 
 /// In-memory SemOS knowledge snapshot for a session. Phase 2.5 — see
 /// `index.rs` for the planning loop's read view + the spike disk

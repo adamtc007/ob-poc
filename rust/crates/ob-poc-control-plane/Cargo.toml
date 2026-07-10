@@ -1,0 +1,20 @@
+[package]
+name = "ob-poc-control-plane"
+version = "0.1.0"
+edition = "2021"
+description = "Owns the execution-control decision for AI-led governed execution (EOP-VS-CONTROLPLANE-001). Assembles the control context, invokes gate adapters, aggregates results under collect-where-independent, produces proof, classifies STP eligibility, and seals the execution envelope. Depends on no execution-tier crate — T1 is types + evaluator only; T2+ tranches wire adapters over existing validators owned elsewhere."
+
+[dependencies]
+uuid = { version = "1.4", features = ["v4", "v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+trybuild = "1"
+
+[lints.rust]
+unreachable_pub = "deny"

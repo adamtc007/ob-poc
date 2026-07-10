@@ -636,8 +636,8 @@ slots:
             AND ops_review exists
             AND ops_review.state = COMPLETE
             AND every required committee_signoff exists
-            AND every required committee_signoff.state = SIGNED
-            AND no objection exists with state = OPEN
+            AND every required committee_signoff.status = SIGNED
+            AND count(objection where objection.status = OPEN) = 0
         - id: PARALLEL_RUN
           description: "Running shadow alongside incumbent (or empty for new mandate)."
         - id: ACTIVE
@@ -731,66 +731,12 @@ slots:
         - investment-manager.terminate
         - investment-manager.find-for-trade
 
-  # R-4 NEW: trading_activity — per-CBU signal slot tracking first-trade
-  # event + dormancy detection. Projects INTO CBU tollgate aggregate
-  # (cbu.operationally_active). Not a stored table in current schema;
-  # Tranche 3 migration will add cbu_trading_activity keyed by cbu_id.
-  - id: trading_activity
-    constellation: trading.streetside
-    stateless: false
-    state_machine:
-      id: trading_activity_lifecycle
-      owner: "trading+ops"
-      expected_lifetime: long_lived
-      source_entity: '"ob-poc".cbu_trading_activity'  # DAG-first; schema follows in Tranche 3
-      state_column: activity_state
-      scope: per_cbu
-      description: |
-        Per-CBU trading-activity state derived from trade events. Governs
-        the distinction between trade_permissioned (mandate live, never
-        traded) and actively_trading (has traded and is currently
-        active) in the overall_lifecycle. Also flags dormancy for
-        commercial / regulatory review. Signal slot: the state is the
-        input, not a thing the UI edits directly.
-      states:
-        - id: never_traded
-          entry: true
-          description: |
-            trading_profile is ACTIVE but first_trade_at IS NULL. CBU is
-            permissioned but not yet executing.
-        - id: trading
-          description: |
-            first_trade_at IS NOT NULL AND last_trade_at within activity
-            window (e.g. last 90 days). Actively making money.
-        - id: dormant
-          description: |
-            first_trade_at IS NOT NULL but last_trade_at older than
-            dormancy threshold. Trading-capable but not currently
-            executing — flags review (is this CBU still operationally
-            relevant?).
-        - id: suspended
-          description: |
-            Trading activity paused alongside trading_profile.SUSPENDED
-            (mirror state).
-      transitions:
-        - from: never_traded
-          to: trading
-          via: "(backend: first trade posted — event from settlement pipeline)"
-        - from: trading
-          to: dormant
-          via: "(backend: last_trade_at + dormancy_window < now)"
-        - from: dormant
-          to: trading
-          via: "(backend: new trade posted)"
-        - from: [never_traded, trading, dormant]
-          to: suspended
-          via: "(backend: trading_profile.SUSPENDED triggers mirror)"
-        - from: suspended
-          to: trading
-          via: "(backend: trading_profile.reactivate triggers mirror)"
-      # No terminal states — when trading_profile archives, this slot
-      # is effectively inert but retained for historical reporting.
-      terminal_states: []
+  # trading_activity slot DELETED (state-graph remediation Phase 7b,
+  # ratified 7.6): source_entity cbu_trading_activity has zero writers and
+  # zero live rows (COMMENT ON TABLE marks it DEPRECATED). Every transition
+  # in this slot was a fictional "(backend: ...)" row -- no settlement-
+  # pipeline/dormancy-scheduler job exists in this codebase. Table retained
+  # (not dropped, fenced to the W1-proper cutover).
 
   - id: custody
     constellation: trading.streetside
@@ -917,10 +863,6 @@ slots:
     stateless: true
     rationale: "Reference data — jurisdictional booking perimeter. No lifecycle; only timestamps."
     source_entity: '"ob-poc".booking_location'
-    verbs:
-      - booking-location.create
-      - booking-location.update
-      - booking-location.list
 
   - id: legal_entity
     constellation: trading.streetside
@@ -987,8 +929,8 @@ slots:
           description: "Delivery complete."
           green_when: |
             every delivery_line_item exists
-            AND every delivery_line_item.state = CONFIRMED_RECEIVED
-            AND no exception exists with state = OPEN
+            AND every delivery_line_item.receipt_status = CONFIRMED_RECEIVED
+            AND count(exception where exception.status = OPEN) = 0
             AND counterparty_acknowledgement exists
             AND counterparty_acknowledgement.state = RECEIVED
         - id: FAILED

@@ -15,7 +15,7 @@ use uuid::Uuid;
 use dsl_runtime::SemanticStateService;
 
 use crate::database::derive_semantic_state;
-use crate::ontology::SemanticStageRegistry;
+use ob_poc_ontology::SemanticStageRegistry;
 
 /// Production impl backed by the ontology stage registry + platform pool.
 pub struct ObPocSemanticStateService {

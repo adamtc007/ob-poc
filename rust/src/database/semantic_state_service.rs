@@ -13,7 +13,7 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::ontology::SemanticStageRegistry;
+use ob_poc_ontology::SemanticStageRegistry;
 
 /// Derive the semantic state for a CBU
 pub async fn derive_semantic_state(

@@ -14,7 +14,9 @@ use sem_os_policy::domain_pack::DomainPackManifest;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::llm_trace::{record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTrace};
+use ob_poc_boundary::llm_trace::{
+    record_llm_inference_trace, workbook_llm_trace_ref, LlmInferenceTrace,
+};
 
 use super::{
     run_kyc_update_status_revision_loop, KycUpdateStatusWorkbookDraft, SemOsLanguagePack,
@@ -162,7 +164,7 @@ pub async fn run_kyc_update_status_llm_draft_loop_with_prompt_pack(
         evidence_digest.as_deref(),
     );
     adapter_diagnostics.extend(repair_decode_fields(&mut draft_arguments, validation_pack));
-    let trace = record_llm_inference_trace(crate::llm_trace::LlmInferenceTraceInput {
+    let trace = record_llm_inference_trace(ob_poc_boundary::llm_trace::LlmInferenceTraceInput {
         provider: client.provider_name(),
         model: client.model_name(),
         model_id: Some(client.model_name()),

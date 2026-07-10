@@ -3,10 +3,10 @@
 use super::client::CompaniesHouseClient;
 use super::normalize::{normalize_company, normalize_officer, normalize_psc};
 use crate::research::sources::normalized::{
-    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer, NormalizedRelationship,
+    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer,
 };
 use crate::research::sources::traits::{
-    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, FetchParentChainOptions,
+    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
     SearchCandidate, SearchOptions, SourceDataType, SourceLoader,
 };
 use anyhow::Result;
@@ -26,6 +26,7 @@ impl CompaniesHouseLoader {
     }
 
     /// Create with an existing client
+    #[allow(dead_code)] // kept for tests
     pub fn with_client(client: CompaniesHouseClient) -> Self {
         Self { client }
     }
@@ -197,17 +198,6 @@ impl SourceLoader for CompaniesHouseLoader {
             .collect();
 
         Ok(officers)
-    }
-
-    async fn fetch_parent_chain(
-        &self,
-        _key: &str,
-        _options: Option<FetchParentChainOptions>,
-    ) -> Result<Vec<NormalizedRelationship>> {
-        // Companies House doesn't provide parent chain directly
-        // Corporate PSC holders could be used to infer this, but that's
-        // a different operation (fetch_control_holders)
-        Ok(vec![])
     }
 }
 

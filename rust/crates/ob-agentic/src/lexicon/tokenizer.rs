@@ -689,11 +689,13 @@ fn is_punctuation(c: char) -> bool {
 }
 
 /// A mock entity resolver for testing.
+#[cfg(any(test, feature = "test-util"))]
 #[derive(Debug, Default)]
 pub struct MockEntityResolver {
     entities: std::collections::HashMap<String, ResolvedEntity>,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl MockEntityResolver {
     pub fn new() -> Self {
         Self::default()
@@ -719,6 +721,7 @@ impl MockEntityResolver {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 #[async_trait]
 impl EntityResolver for MockEntityResolver {
     async fn resolve(&self, text: &str, _hint: Option<&str>) -> Option<ResolvedEntity> {

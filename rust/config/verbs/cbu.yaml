@@ -833,6 +833,17 @@ domains:
           - "assign account operator"
           - "I need to add a signatory"
           - "authorize representative for trading"
+        sentences:
+          step:
+            - "Assign {role} role in this structure"
+            - "Add role relationship for {entity-id}"
+          summary:
+            - "assigned {role} role"
+          clarify:
+            cbu-id: "Which structure should receive the role assignment?"
+            role: "Which role should be assigned?"
+            entity-id: "Which entity should receive the role?"
+          completed: "{role} role assigned"
         behavior: plugin
         handler: AssignRole   # dispatches on role-type (I1 fold of the 6 cbu.assign-* specialists)
         metadata:
@@ -976,9 +987,10 @@ domains:
           - "attach feeder structure"
           - "link aggregator to fund"
         behavior: plugin
-        lifecycle:
-          requires_states: [DISCOVERED]
-          transitions_to: STRUCTURED
+        # lifecycle block removed (state-graph remediation Phase 3b, ratified
+        # 2.2): requires_states/transitions_to were phantom -- LinkStructure::
+        # execute (crates/sem_os_postgres/src/ops/cbu.rs) never reads or
+        # writes cbus.status at all.
         handler: CbuLinkStructureOp
         metadata:
           tier: intent
@@ -1166,6 +1178,7 @@ domains:
           - name: cbu-id
             type: uuid
             required: true
+            maps_to: cbu_id
             lookup:
               table: cbus
               entity_type: cbu
@@ -1175,6 +1188,7 @@ domains:
           - name: entity-id
             type: uuid
             required: true
+            maps_to: entity_id
             lookup:
               table: entities
               entity_type: entity
@@ -1391,7 +1405,13 @@ domains:
         lifecycle:
           entity_arg: cbu-id
           requires_states: [VALIDATED]
-          transitions_to: CONFIGURING
+          # transitions_to: CONFIGURING removed (state-graph remediation
+          # Phase 3b, ratified 2.2) -- phantom; AddProduct::execute
+          # (crates/sem_os_postgres/src/ops/cbu.rs) never writes cbus.status.
+          # requires_states is kept: enforce_requires_states_precondition is
+          # behavior-agnostic and runs at the execute_verb_in_scope
+          # chokepoint regardless of AddProduct's own logic, so this
+          # precondition IS actually enforced with entity_arg set.
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1878,9 +1898,11 @@ domains:
           - "attach screening result"
           - "add verification evidence"
         behavior: crud
-        lifecycle:
-          requires_states: [STRUCTURED]
-          transitions_to: EVIDENCED
+        # lifecycle block removed (state-graph remediation Phase 3b, ratified
+        # 2.2): phantom -- this is a plain CRUD insert into cbu_evidence (a
+        # different table from cbus), so requires_states/transitions_to
+        # against cbus.status could never have been read or written by this
+        # verb's execution path.
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2175,8 +2197,17 @@ domains:
         description: "Suspend CBU operational lifecycle (operational hold — regulatory, dispute, client distress)"
         behavior: plugin
         lifecycle:
-          requires_states: [OPERATIONALLY_ACTIVE]
-          transitions_to: SUSPENDED
+          entity_arg: cbu-id
+          # Values + casing corrected (state-graph remediation Phase 3a/3c):
+          # cbus.operational_status is lowercase snake_case at the DB/
+          # SimpleStatusOp level (cbu_dag.yaml:435-451); the prior
+          # OPERATIONALLY_ACTIVE/SUSPENDED casing never matched any live
+          # value, and without entity_arg the precondition failed open
+          # (never checked at all) so the mismatch was never observed.
+          # transitions_to removed: dead for behavior:plugin (Phase 3b) --
+          # SimpleStatusOp writes its own hardcoded target_state, it does not
+          # read this field.
+          requires_states: [trade_permissioned, actively_trading, restricted]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2219,8 +2250,10 @@ domains:
         description: "Reinstate suspended CBU back to operationally active"
         behavior: plugin
         lifecycle:
-          requires_states: [SUSPENDED]
-          transitions_to: OPERATIONALLY_ACTIVE
+          entity_arg: cbu-id
+          # Values + casing corrected (state-graph remediation Phase 3a/3c);
+          # see cbu.suspend's block above for rationale.
+          requires_states: [suspended]
         effect_class: read_modify_write
         metadata:
           tier: intent
@@ -2340,8 +2373,10 @@ domains:
         description: "Begin CBU winding-down — exit intent, no new activity, unwind positions"
         behavior: plugin
         lifecycle:
-          requires_states: [OPERATIONALLY_ACTIVE, SUSPENDED]
-          transitions_to: WINDING_DOWN
+          entity_arg: cbu-id
+          # Values + casing corrected (state-graph remediation Phase 3a/3c);
+          # see cbu.suspend's block above for rationale.
+          requires_states: [trade_permissioned, actively_trading, restricted, suspended]
         metadata:
           tier: intent
           source_of_truth: operational
@@ -2387,8 +2422,10 @@ domains:
         description: "Complete CBU offboarding — terminal-positive transition to offboarded state"
         behavior: plugin
         lifecycle:
-          requires_states: [WINDING_DOWN]
-          transitions_to: OFFBOARDED
+          entity_arg: cbu-id
+          # Values + casing corrected (state-graph remediation Phase 3a/3c);
+          # see cbu.suspend's block above for rationale.
+          requires_states: [winding_down]
         metadata:
           tier: intent
           source_of_truth: operational

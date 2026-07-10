@@ -7,7 +7,7 @@
 //! - document_metadata: doc_id + attribute_id (composite PK), value (jsonb)
 //! - attribute_values_typed: entity_id, attribute_id, value_text/value_number/etc.
 
-use crate::data_dictionary::{AttributeId, DbAttributeDefinition, DictionaryService};
+use ob_poc_authoring::data_dictionary::{AttributeId, DbAttributeDefinition, DictionaryService};
 use serde_json::Value;
 use sqlx::PgPool;
 use std::collections::HashMap;

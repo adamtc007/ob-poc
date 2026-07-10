@@ -6,6 +6,7 @@
 //! - `scanner` — verb-first YAML scanner (pure conversion functions)
 //! - `seeds` — taxonomy, view, policy, derivation spec seed builders
 //! - `onboarding` — request validation and default generation
+#![deny(unreachable_pub)]
 
 pub mod metadata;
 pub mod onboarding;
@@ -313,3 +314,6 @@ mod tests {
         assert!(fqns.contains(&"trading.aggregate_aum"));
     }
 }
+
+#[cfg(test)]
+mod integration_tests;

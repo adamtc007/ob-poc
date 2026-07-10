@@ -124,12 +124,15 @@ pub enum KnowledgeError {
 /// Spike-only stub. Returns `Empty` for every query and records the
 /// fact that a query reached it. Useful for confirming the planning
 /// loop wires the knowledge surface end-to-end before the MCP client
-/// is built.
+/// is built. Superseded in production by `McpKnowledgeClient`
+/// (see `mcp_client.rs`) — test-only (no non-test consumer, verified).
+#[cfg(test)]
 #[derive(Debug, Default, Clone)]
 pub struct StubKnowledgeClient {
     label: String,
 }
 
+#[cfg(test)]
 impl StubKnowledgeClient {
     pub fn new() -> Self {
         Self {
@@ -144,6 +147,7 @@ impl StubKnowledgeClient {
     }
 }
 
+#[cfg(test)]
 #[async_trait]
 impl SemOsKnowledgeClient for StubKnowledgeClient {
     async fn query(&self, query: KnowledgeQuery) -> Result<KnowledgeResponse, KnowledgeError> {

@@ -500,12 +500,12 @@ fn parse_slot_tree(value: &Value) -> Result<Vec<EntityStateDTO>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sem_os_mcp::bridge::StubBridge;
+    use sem_os_mcp::bridge::NullBridge;
     use sem_os_mcp::tool_impls::build_registry;
     use std::sync::Arc;
 
     fn build_server() -> Arc<McpServer> {
-        let registry = build_registry(Arc::new(StubBridge::with_label("phase-4-test")));
+        let registry = build_registry(Arc::new(NullBridge::with_label("phase-4-test")));
         Arc::new(McpServer::new(registry))
     }
 

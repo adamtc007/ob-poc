@@ -1,0 +1,1641 @@
+# entity-gateway | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:23Z
+pub mod entity_gateway
+pub mod entity_gateway::proto
+pub mod entity_gateway::proto::ob
+pub mod entity_gateway::proto::ob::gateway
+pub mod entity_gateway::proto::ob::gateway::v1
+pub mod entity_gateway::proto::ob::gateway::v1::entity_gateway_client
+pub struct entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+impl entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<tonic::transport::channel::Channel>
+pub async fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<tonic::transport::channel::Channel>::connect<D>(D) -> core::result::Result<Self, tonic::transport::error::Error> where D: core::convert::TryInto<tonic::transport::channel::endpoint::Endpoint>, <D as core::convert::TryInto>::Error: core::convert::Into<tonic::codegen::StdError>
+impl<T> entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: tonic::client::service::GrpcService<tonic::body::BoxBody>, <T as tonic::client::service::GrpcService>::Error: core::convert::Into<tonic::codegen::StdError>, <T as tonic::client::service::GrpcService>::ResponseBody: http_body::Body<Data = bytes::bytes::Bytes> + core::marker::Send + 'static, <<T as tonic::client::service::GrpcService>::ResponseBody as http_body::Body>::Error: core::convert::Into<tonic::codegen::StdError> + core::marker::Send
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::accept_compressed(self, tonic::codec::compression::CompressionEncoding) -> Self
+pub async fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::get_entity_config(&mut self, impl tonic::request::IntoRequest<entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest>) -> core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse>, tonic::status::Status>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::max_decoding_message_size(self, usize) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::max_encoding_message_size(self, usize) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::new(T) -> Self
+pub async fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::search(&mut self, impl tonic::request::IntoRequest<entity_gateway::proto::ob::gateway::v1::SearchRequest>) -> core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::SearchResponse>, tonic::status::Status>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::send_compressed(self, tonic::codec::compression::CompressionEncoding) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::with_interceptor<F>(T, F) -> entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<tonic::service::interceptor::InterceptedService<T, F>> where F: tonic::service::interceptor::Interceptor, <T as tonic::client::service::GrpcService>::ResponseBody: core::default::Default, T: tower_service::Service<http::request::Request<tonic::body::BoxBody>, Response = http::response::Response<<T as tonic::client::service::GrpcService<tonic::body::BoxBody>>::ResponseBody>>, <T as tower_service::Service<http::request::Request<tonic::body::BoxBody>>>::Error: core::convert::Into<tonic::codegen::StdError> + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::with_origin(T, http::uri::Uri) -> Self
+impl<T: core::clone::Clone> core::clone::Clone for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::clone(&self) -> entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+impl<T: core::fmt::Debug> core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<T> !core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+impl<T> core::marker::Send for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::marker::Send
+impl<T> core::marker::Sync for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::marker::Sync
+impl<T> core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::marker::Unpin
+impl<T> core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::marker::UnsafeUnpin
+impl<T> core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::panic::unwind_safe::RefUnwindSafe
+impl<T> core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::panic::unwind_safe::UnwindSafe
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T> where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient<T>::vzip(self) -> V
+pub mod entity_gateway::proto::ob::gateway::v1::entity_gateway_server
+pub struct entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::accept_compressed(self, tonic::codec::compression::CompressionEncoding) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::from_arc(alloc::sync::Arc<T>) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::max_decoding_message_size(self, usize) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::max_encoding_message_size(self, usize) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::new(T) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::send_compressed(self, tonic::codec::compression::CompressionEncoding) -> Self
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::with_interceptor<F>(T, F) -> tonic::service::interceptor::InterceptedService<Self, F> where F: tonic::service::interceptor::Interceptor
+impl<T, B> tower_service::Service<http::request::Request<B>> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGateway, B: http_body::Body + core::marker::Send + 'static, <B as http_body::Body>::Error: core::convert::Into<tonic::codegen::StdError> + core::marker::Send + 'static
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Error = core::convert::Infallible
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Future = core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<<entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> as tower_service::Service<http::request::Request<B>>>::Response, <entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> as tower_service::Service<http::request::Request<B>>>::Error>> + core::marker::Send)>>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Response = http::response::Response<http_body_util::combinators::box_body::UnsyncBoxBody<bytes::bytes::Bytes, tonic::status::Status>>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::call(&mut self, http::request::Request<B>) -> Self::Future
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::poll_ready(&mut self, &mut core::task::wake::Context<'_>) -> core::task::poll::Poll<core::result::Result<(), Self::Error>>
+impl<T: core::fmt::Debug> core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<T> core::clone::Clone for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::clone(&self) -> Self
+impl<T> tonic::server::NamedService for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub const entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::NAME: &'static str
+impl<T> core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> core::marker::Send for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::marker::Sync + core::marker::Send
+impl<T> core::marker::Sync for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::marker::Sync + core::marker::Send
+impl<T> core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::panic::unwind_safe::RefUnwindSafe
+impl<T> core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::panic::unwind_safe::RefUnwindSafe
+impl<S, R> axum::service_ext::ServiceExt<R> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where S: tower_service::Service<R>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::into_make_service(self) -> axum::routing::into_make_service::IntoMakeService<S>
+impl<T, ReqBody, ResBody> tonic::client::service::GrpcService<ReqBody> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: tower_service::Service<http::request::Request<ReqBody>, Response = http::response::Response<ResBody>>, <T as tower_service::Service<http::request::Request<ReqBody>>>::Error: core::convert::Into<alloc::boxed::Box<(dyn core::error::Error + core::marker::Sync + core::marker::Send)>>, ResBody: http_body::Body, <ResBody as http_body::Body>::Error: core::convert::Into<alloc::boxed::Box<(dyn core::error::Error + core::marker::Sync + core::marker::Send)>>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Error = <T as tower_service::Service<http::request::Request<ReqBody>>>::Error
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Future = <T as tower_service::Service<http::request::Request<ReqBody>>>::Future
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::ResponseBody = ResBody
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::call(&mut self, http::request::Request<ReqBody>) -> <T as tonic::client::service::GrpcService<ReqBody>>::Future
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::poll_ready(&mut self, &mut core::task::wake::Context<'_>) -> core::task::poll::Poll<core::result::Result<(), <T as tonic::client::service::GrpcService<ReqBody>>::Error>>
+impl<T, Request> tower::util::ServiceExt<Request> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: tower_service::Service<Request> + ?core::marker::Sized
+impl<T, Request> tower::util::ServiceExt<Request> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: tower_service::Service<Request> + ?core::marker::Sized
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>
+pub type entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T> where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGatewayServer<T>::vzip(self) -> V
+pub const entity_gateway::proto::ob::gateway::v1::entity_gateway_server::SERVICE_NAME: &str
+pub trait entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGateway: core::marker::Send + core::marker::Sync + 'static
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGateway::get_entity_config<'life0, 'async_trait>(&'life0 self, tonic::request::Request<entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse>, tonic::status::Status>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGateway::search<'life0, 'async_trait>(&'life0 self, tonic::request::Request<entity_gateway::proto::ob::gateway::v1::SearchRequest>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::SearchResponse>, tonic::status::Status>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+impl entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGateway for entity_gateway::EntityGatewayService
+pub fn entity_gateway::EntityGatewayService::get_entity_config<'life0, 'async_trait>(&'life0 self, tonic::request::Request<entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse>, tonic::status::Status>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn entity_gateway::EntityGatewayService::search<'life0, 'async_trait>(&'life0 self, tonic::request::Request<entity_gateway::proto::ob::gateway::v1::SearchRequest>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::SearchResponse>, tonic::status::Status>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+#[repr(i32)] pub enum entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Date = 1
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorType::DiscEnum = 2
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorType::String = 0
+impl entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::as_str_name(&self) -> &'static str
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::from_str_name(&str) -> core::option::Option<Self>
+impl entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::from_i32(i32) -> core::option::Option<entity_gateway::proto::ob::gateway::v1::DiscriminatorType>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::is_valid(i32) -> bool
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::clone(&self) -> entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::cmp::Eq for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::cmp::Ord for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::cmp(&self, &entity_gateway::proto::ob::gateway::v1::DiscriminatorType) -> core::cmp::Ordering
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::eq(&self, &entity_gateway::proto::ob::gateway::v1::DiscriminatorType) -> bool
+impl core::cmp::PartialOrd for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::partial_cmp(&self, &entity_gateway::proto::ob::gateway::v1::DiscriminatorType) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<entity_gateway::proto::ob::gateway::v1::DiscriminatorType> for i32
+pub fn i32::from(entity_gateway::proto::ob::gateway::v1::DiscriminatorType) -> i32
+impl core::convert::TryFrom<i32> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Error = prost::error::UnknownEnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::try_from(i32) -> core::result::Result<entity_gateway::proto::ob::gateway::v1::DiscriminatorType, prost::error::UnknownEnumValue>
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::default() -> entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl<Q, K> equivalent::Comparable<K> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::equivalent(&self, &K) -> bool
+impl<Q, K> indexmap::equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::DiscriminatorType::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorType::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::DiscriminatorType where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorType::vzip(self) -> V
+#[repr(i32)] pub enum entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Autocomplete = 1
+pub entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::SearchModal = 0
+impl entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::as_str_name(&self) -> &'static str
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::from_str_name(&str) -> core::option::Option<Self>
+impl entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::from_i32(i32) -> core::option::Option<entity_gateway::proto::ob::gateway::v1::ResolutionModeHint>
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::is_valid(i32) -> bool
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::clone(&self) -> entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::cmp::Eq for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::cmp::Ord for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::cmp(&self, &entity_gateway::proto::ob::gateway::v1::ResolutionModeHint) -> core::cmp::Ordering
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::eq(&self, &entity_gateway::proto::ob::gateway::v1::ResolutionModeHint) -> bool
+impl core::cmp::PartialOrd for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::partial_cmp(&self, &entity_gateway::proto::ob::gateway::v1::ResolutionModeHint) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<entity_gateway::proto::ob::gateway::v1::ResolutionModeHint> for i32
+pub fn i32::from(entity_gateway::proto::ob::gateway::v1::ResolutionModeHint) -> i32
+impl core::convert::TryFrom<i32> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub type entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Error = prost::error::UnknownEnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::try_from(i32) -> core::result::Result<entity_gateway::proto::ob::gateway::v1::ResolutionModeHint, prost::error::UnknownEnumValue>
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::default() -> entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl<Q, K> equivalent::Comparable<K> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::equivalent(&self, &K) -> bool
+impl<Q, K> indexmap::equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub type entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub type entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::ResolutionModeHint where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::ResolutionModeHint::vzip(self) -> V
+#[repr(i32)] pub enum entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyType::Enum = 1
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyType::Text = 0
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyType::Uuid = 2
+impl entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::as_str_name(&self) -> &'static str
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::from_str_name(&str) -> core::option::Option<Self>
+impl entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::from_i32(i32) -> core::option::Option<entity_gateway::proto::ob::gateway::v1::SearchKeyType>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::is_valid(i32) -> bool
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::clone(&self) -> entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::cmp::Eq for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::cmp::Ord for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::cmp(&self, &entity_gateway::proto::ob::gateway::v1::SearchKeyType) -> core::cmp::Ordering
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::eq(&self, &entity_gateway::proto::ob::gateway::v1::SearchKeyType) -> bool
+impl core::cmp::PartialOrd for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::partial_cmp(&self, &entity_gateway::proto::ob::gateway::v1::SearchKeyType) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<entity_gateway::proto::ob::gateway::v1::SearchKeyType> for i32
+pub fn i32::from(entity_gateway::proto::ob::gateway::v1::SearchKeyType) -> i32
+impl core::convert::TryFrom<i32> for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyType::Error = prost::error::UnknownEnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::try_from(i32) -> core::result::Result<entity_gateway::proto::ob::gateway::v1::SearchKeyType, prost::error::UnknownEnumValue>
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::default() -> entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl<Q, K> equivalent::Comparable<K> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::equivalent(&self, &K) -> bool
+impl<Q, K> indexmap::equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyType::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyType::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyType::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::SearchKeyType::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::SearchKeyType where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyType::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::SearchKeyType where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyType::vzip(self) -> V
+#[repr(i32)] pub enum entity_gateway::proto::ob::gateway::v1::SearchMode
+pub entity_gateway::proto::ob::gateway::v1::SearchMode::Exact = 1
+pub entity_gateway::proto::ob::gateway::v1::SearchMode::Fuzzy = 0
+impl entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::as_str_name(&self) -> &'static str
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::from_str_name(&str) -> core::option::Option<Self>
+impl entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::from_i32(i32) -> core::option::Option<entity_gateway::proto::ob::gateway::v1::SearchMode>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::is_valid(i32) -> bool
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::clone(&self) -> entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::cmp::Eq for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::cmp::Ord for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::cmp(&self, &entity_gateway::proto::ob::gateway::v1::SearchMode) -> core::cmp::Ordering
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::eq(&self, &entity_gateway::proto::ob::gateway::v1::SearchMode) -> bool
+impl core::cmp::PartialOrd for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::partial_cmp(&self, &entity_gateway::proto::ob::gateway::v1::SearchMode) -> core::option::Option<core::cmp::Ordering>
+impl core::convert::From<entity_gateway::proto::ob::gateway::v1::SearchMode> for i32
+pub fn i32::from(entity_gateway::proto::ob::gateway::v1::SearchMode) -> i32
+impl core::convert::TryFrom<i32> for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub type entity_gateway::proto::ob::gateway::v1::SearchMode::Error = prost::error::UnknownEnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::try_from(i32) -> core::result::Result<entity_gateway::proto::ob::gateway::v1::SearchMode, prost::error::UnknownEnumValue>
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::default() -> entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl<Q, K> equivalent::Comparable<K> for entity_gateway::proto::ob::gateway::v1::SearchMode where Q: core::cmp::Ord + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::compare(&self, &K) -> core::cmp::Ordering
+impl<Q, K> equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::SearchMode where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::SearchMode where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::equivalent(&self, &K) -> bool
+impl<Q, K> indexmap::equivalent::Equivalent<K> for entity_gateway::proto::ob::gateway::v1::SearchMode where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::SearchMode where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::SearchMode where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchMode::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::SearchMode where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchMode::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::SearchMode where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::SearchMode::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::SearchMode where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::SearchMode where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::SearchMode where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::SearchMode where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::SearchMode where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchMode::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub type entity_gateway::proto::ob::gateway::v1::SearchMode::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::SearchMode::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchMode::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchMode::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchMode::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchMode::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::SearchMode where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::SearchMode where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::SearchMode where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::SearchMode
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::SearchMode
+pub type entity_gateway::proto::ob::gateway::v1::SearchMode::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::SearchMode where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchMode::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::enum_values: alloc::vec::Vec<entity_gateway::proto::ob::gateway::v1::EnumValue>
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::field_type: i32
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::label: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::name: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::selectivity: f32
+impl entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::field_type(&self) -> entity_gateway::proto::ob::gateway::v1::DiscriminatorType
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::set_field_type(&mut self, entity_gateway::proto::ob::gateway::v1::DiscriminatorType)
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::clone(&self) -> entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::eq(&self, &entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo
+pub type entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::EnumValue
+pub entity_gateway::proto::ob::gateway::v1::EnumValue::code: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::EnumValue::display: alloc::string::String
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::clone(&self) -> entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::eq(&self, &entity_gateway::proto::ob::gateway::v1::EnumValue) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::EnumValue where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::EnumValue where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::EnumValue::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::EnumValue where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::EnumValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::EnumValue where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::EnumValue::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::EnumValue where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::EnumValue where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::EnumValue where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::EnumValue where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::EnumValue where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::EnumValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub type entity_gateway::proto::ob::gateway::v1::EnumValue::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::EnumValue::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::EnumValue::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::EnumValue::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::EnumValue::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::EnumValue::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::EnumValue where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::EnumValue where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::EnumValue where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::EnumValue
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::EnumValue
+pub type entity_gateway::proto::ob::gateway::v1::EnumValue::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::EnumValue where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::EnumValue::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::nickname: alloc::string::String
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::clone(&self) -> entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::eq(&self, &entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::discriminators: alloc::vec::Vec<entity_gateway::proto::ob::gateway::v1::DiscriminatorInfo>
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::display_name: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::nickname: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::resolution_mode: i32
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::return_key_type: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::search_keys: alloc::vec::Vec<entity_gateway::proto::ob::gateway::v1::SearchKeyInfo>
+impl entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::resolution_mode(&self) -> entity_gateway::proto::ob::gateway::v1::ResolutionModeHint
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::set_resolution_mode(&mut self, entity_gateway::proto::ob::gateway::v1::ResolutionModeHint)
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::clone(&self) -> entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::eq(&self, &entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse
+pub type entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::Match
+pub entity_gateway::proto::ob::gateway::v1::Match::display: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::Match::input: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::Match::score: f32
+pub entity_gateway::proto::ob::gateway::v1::Match::token: alloc::string::String
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::clone(&self) -> entity_gateway::proto::ob::gateway::v1::Match
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::eq(&self, &entity_gateway::proto::ob::gateway::v1::Match) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::Match
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::Match::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::Match
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::Match
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::Match
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::Match
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::Match
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::Match
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::Match
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::Match where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::Match::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::Match where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::Match::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::Match::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::Match where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::Match::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::Match::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::Match where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::Match::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::Match::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::Match::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::Match where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::Match::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::Match where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::Match::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::Match where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::Match::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::Match where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::Match::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::Match where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::Match::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::Match
+pub type entity_gateway::proto::ob::gateway::v1::Match::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::Match::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::Match::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::Match::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::Match::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::Match::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::Match where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::Match::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::Match::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::Match::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::Match::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::Match where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::Match::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::Match
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::Match where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::Match
+pub fn entity_gateway::proto::ob::gateway::v1::Match::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::Match
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::Match
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::Match
+pub type entity_gateway::proto::ob::gateway::v1::Match::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::Match where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::Match::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::enum_values: alloc::vec::Vec<entity_gateway::proto::ob::gateway::v1::EnumValue>
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::field_type: i32
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::is_default: bool
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::label: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::name: alloc::string::String
+impl entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::field_type(&self) -> entity_gateway::proto::ob::gateway::v1::SearchKeyType
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::set_field_type(&mut self, entity_gateway::proto::ob::gateway::v1::SearchKeyType)
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::clone(&self) -> entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::eq(&self, &entity_gateway::proto::ob::gateway::v1::SearchKeyInfo) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo
+pub type entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::SearchKeyInfo where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchKeyInfo::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::cbu_id: core::option::Option<alloc::string::String>
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::discriminators: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::limit: core::option::Option<i32>
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::mode: i32
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::nickname: alloc::string::String
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::search_key: core::option::Option<alloc::string::String>
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::tenant_id: core::option::Option<alloc::string::String>
+pub entity_gateway::proto::ob::gateway::v1::SearchRequest::values: alloc::vec::Vec<alloc::string::String>
+impl entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::cbu_id(&self) -> &str
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::limit(&self) -> i32
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::mode(&self) -> entity_gateway::proto::ob::gateway::v1::SearchMode
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::search_key(&self) -> &str
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::set_mode(&mut self, entity_gateway::proto::ob::gateway::v1::SearchMode)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::tenant_id(&self) -> &str
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::clone(&self) -> entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::eq(&self, &entity_gateway::proto::ob::gateway::v1::SearchRequest) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::SearchRequest where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::SearchRequest where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchRequest::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::SearchRequest where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::SearchRequest::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub type entity_gateway::proto::ob::gateway::v1::SearchRequest::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::SearchRequest::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchRequest::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchRequest::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchRequest::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchRequest::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::SearchRequest where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::SearchRequest
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::SearchRequest
+pub type entity_gateway::proto::ob::gateway::v1::SearchRequest::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::SearchRequest where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchRequest::vzip(self) -> V
+pub struct entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub entity_gateway::proto::ob::gateway::v1::SearchResponse::matches: alloc::vec::Vec<entity_gateway::proto::ob::gateway::v1::Match>
+impl core::clone::Clone for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::clone(&self) -> entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::cmp::PartialEq for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::eq(&self, &entity_gateway::proto::ob::gateway::v1::SearchResponse) -> bool
+impl core::default::Default for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::default() -> Self
+impl core::fmt::Debug for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl prost::message::Message for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::clear(&mut self)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::encoded_len(&self) -> usize
+impl core::marker::Freeze for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::marker::Send for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::marker::Sync for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::marker::Unpin for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::marker::UnsafeUnpin for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl<T, U> core::convert::Into<U> for entity_gateway::proto::ob::gateway::v1::SearchResponse where U: core::convert::From<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::proto::ob::gateway::v1::SearchResponse where U: core::convert::Into<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchResponse::Error = core::convert::Infallible
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::proto::ob::gateway::v1::SearchResponse where U: core::convert::TryFrom<T>
+pub type entity_gateway::proto::ob::gateway::v1::SearchResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: core::clone::Clone
+pub type entity_gateway::proto::ob::gateway::v1::SearchResponse::Owned = T
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::clone_into(&self, &mut T)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: core::clone::Clone
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: ?core::marker::Sized
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: core::clone::Clone
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub type entity_gateway::proto::ob::gateway::v1::SearchResponse::Init = T
+pub const entity_gateway::proto::ob::gateway::v1::SearchResponse::ALIGN: usize
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchResponse::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchResponse::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchResponse::drop(usize)
+pub unsafe fn entity_gateway::proto::ob::gateway::v1::SearchResponse::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: core::any::Any
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl<T> tantivy::collector::Fruit for entity_gateway::proto::ob::gateway::v1::SearchResponse where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::proto::ob::gateway::v1::SearchResponse
+impl<T> typenum::type_operators::Same for entity_gateway::proto::ob::gateway::v1::SearchResponse
+pub type entity_gateway::proto::ob::gateway::v1::SearchResponse::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::proto::ob::gateway::v1::SearchResponse where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::proto::ob::gateway::v1::SearchResponse::vzip(self) -> V
+pub enum entity_gateway::StartupMode
+pub entity_gateway::StartupMode::Async
+pub entity_gateway::StartupMode::Sync
+impl core::clone::Clone for entity_gateway::StartupMode
+pub fn entity_gateway::StartupMode::clone(&self) -> entity_gateway::StartupMode
+impl core::fmt::Debug for entity_gateway::StartupMode
+pub fn entity_gateway::StartupMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for entity_gateway::StartupMode
+pub fn entity_gateway::StartupMode::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for entity_gateway::StartupMode
+impl core::marker::Send for entity_gateway::StartupMode
+impl core::marker::Sync for entity_gateway::StartupMode
+impl core::marker::Unpin for entity_gateway::StartupMode
+impl core::marker::UnsafeUnpin for entity_gateway::StartupMode
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::StartupMode
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::StartupMode
+impl<T, U> core::convert::Into<U> for entity_gateway::StartupMode where U: core::convert::From<T>
+pub fn entity_gateway::StartupMode::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::StartupMode where U: core::convert::Into<T>
+pub type entity_gateway::StartupMode::Error = core::convert::Infallible
+pub fn entity_gateway::StartupMode::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::StartupMode where U: core::convert::TryFrom<T>
+pub type entity_gateway::StartupMode::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::StartupMode::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::StartupMode where T: core::clone::Clone
+pub type entity_gateway::StartupMode::Owned = T
+pub fn entity_gateway::StartupMode::clone_into(&self, &mut T)
+pub fn entity_gateway::StartupMode::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::StartupMode where T: core::clone::Clone
+pub fn entity_gateway::StartupMode::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::StartupMode where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::StartupMode::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::StartupMode where T: ?core::marker::Sized
+pub fn entity_gateway::StartupMode::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::StartupMode where T: ?core::marker::Sized
+pub fn entity_gateway::StartupMode::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::StartupMode where T: core::clone::Clone
+pub unsafe fn entity_gateway::StartupMode::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::StartupMode
+pub fn entity_gateway::StartupMode::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::StartupMode
+pub type entity_gateway::StartupMode::Init = T
+pub const entity_gateway::StartupMode::ALIGN: usize
+pub unsafe fn entity_gateway::StartupMode::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::StartupMode::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::StartupMode::drop(usize)
+pub unsafe fn entity_gateway::StartupMode::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::StartupMode where T: core::any::Any
+pub fn entity_gateway::StartupMode::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::StartupMode::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::StartupMode::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::StartupMode::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::StartupMode where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::StartupMode::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::StartupMode
+impl<T> serde_core::de::DeserializeOwned for entity_gateway::StartupMode where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tantivy::collector::Fruit for entity_gateway::StartupMode where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::StartupMode
+pub fn entity_gateway::StartupMode::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::StartupMode
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::StartupMode
+impl<T> typenum::type_operators::Same for entity_gateway::StartupMode
+pub type entity_gateway::StartupMode::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::StartupMode where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::StartupMode::vzip(self) -> V
+pub struct entity_gateway::EntityConfig
+pub entity_gateway::EntityConfig::composite_search: core::option::Option<alloc::string::String>
+pub entity_gateway::EntityConfig::discriminators: alloc::vec::Vec<entity_gateway::config::entity_metadata::EntityDiscriminatorConfig>
+pub entity_gateway::EntityConfig::display_template: core::option::Option<alloc::string::String>
+pub entity_gateway::EntityConfig::display_template_full: core::option::Option<alloc::string::String>
+pub entity_gateway::EntityConfig::filter: core::option::Option<alloc::string::String>
+pub entity_gateway::EntityConfig::index_mode: entity_gateway::config::entity_metadata::IndexMode
+pub entity_gateway::EntityConfig::nickname: alloc::string::String
+pub entity_gateway::EntityConfig::return_key: alloc::string::String
+pub entity_gateway::EntityConfig::search_keys: alloc::vec::Vec<entity_gateway::config::entity_metadata::SearchKeyConfig>
+pub entity_gateway::EntityConfig::shard: core::option::Option<entity_gateway::config::entity_metadata::ShardConfig>
+pub entity_gateway::EntityConfig::source_table: alloc::string::String
+impl entity_gateway::EntityConfig
+pub fn entity_gateway::EntityConfig::all_columns(&self) -> alloc::vec::Vec<&str>
+pub fn entity_gateway::EntityConfig::default_search_key(&self) -> &entity_gateway::config::entity_metadata::SearchKeyConfig
+pub fn entity_gateway::EntityConfig::get_discriminator(&self, &str) -> core::option::Option<&entity_gateway::config::entity_metadata::EntityDiscriminatorConfig>
+pub fn entity_gateway::EntityConfig::get_search_key(&self, &str) -> core::option::Option<&entity_gateway::config::entity_metadata::SearchKeyConfig>
+pub fn entity_gateway::EntityConfig::has_composite_search(&self) -> bool
+impl core::clone::Clone for entity_gateway::EntityConfig
+pub fn entity_gateway::EntityConfig::clone(&self) -> entity_gateway::EntityConfig
+impl core::fmt::Debug for entity_gateway::EntityConfig
+pub fn entity_gateway::EntityConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for entity_gateway::EntityConfig
+pub fn entity_gateway::EntityConfig::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for entity_gateway::EntityConfig
+impl core::marker::Send for entity_gateway::EntityConfig
+impl core::marker::Sync for entity_gateway::EntityConfig
+impl core::marker::Unpin for entity_gateway::EntityConfig
+impl core::marker::UnsafeUnpin for entity_gateway::EntityConfig
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::EntityConfig
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::EntityConfig
+impl<T, U> core::convert::Into<U> for entity_gateway::EntityConfig where U: core::convert::From<T>
+pub fn entity_gateway::EntityConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::EntityConfig where U: core::convert::Into<T>
+pub type entity_gateway::EntityConfig::Error = core::convert::Infallible
+pub fn entity_gateway::EntityConfig::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::EntityConfig where U: core::convert::TryFrom<T>
+pub type entity_gateway::EntityConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::EntityConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::EntityConfig where T: core::clone::Clone
+pub type entity_gateway::EntityConfig::Owned = T
+pub fn entity_gateway::EntityConfig::clone_into(&self, &mut T)
+pub fn entity_gateway::EntityConfig::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::EntityConfig where T: core::clone::Clone
+pub fn entity_gateway::EntityConfig::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::EntityConfig where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::EntityConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::EntityConfig where T: ?core::marker::Sized
+pub fn entity_gateway::EntityConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::EntityConfig where T: ?core::marker::Sized
+pub fn entity_gateway::EntityConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::EntityConfig where T: core::clone::Clone
+pub unsafe fn entity_gateway::EntityConfig::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::EntityConfig
+pub fn entity_gateway::EntityConfig::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::EntityConfig
+pub type entity_gateway::EntityConfig::Init = T
+pub const entity_gateway::EntityConfig::ALIGN: usize
+pub unsafe fn entity_gateway::EntityConfig::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::EntityConfig::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::EntityConfig::drop(usize)
+pub unsafe fn entity_gateway::EntityConfig::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::EntityConfig where T: core::any::Any
+pub fn entity_gateway::EntityConfig::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::EntityConfig::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::EntityConfig::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::EntityConfig::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::EntityConfig where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::EntityConfig::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::EntityConfig
+impl<T> serde_core::de::DeserializeOwned for entity_gateway::EntityConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tantivy::collector::Fruit for entity_gateway::EntityConfig where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::EntityConfig
+pub fn entity_gateway::EntityConfig::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::EntityConfig
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::EntityConfig
+impl<T> typenum::type_operators::Same for entity_gateway::EntityConfig
+pub type entity_gateway::EntityConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::EntityConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::EntityConfig::vzip(self) -> V
+pub struct entity_gateway::EntityGatewayService
+impl entity_gateway::EntityGatewayService
+pub fn entity_gateway::EntityGatewayService::new(alloc::sync::Arc<entity_gateway::IndexRegistry>) -> Self
+impl entity_gateway::proto::ob::gateway::v1::entity_gateway_server::EntityGateway for entity_gateway::EntityGatewayService
+pub fn entity_gateway::EntityGatewayService::get_entity_config<'life0, 'async_trait>(&'life0 self, tonic::request::Request<entity_gateway::proto::ob::gateway::v1::GetEntityConfigRequest>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::GetEntityConfigResponse>, tonic::status::Status>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+pub fn entity_gateway::EntityGatewayService::search<'life0, 'async_trait>(&'life0 self, tonic::request::Request<entity_gateway::proto::ob::gateway::v1::SearchRequest>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = core::result::Result<tonic::response::Response<entity_gateway::proto::ob::gateway::v1::SearchResponse>, tonic::status::Status>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait
+impl core::marker::Freeze for entity_gateway::EntityGatewayService
+impl core::marker::Send for entity_gateway::EntityGatewayService
+impl core::marker::Sync for entity_gateway::EntityGatewayService
+impl core::marker::Unpin for entity_gateway::EntityGatewayService
+impl core::marker::UnsafeUnpin for entity_gateway::EntityGatewayService
+impl !core::panic::unwind_safe::RefUnwindSafe for entity_gateway::EntityGatewayService
+impl !core::panic::unwind_safe::UnwindSafe for entity_gateway::EntityGatewayService
+impl<T, U> core::convert::Into<U> for entity_gateway::EntityGatewayService where U: core::convert::From<T>
+pub fn entity_gateway::EntityGatewayService::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::EntityGatewayService where U: core::convert::Into<T>
+pub type entity_gateway::EntityGatewayService::Error = core::convert::Infallible
+pub fn entity_gateway::EntityGatewayService::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::EntityGatewayService where U: core::convert::TryFrom<T>
+pub type entity_gateway::EntityGatewayService::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::EntityGatewayService::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for entity_gateway::EntityGatewayService where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::EntityGatewayService::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::EntityGatewayService where T: ?core::marker::Sized
+pub fn entity_gateway::EntityGatewayService::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::EntityGatewayService where T: ?core::marker::Sized
+pub fn entity_gateway::EntityGatewayService::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for entity_gateway::EntityGatewayService
+pub fn entity_gateway::EntityGatewayService::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::EntityGatewayService
+pub type entity_gateway::EntityGatewayService::Init = T
+pub const entity_gateway::EntityGatewayService::ALIGN: usize
+pub unsafe fn entity_gateway::EntityGatewayService::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::EntityGatewayService::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::EntityGatewayService::drop(usize)
+pub unsafe fn entity_gateway::EntityGatewayService::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::EntityGatewayService where T: core::any::Any
+pub fn entity_gateway::EntityGatewayService::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::EntityGatewayService::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::EntityGatewayService::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::EntityGatewayService::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::EntityGatewayService where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::EntityGatewayService::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::EntityGatewayService
+impl<T> tantivy::collector::Fruit for entity_gateway::EntityGatewayService where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::EntityGatewayService
+pub fn entity_gateway::EntityGatewayService::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::EntityGatewayService
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::EntityGatewayService
+impl<T> typenum::type_operators::Same for entity_gateway::EntityGatewayService
+pub type entity_gateway::EntityGatewayService::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::EntityGatewayService where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::EntityGatewayService::vzip(self) -> V
+pub struct entity_gateway::GatewayConfig
+pub entity_gateway::GatewayConfig::database: entity_gateway::config::entity_metadata::DatabaseConfig
+pub entity_gateway::GatewayConfig::entities: std::collections::hash::map::HashMap<alloc::string::String, entity_gateway::EntityConfig>
+pub entity_gateway::GatewayConfig::refresh: entity_gateway::RefreshConfig
+impl entity_gateway::GatewayConfig
+pub fn entity_gateway::GatewayConfig::from_file(&str) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+pub fn entity_gateway::GatewayConfig::from_yaml(&str) -> core::result::Result<Self, alloc::boxed::Box<dyn core::error::Error>>
+impl core::clone::Clone for entity_gateway::GatewayConfig
+pub fn entity_gateway::GatewayConfig::clone(&self) -> entity_gateway::GatewayConfig
+impl core::fmt::Debug for entity_gateway::GatewayConfig
+pub fn entity_gateway::GatewayConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for entity_gateway::GatewayConfig
+pub fn entity_gateway::GatewayConfig::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for entity_gateway::GatewayConfig
+impl core::marker::Send for entity_gateway::GatewayConfig
+impl core::marker::Sync for entity_gateway::GatewayConfig
+impl core::marker::Unpin for entity_gateway::GatewayConfig
+impl core::marker::UnsafeUnpin for entity_gateway::GatewayConfig
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::GatewayConfig
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::GatewayConfig
+impl<T, U> core::convert::Into<U> for entity_gateway::GatewayConfig where U: core::convert::From<T>
+pub fn entity_gateway::GatewayConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::GatewayConfig where U: core::convert::Into<T>
+pub type entity_gateway::GatewayConfig::Error = core::convert::Infallible
+pub fn entity_gateway::GatewayConfig::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::GatewayConfig where U: core::convert::TryFrom<T>
+pub type entity_gateway::GatewayConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::GatewayConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::GatewayConfig where T: core::clone::Clone
+pub type entity_gateway::GatewayConfig::Owned = T
+pub fn entity_gateway::GatewayConfig::clone_into(&self, &mut T)
+pub fn entity_gateway::GatewayConfig::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::GatewayConfig where T: core::clone::Clone
+pub fn entity_gateway::GatewayConfig::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::GatewayConfig where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::GatewayConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::GatewayConfig where T: ?core::marker::Sized
+pub fn entity_gateway::GatewayConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::GatewayConfig where T: ?core::marker::Sized
+pub fn entity_gateway::GatewayConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::GatewayConfig where T: core::clone::Clone
+pub unsafe fn entity_gateway::GatewayConfig::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::GatewayConfig
+pub fn entity_gateway::GatewayConfig::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::GatewayConfig
+pub type entity_gateway::GatewayConfig::Init = T
+pub const entity_gateway::GatewayConfig::ALIGN: usize
+pub unsafe fn entity_gateway::GatewayConfig::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::GatewayConfig::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::GatewayConfig::drop(usize)
+pub unsafe fn entity_gateway::GatewayConfig::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::GatewayConfig where T: core::any::Any
+pub fn entity_gateway::GatewayConfig::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::GatewayConfig::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::GatewayConfig::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::GatewayConfig::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::GatewayConfig where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::GatewayConfig::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::GatewayConfig
+impl<T> serde_core::de::DeserializeOwned for entity_gateway::GatewayConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tantivy::collector::Fruit for entity_gateway::GatewayConfig where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::GatewayConfig
+pub fn entity_gateway::GatewayConfig::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::GatewayConfig
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::GatewayConfig
+impl<T> typenum::type_operators::Same for entity_gateway::GatewayConfig
+pub type entity_gateway::GatewayConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::GatewayConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::GatewayConfig::vzip(self) -> V
+pub struct entity_gateway::IndexRegistry
+impl entity_gateway::IndexRegistry
+pub fn entity_gateway::IndexRegistry::all_configs(&self) -> impl core::iter::traits::iterator::Iterator<Item = (&alloc::string::String, &entity_gateway::EntityConfig)>
+pub async fn entity_gateway::IndexRegistry::all_ready(&self) -> bool
+pub async fn entity_gateway::IndexRegistry::get(&self, &str) -> core::option::Option<alloc::sync::Arc<dyn entity_gateway::index::traits::SearchIndex>>
+pub fn entity_gateway::IndexRegistry::get_config(&self, &str) -> core::option::Option<&entity_gateway::EntityConfig>
+pub fn entity_gateway::IndexRegistry::new(std::collections::hash::map::HashMap<alloc::string::String, entity_gateway::EntityConfig>) -> Self
+pub fn entity_gateway::IndexRegistry::nicknames(&self) -> alloc::vec::Vec<&str>
+pub async fn entity_gateway::IndexRegistry::register(&self, alloc::string::String, alloc::sync::Arc<dyn entity_gateway::index::traits::SearchIndex>)
+pub async fn entity_gateway::IndexRegistry::status(&self) -> std::collections::hash::map::HashMap<alloc::string::String, bool>
+impl !core::marker::Freeze for entity_gateway::IndexRegistry
+impl core::marker::Send for entity_gateway::IndexRegistry
+impl core::marker::Sync for entity_gateway::IndexRegistry
+impl core::marker::Unpin for entity_gateway::IndexRegistry
+impl core::marker::UnsafeUnpin for entity_gateway::IndexRegistry
+impl !core::panic::unwind_safe::RefUnwindSafe for entity_gateway::IndexRegistry
+impl !core::panic::unwind_safe::UnwindSafe for entity_gateway::IndexRegistry
+impl<T, U> core::convert::Into<U> for entity_gateway::IndexRegistry where U: core::convert::From<T>
+pub fn entity_gateway::IndexRegistry::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::IndexRegistry where U: core::convert::Into<T>
+pub type entity_gateway::IndexRegistry::Error = core::convert::Infallible
+pub fn entity_gateway::IndexRegistry::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::IndexRegistry where U: core::convert::TryFrom<T>
+pub type entity_gateway::IndexRegistry::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::IndexRegistry::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for entity_gateway::IndexRegistry where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::IndexRegistry::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::IndexRegistry where T: ?core::marker::Sized
+pub fn entity_gateway::IndexRegistry::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::IndexRegistry where T: ?core::marker::Sized
+pub fn entity_gateway::IndexRegistry::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for entity_gateway::IndexRegistry
+pub fn entity_gateway::IndexRegistry::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::IndexRegistry
+pub type entity_gateway::IndexRegistry::Init = T
+pub const entity_gateway::IndexRegistry::ALIGN: usize
+pub unsafe fn entity_gateway::IndexRegistry::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::IndexRegistry::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::IndexRegistry::drop(usize)
+pub unsafe fn entity_gateway::IndexRegistry::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::IndexRegistry where T: core::any::Any
+pub fn entity_gateway::IndexRegistry::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::IndexRegistry::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::IndexRegistry::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::IndexRegistry::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::IndexRegistry where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::IndexRegistry::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::IndexRegistry
+impl<T> tantivy::collector::Fruit for entity_gateway::IndexRegistry where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::IndexRegistry
+pub fn entity_gateway::IndexRegistry::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::IndexRegistry
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::IndexRegistry
+impl<T> typenum::type_operators::Same for entity_gateway::IndexRegistry
+pub type entity_gateway::IndexRegistry::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::IndexRegistry where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::IndexRegistry::vzip(self) -> V
+pub struct entity_gateway::RefreshConfig
+pub entity_gateway::RefreshConfig::interval_secs: u64
+pub entity_gateway::RefreshConfig::startup_mode: entity_gateway::StartupMode
+impl core::clone::Clone for entity_gateway::RefreshConfig
+pub fn entity_gateway::RefreshConfig::clone(&self) -> entity_gateway::RefreshConfig
+impl core::fmt::Debug for entity_gateway::RefreshConfig
+pub fn entity_gateway::RefreshConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'de> serde_core::de::Deserialize<'de> for entity_gateway::RefreshConfig
+pub fn entity_gateway::RefreshConfig::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for entity_gateway::RefreshConfig
+impl core::marker::Send for entity_gateway::RefreshConfig
+impl core::marker::Sync for entity_gateway::RefreshConfig
+impl core::marker::Unpin for entity_gateway::RefreshConfig
+impl core::marker::UnsafeUnpin for entity_gateway::RefreshConfig
+impl core::panic::unwind_safe::RefUnwindSafe for entity_gateway::RefreshConfig
+impl core::panic::unwind_safe::UnwindSafe for entity_gateway::RefreshConfig
+impl<T, U> core::convert::Into<U> for entity_gateway::RefreshConfig where U: core::convert::From<T>
+pub fn entity_gateway::RefreshConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::RefreshConfig where U: core::convert::Into<T>
+pub type entity_gateway::RefreshConfig::Error = core::convert::Infallible
+pub fn entity_gateway::RefreshConfig::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::RefreshConfig where U: core::convert::TryFrom<T>
+pub type entity_gateway::RefreshConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::RefreshConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for entity_gateway::RefreshConfig where T: core::clone::Clone
+pub type entity_gateway::RefreshConfig::Owned = T
+pub fn entity_gateway::RefreshConfig::clone_into(&self, &mut T)
+pub fn entity_gateway::RefreshConfig::to_owned(&self) -> T
+impl<T> axum_core::extract::from_ref::FromRef<T> for entity_gateway::RefreshConfig where T: core::clone::Clone
+pub fn entity_gateway::RefreshConfig::from_ref(&T) -> T
+impl<T> core::any::Any for entity_gateway::RefreshConfig where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::RefreshConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::RefreshConfig where T: ?core::marker::Sized
+pub fn entity_gateway::RefreshConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::RefreshConfig where T: ?core::marker::Sized
+pub fn entity_gateway::RefreshConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for entity_gateway::RefreshConfig where T: core::clone::Clone
+pub unsafe fn entity_gateway::RefreshConfig::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for entity_gateway::RefreshConfig
+pub fn entity_gateway::RefreshConfig::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::RefreshConfig
+pub type entity_gateway::RefreshConfig::Init = T
+pub const entity_gateway::RefreshConfig::ALIGN: usize
+pub unsafe fn entity_gateway::RefreshConfig::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::RefreshConfig::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::RefreshConfig::drop(usize)
+pub unsafe fn entity_gateway::RefreshConfig::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::RefreshConfig where T: core::any::Any
+pub fn entity_gateway::RefreshConfig::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::RefreshConfig::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::RefreshConfig::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::RefreshConfig::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::RefreshConfig where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::RefreshConfig::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::RefreshConfig
+impl<T> serde_core::de::DeserializeOwned for entity_gateway::RefreshConfig where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tantivy::collector::Fruit for entity_gateway::RefreshConfig where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::RefreshConfig
+pub fn entity_gateway::RefreshConfig::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::RefreshConfig
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::RefreshConfig
+impl<T> typenum::type_operators::Same for entity_gateway::RefreshConfig
+pub type entity_gateway::RefreshConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::RefreshConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::RefreshConfig::vzip(self) -> V
+pub struct entity_gateway::RefreshPipeline
+impl entity_gateway::RefreshPipeline
+pub fn entity_gateway::RefreshPipeline::config(&self) -> &entity_gateway::GatewayConfig
+pub async fn entity_gateway::RefreshPipeline::new(entity_gateway::GatewayConfig) -> core::result::Result<Self, sqlx_core::error::Error>
+pub fn entity_gateway::RefreshPipeline::pool(&self) -> &sqlx_postgres::PgPool
+pub async fn entity_gateway::RefreshPipeline::refresh_all(&self, &entity_gateway::IndexRegistry) -> core::result::Result<(), alloc::boxed::Box<(dyn core::error::Error + core::marker::Send + core::marker::Sync)>>
+pub async fn entity_gateway::RefreshPipeline::refresh_entity(&self, &entity_gateway::EntityConfig) -> core::result::Result<alloc::vec::Vec<entity_gateway::index::traits::IndexRecord>, sqlx_core::error::Error>
+pub fn entity_gateway::RefreshPipeline::with_pool(sqlx_postgres::PgPool, entity_gateway::GatewayConfig) -> Self
+impl core::marker::Freeze for entity_gateway::RefreshPipeline
+impl core::marker::Send for entity_gateway::RefreshPipeline
+impl core::marker::Sync for entity_gateway::RefreshPipeline
+impl core::marker::Unpin for entity_gateway::RefreshPipeline
+impl core::marker::UnsafeUnpin for entity_gateway::RefreshPipeline
+impl !core::panic::unwind_safe::RefUnwindSafe for entity_gateway::RefreshPipeline
+impl !core::panic::unwind_safe::UnwindSafe for entity_gateway::RefreshPipeline
+impl<T, U> core::convert::Into<U> for entity_gateway::RefreshPipeline where U: core::convert::From<T>
+pub fn entity_gateway::RefreshPipeline::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::RefreshPipeline where U: core::convert::Into<T>
+pub type entity_gateway::RefreshPipeline::Error = core::convert::Infallible
+pub fn entity_gateway::RefreshPipeline::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::RefreshPipeline where U: core::convert::TryFrom<T>
+pub type entity_gateway::RefreshPipeline::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::RefreshPipeline::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for entity_gateway::RefreshPipeline where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::RefreshPipeline::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::RefreshPipeline where T: ?core::marker::Sized
+pub fn entity_gateway::RefreshPipeline::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::RefreshPipeline where T: ?core::marker::Sized
+pub fn entity_gateway::RefreshPipeline::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for entity_gateway::RefreshPipeline
+pub fn entity_gateway::RefreshPipeline::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::RefreshPipeline
+pub type entity_gateway::RefreshPipeline::Init = T
+pub const entity_gateway::RefreshPipeline::ALIGN: usize
+pub unsafe fn entity_gateway::RefreshPipeline::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::RefreshPipeline::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::RefreshPipeline::drop(usize)
+pub unsafe fn entity_gateway::RefreshPipeline::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::RefreshPipeline where T: core::any::Any
+pub fn entity_gateway::RefreshPipeline::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::RefreshPipeline::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::RefreshPipeline::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::RefreshPipeline::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::RefreshPipeline where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::RefreshPipeline::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::RefreshPipeline
+impl<T> tantivy::collector::Fruit for entity_gateway::RefreshPipeline where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::RefreshPipeline
+pub fn entity_gateway::RefreshPipeline::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::RefreshPipeline
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::RefreshPipeline
+impl<T> typenum::type_operators::Same for entity_gateway::RefreshPipeline
+pub type entity_gateway::RefreshPipeline::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::RefreshPipeline where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::RefreshPipeline::vzip(self) -> V
+pub struct entity_gateway::TantivyIndex
+impl entity_gateway::TantivyIndex
+pub async fn entity_gateway::TantivyIndex::force_reload(&self) -> core::result::Result<(), entity_gateway::index::traits::IndexError>
+pub fn entity_gateway::TantivyIndex::generation(&self) -> u64
+pub fn entity_gateway::TantivyIndex::new(entity_gateway::EntityConfig) -> core::result::Result<Self, entity_gateway::index::traits::IndexError>
+pub fn entity_gateway::TantivyIndex::nickname(&self) -> &str
+impl !core::marker::Freeze for entity_gateway::TantivyIndex
+impl core::marker::Send for entity_gateway::TantivyIndex
+impl core::marker::Sync for entity_gateway::TantivyIndex
+impl core::marker::Unpin for entity_gateway::TantivyIndex
+impl core::marker::UnsafeUnpin for entity_gateway::TantivyIndex
+impl !core::panic::unwind_safe::RefUnwindSafe for entity_gateway::TantivyIndex
+impl !core::panic::unwind_safe::UnwindSafe for entity_gateway::TantivyIndex
+impl<T, U> core::convert::Into<U> for entity_gateway::TantivyIndex where U: core::convert::From<T>
+pub fn entity_gateway::TantivyIndex::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for entity_gateway::TantivyIndex where U: core::convert::Into<T>
+pub type entity_gateway::TantivyIndex::Error = core::convert::Infallible
+pub fn entity_gateway::TantivyIndex::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for entity_gateway::TantivyIndex where U: core::convert::TryFrom<T>
+pub type entity_gateway::TantivyIndex::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn entity_gateway::TantivyIndex::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for entity_gateway::TantivyIndex where T: 'static + ?core::marker::Sized
+pub fn entity_gateway::TantivyIndex::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for entity_gateway::TantivyIndex where T: ?core::marker::Sized
+pub fn entity_gateway::TantivyIndex::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for entity_gateway::TantivyIndex where T: ?core::marker::Sized
+pub fn entity_gateway::TantivyIndex::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for entity_gateway::TantivyIndex
+pub fn entity_gateway::TantivyIndex::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for entity_gateway::TantivyIndex
+pub type entity_gateway::TantivyIndex::Init = T
+pub const entity_gateway::TantivyIndex::ALIGN: usize
+pub unsafe fn entity_gateway::TantivyIndex::deref<'a>(usize) -> &'a T
+pub unsafe fn entity_gateway::TantivyIndex::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn entity_gateway::TantivyIndex::drop(usize)
+pub unsafe fn entity_gateway::TantivyIndex::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> downcast_rs::Downcast for entity_gateway::TantivyIndex where T: core::any::Any
+pub fn entity_gateway::TantivyIndex::as_any(&self) -> &(dyn core::any::Any + 'static)
+pub fn entity_gateway::TantivyIndex::as_any_mut(&mut self) -> &mut (dyn core::any::Any + 'static)
+pub fn entity_gateway::TantivyIndex::into_any(alloc::boxed::Box<T>) -> alloc::boxed::Box<dyn core::any::Any>
+pub fn entity_gateway::TantivyIndex::into_any_rc(alloc::rc::Rc<T>) -> alloc::rc::Rc<dyn core::any::Any>
+impl<T> downcast_rs::DowncastSync for entity_gateway::TantivyIndex where T: core::any::Any + core::marker::Send + core::marker::Sync
+pub fn entity_gateway::TantivyIndex::into_any_arc(alloc::sync::Arc<T>) -> alloc::sync::Arc<(dyn core::any::Any + core::marker::Sync + core::marker::Send)>
+impl<T> either::into_either::IntoEither for entity_gateway::TantivyIndex
+impl<T> tantivy::collector::Fruit for entity_gateway::TantivyIndex where T: core::marker::Send + downcast_rs::Downcast
+impl<T> tonic::request::IntoRequest<T> for entity_gateway::TantivyIndex
+pub fn entity_gateway::TantivyIndex::into_request(self) -> tonic::request::Request<T>
+impl<T> tracing::instrument::Instrument for entity_gateway::TantivyIndex
+impl<T> tracing::instrument::WithSubscriber for entity_gateway::TantivyIndex
+impl<T> typenum::type_operators::Same for entity_gateway::TantivyIndex
+pub type entity_gateway::TantivyIndex::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for entity_gateway::TantivyIndex where V: ppv_lite86::types::MultiLane<T>
+pub fn entity_gateway::TantivyIndex::vzip(self) -> V
+pub async fn entity_gateway::run_refresh_loop(entity_gateway::RefreshPipeline, alloc::sync::Arc<entity_gateway::IndexRegistry>, u64)

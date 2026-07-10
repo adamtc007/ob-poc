@@ -49,7 +49,7 @@ use sem_os_postgres::ops::SemOsVerbOpRegistry;
 use sqlx::PgPool;
 
 // Event infrastructure for observability
-use crate::events::SharedEmitter;
+use ob_poc_diagnostics::events::SharedEmitter;
 
 // Error aggregation for best-effort execution
 #[cfg(feature = "database")]
@@ -1349,14 +1349,14 @@ impl DslExecutor {
 
             match &result {
                 Ok(_) => {
-                    events.emit(crate::events::DslEvent::succeeded(
+                    events.emit(ob_poc_diagnostics::events::DslEvent::succeeded(
                         session_id,
                         verb_name,
                         duration_ms,
                     ));
                 }
                 Err(e) => {
-                    events.emit(crate::events::DslEvent::failed(
+                    events.emit(ob_poc_diagnostics::events::DslEvent::failed(
                         session_id,
                         verb_name,
                         duration_ms,
@@ -2012,7 +2012,108 @@ impl DslExecutor {
     }
 }
 
-/// Phase 3 C1 — execution-time `requires_states` precondition (FAIL-OPEN).
+/// T0.2 (EOP-PLAN-CONTROLPLANE-001, closes C-027 divergence): governs
+/// whether `enforce_requires_states_precondition`'s four "policy declared
+/// but unresolvable" fail-open classes (see [`LifecycleFailOpenClass`])
+/// block execution or merely audit-and-pass. Default is `FailClosed` in
+/// production; set `OB_POC_LIFECYCLE_GATE_MODE=fail-open` to restore the
+/// original C1 fail-open behaviour (dev/test only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LifecycleGateMode {
+    FailOpen,
+    FailClosed,
+}
+
+impl LifecycleGateMode {
+    pub fn from_env() -> Self {
+        match std::env::var("OB_POC_LIFECYCLE_GATE_MODE") {
+            Ok(v) if v.eq_ignore_ascii_case("fail-open") => LifecycleGateMode::FailOpen,
+            _ => LifecycleGateMode::FailClosed,
+        }
+    }
+}
+
+/// The five fail-open classes named by C-027 / T0.2's inventory citation
+/// (`ob-poc/src/dsl_v2/executor.rs:L2015-L2041` in the Phase 0 inventory).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LifecycleFailOpenClass {
+    /// No `lifecycle` block authored, OR `requires_states` is authored-empty.
+    /// There is no policy to enforce — NOT gated by `LifecycleGateMode`,
+    /// always passes. Only ~22/1306 verbs declare `requires_states` at all;
+    /// fail-closing this class would block essentially all verb dispatch.
+    NoLifecycleDeclared,
+    /// `requires_states` is non-empty but `entity_arg` is unbound.
+    NoEntityArg,
+    /// `entity_arg` resolved but the argument value is not a valid uuid.
+    InvalidUuid,
+    /// No `SlotStateProvider` table mapping for the verb's domain.
+    NoSlotMapping,
+    /// The state read returned a DB error, no row, or a NULL column.
+    StateUnreadable,
+}
+
+impl LifecycleFailOpenClass {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::NoLifecycleDeclared => "no_lifecycle_declared",
+            Self::NoEntityArg => "no_entity_arg",
+            Self::InvalidUuid => "invalid_uuid",
+            Self::NoSlotMapping => "no_slot_mapping",
+            Self::StateUnreadable => "state_unreadable",
+        }
+    }
+}
+
+/// Always-audited pass-through for [`LifecycleFailOpenClass::NoLifecycleDeclared`]
+/// — never gated by `mode`, since there is no declared policy to enforce.
+/// `debug`-level: this fires on the overwhelming majority of verb calls
+/// (no `requires_states` authored), so `warn`-level would flood production
+/// logs with a structurally meaningless signal.
+fn audit_lifecycle_no_policy(
+    mode: LifecycleGateMode,
+    runtime_verb: &RuntimeVerb,
+    detail: &str,
+) {
+    tracing::debug!(
+        target: "control_plane.lifecycle_gate",
+        verb = %runtime_verb.full_name,
+        class = LifecycleFailOpenClass::NoLifecycleDeclared.as_str(),
+        mode = ?mode,
+        detail,
+        "requires_states precondition: no policy declared"
+    );
+}
+
+/// Always-audited fail-open/fail-closed decision for a class where a policy
+/// WAS declared (non-empty `requires_states`) but could not be resolved.
+/// Returns `Ok(())` to pass, `Err` to block under `LifecycleGateMode::FailClosed`.
+fn gate_lifecycle_fail_open(
+    class: LifecycleFailOpenClass,
+    mode: LifecycleGateMode,
+    runtime_verb: &RuntimeVerb,
+    detail: &str,
+) -> Result<()> {
+    tracing::warn!(
+        target: "control_plane.lifecycle_gate",
+        verb = %runtime_verb.full_name,
+        class = class.as_str(),
+        mode = ?mode,
+        detail,
+        "requires_states precondition unresolvable"
+    );
+    if mode == LifecycleGateMode::FailClosed {
+        bail!(
+            "precondition unresolvable for {}: {} ({}); refusing to execute under \
+             fail-closed lifecycle gate mode (T0.2, closes C-027)",
+            runtime_verb.full_name,
+            class.as_str(),
+            detail
+        );
+    }
+    Ok(())
+}
+
+/// Phase 3 C1 — execution-time `requires_states` precondition.
 ///
 /// The "validate" half of select-then-validate, relocated from the
 /// discovery-time Step-5 prune (`agent::verb_surface` `PruneLayer::LifecycleState`).
@@ -2020,18 +2121,15 @@ impl DslExecutor {
 /// the *selected* verb's *own* entity, at the single dispatch chokepoint every
 /// execution door funnels through (`execute_verb_in_scope`).
 ///
-/// **FAIL-OPEN by construction.** Enforcement is opt-in via an authored
-/// `lifecycle.entity_arg`. Every uncertainty PASSES: no lifecycle, empty
-/// `requires_states`, unbound entity (`entity_arg` absent), an `entity_arg` that
-/// does not resolve to a uuid, no slot→table mapping for the verb's domain, or a
-/// NULL/absent current state. This mirrors the live-DB reality (the CBU
-/// operational lifecycle column is unpopulated; see
-/// `docs/todo/phase3-discoverable-executable-split-plan.md` F-findings) and
-/// guarantees the relocation never bricks a verb the discovery prune only hid.
+/// Resolves [`LifecycleGateMode`] from the environment on every call
+/// (`OB_POC_LIFECYCLE_GATE_MODE`); see [`enforce_requires_states_precondition_with_mode`]
+/// for the mode-parameterised, unit-testable implementation.
 ///
-/// It hard-blocks **only** when the entity's CURRENT, non-NULL state is genuinely
-/// absent from `requires_states` — a true precondition violation — returning an
-/// error that names the required states and the actual state.
+/// It hard-blocks — in both modes — when the entity's CURRENT, non-NULL
+/// state is genuinely absent from `requires_states`: a true precondition
+/// violation, returning an error that names the required states and the
+/// actual state. That case is unrelated to `LifecycleGateMode` — the state
+/// resolved fine, it just didn't match.
 ///
 /// NOTE (deferred guard): there is no out-of-domain check yet — if a verb were
 /// authored with both `entity_arg` and `requires_states` values that the mapped
@@ -2039,25 +2137,52 @@ impl DslExecutor {
 /// today (the `entity_arg`-bearing CBU verbs all require `cbus.status` values).
 /// Authoring `entity_arg` onto an out-of-domain verb (e.g. an operational-state
 /// verb) must add the constraint-domain guard first — tracked in the Phase-3 plan.
+///
+/// Reconciliation with `GateChecker` (C-025/C-026, DAG-taxonomy Mode A
+/// blocking): that check owns cross-workspace transition legality read
+/// through `DagRegistry`; this check owns the single-verb `requires_states`
+/// precondition read directly off the verb's own slot table. The two run
+/// independently today — recorded as a divergence in the ownership ledger,
+/// to unify into one `G4 DAG proof` gate at T2.2.
 #[cfg(feature = "database")]
 async fn enforce_requires_states_precondition(
     runtime_verb: &RuntimeVerb,
     json_args: &HashMap<String, JsonValue>,
     scope: &mut dyn TransactionScope,
 ) -> Result<()> {
+    enforce_requires_states_precondition_with_mode(
+        runtime_verb,
+        json_args,
+        scope,
+        LifecycleGateMode::from_env(),
+    )
+    .await
+}
+
+/// T0.2: mode-parameterised implementation. See [`enforce_requires_states_precondition`].
+#[cfg(feature = "database")]
+async fn enforce_requires_states_precondition_with_mode(
+    runtime_verb: &RuntimeVerb,
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+    mode: LifecycleGateMode,
+) -> Result<()> {
     let Some(lifecycle) = runtime_verb.lifecycle.as_ref() else {
+        audit_lifecycle_no_policy(mode, runtime_verb, "no lifecycle block authored");
         return Ok(());
     };
     if lifecycle.requires_states.is_empty() {
+        audit_lifecycle_no_policy(mode, runtime_verb, "requires_states is empty");
         return Ok(());
     }
     // Opt-in: without an authored entity binding we cannot identify the entity.
     let Some(entity_arg) = lifecycle.entity_arg.as_deref() else {
-        tracing::debug!(
-            verb = %runtime_verb.full_name,
-            "requires_states present but entity_arg unbound — fail-open"
+        return gate_lifecycle_fail_open(
+            LifecycleFailOpenClass::NoEntityArg,
+            mode,
+            runtime_verb,
+            "requires_states present but entity_arg unbound",
         );
-        return Ok(());
     };
     // Resolve the entity id from the (kebab-keyed) resolved args.
     let Some(entity_id) = json_args
@@ -2065,25 +2190,25 @@ async fn enforce_requires_states_precondition(
         .and_then(JsonValue::as_str)
         .and_then(|s| Uuid::parse_str(s).ok())
     else {
-        tracing::debug!(
-            verb = %runtime_verb.full_name,
-            entity_arg,
-            "entity_arg did not resolve to a uuid — fail-open"
+        return gate_lifecycle_fail_open(
+            LifecycleFailOpenClass::InvalidUuid,
+            mode,
+            runtime_verb,
+            &format!("entity_arg '{entity_arg}' did not resolve to a uuid"),
         );
-        return Ok(());
     };
     // Convention: workspace == slot == verb domain (covers `cbu.cbu`). A verb
-    // whose state lives under a non-self-named slot has no mapping here and
-    // fails open — richer slot resolution is deferred (Phase-3 plan).
+    // whose state lives under a non-self-named slot has no mapping here —
+    // richer slot resolution is deferred (Phase-3 plan).
     let Ok((table, column, pk)) =
         dsl_runtime::resolve_slot_table(&runtime_verb.domain, &runtime_verb.domain)
     else {
-        tracing::debug!(
-            verb = %runtime_verb.full_name,
-            domain = %runtime_verb.domain,
-            "no slot-state mapping — fail-open"
+        return gate_lifecycle_fail_open(
+            LifecycleFailOpenClass::NoSlotMapping,
+            mode,
+            runtime_verb,
+            &format!("no slot-state mapping for domain '{}'", runtime_verb.domain),
         );
-        return Ok(());
     };
     // Read CURRENT state INSIDE the open transaction (sees prior in-txn steps).
     let sql = format!(r#"SELECT {column}::text AS state FROM "ob-poc".{table} WHERE {pk} = $1"#);
@@ -2093,17 +2218,21 @@ async fn enforce_requires_states_precondition(
         .await
     {
         Ok(Some(Some(state))) => state,
-        // DB error, no row, or NULL state → fail-open (never brick on absent state).
+        // DB error, no row, or NULL state.
         _ => {
-            tracing::debug!(
-                verb = %runtime_verb.full_name,
-                %entity_id,
-                "current state absent/NULL/unreadable — fail-open"
+            return gate_lifecycle_fail_open(
+                LifecycleFailOpenClass::StateUnreadable,
+                mode,
+                runtime_verb,
+                &format!("current state for {entity_id} absent/NULL/unreadable"),
             );
-            return Ok(());
         }
     };
-    if lifecycle.requires_states.iter().any(|s| s == &current_state) {
+    if lifecycle
+        .requires_states
+        .iter()
+        .any(|s| s == &current_state)
+    {
         return Ok(());
     }
     bail!(
@@ -2232,12 +2361,12 @@ impl DslExecutor {
             if let Some(ref events) = self.events {
                 let duration_ms = step_start.elapsed().as_millis() as u64;
                 match &verb_result {
-                    Ok(_) => events.emit(crate::events::DslEvent::succeeded(
+                    Ok(_) => events.emit(ob_poc_diagnostics::events::DslEvent::succeeded(
                         ctx.session_id,
                         verb_name.clone(),
                         duration_ms,
                     )),
-                    Err(e) => events.emit(crate::events::DslEvent::failed(
+                    Err(e) => events.emit(ob_poc_diagnostics::events::DslEvent::failed(
                         ctx.session_id,
                         verb_name.clone(),
                         duration_ms,
@@ -3061,6 +3190,195 @@ mod tests {
         assert_eq!(ctx.resolve("nonexistent"), None);
     }
 
+    // ── T0.2 (EOP-PLAN-CONTROLPLANE-001, closes C-027 divergence) ──────────
+    //
+    // Table-driven coverage of the five `LifecycleFailOpenClass`es crossed
+    // with both `LifecycleGateMode`s. Four classes (`NoLifecycleDeclared`,
+    // `NoEntityArg`, `InvalidUuid`, `NoSlotMapping`) never touch the DB —
+    // covered here with a scope double that panics if touched, proving by
+    // construction that the early-return path never reaches the query.
+    // `StateUnreadable` requires a real row read; covered in the
+    // `#[cfg(feature = "database")]` `c1_requires_states_precondition`
+    // integration test below (ghost-uuid case, both modes).
+    #[cfg(feature = "database")]
+    mod lifecycle_gate_mode_tests {
+        use super::*;
+        use crate::dsl_v2::runtime_registry::RuntimeReturn;
+
+        /// `TransactionScope` double for classes that return before ever
+        /// calling `scope.executor()`/`scope.transaction()`/`scope.pool()`.
+        /// Panics if any of those are reached — the panic IS the assertion
+        /// that the fail-open early-return actually fired before any DB call.
+        struct PanicScope;
+
+        impl TransactionScope for PanicScope {
+            fn scope_id(&self) -> ob_poc_types::TransactionScopeId {
+                ob_poc_types::TransactionScopeId::new()
+            }
+            fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
+                panic!("PanicScope: transaction() reached — DB should not be touched here")
+            }
+            fn pool(&self) -> &sqlx::PgPool {
+                panic!("PanicScope: pool() reached — DB should not be touched here")
+            }
+        }
+
+        fn fixture_verb(lifecycle: Option<dsl_core::VerbLifecycle>, domain: &str) -> RuntimeVerb {
+            RuntimeVerb {
+                domain: domain.to_string(),
+                verb: "noop".to_string(),
+                full_name: format!("{domain}.noop"),
+                description: "T0.2 test fixture".to_string(),
+                harm_class: None,
+                subject_kinds: vec![],
+                behavior: RuntimeBehavior::Plugin("noop".to_string()),
+                args: vec![],
+                returns: RuntimeReturn {
+                    return_type: dsl_core::ReturnTypeConfig::Void,
+                    name: None,
+                    capture: false,
+                },
+                produces: None,
+                consumes: vec![],
+                lifecycle,
+                policy: None,
+                phase_tags: vec![],
+            }
+        }
+
+        fn no_args() -> HashMap<String, JsonValue> {
+            HashMap::new()
+        }
+
+        async fn run(verb: &RuntimeVerb, mode: LifecycleGateMode) -> Result<()> {
+            enforce_requires_states_precondition_with_mode(
+                verb,
+                &no_args(),
+                &mut PanicScope,
+                mode,
+            )
+            .await
+        }
+
+        #[tokio::test]
+        async fn no_lifecycle_declared_passes_in_both_modes() {
+            let verb = fixture_verb(None, "t0-2-test");
+            run(&verb, LifecycleGateMode::FailOpen)
+                .await
+                .expect("no lifecycle block ⇒ always passes (FailOpen)");
+            run(&verb, LifecycleGateMode::FailClosed)
+                .await
+                .expect("no lifecycle block ⇒ always passes (FailClosed) — no policy to enforce");
+        }
+
+        #[tokio::test]
+        async fn empty_requires_states_passes_in_both_modes() {
+            let verb = fixture_verb(Some(dsl_core::VerbLifecycle::default()), "t0-2-test");
+            run(&verb, LifecycleGateMode::FailOpen)
+                .await
+                .expect("empty requires_states ⇒ always passes (FailOpen)");
+            run(&verb, LifecycleGateMode::FailClosed)
+                .await
+                .expect("empty requires_states ⇒ always passes (FailClosed) — no policy to enforce");
+        }
+
+        #[tokio::test]
+        async fn no_entity_arg_is_mode_gated() {
+            let verb = fixture_verb(
+                Some(dsl_core::VerbLifecycle {
+                    entity_arg: None,
+                    requires_states: vec!["SOME_STATE".to_string()],
+                    ..Default::default()
+                }),
+                "t0-2-test",
+            );
+            run(&verb, LifecycleGateMode::FailOpen)
+                .await
+                .expect("no entity_arg ⇒ passes under FailOpen");
+            let blocked = run(&verb, LifecycleGateMode::FailClosed).await;
+            assert!(
+                blocked.is_err(),
+                "no entity_arg ⇒ blocks under FailClosed (T0.2)"
+            );
+            assert!(blocked.unwrap_err().to_string().contains("no_entity_arg"));
+        }
+
+        #[tokio::test]
+        async fn invalid_uuid_is_mode_gated() {
+            let verb = fixture_verb(
+                Some(dsl_core::VerbLifecycle {
+                    entity_arg: Some("thing-id".to_string()),
+                    requires_states: vec!["SOME_STATE".to_string()],
+                    ..Default::default()
+                }),
+                "t0-2-test",
+            );
+            let mut args = HashMap::new();
+            args.insert(
+                "thing-id".to_string(),
+                JsonValue::String("not-a-uuid".to_string()),
+            );
+            let pass = enforce_requires_states_precondition_with_mode(
+                &verb,
+                &args,
+                &mut PanicScope,
+                LifecycleGateMode::FailOpen,
+            )
+            .await;
+            pass.expect("invalid uuid ⇒ passes under FailOpen");
+            let blocked = enforce_requires_states_precondition_with_mode(
+                &verb,
+                &args,
+                &mut PanicScope,
+                LifecycleGateMode::FailClosed,
+            )
+            .await;
+            assert!(
+                blocked.is_err(),
+                "invalid uuid ⇒ blocks under FailClosed (T0.2)"
+            );
+            assert!(blocked.unwrap_err().to_string().contains("invalid_uuid"));
+        }
+
+        #[tokio::test]
+        async fn no_slot_mapping_is_mode_gated() {
+            // A domain guaranteed to have no `SlotStateProvider` mapping.
+            let verb = fixture_verb(
+                Some(dsl_core::VerbLifecycle {
+                    entity_arg: Some("thing-id".to_string()),
+                    requires_states: vec!["SOME_STATE".to_string()],
+                    ..Default::default()
+                }),
+                "t0-2-unmapped-domain",
+            );
+            let mut args = HashMap::new();
+            args.insert(
+                "thing-id".to_string(),
+                JsonValue::String(Uuid::new_v4().to_string()),
+            );
+            let pass = enforce_requires_states_precondition_with_mode(
+                &verb,
+                &args,
+                &mut PanicScope,
+                LifecycleGateMode::FailOpen,
+            )
+            .await;
+            pass.expect("no slot mapping ⇒ passes under FailOpen");
+            let blocked = enforce_requires_states_precondition_with_mode(
+                &verb,
+                &args,
+                &mut PanicScope,
+                LifecycleGateMode::FailClosed,
+            )
+            .await;
+            assert!(
+                blocked.is_err(),
+                "no slot mapping ⇒ blocks under FailClosed (T0.2)"
+            );
+            assert!(blocked.unwrap_err().to_string().contains("no_slot_mapping"));
+        }
+    }
+
     #[cfg(feature = "database")]
     #[test]
     fn test_sem_os_registry_has_plugin_verbs() {
@@ -3124,11 +3442,12 @@ mod tests {
             .expect("begin scope");
 
         // An existing committed DISCOVERED row (read-only; scope rolls back on drop).
-        let discovered: Uuid =
-            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
-                .fetch_one(scope.executor())
-                .await
-                .expect("a DISCOVERED cbu must exist");
+        let discovered: Uuid = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#,
+        )
+        .fetch_one(scope.executor())
+        .await
+        .expect("a DISCOVERED cbu must exist");
 
         let reg = runtime_registry();
         let confirm = reg.get("cbu", "confirm").expect("cbu.confirm registered");
@@ -3184,13 +3503,31 @@ mod tests {
             "add-product block must name the required state and verb: {apmsg}"
         );
 
-        // FAIL-OPEN (absent-state branch): a gated verb against a non-existent
-        // cbu reads no row → PASS regardless. This is the branch F-D will tighten
-        // once operational state is populated; today it must never brick.
+        // T0.2: the absent-state (`StateUnreadable`) class is now mode-gated.
+        // `FailOpen` preserves the original C1 "never brick" guarantee;
+        // `FailClosed` (the production default) now blocks it — that is
+        // exactly what T0.2 closes C-027 for.
         let ghost = Uuid::new_v4();
-        enforce_requires_states_precondition(confirm, &args(ghost), &mut scope)
-            .await
-            .expect("absent row ⇒ C1 fail-open (never brick on missing state)");
+        enforce_requires_states_precondition_with_mode(
+            confirm,
+            &args(ghost),
+            &mut scope,
+            LifecycleGateMode::FailOpen,
+        )
+        .await
+        .expect("absent row ⇒ FailOpen mode never bricks (original C1 guarantee)");
+
+        let ghost_blocked = enforce_requires_states_precondition_with_mode(
+            confirm,
+            &args(ghost),
+            &mut scope,
+            LifecycleGateMode::FailClosed,
+        )
+        .await;
+        assert!(
+            ghost_blocked.is_err(),
+            "T0.2: absent row must block under FailClosed (closes C-027)"
+        );
 
         // scope drops here → rollback; no rows mutated anyway.
     }
@@ -3254,11 +3591,12 @@ mod tests {
         let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
             .await
             .expect("begin scope");
-        let discovered: Uuid =
-            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#)
-                .fetch_one(scope.executor())
-                .await
-                .expect("a DISCOVERED cbu must exist");
+        let discovered: Uuid = sqlx::query_scalar(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#,
+        )
+        .fetch_one(scope.executor())
+        .await
+        .expect("a DISCOVERED cbu must exist");
         let confirm = runtime_registry()
             .get("cbu", "confirm")
             .expect("cbu.confirm registered");

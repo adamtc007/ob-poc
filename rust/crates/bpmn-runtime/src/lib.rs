@@ -29,6 +29,7 @@
 //! let id = engine.start_instance(serde_json::json!({})).await?;
 //! println!("status: {:?}", engine.get_instance_status(id).await?);
 //! ```
+#![deny(unreachable_pub)]
 
 mod builtins;
 mod event_loop;

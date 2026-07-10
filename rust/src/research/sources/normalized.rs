@@ -57,6 +57,7 @@ pub struct NormalizedEntity {
 
 impl NormalizedEntity {
     /// Create a minimal entity with just the required fields
+    #[allow(dead_code)] // kept for tests
     pub fn new(source_key: String, source_name: String, name: String) -> Self {
         Self {
             source_key,
@@ -74,13 +75,6 @@ impl NormalizedEntity {
             business_address: None,
             raw_response: None,
         }
-    }
-
-    /// Check if this entity is active
-    pub fn is_active(&self) -> bool {
-        self.status
-            .as_ref()
-            .is_none_or(|s| matches!(s, EntityStatus::Active))
     }
 }
 
@@ -248,11 +242,6 @@ pub struct NormalizedControlHolder {
 }
 
 impl NormalizedControlHolder {
-    /// Check if this control relationship is still active
-    pub fn is_active(&self) -> bool {
-        self.ceased_on.is_none()
-    }
-
     /// Get the best ownership percentage estimate
     pub fn ownership_pct_best(&self) -> Option<Decimal> {
         self.ownership_pct_exact.or_else(|| {
@@ -323,12 +312,7 @@ pub struct NormalizedOfficer {
     pub occupation: Option<String>,
 }
 
-impl NormalizedOfficer {
-    /// Check if this officer is still active
-    pub fn is_active(&self) -> bool {
-        self.resigned_date.is_none()
-    }
-}
+impl NormalizedOfficer {}
 
 /// Officer role
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -364,96 +348,11 @@ impl std::fmt::Display for OfficerRole {
     }
 }
 
-impl OfficerRole {
-    /// Parse role from string (case-insensitive)
-    pub fn parse(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "director" => Self::Director,
-            "secretary" | "company secretary" => Self::Secretary,
-            "chairman" | "chair" => Self::Chairman,
-            "ceo" | "chief executive officer" => Self::Ceo,
-            "cfo" | "chief financial officer" => Self::Cfo,
-            "coo" | "chief operating officer" => Self::Coo,
-            "non-executive director" | "ned" => Self::NonExecutiveDirector,
-            "alternate director" => Self::AlternateDirector,
-            "manager" | "llp designated member" => Self::Manager,
-            "partner" | "general partner" | "limited partner" => Self::Partner,
-            other => Self::Other(other.to_string()),
-        }
-    }
-}
-
-/// Normalized parent/subsidiary relationship
-///
-/// Maps to: `kyc.ownership_edges`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NormalizedRelationship {
-    /// Parent entity key (source-specific)
-    pub parent_key: String,
-    /// Parent entity name
-    pub parent_name: String,
-    /// Child entity key (source-specific)
-    pub child_key: String,
-    /// Child entity name
-    pub child_name: String,
-    /// Type of relationship
-    pub relationship_type: RelationshipType,
-    /// Ownership percentage (if known)
-    pub ownership_pct: Option<Decimal>,
-    /// Whether this is a direct relationship
-    pub is_direct: bool,
-}
-
-/// Relationship type
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RelationshipType {
-    /// Direct parent (immediate owner)
-    DirectParent,
-    /// Ultimate parent (top of chain)
-    UltimateParent,
-    /// Subsidiary
-    Subsidiary,
-    /// Branch of parent
-    BranchOf,
-    /// Fund managed by
-    FundManagedBy,
-    /// Sub-fund of umbrella
-    SubfundOf,
-}
-
-impl std::fmt::Display for RelationshipType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::DirectParent => write!(f, "direct_parent"),
-            Self::UltimateParent => write!(f, "ultimate_parent"),
-            Self::Subsidiary => write!(f, "subsidiary"),
-            Self::BranchOf => write!(f, "branch_of"),
-            Self::FundManagedBy => write!(f, "fund_managed_by"),
-            Self::SubfundOf => write!(f, "subfund_of"),
-        }
-    }
-}
+impl OfficerRole {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_normalized_entity_is_active() {
-        let mut entity =
-            NormalizedEntity::new("12345678".into(), "test".into(), "Test Company".into());
-
-        // No status = active
-        assert!(entity.is_active());
-
-        // Active status
-        entity.status = Some(EntityStatus::Active);
-        assert!(entity.is_active());
-
-        // Dissolved = not active
-        entity.status = Some(EntityStatus::Dissolved);
-        assert!(!entity.is_active());
-    }
 
     #[test]
     fn test_control_holder_ownership_pct_best() {
@@ -497,19 +396,10 @@ mod tests {
         assert_eq!(holder.ownership_pct_best(), Some(Decimal::from(25)));
     }
 
-    #[test]
-    fn test_officer_role_parse() {
-        assert_eq!(OfficerRole::parse("director"), OfficerRole::Director);
-        assert_eq!(OfficerRole::parse("DIRECTOR"), OfficerRole::Director);
-        assert_eq!(OfficerRole::parse("Secretary"), OfficerRole::Secretary);
-        assert_eq!(OfficerRole::parse("CEO"), OfficerRole::Ceo);
-        assert_eq!(
-            OfficerRole::parse("Chief Executive Officer"),
-            OfficerRole::Ceo
-        );
-        assert_eq!(
-            OfficerRole::parse("custom role"),
-            OfficerRole::Other("custom role".into())
-        );
-    }
+    // test_officer_role_parse removed 2026-07-10: OfficerRole::parse() had
+    // zero production callers (companies_house/types.rs maps its own
+    // source-specific role codes inline) and was deleted in bc6c165f
+    // (impl OfficerRole { pub fn parse(...) } -> empty impl block); this
+    // was the only remaining caller, breaking `cargo test --features
+    // database`.
 }

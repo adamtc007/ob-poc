@@ -28,7 +28,7 @@ use ob_poc_types::trading_matrix::TradingMatrixResponse;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::trading_profile::ast_db;
+use ob_poc_trading_profile::ast_db;
 
 // =============================================================================
 // API ENDPOINT

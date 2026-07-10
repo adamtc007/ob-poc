@@ -32,9 +32,9 @@
 use super::ast::{Argument, AstNode, Program, Span, Statement, VerbCall};
 use super::runtime_registry::runtime_registry;
 use super::verb_registry::{registry, VerbBehavior};
-use crate::ontology::ontology;
 use dsl_core::ResolvedResourceDependency;
 use dsl_core::{BindingSlotId, DagEdge, NodeId, PopulatedExecutionDag};
+use ob_poc_ontology::ontology;
 use std::collections::{HashMap, HashSet};
 
 /// A compiled execution plan — dependency-sorted sequence of steps.
@@ -402,7 +402,7 @@ impl std::fmt::Display for PlannerDiagnostic {
 ///
 /// Falls back to a simple heuristic if ontology is not loaded.
 fn infer_parent_fk(parent_domain: &str, child_domain: &str) -> Option<&'static str> {
-    use crate::ontology::ontology;
+    use ob_poc_ontology::ontology;
 
     // Try ontology lookup first
     if let Some(fk) = ontology().get_fk(parent_domain, child_domain) {

@@ -3,21 +3,21 @@
 //! Speaks newline-delimited JSON-RPC 2.0 over stdio. Stdout is
 //! reserved for protocol messages; diagnostics go to stderr.
 //!
-//! Today the binary wires the hermetic `StubBridge`. Phase 4.3
+//! Today the binary wires the hermetic `NullBridge`. Phase 4.3
 //! will swap in a `sem_os_client`-backed bridge so the tools
 //! return real substrate data.
 
 use std::io::{BufRead, Write};
 use std::sync::Arc;
 
-use sem_os_mcp::bridge::{SemOsBridge, StubBridge};
+use sem_os_mcp::bridge::{NullBridge, SemOsBridge};
 use sem_os_mcp::protocol::{JsonRpcRequest, JsonRpcResponse, PARSE_ERROR};
 use sem_os_mcp::server::McpServer;
 use sem_os_mcp::tool_impls::build_registry;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let bridge: Arc<dyn SemOsBridge> = Arc::new(StubBridge::with_label("phase-4-spike"));
+    let bridge: Arc<dyn SemOsBridge> = Arc::new(NullBridge::with_label("phase-4-spike"));
     eprintln!(
         "[sem_os_mcp] Bridge wired (provider: {})",
         bridge.provider_label()

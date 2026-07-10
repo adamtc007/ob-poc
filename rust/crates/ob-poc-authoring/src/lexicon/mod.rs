@@ -35,4 +35,7 @@ mod types;
 pub use compiler::LexiconCompiler;
 pub use service::{LexiconService, LexiconServiceImpl};
 pub use snapshot::LexiconSnapshot;
-pub use types::*;
+pub use types::{
+    ConceptId, DomainMeta, EntityTypeCandidate, EntityTypeMeta, LabelNorm, MatchEvidence,
+    TargetTypeMatch, VerbCandidate, VerbMeta,
+};

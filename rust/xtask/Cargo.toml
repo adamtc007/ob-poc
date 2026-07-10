@@ -19,6 +19,10 @@ reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2.1"
 ob-poc = { path = "..", features = ["database"] }
 ob-poc-boundary = { path = "../crates/ob-poc-boundary" }
+# Phase 3 slice A (2026-07-01): direct deps for the entity_linking/lexicon
+# hub-re-export consumers migrated off `ob_poc::{entity_linking,lexicon}`.
+ob-poc-entity-linking = { path = "../crates/ob-poc-entity-linking" }
+ob-poc-authoring = { path = "../crates/ob-poc-authoring" }
 # Phase 5.4 conformance harness consumes the planning loop +
 # index loader directly so the corpus runs through the same
 # entry points the sage-acp binary uses.

@@ -18,7 +18,7 @@ pub mod intent_schema;
 pub mod phases;
 pub mod semantic_ir;
 
-use crate::semtaxonomy::{extract_entity_candidates, EntityCandidate, VerbSurfaceEntry};
+use ob_poc_semtaxonomy::{extract_entity_candidates, EntityCandidate, VerbSurfaceEntry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -154,7 +154,7 @@ pub struct SelectedVerb {
 /// # Examples
 ///
 /// ```ignore
-/// use ob_poc::semtaxonomy::VerbSurfaceEntry;
+/// use ob_poc_semtaxonomy::VerbSurfaceEntry;
 /// use ob_poc::semtaxonomy_v2::build_generic_state;
 ///
 /// let state = build_generic_state("entity", &Vec::<VerbSurfaceEntry>::new());
@@ -1296,7 +1296,7 @@ mod tests {
         build_generic_state, introduces_entity_reference, step1_entity_scope, step2_entity_state,
         step3_select_verb, EntityScope, EntityScopeOutcome, EntitySource,
     };
-    use crate::semtaxonomy::{EntityCandidate, VerbParameter, VerbSurfaceEntry};
+    use ob_poc_semtaxonomy::{EntityCandidate, VerbParameter, VerbSurfaceEntry};
     use serde_json::json;
     use uuid::Uuid;
 

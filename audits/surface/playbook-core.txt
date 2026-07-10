@@ -1,0 +1,436 @@
+# playbook-core | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:10Z
+pub mod playbook_core
+pub enum playbook_core::ParseError
+pub playbook_core::ParseError::Yaml
+pub playbook_core::ParseError::Yaml::line: u32
+pub playbook_core::ParseError::Yaml::msg: alloc::string::String
+impl core::error::Error for playbook_core::ParseError
+impl core::fmt::Debug for playbook_core::ParseError
+pub fn playbook_core::ParseError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for playbook_core::ParseError
+pub fn playbook_core::ParseError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for playbook_core::ParseError
+impl core::marker::Send for playbook_core::ParseError
+impl core::marker::Sync for playbook_core::ParseError
+impl core::marker::Unpin for playbook_core::ParseError
+impl core::marker::UnsafeUnpin for playbook_core::ParseError
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::ParseError
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::ParseError
+impl<T, U> core::convert::Into<U> for playbook_core::ParseError where U: core::convert::From<T>
+pub fn playbook_core::ParseError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::ParseError where U: core::convert::Into<T>
+pub type playbook_core::ParseError::Error = core::convert::Infallible
+pub fn playbook_core::ParseError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::ParseError where U: core::convert::TryFrom<T>
+pub type playbook_core::ParseError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::ParseError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for playbook_core::ParseError where T: core::fmt::Display + ?core::marker::Sized
+pub fn playbook_core::ParseError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for playbook_core::ParseError where T: 'static + ?core::marker::Sized
+pub fn playbook_core::ParseError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::ParseError where T: ?core::marker::Sized
+pub fn playbook_core::ParseError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::ParseError where T: ?core::marker::Sized
+pub fn playbook_core::ParseError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for playbook_core::ParseError
+pub fn playbook_core::ParseError::from(T) -> T
+pub enum playbook_core::SlotValue
+pub playbook_core::SlotValue::String(alloc::string::String)
+pub playbook_core::SlotValue::Uuid(uuid::Uuid)
+impl core::clone::Clone for playbook_core::SlotValue
+pub fn playbook_core::SlotValue::clone(&self) -> playbook_core::SlotValue
+impl core::fmt::Debug for playbook_core::SlotValue
+pub fn playbook_core::SlotValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for playbook_core::SlotValue
+impl core::marker::Send for playbook_core::SlotValue
+impl core::marker::Sync for playbook_core::SlotValue
+impl core::marker::Unpin for playbook_core::SlotValue
+impl core::marker::UnsafeUnpin for playbook_core::SlotValue
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::SlotValue
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::SlotValue
+impl<T, U> core::convert::Into<U> for playbook_core::SlotValue where U: core::convert::From<T>
+pub fn playbook_core::SlotValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::SlotValue where U: core::convert::Into<T>
+pub type playbook_core::SlotValue::Error = core::convert::Infallible
+pub fn playbook_core::SlotValue::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::SlotValue where U: core::convert::TryFrom<T>
+pub type playbook_core::SlotValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::SlotValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::SlotValue where T: core::clone::Clone
+pub type playbook_core::SlotValue::Owned = T
+pub fn playbook_core::SlotValue::clone_into(&self, &mut T)
+pub fn playbook_core::SlotValue::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::SlotValue where T: 'static + ?core::marker::Sized
+pub fn playbook_core::SlotValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::SlotValue where T: ?core::marker::Sized
+pub fn playbook_core::SlotValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::SlotValue where T: ?core::marker::Sized
+pub fn playbook_core::SlotValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::SlotValue where T: core::clone::Clone
+pub unsafe fn playbook_core::SlotValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::SlotValue
+pub fn playbook_core::SlotValue::from(T) -> T
+pub struct playbook_core::LowerResult
+pub playbook_core::LowerResult::dsl_statements: alloc::vec::Vec<alloc::string::String>
+pub playbook_core::LowerResult::missing_slots: alloc::vec::Vec<playbook_core::MissingSlot>
+pub playbook_core::LowerResult::step_to_dsl: std::collections::hash::map::HashMap<alloc::string::String, usize>
+impl core::marker::Freeze for playbook_core::LowerResult
+impl core::marker::Send for playbook_core::LowerResult
+impl core::marker::Sync for playbook_core::LowerResult
+impl core::marker::Unpin for playbook_core::LowerResult
+impl core::marker::UnsafeUnpin for playbook_core::LowerResult
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::LowerResult
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::LowerResult
+impl<T, U> core::convert::Into<U> for playbook_core::LowerResult where U: core::convert::From<T>
+pub fn playbook_core::LowerResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::LowerResult where U: core::convert::Into<T>
+pub type playbook_core::LowerResult::Error = core::convert::Infallible
+pub fn playbook_core::LowerResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::LowerResult where U: core::convert::TryFrom<T>
+pub type playbook_core::LowerResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::LowerResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for playbook_core::LowerResult where T: 'static + ?core::marker::Sized
+pub fn playbook_core::LowerResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::LowerResult where T: ?core::marker::Sized
+pub fn playbook_core::LowerResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::LowerResult where T: ?core::marker::Sized
+pub fn playbook_core::LowerResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for playbook_core::LowerResult
+pub fn playbook_core::LowerResult::from(T) -> T
+pub struct playbook_core::MissingSlot
+pub playbook_core::MissingSlot::name: alloc::string::String
+pub playbook_core::MissingSlot::step_id: alloc::string::String
+pub playbook_core::MissingSlot::step_index: usize
+impl core::marker::Freeze for playbook_core::MissingSlot
+impl core::marker::Send for playbook_core::MissingSlot
+impl core::marker::Sync for playbook_core::MissingSlot
+impl core::marker::Unpin for playbook_core::MissingSlot
+impl core::marker::UnsafeUnpin for playbook_core::MissingSlot
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::MissingSlot
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::MissingSlot
+impl<T, U> core::convert::Into<U> for playbook_core::MissingSlot where U: core::convert::From<T>
+pub fn playbook_core::MissingSlot::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::MissingSlot where U: core::convert::Into<T>
+pub type playbook_core::MissingSlot::Error = core::convert::Infallible
+pub fn playbook_core::MissingSlot::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::MissingSlot where U: core::convert::TryFrom<T>
+pub type playbook_core::MissingSlot::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::MissingSlot::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for playbook_core::MissingSlot where T: 'static + ?core::marker::Sized
+pub fn playbook_core::MissingSlot::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::MissingSlot where T: ?core::marker::Sized
+pub fn playbook_core::MissingSlot::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::MissingSlot where T: ?core::marker::Sized
+pub fn playbook_core::MissingSlot::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for playbook_core::MissingSlot
+pub fn playbook_core::MissingSlot::from(T) -> T
+pub struct playbook_core::ParseOutput
+pub playbook_core::ParseOutput::source_map: playbook_core::PlaybookSourceMap
+pub playbook_core::ParseOutput::spec: playbook_core::PlaybookSpec
+impl core::marker::Freeze for playbook_core::ParseOutput
+impl core::marker::Send for playbook_core::ParseOutput
+impl core::marker::Sync for playbook_core::ParseOutput
+impl core::marker::Unpin for playbook_core::ParseOutput
+impl core::marker::UnsafeUnpin for playbook_core::ParseOutput
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::ParseOutput
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::ParseOutput
+impl<T, U> core::convert::Into<U> for playbook_core::ParseOutput where U: core::convert::From<T>
+pub fn playbook_core::ParseOutput::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::ParseOutput where U: core::convert::Into<T>
+pub type playbook_core::ParseOutput::Error = core::convert::Infallible
+pub fn playbook_core::ParseOutput::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::ParseOutput where U: core::convert::TryFrom<T>
+pub type playbook_core::ParseOutput::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::ParseOutput::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for playbook_core::ParseOutput where T: 'static + ?core::marker::Sized
+pub fn playbook_core::ParseOutput::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::ParseOutput where T: ?core::marker::Sized
+pub fn playbook_core::ParseOutput::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::ParseOutput where T: ?core::marker::Sized
+pub fn playbook_core::ParseOutput::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for playbook_core::ParseOutput
+pub fn playbook_core::ParseOutput::from(T) -> T
+pub struct playbook_core::PlaybookSourceMap
+pub playbook_core::PlaybookSourceMap::step_spans: std::collections::hash::map::HashMap<usize, playbook_core::StepSpan>
+impl playbook_core::PlaybookSourceMap
+pub fn playbook_core::PlaybookSourceMap::verb_span(&self, usize) -> core::option::Option<&playbook_core::SourceSpan>
+impl core::clone::Clone for playbook_core::PlaybookSourceMap
+pub fn playbook_core::PlaybookSourceMap::clone(&self) -> playbook_core::PlaybookSourceMap
+impl core::default::Default for playbook_core::PlaybookSourceMap
+pub fn playbook_core::PlaybookSourceMap::default() -> playbook_core::PlaybookSourceMap
+impl core::fmt::Debug for playbook_core::PlaybookSourceMap
+pub fn playbook_core::PlaybookSourceMap::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for playbook_core::PlaybookSourceMap
+impl core::marker::Send for playbook_core::PlaybookSourceMap
+impl core::marker::Sync for playbook_core::PlaybookSourceMap
+impl core::marker::Unpin for playbook_core::PlaybookSourceMap
+impl core::marker::UnsafeUnpin for playbook_core::PlaybookSourceMap
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::PlaybookSourceMap
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::PlaybookSourceMap
+impl<T, U> core::convert::Into<U> for playbook_core::PlaybookSourceMap where U: core::convert::From<T>
+pub fn playbook_core::PlaybookSourceMap::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::PlaybookSourceMap where U: core::convert::Into<T>
+pub type playbook_core::PlaybookSourceMap::Error = core::convert::Infallible
+pub fn playbook_core::PlaybookSourceMap::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::PlaybookSourceMap where U: core::convert::TryFrom<T>
+pub type playbook_core::PlaybookSourceMap::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::PlaybookSourceMap::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::PlaybookSourceMap where T: core::clone::Clone
+pub type playbook_core::PlaybookSourceMap::Owned = T
+pub fn playbook_core::PlaybookSourceMap::clone_into(&self, &mut T)
+pub fn playbook_core::PlaybookSourceMap::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::PlaybookSourceMap where T: 'static + ?core::marker::Sized
+pub fn playbook_core::PlaybookSourceMap::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::PlaybookSourceMap where T: ?core::marker::Sized
+pub fn playbook_core::PlaybookSourceMap::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::PlaybookSourceMap where T: ?core::marker::Sized
+pub fn playbook_core::PlaybookSourceMap::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::PlaybookSourceMap where T: core::clone::Clone
+pub unsafe fn playbook_core::PlaybookSourceMap::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::PlaybookSourceMap
+pub fn playbook_core::PlaybookSourceMap::from(T) -> T
+pub struct playbook_core::PlaybookSpec
+pub playbook_core::PlaybookSpec::id: alloc::string::String
+pub playbook_core::PlaybookSpec::name: alloc::string::String
+pub playbook_core::PlaybookSpec::slots: std::collections::hash::map::HashMap<alloc::string::String, playbook_core::SlotSpec>
+pub playbook_core::PlaybookSpec::steps: alloc::vec::Vec<playbook_core::StepSpec>
+pub playbook_core::PlaybookSpec::version: u32
+impl core::clone::Clone for playbook_core::PlaybookSpec
+pub fn playbook_core::PlaybookSpec::clone(&self) -> playbook_core::PlaybookSpec
+impl core::fmt::Debug for playbook_core::PlaybookSpec
+pub fn playbook_core::PlaybookSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for playbook_core::PlaybookSpec
+pub fn playbook_core::PlaybookSpec::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for playbook_core::PlaybookSpec
+pub fn playbook_core::PlaybookSpec::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for playbook_core::PlaybookSpec
+impl core::marker::Send for playbook_core::PlaybookSpec
+impl core::marker::Sync for playbook_core::PlaybookSpec
+impl core::marker::Unpin for playbook_core::PlaybookSpec
+impl core::marker::UnsafeUnpin for playbook_core::PlaybookSpec
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::PlaybookSpec
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::PlaybookSpec
+impl<T, U> core::convert::Into<U> for playbook_core::PlaybookSpec where U: core::convert::From<T>
+pub fn playbook_core::PlaybookSpec::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::PlaybookSpec where U: core::convert::Into<T>
+pub type playbook_core::PlaybookSpec::Error = core::convert::Infallible
+pub fn playbook_core::PlaybookSpec::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::PlaybookSpec where U: core::convert::TryFrom<T>
+pub type playbook_core::PlaybookSpec::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::PlaybookSpec::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::PlaybookSpec where T: core::clone::Clone
+pub type playbook_core::PlaybookSpec::Owned = T
+pub fn playbook_core::PlaybookSpec::clone_into(&self, &mut T)
+pub fn playbook_core::PlaybookSpec::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::PlaybookSpec where T: 'static + ?core::marker::Sized
+pub fn playbook_core::PlaybookSpec::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::PlaybookSpec where T: ?core::marker::Sized
+pub fn playbook_core::PlaybookSpec::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::PlaybookSpec where T: ?core::marker::Sized
+pub fn playbook_core::PlaybookSpec::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::PlaybookSpec where T: core::clone::Clone
+pub unsafe fn playbook_core::PlaybookSpec::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::PlaybookSpec
+pub fn playbook_core::PlaybookSpec::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for playbook_core::PlaybookSpec where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct playbook_core::SlotSpec
+pub playbook_core::SlotSpec::autofill_from: core::option::Option<alloc::string::String>
+pub playbook_core::SlotSpec::default: core::option::Option<serde_yaml::value::Value>
+pub playbook_core::SlotSpec::required: bool
+pub playbook_core::SlotSpec::slot_type: alloc::string::String
+impl core::clone::Clone for playbook_core::SlotSpec
+pub fn playbook_core::SlotSpec::clone(&self) -> playbook_core::SlotSpec
+impl core::fmt::Debug for playbook_core::SlotSpec
+pub fn playbook_core::SlotSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for playbook_core::SlotSpec
+pub fn playbook_core::SlotSpec::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for playbook_core::SlotSpec
+pub fn playbook_core::SlotSpec::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for playbook_core::SlotSpec
+impl core::marker::Send for playbook_core::SlotSpec
+impl core::marker::Sync for playbook_core::SlotSpec
+impl core::marker::Unpin for playbook_core::SlotSpec
+impl core::marker::UnsafeUnpin for playbook_core::SlotSpec
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::SlotSpec
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::SlotSpec
+impl<T, U> core::convert::Into<U> for playbook_core::SlotSpec where U: core::convert::From<T>
+pub fn playbook_core::SlotSpec::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::SlotSpec where U: core::convert::Into<T>
+pub type playbook_core::SlotSpec::Error = core::convert::Infallible
+pub fn playbook_core::SlotSpec::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::SlotSpec where U: core::convert::TryFrom<T>
+pub type playbook_core::SlotSpec::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::SlotSpec::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::SlotSpec where T: core::clone::Clone
+pub type playbook_core::SlotSpec::Owned = T
+pub fn playbook_core::SlotSpec::clone_into(&self, &mut T)
+pub fn playbook_core::SlotSpec::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::SlotSpec where T: 'static + ?core::marker::Sized
+pub fn playbook_core::SlotSpec::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::SlotSpec where T: ?core::marker::Sized
+pub fn playbook_core::SlotSpec::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::SlotSpec where T: ?core::marker::Sized
+pub fn playbook_core::SlotSpec::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::SlotSpec where T: core::clone::Clone
+pub unsafe fn playbook_core::SlotSpec::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::SlotSpec
+pub fn playbook_core::SlotSpec::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for playbook_core::SlotSpec where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct playbook_core::SlotState
+impl playbook_core::SlotState
+pub fn playbook_core::SlotState::get(&self, &str) -> core::option::Option<&playbook_core::SlotValue>
+pub fn playbook_core::SlotState::new() -> Self
+pub fn playbook_core::SlotState::set(&mut self, &str, playbook_core::SlotValue)
+impl core::clone::Clone for playbook_core::SlotState
+pub fn playbook_core::SlotState::clone(&self) -> playbook_core::SlotState
+impl core::default::Default for playbook_core::SlotState
+pub fn playbook_core::SlotState::default() -> playbook_core::SlotState
+impl core::fmt::Debug for playbook_core::SlotState
+pub fn playbook_core::SlotState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for playbook_core::SlotState
+impl core::marker::Send for playbook_core::SlotState
+impl core::marker::Sync for playbook_core::SlotState
+impl core::marker::Unpin for playbook_core::SlotState
+impl core::marker::UnsafeUnpin for playbook_core::SlotState
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::SlotState
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::SlotState
+impl<T, U> core::convert::Into<U> for playbook_core::SlotState where U: core::convert::From<T>
+pub fn playbook_core::SlotState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::SlotState where U: core::convert::Into<T>
+pub type playbook_core::SlotState::Error = core::convert::Infallible
+pub fn playbook_core::SlotState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::SlotState where U: core::convert::TryFrom<T>
+pub type playbook_core::SlotState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::SlotState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::SlotState where T: core::clone::Clone
+pub type playbook_core::SlotState::Owned = T
+pub fn playbook_core::SlotState::clone_into(&self, &mut T)
+pub fn playbook_core::SlotState::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::SlotState where T: 'static + ?core::marker::Sized
+pub fn playbook_core::SlotState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::SlotState where T: ?core::marker::Sized
+pub fn playbook_core::SlotState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::SlotState where T: ?core::marker::Sized
+pub fn playbook_core::SlotState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::SlotState where T: core::clone::Clone
+pub unsafe fn playbook_core::SlotState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::SlotState
+pub fn playbook_core::SlotState::from(T) -> T
+pub struct playbook_core::SourceSpan
+pub playbook_core::SourceSpan::column: u32
+pub playbook_core::SourceSpan::length: u32
+pub playbook_core::SourceSpan::line: u32
+impl core::clone::Clone for playbook_core::SourceSpan
+pub fn playbook_core::SourceSpan::clone(&self) -> playbook_core::SourceSpan
+impl core::fmt::Debug for playbook_core::SourceSpan
+pub fn playbook_core::SourceSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for playbook_core::SourceSpan
+impl core::marker::Send for playbook_core::SourceSpan
+impl core::marker::Sync for playbook_core::SourceSpan
+impl core::marker::Unpin for playbook_core::SourceSpan
+impl core::marker::UnsafeUnpin for playbook_core::SourceSpan
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::SourceSpan
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::SourceSpan
+impl<T, U> core::convert::Into<U> for playbook_core::SourceSpan where U: core::convert::From<T>
+pub fn playbook_core::SourceSpan::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::SourceSpan where U: core::convert::Into<T>
+pub type playbook_core::SourceSpan::Error = core::convert::Infallible
+pub fn playbook_core::SourceSpan::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::SourceSpan where U: core::convert::TryFrom<T>
+pub type playbook_core::SourceSpan::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::SourceSpan::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::SourceSpan where T: core::clone::Clone
+pub type playbook_core::SourceSpan::Owned = T
+pub fn playbook_core::SourceSpan::clone_into(&self, &mut T)
+pub fn playbook_core::SourceSpan::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::SourceSpan where T: 'static + ?core::marker::Sized
+pub fn playbook_core::SourceSpan::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::SourceSpan where T: ?core::marker::Sized
+pub fn playbook_core::SourceSpan::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::SourceSpan where T: ?core::marker::Sized
+pub fn playbook_core::SourceSpan::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::SourceSpan where T: core::clone::Clone
+pub unsafe fn playbook_core::SourceSpan::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::SourceSpan
+pub fn playbook_core::SourceSpan::from(T) -> T
+pub struct playbook_core::StepSpan
+pub playbook_core::StepSpan::args: std::collections::hash::map::HashMap<alloc::string::String, playbook_core::SourceSpan>
+pub playbook_core::StepSpan::verb: playbook_core::SourceSpan
+impl core::clone::Clone for playbook_core::StepSpan
+pub fn playbook_core::StepSpan::clone(&self) -> playbook_core::StepSpan
+impl core::fmt::Debug for playbook_core::StepSpan
+pub fn playbook_core::StepSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for playbook_core::StepSpan
+impl core::marker::Send for playbook_core::StepSpan
+impl core::marker::Sync for playbook_core::StepSpan
+impl core::marker::Unpin for playbook_core::StepSpan
+impl core::marker::UnsafeUnpin for playbook_core::StepSpan
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::StepSpan
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::StepSpan
+impl<T, U> core::convert::Into<U> for playbook_core::StepSpan where U: core::convert::From<T>
+pub fn playbook_core::StepSpan::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::StepSpan where U: core::convert::Into<T>
+pub type playbook_core::StepSpan::Error = core::convert::Infallible
+pub fn playbook_core::StepSpan::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::StepSpan where U: core::convert::TryFrom<T>
+pub type playbook_core::StepSpan::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::StepSpan::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::StepSpan where T: core::clone::Clone
+pub type playbook_core::StepSpan::Owned = T
+pub fn playbook_core::StepSpan::clone_into(&self, &mut T)
+pub fn playbook_core::StepSpan::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::StepSpan where T: 'static + ?core::marker::Sized
+pub fn playbook_core::StepSpan::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::StepSpan where T: ?core::marker::Sized
+pub fn playbook_core::StepSpan::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::StepSpan where T: ?core::marker::Sized
+pub fn playbook_core::StepSpan::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::StepSpan where T: core::clone::Clone
+pub unsafe fn playbook_core::StepSpan::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::StepSpan
+pub fn playbook_core::StepSpan::from(T) -> T
+pub struct playbook_core::StepSpec
+pub playbook_core::StepSpec::after: alloc::vec::Vec<alloc::string::String>
+pub playbook_core::StepSpec::args: std::collections::hash::map::HashMap<alloc::string::String, serde_yaml::value::Value>
+pub playbook_core::StepSpec::id: alloc::string::String
+pub playbook_core::StepSpec::verb: alloc::string::String
+impl core::clone::Clone for playbook_core::StepSpec
+pub fn playbook_core::StepSpec::clone(&self) -> playbook_core::StepSpec
+impl core::fmt::Debug for playbook_core::StepSpec
+pub fn playbook_core::StepSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for playbook_core::StepSpec
+pub fn playbook_core::StepSpec::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for playbook_core::StepSpec
+pub fn playbook_core::StepSpec::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for playbook_core::StepSpec
+impl core::marker::Send for playbook_core::StepSpec
+impl core::marker::Sync for playbook_core::StepSpec
+impl core::marker::Unpin for playbook_core::StepSpec
+impl core::marker::UnsafeUnpin for playbook_core::StepSpec
+impl core::panic::unwind_safe::RefUnwindSafe for playbook_core::StepSpec
+impl core::panic::unwind_safe::UnwindSafe for playbook_core::StepSpec
+impl<T, U> core::convert::Into<U> for playbook_core::StepSpec where U: core::convert::From<T>
+pub fn playbook_core::StepSpec::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for playbook_core::StepSpec where U: core::convert::Into<T>
+pub type playbook_core::StepSpec::Error = core::convert::Infallible
+pub fn playbook_core::StepSpec::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for playbook_core::StepSpec where U: core::convert::TryFrom<T>
+pub type playbook_core::StepSpec::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn playbook_core::StepSpec::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for playbook_core::StepSpec where T: core::clone::Clone
+pub type playbook_core::StepSpec::Owned = T
+pub fn playbook_core::StepSpec::clone_into(&self, &mut T)
+pub fn playbook_core::StepSpec::to_owned(&self) -> T
+impl<T> core::any::Any for playbook_core::StepSpec where T: 'static + ?core::marker::Sized
+pub fn playbook_core::StepSpec::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for playbook_core::StepSpec where T: ?core::marker::Sized
+pub fn playbook_core::StepSpec::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for playbook_core::StepSpec where T: ?core::marker::Sized
+pub fn playbook_core::StepSpec::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for playbook_core::StepSpec where T: core::clone::Clone
+pub unsafe fn playbook_core::StepSpec::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for playbook_core::StepSpec
+pub fn playbook_core::StepSpec::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for playbook_core::StepSpec where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn playbook_core::lower_playbook(&playbook_core::PlaybookSpec, &playbook_core::SlotState) -> playbook_core::LowerResult
+pub fn playbook_core::parse_playbook(&str) -> core::result::Result<playbook_core::ParseOutput, playbook_core::ParseError>

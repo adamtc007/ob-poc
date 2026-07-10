@@ -3,7 +3,7 @@
 //! The core abstraction for pluggable research source loaders.
 
 use super::normalized::{
-    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer, NormalizedRelationship,
+    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -116,6 +116,7 @@ impl FetchControlHoldersOptions {
         Self::default()
     }
 
+    #[allow(dead_code)] // kept for tests
     pub fn with_min_ownership(mut self, pct: rust_decimal::Decimal) -> Self {
         self.min_ownership_pct = Some(pct);
         self
@@ -139,8 +140,6 @@ pub struct FetchOfficersOptions {
     pub include_resigned: bool,
     /// Filter by role(s)
     pub roles: Option<Vec<String>>,
-    /// Decision ID for audit trail linkage
-    pub decision_id: Option<uuid::Uuid>,
 }
 
 impl FetchOfficersOptions {
@@ -153,40 +152,6 @@ impl FetchOfficersOptions {
         self
     }
 
-    pub fn with_roles(mut self, roles: Vec<String>) -> Self {
-        self.roles = Some(roles);
-        self
-    }
-
-    pub fn with_decision_id(mut self, id: uuid::Uuid) -> Self {
-        self.decision_id = Some(id);
-        self
-    }
-}
-
-/// Options for fetching parent chain
-#[derive(Debug, Clone, Default)]
-pub struct FetchParentChainOptions {
-    /// Maximum depth to traverse (None = unlimited)
-    pub max_depth: Option<usize>,
-    /// Decision ID for audit trail linkage
-    pub decision_id: Option<uuid::Uuid>,
-}
-
-impl FetchParentChainOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_max_depth(mut self, depth: usize) -> Self {
-        self.max_depth = Some(depth);
-        self
-    }
-
-    pub fn with_decision_id(mut self, id: uuid::Uuid) -> Self {
-        self.decision_id = Some(id);
-        self
-    }
 }
 
 // =============================================================================
@@ -294,16 +259,6 @@ pub trait SourceLoader: Send + Sync {
         key: &str,
         options: Option<FetchOfficersOptions>,
     ) -> Result<Vec<NormalizedOfficer>>;
-
-    /// Fetch parent chain (if available)
-    ///
-    /// Returns relationships from child → parent direction.
-    /// Returns empty Vec if source doesn't provide this data.
-    async fn fetch_parent_chain(
-        &self,
-        key: &str,
-        options: Option<FetchParentChainOptions>,
-    ) -> Result<Vec<NormalizedRelationship>>;
 }
 
 #[cfg(test)]

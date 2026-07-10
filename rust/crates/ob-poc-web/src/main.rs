@@ -52,6 +52,97 @@ use entity_gateway::{
     EntityGatewayService, GatewayConfig, IndexRegistry, RefreshPipeline, StartupMode, TantivyIndex,
 };
 
+/// T0.1 (EOP-PLAN-CONTROLPLANE-001, closes C-030): outcome of evaluating
+/// GatePipeline config/DAG registry load results against the
+/// `OB_POC_GATES_FAIL_OPEN` override at startup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GatePipelineStartupDecision {
+    /// Both config and DAG registry loaded — wire the GatePipeline.
+    Wire,
+    /// A load failed but the explicit override is set — continue ungated,
+    /// with a recurring WARN banner naming the failure.
+    FailOpen { reason: String },
+    /// A load failed and no override is set — startup must abort.
+    Fatal { reason: String },
+}
+
+/// Pure decision function (kept side-effect free and independent of Postgres
+/// so it is unit-testable without a database). `verbs_load`/`dag_load` carry
+/// `Err(reason)` when the corresponding config/registry failed to load.
+fn decide_gate_pipeline_startup(
+    verbs_load: Result<(), String>,
+    dag_load: Result<(), String>,
+    fail_open_env: bool,
+) -> GatePipelineStartupDecision {
+    let reason = match (&verbs_load, &dag_load) {
+        (Ok(()), Ok(())) => return GatePipelineStartupDecision::Wire,
+        (Err(e), _) => format!("failed to load verbs config: {e}"),
+        (Ok(()), Err(e)) => format!("failed to load DAG registry: {e}"),
+    };
+    if fail_open_env {
+        GatePipelineStartupDecision::FailOpen { reason }
+    } else {
+        GatePipelineStartupDecision::Fatal { reason }
+    }
+}
+
+#[cfg(test)]
+mod gate_pipeline_startup_tests {
+    use super::*;
+
+    #[test]
+    fn both_loaded_wires_regardless_of_override() {
+        assert_eq!(
+            decide_gate_pipeline_startup(Ok(()), Ok(()), false),
+            GatePipelineStartupDecision::Wire
+        );
+        assert_eq!(
+            decide_gate_pipeline_startup(Ok(()), Ok(()), true),
+            GatePipelineStartupDecision::Wire
+        );
+    }
+
+    /// Exit criteria: "unit test proving startup aborts on missing DAG registry".
+    #[test]
+    fn missing_dag_registry_without_override_is_fatal() {
+        let decision =
+            decide_gate_pipeline_startup(Ok(()), Err("no such directory".into()), false);
+        assert!(matches!(decision, GatePipelineStartupDecision::Fatal { .. }));
+    }
+
+    #[test]
+    fn missing_verbs_config_without_override_is_fatal() {
+        let decision = decide_gate_pipeline_startup(Err("bad yaml".into()), Ok(()), false);
+        assert!(matches!(decision, GatePipelineStartupDecision::Fatal { .. }));
+    }
+
+    /// Exit criteria: "test proving env override runs with banner" — the
+    /// override degrades a load failure from Fatal to FailOpen (which drives
+    /// the WARN-banner spawn in `main`).
+    #[test]
+    fn missing_dag_registry_with_override_fails_open() {
+        let decision =
+            decide_gate_pipeline_startup(Ok(()), Err("no such directory".into()), true);
+        match decision {
+            GatePipelineStartupDecision::FailOpen { reason } => {
+                assert!(reason.contains("DAG registry"));
+            }
+            other => panic!("expected FailOpen, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn missing_verbs_config_with_override_fails_open() {
+        let decision = decide_gate_pipeline_startup(Err("bad yaml".into()), Ok(()), true);
+        match decision {
+            GatePipelineStartupDecision::FailOpen { reason } => {
+                assert!(reason.contains("verbs config"));
+            }
+            other => panic!("expected FailOpen, got {other:?}"),
+        }
+    }
+}
+
 async fn register_bpmn_models(
     client: &ob_poc::bpmn_integration::BpmnLiteConnection,
     config_index: &mut ob_poc::bpmn_integration::WorkflowConfigIndex,
@@ -1387,7 +1478,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // once at orchestrator construction. Replaces the per-request env
         // read previously in `agent_routes::acp_session_input_draft_mode()`.
         let acp_draft_mode =
-            ob_poc::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env();
+            ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env();
 
         let mut orchestrator = ReplOrchestratorV2::new(pack_router, legacy_executor)
             .with_pool(pool.clone())
@@ -1399,10 +1490,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // v1.2 Tranche 1 T1.F (DoD item 13): wire GatePipeline default-on
         // in production. The runtime gate (GateChecker for Mode A blocking,
         // optional CascadePlanner for Mode C) was opt-in until v1.2 §6.2;
-        // production traffic now flows through it. Soft-fail: if the
-        // catalogue or DAG registry can't load, log + continue ungated
-        // (better than refusing to start; the pre-DB-pool catalogue load
-        // gate at P.1.g already failed earlier if the catalogue was bad).
+        // production traffic now flows through it.
+        //
+        // T0.1 (EOP-PLAN-CONTROLPLANE-001, closes C-030): config/DAG
+        // registry load failure is now production-fatal by default — the
+        // prior soft-fail (log + continue ungated) silently ran every verb
+        // unguarded whenever config drifted. Dev/test may opt into the old
+        // fail-open behaviour via `OB_POC_GATES_FAIL_OPEN=1`, which logs a
+        // WARN banner every 60s for the remaining lifetime of the process.
         {
             use dsl_runtime::{
                 cross_workspace::DagRegistry, GateChecker, PostgresSlotStateProvider,
@@ -1413,8 +1508,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let cfg_loader = ConfigLoader::from_env();
             let dag_path = cfg_loader.config_dir().join("sem_os_seeds/dag_taxonomies");
-            match (cfg_loader.load_verbs(), DagRegistry::from_dir(&dag_path)) {
-                (Ok(verbs_cfg), Ok(registry)) => {
+            let verbs_result = cfg_loader.load_verbs();
+            let dag_result = DagRegistry::from_dir(&dag_path);
+            let fail_open_env = std::env::var("OB_POC_GATES_FAIL_OPEN").as_deref() == Ok("1");
+
+            let decision = decide_gate_pipeline_startup(
+                verbs_result.as_ref().map(|_| ()).map_err(|e| e.to_string()),
+                dag_result.as_ref().map(|_| ()).map_err(|e| e.to_string()),
+                fail_open_env,
+            );
+
+            match decision {
+                GatePipelineStartupDecision::Wire => {
+                    let verbs_cfg = verbs_result.expect("Wire decision implies verbs config loaded");
+                    let registry = dag_result.expect("Wire decision implies DAG registry loaded");
                     let registry = Arc::new(registry);
                     let provider = Arc::new(PostgresSlotStateProvider);
                     let resolver = Arc::new(SqlPredicateResolver);
@@ -1432,11 +1539,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     orchestrator = orchestrator.with_gate_pipeline(pipeline);
                     tracing::info!("v1.3 GatePipeline wired (default-on per v1.2 Tranche 1 T1.F)");
                 }
-                (Err(e), _) => {
-                    tracing::warn!("GatePipeline disabled — failed to load verbs config: {}", e)
+                GatePipelineStartupDecision::FailOpen { reason } => {
+                    tracing::warn!(
+                        "GatePipeline disabled — {reason}. OB_POC_GATES_FAIL_OPEN=1 is set: \
+                         continuing with verbs executing UNGATED (T0.1, closes C-030)."
+                    );
+                    tokio::spawn(async move {
+                        let mut interval = tokio::time::interval(Duration::from_secs(60));
+                        loop {
+                            interval.tick().await;
+                            tracing::warn!(
+                                "*** GatePipeline is running FAIL-OPEN \
+                                 (OB_POC_GATES_FAIL_OPEN=1) — verbs are executing UNGATED. \
+                                 {reason} ***"
+                            );
+                        }
+                    });
                 }
-                (_, Err(e)) => {
-                    tracing::warn!("GatePipeline disabled — failed to load DAG registry: {}", e)
+                GatePipelineStartupDecision::Fatal { reason } => {
+                    return Err(format!(
+                        "GatePipeline failed to load ({reason}) and OB_POC_GATES_FAIL_OPEN is \
+                         not set. Refusing to start with verbs executing ungated. Fix the \
+                         config/DAG registry, or set OB_POC_GATES_FAIL_OPEN=1 to explicitly opt \
+                         into fail-open (T0.1, closes C-030)."
+                    )
+                    .into());
                 }
             }
         }
@@ -1493,9 +1620,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::agent::learning::embedder::CandleEmbedder;
             use ob_poc::agent::learning::warmup::LearningWarmup;
             use ob_poc::dsl_v2::{load_macro_registry_from_dir, ConfigLoader, MacroRegistry};
-            use ob_poc::entity_linking::{
-                EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
-            };
             use ob_poc::lookup::LookupService;
             use ob_poc::mcp::macro_index::MacroIndex;
             use ob_poc::mcp::scenario_index::ScenarioIndex;
@@ -1503,6 +1627,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             use ob_poc::mcp::verb_search_intent_matcher::VerbSearchIntentMatcher;
             use ob_poc::repl::intent_service::IntentService;
             use ob_poc::repl::verb_config_index::VerbConfigIndex;
+            use ob_poc_entity_linking::{
+                EntityLinkingService, EntityLinkingServiceImpl, NullEntityLinkingService,
+            };
 
             tracing::info!("Initializing V2 REPL IntentService...");
             let intent_start = std::time::Instant::now();
@@ -1553,7 +1680,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                     // 4. Load lexicon snapshot
                     let lexicon: Option<ob_poc::mcp::verb_search::SharedLexicon> = {
-                        use ob_poc::lexicon::{LexiconServiceImpl, LexiconSnapshot};
+                        use ob_poc_authoring::lexicon::{LexiconServiceImpl, LexiconSnapshot};
                         let snapshot_paths = [
                             std::path::Path::new("rust/assets/lexicon.snapshot.bin"),
                             std::path::Path::new("assets/lexicon.snapshot.bin"),
@@ -1565,7 +1692,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 if let Ok(snapshot) = LexiconSnapshot::load_binary(path) {
                                     loaded =
                                         Some(Arc::new(LexiconServiceImpl::new(Arc::new(snapshot)))
-                                            as Arc<dyn ob_poc::lexicon::LexiconService>);
+                                            as Arc<dyn ob_poc_authoring::lexicon::LexiconService>);
                                     break;
                                 }
                             }
@@ -1678,7 +1805,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             tracing::info!(
                                 "V2 REPL entity snapshot not found. Entity linking disabled."
                             );
-                            Arc::new(StubEntityLinkingService::new())
+                            Arc::new(NullEntityLinkingService::new())
                         })
                     };
 

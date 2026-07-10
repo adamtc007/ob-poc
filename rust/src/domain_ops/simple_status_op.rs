@@ -84,8 +84,21 @@ impl SemOsVerbOp for SimpleStatusOp {
     ) -> Result<VerbExecutionOutcome> {
         let entity_id: Uuid = json_extract_uuid(args, ctx, self.cfg.entity_arg)?;
 
-        let sql = match &self.cfg.timestamp {
-            Some(ts) => format!(
+        // From-state enforcement (state-graph remediation Phase 3c): read the
+        // verb's own `requires_states` from its YAML config (single source
+        // of truth -- no duplicated Rust constant) and, when declared,
+        // require the current value to be one of them. Opt-in: a verb with
+        // no `requires_states` gets the prior unconditional-write behavior.
+        // The check is folded into the UPDATE's WHERE clause so it is atomic
+        // with the write (no separate SELECT-then-UPDATE TOCTOU window).
+        let requires_states: &[String] = dsl_analysis::runtime_registry::runtime_registry()
+            .get_by_name(self.cfg.fqn)
+            .and_then(|v| v.lifecycle.as_ref())
+            .map(|l| l.requires_states.as_slice())
+            .unwrap_or(&[]);
+
+        let sql = match (&self.cfg.timestamp, requires_states.is_empty()) {
+            (Some(ts), true) => format!(
                 r#"UPDATE "ob-poc".{tbl}
                    SET {state_col} = $1, {ts_col} = $2, updated_at = $2
                    WHERE {pk_col} = $3"#,
@@ -94,7 +107,16 @@ impl SemOsVerbOp for SimpleStatusOp {
                 ts_col = ts.column,
                 pk_col = self.cfg.pk_col,
             ),
-            None => format!(
+            (Some(ts), false) => format!(
+                r#"UPDATE "ob-poc".{tbl}
+                   SET {state_col} = $1, {ts_col} = $2, updated_at = $2
+                   WHERE {pk_col} = $3 AND {state_col} = ANY($4)"#,
+                tbl = self.cfg.table,
+                state_col = self.cfg.state_col,
+                ts_col = ts.column,
+                pk_col = self.cfg.pk_col,
+            ),
+            (None, true) => format!(
                 r#"UPDATE "ob-poc".{tbl}
                    SET {state_col} = $1, updated_at = $2
                    WHERE {pk_col} = $3"#,
@@ -102,16 +124,52 @@ impl SemOsVerbOp for SimpleStatusOp {
                 state_col = self.cfg.state_col,
                 pk_col = self.cfg.pk_col,
             ),
+            (None, false) => format!(
+                r#"UPDATE "ob-poc".{tbl}
+                   SET {state_col} = $1, updated_at = $2
+                   WHERE {pk_col} = $3 AND {state_col} = ANY($4)"#,
+                tbl = self.cfg.table,
+                state_col = self.cfg.state_col,
+                pk_col = self.cfg.pk_col,
+            ),
         };
 
         let now = Utc::now();
-        let affected = sqlx::query(&sql)
+        let mut query = sqlx::query(&sql)
             .bind(self.cfg.target_state)
             .bind(now)
+            .bind(entity_id);
+        if !requires_states.is_empty() {
+            query = query.bind(requires_states);
+        }
+        let affected = query.execute(scope.executor()).await?.rows_affected();
+
+        if affected == 0 && !requires_states.is_empty() {
+            let current: Option<String> = sqlx::query_scalar(&format!(
+                r#"SELECT {state_col} FROM "ob-poc".{tbl} WHERE {pk_col} = $1"#,
+                state_col = self.cfg.state_col,
+                tbl = self.cfg.table,
+                pk_col = self.cfg.pk_col,
+            ))
             .bind(entity_id)
-            .execute(scope.executor())
-            .await?
-            .rows_affected();
+            .fetch_optional(scope.executor())
+            .await?;
+            return match current {
+                None => Err(anyhow::anyhow!(
+                    "{}: entity {} not found in \"ob-poc\".{}",
+                    self.cfg.fqn,
+                    entity_id,
+                    self.cfg.table
+                )),
+                Some(state) => Err(anyhow::anyhow!(
+                    "{}: cannot transition entity {} from state {:?} -- requires one of {:?}",
+                    self.cfg.fqn,
+                    entity_id,
+                    state,
+                    requires_states
+                )),
+            };
+        }
 
         Ok(VerbExecutionOutcome::Affected(affected))
     }

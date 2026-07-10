@@ -1,0 +1,1325 @@
+# ob-workflow | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:09Z
+pub mod ob_workflow
+pub enum ob_workflow::BlockerType
+pub ob_workflow::BlockerType::ApprovalNotRecorded
+pub ob_workflow::BlockerType::ApprovalNotRecorded::case_id: uuid::Uuid
+pub ob_workflow::BlockerType::ChangeLogNotReviewed
+pub ob_workflow::BlockerType::ChangeLogNotReviewed::changes_since: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_workflow::BlockerType::ChangeLogNotReviewed::pending_count: u32
+pub ob_workflow::BlockerType::Custom
+pub ob_workflow::BlockerType::Custom::code: alloc::string::String
+pub ob_workflow::BlockerType::DocumentNotReviewed
+pub ob_workflow::BlockerType::DocumentNotReviewed::document_id: uuid::Uuid
+pub ob_workflow::BlockerType::DocumentNotReviewed::document_type: alloc::string::String
+pub ob_workflow::BlockerType::EntityDataStale
+pub ob_workflow::BlockerType::EntityDataStale::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::EntityDataStale::last_updated: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_workflow::BlockerType::EntityDataStale::max_age_days: u32
+pub ob_workflow::BlockerType::FieldMissing
+pub ob_workflow::BlockerType::FieldMissing::field: alloc::string::String
+pub ob_workflow::BlockerType::IncompleteOwnership
+pub ob_workflow::BlockerType::IncompleteOwnership::current_total: f64
+pub ob_workflow::BlockerType::IncompleteOwnership::required: f64
+pub ob_workflow::BlockerType::ManualApprovalRequired
+pub ob_workflow::BlockerType::MissingDocument
+pub ob_workflow::BlockerType::MissingDocument::document_type: alloc::string::String
+pub ob_workflow::BlockerType::MissingDocument::for_entity: core::option::Option<uuid::Uuid>
+pub ob_workflow::BlockerType::MissingProduct
+pub ob_workflow::BlockerType::MissingProduct::current: u32
+pub ob_workflow::BlockerType::MissingProduct::product_type: core::option::Option<alloc::string::String>
+pub ob_workflow::BlockerType::MissingProduct::required: u32
+pub ob_workflow::BlockerType::MissingRelationship
+pub ob_workflow::BlockerType::MissingRelationship::from_entity: core::option::Option<uuid::Uuid>
+pub ob_workflow::BlockerType::MissingRelationship::relationship_type: alloc::string::String
+pub ob_workflow::BlockerType::MissingRelationship::to_entity: core::option::Option<uuid::Uuid>
+pub ob_workflow::BlockerType::MissingRole
+pub ob_workflow::BlockerType::MissingRole::current: u32
+pub ob_workflow::BlockerType::MissingRole::required: u32
+pub ob_workflow::BlockerType::MissingRole::role: alloc::string::String
+pub ob_workflow::BlockerType::NextReviewNotScheduled
+pub ob_workflow::BlockerType::NoAnalystAssigned
+pub ob_workflow::BlockerType::NoAnalystAssigned::case_id: uuid::Uuid
+pub ob_workflow::BlockerType::NoCaseExists
+pub ob_workflow::BlockerType::NoCaseExists::case_type: core::option::Option<alloc::string::String>
+pub ob_workflow::BlockerType::PendingHit
+pub ob_workflow::BlockerType::PendingHit::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::PendingHit::hit_type: alloc::string::String
+pub ob_workflow::BlockerType::PendingHit::screening_id: uuid::Uuid
+pub ob_workflow::BlockerType::PendingScreening
+pub ob_workflow::BlockerType::PendingScreening::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::RejectionNotRecorded
+pub ob_workflow::BlockerType::RejectionNotRecorded::case_id: uuid::Uuid
+pub ob_workflow::BlockerType::RiskRatingNotSet
+pub ob_workflow::BlockerType::RiskRatingNotSet::case_id: uuid::Uuid
+pub ob_workflow::BlockerType::SignOffMissing
+pub ob_workflow::BlockerType::SignOffMissing::required_role: core::option::Option<alloc::string::String>
+pub ob_workflow::BlockerType::StaleScreening
+pub ob_workflow::BlockerType::StaleScreening::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::StaleScreening::last_screened_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_workflow::BlockerType::StaleScreening::max_age_days: u32
+pub ob_workflow::BlockerType::StaleScreening::screening_type: alloc::string::String
+pub ob_workflow::BlockerType::UboThresholdNotApplied
+pub ob_workflow::BlockerType::UboThresholdNotApplied::cbu_id: uuid::Uuid
+pub ob_workflow::BlockerType::UnresolvedAlert
+pub ob_workflow::BlockerType::UnresolvedAlert::alert_id: uuid::Uuid
+pub ob_workflow::BlockerType::UnresolvedAlert::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::UnresolvedOwnershipChain
+pub ob_workflow::BlockerType::UnresolvedOwnershipChain::chain_depth: core::option::Option<u32>
+pub ob_workflow::BlockerType::UnresolvedOwnershipChain::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::UnverifiedUbo
+pub ob_workflow::BlockerType::UnverifiedUbo::person_name: alloc::string::String
+pub ob_workflow::BlockerType::UnverifiedUbo::ubo_id: uuid::Uuid
+pub ob_workflow::BlockerType::WorkstreamIncomplete
+pub ob_workflow::BlockerType::WorkstreamIncomplete::entity_id: uuid::Uuid
+pub ob_workflow::BlockerType::WorkstreamIncomplete::missing_fields: alloc::vec::Vec<alloc::string::String>
+pub ob_workflow::BlockerType::WorkstreamIncomplete::workstream_id: uuid::Uuid
+pub ob_workflow::BlockerType::WorkstreamMissing
+pub ob_workflow::BlockerType::WorkstreamMissing::entity_id: uuid::Uuid
+impl ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::suggested_verb(&self) -> core::option::Option<&'static str>
+impl core::clone::Clone for ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::clone(&self) -> ob_workflow::BlockerType
+impl core::cmp::PartialEq for ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::eq(&self, &ob_workflow::BlockerType) -> bool
+impl core::fmt::Debug for ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_workflow::BlockerType
+impl serde_core::ser::Serialize for ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::BlockerType
+impl core::marker::Send for ob_workflow::BlockerType
+impl core::marker::Sync for ob_workflow::BlockerType
+impl core::marker::Unpin for ob_workflow::BlockerType
+impl core::marker::UnsafeUnpin for ob_workflow::BlockerType
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::BlockerType
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::BlockerType
+impl<T, U> core::convert::Into<U> for ob_workflow::BlockerType where U: core::convert::From<T>
+pub fn ob_workflow::BlockerType::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::BlockerType where U: core::convert::Into<T>
+pub type ob_workflow::BlockerType::Error = core::convert::Infallible
+pub fn ob_workflow::BlockerType::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::BlockerType where U: core::convert::TryFrom<T>
+pub type ob_workflow::BlockerType::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::BlockerType::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::BlockerType where T: core::clone::Clone
+pub type ob_workflow::BlockerType::Owned = T
+pub fn ob_workflow::BlockerType::clone_into(&self, &mut T)
+pub fn ob_workflow::BlockerType::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::BlockerType where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::BlockerType::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::BlockerType where T: ?core::marker::Sized
+pub fn ob_workflow::BlockerType::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::BlockerType where T: ?core::marker::Sized
+pub fn ob_workflow::BlockerType::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::BlockerType where T: core::clone::Clone
+pub unsafe fn ob_workflow::BlockerType::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::BlockerType
+pub fn ob_workflow::BlockerType::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::BlockerType
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::BlockerType where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::BlockerType
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::BlockerType
+impl<T> typenum::type_operators::Same for ob_workflow::BlockerType
+pub type ob_workflow::BlockerType::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::BlockerType where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::BlockerType::vzip(self) -> V
+pub enum ob_workflow::CargoRef
+pub ob_workflow::CargoRef::Document
+pub ob_workflow::CargoRef::Document::id: uuid::Uuid
+pub ob_workflow::CargoRef::Document::schema: alloc::string::String
+pub ob_workflow::CargoRef::Entity
+pub ob_workflow::CargoRef::Entity::id: uuid::Uuid
+pub ob_workflow::CargoRef::Entity::schema: alloc::string::String
+pub ob_workflow::CargoRef::External
+pub ob_workflow::CargoRef::External::id: alloc::string::String
+pub ob_workflow::CargoRef::External::system: alloc::string::String
+pub ob_workflow::CargoRef::Screening
+pub ob_workflow::CargoRef::Screening::id: uuid::Uuid
+pub ob_workflow::CargoRef::Screening::schema: alloc::string::String
+pub ob_workflow::CargoRef::Version
+pub ob_workflow::CargoRef::Version::id: uuid::Uuid
+pub ob_workflow::CargoRef::Version::schema: alloc::string::String
+impl ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::document(uuid::Uuid) -> Self
+pub fn ob_workflow::CargoRef::entity(uuid::Uuid) -> Self
+pub fn ob_workflow::CargoRef::external(impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn ob_workflow::CargoRef::parse(&str) -> core::result::Result<Self, ob_workflow::CargoRefParseError>
+pub fn ob_workflow::CargoRef::scheme(&self) -> &'static str
+pub fn ob_workflow::CargoRef::screening(uuid::Uuid) -> Self
+pub fn ob_workflow::CargoRef::to_uri(&self) -> alloc::string::String
+pub fn ob_workflow::CargoRef::uuid(&self) -> core::option::Option<uuid::Uuid>
+pub fn ob_workflow::CargoRef::version(uuid::Uuid) -> Self
+impl core::clone::Clone for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::clone(&self) -> ob_workflow::CargoRef
+impl core::cmp::Eq for ob_workflow::CargoRef
+impl core::cmp::PartialEq for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::eq(&self, &ob_workflow::CargoRef) -> bool
+impl core::fmt::Debug for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_workflow::CargoRef
+impl core::str::traits::FromStr for ob_workflow::CargoRef
+pub type ob_workflow::CargoRef::Err = ob_workflow::CargoRefParseError
+pub fn ob_workflow::CargoRef::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::CargoRef
+impl core::marker::Send for ob_workflow::CargoRef
+impl core::marker::Sync for ob_workflow::CargoRef
+impl core::marker::Unpin for ob_workflow::CargoRef
+impl core::marker::UnsafeUnpin for ob_workflow::CargoRef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::CargoRef
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::CargoRef
+impl<Q, K> equivalent::Equivalent<K> for ob_workflow::CargoRef where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_workflow::CargoRef::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_workflow::CargoRef where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_workflow::CargoRef::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_workflow::CargoRef where U: core::convert::From<T>
+pub fn ob_workflow::CargoRef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::CargoRef where U: core::convert::Into<T>
+pub type ob_workflow::CargoRef::Error = core::convert::Infallible
+pub fn ob_workflow::CargoRef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::CargoRef where U: core::convert::TryFrom<T>
+pub type ob_workflow::CargoRef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::CargoRef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::CargoRef where T: core::clone::Clone
+pub type ob_workflow::CargoRef::Owned = T
+pub fn ob_workflow::CargoRef::clone_into(&self, &mut T)
+pub fn ob_workflow::CargoRef::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_workflow::CargoRef where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_workflow::CargoRef::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_workflow::CargoRef where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::CargoRef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::CargoRef where T: ?core::marker::Sized
+pub fn ob_workflow::CargoRef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::CargoRef where T: ?core::marker::Sized
+pub fn ob_workflow::CargoRef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::CargoRef where T: core::clone::Clone
+pub unsafe fn ob_workflow::CargoRef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::CargoRef
+pub fn ob_workflow::CargoRef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::CargoRef
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::CargoRef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::CargoRef
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::CargoRef
+impl<T> typenum::type_operators::Same for ob_workflow::CargoRef
+pub type ob_workflow::CargoRef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::CargoRef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::CargoRef::vzip(self) -> V
+pub enum ob_workflow::CargoRefParseError
+pub ob_workflow::CargoRefParseError::InvalidFormat
+pub ob_workflow::CargoRefParseError::InvalidUuid(uuid::error::Error)
+pub ob_workflow::CargoRefParseError::MissingPath
+pub ob_workflow::CargoRefParseError::UnknownScheme(alloc::string::String)
+impl core::convert::From<uuid::error::Error> for ob_workflow::CargoRefParseError
+pub fn ob_workflow::CargoRefParseError::from(uuid::error::Error) -> Self
+impl core::error::Error for ob_workflow::CargoRefParseError
+pub fn ob_workflow::CargoRefParseError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for ob_workflow::CargoRefParseError
+pub fn ob_workflow::CargoRefParseError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_workflow::CargoRefParseError
+pub fn ob_workflow::CargoRefParseError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_workflow::CargoRefParseError
+impl core::marker::Send for ob_workflow::CargoRefParseError
+impl core::marker::Sync for ob_workflow::CargoRefParseError
+impl core::marker::Unpin for ob_workflow::CargoRefParseError
+impl core::marker::UnsafeUnpin for ob_workflow::CargoRefParseError
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::CargoRefParseError
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::CargoRefParseError
+impl<T, U> core::convert::Into<U> for ob_workflow::CargoRefParseError where U: core::convert::From<T>
+pub fn ob_workflow::CargoRefParseError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::CargoRefParseError where U: core::convert::Into<T>
+pub type ob_workflow::CargoRefParseError::Error = core::convert::Infallible
+pub fn ob_workflow::CargoRefParseError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::CargoRefParseError where U: core::convert::TryFrom<T>
+pub type ob_workflow::CargoRefParseError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::CargoRefParseError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_workflow::CargoRefParseError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_workflow::CargoRefParseError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_workflow::CargoRefParseError where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::CargoRefParseError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::CargoRefParseError where T: ?core::marker::Sized
+pub fn ob_workflow::CargoRefParseError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::CargoRefParseError where T: ?core::marker::Sized
+pub fn ob_workflow::CargoRefParseError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::CargoRefParseError
+pub fn ob_workflow::CargoRefParseError::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::CargoRefParseError
+impl<T> tracing::instrument::Instrument for ob_workflow::CargoRefParseError
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::CargoRefParseError
+impl<T> typenum::type_operators::Same for ob_workflow::CargoRefParseError
+pub type ob_workflow::CargoRefParseError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::CargoRefParseError where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::CargoRefParseError::vzip(self) -> V
+pub enum ob_workflow::GuardStatus
+pub ob_workflow::GuardStatus::Blocked
+pub ob_workflow::GuardStatus::Blocked::blockers: alloc::vec::Vec<ob_workflow::Blocker>
+pub ob_workflow::GuardStatus::NoGuard
+pub ob_workflow::GuardStatus::Passed
+impl core::clone::Clone for ob_workflow::GuardStatus
+pub fn ob_workflow::GuardStatus::clone(&self) -> ob_workflow::GuardStatus
+impl core::fmt::Debug for ob_workflow::GuardStatus
+pub fn ob_workflow::GuardStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::GuardStatus
+pub fn ob_workflow::GuardStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_workflow::GuardStatus
+impl core::marker::Send for ob_workflow::GuardStatus
+impl core::marker::Sync for ob_workflow::GuardStatus
+impl core::marker::Unpin for ob_workflow::GuardStatus
+impl core::marker::UnsafeUnpin for ob_workflow::GuardStatus
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::GuardStatus
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::GuardStatus
+impl<T, U> core::convert::Into<U> for ob_workflow::GuardStatus where U: core::convert::From<T>
+pub fn ob_workflow::GuardStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::GuardStatus where U: core::convert::Into<T>
+pub type ob_workflow::GuardStatus::Error = core::convert::Infallible
+pub fn ob_workflow::GuardStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::GuardStatus where U: core::convert::TryFrom<T>
+pub type ob_workflow::GuardStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::GuardStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::GuardStatus where T: core::clone::Clone
+pub type ob_workflow::GuardStatus::Owned = T
+pub fn ob_workflow::GuardStatus::clone_into(&self, &mut T)
+pub fn ob_workflow::GuardStatus::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::GuardStatus where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::GuardStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::GuardStatus where T: ?core::marker::Sized
+pub fn ob_workflow::GuardStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::GuardStatus where T: ?core::marker::Sized
+pub fn ob_workflow::GuardStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::GuardStatus where T: core::clone::Clone
+pub unsafe fn ob_workflow::GuardStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::GuardStatus
+pub fn ob_workflow::GuardStatus::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::GuardStatus
+impl<T> tracing::instrument::Instrument for ob_workflow::GuardStatus
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::GuardStatus
+impl<T> typenum::type_operators::Same for ob_workflow::GuardStatus
+pub type ob_workflow::GuardStatus::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::GuardStatus where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::GuardStatus::vzip(self) -> V
+pub enum ob_workflow::RequirementDef
+pub ob_workflow::RequirementDef::AllEntitiesScreened
+pub ob_workflow::RequirementDef::AllEntitiesScreened::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllEntitiesTyped
+pub ob_workflow::RequirementDef::AllEntitiesTyped::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllScreeningsComplete
+pub ob_workflow::RequirementDef::AllScreeningsComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllScreeningsCurrent
+pub ob_workflow::RequirementDef::AllScreeningsCurrent::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllScreeningsCurrent::max_age_days: u32
+pub ob_workflow::RequirementDef::AllUbosHaveIdentityDocs
+pub ob_workflow::RequirementDef::AllUbosHaveIdentityDocs::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllUbosScreened
+pub ob_workflow::RequirementDef::AllUbosScreened::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllUbosVerified
+pub ob_workflow::RequirementDef::AllUbosVerified::description: alloc::string::String
+pub ob_workflow::RequirementDef::AllWorkstreamsDataComplete
+pub ob_workflow::RequirementDef::AllWorkstreamsDataComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::AnalystAssigned
+pub ob_workflow::RequirementDef::AnalystAssigned::description: alloc::string::String
+pub ob_workflow::RequirementDef::ApprovalRecorded
+pub ob_workflow::RequirementDef::ApprovalRecorded::description: alloc::string::String
+pub ob_workflow::RequirementDef::CaseChecklistComplete
+pub ob_workflow::RequirementDef::CaseChecklistComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::CaseExists
+pub ob_workflow::RequirementDef::CaseExists::case_type: core::option::Option<alloc::string::String>
+pub ob_workflow::RequirementDef::CaseExists::description: alloc::string::String
+pub ob_workflow::RequirementDef::ChainsResolvedToPersons
+pub ob_workflow::RequirementDef::ChainsResolvedToPersons::description: alloc::string::String
+pub ob_workflow::RequirementDef::ChangeLogReviewed
+pub ob_workflow::RequirementDef::ChangeLogReviewed::description: alloc::string::String
+pub ob_workflow::RequirementDef::ChecklistComplete
+pub ob_workflow::RequirementDef::ChecklistComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::Conditional
+pub ob_workflow::RequirementDef::Conditional::condition: ob_workflow::definition::ConditionalCheck
+pub ob_workflow::RequirementDef::Conditional::description: alloc::string::String
+pub ob_workflow::RequirementDef::Conditional::requirement: alloc::boxed::Box<ob_workflow::RequirementDef>
+pub ob_workflow::RequirementDef::Custom
+pub ob_workflow::RequirementDef::Custom::code: alloc::string::String
+pub ob_workflow::RequirementDef::Custom::description: alloc::string::String
+pub ob_workflow::RequirementDef::Custom::params: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub ob_workflow::RequirementDef::DeferralApprovalRecorded
+pub ob_workflow::RequirementDef::DeferralApprovalRecorded::description: alloc::string::String
+pub ob_workflow::RequirementDef::DeferralReasonDocumented
+pub ob_workflow::RequirementDef::DeferralReasonDocumented::description: alloc::string::String
+pub ob_workflow::RequirementDef::DeterminationRationaleRecorded
+pub ob_workflow::RequirementDef::DeterminationRationaleRecorded::description: alloc::string::String
+pub ob_workflow::RequirementDef::DocumentExists
+pub ob_workflow::RequirementDef::DocumentExists::description: alloc::string::String
+pub ob_workflow::RequirementDef::DocumentExists::document_type: alloc::string::String
+pub ob_workflow::RequirementDef::DocumentExists::max_age_days: core::option::Option<u32>
+pub ob_workflow::RequirementDef::DocumentExists::status: alloc::string::String
+pub ob_workflow::RequirementDef::DocumentExists::subject: alloc::string::String
+pub ob_workflow::RequirementDef::DocumentSet
+pub ob_workflow::RequirementDef::DocumentSet::description: alloc::string::String
+pub ob_workflow::RequirementDef::DocumentSet::documents: alloc::vec::Vec<alloc::string::String>
+pub ob_workflow::RequirementDef::DocumentsReviewed
+pub ob_workflow::RequirementDef::DocumentsReviewed::description: alloc::string::String
+pub ob_workflow::RequirementDef::EntityDataCurrent
+pub ob_workflow::RequirementDef::EntityDataCurrent::description: alloc::string::String
+pub ob_workflow::RequirementDef::EntityDataCurrent::max_age_days: u32
+pub ob_workflow::RequirementDef::EntityWorkstreamsCreated
+pub ob_workflow::RequirementDef::EntityWorkstreamsCreated::description: alloc::string::String
+pub ob_workflow::RequirementDef::ExemptionsDocumented
+pub ob_workflow::RequirementDef::ExemptionsDocumented::description: alloc::string::String
+pub ob_workflow::RequirementDef::FieldPresent
+pub ob_workflow::RequirementDef::FieldPresent::description: alloc::string::String
+pub ob_workflow::RequirementDef::FieldPresent::fields: alloc::vec::Vec<alloc::string::String>
+pub ob_workflow::RequirementDef::NextReviewScheduled
+pub ob_workflow::RequirementDef::NextReviewScheduled::description: alloc::string::String
+pub ob_workflow::RequirementDef::NoOpenAlerts
+pub ob_workflow::RequirementDef::NoOpenAlerts::description: alloc::string::String
+pub ob_workflow::RequirementDef::NoOpenRedFlags
+pub ob_workflow::RequirementDef::NoOpenRedFlags::description: alloc::string::String
+pub ob_workflow::RequirementDef::NoPendingHits
+pub ob_workflow::RequirementDef::NoPendingHits::description: alloc::string::String
+pub ob_workflow::RequirementDef::NoUnknownOwners
+pub ob_workflow::RequirementDef::NoUnknownOwners::description: alloc::string::String
+pub ob_workflow::RequirementDef::OwnershipComplete
+pub ob_workflow::RequirementDef::OwnershipComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::OwnershipComplete::threshold: f64
+pub ob_workflow::RequirementDef::PerEntityDocument
+pub ob_workflow::RequirementDef::PerEntityDocument::description: alloc::string::String
+pub ob_workflow::RequirementDef::PerEntityDocument::documents: alloc::vec::Vec<alloc::string::String>
+pub ob_workflow::RequirementDef::PerEntityDocument::entity_type: alloc::string::String
+pub ob_workflow::RequirementDef::ProductAssigned
+pub ob_workflow::RequirementDef::ProductAssigned::description: alloc::string::String
+pub ob_workflow::RequirementDef::ProductAssigned::min: u32
+pub ob_workflow::RequirementDef::RejectionRecorded
+pub ob_workflow::RequirementDef::RejectionRecorded::description: alloc::string::String
+pub ob_workflow::RequirementDef::RelationshipExists
+pub ob_workflow::RequirementDef::RelationshipExists::description: alloc::string::String
+pub ob_workflow::RequirementDef::RelationshipExists::relationship_type: alloc::string::String
+pub ob_workflow::RequirementDef::RequirementSatisfied
+pub ob_workflow::RequirementDef::RequirementSatisfied::description: alloc::string::String
+pub ob_workflow::RequirementDef::RequirementSatisfied::doc_type: alloc::string::String
+pub ob_workflow::RequirementDef::RequirementSatisfied::max_age_days: core::option::Option<u32>
+pub ob_workflow::RequirementDef::RequirementSatisfied::min_state: alloc::string::String
+pub ob_workflow::RequirementDef::RequirementSatisfied::subject: alloc::string::String
+pub ob_workflow::RequirementDef::RiskRatingSet
+pub ob_workflow::RequirementDef::RiskRatingSet::description: alloc::string::String
+pub ob_workflow::RequirementDef::RiskReassessmentComplete
+pub ob_workflow::RequirementDef::RiskReassessmentComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::RoleCount
+pub ob_workflow::RequirementDef::RoleCount::description: alloc::string::String
+pub ob_workflow::RequirementDef::RoleCount::min: u32
+pub ob_workflow::RequirementDef::RoleCount::role: alloc::string::String
+pub ob_workflow::RequirementDef::SignOffRecorded
+pub ob_workflow::RequirementDef::SignOffRecorded::description: alloc::string::String
+pub ob_workflow::RequirementDef::UboRegisterComplete
+pub ob_workflow::RequirementDef::UboRegisterComplete::description: alloc::string::String
+pub ob_workflow::RequirementDef::UboThresholdApplied
+pub ob_workflow::RequirementDef::UboThresholdApplied::description: alloc::string::String
+pub ob_workflow::RequirementDef::UboThresholdApplied::threshold: f64
+impl core::clone::Clone for ob_workflow::RequirementDef
+pub fn ob_workflow::RequirementDef::clone(&self) -> ob_workflow::RequirementDef
+impl core::fmt::Debug for ob_workflow::RequirementDef
+pub fn ob_workflow::RequirementDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::RequirementDef
+pub fn ob_workflow::RequirementDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::RequirementDef
+pub fn ob_workflow::RequirementDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::RequirementDef
+impl core::marker::Send for ob_workflow::RequirementDef
+impl core::marker::Sync for ob_workflow::RequirementDef
+impl core::marker::Unpin for ob_workflow::RequirementDef
+impl core::marker::UnsafeUnpin for ob_workflow::RequirementDef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::RequirementDef
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::RequirementDef
+impl<T, U> core::convert::Into<U> for ob_workflow::RequirementDef where U: core::convert::From<T>
+pub fn ob_workflow::RequirementDef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::RequirementDef where U: core::convert::Into<T>
+pub type ob_workflow::RequirementDef::Error = core::convert::Infallible
+pub fn ob_workflow::RequirementDef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::RequirementDef where U: core::convert::TryFrom<T>
+pub type ob_workflow::RequirementDef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::RequirementDef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::RequirementDef where T: core::clone::Clone
+pub type ob_workflow::RequirementDef::Owned = T
+pub fn ob_workflow::RequirementDef::clone_into(&self, &mut T)
+pub fn ob_workflow::RequirementDef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::RequirementDef where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::RequirementDef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::RequirementDef where T: ?core::marker::Sized
+pub fn ob_workflow::RequirementDef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::RequirementDef where T: ?core::marker::Sized
+pub fn ob_workflow::RequirementDef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::RequirementDef where T: core::clone::Clone
+pub unsafe fn ob_workflow::RequirementDef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::RequirementDef
+pub fn ob_workflow::RequirementDef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::RequirementDef
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::RequirementDef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::RequirementDef
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::RequirementDef
+impl<T> typenum::type_operators::Same for ob_workflow::RequirementDef
+pub type ob_workflow::RequirementDef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::RequirementDef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::RequirementDef::vzip(self) -> V
+pub enum ob_workflow::WorkflowError
+pub ob_workflow::WorkflowError::Database(sqlx_core::error::Error)
+pub ob_workflow::WorkflowError::GuardFailed
+pub ob_workflow::WorkflowError::GuardFailed::blockers: alloc::vec::Vec<ob_workflow::Blocker>
+pub ob_workflow::WorkflowError::GuardFailed::guard: alloc::string::String
+pub ob_workflow::WorkflowError::InstanceNotFound(uuid::Uuid)
+pub ob_workflow::WorkflowError::InvalidTransition
+pub ob_workflow::WorkflowError::InvalidTransition::from: alloc::string::String
+pub ob_workflow::WorkflowError::InvalidTransition::to: alloc::string::String
+pub ob_workflow::WorkflowError::Io(core::io::error::Error)
+pub ob_workflow::WorkflowError::JsonSerialize(serde_json::error::Error)
+pub ob_workflow::WorkflowError::NoInitialState
+pub ob_workflow::WorkflowError::UnknownWorkflow(alloc::string::String)
+pub ob_workflow::WorkflowError::YamlParse(serde_yaml::error::Error)
+impl core::convert::From<core::io::error::Error> for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::from(core::io::error::Error) -> Self
+impl core::convert::From<serde_json::error::Error> for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::from(serde_json::error::Error) -> Self
+impl core::convert::From<serde_yaml::error::Error> for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::from(serde_yaml::error::Error) -> Self
+impl core::convert::From<sqlx_core::error::Error> for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::from(sqlx_core::error::Error) -> Self
+impl core::error::Error for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_workflow::WorkflowError
+impl core::marker::Send for ob_workflow::WorkflowError
+impl core::marker::Sync for ob_workflow::WorkflowError
+impl core::marker::Unpin for ob_workflow::WorkflowError
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowError
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowError
+impl !core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowError
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowError where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowError where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowError::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowError::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowError where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::string::ToString for ob_workflow::WorkflowError where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_workflow::WorkflowError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_workflow::WorkflowError where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowError where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowError where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::WorkflowError
+pub fn ob_workflow::WorkflowError::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowError
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowError
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowError
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowError
+pub type ob_workflow::WorkflowError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowError where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowError::vzip(self) -> V
+pub struct ob_workflow::ActionDef
+pub ob_workflow::ActionDef::action: alloc::string::String
+pub ob_workflow::ActionDef::description: alloc::string::String
+pub ob_workflow::ActionDef::params: alloc::vec::Vec<alloc::string::String>
+pub ob_workflow::ActionDef::verb: alloc::string::String
+impl core::clone::Clone for ob_workflow::ActionDef
+pub fn ob_workflow::ActionDef::clone(&self) -> ob_workflow::ActionDef
+impl core::fmt::Debug for ob_workflow::ActionDef
+pub fn ob_workflow::ActionDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::ActionDef
+pub fn ob_workflow::ActionDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::ActionDef
+pub fn ob_workflow::ActionDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::ActionDef
+impl core::marker::Send for ob_workflow::ActionDef
+impl core::marker::Sync for ob_workflow::ActionDef
+impl core::marker::Unpin for ob_workflow::ActionDef
+impl core::marker::UnsafeUnpin for ob_workflow::ActionDef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::ActionDef
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::ActionDef
+impl<T, U> core::convert::Into<U> for ob_workflow::ActionDef where U: core::convert::From<T>
+pub fn ob_workflow::ActionDef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::ActionDef where U: core::convert::Into<T>
+pub type ob_workflow::ActionDef::Error = core::convert::Infallible
+pub fn ob_workflow::ActionDef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::ActionDef where U: core::convert::TryFrom<T>
+pub type ob_workflow::ActionDef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::ActionDef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::ActionDef where T: core::clone::Clone
+pub type ob_workflow::ActionDef::Owned = T
+pub fn ob_workflow::ActionDef::clone_into(&self, &mut T)
+pub fn ob_workflow::ActionDef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::ActionDef where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::ActionDef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::ActionDef where T: ?core::marker::Sized
+pub fn ob_workflow::ActionDef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::ActionDef where T: ?core::marker::Sized
+pub fn ob_workflow::ActionDef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::ActionDef where T: core::clone::Clone
+pub unsafe fn ob_workflow::ActionDef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::ActionDef
+pub fn ob_workflow::ActionDef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::ActionDef
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::ActionDef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::ActionDef
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::ActionDef
+impl<T> typenum::type_operators::Same for ob_workflow::ActionDef
+pub type ob_workflow::ActionDef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::ActionDef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::ActionDef::vzip(self) -> V
+pub struct ob_workflow::AvailableAction
+pub ob_workflow::AvailableAction::action: alloc::string::String
+pub ob_workflow::AvailableAction::description: alloc::string::String
+pub ob_workflow::AvailableAction::verb: alloc::string::String
+impl core::clone::Clone for ob_workflow::AvailableAction
+pub fn ob_workflow::AvailableAction::clone(&self) -> ob_workflow::AvailableAction
+impl core::fmt::Debug for ob_workflow::AvailableAction
+pub fn ob_workflow::AvailableAction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::AvailableAction
+pub fn ob_workflow::AvailableAction::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_workflow::AvailableAction
+impl core::marker::Send for ob_workflow::AvailableAction
+impl core::marker::Sync for ob_workflow::AvailableAction
+impl core::marker::Unpin for ob_workflow::AvailableAction
+impl core::marker::UnsafeUnpin for ob_workflow::AvailableAction
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::AvailableAction
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::AvailableAction
+impl<T, U> core::convert::Into<U> for ob_workflow::AvailableAction where U: core::convert::From<T>
+pub fn ob_workflow::AvailableAction::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::AvailableAction where U: core::convert::Into<T>
+pub type ob_workflow::AvailableAction::Error = core::convert::Infallible
+pub fn ob_workflow::AvailableAction::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::AvailableAction where U: core::convert::TryFrom<T>
+pub type ob_workflow::AvailableAction::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::AvailableAction::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::AvailableAction where T: core::clone::Clone
+pub type ob_workflow::AvailableAction::Owned = T
+pub fn ob_workflow::AvailableAction::clone_into(&self, &mut T)
+pub fn ob_workflow::AvailableAction::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::AvailableAction where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::AvailableAction::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::AvailableAction where T: ?core::marker::Sized
+pub fn ob_workflow::AvailableAction::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::AvailableAction where T: ?core::marker::Sized
+pub fn ob_workflow::AvailableAction::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::AvailableAction where T: core::clone::Clone
+pub unsafe fn ob_workflow::AvailableAction::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::AvailableAction
+pub fn ob_workflow::AvailableAction::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::AvailableAction
+impl<T> tracing::instrument::Instrument for ob_workflow::AvailableAction
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::AvailableAction
+impl<T> typenum::type_operators::Same for ob_workflow::AvailableAction
+pub type ob_workflow::AvailableAction::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::AvailableAction where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::AvailableAction::vzip(self) -> V
+pub struct ob_workflow::AvailableTransition
+pub ob_workflow::AvailableTransition::description: alloc::string::String
+pub ob_workflow::AvailableTransition::guard_status: ob_workflow::GuardStatus
+pub ob_workflow::AvailableTransition::is_manual: bool
+pub ob_workflow::AvailableTransition::to_state: alloc::string::String
+impl core::clone::Clone for ob_workflow::AvailableTransition
+pub fn ob_workflow::AvailableTransition::clone(&self) -> ob_workflow::AvailableTransition
+impl core::fmt::Debug for ob_workflow::AvailableTransition
+pub fn ob_workflow::AvailableTransition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::AvailableTransition
+pub fn ob_workflow::AvailableTransition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_workflow::AvailableTransition
+impl core::marker::Send for ob_workflow::AvailableTransition
+impl core::marker::Sync for ob_workflow::AvailableTransition
+impl core::marker::Unpin for ob_workflow::AvailableTransition
+impl core::marker::UnsafeUnpin for ob_workflow::AvailableTransition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::AvailableTransition
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::AvailableTransition
+impl<T, U> core::convert::Into<U> for ob_workflow::AvailableTransition where U: core::convert::From<T>
+pub fn ob_workflow::AvailableTransition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::AvailableTransition where U: core::convert::Into<T>
+pub type ob_workflow::AvailableTransition::Error = core::convert::Infallible
+pub fn ob_workflow::AvailableTransition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::AvailableTransition where U: core::convert::TryFrom<T>
+pub type ob_workflow::AvailableTransition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::AvailableTransition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::AvailableTransition where T: core::clone::Clone
+pub type ob_workflow::AvailableTransition::Owned = T
+pub fn ob_workflow::AvailableTransition::clone_into(&self, &mut T)
+pub fn ob_workflow::AvailableTransition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::AvailableTransition where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::AvailableTransition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::AvailableTransition where T: ?core::marker::Sized
+pub fn ob_workflow::AvailableTransition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::AvailableTransition where T: ?core::marker::Sized
+pub fn ob_workflow::AvailableTransition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::AvailableTransition where T: core::clone::Clone
+pub unsafe fn ob_workflow::AvailableTransition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::AvailableTransition
+pub fn ob_workflow::AvailableTransition::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::AvailableTransition
+impl<T> tracing::instrument::Instrument for ob_workflow::AvailableTransition
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::AvailableTransition
+impl<T> typenum::type_operators::Same for ob_workflow::AvailableTransition
+pub type ob_workflow::AvailableTransition::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::AvailableTransition where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::AvailableTransition::vzip(self) -> V
+pub struct ob_workflow::Blocker
+pub ob_workflow::Blocker::blocker_type: ob_workflow::BlockerType
+pub ob_workflow::Blocker::description: alloc::string::String
+pub ob_workflow::Blocker::details: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub ob_workflow::Blocker::resolution_action: core::option::Option<alloc::string::String>
+impl ob_workflow::Blocker
+pub fn ob_workflow::Blocker::new(ob_workflow::BlockerType, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn ob_workflow::Blocker::with_detail(self, impl core::convert::Into<alloc::string::String>, serde_json::value::Value) -> Self
+pub fn ob_workflow::Blocker::with_resolution(self, impl core::convert::Into<alloc::string::String>) -> Self
+impl core::clone::Clone for ob_workflow::Blocker
+pub fn ob_workflow::Blocker::clone(&self) -> ob_workflow::Blocker
+impl core::fmt::Debug for ob_workflow::Blocker
+pub fn ob_workflow::Blocker::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::Blocker
+pub fn ob_workflow::Blocker::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::Blocker
+pub fn ob_workflow::Blocker::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::Blocker
+impl core::marker::Send for ob_workflow::Blocker
+impl core::marker::Sync for ob_workflow::Blocker
+impl core::marker::Unpin for ob_workflow::Blocker
+impl core::marker::UnsafeUnpin for ob_workflow::Blocker
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::Blocker
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::Blocker
+impl<T, U> core::convert::Into<U> for ob_workflow::Blocker where U: core::convert::From<T>
+pub fn ob_workflow::Blocker::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::Blocker where U: core::convert::Into<T>
+pub type ob_workflow::Blocker::Error = core::convert::Infallible
+pub fn ob_workflow::Blocker::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::Blocker where U: core::convert::TryFrom<T>
+pub type ob_workflow::Blocker::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::Blocker::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::Blocker where T: core::clone::Clone
+pub type ob_workflow::Blocker::Owned = T
+pub fn ob_workflow::Blocker::clone_into(&self, &mut T)
+pub fn ob_workflow::Blocker::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::Blocker where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::Blocker::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::Blocker where T: ?core::marker::Sized
+pub fn ob_workflow::Blocker::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::Blocker where T: ?core::marker::Sized
+pub fn ob_workflow::Blocker::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::Blocker where T: core::clone::Clone
+pub unsafe fn ob_workflow::Blocker::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::Blocker
+pub fn ob_workflow::Blocker::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::Blocker
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::Blocker where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::Blocker
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::Blocker
+impl<T> typenum::type_operators::Same for ob_workflow::Blocker
+pub type ob_workflow::Blocker::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::Blocker where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::Blocker::vzip(self) -> V
+pub struct ob_workflow::GuardEvaluator
+impl ob_workflow::GuardEvaluator
+pub async fn ob_workflow::GuardEvaluator::evaluate(&self, &str, uuid::Uuid, &str) -> core::result::Result<ob_workflow::GuardResult, sqlx_core::error::Error>
+pub async fn ob_workflow::GuardEvaluator::evaluate_for_transition(&self, &str, &str, &str, uuid::Uuid, &str) -> core::result::Result<ob_workflow::GuardResult, ob_workflow::WorkflowError>
+pub fn ob_workflow::GuardEvaluator::new(sqlx_postgres::PgPool, alloc::sync::Arc<std::collections::hash::map::HashMap<alloc::string::String, ob_workflow::WorkflowDefinition>>) -> Self
+impl core::marker::Freeze for ob_workflow::GuardEvaluator
+impl core::marker::Send for ob_workflow::GuardEvaluator
+impl core::marker::Sync for ob_workflow::GuardEvaluator
+impl core::marker::Unpin for ob_workflow::GuardEvaluator
+impl core::marker::UnsafeUnpin for ob_workflow::GuardEvaluator
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_workflow::GuardEvaluator
+impl !core::panic::unwind_safe::UnwindSafe for ob_workflow::GuardEvaluator
+impl<T, U> core::convert::Into<U> for ob_workflow::GuardEvaluator where U: core::convert::From<T>
+pub fn ob_workflow::GuardEvaluator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::GuardEvaluator where U: core::convert::Into<T>
+pub type ob_workflow::GuardEvaluator::Error = core::convert::Infallible
+pub fn ob_workflow::GuardEvaluator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::GuardEvaluator where U: core::convert::TryFrom<T>
+pub type ob_workflow::GuardEvaluator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::GuardEvaluator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_workflow::GuardEvaluator where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::GuardEvaluator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::GuardEvaluator where T: ?core::marker::Sized
+pub fn ob_workflow::GuardEvaluator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::GuardEvaluator where T: ?core::marker::Sized
+pub fn ob_workflow::GuardEvaluator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::GuardEvaluator
+pub fn ob_workflow::GuardEvaluator::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::GuardEvaluator
+impl<T> tracing::instrument::Instrument for ob_workflow::GuardEvaluator
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::GuardEvaluator
+impl<T> typenum::type_operators::Same for ob_workflow::GuardEvaluator
+pub type ob_workflow::GuardEvaluator::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::GuardEvaluator where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::GuardEvaluator::vzip(self) -> V
+pub struct ob_workflow::GuardResult
+pub ob_workflow::GuardResult::blockers: alloc::vec::Vec<ob_workflow::Blocker>
+pub ob_workflow::GuardResult::passed: bool
+impl ob_workflow::GuardResult
+pub fn ob_workflow::GuardResult::blocked(alloc::vec::Vec<ob_workflow::Blocker>) -> Self
+pub fn ob_workflow::GuardResult::failed(alloc::string::String) -> Self
+pub fn ob_workflow::GuardResult::passed() -> Self
+impl core::fmt::Debug for ob_workflow::GuardResult
+pub fn ob_workflow::GuardResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_workflow::GuardResult
+impl core::marker::Send for ob_workflow::GuardResult
+impl core::marker::Sync for ob_workflow::GuardResult
+impl core::marker::Unpin for ob_workflow::GuardResult
+impl core::marker::UnsafeUnpin for ob_workflow::GuardResult
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::GuardResult
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::GuardResult
+impl<T, U> core::convert::Into<U> for ob_workflow::GuardResult where U: core::convert::From<T>
+pub fn ob_workflow::GuardResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::GuardResult where U: core::convert::Into<T>
+pub type ob_workflow::GuardResult::Error = core::convert::Infallible
+pub fn ob_workflow::GuardResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::GuardResult where U: core::convert::TryFrom<T>
+pub type ob_workflow::GuardResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::GuardResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_workflow::GuardResult where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::GuardResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::GuardResult where T: ?core::marker::Sized
+pub fn ob_workflow::GuardResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::GuardResult where T: ?core::marker::Sized
+pub fn ob_workflow::GuardResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::GuardResult
+pub fn ob_workflow::GuardResult::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::GuardResult
+impl<T> tracing::instrument::Instrument for ob_workflow::GuardResult
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::GuardResult
+impl<T> typenum::type_operators::Same for ob_workflow::GuardResult
+pub type ob_workflow::GuardResult::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::GuardResult where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::GuardResult::vzip(self) -> V
+pub struct ob_workflow::RequirementEvaluator
+impl ob_workflow::RequirementEvaluator
+pub async fn ob_workflow::RequirementEvaluator::evaluate(&self, &ob_workflow::RequirementDef, uuid::Uuid) -> core::result::Result<alloc::vec::Vec<ob_workflow::Blocker>, ob_workflow::WorkflowError>
+pub async fn ob_workflow::RequirementEvaluator::evaluate_all(&self, &[ob_workflow::RequirementDef], uuid::Uuid) -> core::result::Result<alloc::vec::Vec<ob_workflow::Blocker>, ob_workflow::WorkflowError>
+pub fn ob_workflow::RequirementEvaluator::new(sqlx_postgres::PgPool) -> Self
+impl core::marker::Freeze for ob_workflow::RequirementEvaluator
+impl core::marker::Send for ob_workflow::RequirementEvaluator
+impl core::marker::Sync for ob_workflow::RequirementEvaluator
+impl core::marker::Unpin for ob_workflow::RequirementEvaluator
+impl core::marker::UnsafeUnpin for ob_workflow::RequirementEvaluator
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_workflow::RequirementEvaluator
+impl !core::panic::unwind_safe::UnwindSafe for ob_workflow::RequirementEvaluator
+impl<T, U> core::convert::Into<U> for ob_workflow::RequirementEvaluator where U: core::convert::From<T>
+pub fn ob_workflow::RequirementEvaluator::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::RequirementEvaluator where U: core::convert::Into<T>
+pub type ob_workflow::RequirementEvaluator::Error = core::convert::Infallible
+pub fn ob_workflow::RequirementEvaluator::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::RequirementEvaluator where U: core::convert::TryFrom<T>
+pub type ob_workflow::RequirementEvaluator::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::RequirementEvaluator::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_workflow::RequirementEvaluator where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::RequirementEvaluator::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::RequirementEvaluator where T: ?core::marker::Sized
+pub fn ob_workflow::RequirementEvaluator::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::RequirementEvaluator where T: ?core::marker::Sized
+pub fn ob_workflow::RequirementEvaluator::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::RequirementEvaluator
+pub fn ob_workflow::RequirementEvaluator::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::RequirementEvaluator
+impl<T> tracing::instrument::Instrument for ob_workflow::RequirementEvaluator
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::RequirementEvaluator
+impl<T> typenum::type_operators::Same for ob_workflow::RequirementEvaluator
+pub type ob_workflow::RequirementEvaluator::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::RequirementEvaluator where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::RequirementEvaluator::vzip(self) -> V
+pub struct ob_workflow::StateDef
+pub ob_workflow::StateDef::description: alloc::string::String
+pub ob_workflow::StateDef::initial: bool
+pub ob_workflow::StateDef::terminal: bool
+pub ob_workflow::StateDef::timeout_hours: core::option::Option<u32>
+impl core::clone::Clone for ob_workflow::StateDef
+pub fn ob_workflow::StateDef::clone(&self) -> ob_workflow::StateDef
+impl core::fmt::Debug for ob_workflow::StateDef
+pub fn ob_workflow::StateDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::StateDef
+pub fn ob_workflow::StateDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::StateDef
+pub fn ob_workflow::StateDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::StateDef
+impl core::marker::Send for ob_workflow::StateDef
+impl core::marker::Sync for ob_workflow::StateDef
+impl core::marker::Unpin for ob_workflow::StateDef
+impl core::marker::UnsafeUnpin for ob_workflow::StateDef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::StateDef
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::StateDef
+impl<T, U> core::convert::Into<U> for ob_workflow::StateDef where U: core::convert::From<T>
+pub fn ob_workflow::StateDef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::StateDef where U: core::convert::Into<T>
+pub type ob_workflow::StateDef::Error = core::convert::Infallible
+pub fn ob_workflow::StateDef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::StateDef where U: core::convert::TryFrom<T>
+pub type ob_workflow::StateDef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::StateDef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::StateDef where T: core::clone::Clone
+pub type ob_workflow::StateDef::Owned = T
+pub fn ob_workflow::StateDef::clone_into(&self, &mut T)
+pub fn ob_workflow::StateDef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::StateDef where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::StateDef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::StateDef where T: ?core::marker::Sized
+pub fn ob_workflow::StateDef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::StateDef where T: ?core::marker::Sized
+pub fn ob_workflow::StateDef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::StateDef where T: core::clone::Clone
+pub unsafe fn ob_workflow::StateDef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::StateDef
+pub fn ob_workflow::StateDef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::StateDef
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::StateDef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::StateDef
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::StateDef
+impl<T> typenum::type_operators::Same for ob_workflow::StateDef
+pub type ob_workflow::StateDef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::StateDef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::StateDef::vzip(self) -> V
+pub struct ob_workflow::StateTransition
+pub ob_workflow::StateTransition::from_state: alloc::string::String
+pub ob_workflow::StateTransition::reason: core::option::Option<alloc::string::String>
+pub ob_workflow::StateTransition::to_state: alloc::string::String
+pub ob_workflow::StateTransition::transitioned_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_workflow::StateTransition::transitioned_by: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_workflow::StateTransition
+pub fn ob_workflow::StateTransition::clone(&self) -> ob_workflow::StateTransition
+impl core::fmt::Debug for ob_workflow::StateTransition
+pub fn ob_workflow::StateTransition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::StateTransition
+pub fn ob_workflow::StateTransition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::StateTransition
+pub fn ob_workflow::StateTransition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::StateTransition
+impl core::marker::Send for ob_workflow::StateTransition
+impl core::marker::Sync for ob_workflow::StateTransition
+impl core::marker::Unpin for ob_workflow::StateTransition
+impl core::marker::UnsafeUnpin for ob_workflow::StateTransition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::StateTransition
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::StateTransition
+impl<T, U> core::convert::Into<U> for ob_workflow::StateTransition where U: core::convert::From<T>
+pub fn ob_workflow::StateTransition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::StateTransition where U: core::convert::Into<T>
+pub type ob_workflow::StateTransition::Error = core::convert::Infallible
+pub fn ob_workflow::StateTransition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::StateTransition where U: core::convert::TryFrom<T>
+pub type ob_workflow::StateTransition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::StateTransition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::StateTransition where T: core::clone::Clone
+pub type ob_workflow::StateTransition::Owned = T
+pub fn ob_workflow::StateTransition::clone_into(&self, &mut T)
+pub fn ob_workflow::StateTransition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::StateTransition where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::StateTransition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::StateTransition where T: ?core::marker::Sized
+pub fn ob_workflow::StateTransition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::StateTransition where T: ?core::marker::Sized
+pub fn ob_workflow::StateTransition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::StateTransition where T: core::clone::Clone
+pub unsafe fn ob_workflow::StateTransition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::StateTransition
+pub fn ob_workflow::StateTransition::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::StateTransition
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::StateTransition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::StateTransition
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::StateTransition
+impl<T> typenum::type_operators::Same for ob_workflow::StateTransition
+pub type ob_workflow::StateTransition::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::StateTransition where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::StateTransition::vzip(self) -> V
+pub struct ob_workflow::TransitionDef
+pub ob_workflow::TransitionDef::auto: bool
+pub ob_workflow::TransitionDef::description: core::option::Option<alloc::string::String>
+pub ob_workflow::TransitionDef::from: alloc::string::String
+pub ob_workflow::TransitionDef::guard: core::option::Option<alloc::string::String>
+pub ob_workflow::TransitionDef::manual: bool
+pub ob_workflow::TransitionDef::to: alloc::string::String
+impl core::clone::Clone for ob_workflow::TransitionDef
+pub fn ob_workflow::TransitionDef::clone(&self) -> ob_workflow::TransitionDef
+impl core::fmt::Debug for ob_workflow::TransitionDef
+pub fn ob_workflow::TransitionDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::TransitionDef
+pub fn ob_workflow::TransitionDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::TransitionDef
+pub fn ob_workflow::TransitionDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::TransitionDef
+impl core::marker::Send for ob_workflow::TransitionDef
+impl core::marker::Sync for ob_workflow::TransitionDef
+impl core::marker::Unpin for ob_workflow::TransitionDef
+impl core::marker::UnsafeUnpin for ob_workflow::TransitionDef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::TransitionDef
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::TransitionDef
+impl<T, U> core::convert::Into<U> for ob_workflow::TransitionDef where U: core::convert::From<T>
+pub fn ob_workflow::TransitionDef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::TransitionDef where U: core::convert::Into<T>
+pub type ob_workflow::TransitionDef::Error = core::convert::Infallible
+pub fn ob_workflow::TransitionDef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::TransitionDef where U: core::convert::TryFrom<T>
+pub type ob_workflow::TransitionDef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::TransitionDef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::TransitionDef where T: core::clone::Clone
+pub type ob_workflow::TransitionDef::Owned = T
+pub fn ob_workflow::TransitionDef::clone_into(&self, &mut T)
+pub fn ob_workflow::TransitionDef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::TransitionDef where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::TransitionDef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::TransitionDef where T: ?core::marker::Sized
+pub fn ob_workflow::TransitionDef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::TransitionDef where T: ?core::marker::Sized
+pub fn ob_workflow::TransitionDef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::TransitionDef where T: core::clone::Clone
+pub unsafe fn ob_workflow::TransitionDef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::TransitionDef
+pub fn ob_workflow::TransitionDef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::TransitionDef
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::TransitionDef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::TransitionDef
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::TransitionDef
+impl<T> typenum::type_operators::Same for ob_workflow::TransitionDef
+pub type ob_workflow::TransitionDef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::TransitionDef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::TransitionDef::vzip(self) -> V
+pub struct ob_workflow::TriggerDef
+pub ob_workflow::TriggerDef::conditions: alloc::vec::Vec<ob_workflow::definition::TriggerCondition>
+pub ob_workflow::TriggerDef::event: alloc::string::String
+impl core::clone::Clone for ob_workflow::TriggerDef
+pub fn ob_workflow::TriggerDef::clone(&self) -> ob_workflow::TriggerDef
+impl core::fmt::Debug for ob_workflow::TriggerDef
+pub fn ob_workflow::TriggerDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::TriggerDef
+pub fn ob_workflow::TriggerDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::TriggerDef
+pub fn ob_workflow::TriggerDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::TriggerDef
+impl core::marker::Send for ob_workflow::TriggerDef
+impl core::marker::Sync for ob_workflow::TriggerDef
+impl core::marker::Unpin for ob_workflow::TriggerDef
+impl core::marker::UnsafeUnpin for ob_workflow::TriggerDef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::TriggerDef
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::TriggerDef
+impl<T, U> core::convert::Into<U> for ob_workflow::TriggerDef where U: core::convert::From<T>
+pub fn ob_workflow::TriggerDef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::TriggerDef where U: core::convert::Into<T>
+pub type ob_workflow::TriggerDef::Error = core::convert::Infallible
+pub fn ob_workflow::TriggerDef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::TriggerDef where U: core::convert::TryFrom<T>
+pub type ob_workflow::TriggerDef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::TriggerDef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::TriggerDef where T: core::clone::Clone
+pub type ob_workflow::TriggerDef::Owned = T
+pub fn ob_workflow::TriggerDef::clone_into(&self, &mut T)
+pub fn ob_workflow::TriggerDef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::TriggerDef where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::TriggerDef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::TriggerDef where T: ?core::marker::Sized
+pub fn ob_workflow::TriggerDef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::TriggerDef where T: ?core::marker::Sized
+pub fn ob_workflow::TriggerDef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::TriggerDef where T: core::clone::Clone
+pub unsafe fn ob_workflow::TriggerDef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::TriggerDef
+pub fn ob_workflow::TriggerDef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::TriggerDef
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::TriggerDef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::TriggerDef
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::TriggerDef
+impl<T> typenum::type_operators::Same for ob_workflow::TriggerDef
+pub type ob_workflow::TriggerDef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::TriggerDef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::TriggerDef::vzip(self) -> V
+pub struct ob_workflow::WorkflowDefinition
+pub ob_workflow::WorkflowDefinition::actions: std::collections::hash::map::HashMap<alloc::string::String, alloc::vec::Vec<ob_workflow::ActionDef>>
+pub ob_workflow::WorkflowDefinition::description: alloc::string::String
+pub ob_workflow::WorkflowDefinition::requirements: std::collections::hash::map::HashMap<alloc::string::String, alloc::vec::Vec<ob_workflow::RequirementDef>>
+pub ob_workflow::WorkflowDefinition::states: std::collections::hash::map::HashMap<alloc::string::String, ob_workflow::StateDef>
+pub ob_workflow::WorkflowDefinition::transitions: alloc::vec::Vec<ob_workflow::TransitionDef>
+pub ob_workflow::WorkflowDefinition::trigger: core::option::Option<ob_workflow::TriggerDef>
+pub ob_workflow::WorkflowDefinition::version: u32
+pub ob_workflow::WorkflowDefinition::workflow: alloc::string::String
+impl ob_workflow::WorkflowDefinition
+pub fn ob_workflow::WorkflowDefinition::actions_for_state(&self, &str) -> alloc::vec::Vec<&ob_workflow::ActionDef>
+pub fn ob_workflow::WorkflowDefinition::get_transition(&self, &str, &str) -> core::option::Option<&ob_workflow::TransitionDef>
+pub fn ob_workflow::WorkflowDefinition::initial_state(&self) -> core::option::Option<&str>
+pub fn ob_workflow::WorkflowDefinition::is_valid_transition(&self, &str, &str) -> bool
+pub fn ob_workflow::WorkflowDefinition::terminal_states(&self) -> alloc::vec::Vec<alloc::string::String>
+pub fn ob_workflow::WorkflowDefinition::transitions_from(&self, &str) -> alloc::vec::Vec<&ob_workflow::TransitionDef>
+impl core::clone::Clone for ob_workflow::WorkflowDefinition
+pub fn ob_workflow::WorkflowDefinition::clone(&self) -> ob_workflow::WorkflowDefinition
+impl core::fmt::Debug for ob_workflow::WorkflowDefinition
+pub fn ob_workflow::WorkflowDefinition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::WorkflowDefinition
+pub fn ob_workflow::WorkflowDefinition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::WorkflowDefinition
+pub fn ob_workflow::WorkflowDefinition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::WorkflowDefinition
+impl core::marker::Send for ob_workflow::WorkflowDefinition
+impl core::marker::Sync for ob_workflow::WorkflowDefinition
+impl core::marker::Unpin for ob_workflow::WorkflowDefinition
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowDefinition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowDefinition
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowDefinition
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowDefinition where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowDefinition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowDefinition where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowDefinition::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowDefinition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowDefinition where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowDefinition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowDefinition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::WorkflowDefinition where T: core::clone::Clone
+pub type ob_workflow::WorkflowDefinition::Owned = T
+pub fn ob_workflow::WorkflowDefinition::clone_into(&self, &mut T)
+pub fn ob_workflow::WorkflowDefinition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::WorkflowDefinition where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowDefinition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowDefinition where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowDefinition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowDefinition where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowDefinition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::WorkflowDefinition where T: core::clone::Clone
+pub unsafe fn ob_workflow::WorkflowDefinition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::WorkflowDefinition
+pub fn ob_workflow::WorkflowDefinition::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowDefinition
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::WorkflowDefinition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowDefinition
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowDefinition
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowDefinition
+pub type ob_workflow::WorkflowDefinition::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowDefinition where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowDefinition::vzip(self) -> V
+pub struct ob_workflow::WorkflowEngine
+impl ob_workflow::WorkflowEngine
+pub fn ob_workflow::WorkflowEngine::definitions(&self) -> &std::collections::hash::map::HashMap<alloc::string::String, ob_workflow::WorkflowDefinition>
+pub async fn ob_workflow::WorkflowEngine::find_or_start(&self, &str, &str, uuid::Uuid, core::option::Option<alloc::string::String>) -> core::result::Result<ob_workflow::WorkflowInstance, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowEngine::get_status(&self, uuid::Uuid) -> core::result::Result<ob_workflow::WorkflowStatus, ob_workflow::WorkflowError>
+pub fn ob_workflow::WorkflowEngine::new(sqlx_postgres::PgPool, std::collections::hash::map::HashMap<alloc::string::String, ob_workflow::WorkflowDefinition>) -> Self
+pub async fn ob_workflow::WorkflowEngine::start_workflow(&self, &str, &str, uuid::Uuid, core::option::Option<alloc::string::String>) -> core::result::Result<ob_workflow::WorkflowInstance, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowEngine::transition(&self, uuid::Uuid, &str, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> core::result::Result<ob_workflow::WorkflowInstance, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowEngine::try_advance(&self, uuid::Uuid) -> core::result::Result<ob_workflow::WorkflowInstance, ob_workflow::WorkflowError>
+impl core::marker::Freeze for ob_workflow::WorkflowEngine
+impl core::marker::Send for ob_workflow::WorkflowEngine
+impl core::marker::Sync for ob_workflow::WorkflowEngine
+impl core::marker::Unpin for ob_workflow::WorkflowEngine
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowEngine
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowEngine
+impl !core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowEngine
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowEngine where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowEngine::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowEngine where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowEngine::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowEngine::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowEngine where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowEngine::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowEngine::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_workflow::WorkflowEngine where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowEngine::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowEngine where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowEngine::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowEngine where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowEngine::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::WorkflowEngine
+pub fn ob_workflow::WorkflowEngine::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowEngine
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowEngine
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowEngine
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowEngine
+pub type ob_workflow::WorkflowEngine::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowEngine where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowEngine::vzip(self) -> V
+pub struct ob_workflow::WorkflowInstance
+pub ob_workflow::WorkflowInstance::blockers: alloc::vec::Vec<ob_workflow::Blocker>
+pub ob_workflow::WorkflowInstance::created_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_workflow::WorkflowInstance::created_by: core::option::Option<alloc::string::String>
+pub ob_workflow::WorkflowInstance::current_state: alloc::string::String
+pub ob_workflow::WorkflowInstance::history: alloc::vec::Vec<ob_workflow::StateTransition>
+pub ob_workflow::WorkflowInstance::instance_id: uuid::Uuid
+pub ob_workflow::WorkflowInstance::metadata: std::collections::hash::map::HashMap<alloc::string::String, serde_json::value::Value>
+pub ob_workflow::WorkflowInstance::state_entered_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_workflow::WorkflowInstance::subject_id: uuid::Uuid
+pub ob_workflow::WorkflowInstance::subject_type: alloc::string::String
+pub ob_workflow::WorkflowInstance::updated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_workflow::WorkflowInstance::version: u32
+pub ob_workflow::WorkflowInstance::workflow_id: alloc::string::String
+impl ob_workflow::WorkflowInstance
+pub fn ob_workflow::WorkflowInstance::is_terminal(&self, &[alloc::string::String]) -> bool
+pub fn ob_workflow::WorkflowInstance::new(alloc::string::String, u32, alloc::string::String, uuid::Uuid, alloc::string::String, core::option::Option<alloc::string::String>) -> Self
+pub fn ob_workflow::WorkflowInstance::transition_to(&mut self, alloc::string::String, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>)
+impl core::clone::Clone for ob_workflow::WorkflowInstance
+pub fn ob_workflow::WorkflowInstance::clone(&self) -> ob_workflow::WorkflowInstance
+impl core::fmt::Debug for ob_workflow::WorkflowInstance
+pub fn ob_workflow::WorkflowInstance::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::WorkflowInstance
+pub fn ob_workflow::WorkflowInstance::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_workflow::WorkflowInstance
+pub fn ob_workflow::WorkflowInstance::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_workflow::WorkflowInstance
+impl core::marker::Send for ob_workflow::WorkflowInstance
+impl core::marker::Sync for ob_workflow::WorkflowInstance
+impl core::marker::Unpin for ob_workflow::WorkflowInstance
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowInstance
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowInstance
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowInstance
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowInstance where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowInstance::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowInstance where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowInstance::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowInstance::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowInstance where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowInstance::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowInstance::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::WorkflowInstance where T: core::clone::Clone
+pub type ob_workflow::WorkflowInstance::Owned = T
+pub fn ob_workflow::WorkflowInstance::clone_into(&self, &mut T)
+pub fn ob_workflow::WorkflowInstance::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::WorkflowInstance where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowInstance::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowInstance where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowInstance::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowInstance where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowInstance::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::WorkflowInstance where T: core::clone::Clone
+pub unsafe fn ob_workflow::WorkflowInstance::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::WorkflowInstance
+pub fn ob_workflow::WorkflowInstance::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowInstance
+impl<T> serde_core::de::DeserializeOwned for ob_workflow::WorkflowInstance where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowInstance
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowInstance
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowInstance
+pub type ob_workflow::WorkflowInstance::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowInstance where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowInstance::vzip(self) -> V
+pub struct ob_workflow::WorkflowLoader
+impl ob_workflow::WorkflowLoader
+pub async fn ob_workflow::WorkflowLoader::load_and_sync(&std::path::Path, &sqlx_postgres::PgPool) -> core::result::Result<std::collections::hash::map::HashMap<alloc::string::String, ob_workflow::WorkflowDefinition>, ob_workflow::WorkflowError>
+pub fn ob_workflow::WorkflowLoader::load_from_dir(&std::path::Path) -> core::result::Result<std::collections::hash::map::HashMap<alloc::string::String, ob_workflow::WorkflowDefinition>, ob_workflow::WorkflowError>
+pub fn ob_workflow::WorkflowLoader::load_from_file(&std::path::Path) -> core::result::Result<ob_workflow::WorkflowDefinition, ob_workflow::WorkflowError>
+pub fn ob_workflow::WorkflowLoader::load_from_str(&str) -> core::result::Result<ob_workflow::WorkflowDefinition, ob_workflow::WorkflowError>
+impl core::marker::Freeze for ob_workflow::WorkflowLoader
+impl core::marker::Send for ob_workflow::WorkflowLoader
+impl core::marker::Sync for ob_workflow::WorkflowLoader
+impl core::marker::Unpin for ob_workflow::WorkflowLoader
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowLoader
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowLoader
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowLoader
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowLoader where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowLoader::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowLoader where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowLoader::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowLoader::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowLoader where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowLoader::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowLoader::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_workflow::WorkflowLoader where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowLoader::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowLoader where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowLoader::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowLoader where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowLoader::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::WorkflowLoader
+pub fn ob_workflow::WorkflowLoader::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowLoader
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowLoader
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowLoader
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowLoader
+pub type ob_workflow::WorkflowLoader::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowLoader where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowLoader::vzip(self) -> V
+pub struct ob_workflow::WorkflowRepository
+impl ob_workflow::WorkflowRepository
+pub async fn ob_workflow::WorkflowRepository::delete(&self, uuid::Uuid) -> core::result::Result<(), ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowRepository::find_by_subject(&self, &str, &str, uuid::Uuid) -> core::result::Result<core::option::Option<ob_workflow::WorkflowInstance>, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowRepository::list_by_state(&self, &str, &str) -> core::result::Result<alloc::vec::Vec<ob_workflow::WorkflowInstance>, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowRepository::list_by_subject(&self, &str, uuid::Uuid) -> core::result::Result<alloc::vec::Vec<ob_workflow::WorkflowInstance>, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowRepository::load(&self, uuid::Uuid) -> core::result::Result<ob_workflow::WorkflowInstance, ob_workflow::WorkflowError>
+pub async fn ob_workflow::WorkflowRepository::log_transition(&self, uuid::Uuid, core::option::Option<&str>, &str, &str, core::option::Option<&str>, core::option::Option<&str>, &[ob_workflow::Blocker]) -> core::result::Result<(), ob_workflow::WorkflowError>
+pub fn ob_workflow::WorkflowRepository::new(sqlx_postgres::PgPool) -> Self
+pub async fn ob_workflow::WorkflowRepository::save(&self, &ob_workflow::WorkflowInstance) -> core::result::Result<(), ob_workflow::WorkflowError>
+impl core::marker::Freeze for ob_workflow::WorkflowRepository
+impl core::marker::Send for ob_workflow::WorkflowRepository
+impl core::marker::Sync for ob_workflow::WorkflowRepository
+impl core::marker::Unpin for ob_workflow::WorkflowRepository
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowRepository
+impl !core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowRepository
+impl !core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowRepository
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowRepository where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowRepository::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowRepository where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowRepository::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowRepository::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowRepository where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowRepository::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowRepository::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_workflow::WorkflowRepository where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowRepository::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowRepository where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowRepository::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowRepository where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowRepository::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_workflow::WorkflowRepository
+pub fn ob_workflow::WorkflowRepository::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowRepository
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowRepository
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowRepository
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowRepository
+pub type ob_workflow::WorkflowRepository::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowRepository where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowRepository::vzip(self) -> V
+pub struct ob_workflow::WorkflowStatus
+pub ob_workflow::WorkflowStatus::available_actions: alloc::vec::Vec<ob_workflow::AvailableAction>
+pub ob_workflow::WorkflowStatus::available_transitions: alloc::vec::Vec<ob_workflow::AvailableTransition>
+pub ob_workflow::WorkflowStatus::blockers: alloc::vec::Vec<ob_workflow::Blocker>
+pub ob_workflow::WorkflowStatus::current_state: alloc::string::String
+pub ob_workflow::WorkflowStatus::history: alloc::vec::Vec<ob_workflow::StateTransition>
+pub ob_workflow::WorkflowStatus::instance_id: uuid::Uuid
+pub ob_workflow::WorkflowStatus::is_terminal: bool
+pub ob_workflow::WorkflowStatus::progress: f32
+pub ob_workflow::WorkflowStatus::state_description: core::option::Option<alloc::string::String>
+pub ob_workflow::WorkflowStatus::subject_id: uuid::Uuid
+pub ob_workflow::WorkflowStatus::subject_type: alloc::string::String
+pub ob_workflow::WorkflowStatus::workflow_id: alloc::string::String
+impl core::clone::Clone for ob_workflow::WorkflowStatus
+pub fn ob_workflow::WorkflowStatus::clone(&self) -> ob_workflow::WorkflowStatus
+impl core::fmt::Debug for ob_workflow::WorkflowStatus
+pub fn ob_workflow::WorkflowStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_workflow::WorkflowStatus
+pub fn ob_workflow::WorkflowStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for ob_workflow::WorkflowStatus
+impl core::marker::Send for ob_workflow::WorkflowStatus
+impl core::marker::Sync for ob_workflow::WorkflowStatus
+impl core::marker::Unpin for ob_workflow::WorkflowStatus
+impl core::marker::UnsafeUnpin for ob_workflow::WorkflowStatus
+impl core::panic::unwind_safe::RefUnwindSafe for ob_workflow::WorkflowStatus
+impl core::panic::unwind_safe::UnwindSafe for ob_workflow::WorkflowStatus
+impl<T, U> core::convert::Into<U> for ob_workflow::WorkflowStatus where U: core::convert::From<T>
+pub fn ob_workflow::WorkflowStatus::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_workflow::WorkflowStatus where U: core::convert::Into<T>
+pub type ob_workflow::WorkflowStatus::Error = core::convert::Infallible
+pub fn ob_workflow::WorkflowStatus::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_workflow::WorkflowStatus where U: core::convert::TryFrom<T>
+pub type ob_workflow::WorkflowStatus::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_workflow::WorkflowStatus::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_workflow::WorkflowStatus where T: core::clone::Clone
+pub type ob_workflow::WorkflowStatus::Owned = T
+pub fn ob_workflow::WorkflowStatus::clone_into(&self, &mut T)
+pub fn ob_workflow::WorkflowStatus::to_owned(&self) -> T
+impl<T> core::any::Any for ob_workflow::WorkflowStatus where T: 'static + ?core::marker::Sized
+pub fn ob_workflow::WorkflowStatus::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_workflow::WorkflowStatus where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowStatus::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_workflow::WorkflowStatus where T: ?core::marker::Sized
+pub fn ob_workflow::WorkflowStatus::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_workflow::WorkflowStatus where T: core::clone::Clone
+pub unsafe fn ob_workflow::WorkflowStatus::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_workflow::WorkflowStatus
+pub fn ob_workflow::WorkflowStatus::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_workflow::WorkflowStatus
+impl<T> tracing::instrument::Instrument for ob_workflow::WorkflowStatus
+impl<T> tracing::instrument::WithSubscriber for ob_workflow::WorkflowStatus
+impl<T> typenum::type_operators::Same for ob_workflow::WorkflowStatus
+pub type ob_workflow::WorkflowStatus::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_workflow::WorkflowStatus where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_workflow::WorkflowStatus::vzip(self) -> V

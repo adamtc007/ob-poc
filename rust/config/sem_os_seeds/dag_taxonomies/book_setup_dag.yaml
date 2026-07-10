@@ -116,7 +116,6 @@ overall_lifecycle:
           - "book.status = 'proposed'"
       progression_verbs:
         - session.load-galaxy   # load client group context
-        - mandate.create        # outline the structural intent
       next_phase: structure_chosen
 
     - name: structure_chosen
@@ -177,8 +176,8 @@ overall_lifecycle:
 
     - name: mandates_defined
       description: |
-        Trading mandates created (mandate.create) with instrument scope
-        + permitted markets. This is the bridge into the IM workspace —
+        Trading profiles created with instrument scope + permitted
+        markets. This is the bridge into the IM workspace —
         mandate.* macros invoke IM trading_profile authoring. Book is
         ready to hand off for deal.CONTRACTED.
       derivation:
@@ -278,7 +277,7 @@ slots:
           via: cbu.assign-role   # iterated per role per CBU
         - from: parties_assigned
           to: mandates_defined
-          via: mandate.create   # iterated per mandate
+          via: trading-profile.create-draft
         - from: mandates_defined
           to: ready_for_deal
           via: book.mark-ready

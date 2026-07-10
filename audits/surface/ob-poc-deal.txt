@@ -1,0 +1,724 @@
+# ob-poc-deal | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:48Z
+pub mod ob_poc_deal
+pub enum ob_poc_deal::DealViewMode
+pub ob_poc_deal::DealViewMode::Commercial
+pub ob_poc_deal::DealViewMode::Financial
+pub ob_poc_deal::DealViewMode::Status
+impl core::clone::Clone for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::clone(&self) -> ob_poc_deal::DealViewMode
+impl core::cmp::Eq for ob_poc_deal::DealViewMode
+impl core::cmp::PartialEq for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::eq(&self, &ob_poc_deal::DealViewMode) -> bool
+impl core::default::Default for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::default() -> ob_poc_deal::DealViewMode
+impl core::fmt::Debug for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_deal::DealViewMode
+impl core::marker::StructuralPartialEq for ob_poc_deal::DealViewMode
+impl core::str::traits::FromStr for ob_poc_deal::DealViewMode
+pub type ob_poc_deal::DealViewMode::Err = anyhow::Error
+pub fn ob_poc_deal::DealViewMode::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl serde_core::ser::Serialize for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealViewMode
+impl core::marker::Send for ob_poc_deal::DealViewMode
+impl core::marker::Sync for ob_poc_deal::DealViewMode
+impl core::marker::Unpin for ob_poc_deal::DealViewMode
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealViewMode
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealViewMode
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealViewMode
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealViewMode where U: core::convert::From<T>
+pub fn ob_poc_deal::DealViewMode::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealViewMode where U: core::convert::Into<T>
+pub type ob_poc_deal::DealViewMode::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealViewMode::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealViewMode where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealViewMode::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealViewMode::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealViewMode where T: core::clone::Clone
+pub type ob_poc_deal::DealViewMode::Owned = T
+pub fn ob_poc_deal::DealViewMode::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealViewMode::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_deal::DealViewMode where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_deal::DealViewMode::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_deal::DealViewMode where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealViewMode::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealViewMode where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealViewMode::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealViewMode where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealViewMode::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealViewMode where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealViewMode::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealViewMode
+pub fn ob_poc_deal::DealViewMode::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealViewMode where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealContractSummary
+pub ob_poc_deal::DealContractSummary::client_label: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealContractSummary::contract_id: uuid::Uuid
+pub ob_poc_deal::DealContractSummary::contract_reference: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealContractSummary::contract_role: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealContractSummary::deal_id: uuid::Uuid
+pub ob_poc_deal::DealContractSummary::effective_date: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_deal::DealContractSummary::sequence_order: i32
+pub ob_poc_deal::DealContractSummary::status: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealContractSummary::termination_date: core::option::Option<chrono::naive::date::NaiveDate>
+impl core::clone::Clone for ob_poc_deal::DealContractSummary
+pub fn ob_poc_deal::DealContractSummary::clone(&self) -> ob_poc_deal::DealContractSummary
+impl core::fmt::Debug for ob_poc_deal::DealContractSummary
+pub fn ob_poc_deal::DealContractSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealContractSummary
+pub fn ob_poc_deal::DealContractSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealContractSummary
+pub fn ob_poc_deal::DealContractSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealContractSummary
+impl core::marker::Send for ob_poc_deal::DealContractSummary
+impl core::marker::Sync for ob_poc_deal::DealContractSummary
+impl core::marker::Unpin for ob_poc_deal::DealContractSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealContractSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealContractSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealContractSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealContractSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::DealContractSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealContractSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::DealContractSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealContractSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealContractSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealContractSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealContractSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealContractSummary where T: core::clone::Clone
+pub type ob_poc_deal::DealContractSummary::Owned = T
+pub fn ob_poc_deal::DealContractSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealContractSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealContractSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealContractSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealContractSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealContractSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealContractSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealContractSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealContractSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealContractSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealContractSummary
+pub fn ob_poc_deal::DealContractSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealContractSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealFilters
+pub ob_poc_deal::DealFilters::client_group_id: core::option::Option<uuid::Uuid>
+pub ob_poc_deal::DealFilters::deal_status: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealFilters::limit: core::option::Option<i32>
+pub ob_poc_deal::DealFilters::offset: core::option::Option<i32>
+pub ob_poc_deal::DealFilters::opened_after: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealFilters::opened_before: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealFilters::sales_owner: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealFilters::sales_team: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_deal::DealFilters
+pub fn ob_poc_deal::DealFilters::clone(&self) -> ob_poc_deal::DealFilters
+impl core::default::Default for ob_poc_deal::DealFilters
+pub fn ob_poc_deal::DealFilters::default() -> ob_poc_deal::DealFilters
+impl core::fmt::Debug for ob_poc_deal::DealFilters
+pub fn ob_poc_deal::DealFilters::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealFilters
+pub fn ob_poc_deal::DealFilters::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealFilters
+pub fn ob_poc_deal::DealFilters::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealFilters
+impl core::marker::Send for ob_poc_deal::DealFilters
+impl core::marker::Sync for ob_poc_deal::DealFilters
+impl core::marker::Unpin for ob_poc_deal::DealFilters
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealFilters
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealFilters
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealFilters
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealFilters where U: core::convert::From<T>
+pub fn ob_poc_deal::DealFilters::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealFilters where U: core::convert::Into<T>
+pub type ob_poc_deal::DealFilters::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealFilters::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealFilters where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealFilters::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealFilters::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealFilters where T: core::clone::Clone
+pub type ob_poc_deal::DealFilters::Owned = T
+pub fn ob_poc_deal::DealFilters::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealFilters::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealFilters where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealFilters::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealFilters where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealFilters::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealFilters where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealFilters::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealFilters where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealFilters::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealFilters
+pub fn ob_poc_deal::DealFilters::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealFilters where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealGraphResponse
+pub ob_poc_deal::DealGraphResponse::contracts: alloc::vec::Vec<ob_poc_deal::DealContractSummary>
+pub ob_poc_deal::DealGraphResponse::deal: ob_poc_deal::DealSummary
+pub ob_poc_deal::DealGraphResponse::onboarding_requests: alloc::vec::Vec<ob_poc_deal::OnboardingRequestSummary>
+pub ob_poc_deal::DealGraphResponse::participants: alloc::vec::Vec<ob_poc_deal::DealParticipantSummary>
+pub ob_poc_deal::DealGraphResponse::products: alloc::vec::Vec<ob_poc_deal::DealProductSummary>
+pub ob_poc_deal::DealGraphResponse::rate_cards: alloc::vec::Vec<ob_poc_deal::RateCardSummary>
+pub ob_poc_deal::DealGraphResponse::view_mode: alloc::string::String
+impl core::clone::Clone for ob_poc_deal::DealGraphResponse
+pub fn ob_poc_deal::DealGraphResponse::clone(&self) -> ob_poc_deal::DealGraphResponse
+impl core::fmt::Debug for ob_poc_deal::DealGraphResponse
+pub fn ob_poc_deal::DealGraphResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealGraphResponse
+pub fn ob_poc_deal::DealGraphResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealGraphResponse
+pub fn ob_poc_deal::DealGraphResponse::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealGraphResponse
+impl core::marker::Send for ob_poc_deal::DealGraphResponse
+impl core::marker::Sync for ob_poc_deal::DealGraphResponse
+impl core::marker::Unpin for ob_poc_deal::DealGraphResponse
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealGraphResponse
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealGraphResponse
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealGraphResponse
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealGraphResponse where U: core::convert::From<T>
+pub fn ob_poc_deal::DealGraphResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealGraphResponse where U: core::convert::Into<T>
+pub type ob_poc_deal::DealGraphResponse::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealGraphResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealGraphResponse where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealGraphResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealGraphResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealGraphResponse where T: core::clone::Clone
+pub type ob_poc_deal::DealGraphResponse::Owned = T
+pub fn ob_poc_deal::DealGraphResponse::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealGraphResponse::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealGraphResponse where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealGraphResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealGraphResponse where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealGraphResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealGraphResponse where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealGraphResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealGraphResponse where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealGraphResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealGraphResponse
+pub fn ob_poc_deal::DealGraphResponse::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealGraphResponse where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealListResponse
+pub ob_poc_deal::DealListResponse::deals: alloc::vec::Vec<ob_poc_deal::DealSummary>
+pub ob_poc_deal::DealListResponse::limit: i32
+pub ob_poc_deal::DealListResponse::offset: i32
+pub ob_poc_deal::DealListResponse::total_count: i64
+impl core::clone::Clone for ob_poc_deal::DealListResponse
+pub fn ob_poc_deal::DealListResponse::clone(&self) -> ob_poc_deal::DealListResponse
+impl core::fmt::Debug for ob_poc_deal::DealListResponse
+pub fn ob_poc_deal::DealListResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealListResponse
+pub fn ob_poc_deal::DealListResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealListResponse
+pub fn ob_poc_deal::DealListResponse::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealListResponse
+impl core::marker::Send for ob_poc_deal::DealListResponse
+impl core::marker::Sync for ob_poc_deal::DealListResponse
+impl core::marker::Unpin for ob_poc_deal::DealListResponse
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealListResponse
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealListResponse
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealListResponse
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealListResponse where U: core::convert::From<T>
+pub fn ob_poc_deal::DealListResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealListResponse where U: core::convert::Into<T>
+pub type ob_poc_deal::DealListResponse::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealListResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealListResponse where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealListResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealListResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealListResponse where T: core::clone::Clone
+pub type ob_poc_deal::DealListResponse::Owned = T
+pub fn ob_poc_deal::DealListResponse::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealListResponse::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealListResponse where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealListResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealListResponse where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealListResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealListResponse where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealListResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealListResponse where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealListResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealListResponse
+pub fn ob_poc_deal::DealListResponse::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealListResponse where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealParticipantSummary
+pub ob_poc_deal::DealParticipantSummary::created_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealParticipantSummary::deal_id: uuid::Uuid
+pub ob_poc_deal::DealParticipantSummary::deal_participant_id: uuid::Uuid
+pub ob_poc_deal::DealParticipantSummary::entity_id: uuid::Uuid
+pub ob_poc_deal::DealParticipantSummary::entity_name: alloc::string::String
+pub ob_poc_deal::DealParticipantSummary::is_primary: bool
+pub ob_poc_deal::DealParticipantSummary::lei: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealParticipantSummary::participant_role: alloc::string::String
+impl core::clone::Clone for ob_poc_deal::DealParticipantSummary
+pub fn ob_poc_deal::DealParticipantSummary::clone(&self) -> ob_poc_deal::DealParticipantSummary
+impl core::fmt::Debug for ob_poc_deal::DealParticipantSummary
+pub fn ob_poc_deal::DealParticipantSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealParticipantSummary
+pub fn ob_poc_deal::DealParticipantSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealParticipantSummary
+pub fn ob_poc_deal::DealParticipantSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealParticipantSummary
+impl core::marker::Send for ob_poc_deal::DealParticipantSummary
+impl core::marker::Sync for ob_poc_deal::DealParticipantSummary
+impl core::marker::Unpin for ob_poc_deal::DealParticipantSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealParticipantSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealParticipantSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealParticipantSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealParticipantSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::DealParticipantSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealParticipantSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::DealParticipantSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealParticipantSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealParticipantSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealParticipantSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealParticipantSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealParticipantSummary where T: core::clone::Clone
+pub type ob_poc_deal::DealParticipantSummary::Owned = T
+pub fn ob_poc_deal::DealParticipantSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealParticipantSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealParticipantSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealParticipantSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealParticipantSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealParticipantSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealParticipantSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealParticipantSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealParticipantSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealParticipantSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealParticipantSummary
+pub fn ob_poc_deal::DealParticipantSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealParticipantSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealProductSummary
+pub ob_poc_deal::DealProductSummary::added_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealProductSummary::agreed_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealProductSummary::currency_code: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealProductSummary::deal_id: uuid::Uuid
+pub ob_poc_deal::DealProductSummary::deal_product_id: uuid::Uuid
+pub ob_poc_deal::DealProductSummary::indicative_revenue: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_deal::DealProductSummary::notes: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealProductSummary::product_category: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealProductSummary::product_code: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealProductSummary::product_id: uuid::Uuid
+pub ob_poc_deal::DealProductSummary::product_name: alloc::string::String
+pub ob_poc_deal::DealProductSummary::product_status: alloc::string::String
+pub ob_poc_deal::DealProductSummary::rate_card_count: i32
+impl core::clone::Clone for ob_poc_deal::DealProductSummary
+pub fn ob_poc_deal::DealProductSummary::clone(&self) -> ob_poc_deal::DealProductSummary
+impl core::fmt::Debug for ob_poc_deal::DealProductSummary
+pub fn ob_poc_deal::DealProductSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealProductSummary
+pub fn ob_poc_deal::DealProductSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealProductSummary
+pub fn ob_poc_deal::DealProductSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealProductSummary
+impl core::marker::Send for ob_poc_deal::DealProductSummary
+impl core::marker::Sync for ob_poc_deal::DealProductSummary
+impl core::marker::Unpin for ob_poc_deal::DealProductSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealProductSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealProductSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealProductSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealProductSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::DealProductSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealProductSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::DealProductSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealProductSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealProductSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealProductSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealProductSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealProductSummary where T: core::clone::Clone
+pub type ob_poc_deal::DealProductSummary::Owned = T
+pub fn ob_poc_deal::DealProductSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealProductSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealProductSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealProductSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealProductSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealProductSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealProductSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealProductSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealProductSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealProductSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealProductSummary
+pub fn ob_poc_deal::DealProductSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealProductSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::DealSummary
+pub ob_poc_deal::DealSummary::active_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealSummary::client_group_name: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealSummary::closed_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealSummary::contract_count: i32
+pub ob_poc_deal::DealSummary::contracted_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealSummary::currency_code: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealSummary::deal_id: uuid::Uuid
+pub ob_poc_deal::DealSummary::deal_name: alloc::string::String
+pub ob_poc_deal::DealSummary::deal_reference: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealSummary::deal_status: alloc::string::String
+pub ob_poc_deal::DealSummary::estimated_revenue: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_deal::DealSummary::onboarding_request_count: i32
+pub ob_poc_deal::DealSummary::opened_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_deal::DealSummary::participant_count: i32
+pub ob_poc_deal::DealSummary::primary_client_group_id: uuid::Uuid
+pub ob_poc_deal::DealSummary::product_count: i32
+pub ob_poc_deal::DealSummary::qualified_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::DealSummary::rate_card_count: i32
+pub ob_poc_deal::DealSummary::sales_owner: core::option::Option<alloc::string::String>
+pub ob_poc_deal::DealSummary::sales_team: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_deal::DealSummary
+pub fn ob_poc_deal::DealSummary::clone(&self) -> ob_poc_deal::DealSummary
+impl core::fmt::Debug for ob_poc_deal::DealSummary
+pub fn ob_poc_deal::DealSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::DealSummary
+pub fn ob_poc_deal::DealSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::DealSummary
+pub fn ob_poc_deal::DealSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::DealSummary
+impl core::marker::Send for ob_poc_deal::DealSummary
+impl core::marker::Sync for ob_poc_deal::DealSummary
+impl core::marker::Unpin for ob_poc_deal::DealSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::DealSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::DealSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::DealSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::DealSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::DealSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::DealSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::DealSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::DealSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::DealSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::DealSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::DealSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::DealSummary where T: core::clone::Clone
+pub type ob_poc_deal::DealSummary::Owned = T
+pub fn ob_poc_deal::DealSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::DealSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::DealSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::DealSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::DealSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::DealSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::DealSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::DealSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::DealSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::DealSummary
+pub fn ob_poc_deal::DealSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::DealSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::LoadDealRequest
+pub ob_poc_deal::LoadDealRequest::deal_id: core::option::Option<uuid::Uuid>
+pub ob_poc_deal::LoadDealRequest::deal_name: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_deal::LoadDealRequest
+pub fn ob_poc_deal::LoadDealRequest::clone(&self) -> ob_poc_deal::LoadDealRequest
+impl core::fmt::Debug for ob_poc_deal::LoadDealRequest
+pub fn ob_poc_deal::LoadDealRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::LoadDealRequest
+pub fn ob_poc_deal::LoadDealRequest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::LoadDealRequest
+pub fn ob_poc_deal::LoadDealRequest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::LoadDealRequest
+impl core::marker::Send for ob_poc_deal::LoadDealRequest
+impl core::marker::Sync for ob_poc_deal::LoadDealRequest
+impl core::marker::Unpin for ob_poc_deal::LoadDealRequest
+impl core::marker::UnsafeUnpin for ob_poc_deal::LoadDealRequest
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::LoadDealRequest
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::LoadDealRequest
+impl<T, U> core::convert::Into<U> for ob_poc_deal::LoadDealRequest where U: core::convert::From<T>
+pub fn ob_poc_deal::LoadDealRequest::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::LoadDealRequest where U: core::convert::Into<T>
+pub type ob_poc_deal::LoadDealRequest::Error = core::convert::Infallible
+pub fn ob_poc_deal::LoadDealRequest::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::LoadDealRequest where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::LoadDealRequest::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::LoadDealRequest::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::LoadDealRequest where T: core::clone::Clone
+pub type ob_poc_deal::LoadDealRequest::Owned = T
+pub fn ob_poc_deal::LoadDealRequest::clone_into(&self, &mut T)
+pub fn ob_poc_deal::LoadDealRequest::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::LoadDealRequest where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::LoadDealRequest::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::LoadDealRequest where T: ?core::marker::Sized
+pub fn ob_poc_deal::LoadDealRequest::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::LoadDealRequest where T: ?core::marker::Sized
+pub fn ob_poc_deal::LoadDealRequest::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::LoadDealRequest where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::LoadDealRequest::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::LoadDealRequest
+pub fn ob_poc_deal::LoadDealRequest::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::LoadDealRequest where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::LoadDealResponse
+pub ob_poc_deal::LoadDealResponse::client_group_name: core::option::Option<alloc::string::String>
+pub ob_poc_deal::LoadDealResponse::deal_id: uuid::Uuid
+pub ob_poc_deal::LoadDealResponse::deal_name: alloc::string::String
+pub ob_poc_deal::LoadDealResponse::deal_status: alloc::string::String
+pub ob_poc_deal::LoadDealResponse::message: alloc::string::String
+impl core::clone::Clone for ob_poc_deal::LoadDealResponse
+pub fn ob_poc_deal::LoadDealResponse::clone(&self) -> ob_poc_deal::LoadDealResponse
+impl core::fmt::Debug for ob_poc_deal::LoadDealResponse
+pub fn ob_poc_deal::LoadDealResponse::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::LoadDealResponse
+pub fn ob_poc_deal::LoadDealResponse::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::LoadDealResponse
+pub fn ob_poc_deal::LoadDealResponse::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::LoadDealResponse
+impl core::marker::Send for ob_poc_deal::LoadDealResponse
+impl core::marker::Sync for ob_poc_deal::LoadDealResponse
+impl core::marker::Unpin for ob_poc_deal::LoadDealResponse
+impl core::marker::UnsafeUnpin for ob_poc_deal::LoadDealResponse
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::LoadDealResponse
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::LoadDealResponse
+impl<T, U> core::convert::Into<U> for ob_poc_deal::LoadDealResponse where U: core::convert::From<T>
+pub fn ob_poc_deal::LoadDealResponse::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::LoadDealResponse where U: core::convert::Into<T>
+pub type ob_poc_deal::LoadDealResponse::Error = core::convert::Infallible
+pub fn ob_poc_deal::LoadDealResponse::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::LoadDealResponse where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::LoadDealResponse::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::LoadDealResponse::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::LoadDealResponse where T: core::clone::Clone
+pub type ob_poc_deal::LoadDealResponse::Owned = T
+pub fn ob_poc_deal::LoadDealResponse::clone_into(&self, &mut T)
+pub fn ob_poc_deal::LoadDealResponse::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::LoadDealResponse where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::LoadDealResponse::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::LoadDealResponse where T: ?core::marker::Sized
+pub fn ob_poc_deal::LoadDealResponse::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::LoadDealResponse where T: ?core::marker::Sized
+pub fn ob_poc_deal::LoadDealResponse::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::LoadDealResponse where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::LoadDealResponse::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::LoadDealResponse
+pub fn ob_poc_deal::LoadDealResponse::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::LoadDealResponse where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::OnboardingRequestSummary
+pub ob_poc_deal::OnboardingRequestSummary::cbu_id: uuid::Uuid
+pub ob_poc_deal::OnboardingRequestSummary::cbu_name: core::option::Option<alloc::string::String>
+pub ob_poc_deal::OnboardingRequestSummary::completed_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::OnboardingRequestSummary::created_at: core::option::Option<chrono::datetime::DateTime<chrono::offset::utc::Utc>>
+pub ob_poc_deal::OnboardingRequestSummary::created_by: core::option::Option<alloc::string::String>
+pub ob_poc_deal::OnboardingRequestSummary::current_phase: core::option::Option<alloc::string::String>
+pub ob_poc_deal::OnboardingRequestSummary::deal_product_id: core::option::Option<uuid::Uuid>
+pub ob_poc_deal::OnboardingRequestSummary::request_id: uuid::Uuid
+pub ob_poc_deal::OnboardingRequestSummary::request_state: alloc::string::String
+impl core::clone::Clone for ob_poc_deal::OnboardingRequestSummary
+pub fn ob_poc_deal::OnboardingRequestSummary::clone(&self) -> ob_poc_deal::OnboardingRequestSummary
+impl core::fmt::Debug for ob_poc_deal::OnboardingRequestSummary
+pub fn ob_poc_deal::OnboardingRequestSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::OnboardingRequestSummary
+pub fn ob_poc_deal::OnboardingRequestSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::OnboardingRequestSummary
+pub fn ob_poc_deal::OnboardingRequestSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::OnboardingRequestSummary
+impl core::marker::Send for ob_poc_deal::OnboardingRequestSummary
+impl core::marker::Sync for ob_poc_deal::OnboardingRequestSummary
+impl core::marker::Unpin for ob_poc_deal::OnboardingRequestSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::OnboardingRequestSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::OnboardingRequestSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::OnboardingRequestSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::OnboardingRequestSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::OnboardingRequestSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::OnboardingRequestSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::OnboardingRequestSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::OnboardingRequestSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::OnboardingRequestSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::OnboardingRequestSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::OnboardingRequestSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::OnboardingRequestSummary where T: core::clone::Clone
+pub type ob_poc_deal::OnboardingRequestSummary::Owned = T
+pub fn ob_poc_deal::OnboardingRequestSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::OnboardingRequestSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::OnboardingRequestSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::OnboardingRequestSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::OnboardingRequestSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::OnboardingRequestSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::OnboardingRequestSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::OnboardingRequestSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::OnboardingRequestSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::OnboardingRequestSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::OnboardingRequestSummary
+pub fn ob_poc_deal::OnboardingRequestSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::OnboardingRequestSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::RateCardDetail
+pub ob_poc_deal::RateCardDetail::history: alloc::vec::Vec<ob_poc_deal::RateCardSummary>
+pub ob_poc_deal::RateCardDetail::lines: alloc::vec::Vec<ob_poc_deal::RateCardLineSummary>
+pub ob_poc_deal::RateCardDetail::rate_card: ob_poc_deal::RateCardSummary
+impl core::clone::Clone for ob_poc_deal::RateCardDetail
+pub fn ob_poc_deal::RateCardDetail::clone(&self) -> ob_poc_deal::RateCardDetail
+impl core::fmt::Debug for ob_poc_deal::RateCardDetail
+pub fn ob_poc_deal::RateCardDetail::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::RateCardDetail
+pub fn ob_poc_deal::RateCardDetail::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::RateCardDetail
+pub fn ob_poc_deal::RateCardDetail::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::RateCardDetail
+impl core::marker::Send for ob_poc_deal::RateCardDetail
+impl core::marker::Sync for ob_poc_deal::RateCardDetail
+impl core::marker::Unpin for ob_poc_deal::RateCardDetail
+impl core::marker::UnsafeUnpin for ob_poc_deal::RateCardDetail
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::RateCardDetail
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::RateCardDetail
+impl<T, U> core::convert::Into<U> for ob_poc_deal::RateCardDetail where U: core::convert::From<T>
+pub fn ob_poc_deal::RateCardDetail::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::RateCardDetail where U: core::convert::Into<T>
+pub type ob_poc_deal::RateCardDetail::Error = core::convert::Infallible
+pub fn ob_poc_deal::RateCardDetail::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::RateCardDetail where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::RateCardDetail::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::RateCardDetail::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::RateCardDetail where T: core::clone::Clone
+pub type ob_poc_deal::RateCardDetail::Owned = T
+pub fn ob_poc_deal::RateCardDetail::clone_into(&self, &mut T)
+pub fn ob_poc_deal::RateCardDetail::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::RateCardDetail where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::RateCardDetail::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::RateCardDetail where T: ?core::marker::Sized
+pub fn ob_poc_deal::RateCardDetail::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::RateCardDetail where T: ?core::marker::Sized
+pub fn ob_poc_deal::RateCardDetail::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::RateCardDetail where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::RateCardDetail::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::RateCardDetail
+pub fn ob_poc_deal::RateCardDetail::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::RateCardDetail where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::RateCardLineSummary
+pub ob_poc_deal::RateCardLineSummary::currency_code: core::option::Option<alloc::string::String>
+pub ob_poc_deal::RateCardLineSummary::description: core::option::Option<alloc::string::String>
+pub ob_poc_deal::RateCardLineSummary::fee_basis: core::option::Option<alloc::string::String>
+pub ob_poc_deal::RateCardLineSummary::fee_subtype: alloc::string::String
+pub ob_poc_deal::RateCardLineSummary::fee_type: alloc::string::String
+pub ob_poc_deal::RateCardLineSummary::line_id: uuid::Uuid
+pub ob_poc_deal::RateCardLineSummary::maximum_fee: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_deal::RateCardLineSummary::minimum_fee: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_deal::RateCardLineSummary::pricing_model: alloc::string::String
+pub ob_poc_deal::RateCardLineSummary::rate_card_id: uuid::Uuid
+pub ob_poc_deal::RateCardLineSummary::rate_value: core::option::Option<rust_decimal::decimal::Decimal>
+pub ob_poc_deal::RateCardLineSummary::sequence_order: core::option::Option<i32>
+pub ob_poc_deal::RateCardLineSummary::tier_brackets: core::option::Option<serde_json::value::Value>
+impl core::clone::Clone for ob_poc_deal::RateCardLineSummary
+pub fn ob_poc_deal::RateCardLineSummary::clone(&self) -> ob_poc_deal::RateCardLineSummary
+impl core::fmt::Debug for ob_poc_deal::RateCardLineSummary
+pub fn ob_poc_deal::RateCardLineSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::RateCardLineSummary
+pub fn ob_poc_deal::RateCardLineSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::RateCardLineSummary
+pub fn ob_poc_deal::RateCardLineSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::RateCardLineSummary
+impl core::marker::Send for ob_poc_deal::RateCardLineSummary
+impl core::marker::Sync for ob_poc_deal::RateCardLineSummary
+impl core::marker::Unpin for ob_poc_deal::RateCardLineSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::RateCardLineSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::RateCardLineSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::RateCardLineSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::RateCardLineSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::RateCardLineSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::RateCardLineSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::RateCardLineSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::RateCardLineSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::RateCardLineSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::RateCardLineSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::RateCardLineSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::RateCardLineSummary where T: core::clone::Clone
+pub type ob_poc_deal::RateCardLineSummary::Owned = T
+pub fn ob_poc_deal::RateCardLineSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::RateCardLineSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::RateCardLineSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::RateCardLineSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::RateCardLineSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::RateCardLineSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::RateCardLineSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::RateCardLineSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::RateCardLineSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::RateCardLineSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::RateCardLineSummary
+pub fn ob_poc_deal::RateCardLineSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::RateCardLineSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::RateCardSummary
+pub ob_poc_deal::RateCardSummary::contract_id: uuid::Uuid
+pub ob_poc_deal::RateCardSummary::deal_id: uuid::Uuid
+pub ob_poc_deal::RateCardSummary::effective_from: chrono::naive::date::NaiveDate
+pub ob_poc_deal::RateCardSummary::effective_to: core::option::Option<chrono::naive::date::NaiveDate>
+pub ob_poc_deal::RateCardSummary::is_active: bool
+pub ob_poc_deal::RateCardSummary::line_count: i32
+pub ob_poc_deal::RateCardSummary::negotiation_round: core::option::Option<i32>
+pub ob_poc_deal::RateCardSummary::product_id: uuid::Uuid
+pub ob_poc_deal::RateCardSummary::product_name: core::option::Option<alloc::string::String>
+pub ob_poc_deal::RateCardSummary::rate_card_id: uuid::Uuid
+pub ob_poc_deal::RateCardSummary::rate_card_name: core::option::Option<alloc::string::String>
+pub ob_poc_deal::RateCardSummary::status: core::option::Option<alloc::string::String>
+pub ob_poc_deal::RateCardSummary::superseded_by: core::option::Option<uuid::Uuid>
+impl core::clone::Clone for ob_poc_deal::RateCardSummary
+pub fn ob_poc_deal::RateCardSummary::clone(&self) -> ob_poc_deal::RateCardSummary
+impl core::fmt::Debug for ob_poc_deal::RateCardSummary
+pub fn ob_poc_deal::RateCardSummary::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::RateCardSummary
+pub fn ob_poc_deal::RateCardSummary::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::RateCardSummary
+pub fn ob_poc_deal::RateCardSummary::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::RateCardSummary
+impl core::marker::Send for ob_poc_deal::RateCardSummary
+impl core::marker::Sync for ob_poc_deal::RateCardSummary
+impl core::marker::Unpin for ob_poc_deal::RateCardSummary
+impl core::marker::UnsafeUnpin for ob_poc_deal::RateCardSummary
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::RateCardSummary
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::RateCardSummary
+impl<T, U> core::convert::Into<U> for ob_poc_deal::RateCardSummary where U: core::convert::From<T>
+pub fn ob_poc_deal::RateCardSummary::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::RateCardSummary where U: core::convert::Into<T>
+pub type ob_poc_deal::RateCardSummary::Error = core::convert::Infallible
+pub fn ob_poc_deal::RateCardSummary::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::RateCardSummary where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::RateCardSummary::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::RateCardSummary::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::RateCardSummary where T: core::clone::Clone
+pub type ob_poc_deal::RateCardSummary::Owned = T
+pub fn ob_poc_deal::RateCardSummary::clone_into(&self, &mut T)
+pub fn ob_poc_deal::RateCardSummary::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::RateCardSummary where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::RateCardSummary::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::RateCardSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::RateCardSummary::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::RateCardSummary where T: ?core::marker::Sized
+pub fn ob_poc_deal::RateCardSummary::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::RateCardSummary where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::RateCardSummary::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::RateCardSummary
+pub fn ob_poc_deal::RateCardSummary::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::RateCardSummary where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_deal::SessionDealContext
+pub ob_poc_deal::SessionDealContext::client_group_name: core::option::Option<alloc::string::String>
+pub ob_poc_deal::SessionDealContext::deal_id: uuid::Uuid
+pub ob_poc_deal::SessionDealContext::deal_name: alloc::string::String
+pub ob_poc_deal::SessionDealContext::deal_status: alloc::string::String
+impl core::clone::Clone for ob_poc_deal::SessionDealContext
+pub fn ob_poc_deal::SessionDealContext::clone(&self) -> ob_poc_deal::SessionDealContext
+impl core::fmt::Debug for ob_poc_deal::SessionDealContext
+pub fn ob_poc_deal::SessionDealContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_deal::SessionDealContext
+pub fn ob_poc_deal::SessionDealContext::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_deal::SessionDealContext
+pub fn ob_poc_deal::SessionDealContext::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_deal::SessionDealContext
+impl core::marker::Send for ob_poc_deal::SessionDealContext
+impl core::marker::Sync for ob_poc_deal::SessionDealContext
+impl core::marker::Unpin for ob_poc_deal::SessionDealContext
+impl core::marker::UnsafeUnpin for ob_poc_deal::SessionDealContext
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_deal::SessionDealContext
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_deal::SessionDealContext
+impl<T, U> core::convert::Into<U> for ob_poc_deal::SessionDealContext where U: core::convert::From<T>
+pub fn ob_poc_deal::SessionDealContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_deal::SessionDealContext where U: core::convert::Into<T>
+pub type ob_poc_deal::SessionDealContext::Error = core::convert::Infallible
+pub fn ob_poc_deal::SessionDealContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_deal::SessionDealContext where U: core::convert::TryFrom<T>
+pub type ob_poc_deal::SessionDealContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_deal::SessionDealContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_deal::SessionDealContext where T: core::clone::Clone
+pub type ob_poc_deal::SessionDealContext::Owned = T
+pub fn ob_poc_deal::SessionDealContext::clone_into(&self, &mut T)
+pub fn ob_poc_deal::SessionDealContext::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_deal::SessionDealContext where T: 'static + ?core::marker::Sized
+pub fn ob_poc_deal::SessionDealContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_deal::SessionDealContext where T: ?core::marker::Sized
+pub fn ob_poc_deal::SessionDealContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_deal::SessionDealContext where T: ?core::marker::Sized
+pub fn ob_poc_deal::SessionDealContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_deal::SessionDealContext where T: core::clone::Clone
+pub unsafe fn ob_poc_deal::SessionDealContext::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_deal::SessionDealContext
+pub fn ob_poc_deal::SessionDealContext::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_deal::SessionDealContext where T: for<'de> serde_core::de::Deserialize<'de>

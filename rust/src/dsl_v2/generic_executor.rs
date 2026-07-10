@@ -20,11 +20,11 @@ use uuid::Uuid;
 use sqlx::{postgres::PgRow, PgPool, Row};
 
 #[cfg(feature = "database")]
-use crate::ontology::ontology;
-#[cfg(feature = "database")]
 use entity_gateway::proto::ob::gateway::v1::{
     entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
 };
+#[cfg(feature = "database")]
+use ob_poc_ontology::ontology;
 #[cfg(feature = "database")]
 use tonic::transport::Channel;
 

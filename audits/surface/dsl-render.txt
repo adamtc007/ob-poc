@@ -1,0 +1,174 @@
+# dsl-render | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:18Z
+pub mod dsl_render
+pub mod dsl_render::layout
+pub fn dsl_render::layout::compute_layout(&dsl_bpmn_frontend::railway::RailwayGraph) -> std::collections::hash::map::HashMap<alloc::string::String, dsl_render::shapes::NodeLayout>
+pub mod dsl_render::renderer
+pub struct dsl_render::renderer::RenderOptions
+pub dsl_render::renderer::RenderOptions::height: core::option::Option<f64>
+pub dsl_render::renderer::RenderOptions::include_labels: bool
+pub dsl_render::renderer::RenderOptions::include_provenance_badges: bool
+pub dsl_render::renderer::RenderOptions::width: core::option::Option<f64>
+impl core::clone::Clone for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::clone(&self) -> dsl_render::renderer::RenderOptions
+impl core::default::Default for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::default() -> Self
+impl core::fmt::Debug for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_render::renderer::RenderOptions
+impl core::marker::Send for dsl_render::renderer::RenderOptions
+impl core::marker::Sync for dsl_render::renderer::RenderOptions
+impl core::marker::Unpin for dsl_render::renderer::RenderOptions
+impl core::marker::UnsafeUnpin for dsl_render::renderer::RenderOptions
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_render::renderer::RenderOptions
+impl core::panic::unwind_safe::UnwindSafe for dsl_render::renderer::RenderOptions
+impl<T, U> core::convert::Into<U> for dsl_render::renderer::RenderOptions where U: core::convert::From<T>
+pub fn dsl_render::renderer::RenderOptions::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_render::renderer::RenderOptions where U: core::convert::Into<T>
+pub type dsl_render::renderer::RenderOptions::Error = core::convert::Infallible
+pub fn dsl_render::renderer::RenderOptions::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_render::renderer::RenderOptions where U: core::convert::TryFrom<T>
+pub type dsl_render::renderer::RenderOptions::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_render::renderer::RenderOptions::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_render::renderer::RenderOptions where T: core::clone::Clone
+pub type dsl_render::renderer::RenderOptions::Owned = T
+pub fn dsl_render::renderer::RenderOptions::clone_into(&self, &mut T)
+pub fn dsl_render::renderer::RenderOptions::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_render::renderer::RenderOptions where T: 'static + ?core::marker::Sized
+pub fn dsl_render::renderer::RenderOptions::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_render::renderer::RenderOptions where T: ?core::marker::Sized
+pub fn dsl_render::renderer::RenderOptions::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_render::renderer::RenderOptions where T: ?core::marker::Sized
+pub fn dsl_render::renderer::RenderOptions::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_render::renderer::RenderOptions where T: core::clone::Clone
+pub unsafe fn dsl_render::renderer::RenderOptions::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::from(T) -> T
+pub fn dsl_render::renderer::extract_provenance_coverage(&dsl_ast::atom_bag::AtomBag) -> std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub fn dsl_render::renderer::render_dsl(&str, &dsl_render::renderer::RenderOptions) -> anyhow::Result<alloc::string::String>
+pub fn dsl_render::renderer::render_graph(&dsl_bpmn_frontend::railway::RailwayGraph, &dsl_render::renderer::RenderOptions, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>) -> anyhow::Result<alloc::string::String>
+pub mod dsl_render::shapes
+pub struct dsl_render::shapes::NodeLayout
+pub dsl_render::shapes::NodeLayout::height: f64
+pub dsl_render::shapes::NodeLayout::id: alloc::string::String
+pub dsl_render::shapes::NodeLayout::pos: dsl_render::shapes::Point
+pub dsl_render::shapes::NodeLayout::width: f64
+impl core::clone::Clone for dsl_render::shapes::NodeLayout
+pub fn dsl_render::shapes::NodeLayout::clone(&self) -> dsl_render::shapes::NodeLayout
+impl core::fmt::Debug for dsl_render::shapes::NodeLayout
+pub fn dsl_render::shapes::NodeLayout::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_render::shapes::NodeLayout
+impl core::marker::Send for dsl_render::shapes::NodeLayout
+impl core::marker::Sync for dsl_render::shapes::NodeLayout
+impl core::marker::Unpin for dsl_render::shapes::NodeLayout
+impl core::marker::UnsafeUnpin for dsl_render::shapes::NodeLayout
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_render::shapes::NodeLayout
+impl core::panic::unwind_safe::UnwindSafe for dsl_render::shapes::NodeLayout
+impl<T, U> core::convert::Into<U> for dsl_render::shapes::NodeLayout where U: core::convert::From<T>
+pub fn dsl_render::shapes::NodeLayout::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_render::shapes::NodeLayout where U: core::convert::Into<T>
+pub type dsl_render::shapes::NodeLayout::Error = core::convert::Infallible
+pub fn dsl_render::shapes::NodeLayout::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_render::shapes::NodeLayout where U: core::convert::TryFrom<T>
+pub type dsl_render::shapes::NodeLayout::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_render::shapes::NodeLayout::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_render::shapes::NodeLayout where T: core::clone::Clone
+pub type dsl_render::shapes::NodeLayout::Owned = T
+pub fn dsl_render::shapes::NodeLayout::clone_into(&self, &mut T)
+pub fn dsl_render::shapes::NodeLayout::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_render::shapes::NodeLayout where T: 'static + ?core::marker::Sized
+pub fn dsl_render::shapes::NodeLayout::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_render::shapes::NodeLayout where T: ?core::marker::Sized
+pub fn dsl_render::shapes::NodeLayout::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_render::shapes::NodeLayout where T: ?core::marker::Sized
+pub fn dsl_render::shapes::NodeLayout::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_render::shapes::NodeLayout where T: core::clone::Clone
+pub unsafe fn dsl_render::shapes::NodeLayout::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_render::shapes::NodeLayout
+pub fn dsl_render::shapes::NodeLayout::from(T) -> T
+pub struct dsl_render::shapes::Point
+pub dsl_render::shapes::Point::x: f64
+pub dsl_render::shapes::Point::y: f64
+impl core::clone::Clone for dsl_render::shapes::Point
+pub fn dsl_render::shapes::Point::clone(&self) -> dsl_render::shapes::Point
+impl core::fmt::Debug for dsl_render::shapes::Point
+pub fn dsl_render::shapes::Point::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_render::shapes::Point
+impl core::marker::Send for dsl_render::shapes::Point
+impl core::marker::Sync for dsl_render::shapes::Point
+impl core::marker::Unpin for dsl_render::shapes::Point
+impl core::marker::UnsafeUnpin for dsl_render::shapes::Point
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_render::shapes::Point
+impl core::panic::unwind_safe::UnwindSafe for dsl_render::shapes::Point
+impl<T, U> core::convert::Into<U> for dsl_render::shapes::Point where U: core::convert::From<T>
+pub fn dsl_render::shapes::Point::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_render::shapes::Point where U: core::convert::Into<T>
+pub type dsl_render::shapes::Point::Error = core::convert::Infallible
+pub fn dsl_render::shapes::Point::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_render::shapes::Point where U: core::convert::TryFrom<T>
+pub type dsl_render::shapes::Point::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_render::shapes::Point::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_render::shapes::Point where T: core::clone::Clone
+pub type dsl_render::shapes::Point::Owned = T
+pub fn dsl_render::shapes::Point::clone_into(&self, &mut T)
+pub fn dsl_render::shapes::Point::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_render::shapes::Point where T: 'static + ?core::marker::Sized
+pub fn dsl_render::shapes::Point::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_render::shapes::Point where T: ?core::marker::Sized
+pub fn dsl_render::shapes::Point::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_render::shapes::Point where T: ?core::marker::Sized
+pub fn dsl_render::shapes::Point::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_render::shapes::Point where T: core::clone::Clone
+pub unsafe fn dsl_render::shapes::Point::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_render::shapes::Point
+pub fn dsl_render::shapes::Point::from(T) -> T
+pub const dsl_render::shapes::ARROWHEAD_DEF: &str
+pub fn dsl_render::shapes::render_boundary_event(&dsl_render::shapes::NodeLayout, &str, &str, bool) -> alloc::string::String
+pub fn dsl_render::shapes::render_edge(&dsl_render::shapes::NodeLayout, &dsl_render::shapes::NodeLayout, &dsl_bpmn_frontend::railway::RailwayEdge, bool) -> alloc::string::String
+pub fn dsl_render::shapes::render_gateway_shape(&dsl_render::shapes::NodeLayout, &dsl_bpmn_frontend::railway::GatewayKind, &str, core::option::Option<&alloc::string::String>, bool) -> alloc::string::String
+pub fn dsl_render::shapes::render_node_shape(&dsl_render::shapes::NodeLayout, &dsl_bpmn_frontend::railway::NodeKind, &str, core::option::Option<&alloc::string::String>, bool) -> alloc::string::String
+pub fn dsl_render::shapes::render_parallel_join(&dsl_render::shapes::NodeLayout, &str) -> alloc::string::String
+pub mod dsl_render::style
+pub const dsl_render::style::EMBEDDED_CSS: &str
+pub struct dsl_render::RenderOptions
+pub dsl_render::RenderOptions::height: core::option::Option<f64>
+pub dsl_render::RenderOptions::include_labels: bool
+pub dsl_render::RenderOptions::include_provenance_badges: bool
+pub dsl_render::RenderOptions::width: core::option::Option<f64>
+impl core::clone::Clone for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::clone(&self) -> dsl_render::renderer::RenderOptions
+impl core::default::Default for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::default() -> Self
+impl core::fmt::Debug for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for dsl_render::renderer::RenderOptions
+impl core::marker::Send for dsl_render::renderer::RenderOptions
+impl core::marker::Sync for dsl_render::renderer::RenderOptions
+impl core::marker::Unpin for dsl_render::renderer::RenderOptions
+impl core::marker::UnsafeUnpin for dsl_render::renderer::RenderOptions
+impl core::panic::unwind_safe::RefUnwindSafe for dsl_render::renderer::RenderOptions
+impl core::panic::unwind_safe::UnwindSafe for dsl_render::renderer::RenderOptions
+impl<T, U> core::convert::Into<U> for dsl_render::renderer::RenderOptions where U: core::convert::From<T>
+pub fn dsl_render::renderer::RenderOptions::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for dsl_render::renderer::RenderOptions where U: core::convert::Into<T>
+pub type dsl_render::renderer::RenderOptions::Error = core::convert::Infallible
+pub fn dsl_render::renderer::RenderOptions::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for dsl_render::renderer::RenderOptions where U: core::convert::TryFrom<T>
+pub type dsl_render::renderer::RenderOptions::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn dsl_render::renderer::RenderOptions::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for dsl_render::renderer::RenderOptions where T: core::clone::Clone
+pub type dsl_render::renderer::RenderOptions::Owned = T
+pub fn dsl_render::renderer::RenderOptions::clone_into(&self, &mut T)
+pub fn dsl_render::renderer::RenderOptions::to_owned(&self) -> T
+impl<T> core::any::Any for dsl_render::renderer::RenderOptions where T: 'static + ?core::marker::Sized
+pub fn dsl_render::renderer::RenderOptions::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for dsl_render::renderer::RenderOptions where T: ?core::marker::Sized
+pub fn dsl_render::renderer::RenderOptions::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for dsl_render::renderer::RenderOptions where T: ?core::marker::Sized
+pub fn dsl_render::renderer::RenderOptions::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for dsl_render::renderer::RenderOptions where T: core::clone::Clone
+pub unsafe fn dsl_render::renderer::RenderOptions::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for dsl_render::renderer::RenderOptions
+pub fn dsl_render::renderer::RenderOptions::from(T) -> T
+pub fn dsl_render::render(&str) -> anyhow::Result<alloc::string::String>
+pub fn dsl_render::render_dsl(&str, &dsl_render::renderer::RenderOptions) -> anyhow::Result<alloc::string::String>
+pub fn dsl_render::render_graph(&dsl_bpmn_frontend::railway::RailwayGraph, &dsl_render::renderer::RenderOptions, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>) -> anyhow::Result<alloc::string::String>

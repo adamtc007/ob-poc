@@ -44,6 +44,7 @@ struct DslState {
     #[serde(default)]
     source: Option<String>,
     #[serde(default)]
+    #[allow(dead_code)]
     can_execute: bool,
 }
 

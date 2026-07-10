@@ -7,7 +7,7 @@
 
 use dsl_runtime::LifecycleCatalog;
 
-use crate::ontology::{is_terminal_state, is_valid_transition, ontology};
+use ob_poc_ontology::{is_terminal_state, is_valid_transition, ontology};
 
 pub struct ObPocLifecycleCatalog;
 

@@ -13,6 +13,7 @@
 //!
 //! - [`resolve`] — resolution pass; validates and indexes decision-pack atoms.
 //! - [`validate_bpmn`] — full pipeline (parse → bag → resolve → assemble).
+#![deny(unreachable_pub)]
 
 pub mod pack_registry;
 pub mod resolve;

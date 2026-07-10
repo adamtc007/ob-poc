@@ -1,6 +1,7 @@
 //! Phase 1 Task 2 (§10.6) — optimistic-concurrency (CAS) on the directly-mutated
 //! compliance write-paths, with the three-class carve-out.
 //!
+#![allow(clippy::doc_overindented_list_items)]
 //! v0.5 §10.6 turns LWW into compare-and-set for operator-authored compliance
 //! values. The ratified design carves the surface into three classes:
 //!   * Class 1 — operator-authored, NON-ManCo compliance facts → version-CAS'd
@@ -149,29 +150,69 @@ async fn cas_a1_rejects_stale_class1_and_keeps_idempotent_floor() {
     };
 
     // Initial insert → version 1.
-    AssignOwnership.execute(&base("42.50", None), &mut ctx, &mut scope).await.expect("insert");
-    assert_eq!(role_version(&mut scope, cbu).await, 1, "fresh insert is version 1");
+    AssignOwnership
+        .execute(&base("42.50", None), &mut ctx, &mut scope)
+        .await
+        .expect("insert");
+    assert_eq!(
+        role_version(&mut scope, cbu).await,
+        1,
+        "fresh insert is version 1"
+    );
 
     // Reader-at-v1 commits first: expected-version=1 matches → succeeds, version→2.
-    AssignOwnership.execute(&base("50.00", Some(1)), &mut ctx, &mut scope).await.expect("v1→v2 update");
-    assert_eq!(role_version(&mut scope, cbu).await, 2, "matched-version update bumps to 2");
-    assert_eq!(role_pct(&mut scope, cbu).await, Some("50.00".parse().unwrap()));
+    AssignOwnership
+        .execute(&base("50.00", Some(1)), &mut ctx, &mut scope)
+        .await
+        .expect("v1→v2 update");
+    assert_eq!(
+        role_version(&mut scope, cbu).await,
+        2,
+        "matched-version update bumps to 2"
+    );
+    assert_eq!(
+        role_pct(&mut scope, cbu).await,
+        Some("50.00".parse().unwrap())
+    );
 
     // Stale writer still holding expected-version=1 → REJECTED (version is now 2).
-    let stale = AssignOwnership.execute(&base("99.99", Some(1)), &mut ctx, &mut scope).await;
-    assert!(stale.is_err(), "stale Class-1 write MUST be rejected, got {stale:?}");
+    let stale = AssignOwnership
+        .execute(&base("99.99", Some(1)), &mut ctx, &mut scope)
+        .await;
+    assert!(
+        stale.is_err(),
+        "stale Class-1 write MUST be rejected, got {stale:?}"
+    );
     let msg = format!("{}", stale.unwrap_err());
-    assert!(msg.contains("CAS conflict"), "expected a CAS conflict error, got: {msg}");
+    assert!(
+        msg.contains("CAS conflict"),
+        "expected a CAS conflict error, got: {msg}"
+    );
     // NOT clobbered: value + version unchanged by the rejected write.
-    assert_eq!(role_pct(&mut scope, cbu).await, Some("50.00".parse().unwrap()), "rejected write must not clobber");
-    assert_eq!(role_version(&mut scope, cbu).await, 2, "rejected write must not bump version");
+    assert_eq!(
+        role_pct(&mut scope, cbu).await,
+        Some("50.00".parse().unwrap()),
+        "rejected write must not clobber"
+    );
+    assert_eq!(
+        role_version(&mut scope, cbu).await,
+        2,
+        "rejected write must not bump version"
+    );
     eprintln!("[CAS a1] class-1 stale write rejected; value 50.00 / version 2 intact (not clobbered to 99.99)");
 
     // M-13 floor (CAS and idempotency stack, §10.1): a version-LESS re-write still
     // succeeds — the idempotent upsert is preserved for callers that do not assert
     // a version.
-    AssignOwnership.execute(&base("55.00", None), &mut ctx, &mut scope).await.expect("version-less floor write");
-    assert_eq!(role_version(&mut scope, cbu).await, 3, "version-less write bumps and is not blocked");
+    AssignOwnership
+        .execute(&base("55.00", None), &mut ctx, &mut scope)
+        .await
+        .expect("version-less floor write");
+    assert_eq!(
+        role_version(&mut scope, cbu).await,
+        3,
+        "version-less write bumps and is not blocked"
+    );
     eprintln!("[CAS a1] M-13 floor intact: version-less re-write succeeded (v3)");
     drop(scope);
 }
@@ -200,14 +241,27 @@ async fn cas_a1_carveout_manco_not_version_blocked() {
         a
     };
 
-    AssignFundRole.execute(&args("10.00", None), &mut ctx, &mut scope).await.expect("manco insert");
+    AssignFundRole
+        .execute(&args("10.00", None), &mut ctx, &mut scope)
+        .await
+        .expect("manco insert");
     assert_eq!(role_version(&mut scope, cbu).await, 1);
     // A deliberately WRONG version (999) would reject a Class-1 row — but the ManCo
     // row is Class 2 (carve-out), so it must update regardless of version.
-    AssignFundRole.execute(&args("20.00", Some(999)), &mut ctx, &mut scope).await
+    AssignFundRole
+        .execute(&args("20.00", Some(999)), &mut ctx, &mut scope)
+        .await
         .expect("ManCo (Class 2) write must NOT be version-blocked");
-    assert_eq!(role_pct(&mut scope, cbu).await, Some("20.00".parse().unwrap()), "carve-out write applied");
-    assert_eq!(role_version(&mut scope, cbu).await, 2, "carve-out still bumps version");
+    assert_eq!(
+        role_pct(&mut scope, cbu).await,
+        Some("20.00".parse().unwrap()),
+        "carve-out write applied"
+    );
+    assert_eq!(
+        role_version(&mut scope, cbu).await,
+        2,
+        "carve-out still bumps version"
+    );
     eprintln!("[CAS a1] ManCo carve-out proven: stale-version write applied (Class-2 not blocked)");
     drop(scope);
 }
@@ -232,15 +286,28 @@ async fn cas_a7_rejects_class1_and_carves_out_recompute() {
     let op_edge = |pct: &str, ev: Option<i64>| {
         let mut x = json!({ "from-entity-id": a, "to-entity-id": b, "relationship-type": "ownership",
                             "percentage": pct, "source": "cbu.assign-ownership" });
-        if let Some(v) = ev { x["expected-version"] = json!(v); }
+        if let Some(v) = ev {
+            x["expected-version"] = json!(v);
+        }
         x
     };
-    EdgeUpsert.execute(&op_edge("30.00", None), &mut ctx, &mut scope).await.expect("op edge insert");
+    EdgeUpsert
+        .execute(&op_edge("30.00", None), &mut ctx, &mut scope)
+        .await
+        .expect("op edge insert");
     assert_eq!(edge_version(&mut scope, a, b, "ownership").await, 1);
-    EdgeUpsert.execute(&op_edge("31.00", Some(1)), &mut ctx, &mut scope).await.expect("matched update");
+    EdgeUpsert
+        .execute(&op_edge("31.00", Some(1)), &mut ctx, &mut scope)
+        .await
+        .expect("matched update");
     assert_eq!(edge_version(&mut scope, a, b, "ownership").await, 2);
-    let stale = EdgeUpsert.execute(&op_edge("99.00", Some(1)), &mut ctx, &mut scope).await;
-    assert!(stale.is_err(), "stale Class-1 edge write MUST be rejected, got {stale:?}");
+    let stale = EdgeUpsert
+        .execute(&op_edge("99.00", Some(1)), &mut ctx, &mut scope)
+        .await;
+    assert!(
+        stale.is_err(),
+        "stale Class-1 edge write MUST be rejected, got {stale:?}"
+    );
     assert!(format!("{}", stale.unwrap_err()).contains("CAS conflict"));
     eprintln!("[CAS a7] class-1 operator edge stale write rejected");
 
@@ -248,12 +315,19 @@ async fn cas_a7_rejects_class1_and_carves_out_recompute() {
     let ubo_edge = |pct: &str, ev: Option<i64>| {
         let mut x = json!({ "from-entity-id": a, "to-entity-id": c, "relationship-type": "ownership",
                             "percentage": pct, "source": "ubo.supersede", "effective-from": "2024-01-01" });
-        if let Some(v) = ev { x["expected-version"] = json!(v); }
+        if let Some(v) = ev {
+            x["expected-version"] = json!(v);
+        }
         x
     };
-    EdgeUpsert.execute(&ubo_edge("40.00", None), &mut ctx, &mut scope).await.expect("ubo edge insert");
+    EdgeUpsert
+        .execute(&ubo_edge("40.00", None), &mut ctx, &mut scope)
+        .await
+        .expect("ubo edge insert");
     // Deliberately wrong version — recompute (Class 3) is carved out, must apply.
-    EdgeUpsert.execute(&ubo_edge("41.00", Some(999)), &mut ctx, &mut scope).await
+    EdgeUpsert
+        .execute(&ubo_edge("41.00", Some(999)), &mut ctx, &mut scope)
+        .await
         .expect("ubo recompute (Class 3) write must NOT be version-blocked");
     eprintln!("[CAS a7] ubo recompute carve-out proven: stale-version write applied (Class-3 not blocked)");
     drop(scope);

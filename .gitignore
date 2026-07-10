@@ -124,6 +124,14 @@ rust-project.json
 src/proto/
 proto/gen/
 
+# ==============================================================================
+# Java specific ignores
+# ==============================================================================
+
+# Local Gradle cache and generated docs for the Java workspace
+/java/.gradle/
+/java/docs/
+
 # Binary outputs from cargo build
 rust/dsl-poc
 rust/ob-poc
@@ -168,6 +176,12 @@ pids/
 *.pid
 *.seed
 *.pid.lock
+
+# Local model/evaluation scratch outputs
+/assets/
+/scratch/
+/rust/reports/*.json
+/rust/reports/*.jsonl
 
 # Temporary files
 tmp/
@@ -418,4 +432,3 @@ ob_poc_unreachable_pub_v2.txt
 patch.rs
 rust/check.txt
 rust/check_after.txt
-

@@ -578,7 +578,7 @@ impl ToolHandlers {
     /// Dispatch sem_reg_* tools through SemOsClient DI boundary.
     async fn dispatch_sem_reg(&self, name: &str, args: Value) -> Result<Value> {
         if let Some(ref client) = self.sem_os_client {
-            let actor_ctx = crate::policy::ActorResolver::from_env();
+            let actor_ctx = ob_poc_boundary::policy::ActorResolver::from_env();
             let principal = sem_os_core::principal::Principal::in_process(
                 &actor_ctx.actor_id,
                 actor_ctx.roles.clone(),
@@ -601,7 +601,7 @@ impl ToolHandlers {
         } else {
             use crate::sem_reg::agent::mcp_tools::{dispatch_tool, SemRegToolContext};
 
-            let actor = crate::policy::ActorResolver::from_env();
+            let actor = ob_poc_boundary::policy::ActorResolver::from_env();
             let ctx = SemRegToolContext {
                 pool: &self.pool,
                 actor: &actor,
@@ -797,7 +797,7 @@ impl ToolHandlers {
         // SemReg verb validation: extract verb FQNs from AST, check all are allowed
         if let Some(ref client) = self.sem_os_client {
             use dsl_core::Statement;
-            let actor = crate::policy::ActorResolver::from_env();
+            let actor = ob_poc_boundary::policy::ActorResolver::from_env();
             let mut constellation_family = None;
             let mut constellation_map = None;
             if let (Some(sid), Some(ref sessions)) = (session_id, &self.sessions) {
@@ -826,7 +826,7 @@ impl ToolHandlers {
             match phase2.halt_reason_code {
                 Some("sem_os_unavailable") => {
                     // Graceful degradation: if strict mode, fail; otherwise warn and continue
-                    let policy_gate = crate::policy::PolicyGate::from_env();
+                    let policy_gate = ob_poc_boundary::policy::PolicyGate::from_env();
                     if policy_gate.semreg_fail_closed() {
                         tracing::warn!("dsl_execute: SemReg unavailable in strict mode — blocking");
                         return Err(anyhow!(
@@ -1545,7 +1545,7 @@ impl ToolHandlers {
 
         // Resolve SemReg allowed verbs BEFORE search (Phase 3: pre-constrained)
         let envelope = if let Some(ref client) = self.sem_os_client {
-            let actor = crate::policy::ActorResolver::from_env();
+            let actor = ob_poc_boundary::policy::ActorResolver::from_env();
             let env = crate::agent::orchestrator::resolve_allowed_verbs(
                 client.as_ref(),
                 &actor,
@@ -1659,7 +1659,7 @@ impl ToolHandlers {
             let searcher = self.get_verb_searcher().await?;
             let mut orchestrator = crate::sequencer::ReplOrchestratorV2::new(
                 crate::journey::router::PackRouter::new(vec![]),
-                Arc::new(crate::sequencer::StubExecutor),
+                Arc::new(crate::sequencer::NullDslExecutor),
             )
             .with_verb_searcher(std::sync::Arc::new(searcher))
             .with_nlci_compiler(crate::semtaxonomy_v2::build_minimal_cbu_compiler());

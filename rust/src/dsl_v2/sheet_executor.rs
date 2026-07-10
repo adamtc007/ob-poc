@@ -45,7 +45,7 @@ use sqlx::PgPool;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
-use crate::events::SharedEmitter;
+use ob_poc_diagnostics::events::SharedEmitter;
 // Legacy imports (deprecated - use unified types for new code)
 #[allow(deprecated)]
 use crate::session::dsl_sheet::{

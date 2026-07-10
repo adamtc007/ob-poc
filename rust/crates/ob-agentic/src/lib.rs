@@ -15,6 +15,7 @@
 //! - `anthropic` (default): Anthropic Claude API, `claude-sonnet-4-6`
 //! - `openai`: OpenAI API
 //! - `claude-code-cli`: local Claude Code CLI, usually authenticated through Zed/Claude Code
+#![deny(unreachable_pub)]
 
 // LLM client abstraction
 pub mod anthropic_client;

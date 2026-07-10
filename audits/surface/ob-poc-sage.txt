@@ -1,0 +1,1682 @@
+# ob-poc-sage | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:59Z
+pub mod ob_poc_sage
+pub mod ob_poc_sage::context
+pub struct ob_poc_sage::context::RecentIntent
+pub ob_poc_sage::context::RecentIntent::action: alloc::string::String
+pub ob_poc_sage::context::RecentIntent::confidence: alloc::string::String
+pub ob_poc_sage::context::RecentIntent::domain_concept: alloc::string::String
+pub ob_poc_sage::context::RecentIntent::plane: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::context::RecentIntent
+pub fn ob_poc_sage::context::RecentIntent::clone(&self) -> ob_poc_sage::context::RecentIntent
+impl core::default::Default for ob_poc_sage::context::RecentIntent
+pub fn ob_poc_sage::context::RecentIntent::default() -> ob_poc_sage::context::RecentIntent
+impl core::fmt::Debug for ob_poc_sage::context::RecentIntent
+pub fn ob_poc_sage::context::RecentIntent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::context::RecentIntent
+pub fn ob_poc_sage::context::RecentIntent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::context::RecentIntent
+pub fn ob_poc_sage::context::RecentIntent::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::context::RecentIntent
+impl core::marker::Send for ob_poc_sage::context::RecentIntent
+impl core::marker::Sync for ob_poc_sage::context::RecentIntent
+impl core::marker::Unpin for ob_poc_sage::context::RecentIntent
+impl core::marker::UnsafeUnpin for ob_poc_sage::context::RecentIntent
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::context::RecentIntent
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::context::RecentIntent
+impl<T, U> core::convert::Into<U> for ob_poc_sage::context::RecentIntent where U: core::convert::From<T>
+pub fn ob_poc_sage::context::RecentIntent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::context::RecentIntent where U: core::convert::Into<T>
+pub type ob_poc_sage::context::RecentIntent::Error = core::convert::Infallible
+pub fn ob_poc_sage::context::RecentIntent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::context::RecentIntent where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::context::RecentIntent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::context::RecentIntent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::context::RecentIntent where T: core::clone::Clone
+pub type ob_poc_sage::context::RecentIntent::Owned = T
+pub fn ob_poc_sage::context::RecentIntent::clone_into(&self, &mut T)
+pub fn ob_poc_sage::context::RecentIntent::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::context::RecentIntent where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::context::RecentIntent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::context::RecentIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::context::RecentIntent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::context::RecentIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::context::RecentIntent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::context::RecentIntent where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::context::RecentIntent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::context::RecentIntent
+pub fn ob_poc_sage::context::RecentIntent::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::context::RecentIntent
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::context::RecentIntent where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::context::RecentIntent
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::context::RecentIntent
+impl<T> typenum::type_operators::Same for ob_poc_sage::context::RecentIntent
+pub type ob_poc_sage::context::RecentIntent::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::context::RecentIntent where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::context::RecentIntent::vzip(self) -> V
+pub struct ob_poc_sage::context::SageContext
+pub ob_poc_sage::context::SageContext::dominant_entity_name: core::option::Option<alloc::string::String>
+pub ob_poc_sage::context::SageContext::entity_kind: core::option::Option<alloc::string::String>
+pub ob_poc_sage::context::SageContext::goals: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::context::SageContext::last_intents: alloc::vec::Vec<ob_poc_sage::context::RecentIntent>
+pub ob_poc_sage::context::SageContext::session_id: core::option::Option<uuid::Uuid>
+pub ob_poc_sage::context::SageContext::stage_focus: core::option::Option<alloc::string::String>
+impl ob_poc_sage::context::SageContext
+pub fn ob_poc_sage::context::SageContext::from_stage_focus(core::option::Option<alloc::string::String>) -> Self
+impl core::clone::Clone for ob_poc_sage::context::SageContext
+pub fn ob_poc_sage::context::SageContext::clone(&self) -> ob_poc_sage::context::SageContext
+impl core::default::Default for ob_poc_sage::context::SageContext
+pub fn ob_poc_sage::context::SageContext::default() -> ob_poc_sage::context::SageContext
+impl core::fmt::Debug for ob_poc_sage::context::SageContext
+pub fn ob_poc_sage::context::SageContext::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_sage::context::SageContext
+impl core::marker::Send for ob_poc_sage::context::SageContext
+impl core::marker::Sync for ob_poc_sage::context::SageContext
+impl core::marker::Unpin for ob_poc_sage::context::SageContext
+impl core::marker::UnsafeUnpin for ob_poc_sage::context::SageContext
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::context::SageContext
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::context::SageContext
+impl<T, U> core::convert::Into<U> for ob_poc_sage::context::SageContext where U: core::convert::From<T>
+pub fn ob_poc_sage::context::SageContext::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::context::SageContext where U: core::convert::Into<T>
+pub type ob_poc_sage::context::SageContext::Error = core::convert::Infallible
+pub fn ob_poc_sage::context::SageContext::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::context::SageContext where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::context::SageContext::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::context::SageContext::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::context::SageContext where T: core::clone::Clone
+pub type ob_poc_sage::context::SageContext::Owned = T
+pub fn ob_poc_sage::context::SageContext::clone_into(&self, &mut T)
+pub fn ob_poc_sage::context::SageContext::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::context::SageContext where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::context::SageContext::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::context::SageContext where T: ?core::marker::Sized
+pub fn ob_poc_sage::context::SageContext::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::context::SageContext where T: ?core::marker::Sized
+pub fn ob_poc_sage::context::SageContext::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::context::SageContext where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::context::SageContext::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::context::SageContext
+pub fn ob_poc_sage::context::SageContext::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::context::SageContext
+impl<T> tracing::instrument::Instrument for ob_poc_sage::context::SageContext
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::context::SageContext
+impl<T> typenum::type_operators::Same for ob_poc_sage::context::SageContext
+pub type ob_poc_sage::context::SageContext::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::context::SageContext where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::context::SageContext::vzip(self) -> V
+pub mod ob_poc_sage::disposition
+pub enum ob_poc_sage::disposition::UtteranceDisposition
+pub ob_poc_sage::disposition::UtteranceDisposition::Delegate(alloc::boxed::Box<ob_poc_sage::disposition::DelegateIntent>)
+pub ob_poc_sage::disposition::UtteranceDisposition::Serve(ob_poc_sage::disposition::ServeIntent)
+impl core::clone::Clone for ob_poc_sage::disposition::UtteranceDisposition
+pub fn ob_poc_sage::disposition::UtteranceDisposition::clone(&self) -> ob_poc_sage::disposition::UtteranceDisposition
+impl core::fmt::Debug for ob_poc_sage::disposition::UtteranceDisposition
+pub fn ob_poc_sage::disposition::UtteranceDisposition::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::disposition::UtteranceDisposition
+pub fn ob_poc_sage::disposition::UtteranceDisposition::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::disposition::UtteranceDisposition
+pub fn ob_poc_sage::disposition::UtteranceDisposition::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::disposition::UtteranceDisposition
+impl core::marker::Send for ob_poc_sage::disposition::UtteranceDisposition
+impl core::marker::Sync for ob_poc_sage::disposition::UtteranceDisposition
+impl core::marker::Unpin for ob_poc_sage::disposition::UtteranceDisposition
+impl core::marker::UnsafeUnpin for ob_poc_sage::disposition::UtteranceDisposition
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::disposition::UtteranceDisposition
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::disposition::UtteranceDisposition
+impl<T, U> core::convert::Into<U> for ob_poc_sage::disposition::UtteranceDisposition where U: core::convert::From<T>
+pub fn ob_poc_sage::disposition::UtteranceDisposition::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::disposition::UtteranceDisposition where U: core::convert::Into<T>
+pub type ob_poc_sage::disposition::UtteranceDisposition::Error = core::convert::Infallible
+pub fn ob_poc_sage::disposition::UtteranceDisposition::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::disposition::UtteranceDisposition where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::disposition::UtteranceDisposition::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::disposition::UtteranceDisposition::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::disposition::UtteranceDisposition where T: core::clone::Clone
+pub type ob_poc_sage::disposition::UtteranceDisposition::Owned = T
+pub fn ob_poc_sage::disposition::UtteranceDisposition::clone_into(&self, &mut T)
+pub fn ob_poc_sage::disposition::UtteranceDisposition::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::disposition::UtteranceDisposition where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::disposition::UtteranceDisposition::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::disposition::UtteranceDisposition where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::UtteranceDisposition::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::disposition::UtteranceDisposition where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::UtteranceDisposition::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::disposition::UtteranceDisposition where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::disposition::UtteranceDisposition::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::disposition::UtteranceDisposition
+pub fn ob_poc_sage::disposition::UtteranceDisposition::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::disposition::UtteranceDisposition
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::disposition::UtteranceDisposition where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::disposition::UtteranceDisposition
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::disposition::UtteranceDisposition
+impl<T> typenum::type_operators::Same for ob_poc_sage::disposition::UtteranceDisposition
+pub type ob_poc_sage::disposition::UtteranceDisposition::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::disposition::UtteranceDisposition where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::disposition::UtteranceDisposition::vzip(self) -> V
+pub struct ob_poc_sage::disposition::DelegateIntent
+pub ob_poc_sage::disposition::DelegateIntent::outcome: ob_poc_sage::outcome::OutcomeIntent
+pub ob_poc_sage::disposition::DelegateIntent::summary: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::disposition::DelegateIntent
+pub fn ob_poc_sage::disposition::DelegateIntent::clone(&self) -> ob_poc_sage::disposition::DelegateIntent
+impl core::fmt::Debug for ob_poc_sage::disposition::DelegateIntent
+pub fn ob_poc_sage::disposition::DelegateIntent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::disposition::DelegateIntent
+pub fn ob_poc_sage::disposition::DelegateIntent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::disposition::DelegateIntent
+pub fn ob_poc_sage::disposition::DelegateIntent::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::disposition::DelegateIntent
+impl core::marker::Send for ob_poc_sage::disposition::DelegateIntent
+impl core::marker::Sync for ob_poc_sage::disposition::DelegateIntent
+impl core::marker::Unpin for ob_poc_sage::disposition::DelegateIntent
+impl core::marker::UnsafeUnpin for ob_poc_sage::disposition::DelegateIntent
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::disposition::DelegateIntent
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::disposition::DelegateIntent
+impl<T, U> core::convert::Into<U> for ob_poc_sage::disposition::DelegateIntent where U: core::convert::From<T>
+pub fn ob_poc_sage::disposition::DelegateIntent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::disposition::DelegateIntent where U: core::convert::Into<T>
+pub type ob_poc_sage::disposition::DelegateIntent::Error = core::convert::Infallible
+pub fn ob_poc_sage::disposition::DelegateIntent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::disposition::DelegateIntent where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::disposition::DelegateIntent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::disposition::DelegateIntent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::disposition::DelegateIntent where T: core::clone::Clone
+pub type ob_poc_sage::disposition::DelegateIntent::Owned = T
+pub fn ob_poc_sage::disposition::DelegateIntent::clone_into(&self, &mut T)
+pub fn ob_poc_sage::disposition::DelegateIntent::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::disposition::DelegateIntent where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::disposition::DelegateIntent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::disposition::DelegateIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::DelegateIntent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::disposition::DelegateIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::DelegateIntent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::disposition::DelegateIntent where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::disposition::DelegateIntent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::disposition::DelegateIntent
+pub fn ob_poc_sage::disposition::DelegateIntent::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::disposition::DelegateIntent
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::disposition::DelegateIntent where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::disposition::DelegateIntent
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::disposition::DelegateIntent
+impl<T> typenum::type_operators::Same for ob_poc_sage::disposition::DelegateIntent
+pub type ob_poc_sage::disposition::DelegateIntent::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::disposition::DelegateIntent where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::disposition::DelegateIntent::vzip(self) -> V
+pub struct ob_poc_sage::disposition::PendingMutation
+pub ob_poc_sage::disposition::PendingMutation::change_summary: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::disposition::PendingMutation::confirmation_text: alloc::string::String
+pub ob_poc_sage::disposition::PendingMutation::drafter_result: ob_poc_sage::drafter_result::DraftResult
+pub ob_poc_sage::disposition::PendingMutation::intent: ob_poc_sage::outcome::OutcomeIntent
+impl core::clone::Clone for ob_poc_sage::disposition::PendingMutation
+pub fn ob_poc_sage::disposition::PendingMutation::clone(&self) -> ob_poc_sage::disposition::PendingMutation
+impl core::fmt::Debug for ob_poc_sage::disposition::PendingMutation
+pub fn ob_poc_sage::disposition::PendingMutation::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::disposition::PendingMutation
+pub fn ob_poc_sage::disposition::PendingMutation::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::disposition::PendingMutation
+pub fn ob_poc_sage::disposition::PendingMutation::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::disposition::PendingMutation
+impl core::marker::Send for ob_poc_sage::disposition::PendingMutation
+impl core::marker::Sync for ob_poc_sage::disposition::PendingMutation
+impl core::marker::Unpin for ob_poc_sage::disposition::PendingMutation
+impl core::marker::UnsafeUnpin for ob_poc_sage::disposition::PendingMutation
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::disposition::PendingMutation
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::disposition::PendingMutation
+impl<T, U> core::convert::Into<U> for ob_poc_sage::disposition::PendingMutation where U: core::convert::From<T>
+pub fn ob_poc_sage::disposition::PendingMutation::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::disposition::PendingMutation where U: core::convert::Into<T>
+pub type ob_poc_sage::disposition::PendingMutation::Error = core::convert::Infallible
+pub fn ob_poc_sage::disposition::PendingMutation::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::disposition::PendingMutation where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::disposition::PendingMutation::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::disposition::PendingMutation::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::disposition::PendingMutation where T: core::clone::Clone
+pub type ob_poc_sage::disposition::PendingMutation::Owned = T
+pub fn ob_poc_sage::disposition::PendingMutation::clone_into(&self, &mut T)
+pub fn ob_poc_sage::disposition::PendingMutation::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::disposition::PendingMutation where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::disposition::PendingMutation::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::disposition::PendingMutation where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::PendingMutation::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::disposition::PendingMutation where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::PendingMutation::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::disposition::PendingMutation where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::disposition::PendingMutation::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::disposition::PendingMutation
+pub fn ob_poc_sage::disposition::PendingMutation::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::disposition::PendingMutation
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::disposition::PendingMutation where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::disposition::PendingMutation
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::disposition::PendingMutation
+impl<T> typenum::type_operators::Same for ob_poc_sage::disposition::PendingMutation
+pub type ob_poc_sage::disposition::PendingMutation::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::disposition::PendingMutation where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::disposition::PendingMutation::vzip(self) -> V
+pub struct ob_poc_sage::disposition::ServeIntent
+pub ob_poc_sage::disposition::ServeIntent::action: ob_poc_sage::outcome::OutcomeAction
+pub ob_poc_sage::disposition::ServeIntent::domain: alloc::string::String
+pub ob_poc_sage::disposition::ServeIntent::subject: core::option::Option<ob_poc_sage::outcome::EntityRef>
+pub ob_poc_sage::disposition::ServeIntent::summary: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::disposition::ServeIntent
+pub fn ob_poc_sage::disposition::ServeIntent::clone(&self) -> ob_poc_sage::disposition::ServeIntent
+impl core::fmt::Debug for ob_poc_sage::disposition::ServeIntent
+pub fn ob_poc_sage::disposition::ServeIntent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::disposition::ServeIntent
+pub fn ob_poc_sage::disposition::ServeIntent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::disposition::ServeIntent
+pub fn ob_poc_sage::disposition::ServeIntent::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::disposition::ServeIntent
+impl core::marker::Send for ob_poc_sage::disposition::ServeIntent
+impl core::marker::Sync for ob_poc_sage::disposition::ServeIntent
+impl core::marker::Unpin for ob_poc_sage::disposition::ServeIntent
+impl core::marker::UnsafeUnpin for ob_poc_sage::disposition::ServeIntent
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::disposition::ServeIntent
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::disposition::ServeIntent
+impl<T, U> core::convert::Into<U> for ob_poc_sage::disposition::ServeIntent where U: core::convert::From<T>
+pub fn ob_poc_sage::disposition::ServeIntent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::disposition::ServeIntent where U: core::convert::Into<T>
+pub type ob_poc_sage::disposition::ServeIntent::Error = core::convert::Infallible
+pub fn ob_poc_sage::disposition::ServeIntent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::disposition::ServeIntent where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::disposition::ServeIntent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::disposition::ServeIntent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::disposition::ServeIntent where T: core::clone::Clone
+pub type ob_poc_sage::disposition::ServeIntent::Owned = T
+pub fn ob_poc_sage::disposition::ServeIntent::clone_into(&self, &mut T)
+pub fn ob_poc_sage::disposition::ServeIntent::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::disposition::ServeIntent where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::disposition::ServeIntent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::disposition::ServeIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::ServeIntent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::disposition::ServeIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::disposition::ServeIntent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::disposition::ServeIntent where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::disposition::ServeIntent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::disposition::ServeIntent
+pub fn ob_poc_sage::disposition::ServeIntent::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::disposition::ServeIntent
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::disposition::ServeIntent where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::disposition::ServeIntent
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::disposition::ServeIntent
+impl<T> typenum::type_operators::Same for ob_poc_sage::disposition::ServeIntent
+pub type ob_poc_sage::disposition::ServeIntent::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::disposition::ServeIntent where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::disposition::ServeIntent::vzip(self) -> V
+pub mod ob_poc_sage::drafter_result
+pub enum ob_poc_sage::drafter_result::DraftFailureKind
+pub ob_poc_sage::drafter_result::DraftFailureKind::ActionConflict
+pub ob_poc_sage::drafter_result::DraftFailureKind::BelowThreshold
+pub ob_poc_sage::drafter_result::DraftFailureKind::DomainConflict
+pub ob_poc_sage::drafter_result::DraftFailureKind::NoCandidateAfterFilters
+pub ob_poc_sage::drafter_result::DraftFailureKind::PhaseConflict
+pub ob_poc_sage::drafter_result::DraftFailureKind::PolicyConflict
+pub ob_poc_sage::drafter_result::DraftFailureKind::SubjectKindConflict
+impl core::clone::Clone for ob_poc_sage::drafter_result::DraftFailureKind
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::clone(&self) -> ob_poc_sage::drafter_result::DraftFailureKind
+impl core::cmp::Eq for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::cmp::PartialEq for ob_poc_sage::drafter_result::DraftFailureKind
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::eq(&self, &ob_poc_sage::drafter_result::DraftFailureKind) -> bool
+impl core::fmt::Debug for ob_poc_sage::drafter_result::DraftFailureKind
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::marker::StructuralPartialEq for ob_poc_sage::drafter_result::DraftFailureKind
+impl serde_core::ser::Serialize for ob_poc_sage::drafter_result::DraftFailureKind
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::drafter_result::DraftFailureKind
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::marker::Send for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::marker::Sync for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::marker::Unpin for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::marker::UnsafeUnpin for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::drafter_result::DraftFailureKind
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::drafter_result::DraftFailureKind
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::drafter_result::DraftFailureKind where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::drafter_result::DraftFailureKind where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::drafter_result::DraftFailureKind where U: core::convert::From<T>
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::drafter_result::DraftFailureKind where U: core::convert::Into<T>
+pub type ob_poc_sage::drafter_result::DraftFailureKind::Error = core::convert::Infallible
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::drafter_result::DraftFailureKind where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::drafter_result::DraftFailureKind::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::drafter_result::DraftFailureKind where T: core::clone::Clone
+pub type ob_poc_sage::drafter_result::DraftFailureKind::Owned = T
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::clone_into(&self, &mut T)
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::drafter_result::DraftFailureKind where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::drafter_result::DraftFailureKind where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::drafter_result::DraftFailureKind where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::drafter_result::DraftFailureKind where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::drafter_result::DraftFailureKind::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::drafter_result::DraftFailureKind
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::drafter_result::DraftFailureKind
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::drafter_result::DraftFailureKind where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::drafter_result::DraftFailureKind
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::drafter_result::DraftFailureKind
+impl<T> typenum::type_operators::Same for ob_poc_sage::drafter_result::DraftFailureKind
+pub type ob_poc_sage::drafter_result::DraftFailureKind::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::drafter_result::DraftFailureKind where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::drafter_result::DraftFailureKind::vzip(self) -> V
+pub enum ob_poc_sage::drafter_result::DraftResolution
+pub ob_poc_sage::drafter_result::DraftResolution::Confident
+pub ob_poc_sage::drafter_result::DraftResolution::NeedsInput
+pub ob_poc_sage::drafter_result::DraftResolution::Proposed
+impl core::clone::Clone for ob_poc_sage::drafter_result::DraftResolution
+pub fn ob_poc_sage::drafter_result::DraftResolution::clone(&self) -> ob_poc_sage::drafter_result::DraftResolution
+impl core::cmp::Eq for ob_poc_sage::drafter_result::DraftResolution
+impl core::cmp::PartialEq for ob_poc_sage::drafter_result::DraftResolution
+pub fn ob_poc_sage::drafter_result::DraftResolution::eq(&self, &ob_poc_sage::drafter_result::DraftResolution) -> bool
+impl core::fmt::Debug for ob_poc_sage::drafter_result::DraftResolution
+pub fn ob_poc_sage::drafter_result::DraftResolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_sage::drafter_result::DraftResolution
+impl core::marker::StructuralPartialEq for ob_poc_sage::drafter_result::DraftResolution
+impl serde_core::ser::Serialize for ob_poc_sage::drafter_result::DraftResolution
+pub fn ob_poc_sage::drafter_result::DraftResolution::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::drafter_result::DraftResolution
+pub fn ob_poc_sage::drafter_result::DraftResolution::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::drafter_result::DraftResolution
+impl core::marker::Send for ob_poc_sage::drafter_result::DraftResolution
+impl core::marker::Sync for ob_poc_sage::drafter_result::DraftResolution
+impl core::marker::Unpin for ob_poc_sage::drafter_result::DraftResolution
+impl core::marker::UnsafeUnpin for ob_poc_sage::drafter_result::DraftResolution
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::drafter_result::DraftResolution
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::drafter_result::DraftResolution
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::drafter_result::DraftResolution where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResolution::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::drafter_result::DraftResolution where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResolution::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::drafter_result::DraftResolution where U: core::convert::From<T>
+pub fn ob_poc_sage::drafter_result::DraftResolution::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::drafter_result::DraftResolution where U: core::convert::Into<T>
+pub type ob_poc_sage::drafter_result::DraftResolution::Error = core::convert::Infallible
+pub fn ob_poc_sage::drafter_result::DraftResolution::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::drafter_result::DraftResolution where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::drafter_result::DraftResolution::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::drafter_result::DraftResolution::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::drafter_result::DraftResolution where T: core::clone::Clone
+pub type ob_poc_sage::drafter_result::DraftResolution::Owned = T
+pub fn ob_poc_sage::drafter_result::DraftResolution::clone_into(&self, &mut T)
+pub fn ob_poc_sage::drafter_result::DraftResolution::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::drafter_result::DraftResolution where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResolution::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::drafter_result::DraftResolution where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResolution::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::drafter_result::DraftResolution where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResolution::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::drafter_result::DraftResolution where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::drafter_result::DraftResolution::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::drafter_result::DraftResolution
+pub fn ob_poc_sage::drafter_result::DraftResolution::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::drafter_result::DraftResolution
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::drafter_result::DraftResolution where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::drafter_result::DraftResolution
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::drafter_result::DraftResolution
+impl<T> typenum::type_operators::Same for ob_poc_sage::drafter_result::DraftResolution
+pub type ob_poc_sage::drafter_result::DraftResolution::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::drafter_result::DraftResolution where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::drafter_result::DraftResolution::vzip(self) -> V
+pub struct ob_poc_sage::drafter_result::DraftDiagnostics
+pub ob_poc_sage::drafter_result::DraftDiagnostics::failure_kind: core::option::Option<ob_poc_sage::drafter_result::DraftFailureKind>
+pub ob_poc_sage::drafter_result::DraftDiagnostics::filter_diagnostics: ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub ob_poc_sage::drafter_result::DraftDiagnostics::threshold: core::option::Option<f32>
+pub ob_poc_sage::drafter_result::DraftDiagnostics::top_candidate: core::option::Option<alloc::string::String>
+pub ob_poc_sage::drafter_result::DraftDiagnostics::top_score: core::option::Option<f32>
+impl core::clone::Clone for ob_poc_sage::drafter_result::DraftDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::clone(&self) -> ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::fmt::Debug for ob_poc_sage::drafter_result::DraftDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::drafter_result::DraftDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::drafter_result::DraftDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::marker::Send for ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::marker::Sync for ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::marker::Unpin for ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::marker::UnsafeUnpin for ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::drafter_result::DraftDiagnostics
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::drafter_result::DraftDiagnostics
+impl<T, U> core::convert::Into<U> for ob_poc_sage::drafter_result::DraftDiagnostics where U: core::convert::From<T>
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::drafter_result::DraftDiagnostics where U: core::convert::Into<T>
+pub type ob_poc_sage::drafter_result::DraftDiagnostics::Error = core::convert::Infallible
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::drafter_result::DraftDiagnostics where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::drafter_result::DraftDiagnostics::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::drafter_result::DraftDiagnostics where T: core::clone::Clone
+pub type ob_poc_sage::drafter_result::DraftDiagnostics::Owned = T
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::clone_into(&self, &mut T)
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::drafter_result::DraftDiagnostics where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::drafter_result::DraftDiagnostics where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::drafter_result::DraftDiagnostics where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::drafter_result::DraftDiagnostics where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::drafter_result::DraftDiagnostics::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::drafter_result::DraftDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::drafter_result::DraftDiagnostics
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::drafter_result::DraftDiagnostics where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::drafter_result::DraftDiagnostics
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::drafter_result::DraftDiagnostics
+impl<T> typenum::type_operators::Same for ob_poc_sage::drafter_result::DraftDiagnostics
+pub type ob_poc_sage::drafter_result::DraftDiagnostics::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::drafter_result::DraftDiagnostics where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::drafter_result::DraftDiagnostics::vzip(self) -> V
+pub struct ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub ob_poc_sage::drafter_result::DraftFilterDiagnostics::base_candidates: usize
+pub ob_poc_sage::drafter_result::DraftFilterDiagnostics::domain_candidates: usize
+pub ob_poc_sage::drafter_result::DraftFilterDiagnostics::final_candidates: usize
+pub ob_poc_sage::drafter_result::DraftFilterDiagnostics::phase_candidates: usize
+pub ob_poc_sage::drafter_result::DraftFilterDiagnostics::subject_kind_candidates: usize
+impl core::clone::Clone for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::clone(&self) -> ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::convert::From<ob_poc_sage::verb_resolve_types::FilterDiagnostics> for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::from(ob_poc_sage::verb_resolve_types::FilterDiagnostics) -> Self
+impl core::fmt::Debug for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl serde_core::ser::Serialize for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::marker::Send for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::marker::Sync for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::marker::Unpin for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::marker::UnsafeUnpin for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl<T, U> core::convert::Into<U> for ob_poc_sage::drafter_result::DraftFilterDiagnostics where U: core::convert::From<T>
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::drafter_result::DraftFilterDiagnostics where U: core::convert::Into<T>
+pub type ob_poc_sage::drafter_result::DraftFilterDiagnostics::Error = core::convert::Infallible
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::drafter_result::DraftFilterDiagnostics where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::drafter_result::DraftFilterDiagnostics::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::drafter_result::DraftFilterDiagnostics where T: core::clone::Clone
+pub type ob_poc_sage::drafter_result::DraftFilterDiagnostics::Owned = T
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::clone_into(&self, &mut T)
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::drafter_result::DraftFilterDiagnostics where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::drafter_result::DraftFilterDiagnostics where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::drafter_result::DraftFilterDiagnostics where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::drafter_result::DraftFilterDiagnostics where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::drafter_result::DraftFilterDiagnostics where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+impl<T> typenum::type_operators::Same for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub type ob_poc_sage::drafter_result::DraftFilterDiagnostics::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::drafter_result::DraftFilterDiagnostics where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::vzip(self) -> V
+pub struct ob_poc_sage::drafter_result::DraftResult
+pub ob_poc_sage::drafter_result::DraftResult::diagnostics: core::option::Option<ob_poc_sage::drafter_result::DraftDiagnostics>
+pub ob_poc_sage::drafter_result::DraftResult::dsl: alloc::string::String
+pub ob_poc_sage::drafter_result::DraftResult::missing_args: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::drafter_result::DraftResult::resolution: ob_poc_sage::drafter_result::DraftResolution
+pub ob_poc_sage::drafter_result::DraftResult::unresolved_refs: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::drafter_result::DraftResult::verb_fqn: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::drafter_result::DraftResult
+pub fn ob_poc_sage::drafter_result::DraftResult::clone(&self) -> ob_poc_sage::drafter_result::DraftResult
+impl core::fmt::Debug for ob_poc_sage::drafter_result::DraftResult
+pub fn ob_poc_sage::drafter_result::DraftResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::drafter_result::DraftResult
+pub fn ob_poc_sage::drafter_result::DraftResult::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::drafter_result::DraftResult
+pub fn ob_poc_sage::drafter_result::DraftResult::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::drafter_result::DraftResult
+impl core::marker::Send for ob_poc_sage::drafter_result::DraftResult
+impl core::marker::Sync for ob_poc_sage::drafter_result::DraftResult
+impl core::marker::Unpin for ob_poc_sage::drafter_result::DraftResult
+impl core::marker::UnsafeUnpin for ob_poc_sage::drafter_result::DraftResult
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::drafter_result::DraftResult
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::drafter_result::DraftResult
+impl<T, U> core::convert::Into<U> for ob_poc_sage::drafter_result::DraftResult where U: core::convert::From<T>
+pub fn ob_poc_sage::drafter_result::DraftResult::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::drafter_result::DraftResult where U: core::convert::Into<T>
+pub type ob_poc_sage::drafter_result::DraftResult::Error = core::convert::Infallible
+pub fn ob_poc_sage::drafter_result::DraftResult::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::drafter_result::DraftResult where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::drafter_result::DraftResult::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::drafter_result::DraftResult::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::drafter_result::DraftResult where T: core::clone::Clone
+pub type ob_poc_sage::drafter_result::DraftResult::Owned = T
+pub fn ob_poc_sage::drafter_result::DraftResult::clone_into(&self, &mut T)
+pub fn ob_poc_sage::drafter_result::DraftResult::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::drafter_result::DraftResult where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResult::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::drafter_result::DraftResult where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResult::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::drafter_result::DraftResult where T: ?core::marker::Sized
+pub fn ob_poc_sage::drafter_result::DraftResult::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::drafter_result::DraftResult where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::drafter_result::DraftResult::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::drafter_result::DraftResult
+pub fn ob_poc_sage::drafter_result::DraftResult::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::drafter_result::DraftResult
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::drafter_result::DraftResult where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::drafter_result::DraftResult
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::drafter_result::DraftResult
+impl<T> typenum::type_operators::Same for ob_poc_sage::drafter_result::DraftResult
+pub type ob_poc_sage::drafter_result::DraftResult::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::drafter_result::DraftResult where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::drafter_result::DraftResult::vzip(self) -> V
+pub mod ob_poc_sage::engine
+pub struct ob_poc_sage::engine::ValidVerbSetScope<'a>
+pub ob_poc_sage::engine::ValidVerbSetScope::client_group_id: uuid::Uuid
+pub ob_poc_sage::engine::ValidVerbSetScope::constellation_id: &'a str
+pub ob_poc_sage::engine::ValidVerbSetScope::entity_states: &'a [ob_poc_sage::session_context::EntityState]
+pub ob_poc_sage::engine::ValidVerbSetScope::workspace: &'a str
+impl<'a> core::clone::Clone for ob_poc_sage::engine::ValidVerbSetScope<'a>
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::clone(&self) -> ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::fmt::Debug for ob_poc_sage::engine::ValidVerbSetScope<'a>
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::marker::Send for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::marker::Sync for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::marker::Unpin for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::marker::UnsafeUnpin for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<T, U> core::convert::Into<U> for ob_poc_sage::engine::ValidVerbSetScope<'a> where U: core::convert::From<T>
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::engine::ValidVerbSetScope<'a> where U: core::convert::Into<T>
+pub type ob_poc_sage::engine::ValidVerbSetScope<'a>::Error = core::convert::Infallible
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::engine::ValidVerbSetScope<'a> where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::engine::ValidVerbSetScope<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::engine::ValidVerbSetScope<'a> where T: core::clone::Clone
+pub type ob_poc_sage::engine::ValidVerbSetScope<'a>::Owned = T
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::clone_into(&self, &mut T)
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::engine::ValidVerbSetScope<'a> where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::engine::ValidVerbSetScope<'a> where T: ?core::marker::Sized
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::engine::ValidVerbSetScope<'a> where T: ?core::marker::Sized
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::engine::ValidVerbSetScope<'a> where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::engine::ValidVerbSetScope<'a>::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::engine::ValidVerbSetScope<'a>
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::engine::ValidVerbSetScope<'a>
+impl<T> typenum::type_operators::Same for ob_poc_sage::engine::ValidVerbSetScope<'a>
+pub type ob_poc_sage::engine::ValidVerbSetScope<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::engine::ValidVerbSetScope<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::engine::ValidVerbSetScope<'a>::vzip(self) -> V
+pub trait ob_poc_sage::engine::SageEngine: core::marker::Send + core::marker::Sync
+pub fn ob_poc_sage::engine::SageEngine::classify<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, &'life2 ob_poc_sage::context::SageContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<ob_poc_sage::outcome::OutcomeIntent>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub trait ob_poc_sage::engine::ValidVerbSetEngine: core::marker::Send + core::marker::Sync
+pub fn ob_poc_sage::engine::ValidVerbSetEngine::compute<'life0, 'life1, 'async_trait>(&'life0 self, ob_poc_sage::engine::ValidVerbSetScope<'life1>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<ob_poc_sage::valid_verb_set::ValidVerbSet>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+pub mod ob_poc_sage::outcome
+pub enum ob_poc_sage::outcome::OutcomeAction
+pub ob_poc_sage::outcome::OutcomeAction::Assign
+pub ob_poc_sage::outcome::OutcomeAction::Compute
+pub ob_poc_sage::outcome::OutcomeAction::Create
+pub ob_poc_sage::outcome::OutcomeAction::Delete
+pub ob_poc_sage::outcome::OutcomeAction::Import
+pub ob_poc_sage::outcome::OutcomeAction::Other(alloc::string::String)
+pub ob_poc_sage::outcome::OutcomeAction::Publish
+pub ob_poc_sage::outcome::OutcomeAction::Read
+pub ob_poc_sage::outcome::OutcomeAction::Search
+pub ob_poc_sage::outcome::OutcomeAction::Update
+impl ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::as_str(&self) -> &str
+pub fn ob_poc_sage::outcome::OutcomeAction::from_first_word(&str) -> Self
+impl core::clone::Clone for ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::clone(&self) -> ob_poc_sage::outcome::OutcomeAction
+impl core::cmp::Eq for ob_poc_sage::outcome::OutcomeAction
+impl core::cmp::PartialEq for ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::eq(&self, &ob_poc_sage::outcome::OutcomeAction) -> bool
+impl core::fmt::Debug for ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_sage::outcome::OutcomeAction
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::OutcomeAction
+impl core::marker::Send for ob_poc_sage::outcome::OutcomeAction
+impl core::marker::Sync for ob_poc_sage::outcome::OutcomeAction
+impl core::marker::Unpin for ob_poc_sage::outcome::OutcomeAction
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::OutcomeAction
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::OutcomeAction
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::OutcomeAction
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::outcome::OutcomeAction where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeAction::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::outcome::OutcomeAction where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeAction::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::OutcomeAction where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::OutcomeAction::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::OutcomeAction where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::OutcomeAction::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::OutcomeAction::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::OutcomeAction where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::OutcomeAction::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::OutcomeAction::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::OutcomeAction where T: core::clone::Clone
+pub type ob_poc_sage::outcome::OutcomeAction::Owned = T
+pub fn ob_poc_sage::outcome::OutcomeAction::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::OutcomeAction::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::OutcomeAction where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeAction::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::OutcomeAction where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeAction::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::OutcomeAction where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeAction::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::OutcomeAction where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::OutcomeAction::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::OutcomeAction
+pub fn ob_poc_sage::outcome::OutcomeAction::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::OutcomeAction
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::OutcomeAction where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::OutcomeAction
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::OutcomeAction
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::OutcomeAction
+pub type ob_poc_sage::outcome::OutcomeAction::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::OutcomeAction where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::OutcomeAction::vzip(self) -> V
+pub enum ob_poc_sage::outcome::SageConfidence
+pub ob_poc_sage::outcome::SageConfidence::High
+pub ob_poc_sage::outcome::SageConfidence::Low
+pub ob_poc_sage::outcome::SageConfidence::Medium
+impl ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::as_str(&self) -> &'static str
+impl core::clone::Clone for ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::clone(&self) -> ob_poc_sage::outcome::SageConfidence
+impl core::cmp::Eq for ob_poc_sage::outcome::SageConfidence
+impl core::cmp::PartialEq for ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::eq(&self, &ob_poc_sage::outcome::SageConfidence) -> bool
+impl core::fmt::Debug for ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_sage::outcome::SageConfidence
+impl core::marker::StructuralPartialEq for ob_poc_sage::outcome::SageConfidence
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::SageConfidence
+impl core::marker::Send for ob_poc_sage::outcome::SageConfidence
+impl core::marker::Sync for ob_poc_sage::outcome::SageConfidence
+impl core::marker::Unpin for ob_poc_sage::outcome::SageConfidence
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::SageConfidence
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::SageConfidence
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::SageConfidence
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::outcome::SageConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageConfidence::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::outcome::SageConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageConfidence::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::SageConfidence where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::SageConfidence::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::SageConfidence where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::SageConfidence::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::SageConfidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::SageConfidence where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::SageConfidence::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::SageConfidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::SageConfidence where T: core::clone::Clone
+pub type ob_poc_sage::outcome::SageConfidence::Owned = T
+pub fn ob_poc_sage::outcome::SageConfidence::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::SageConfidence::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::SageConfidence where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageConfidence::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::SageConfidence where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageConfidence::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::SageConfidence where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageConfidence::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::SageConfidence where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::SageConfidence::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::SageConfidence
+pub fn ob_poc_sage::outcome::SageConfidence::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::SageConfidence
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::SageConfidence where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::SageConfidence
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::SageConfidence
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::SageConfidence
+pub type ob_poc_sage::outcome::SageConfidence::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::SageConfidence where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::SageConfidence::vzip(self) -> V
+pub struct ob_poc_sage::outcome::Clarification
+pub ob_poc_sage::outcome::Clarification::clarifies: alloc::string::String
+pub ob_poc_sage::outcome::Clarification::options: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::outcome::Clarification::question: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::outcome::Clarification
+pub fn ob_poc_sage::outcome::Clarification::clone(&self) -> ob_poc_sage::outcome::Clarification
+impl core::fmt::Debug for ob_poc_sage::outcome::Clarification
+pub fn ob_poc_sage::outcome::Clarification::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::Clarification
+pub fn ob_poc_sage::outcome::Clarification::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::Clarification
+pub fn ob_poc_sage::outcome::Clarification::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::Clarification
+impl core::marker::Send for ob_poc_sage::outcome::Clarification
+impl core::marker::Sync for ob_poc_sage::outcome::Clarification
+impl core::marker::Unpin for ob_poc_sage::outcome::Clarification
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::Clarification
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::Clarification
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::Clarification
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::Clarification where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::Clarification::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::Clarification where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::Clarification::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::Clarification::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::Clarification where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::Clarification::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::Clarification::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::Clarification where T: core::clone::Clone
+pub type ob_poc_sage::outcome::Clarification::Owned = T
+pub fn ob_poc_sage::outcome::Clarification::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::Clarification::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::Clarification where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::Clarification::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::Clarification where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::Clarification::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::Clarification where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::Clarification::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::Clarification where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::Clarification::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::Clarification
+pub fn ob_poc_sage::outcome::Clarification::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::Clarification
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::Clarification where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::Clarification
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::Clarification
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::Clarification
+pub type ob_poc_sage::outcome::Clarification::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::Clarification where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::Clarification::vzip(self) -> V
+pub struct ob_poc_sage::outcome::DrafterHandoff
+pub ob_poc_sage::outcome::DrafterHandoff::constraints: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::outcome::DrafterHandoff::goal: alloc::string::String
+pub ob_poc_sage::outcome::DrafterHandoff::hint_terms: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::outcome::DrafterHandoff::intent_summary: alloc::string::String
+pub ob_poc_sage::outcome::DrafterHandoff::required_outcome: alloc::string::String
+pub ob_poc_sage::outcome::DrafterHandoff::requires_confirmation: bool
+pub ob_poc_sage::outcome::DrafterHandoff::serve_safe: bool
+impl core::clone::Clone for ob_poc_sage::outcome::DrafterHandoff
+pub fn ob_poc_sage::outcome::DrafterHandoff::clone(&self) -> ob_poc_sage::outcome::DrafterHandoff
+impl core::default::Default for ob_poc_sage::outcome::DrafterHandoff
+pub fn ob_poc_sage::outcome::DrafterHandoff::default() -> ob_poc_sage::outcome::DrafterHandoff
+impl core::fmt::Debug for ob_poc_sage::outcome::DrafterHandoff
+pub fn ob_poc_sage::outcome::DrafterHandoff::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::DrafterHandoff
+pub fn ob_poc_sage::outcome::DrafterHandoff::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::DrafterHandoff
+pub fn ob_poc_sage::outcome::DrafterHandoff::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::DrafterHandoff
+impl core::marker::Send for ob_poc_sage::outcome::DrafterHandoff
+impl core::marker::Sync for ob_poc_sage::outcome::DrafterHandoff
+impl core::marker::Unpin for ob_poc_sage::outcome::DrafterHandoff
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::DrafterHandoff
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::DrafterHandoff
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::DrafterHandoff
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::DrafterHandoff where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::DrafterHandoff::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::DrafterHandoff where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::DrafterHandoff::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::DrafterHandoff::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::DrafterHandoff where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::DrafterHandoff::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::DrafterHandoff::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::DrafterHandoff where T: core::clone::Clone
+pub type ob_poc_sage::outcome::DrafterHandoff::Owned = T
+pub fn ob_poc_sage::outcome::DrafterHandoff::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::DrafterHandoff::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::DrafterHandoff where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::DrafterHandoff::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::DrafterHandoff where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::DrafterHandoff::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::DrafterHandoff where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::DrafterHandoff::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::DrafterHandoff where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::DrafterHandoff::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::DrafterHandoff
+pub fn ob_poc_sage::outcome::DrafterHandoff::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::DrafterHandoff
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::DrafterHandoff where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::DrafterHandoff
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::DrafterHandoff
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::DrafterHandoff
+pub type ob_poc_sage::outcome::DrafterHandoff::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::DrafterHandoff where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::DrafterHandoff::vzip(self) -> V
+pub struct ob_poc_sage::outcome::EntityRef
+pub ob_poc_sage::outcome::EntityRef::kind_hint: core::option::Option<alloc::string::String>
+pub ob_poc_sage::outcome::EntityRef::mention: alloc::string::String
+pub ob_poc_sage::outcome::EntityRef::uuid: core::option::Option<uuid::Uuid>
+impl core::clone::Clone for ob_poc_sage::outcome::EntityRef
+pub fn ob_poc_sage::outcome::EntityRef::clone(&self) -> ob_poc_sage::outcome::EntityRef
+impl core::fmt::Debug for ob_poc_sage::outcome::EntityRef
+pub fn ob_poc_sage::outcome::EntityRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::EntityRef
+pub fn ob_poc_sage::outcome::EntityRef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::EntityRef
+pub fn ob_poc_sage::outcome::EntityRef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::EntityRef
+impl core::marker::Send for ob_poc_sage::outcome::EntityRef
+impl core::marker::Sync for ob_poc_sage::outcome::EntityRef
+impl core::marker::Unpin for ob_poc_sage::outcome::EntityRef
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::EntityRef
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::EntityRef
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::EntityRef
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::EntityRef where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::EntityRef::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::EntityRef where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::EntityRef::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::EntityRef::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::EntityRef where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::EntityRef::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::EntityRef::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::EntityRef where T: core::clone::Clone
+pub type ob_poc_sage::outcome::EntityRef::Owned = T
+pub fn ob_poc_sage::outcome::EntityRef::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::EntityRef::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::EntityRef where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::EntityRef::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::EntityRef where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::EntityRef::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::EntityRef where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::EntityRef::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::EntityRef where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::EntityRef::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::EntityRef
+pub fn ob_poc_sage::outcome::EntityRef::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::EntityRef
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::EntityRef where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::EntityRef
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::EntityRef
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::EntityRef
+pub type ob_poc_sage::outcome::EntityRef::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::EntityRef where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::EntityRef::vzip(self) -> V
+pub struct ob_poc_sage::outcome::OutcomeIntent
+pub ob_poc_sage::outcome::OutcomeIntent::action: ob_poc_sage::outcome::OutcomeAction
+pub ob_poc_sage::outcome::OutcomeIntent::confidence: ob_poc_sage::outcome::SageConfidence
+pub ob_poc_sage::outcome::OutcomeIntent::domain_concept: alloc::string::String
+pub ob_poc_sage::outcome::OutcomeIntent::drafter_handoff: ob_poc_sage::outcome::DrafterHandoff
+pub ob_poc_sage::outcome::OutcomeIntent::explain: ob_poc_sage::outcome::SageExplain
+pub ob_poc_sage::outcome::OutcomeIntent::hints: ob_poc_sage::outcome::UtteranceHints
+pub ob_poc_sage::outcome::OutcomeIntent::pending_clarifications: alloc::vec::Vec<ob_poc_sage::outcome::Clarification>
+pub ob_poc_sage::outcome::OutcomeIntent::plane: ob_poc_sage::plane::ObservationPlane
+pub ob_poc_sage::outcome::OutcomeIntent::polarity: ob_poc_sage::polarity::IntentPolarity
+pub ob_poc_sage::outcome::OutcomeIntent::steps: alloc::vec::Vec<ob_poc_sage::outcome::OutcomeStep>
+pub ob_poc_sage::outcome::OutcomeIntent::subject: core::option::Option<ob_poc_sage::outcome::EntityRef>
+pub ob_poc_sage::outcome::OutcomeIntent::summary: alloc::string::String
+impl ob_poc_sage::outcome::OutcomeIntent
+pub fn ob_poc_sage::outcome::OutcomeIntent::stub(&str, ob_poc_sage::plane::ObservationPlane, ob_poc_sage::polarity::IntentPolarity) -> Self
+impl core::clone::Clone for ob_poc_sage::outcome::OutcomeIntent
+pub fn ob_poc_sage::outcome::OutcomeIntent::clone(&self) -> ob_poc_sage::outcome::OutcomeIntent
+impl core::fmt::Debug for ob_poc_sage::outcome::OutcomeIntent
+pub fn ob_poc_sage::outcome::OutcomeIntent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::OutcomeIntent
+pub fn ob_poc_sage::outcome::OutcomeIntent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::OutcomeIntent
+pub fn ob_poc_sage::outcome::OutcomeIntent::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::OutcomeIntent
+impl core::marker::Send for ob_poc_sage::outcome::OutcomeIntent
+impl core::marker::Sync for ob_poc_sage::outcome::OutcomeIntent
+impl core::marker::Unpin for ob_poc_sage::outcome::OutcomeIntent
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::OutcomeIntent
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::OutcomeIntent
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::OutcomeIntent
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::OutcomeIntent where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::OutcomeIntent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::OutcomeIntent where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::OutcomeIntent::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::OutcomeIntent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::OutcomeIntent where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::OutcomeIntent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::OutcomeIntent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::OutcomeIntent where T: core::clone::Clone
+pub type ob_poc_sage::outcome::OutcomeIntent::Owned = T
+pub fn ob_poc_sage::outcome::OutcomeIntent::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::OutcomeIntent::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::OutcomeIntent where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeIntent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::OutcomeIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeIntent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::OutcomeIntent where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeIntent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::OutcomeIntent where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::OutcomeIntent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::OutcomeIntent
+pub fn ob_poc_sage::outcome::OutcomeIntent::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::OutcomeIntent
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::OutcomeIntent where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::OutcomeIntent
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::OutcomeIntent
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::OutcomeIntent
+pub type ob_poc_sage::outcome::OutcomeIntent::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::OutcomeIntent where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::OutcomeIntent::vzip(self) -> V
+pub struct ob_poc_sage::outcome::OutcomeStep
+pub ob_poc_sage::outcome::OutcomeStep::action: ob_poc_sage::outcome::OutcomeAction
+pub ob_poc_sage::outcome::OutcomeStep::notes: core::option::Option<alloc::string::String>
+pub ob_poc_sage::outcome::OutcomeStep::params: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub ob_poc_sage::outcome::OutcomeStep::target: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::outcome::OutcomeStep
+pub fn ob_poc_sage::outcome::OutcomeStep::clone(&self) -> ob_poc_sage::outcome::OutcomeStep
+impl core::fmt::Debug for ob_poc_sage::outcome::OutcomeStep
+pub fn ob_poc_sage::outcome::OutcomeStep::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::OutcomeStep
+pub fn ob_poc_sage::outcome::OutcomeStep::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::OutcomeStep
+pub fn ob_poc_sage::outcome::OutcomeStep::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::OutcomeStep
+impl core::marker::Send for ob_poc_sage::outcome::OutcomeStep
+impl core::marker::Sync for ob_poc_sage::outcome::OutcomeStep
+impl core::marker::Unpin for ob_poc_sage::outcome::OutcomeStep
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::OutcomeStep
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::OutcomeStep
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::OutcomeStep
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::OutcomeStep where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::OutcomeStep::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::OutcomeStep where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::OutcomeStep::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::OutcomeStep::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::OutcomeStep where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::OutcomeStep::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::OutcomeStep::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::OutcomeStep where T: core::clone::Clone
+pub type ob_poc_sage::outcome::OutcomeStep::Owned = T
+pub fn ob_poc_sage::outcome::OutcomeStep::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::OutcomeStep::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::OutcomeStep where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeStep::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::OutcomeStep where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeStep::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::OutcomeStep where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::OutcomeStep::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::OutcomeStep where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::OutcomeStep::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::OutcomeStep
+pub fn ob_poc_sage::outcome::OutcomeStep::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::OutcomeStep
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::OutcomeStep where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::OutcomeStep
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::OutcomeStep
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::OutcomeStep
+pub type ob_poc_sage::outcome::OutcomeStep::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::OutcomeStep where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::OutcomeStep::vzip(self) -> V
+pub struct ob_poc_sage::outcome::SageExplain
+pub ob_poc_sage::outcome::SageExplain::clarifications: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::outcome::SageExplain::confidence: alloc::string::String
+pub ob_poc_sage::outcome::SageExplain::mode: alloc::string::String
+pub ob_poc_sage::outcome::SageExplain::scope_summary: core::option::Option<alloc::string::String>
+pub ob_poc_sage::outcome::SageExplain::understanding: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::outcome::SageExplain
+pub fn ob_poc_sage::outcome::SageExplain::clone(&self) -> ob_poc_sage::outcome::SageExplain
+impl core::default::Default for ob_poc_sage::outcome::SageExplain
+pub fn ob_poc_sage::outcome::SageExplain::default() -> ob_poc_sage::outcome::SageExplain
+impl core::fmt::Debug for ob_poc_sage::outcome::SageExplain
+pub fn ob_poc_sage::outcome::SageExplain::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::SageExplain
+pub fn ob_poc_sage::outcome::SageExplain::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::SageExplain
+pub fn ob_poc_sage::outcome::SageExplain::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::SageExplain
+impl core::marker::Send for ob_poc_sage::outcome::SageExplain
+impl core::marker::Sync for ob_poc_sage::outcome::SageExplain
+impl core::marker::Unpin for ob_poc_sage::outcome::SageExplain
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::SageExplain
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::SageExplain
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::SageExplain
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::SageExplain where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::SageExplain::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::SageExplain where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::SageExplain::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::SageExplain::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::SageExplain where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::SageExplain::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::SageExplain::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::SageExplain where T: core::clone::Clone
+pub type ob_poc_sage::outcome::SageExplain::Owned = T
+pub fn ob_poc_sage::outcome::SageExplain::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::SageExplain::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::SageExplain where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageExplain::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::SageExplain where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageExplain::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::SageExplain where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::SageExplain::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::SageExplain where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::SageExplain::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::SageExplain
+pub fn ob_poc_sage::outcome::SageExplain::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::SageExplain
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::SageExplain where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::SageExplain
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::SageExplain
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::SageExplain
+pub type ob_poc_sage::outcome::SageExplain::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::SageExplain where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::SageExplain::vzip(self) -> V
+pub struct ob_poc_sage::outcome::UtteranceHints
+pub ob_poc_sage::outcome::UtteranceHints::create_name_candidate: core::option::Option<alloc::string::String>
+pub ob_poc_sage::outcome::UtteranceHints::entity_kind: core::option::Option<alloc::string::String>
+pub ob_poc_sage::outcome::UtteranceHints::explicit_action_terms: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::outcome::UtteranceHints::explicit_domain_terms: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::outcome::UtteranceHints::inventory_read: bool
+pub ob_poc_sage::outcome::UtteranceHints::raw_preview: alloc::string::String
+pub ob_poc_sage::outcome::UtteranceHints::scope_carry_forward_used: bool
+pub ob_poc_sage::outcome::UtteranceHints::stage_focus: core::option::Option<alloc::string::String>
+pub ob_poc_sage::outcome::UtteranceHints::structure_read: bool
+pub ob_poc_sage::outcome::UtteranceHints::subject_phrase: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_sage::outcome::UtteranceHints
+pub fn ob_poc_sage::outcome::UtteranceHints::clone(&self) -> ob_poc_sage::outcome::UtteranceHints
+impl core::default::Default for ob_poc_sage::outcome::UtteranceHints
+pub fn ob_poc_sage::outcome::UtteranceHints::default() -> ob_poc_sage::outcome::UtteranceHints
+impl core::fmt::Debug for ob_poc_sage::outcome::UtteranceHints
+pub fn ob_poc_sage::outcome::UtteranceHints::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::outcome::UtteranceHints
+pub fn ob_poc_sage::outcome::UtteranceHints::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::outcome::UtteranceHints
+pub fn ob_poc_sage::outcome::UtteranceHints::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::outcome::UtteranceHints
+impl core::marker::Send for ob_poc_sage::outcome::UtteranceHints
+impl core::marker::Sync for ob_poc_sage::outcome::UtteranceHints
+impl core::marker::Unpin for ob_poc_sage::outcome::UtteranceHints
+impl core::marker::UnsafeUnpin for ob_poc_sage::outcome::UtteranceHints
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::outcome::UtteranceHints
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::outcome::UtteranceHints
+impl<T, U> core::convert::Into<U> for ob_poc_sage::outcome::UtteranceHints where U: core::convert::From<T>
+pub fn ob_poc_sage::outcome::UtteranceHints::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::outcome::UtteranceHints where U: core::convert::Into<T>
+pub type ob_poc_sage::outcome::UtteranceHints::Error = core::convert::Infallible
+pub fn ob_poc_sage::outcome::UtteranceHints::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::outcome::UtteranceHints where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::outcome::UtteranceHints::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::outcome::UtteranceHints::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::outcome::UtteranceHints where T: core::clone::Clone
+pub type ob_poc_sage::outcome::UtteranceHints::Owned = T
+pub fn ob_poc_sage::outcome::UtteranceHints::clone_into(&self, &mut T)
+pub fn ob_poc_sage::outcome::UtteranceHints::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::outcome::UtteranceHints where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::outcome::UtteranceHints::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::outcome::UtteranceHints where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::UtteranceHints::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::outcome::UtteranceHints where T: ?core::marker::Sized
+pub fn ob_poc_sage::outcome::UtteranceHints::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::outcome::UtteranceHints where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::outcome::UtteranceHints::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::outcome::UtteranceHints
+pub fn ob_poc_sage::outcome::UtteranceHints::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::outcome::UtteranceHints
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::outcome::UtteranceHints where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::outcome::UtteranceHints
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::outcome::UtteranceHints
+impl<T> typenum::type_operators::Same for ob_poc_sage::outcome::UtteranceHints
+pub type ob_poc_sage::outcome::UtteranceHints::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::outcome::UtteranceHints where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::outcome::UtteranceHints::vzip(self) -> V
+pub mod ob_poc_sage::plane
+pub enum ob_poc_sage::plane::ObservationPlane
+pub ob_poc_sage::plane::ObservationPlane::Instance
+pub ob_poc_sage::plane::ObservationPlane::Registry
+pub ob_poc_sage::plane::ObservationPlane::Structure
+impl ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::as_str(&self) -> &'static str
+impl core::clone::Clone for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::clone(&self) -> ob_poc_sage::plane::ObservationPlane
+impl core::cmp::Eq for ob_poc_sage::plane::ObservationPlane
+impl core::cmp::PartialEq for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::eq(&self, &ob_poc_sage::plane::ObservationPlane) -> bool
+impl core::fmt::Debug for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_sage::plane::ObservationPlane
+impl core::marker::StructuralPartialEq for ob_poc_sage::plane::ObservationPlane
+impl serde_core::ser::Serialize for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::plane::ObservationPlane
+impl core::marker::Send for ob_poc_sage::plane::ObservationPlane
+impl core::marker::Sync for ob_poc_sage::plane::ObservationPlane
+impl core::marker::Unpin for ob_poc_sage::plane::ObservationPlane
+impl core::marker::UnsafeUnpin for ob_poc_sage::plane::ObservationPlane
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::plane::ObservationPlane
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::plane::ObservationPlane
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::plane::ObservationPlane where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::plane::ObservationPlane::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::plane::ObservationPlane where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::plane::ObservationPlane::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::plane::ObservationPlane where U: core::convert::From<T>
+pub fn ob_poc_sage::plane::ObservationPlane::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::plane::ObservationPlane where U: core::convert::Into<T>
+pub type ob_poc_sage::plane::ObservationPlane::Error = core::convert::Infallible
+pub fn ob_poc_sage::plane::ObservationPlane::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::plane::ObservationPlane where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::plane::ObservationPlane::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::plane::ObservationPlane::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::plane::ObservationPlane where T: core::clone::Clone
+pub type ob_poc_sage::plane::ObservationPlane::Owned = T
+pub fn ob_poc_sage::plane::ObservationPlane::clone_into(&self, &mut T)
+pub fn ob_poc_sage::plane::ObservationPlane::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_sage::plane::ObservationPlane where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_sage::plane::ObservationPlane::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_sage::plane::ObservationPlane where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::plane::ObservationPlane::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::plane::ObservationPlane where T: ?core::marker::Sized
+pub fn ob_poc_sage::plane::ObservationPlane::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::plane::ObservationPlane where T: ?core::marker::Sized
+pub fn ob_poc_sage::plane::ObservationPlane::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::plane::ObservationPlane where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::plane::ObservationPlane::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::plane::ObservationPlane
+pub fn ob_poc_sage::plane::ObservationPlane::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::plane::ObservationPlane
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::plane::ObservationPlane where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::plane::ObservationPlane
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::plane::ObservationPlane
+impl<T> typenum::type_operators::Same for ob_poc_sage::plane::ObservationPlane
+pub type ob_poc_sage::plane::ObservationPlane::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::plane::ObservationPlane where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::plane::ObservationPlane::vzip(self) -> V
+pub mod ob_poc_sage::polarity
+pub enum ob_poc_sage::polarity::IntentPolarity
+pub ob_poc_sage::polarity::IntentPolarity::Ambiguous
+pub ob_poc_sage::polarity::IntentPolarity::Read
+pub ob_poc_sage::polarity::IntentPolarity::Write
+impl ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::as_str(&self) -> &'static str
+pub fn ob_poc_sage::polarity::IntentPolarity::from_utterance(&str) -> (Self, core::option::Option<alloc::string::String>)
+impl core::clone::Clone for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::clone(&self) -> ob_poc_sage::polarity::IntentPolarity
+impl core::cmp::Eq for ob_poc_sage::polarity::IntentPolarity
+impl core::cmp::PartialEq for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::eq(&self, &ob_poc_sage::polarity::IntentPolarity) -> bool
+impl core::fmt::Debug for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_sage::polarity::IntentPolarity
+impl core::marker::StructuralPartialEq for ob_poc_sage::polarity::IntentPolarity
+impl serde_core::ser::Serialize for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::polarity::IntentPolarity
+impl core::marker::Send for ob_poc_sage::polarity::IntentPolarity
+impl core::marker::Sync for ob_poc_sage::polarity::IntentPolarity
+impl core::marker::Unpin for ob_poc_sage::polarity::IntentPolarity
+impl core::marker::UnsafeUnpin for ob_poc_sage::polarity::IntentPolarity
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::polarity::IntentPolarity
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::polarity::IntentPolarity
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::polarity::IntentPolarity where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::polarity::IntentPolarity::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::polarity::IntentPolarity where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::polarity::IntentPolarity::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::polarity::IntentPolarity where U: core::convert::From<T>
+pub fn ob_poc_sage::polarity::IntentPolarity::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::polarity::IntentPolarity where U: core::convert::Into<T>
+pub type ob_poc_sage::polarity::IntentPolarity::Error = core::convert::Infallible
+pub fn ob_poc_sage::polarity::IntentPolarity::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::polarity::IntentPolarity where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::polarity::IntentPolarity::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::polarity::IntentPolarity::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::polarity::IntentPolarity where T: core::clone::Clone
+pub type ob_poc_sage::polarity::IntentPolarity::Owned = T
+pub fn ob_poc_sage::polarity::IntentPolarity::clone_into(&self, &mut T)
+pub fn ob_poc_sage::polarity::IntentPolarity::to_owned(&self) -> T
+impl<T> alloc::string::ToString for ob_poc_sage::polarity::IntentPolarity where T: core::fmt::Display + ?core::marker::Sized
+pub fn ob_poc_sage::polarity::IntentPolarity::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for ob_poc_sage::polarity::IntentPolarity where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::polarity::IntentPolarity::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::polarity::IntentPolarity where T: ?core::marker::Sized
+pub fn ob_poc_sage::polarity::IntentPolarity::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::polarity::IntentPolarity where T: ?core::marker::Sized
+pub fn ob_poc_sage::polarity::IntentPolarity::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::polarity::IntentPolarity where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::polarity::IntentPolarity::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::polarity::IntentPolarity
+pub fn ob_poc_sage::polarity::IntentPolarity::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::polarity::IntentPolarity
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::polarity::IntentPolarity where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::polarity::IntentPolarity
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::polarity::IntentPolarity
+impl<T> typenum::type_operators::Same for ob_poc_sage::polarity::IntentPolarity
+pub type ob_poc_sage::polarity::IntentPolarity::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::polarity::IntentPolarity where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::polarity::IntentPolarity::vzip(self) -> V
+pub const ob_poc_sage::polarity::AMBIGUOUS_CLUE_WORDS: &[&str]
+pub const ob_poc_sage::polarity::READ_CLUE_WORDS: &[&str]
+pub const ob_poc_sage::polarity::WRITE_CLUE_WORDS: &[&str]
+pub mod ob_poc_sage::pre_classify
+pub struct ob_poc_sage::pre_classify::SagePreClassification
+pub ob_poc_sage::pre_classify::SagePreClassification::domain_hints: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::pre_classify::SagePreClassification::domain_score: i32
+pub ob_poc_sage::pre_classify::SagePreClassification::plane: ob_poc_sage::plane::ObservationPlane
+pub ob_poc_sage::pre_classify::SagePreClassification::polarity: ob_poc_sage::polarity::IntentPolarity
+pub ob_poc_sage::pre_classify::SagePreClassification::polarity_clue: core::option::Option<alloc::string::String>
+pub ob_poc_sage::pre_classify::SagePreClassification::runner_up_domain_score: i32
+pub ob_poc_sage::pre_classify::SagePreClassification::sage_only: bool
+impl core::clone::Clone for ob_poc_sage::pre_classify::SagePreClassification
+pub fn ob_poc_sage::pre_classify::SagePreClassification::clone(&self) -> ob_poc_sage::pre_classify::SagePreClassification
+impl core::fmt::Debug for ob_poc_sage::pre_classify::SagePreClassification
+pub fn ob_poc_sage::pre_classify::SagePreClassification::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_sage::pre_classify::SagePreClassification
+pub fn ob_poc_sage::pre_classify::SagePreClassification::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_sage::pre_classify::SagePreClassification
+pub fn ob_poc_sage::pre_classify::SagePreClassification::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_sage::pre_classify::SagePreClassification
+impl core::marker::Send for ob_poc_sage::pre_classify::SagePreClassification
+impl core::marker::Sync for ob_poc_sage::pre_classify::SagePreClassification
+impl core::marker::Unpin for ob_poc_sage::pre_classify::SagePreClassification
+impl core::marker::UnsafeUnpin for ob_poc_sage::pre_classify::SagePreClassification
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::pre_classify::SagePreClassification
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::pre_classify::SagePreClassification
+impl<T, U> core::convert::Into<U> for ob_poc_sage::pre_classify::SagePreClassification where U: core::convert::From<T>
+pub fn ob_poc_sage::pre_classify::SagePreClassification::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::pre_classify::SagePreClassification where U: core::convert::Into<T>
+pub type ob_poc_sage::pre_classify::SagePreClassification::Error = core::convert::Infallible
+pub fn ob_poc_sage::pre_classify::SagePreClassification::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::pre_classify::SagePreClassification where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::pre_classify::SagePreClassification::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::pre_classify::SagePreClassification::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::pre_classify::SagePreClassification where T: core::clone::Clone
+pub type ob_poc_sage::pre_classify::SagePreClassification::Owned = T
+pub fn ob_poc_sage::pre_classify::SagePreClassification::clone_into(&self, &mut T)
+pub fn ob_poc_sage::pre_classify::SagePreClassification::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::pre_classify::SagePreClassification where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::pre_classify::SagePreClassification::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::pre_classify::SagePreClassification where T: ?core::marker::Sized
+pub fn ob_poc_sage::pre_classify::SagePreClassification::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::pre_classify::SagePreClassification where T: ?core::marker::Sized
+pub fn ob_poc_sage::pre_classify::SagePreClassification::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::pre_classify::SagePreClassification where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::pre_classify::SagePreClassification::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::pre_classify::SagePreClassification
+pub fn ob_poc_sage::pre_classify::SagePreClassification::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::pre_classify::SagePreClassification
+impl<T> serde_core::de::DeserializeOwned for ob_poc_sage::pre_classify::SagePreClassification where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_poc_sage::pre_classify::SagePreClassification
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::pre_classify::SagePreClassification
+impl<T> typenum::type_operators::Same for ob_poc_sage::pre_classify::SagePreClassification
+pub type ob_poc_sage::pre_classify::SagePreClassification::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::pre_classify::SagePreClassification where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::pre_classify::SagePreClassification::vzip(self) -> V
+pub fn ob_poc_sage::pre_classify::pre_classify(&str, &ob_poc_sage::context::SageContext) -> ob_poc_sage::pre_classify::SagePreClassification
+pub mod ob_poc_sage::session_context
+pub struct ob_poc_sage::session_context::EntityState
+pub ob_poc_sage::session_context::EntityState::current_state: alloc::string::String
+pub ob_poc_sage::session_context::EntityState::entity_id: uuid::Uuid
+pub ob_poc_sage::session_context::EntityState::entity_type: alloc::string::String
+pub ob_poc_sage::session_context::EntityState::slot_name: core::option::Option<alloc::string::String>
+impl core::clone::Clone for ob_poc_sage::session_context::EntityState
+pub fn ob_poc_sage::session_context::EntityState::clone(&self) -> ob_poc_sage::session_context::EntityState
+impl core::fmt::Debug for ob_poc_sage::session_context::EntityState
+pub fn ob_poc_sage::session_context::EntityState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_sage::session_context::EntityState
+impl core::marker::Send for ob_poc_sage::session_context::EntityState
+impl core::marker::Sync for ob_poc_sage::session_context::EntityState
+impl core::marker::Unpin for ob_poc_sage::session_context::EntityState
+impl core::marker::UnsafeUnpin for ob_poc_sage::session_context::EntityState
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::session_context::EntityState
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::session_context::EntityState
+impl<T, U> core::convert::Into<U> for ob_poc_sage::session_context::EntityState where U: core::convert::From<T>
+pub fn ob_poc_sage::session_context::EntityState::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::session_context::EntityState where U: core::convert::Into<T>
+pub type ob_poc_sage::session_context::EntityState::Error = core::convert::Infallible
+pub fn ob_poc_sage::session_context::EntityState::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::session_context::EntityState where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::session_context::EntityState::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::session_context::EntityState::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::session_context::EntityState where T: core::clone::Clone
+pub type ob_poc_sage::session_context::EntityState::Owned = T
+pub fn ob_poc_sage::session_context::EntityState::clone_into(&self, &mut T)
+pub fn ob_poc_sage::session_context::EntityState::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::session_context::EntityState where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::session_context::EntityState::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::session_context::EntityState where T: ?core::marker::Sized
+pub fn ob_poc_sage::session_context::EntityState::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::session_context::EntityState where T: ?core::marker::Sized
+pub fn ob_poc_sage::session_context::EntityState::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::session_context::EntityState where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::session_context::EntityState::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::session_context::EntityState
+pub fn ob_poc_sage::session_context::EntityState::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::session_context::EntityState
+impl<T> tracing::instrument::Instrument for ob_poc_sage::session_context::EntityState
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::session_context::EntityState
+impl<T> typenum::type_operators::Same for ob_poc_sage::session_context::EntityState
+pub type ob_poc_sage::session_context::EntityState::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::session_context::EntityState where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::session_context::EntityState::vzip(self) -> V
+pub struct ob_poc_sage::session_context::SageSession
+pub ob_poc_sage::session_context::SageSession::active_domain: core::option::Option<alloc::string::String>
+pub ob_poc_sage::session_context::SageSession::active_entity_id: core::option::Option<uuid::Uuid>
+pub ob_poc_sage::session_context::SageSession::client_group_id: core::option::Option<uuid::Uuid>
+pub ob_poc_sage::session_context::SageSession::constellation_id: core::option::Option<alloc::string::String>
+pub ob_poc_sage::session_context::SageSession::session_id: uuid::Uuid
+pub ob_poc_sage::session_context::SageSession::updated_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+impl ob_poc_sage::session_context::SageSession
+pub fn ob_poc_sage::session_context::SageSession::from_ui_context(uuid::Uuid, alloc::string::String, core::option::Option<uuid::Uuid>) -> Self
+pub fn ob_poc_sage::session_context::SageSession::has_client_group(&self) -> bool
+pub fn ob_poc_sage::session_context::SageSession::new() -> Self
+pub fn ob_poc_sage::session_context::SageSession::set_active_entity(&mut self, uuid::Uuid, alloc::string::String)
+pub fn ob_poc_sage::session_context::SageSession::set_client_group(&mut self, uuid::Uuid, alloc::string::String)
+impl core::clone::Clone for ob_poc_sage::session_context::SageSession
+pub fn ob_poc_sage::session_context::SageSession::clone(&self) -> ob_poc_sage::session_context::SageSession
+impl core::default::Default for ob_poc_sage::session_context::SageSession
+pub fn ob_poc_sage::session_context::SageSession::default() -> Self
+impl core::fmt::Debug for ob_poc_sage::session_context::SageSession
+pub fn ob_poc_sage::session_context::SageSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_sage::session_context::SageSession
+impl core::marker::Send for ob_poc_sage::session_context::SageSession
+impl core::marker::Sync for ob_poc_sage::session_context::SageSession
+impl core::marker::Unpin for ob_poc_sage::session_context::SageSession
+impl core::marker::UnsafeUnpin for ob_poc_sage::session_context::SageSession
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::session_context::SageSession
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::session_context::SageSession
+impl<T, U> core::convert::Into<U> for ob_poc_sage::session_context::SageSession where U: core::convert::From<T>
+pub fn ob_poc_sage::session_context::SageSession::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::session_context::SageSession where U: core::convert::Into<T>
+pub type ob_poc_sage::session_context::SageSession::Error = core::convert::Infallible
+pub fn ob_poc_sage::session_context::SageSession::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::session_context::SageSession where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::session_context::SageSession::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::session_context::SageSession::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::session_context::SageSession where T: core::clone::Clone
+pub type ob_poc_sage::session_context::SageSession::Owned = T
+pub fn ob_poc_sage::session_context::SageSession::clone_into(&self, &mut T)
+pub fn ob_poc_sage::session_context::SageSession::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::session_context::SageSession where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::session_context::SageSession::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::session_context::SageSession where T: ?core::marker::Sized
+pub fn ob_poc_sage::session_context::SageSession::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::session_context::SageSession where T: ?core::marker::Sized
+pub fn ob_poc_sage::session_context::SageSession::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::session_context::SageSession where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::session_context::SageSession::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::session_context::SageSession
+pub fn ob_poc_sage::session_context::SageSession::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::session_context::SageSession
+impl<T> tracing::instrument::Instrument for ob_poc_sage::session_context::SageSession
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::session_context::SageSession
+impl<T> typenum::type_operators::Same for ob_poc_sage::session_context::SageSession
+pub type ob_poc_sage::session_context::SageSession::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::session_context::SageSession where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::session_context::SageSession::vzip(self) -> V
+pub async fn ob_poc_sage::session_context::create_session(&sqlx_postgres::PgPool, &ob_poc_sage::session_context::SageSession) -> anyhow::Result<()>
+pub async fn ob_poc_sage::session_context::list_active_client_groups(&sqlx_postgres::PgPool) -> anyhow::Result<alloc::vec::Vec<(uuid::Uuid, alloc::string::String, alloc::string::String)>>
+pub async fn ob_poc_sage::session_context::load_entity_states_for_group(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<alloc::vec::Vec<ob_poc_sage::session_context::EntityState>>
+pub async fn ob_poc_sage::session_context::load_session(&sqlx_postgres::PgPool, uuid::Uuid) -> anyhow::Result<core::option::Option<ob_poc_sage::session_context::SageSession>>
+pub async fn ob_poc_sage::session_context::post_verb_update(&mut ob_poc_sage::session_context::SageSession, &str, core::option::Option<uuid::Uuid>, &sqlx_postgres::PgPool) -> anyhow::Result<()>
+pub async fn ob_poc_sage::session_context::try_extract_client_group(&str, &sqlx_postgres::PgPool) -> anyhow::Result<core::option::Option<(uuid::Uuid, alloc::string::String)>>
+pub async fn ob_poc_sage::session_context::update_session(&sqlx_postgres::PgPool, &ob_poc_sage::session_context::SageSession) -> anyhow::Result<()>
+pub mod ob_poc_sage::valid_verb_set
+pub enum ob_poc_sage::valid_verb_set::VerbSource
+pub ob_poc_sage::valid_verb_set::VerbSource::AlwaysAvailable
+pub ob_poc_sage::valid_verb_set::VerbSource::CreationVerb
+pub ob_poc_sage::valid_verb_set::VerbSource::FsmTransition
+impl core::clone::Clone for ob_poc_sage::valid_verb_set::VerbSource
+pub fn ob_poc_sage::valid_verb_set::VerbSource::clone(&self) -> ob_poc_sage::valid_verb_set::VerbSource
+impl core::cmp::Eq for ob_poc_sage::valid_verb_set::VerbSource
+impl core::cmp::PartialEq for ob_poc_sage::valid_verb_set::VerbSource
+pub fn ob_poc_sage::valid_verb_set::VerbSource::eq(&self, &ob_poc_sage::valid_verb_set::VerbSource) -> bool
+impl core::fmt::Debug for ob_poc_sage::valid_verb_set::VerbSource
+pub fn ob_poc_sage::valid_verb_set::VerbSource::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_sage::valid_verb_set::VerbSource
+impl core::marker::Freeze for ob_poc_sage::valid_verb_set::VerbSource
+impl core::marker::Send for ob_poc_sage::valid_verb_set::VerbSource
+impl core::marker::Sync for ob_poc_sage::valid_verb_set::VerbSource
+impl core::marker::Unpin for ob_poc_sage::valid_verb_set::VerbSource
+impl core::marker::UnsafeUnpin for ob_poc_sage::valid_verb_set::VerbSource
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::valid_verb_set::VerbSource
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::valid_verb_set::VerbSource
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_sage::valid_verb_set::VerbSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbSource::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_sage::valid_verb_set::VerbSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbSource::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_sage::valid_verb_set::VerbSource where U: core::convert::From<T>
+pub fn ob_poc_sage::valid_verb_set::VerbSource::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::valid_verb_set::VerbSource where U: core::convert::Into<T>
+pub type ob_poc_sage::valid_verb_set::VerbSource::Error = core::convert::Infallible
+pub fn ob_poc_sage::valid_verb_set::VerbSource::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::valid_verb_set::VerbSource where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::valid_verb_set::VerbSource::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::valid_verb_set::VerbSource::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::valid_verb_set::VerbSource where T: core::clone::Clone
+pub type ob_poc_sage::valid_verb_set::VerbSource::Owned = T
+pub fn ob_poc_sage::valid_verb_set::VerbSource::clone_into(&self, &mut T)
+pub fn ob_poc_sage::valid_verb_set::VerbSource::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::valid_verb_set::VerbSource where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbSource::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::valid_verb_set::VerbSource where T: ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbSource::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::valid_verb_set::VerbSource where T: ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbSource::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::valid_verb_set::VerbSource where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::valid_verb_set::VerbSource::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::valid_verb_set::VerbSource
+pub fn ob_poc_sage::valid_verb_set::VerbSource::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::valid_verb_set::VerbSource
+impl<T> tracing::instrument::Instrument for ob_poc_sage::valid_verb_set::VerbSource
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::valid_verb_set::VerbSource
+impl<T> typenum::type_operators::Same for ob_poc_sage::valid_verb_set::VerbSource
+pub type ob_poc_sage::valid_verb_set::VerbSource::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::valid_verb_set::VerbSource where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::valid_verb_set::VerbSource::vzip(self) -> V
+pub struct ob_poc_sage::valid_verb_set::ValidVerbSet
+pub ob_poc_sage::valid_verb_set::ValidVerbSet::client_group_id: uuid::Uuid
+pub ob_poc_sage::valid_verb_set::ValidVerbSet::computed_at: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+pub ob_poc_sage::valid_verb_set::ValidVerbSet::constellation_id: alloc::string::String
+pub ob_poc_sage::valid_verb_set::ValidVerbSet::verbs: alloc::vec::Vec<ob_poc_sage::valid_verb_set::VerbCandidate>
+impl ob_poc_sage::valid_verb_set::ValidVerbSet
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::contains_verb(&self, &str) -> bool
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::is_empty(&self) -> bool
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::len(&self) -> usize
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::to_allowed_set(&self) -> std::collections::hash::set::HashSet<alloc::string::String>
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::verb_fqns(&self) -> alloc::vec::Vec<&str>
+impl core::clone::Clone for ob_poc_sage::valid_verb_set::ValidVerbSet
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::clone(&self) -> ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::fmt::Debug for ob_poc_sage::valid_verb_set::ValidVerbSet
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::marker::Send for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::marker::Sync for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::marker::Unpin for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::marker::UnsafeUnpin for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl<T, U> core::convert::Into<U> for ob_poc_sage::valid_verb_set::ValidVerbSet where U: core::convert::From<T>
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::valid_verb_set::ValidVerbSet where U: core::convert::Into<T>
+pub type ob_poc_sage::valid_verb_set::ValidVerbSet::Error = core::convert::Infallible
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::valid_verb_set::ValidVerbSet where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::valid_verb_set::ValidVerbSet::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::valid_verb_set::ValidVerbSet where T: core::clone::Clone
+pub type ob_poc_sage::valid_verb_set::ValidVerbSet::Owned = T
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::clone_into(&self, &mut T)
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::valid_verb_set::ValidVerbSet where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::valid_verb_set::ValidVerbSet where T: ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::valid_verb_set::ValidVerbSet where T: ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::valid_verb_set::ValidVerbSet where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::valid_verb_set::ValidVerbSet::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::valid_verb_set::ValidVerbSet
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl<T> tracing::instrument::Instrument for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::valid_verb_set::ValidVerbSet
+impl<T> typenum::type_operators::Same for ob_poc_sage::valid_verb_set::ValidVerbSet
+pub type ob_poc_sage::valid_verb_set::ValidVerbSet::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::valid_verb_set::ValidVerbSet where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::valid_verb_set::ValidVerbSet::vzip(self) -> V
+pub struct ob_poc_sage::valid_verb_set::VerbCandidate
+pub ob_poc_sage::valid_verb_set::VerbCandidate::entity_id: core::option::Option<uuid::Uuid>
+pub ob_poc_sage::valid_verb_set::VerbCandidate::entity_type: alloc::string::String
+pub ob_poc_sage::valid_verb_set::VerbCandidate::keywords: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_sage::valid_verb_set::VerbCandidate::priority: u32
+pub ob_poc_sage::valid_verb_set::VerbCandidate::source: ob_poc_sage::valid_verb_set::VerbSource
+pub ob_poc_sage::valid_verb_set::VerbCandidate::verb_fqn: alloc::string::String
+impl core::clone::Clone for ob_poc_sage::valid_verb_set::VerbCandidate
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::clone(&self) -> ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::fmt::Debug for ob_poc_sage::valid_verb_set::VerbCandidate
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::marker::Send for ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::marker::Sync for ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::marker::Unpin for ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::marker::UnsafeUnpin for ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::valid_verb_set::VerbCandidate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::valid_verb_set::VerbCandidate
+impl<T, U> core::convert::Into<U> for ob_poc_sage::valid_verb_set::VerbCandidate where U: core::convert::From<T>
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::valid_verb_set::VerbCandidate where U: core::convert::Into<T>
+pub type ob_poc_sage::valid_verb_set::VerbCandidate::Error = core::convert::Infallible
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::valid_verb_set::VerbCandidate where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::valid_verb_set::VerbCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::valid_verb_set::VerbCandidate where T: core::clone::Clone
+pub type ob_poc_sage::valid_verb_set::VerbCandidate::Owned = T
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::clone_into(&self, &mut T)
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::valid_verb_set::VerbCandidate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::valid_verb_set::VerbCandidate where T: ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::valid_verb_set::VerbCandidate where T: ?core::marker::Sized
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::valid_verb_set::VerbCandidate where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::valid_verb_set::VerbCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::valid_verb_set::VerbCandidate
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::valid_verb_set::VerbCandidate
+impl<T> tracing::instrument::Instrument for ob_poc_sage::valid_verb_set::VerbCandidate
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::valid_verb_set::VerbCandidate
+impl<T> typenum::type_operators::Same for ob_poc_sage::valid_verb_set::VerbCandidate
+pub type ob_poc_sage::valid_verb_set::VerbCandidate::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::valid_verb_set::VerbCandidate where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::valid_verb_set::VerbCandidate::vzip(self) -> V
+pub mod ob_poc_sage::verb_resolve_types
+pub struct ob_poc_sage::verb_resolve_types::FilterDiagnostics
+pub ob_poc_sage::verb_resolve_types::FilterDiagnostics::base_candidates: usize
+pub ob_poc_sage::verb_resolve_types::FilterDiagnostics::domain_candidates: usize
+pub ob_poc_sage::verb_resolve_types::FilterDiagnostics::final_candidates: usize
+pub ob_poc_sage::verb_resolve_types::FilterDiagnostics::phase_candidates: usize
+pub ob_poc_sage::verb_resolve_types::FilterDiagnostics::subject_kind_candidates: usize
+impl core::clone::Clone for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::clone(&self) -> ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::convert::From<ob_poc_sage::verb_resolve_types::FilterDiagnostics> for ob_poc_sage::drafter_result::DraftFilterDiagnostics
+pub fn ob_poc_sage::drafter_result::DraftFilterDiagnostics::from(ob_poc_sage::verb_resolve_types::FilterDiagnostics) -> Self
+impl core::default::Default for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::default() -> ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::fmt::Debug for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::marker::Freeze for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::marker::Send for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::marker::Sync for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::marker::Unpin for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::marker::UnsafeUnpin for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl<T, U> core::convert::Into<U> for ob_poc_sage::verb_resolve_types::FilterDiagnostics where U: core::convert::From<T>
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::verb_resolve_types::FilterDiagnostics where U: core::convert::Into<T>
+pub type ob_poc_sage::verb_resolve_types::FilterDiagnostics::Error = core::convert::Infallible
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::verb_resolve_types::FilterDiagnostics where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::verb_resolve_types::FilterDiagnostics::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::verb_resolve_types::FilterDiagnostics where T: core::clone::Clone
+pub type ob_poc_sage::verb_resolve_types::FilterDiagnostics::Owned = T
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::clone_into(&self, &mut T)
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::verb_resolve_types::FilterDiagnostics where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::verb_resolve_types::FilterDiagnostics where T: ?core::marker::Sized
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::verb_resolve_types::FilterDiagnostics where T: ?core::marker::Sized
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::verb_resolve_types::FilterDiagnostics where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl<T> tracing::instrument::Instrument for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+impl<T> typenum::type_operators::Same for ob_poc_sage::verb_resolve_types::FilterDiagnostics
+pub type ob_poc_sage::verb_resolve_types::FilterDiagnostics::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::verb_resolve_types::FilterDiagnostics where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::verb_resolve_types::FilterDiagnostics::vzip(self) -> V
+pub struct ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+pub ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::action_score: f32
+pub ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::fqn: alloc::string::String
+pub ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::param_overlap_score: f32
+pub ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::score: f32
+impl core::clone::Clone for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::clone(&self) -> ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::fmt::Debug for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::marker::Send for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::marker::Sync for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::marker::Unpin for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::marker::UnsafeUnpin for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl<T, U> core::convert::Into<U> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where U: core::convert::From<T>
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where U: core::convert::Into<T>
+pub type ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::Error = core::convert::Infallible
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where U: core::convert::TryFrom<T>
+pub type ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where T: core::clone::Clone
+pub type ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::Owned = T
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::clone_into(&self, &mut T)
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where T: ?core::marker::Sized
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where T: ?core::marker::Sized
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where T: core::clone::Clone
+pub unsafe fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl<T> tracing::instrument::Instrument for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl<T> tracing::instrument::WithSubscriber for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+impl<T> typenum::type_operators::Same for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate
+pub type ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_sage::verb_resolve_types::ScoredVerbCandidate where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_sage::verb_resolve_types::ScoredVerbCandidate::vzip(self) -> V

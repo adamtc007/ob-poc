@@ -120,7 +120,9 @@ impl SemOsVerbOp for AssignRole {
                 let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
                 let role = json_extract_string_opt(args, "role")
                     .map(|s| s.to_uppercase())
-                    .ok_or_else(|| anyhow!("cbu.assign-role requires `role` for a generic role assignment"))?;
+                    .ok_or_else(|| {
+                        anyhow!("cbu.assign-role requires `role` for a generic role assignment")
+                    })?;
                 let expected_version = json_extract_int_opt(args, "expected-version");
                 let role_id = get_role_id(scope, &role).await?;
                 let role_result: Uuid = sqlx::query_scalar(&format!(
@@ -763,7 +765,7 @@ impl SemOsVerbOp for ValidateRoles {
             r#"SELECT EXISTS(
                 SELECT 1 FROM "ob-poc".cbu_entity_roles cer
                 JOIN "ob-poc".roles r ON cer.role_id = r.role_id
-                WHERE cer.cbu_id = $1 AND r.role_category = 'CONTROL'
+                WHERE cer.cbu_id = $1 AND r.role_category = 'CONTROL_CHAIN'
             )"#,
         )
         .bind(cbu_id)

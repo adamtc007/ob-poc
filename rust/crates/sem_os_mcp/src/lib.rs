@@ -61,6 +61,7 @@
 //! - Tools that need DB access reach through
 //!   `sem_os_client` → `sem_os_postgres`. No direct sqlx usage
 //!   in this crate.
+#![deny(unreachable_pub)]
 
 /// Minimal JSON-RPC 2.0 primitives — Phase 4.2a.
 pub mod protocol;
@@ -73,7 +74,7 @@ pub mod tools;
 pub mod server;
 
 /// SemOS substrate bridge trait — narrow surface the knowledge
-/// tools delegate through. Spike ships `StubBridge`; Phase 4.3
+/// tools delegate through. Spike ships `NullBridge`; Phase 4.3
 /// adapts `sem_os_client::SemOsClient` to this surface.
 pub mod bridge;
 

@@ -11,7 +11,7 @@ pub(crate) fn compile(
     output: Option<&Path>,
     verbose: bool,
 ) -> Result<()> {
-    use ob_poc::lexicon::LexiconCompiler;
+    use ob_poc_authoring::lexicon::LexiconCompiler;
 
     println!("===========================================");
     println!("  Lexicon Compile");
@@ -164,7 +164,7 @@ pub(crate) fn lint(config_root: Option<&Path>, errors_only: bool) -> Result<()> 
 
 /// Benchmark lexicon search performance.
 pub(crate) fn bench(snapshot_path: Option<&Path>, iterations: usize) -> Result<()> {
-    use ob_poc::lexicon::{LexiconService, LexiconServiceImpl, LexiconSnapshot};
+    use ob_poc_authoring::lexicon::{LexiconService, LexiconServiceImpl, LexiconSnapshot};
     use std::sync::Arc;
     use std::time::Instant;
 
