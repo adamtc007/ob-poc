@@ -122,6 +122,11 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         // Learning routes removed — verb selection signals through REPL pipeline
         // Semantic OS context
         .route("/api/sem-os/context", get(get_semos_context))
+        // T7.2 (EOP-PLAN-CONTROLPLANE-001): control-plane observability
+        .route(
+            "/api/control-plane/metrics",
+            get(get_control_plane_metrics),
+        )
         // F20 fix (Slice 5.2, 2026-04-22): legacy `/decision/reply` route
         // removed. Previously returned 410 Gone — now 404 from the router.
         // Use `/api/session/:id/input` with `kind=decision_reply`.
@@ -1144,6 +1149,69 @@ struct ChangesetSummary {
 }
 
 /// GET /api/sem-os/context — registry stats, recent changesets, agent mode
+/// GET /api/control-plane/metrics
+///
+/// T7.2 (EOP-PLAN-CONTROLPLANE-001): aggregated read-only metrics over the
+/// three `control_plane_*` tables (T2.7 shadow decisions, T4.2 envelopes,
+/// T5.3 write attestations). Never gates or influences dispatch — this is
+/// observability only, matching V&S §6.14's "per-gate rejection rates,
+/// breach count" asks (exception ageing and replay success are omitted:
+/// no exception-tracking table or replay job exists yet, T7.3/T7.4 not
+/// attempted this tranche).
+#[derive(Debug, serde::Serialize)]
+struct ControlPlaneMetricsResponse {
+    gate_outcomes: Vec<crate::agent::control_plane_metrics::GateOutcomeCount>,
+    shadow_divergence: crate::agent::control_plane_metrics::ShadowDivergenceStats,
+    shadow_divergence_rate: f64,
+    write_attestation_breaches: crate::agent::control_plane_metrics::WriteAttestationBreachStats,
+    write_attestation_breach_rate: f64,
+    envelope_status_counts: Vec<crate::agent::control_plane_metrics::EnvelopeStatusCount>,
+}
+
+async fn get_control_plane_metrics(
+    State(state): State<AgentState>,
+) -> Result<Json<ControlPlaneMetricsResponse>, StatusCode> {
+    let gate_outcomes = crate::agent::control_plane_metrics::gate_outcome_counts(&state.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "control-plane metrics: gate_outcome_counts query failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let shadow_divergence =
+        crate::agent::control_plane_metrics::shadow_divergence_stats(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: shadow_divergence_stats query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let write_attestation_breaches =
+        crate::agent::control_plane_metrics::write_attestation_breach_stats(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: write_attestation_breach_stats query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let envelope_status_counts =
+        crate::agent::control_plane_metrics::envelope_status_counts(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: envelope_status_counts query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+    let shadow_divergence_rate = shadow_divergence.divergence_rate();
+    let write_attestation_breach_rate = write_attestation_breaches.breach_rate();
+
+    Ok(Json(ControlPlaneMetricsResponse {
+        gate_outcomes,
+        shadow_divergence,
+        shadow_divergence_rate,
+        write_attestation_breaches,
+        write_attestation_breach_rate,
+        envelope_status_counts,
+    }))
+}
+
 async fn get_semos_context(
     State(state): State<AgentState>,
 ) -> Result<Json<SemOsContextResponse>, StatusCode> {
