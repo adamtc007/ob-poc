@@ -128,7 +128,13 @@ impl VerbExecutor for ObPocVerbAdapter {
         inputs: Vec<ResolvedBinding>,
     ) -> Result<VerbOutcome, VerbExecutorError> {
         let args = bindings_to_json(&inputs).map_err(VerbExecutorError::Malformed)?;
-        let mut ctx = VerbExecutionContext::new(Principal::system());
+        // T6.1 (EOP-PLAN-CONTROLPLANE-001, C-034): distinct from
+        // `Principal::system()` (which also carries the `admin` role) so
+        // bus-originated actions are attributable in audit/telemetry as
+        // coming over the federated bus, not conflated with genuine
+        // system-internal actions.
+        let mut ctx =
+            VerbExecutionContext::new(Principal::in_process("bus-federated", vec!["bus".into()]));
 
         // Pre-populate symbol table with any uuid-typed bindings so
         // @reference resolution inside verb handlers sees the same
@@ -143,9 +149,23 @@ impl VerbExecutor for ObPocVerbAdapter {
             }
         }
 
+        // T6.1: route through the T4.1 envelope-admission entry point —
+        // the bus is the first production caller. `envelope_id: None`
+        // because nothing issues a sealed `ExecutionEnvelope` for bus
+        // calls yet; with the production-default empty
+        // `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`, this is behaviourally
+        // identical to the prior direct `execute_verb` call (`NotEnforced`)
+        // for every verb — no dispatch outcome changes here. Flipping the
+        // bus path to enforce-by-default (plan §0 assumption A1: "enforce
+        // mode on from day one for bus, it has no legacy users to
+        // shadow-compare") is NOT done by this change: bpmn-lite is a real
+        // production bus caller today and nothing issues it a sealed
+        // envelope, so defaulting to enforce would reject every live bus
+        // verb call outright. That flip needs an explicit architect
+        // decision, not a default flipped silently inside this adapter.
         let result = self
             .executor
-            .execute_verb(local_verb_id, args, &mut ctx)
+            .execute_verb_admitting_envelope(local_verb_id, args, &mut ctx, None)
             .await
             .map_err(map_executor_error)?;
 
