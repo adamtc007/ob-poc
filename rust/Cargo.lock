@@ -4147,6 +4147,7 @@ dependencies = [
  "ob-poc-bods",
  "ob-poc-boundary",
  "ob-poc-compiler",
+ "ob-poc-control-plane",
  "ob-poc-deal",
  "ob-poc-derived-attributes",
  "ob-poc-diagnostics",

@@ -7784,7 +7784,34 @@ impl ReplOrchestratorV2 {
             "Stage 6 shadow — GatedVerbEnvelope constructed"
         );
 
-        phase5_recheck_failure(&entry.verb, &envelope)
+        let legacy_outcome = phase5_recheck_failure(&entry.verb, &envelope);
+
+        // T2.7 (EOP-PLAN-CONTROLPLANE-001, C-044): run the control plane in
+        // shadow mode alongside the legacy recheck above. Never gates
+        // dispatch — `legacy_outcome` (computed above) remains the sole
+        // return value; this only observes and records.
+        #[cfg(feature = "database")]
+        if let Some(pool) = self.pool() {
+            let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
+                &envelope,
+                &entry.verb,
+                entry_id,
+            );
+            let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
+            let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                session.id,
+                entry_id,
+                &entry.verb,
+                &report,
+                legacy_outcome.is_some(),
+            );
+            let pool = pool.clone();
+            tokio::spawn(async move {
+                crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+            });
+        }
+
+        legacy_outcome
     }
 
     /// Compile a runbook entry on-the-fly for entries that lack a `compiled_runbook_id`.

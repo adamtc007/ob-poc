@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jUdsWB3esBI0ThgEMIrYpgiMl28dF6NqtKe1AtnkZd6p0GrxhJ2W054IwIOUAFX
+\restrict RWZM7lcKAfhter4mo3GuLPrrxI95KhofCtZKVMsJZYYDRycHVLqLeHoJRzCoRnN
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -10450,6 +10450,44 @@ COMMENT ON COLUMN "ob-poc".control_edges.gleif_relationship_type IS 'GLEIF RR ty
 --
 
 COMMENT ON COLUMN "ob-poc".control_edges.psc_category IS 'UK PSC category (auto-set from edge_type + percentage)';
+
+
+--
+-- Name: control_plane_shadow_decisions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_shadow_decisions (
+    id bigint NOT NULL,
+    decided_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    session_id uuid NOT NULL,
+    entry_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    gate_results jsonb NOT NULL,
+    legacy_outcome_blocked boolean NOT NULL,
+    shadow_intent_admission_blocked boolean CONSTRAINT control_plane_shadow_decisi_shadow_intent_admission_bl_not_null NOT NULL,
+    diverged boolean NOT NULL
+);
+
+
+--
+-- Name: TABLE control_plane_shadow_decisions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_shadow_decisions IS 'T2.7 shadow-mode ob-poc-control-plane decisions vs legacy Phase 5 recheck outcome (EOP-PLAN-CONTROLPLANE-001). Never gates dispatch; divergence triage input for per-gate enforce-mode graduation.';
+
+
+--
+-- Name: control_plane_shadow_decisions_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE "ob-poc".control_plane_shadow_decisions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "ob-poc".control_plane_shadow_decisions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
@@ -25080,6 +25118,14 @@ ALTER TABLE ONLY "ob-poc".control_edges
 
 
 --
+-- Name: control_plane_shadow_decisions control_plane_shadow_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_shadow_decisions
+    ADD CONSTRAINT control_plane_shadow_decisions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: corporate_action_events corporate_action_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -30453,6 +30499,20 @@ CREATE INDEX idx_control_edges_type ON "ob-poc".control_edges USING btree (edge_
 --
 
 CREATE UNIQUE INDEX idx_control_edges_unique_active ON "ob-poc".control_edges USING btree (from_entity_id, to_entity_id, edge_type) WHERE (end_date IS NULL);
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_diverged; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_diverged ON "ob-poc".control_plane_shadow_decisions USING btree (diverged, decided_at DESC) WHERE diverged;
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_session ON "ob-poc".control_plane_shadow_decisions USING btree (session_id, decided_at DESC);
 
 
 --
@@ -41002,5 +41062,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jUdsWB3esBI0ThgEMIrYpgiMl28dF6NqtKe1AtnkZd6p0GrxhJ2W054IwIOUAFX
+\unrestrict RWZM7lcKAfhter4mo3GuLPrrxI95KhofCtZKVMsJZYYDRycHVLqLeHoJRzCoRnN
 

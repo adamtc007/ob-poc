@@ -22,6 +22,7 @@ entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
 ob-poc-boundary = { path = "crates/ob-poc-boundary" }
+ob-poc-control-plane = { path = "crates/ob-poc-control-plane" }
 # bpmn-controller: pool lifecycle (K8s Deployment + HPA) and instance
 # kick-off via direct writes to bpmn-lite's Postgres schema.
 # Reached from loader.* and bpmn-controller.* DSL verbs via Pattern B ops.

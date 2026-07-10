@@ -6,6 +6,7 @@
 pub mod composite_state;
 pub mod composite_state_loader;
 pub mod constellation_verb_index;
+pub(crate) mod control_plane_shadow;
 pub mod harness;
 pub mod learning;
 pub mod narration_engine;

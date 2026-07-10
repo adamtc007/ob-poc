@@ -233,7 +233,7 @@ mod tests {
             "VALIDATION_PENDING",
             "VALIDATED",
         );
-        let authority = crate::authority_gate::tests_support::authorised(Uuid::nil(), "compliance_officer");
+        let authority = crate::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
         let evidence = crate::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
         let write_set = crate::write_set::tests_support::proof(
             vec![Uuid::nil()],
