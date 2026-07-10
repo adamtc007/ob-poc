@@ -289,6 +289,13 @@ pub struct ReplOrchestratorV2 {
     nlci_compiler: Option<Arc<dyn IntentCompiler>>,
     /// Optional verb searcher for dsl_generate / process_intent_only pipeline.
     verb_searcher: Option<Arc<HybridVerbSearcher>>,
+    /// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022) follow-up: explicit,
+    /// hard-to-forge opt-in for running `execute_runbook` without a pool
+    /// (advisory locks skipped) even when a step declares a non-empty
+    /// write_set. Always `None` in production — the token's only
+    /// constructor is `#[cfg(test)]`-gated. Set via
+    /// `with_test_only_unlocked_execution()`.
+    unlocked_execution_token: Option<crate::runbook::UnlockedExecutionToken>,
 }
 
 impl ReplOrchestratorV2 {
@@ -325,7 +332,22 @@ impl ReplOrchestratorV2 {
             sage_engine: None,
             nlci_compiler: None,
             verb_searcher: None,
+            unlocked_execution_token: None,
         }
+    }
+
+    /// TEST-ONLY (T0.3): explicitly opt this orchestrator into running
+    /// `execute_runbook` unlocked (no advisory locks) when no pool is
+    /// configured, even for steps with a non-empty write_set. Without this,
+    /// such a step now hard-errors (`ExecutionError::LockingRequired`) —
+    /// see `runbook::UnlockedExecutionToken`. For fast, DB-free orchestrator
+    /// tests (`NullDslExecutor`, no `.with_pool(...)`) that genuinely
+    /// exercise a write-set-declaring verb.
+    #[cfg(test)]
+    pub fn with_test_only_unlocked_execution(mut self) -> Self {
+        self.unlocked_execution_token =
+            Some(crate::runbook::UnlockedExecutionToken::allow_unlocked_execution_for_tests());
+        self
     }
 
     /// Configure the orchestrator's ACP session-input draft mode (R8).
@@ -7940,6 +7962,49 @@ impl ReplOrchestratorV2 {
                 })
         };
 
+        // T0.3: dispatch to the pool path, or — TEST-ONLY — the explicit
+        // unlocked path when an `UnlockedExecutionToken` was supplied via
+        // `with_test_only_unlocked_execution`. Two cfg-gated variants
+        // because `execute_runbook_unlocked_for_tests` itself only exists
+        // under `#[cfg(test)]`; the token can only be `Some` under test
+        // anyway (its constructor is `#[cfg(test)]`-gated), so the
+        // `cfg(not(test))` variant never actually needs the unlocked path.
+        #[cfg(test)]
+        async fn dispatch_no_scope(
+            store: &dyn RunbookStoreBackend,
+            compiled_id: CompiledRunbookId,
+            bridge: &dyn crate::runbook::StepExecutor,
+            pool: Option<&sqlx::PgPool>,
+            unlocked_token: Option<crate::runbook::UnlockedExecutionToken>,
+        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
+        {
+            match (pool, unlocked_token) {
+                (None, Some(token)) => {
+                    crate::runbook::execute_runbook_unlocked_for_tests(
+                        store,
+                        compiled_id,
+                        None,
+                        bridge,
+                        token,
+                    )
+                    .await
+                }
+                _ => execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await,
+            }
+        }
+
+        #[cfg(not(test))]
+        async fn dispatch_no_scope(
+            store: &dyn RunbookStoreBackend,
+            compiled_id: CompiledRunbookId,
+            bridge: &dyn crate::runbook::StepExecutor,
+            pool: Option<&sqlx::PgPool>,
+            _unlocked_token: Option<crate::runbook::UnlockedExecutionToken>,
+        ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
+        {
+            execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await
+        }
+
         // Dispatch helper: picks between in-scope and with-pool paths.
         async fn run_through_gate(
             store: &dyn RunbookStoreBackend,
@@ -7947,6 +8012,7 @@ impl ReplOrchestratorV2 {
             bridge: &dyn crate::runbook::StepExecutor,
             scope: Option<&mut dyn TransactionScope>,
             pool: Option<&sqlx::PgPool>,
+            unlocked_token: Option<crate::runbook::UnlockedExecutionToken>,
         ) -> Result<crate::runbook::executor::RunbookExecutionResult, crate::runbook::ExecutionError>
         {
             match scope {
@@ -7954,7 +8020,7 @@ impl ReplOrchestratorV2 {
                     crate::runbook::execute_runbook_in_scope(store, compiled_id, None, bridge, s)
                         .await
                 }
-                None => execute_runbook_with_pool(store, compiled_id, None, bridge, pool).await,
+                None => dispatch_no_scope(store, compiled_id, bridge, pool, unlocked_token).await,
             }
         }
 
@@ -7962,7 +8028,16 @@ impl ReplOrchestratorV2 {
             if let Some(ref exec) = self.executor_v2 {
                 let bridge =
                     DslExecutorV2StepExecutor::new(exec.clone(), runbook_id, session_stack);
-                match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+                match run_through_gate(
+                    store,
+                    compiled_id,
+                    &bridge,
+                    scope,
+                    self.pool(),
+                    self.unlocked_execution_token,
+                )
+                .await
+                {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
                         error: format!("Execution gate error: {}", e),
@@ -7971,7 +8046,16 @@ impl ReplOrchestratorV2 {
             } else {
                 // No V2 executor — fall back to sync bridge (never parks).
                 let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-                match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+                match run_through_gate(
+                    store,
+                    compiled_id,
+                    &bridge,
+                    scope,
+                    self.pool(),
+                    self.unlocked_execution_token,
+                )
+                .await
+                {
                     Ok(result) => extract_first_outcome(result),
                     Err(e) => StepOutcome::Failed {
                         error: format!("Execution gate error: {}", e),
@@ -7991,7 +8075,16 @@ impl ReplOrchestratorV2 {
             if let Some(pipeline) = self.gate_pipeline.clone() {
                 bridge = bridge.with_gate_pipeline(pipeline);
             }
-            match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+            match run_through_gate(
+                store,
+                compiled_id,
+                &bridge,
+                scope,
+                self.pool(),
+                self.unlocked_execution_token,
+            )
+            .await
+            {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),
@@ -7999,7 +8092,16 @@ impl ReplOrchestratorV2 {
             }
         } else {
             let bridge = DslStepExecutor::new(Arc::clone(&self.executor));
-            match run_through_gate(store, compiled_id, &bridge, scope, self.pool()).await {
+            match run_through_gate(
+                store,
+                compiled_id,
+                &bridge,
+                scope,
+                self.pool(),
+                self.unlocked_execution_token,
+            )
+            .await
+            {
                 Ok(result) => extract_first_outcome(result),
                 Err(e) => StepOutcome::Failed {
                     error: format!("Execution gate error: {}", e),
@@ -10226,7 +10328,13 @@ definition_of_done:
         let (manifest, hash) = load_pack_from_bytes(kyc_yaml()).unwrap();
         let packs = vec![(Arc::new(manifest), hash)];
         let router = PackRouter::new(packs);
+        // T0.3 (closes C-022): this orchestrator has no pool (NullDslExecutor,
+        // in-memory) but drives real write-set-declaring verbs (e.g.
+        // kyc-case.create) through Run — explicitly opt into unlocked
+        // execution rather than silently relying on the old skip-locking
+        // default.
         ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
+            .with_test_only_unlocked_execution()
     }
 
     /// Phase H acceptance test: full KYC case flow.
