@@ -470,8 +470,29 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
             .collect::<serde_json::Map<String, serde_json::Value>>()
             .into();
 
-        // Execute through the SemOS port
-        let outcome = match self.port.execute_verb(&step.verb, args, &mut ctx).await {
+        // Execute through the SemOS port.
+        //
+        // T6.1-style admission wiring (EOP-PLAN-CONTROLPLANE-001, PIR-D-002):
+        // routes through the T4.1 envelope-admission entry point instead of
+        // the bare `execute_verb`, mirroring the bus adapter's change
+        // (`ob-poc-web/src/bus_runtime.rs`). `envelope_id: None` — nothing at
+        // this call site issues a sealed `ExecutionEnvelope` yet, so with the
+        // production-default empty `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` this
+        // is behaviourally identical to the prior direct `execute_verb` call
+        // (`NotEnforced`) for every verb dispatched through the runbook step
+        // executor (Path A) — zero dispatch-outcome change. This closes the
+        // "Path A never reaches the admission mechanism at all" gap
+        // (independent adversarial review, docs/research/control-plane-pir-001.md,
+        // PIR-D-002) and satisfies the graduation runbook's Path A Step 0
+        // precondition (docs/todo/control-plane/EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001.md
+        // §4) — Path A's shadow-evaluation window for any gate wired here
+        // still starts fresh from this commit per the runbook's §1
+        // graduation-window rule, not before.
+        let outcome = match self
+            .port
+            .execute_verb_admitting_envelope(&step.verb, args, &mut ctx, None)
+            .await
+        {
             Ok(result) => {
                 let json = match &result.outcome {
                     dsl_runtime::VerbExecutionOutcome::Uuid(id) => {
