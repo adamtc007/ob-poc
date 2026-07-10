@@ -228,14 +228,7 @@ slots:
     overlays: [registry, evidence, screenings]
     edge_overlays: [ownership]
     verbs:
-      {
-        discover: ubo.discover,
-        allege: ubo.allege,
-        verify: ubo.verify,
-        promote: ubo.promote,
-        approve: ubo.approve,
-        reject: ubo.reject,
-      }
+      { discover: ubo.discover }
   case:
     type: case
     table: cases

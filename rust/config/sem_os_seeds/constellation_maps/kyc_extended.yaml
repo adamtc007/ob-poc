@@ -20,16 +20,11 @@ slots:
     join: { via: board_compositions, parent_fk: entity_id, child_fk: person_entity_id }
     cardinality: optional
     depends_on: [entity]
-    verbs:
-      appoint: { verb: board.appoint, when: [empty, filled] }
-      resign: { verb: board.resign, when: filled }
-      list_by_entity: { verb: board.list-by-entity, when: filled }
-      list_by_person: { verb: board.list-by-person, when: filled }
-      grant_right: { verb: board.grant-appointment-right, when: filled }
-      revoke_right: { verb: board.revoke-appointment-right, when: filled }
-      list_rights: { verb: board.list-appointment-rights, when: filled }
-      list_held: { verb: board.list-rights-held, when: filled }
-      analyze: { verb: board.analyze-control, when: filled }
+    # verbs: intentionally empty — the 9 legacy board.* action verbs
+    # (appoint/resign/list-by-*/grant-*/revoke-*/list-*-rights/analyze-control)
+    # were deleted in 5517de31 (R3/R4 legacy determination verb rip); no
+    # dsl.kyc stream-backed replacement exists yet for board-composition
+    # actions specifically (2026-07-10).
   bods:
     type: entity
     entity_kinds: [person, company]
