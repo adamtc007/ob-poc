@@ -1,7 +1,13 @@
 # GRADUATION RUNBOOK — ob-poc-control-plane enforce-mode rollout
-### EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001 v0.1
+### EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001 v0.2
 ### Basis: EOP-PLAN-CONTROLPLANE-001 v0.1 §0 (shadow-first strategy) + docs/research/control-plane-ownership-ledger.md
 ### Status: DRAFT — precondition state verified against code 2026-07-10; no path has graduated yet.
+
+v0.2 (2026-07-10, architect review): added §1's graduation-window
+definition (a gate's window resets when its shadow inputs go from
+partial to full-pipeline coverage, or from the last CP-DEFECT fix,
+whichever is later — the general form of Path A's Step 0 finding) and
+§4 Path D's trust-boundary design note for T6.1a's rehydration path.
 
 ---
 
@@ -41,6 +47,24 @@ the query that answers "is this gate ready" — run it, don't estimate it.
 REPL, workflow, bus) can have some gates ready and others not, because
 shadow evidence is per-gate — see §2's per-path gate coverage table before
 assuming "graduate Path A" means all 14 gates at once.
+
+**The graduation window is defined against the pipeline that will actually
+enforce, not against whatever telemetry happens to already exist.**
+Concretely: `total_decisions >= 500` only counts decisions produced by the
+*same* evaluation the enforce flip will make binding. Shadow data collected
+while a call site only wires G1 (as Path A's does today — §2) is evidence
+about intent admission alone; it says nothing about the G1-G14 decision
+that verb would be bound to once enforced. Adding a gate's real inputs to
+an already-shadow-collecting call site (the precondition work in §4)
+**resets that gate's window to zero** — it does not inherit the prior
+partial-coverage telemetry, even if the surrounding path has been
+shadow-collecting for months. Formally: **a gate's graduation window is
+measured from the later of (a) the commit that wired full-pipeline shadow
+evaluation on that path, or (b) the last CP-DEFECT fix for that gate on
+that path** — whichever is more recent. This is the general form of §4's
+Path A Step 0 precondition; recording it here so the same trap (assuming
+partial shadow coverage counts toward a full-pipeline enforce decision)
+doesn't recur when Path B or Path C reach this stage.
 
 ---
 
@@ -129,9 +153,29 @@ envelope can ever be non-`None` there.
       `EnvelopeHandle` as a `String` data object, write it at process start
       from wherever the envelope is issued, read it back at the task that
       dispatches over the bus and pass it through to `ObPocVerbAdapter`.
+      **This is an ob-poc-only change**: `domain_payload` and its
+      `String`-data-object routing already exist in bpmn-lite today —
+      nothing in the bpmn-lite platform crate needs to change, no version
+      bump, no federation-partner coordination. The only new artefacts are
+      an ob-poc-side BPMN process definition declaring the data object and
+      the dispatcher/bus-handler glue code that writes/reads it.
+      **Design note for whoever writes this (architect, 2026-07-10):** the
+      handle riding in `domain_payload` is data crossing a trust
+      boundary — a string in a process variable is not proof of anything
+      on its own. Rehydration at the bus handler must treat it as **a
+      claim to verify**, not an authorization: full lookup against
+      `control_plane_envelopes`, content-hash check, single-use check,
+      validity-window check, and pre-state-pin check (§6.10.4 of the V&S),
+      exactly as any other envelope-handle rehydration path would. A
+      forged or replayed string in that field must void loudly (routed to
+      exception handling, not silently accepted) — this failure path
+      needs its own dedicated test alongside the happy-path threading
+      test when T6.1a is implemented.
 - [ ] A shadow-decision call site is added for the bus path (currently
       none exists — bus shadow-collects nothing today).
-- [ ] Same divergence criterion, once evidence exists.
+- [ ] Same divergence criterion as Path A/B/C, once evidence exists — and
+      per §1's graduation-window rule, that window starts when this
+      shadow-decision call site goes live, not before.
 
 ---
 
