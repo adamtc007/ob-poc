@@ -64,12 +64,12 @@ impl BoundEntities {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::BoundEntities;
     use uuid::Uuid;
 
-    pub(crate) fn bound(entity_ids: Vec<Uuid>) -> BoundEntities {
+    pub fn bound(entity_ids: Vec<Uuid>) -> BoundEntities {
         BoundEntities::new(entity_ids)
     }
 }

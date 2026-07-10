@@ -44,11 +44,11 @@ impl EvidenceSufficient {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::EvidenceSufficient;
 
-    pub(crate) fn sufficient(satisfied_obligation_ids: Vec<String>) -> EvidenceSufficient {
+    pub fn sufficient(satisfied_obligation_ids: Vec<String>) -> EvidenceSufficient {
         EvidenceSufficient::new(satisfied_obligation_ids)
     }
 }

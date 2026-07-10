@@ -43,11 +43,11 @@ impl ResolvedPack {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::ResolvedPack;
 
-    pub(crate) fn resolved(pack_id: &str) -> ResolvedPack {
+    pub fn resolved(pack_id: &str) -> ResolvedPack {
         ResolvedPack::new(pack_id)
     }
 }

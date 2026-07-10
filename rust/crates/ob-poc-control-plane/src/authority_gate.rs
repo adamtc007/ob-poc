@@ -55,11 +55,11 @@ impl Authorised {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::Authorised;
 
-    pub(crate) fn authorised(actor_id: &str, role: &str) -> Authorised {
+    pub fn authorised(actor_id: &str, role: &str) -> Authorised {
         Authorised::new(actor_id, role)
     }
 }

@@ -20,6 +20,27 @@ use uuid::Uuid;
 
 use crate::gate::{Gate, GateId, GateResult};
 
+/// T4.4 (G12) — the unified pinned version set: every subsystem version
+/// that must match between gate time and execution time, folded into one
+/// block on the snapshot rather than left as independently-checked
+/// per-subsystem equality tests (C-033's bus catalogue-version check being
+/// the one with an existing production analogue; compiler/model/prompt
+/// versions have no existing pin at all — see the ledger).
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct PinnedVersionSet {
+    /// Mirrors `ob-poc-bus-handler`'s `expected_catalogue_version` /
+    /// `InvocationContext.catalogue_version` string equality check (C-033).
+    pub bus_catalogue_version: Option<String>,
+    /// `ob-poc`'s own build version (`CARGO_PKG_VERSION`) at gate time —
+    /// the DSL compiler/parser/macro-expander ship as part of the same
+    /// crate, so this is the closest existing proxy for "DSL/compiler
+    /// crate version" (no finer-grained content hash exists yet).
+    pub compiler_version: Option<String>,
+    /// From the (net-new, T2.1) interpretation attestation, when present.
+    pub model_version: Option<String>,
+    pub prompt_version: Option<String>,
+}
+
 /// `SnapshotPins` — the artefact pinning every gate read against a
 /// specific, reproducible system state, so replaying a persisted
 /// `ControlPlaneProof` against the pinned snapshot reproduces the original
@@ -34,6 +55,7 @@ pub struct SnapshotPins {
     /// comparable version pin (RR-5 Mode-1) and is STP-ineligible per plan
     /// A5 until the row-version migration (C-045) lands for its family.
     entity_row_versions: Vec<(Uuid, i64)>,
+    versions: PinnedVersionSet,
 }
 
 impl SnapshotPins {
@@ -45,12 +67,14 @@ impl SnapshotPins {
         session_snapshot_id: Option<Uuid>,
         kyc_manifest_hash: Option<String>,
         entity_row_versions: Vec<(Uuid, i64)>,
+        versions: PinnedVersionSet,
     ) -> Self {
         Self {
             sem_reg_snapshot_id,
             session_snapshot_id,
             kyc_manifest_hash,
             entity_row_versions,
+            versions,
         }
     }
 
@@ -73,6 +97,10 @@ impl SnapshotPins {
             .map(|(_, version)| *version)
     }
 
+    pub fn versions(&self) -> &PinnedVersionSet {
+        &self.versions
+    }
+
     /// Every bound entity lacking a comparable version pin — the input the
     /// (future) STP classifier (T3.3) uses to enforce plan A5.
     pub fn unpinned_entities<'a>(&'a self, bound: &'a [Uuid]) -> impl Iterator<Item = Uuid> + 'a {
@@ -83,12 +111,12 @@ impl SnapshotPins {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
-    use super::SnapshotPins;
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
+    use super::{PinnedVersionSet, SnapshotPins};
     use uuid::Uuid;
 
-    pub(crate) fn pins(
+    pub fn pins(
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
         kyc_manifest_hash: Option<String>,
@@ -99,19 +127,38 @@ pub(crate) mod tests_support {
             session_snapshot_id,
             kyc_manifest_hash,
             entity_row_versions,
+            PinnedVersionSet::default(),
+        )
+    }
+
+    pub fn pins_with_versions(
+        sem_reg_snapshot_id: Option<Uuid>,
+        session_snapshot_id: Option<Uuid>,
+        kyc_manifest_hash: Option<String>,
+        entity_row_versions: Vec<(Uuid, i64)>,
+        versions: PinnedVersionSet,
+    ) -> SnapshotPins {
+        SnapshotPins::new(
+            sem_reg_snapshot_id,
+            session_snapshot_id,
+            kyc_manifest_hash,
+            entity_row_versions,
+            versions,
         )
     }
 }
 
 /// Pre-computed input for the decision snapshot gate — the raw pin values
 /// the call site collected while resolving the intent (SemReg snapshot set
-/// id, session snapshot id, KYC manifest hash, per-entity row versions).
+/// id, session snapshot id, KYC manifest hash, per-entity row versions,
+/// and the T4.4 pinned version set).
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct SnapshotInput {
     pub sem_reg_snapshot_id: Option<Uuid>,
     pub session_snapshot_id: Option<Uuid>,
     pub kyc_manifest_hash: Option<String>,
     pub entity_row_versions: Vec<(Uuid, i64)>,
+    pub versions: PinnedVersionSet,
 }
 
 /// Translates a `SnapshotInput` into `SnapshotPins` — the function T3.4's
@@ -124,6 +171,7 @@ pub fn build_pins(input: &SnapshotInput) -> SnapshotPins {
         input.session_snapshot_id,
         input.kyc_manifest_hash.clone(),
         input.entity_row_versions.clone(),
+        input.versions.clone(),
     )
 }
 
@@ -155,11 +203,16 @@ mod tests {
             session_snapshot_id: None,
             kyc_manifest_hash: Some("hash-1".to_string()),
             entity_row_versions: vec![(entity, 5)],
+            versions: PinnedVersionSet {
+                bus_catalogue_version: Some("v3".to_string()),
+                ..Default::default()
+            },
         };
         let pins = build_pins(&input);
         assert_eq!(pins.sem_reg_snapshot_id(), Some(Uuid::nil()));
         assert_eq!(pins.kyc_manifest_hash(), Some("hash-1"));
         assert_eq!(pins.entity_row_version(entity), Some(5));
+        assert_eq!(pins.versions().bus_catalogue_version.as_deref(), Some("v3"));
     }
 
     #[test]
@@ -184,7 +237,7 @@ mod tests {
     #[test]
     fn snapshot_pins_is_constructible_within_its_own_module() {
         let entity = Uuid::nil();
-        let pins = SnapshotPins::new(Some(Uuid::nil()), None, None, vec![(entity, 3)]);
+        let pins = SnapshotPins::new(Some(Uuid::nil()), None, None, vec![(entity, 3)], PinnedVersionSet::default());
         assert_eq!(pins.entity_row_version(entity), Some(3));
     }
 
@@ -192,7 +245,7 @@ mod tests {
     fn unpinned_entities_reports_bound_entities_missing_a_version() {
         let pinned = Uuid::from_u128(1);
         let unpinned = Uuid::from_u128(2);
-        let pins = SnapshotPins::new(None, None, None, vec![(pinned, 1)]);
+        let pins = SnapshotPins::new(None, None, None, vec![(pinned, 1)], PinnedVersionSet::default());
         let result: Vec<Uuid> = pins.unpinned_entities(&[pinned, unpinned]).collect();
         assert_eq!(result, vec![unpinned]);
     }

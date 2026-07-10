@@ -64,12 +64,12 @@ impl LegalTransition {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::LegalTransition;
     use uuid::Uuid;
 
-    pub(crate) fn legal(entity_id: Uuid, from_state: &str, to_state: &str) -> LegalTransition {
+    pub fn legal(entity_id: Uuid, from_state: &str, to_state: &str) -> LegalTransition {
         LegalTransition::new(entity_id, from_state, to_state)
     }
 }

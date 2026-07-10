@@ -113,6 +113,47 @@ impl ObPocVerbExecutor {
 }
 
 #[cfg(feature = "database")]
+impl ObPocVerbExecutor {
+    /// T4.1 (EOP-PLAN-CONTROLPLANE-001): admission-check `verb_fqn` against
+    /// the `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` set before dispatching.
+    /// Read fresh from the environment on every call rather than cached at
+    /// construction — matches `LifecycleGateMode::from_env()`'s existing
+    /// per-call-read pattern (`dsl_v2/executor.rs`) so a config change
+    /// takes effect without a process restart, which matters for a
+    /// mechanism whose whole purpose is incremental per-path graduation.
+    async fn admit(
+        &self,
+        verb_fqn: &str,
+        envelope_id: Option<Uuid>,
+    ) -> dsl_runtime::Result<()> {
+        let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
+        let decision = crate::agent::control_plane_envelope_store::check_admission(
+            self.executor.pool(),
+            &enforced,
+            verb_fqn,
+            envelope_id,
+        )
+        .await
+        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("envelope admission check failed: {e}")))?;
+
+        match decision {
+            crate::agent::control_plane_envelope_store::AdmissionDecision::NotEnforced
+            | crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => Ok(()),
+            crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedNoEnvelope => {
+                Err(SemOsError::InvalidInput(format!(
+                    "{verb_fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) but no sealed envelope was presented"
+                )))
+            }
+            crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedConsumeFailed(outcome) => {
+                Err(SemOsError::InvalidInput(format!(
+                    "{verb_fqn} envelope admission rejected: {outcome:?}"
+                )))
+            }
+        }
+    }
+}
+
+#[cfg(feature = "database")]
 #[async_trait]
 impl VerbExecutionPort for ObPocVerbExecutor {
     async fn execute_verb(
@@ -297,6 +338,24 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             side_effects,
             ..Default::default()
         })
+    }
+
+    /// T4.1: admission-checks `verb_fqn` before delegating to
+    /// `execute_verb`. With the production-default empty
+    /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`, `admit()` always returns
+    /// `Ok(())` immediately (`NotEnforced`) — this override is
+    /// behaviourally identical to the default trait impl for every path
+    /// until a verb is explicitly added to that set, matching the plan's
+    /// shadow-first posture (§0).
+    async fn execute_verb_admitting_envelope(
+        &self,
+        verb_fqn: &str,
+        args: serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        envelope_id: Option<Uuid>,
+    ) -> dsl_runtime::Result<VerbExecutionResult> {
+        self.admit(verb_fqn, envelope_id).await?;
+        self.execute_verb(verb_fqn, args, ctx).await
     }
 }
 
@@ -889,5 +948,106 @@ mod tests {
         // (all CRUD verbs fall through to DslExecutor)
         // This just verifies the type compiles — actual execution needs a pool.
         let _has_method = ObPocVerbExecutor::with_crud_port;
+    }
+}
+
+/// T4.1 exit criterion: "enforce-mode Path A green end-to-end" — proves the
+/// admission mechanism itself works against a real `ObPocVerbExecutor` and
+/// a real envelope row, without flipping any actual production verb into
+/// the enforced set (the env var is set and unset entirely within this
+/// test's own process-local scope). `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`
+/// being unset is the production default (see `EnforcedVerbs::from_env`)
+/// — every path stays shadow/legacy until it individually graduates
+/// (§0), which this tranche does not do.
+#[cfg(all(test, feature = "database"))]
+mod t4_1_envelope_admission_tests {
+    use super::*;
+
+    async fn test_pool() -> sqlx::PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    /// Guards `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` mutation so these tests
+    /// can't interleave with each other (env vars are process-global) and
+    /// always restores the unset production default on drop.
+    struct EnvGuard;
+    impl EnvGuard {
+        fn set(verb_fqn: &str) -> Self {
+            std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", verb_fqn);
+            Self
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn shadow_default_admits_every_verb_with_no_envelope() {
+        std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS"); // explicit production default
+        let pool = test_pool().await;
+        let executor = ObPocVerbExecutor::from_pool(pool);
+        executor
+            .admit("cbu.confirm", None)
+            .await
+            .expect("unset OB_POC_CONTROL_PLANE_ENFORCE_VERBS must admit every verb, envelope or not");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn enforced_verb_without_envelope_is_rejected() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+        let executor = ObPocVerbExecutor::from_pool(pool);
+
+        let err = executor
+            .admit("cbu.confirm", None)
+            .await
+            .expect_err("enforced verb with no envelope must be rejected");
+        assert!(err.to_string().contains("no sealed envelope was presented"));
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn enforced_verb_with_consumed_envelope_admits_then_rejects_resubmission() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+
+        let envelope_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".control_plane_envelopes (
+                envelope_id, content_hash, session_id, verb_fqn,
+                status, not_before, not_after
+            ) VALUES ($1, 'test-hash', $2, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+            "#,
+        )
+        .bind(envelope_id)
+        .bind(Uuid::new_v4())
+        .execute(&pool)
+        .await
+        .expect("insert sealed envelope row");
+
+        let executor = ObPocVerbExecutor::from_pool(pool);
+
+        executor
+            .admit("cbu.confirm", Some(envelope_id))
+            .await
+            .expect("sealed, unconsumed envelope must admit");
+
+        let err = executor
+            .admit("cbu.confirm", Some(envelope_id))
+            .await
+            .expect_err("resubmitting the same (now-consumed) envelope must be rejected");
+        assert!(err.to_string().contains("AlreadyConsumed"));
+
+        // A different, non-enforced verb is untouched by this envelope's fate.
+        executor
+            .admit("cbu.reject", None)
+            .await
+            .expect("cbu.reject is not in the enforced set — must admit regardless");
     }
 }

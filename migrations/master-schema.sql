@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict oAAFlxbOPA25TjAEWnwAMTszWXeYnTlahmDElqAOq3gS4Fpb2MK1KnPHCZUaaYG
+\restrict qWt8bgTgi3uHDk6xNeXwrU649ayCTtdEjcwuENuNW8dOqtNwuvyejH4RZQ08AtY
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -10450,6 +10450,32 @@ COMMENT ON COLUMN "ob-poc".control_edges.gleif_relationship_type IS 'GLEIF RR ty
 --
 
 COMMENT ON COLUMN "ob-poc".control_edges.psc_category IS 'UK PSC category (auto-set from edge_type + percentage)';
+
+
+--
+-- Name: control_plane_envelopes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_envelopes (
+    envelope_id uuid NOT NULL,
+    content_hash text NOT NULL,
+    session_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    status text DEFAULT 'sealed'::text NOT NULL,
+    not_before timestamp with time zone NOT NULL,
+    not_after timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    void_reason text,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT control_plane_envelopes_status_check CHECK ((status = ANY (ARRAY['sealed'::text, 'consumed'::text, 'expired'::text, 'voided'::text])))
+);
+
+
+--
+-- Name: TABLE control_plane_envelopes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_envelopes IS 'T4.2 sealed ExecutionEnvelope identity + single-use/TTL bookkeeping (EOP-PLAN-CONTROLPLANE-001). No envelope content is stored, only its handle identity and lifecycle status; rehydration is a status-checked consume, never a raw deserialize.';
 
 
 --
@@ -25118,6 +25144,14 @@ ALTER TABLE ONLY "ob-poc".control_edges
 
 
 --
+-- Name: control_plane_envelopes control_plane_envelopes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_envelopes
+    ADD CONSTRAINT control_plane_envelopes_pkey PRIMARY KEY (envelope_id);
+
+
+--
 -- Name: control_plane_shadow_decisions control_plane_shadow_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -30499,6 +30533,20 @@ CREATE INDEX idx_control_edges_type ON "ob-poc".control_edges USING btree (edge_
 --
 
 CREATE UNIQUE INDEX idx_control_edges_unique_active ON "ob-poc".control_edges USING btree (from_entity_id, to_entity_id, edge_type) WHERE (end_date IS NULL);
+
+
+--
+-- Name: idx_control_plane_envelopes_sealed_not_after; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_envelopes_sealed_not_after ON "ob-poc".control_plane_envelopes USING btree (not_after) WHERE (status = 'sealed'::text);
+
+
+--
+-- Name: idx_control_plane_envelopes_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_envelopes_session ON "ob-poc".control_plane_envelopes USING btree (session_id, created_at DESC);
 
 
 --
@@ -41062,5 +41110,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict oAAFlxbOPA25TjAEWnwAMTszWXeYnTlahmDElqAOq3gS4Fpb2MK1KnPHCZUaaYG
+\unrestrict qWt8bgTgi3uHDk6xNeXwrU649ayCTtdEjcwuENuNW8dOqtNwuvyejH4RZQ08AtY
 

@@ -159,6 +159,11 @@ smallvec = { version = "1.11", features = ["serde"] }
 
 # Testing
 [dev-dependencies]
+# test-support: exposes ob-poc-control-plane::envelope::test_support::seal
+# (+ every gate module's tests_support fixture constructors) for T4.2's
+# envelope-persistence tests, which need a real sealed ExecutionEnvelope.
+# Off in a plain `cargo build`; only unified in during `cargo test`.
+ob-poc-control-plane = { path = "crates/ob-poc-control-plane", features = ["test-support"] }
 # bpmn-lite was extracted to github.com/adamtc007/bpmn-lite. Workspace
 # deps below resolve from the git tag; ~/.cargo/config.toml [patch]
 # redirects to the local ~/dev/bpmn-lite/ checkout during development.

@@ -73,12 +73,12 @@ impl AdmittedIntent {
 /// `AdmittedIntent::new` — it exists so crate-internal integration-style
 /// tests elsewhere (e.g. `envelope::tests`) can obtain a fixture without
 /// duplicating this module's construction logic.
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::AdmittedIntent;
     use uuid::Uuid;
 
-    pub(crate) fn admitted(id: Uuid, verb_fqn: &str) -> AdmittedIntent {
+    pub fn admitted(id: Uuid, verb_fqn: &str) -> AdmittedIntent {
         AdmittedIntent::new(id, verb_fqn, true)
     }
 }

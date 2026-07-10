@@ -116,9 +116,11 @@ impl ExecutionEnvelope {
     /// adding a gate to the platform means adding a parameter here;
     /// forgetting to run it becomes unrepresentable rather than undetected.
     ///
-    /// Called by the (future) T2's collected-gate orchestration, once every
-    /// gate has a real adapter; the only caller today is the cfg(test)
-    /// positive-path test below.
+    /// Called by the (future) full-orchestration `evaluate()` once every
+    /// gate has a real adapter; today's callers are the cfg(test)
+    /// positive-path test below and, behind the `test-support` feature,
+    /// `envelope::test_support::seal` (for downstream crates' storage-layer
+    /// tests — see that module's doc).
     #[allow(clippy::too_many_arguments, dead_code)]
     pub(crate) fn seal(
         intent: AdmittedIntent,
@@ -201,6 +203,41 @@ impl ExecutionEnvelope {
             id: self.id,
             content_hash,
         }
+    }
+}
+
+/// Feature-gated (`test-support`, off by default), NOT `cfg(test)`: a
+/// downstream crate's own `cargo test` run does not compile this crate
+/// with `cfg(test)` active (that only applies to a crate's *own* test
+/// target), so a `cfg(test)` bridge here would be invisible to e.g.
+/// `ob-poc`'s T4.2 envelope-persistence tests. This module exists solely so
+/// those tests can obtain a real, fully-proven `ExecutionEnvelope` to
+/// exercise storage/consume-once/TTL logic against — every parameter is
+/// still each gate's own module-private success proof, unchanged from
+/// `seal` itself.
+#[cfg(feature = "test-support")]
+pub mod test_support {
+    use super::{
+        AdmittedIntent, Authorised, BoundEntities, CompiledRunbookRef, EvidenceSufficient, ExecutionEnvelope,
+        LegalTransition, ResolvedPack, SnapshotPins, ValidityWindow, WriteSetProof,
+    };
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn seal(
+        intent: AdmittedIntent,
+        binding: BoundEntities,
+        pack: ResolvedPack,
+        dag: LegalTransition,
+        authority: Authorised,
+        evidence: EvidenceSufficient,
+        write_set: WriteSetProof,
+        runbook: CompiledRunbookRef,
+        snapshot: SnapshotPins,
+        validity: ValidityWindow,
+    ) -> ExecutionEnvelope {
+        ExecutionEnvelope::seal(
+            intent, binding, pack, dag, authority, evidence, write_set, runbook, snapshot, validity,
+        )
     }
 }
 

@@ -230,6 +230,7 @@ mod evaluate_shadow_tests {
                 session_snapshot_id: None,
                 kyc_manifest_hash: None,
                 entity_row_versions: vec![(entity, 1)],
+                versions: snapshot::PinnedVersionSet::default(),
             }),
             stp_classifier: Some(StpClassifierInput {
                 is_durable_verb: false,

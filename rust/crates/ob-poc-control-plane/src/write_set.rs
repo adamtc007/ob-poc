@@ -87,13 +87,13 @@ pub enum WriteSetOutcome {
     CannotDerive { reason: String },
 }
 
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::WriteSetProof;
     use uuid::Uuid;
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn proof(
+    pub fn proof(
         entity_ids: Vec<Uuid>,
         state_slots: Vec<String>,
         tables: Vec<String>,

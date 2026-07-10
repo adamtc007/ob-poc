@@ -138,6 +138,68 @@ pub async fn verify_toctou(
     }
 }
 
+/// T4.3 (EOP-PLAN-CONTROLPLANE-001): pre-state pinning enforcement against
+/// `ob-poc-control-plane`'s own `SnapshotPins` (G13), as an alternative
+/// comparison surface to `verify_toctou`'s `GatedVerbEnvelope`-shaped one —
+/// same `RowVersionProvider`, different pin source. `SnapshotPins` carries
+/// no entity-kind discriminator (it's a plain `(entity_id, row_version)`
+/// map), so the caller supplies `entity_kinds` alongside it.
+///
+/// Only entities present in `pins.entity_row_version(id)` are compared —
+/// plan A5's unpinned-entity classification (any bound entity lacking a
+/// comparable pin caps the plan at `HumanGated`) is the STP classifier's
+/// job (`ob-poc-control-plane::stp_classifier`), not this function's; an
+/// entity absent from the pin set is silently skipped here rather than
+/// treated as a drift, matching that division of responsibility.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinDrift {
+    pub entity_id: Uuid,
+    pub expected_row_version: i64,
+    pub actual_row_version: u64,
+}
+
+impl std::fmt::Display for PinDrift {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "pin drift for entity {}: expected row_version {}, actual {}",
+            self.entity_id, self.expected_row_version, self.actual_row_version
+        )
+    }
+}
+
+impl std::error::Error for PinDrift {}
+
+/// Re-reads `row_version` for every entity `pins` has a comparable version
+/// for, and compares. Returns `Ok(())` when every pinned entity's current
+/// row_version still matches what was pinned at gate time. Returns the
+/// *first* drift found — like `verify_toctou`, this is a hard stop (void +
+/// `stale_state` exception per the plan), not a collect-all report; a
+/// caller wanting every drift can call this per-entity instead.
+pub async fn verify_pins(
+    pins: &ob_poc_control_plane::snapshot::SnapshotPins,
+    entity_kinds: &[(Uuid, String)],
+    provider: &dyn RowVersionProvider,
+) -> Result<(), anyhow::Error> {
+    for (entity_id, kind) in entity_kinds {
+        let Some(expected) = pins.entity_row_version(*entity_id) else {
+            continue;
+        };
+        let actual = provider
+            .row_version(*entity_id, kind)
+            .await
+            .map_err(|err| anyhow!("row_version lookup failed for {}: {}", entity_id, err))?;
+        if actual as i64 != expected {
+            return Err(anyhow!(PinDrift {
+                entity_id: *entity_id,
+                expected_row_version: expected,
+                actual_row_version: actual,
+            }));
+        }
+    }
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Production SQL-backed provider (behind #[cfg(feature = "database")]).
 // Requires the D.2 migration to be applied to the target database.
@@ -407,5 +469,105 @@ mod tests {
         let provider = MockProvider(Mutex::new(map));
         let err = verify_toctou(&envelope, workspace_snapshot_id, &provider).await;
         assert!(err.is_err(), "one entity drifted → drift detected");
+    }
+
+    fn pins_with(entries: Vec<(Uuid, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
+        ob_poc_control_plane::snapshot::tests_support::pins(None, None, None, entries)
+    }
+
+    #[tokio::test]
+    async fn verify_pins_matches_when_row_version_unchanged() {
+        let entity_id = Uuid::new_v4();
+        let pins = pins_with(vec![(entity_id, 42)]);
+        let mut map = HashMap::new();
+        map.insert(entity_id, 42u64);
+        let provider = MockProvider(Mutex::new(map));
+
+        verify_pins(&pins, &[(entity_id, "cbu".to_string())], &provider)
+            .await
+            .expect("same row_version -> no drift");
+    }
+
+    #[tokio::test]
+    async fn verify_pins_detects_drift_when_row_version_bumped() {
+        let entity_id = Uuid::new_v4();
+        let pins = pins_with(vec![(entity_id, 42)]);
+        let mut map = HashMap::new();
+        map.insert(entity_id, 43u64);
+        let provider = MockProvider(Mutex::new(map));
+
+        let err = verify_pins(&pins, &[(entity_id, "cbu".to_string())], &provider)
+            .await
+            .expect_err("row_version changed -> drift expected");
+        let drift = err.downcast_ref::<PinDrift>().expect("PinDrift");
+        assert_eq!(drift.expected_row_version, 42);
+        assert_eq!(drift.actual_row_version, 43);
+    }
+
+    #[tokio::test]
+    async fn verify_pins_skips_entities_with_no_comparable_pin() {
+        // plan A5: an unpinned entity is the STP classifier's concern, not
+        // a drift here — verify_pins must not error just because an entity
+        // in entity_kinds has no pin recorded.
+        let pinned = Uuid::new_v4();
+        let unpinned = Uuid::new_v4();
+        let pins = pins_with(vec![(pinned, 1)]);
+        let mut map = HashMap::new();
+        map.insert(pinned, 1u64);
+        // deliberately no row_version for `unpinned` in the provider map —
+        // if verify_pins tried to look it up, this would error.
+        let provider = MockProvider(Mutex::new(map));
+
+        verify_pins(
+            &pins,
+            &[(pinned, "cbu".to_string()), (unpinned, "cbu".to_string())],
+            &provider,
+        )
+        .await
+        .expect("unpinned entity must be skipped, not looked up");
+    }
+}
+
+/// T4.3 "productionise": `verify_pins` exercised against `SqlRowVersionProvider`
+/// and a real `"ob-poc".cbus` row, not just the in-memory `MockProvider` — the
+/// exit criterion is "stale pin voids and routes exception," which only a
+/// live-DB proof can actually demonstrate for the SQL-backed provider path.
+#[cfg(all(test, feature = "database"))]
+mod db_integration_tests {
+    use super::*;
+
+    async fn test_pool() -> sqlx::PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    fn pins_with(entries: Vec<(Uuid, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
+        ob_poc_control_plane::snapshot::tests_support::pins(None, None, None, entries)
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn verify_pins_against_real_cbu_row_version() {
+        let pool = test_pool().await;
+        let (cbu_id, current_row_version): (Uuid, i64) =
+            sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let provider = SqlRowVersionProvider { pool: &pool };
+
+        let matching_pins = pins_with(vec![(cbu_id, current_row_version)]);
+        verify_pins(&matching_pins, &[(cbu_id, "cbu".to_string())], &provider)
+            .await
+            .expect("pin matching the live row_version must not drift");
+
+        let stale_pins = pins_with(vec![(cbu_id, current_row_version - 1)]);
+        let err = verify_pins(&stale_pins, &[(cbu_id, "cbu".to_string())], &provider)
+            .await
+            .expect_err("a pin one version behind the live row must drift");
+        let drift = err.downcast_ref::<PinDrift>().expect("PinDrift");
+        assert_eq!(drift.expected_row_version, current_row_version - 1);
+        assert_eq!(drift.actual_row_version as i64, current_row_version);
     }
 }

@@ -45,6 +45,32 @@ pub trait VerbExecutionPort: Send + Sync {
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
     ) -> Result<VerbExecutionResult>;
+
+    /// T4.1 (EOP-PLAN-CONTROLPLANE-001): envelope-admitting entry point.
+    ///
+    /// `envelope_id` is `Some` only when the caller holds a sealed
+    /// control-plane `ExecutionEnvelope` (`ob-poc-control-plane`) for this
+    /// dispatch — a plain `Uuid` rather than the envelope-handle type
+    /// itself, so this trait (the pure execution-tier contract) does not
+    /// need a dependency on the control-plane crate; the implementor
+    /// re-resolves the id against its own envelope store to verify/consume
+    /// it.
+    ///
+    /// Default implementation ignores the id and degrades to the legacy
+    /// envelope-less `execute_verb` path — every existing implementor
+    /// (including test doubles) is behaviourally unchanged unless it
+    /// explicitly overrides this method, matching the plan's shadow-first
+    /// posture (§0): a gate/envelope concept landing in the trait must not,
+    /// by itself, change any dispatch outcome.
+    async fn execute_verb_admitting_envelope(
+        &self,
+        verb_fqn: &str,
+        args: serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _envelope_id: Option<uuid::Uuid>,
+    ) -> Result<VerbExecutionResult> {
+        self.execute_verb(verb_fqn, args, ctx).await
+    }
 }
 
 /// Port trait for CRUD verb execution — driven by `VerbContractBody.crud_mapping`.
