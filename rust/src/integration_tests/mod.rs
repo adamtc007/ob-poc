@@ -20,10 +20,12 @@ mod dataflow_validation;
 mod derived_attribute_persistence_integration;
 #[cfg(test)]
 mod discovery_ops_integration;
-#[cfg(test)]
-mod drafter_clash_matrix;
-#[cfg(test)]
-mod drafter_clash_regressions;
+// drafter_clash_matrix / drafter_clash_regressions removed 2026-07-10: the
+// files they tested (src/integration_tests/drafter_clash_matrix.rs,
+// drafter_clash_regressions.rs) were deleted in bc6c165f alongside the
+// dead sage::clash_matrix module (build_clash_matrix/render_clash_reports/
+// ClashRow had zero production callers) — these two `mod` declarations
+// were left dangling, breaking `cargo test --features database`.
 #[cfg(test)]
 mod entity_deps_integration;
 #[cfg(test)]
@@ -76,8 +78,13 @@ mod sem_reg_integration;
 mod sem_reg_invariants;
 #[cfg(test)]
 mod semantic_validator_integration;
-#[cfg(test)]
-mod service_resource_resolve;
+// service_resource_resolve removed 2026-07-10: the file it tested
+// (src/integration_tests/service_resource_resolve.rs) covered
+// service_resources::resolve()/ResolvedDependencies, deleted in bc6c165f
+// (938-line service_resources/resolve.rs, zero production callers —
+// superseded by the discovery pipeline in service_resources::discovery).
+// The mod declaration was left dangling, breaking `cargo test --features
+// database`; the test file itself is deleted alongside this line.
 #[cfg(test)]
 mod srdef_sync_governance;
 #[cfg(test)]

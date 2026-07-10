@@ -936,6 +936,7 @@ mod tests {
     use super::*;
     use crate::sage::valid_verb_set::{VerbCandidate, VerbSource};
     use chrono::Utc;
+    use uuid::Uuid;
 
     fn make_test_verb_set(entries: Vec<(&str, &str, Vec<&str>)>) -> ValidVerbSet {
         ValidVerbSet {

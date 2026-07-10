@@ -157,7 +157,7 @@ impl ResearchContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::research::SearchQuality;
+    use crate::research::executor::SearchQuality;
 
     fn create_test_result() -> ResearchResult {
         ResearchResult {

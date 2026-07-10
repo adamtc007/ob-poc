@@ -361,10 +361,8 @@ mod tests {
     };
 
     use super::*;
-    use crate::sage::{
-        DrafterHandoff, IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence,
-        SageExplain, UtteranceHints,
-    };
+    use crate::sage::outcome::{DrafterHandoff, SageExplain, UtteranceHints};
+    use crate::sage::{IntentPolarity, ObservationPlane, OutcomeAction, SageConfidence};
 
     fn sample_config() -> VerbsConfig {
         let mut domains = HashMap::new();
@@ -592,7 +590,7 @@ mod tests {
             polarity: IntentPolarity::Read,
             domain_concept: "deal".to_string(),
             action: OutcomeAction::Read,
-            subject: Some(crate::sage::EntityRef {
+            subject: Some(crate::sage::outcome::EntityRef {
                 mention: "this cbu".to_string(),
                 kind_hint: Some("cbu".to_string()),
                 uuid: None,

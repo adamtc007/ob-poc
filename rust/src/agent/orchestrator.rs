@@ -3629,9 +3629,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
         assert!(matches!(
             route(&read_intent),
@@ -3644,7 +3644,7 @@ mod tests {
             polarity: crate::sage::IntentPolarity::Write,
             domain_concept: "deal".into(),
             action: crate::sage::OutcomeAction::Create,
-            subject: Some(crate::sage::EntityRef {
+            subject: Some(crate::sage::outcome::EntityRef {
                 mention: "Allianz UK Deal".into(),
                 kind_hint: Some("deal".into()),
                 uuid: None,
@@ -3652,9 +3652,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
         assert!(matches!(
             route(&write_intent),
@@ -3678,7 +3678,7 @@ mod tests {
             polarity: crate::sage::IntentPolarity::Write,
             domain_concept: "deal".into(),
             action: crate::sage::OutcomeAction::Create,
-            subject: Some(crate::sage::EntityRef {
+            subject: Some(crate::sage::outcome::EntityRef {
                 mention: "Allianz UK Deal".into(),
                 kind_hint: Some("deal".into()),
                 uuid: None,
@@ -3686,9 +3686,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
         let drafter_result = DraftResult {
             verb_fqn: "deal.create".into(),
@@ -3717,9 +3717,9 @@ mod tests {
             steps: vec![],
             confidence: SageConfidence::Medium,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
 
         let result = read_only_list_fallback(&intent).expect("expected safe list fallback");
@@ -4070,9 +4070,9 @@ mod tests {
             }],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         }
     }
 
@@ -4100,9 +4100,9 @@ mod tests {
             }],
             confidence: SageConfidence::High,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         }
     }
 
@@ -4555,9 +4555,9 @@ mod tests {
             steps: vec![],
             confidence: crate::sage::SageConfidence::High,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
 
         assert!(should_use_generic_task_subject_for_sage(
@@ -4583,9 +4583,9 @@ mod tests {
             steps: vec![],
             confidence: crate::sage::SageConfidence::High,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
 
         assert!(allow_data_management_structure_fast_path(
@@ -4625,9 +4625,9 @@ mod tests {
             steps: vec![],
             confidence: crate::sage::SageConfidence::Medium,
             pending_clarifications: vec![],
-            hints: crate::sage::UtteranceHints::default(),
-            explain: crate::sage::SageExplain::default(),
-            drafter_handoff: crate::sage::DrafterHandoff::default(),
+            hints: crate::sage::outcome::UtteranceHints::default(),
+            explain: crate::sage::outcome::SageExplain::default(),
+            drafter_handoff: crate::sage::outcome::DrafterHandoff::default(),
         };
         let drafter_result = DraftResult {
             verb_fqn: "cbu.list".to_string(),
@@ -4880,7 +4880,7 @@ mod tests {
             legal_verbs_or_empty: legal.clone(),
             legal_verbs_if_usable: Some(legal),
         };
-        let violation = crate::traceability::enforce_phase4_resolution_within_evaluation(
+        let violation = crate::traceability::phase4::enforce_phase4_resolution_within_evaluation(
             Some("deal.create"),
             &evaluation,
         );

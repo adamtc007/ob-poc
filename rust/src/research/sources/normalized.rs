@@ -396,19 +396,10 @@ mod tests {
         assert_eq!(holder.ownership_pct_best(), Some(Decimal::from(25)));
     }
 
-    #[test]
-    fn test_officer_role_parse() {
-        assert_eq!(OfficerRole::parse("director"), OfficerRole::Director);
-        assert_eq!(OfficerRole::parse("DIRECTOR"), OfficerRole::Director);
-        assert_eq!(OfficerRole::parse("Secretary"), OfficerRole::Secretary);
-        assert_eq!(OfficerRole::parse("CEO"), OfficerRole::Ceo);
-        assert_eq!(
-            OfficerRole::parse("Chief Executive Officer"),
-            OfficerRole::Ceo
-        );
-        assert_eq!(
-            OfficerRole::parse("custom role"),
-            OfficerRole::Other("custom role".into())
-        );
-    }
+    // test_officer_role_parse removed 2026-07-10: OfficerRole::parse() had
+    // zero production callers (companies_house/types.rs maps its own
+    // source-specific role codes inline) and was deleted in bc6c165f
+    // (impl OfficerRole { pub fn parse(...) } -> empty impl block); this
+    // was the only remaining caller, breaking `cargo test --features
+    // database`.
 }
