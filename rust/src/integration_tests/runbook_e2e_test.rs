@@ -15,10 +15,11 @@ use crate::journey::pack_manager::{ConstraintSource, EffectiveConstraints};
 use crate::repl::verb_config_index::VerbConfigIndex;
 use crate::runbook::{
     canonical_bytes_for_steps, classify_verb, compile_invocation, compile_verb, compute_write_set,
-    content_addressed_id, derive_write_set_heuristic, execute_runbook, full_sha256,
-    CompiledRunbook, CompiledRunbookStatus, CompiledStep, ExecutionError, ExecutionMode,
-    OrchestratorResponse, ReplayEnvelope, RunbookStore, RunbookStoreBackend, StepExecutor,
-    StepOutcome, VerbClassification,
+    content_addressed_id, derive_write_set_heuristic, execute_runbook,
+    execute_runbook_unlocked_for_tests, full_sha256, CompiledRunbook, CompiledRunbookStatus,
+    CompiledStep, ExecutionError, ExecutionMode, OrchestratorResponse, ReplayEnvelope,
+    RunbookStore, RunbookStoreBackend, StepExecutor, StepOutcome, UnlockedExecutionToken,
+    VerbClassification,
 };
 use crate::session::unified::{ClientRef, StructureType, UnifiedSession};
 
@@ -427,7 +428,17 @@ async fn test_write_set_computation() {
     store.insert(&rb).await.unwrap();
 
     let recorder = RecordingExecutor::new();
-    let result = execute_runbook(&store, id, None, &recorder).await.unwrap();
+    // T0.3 (closes C-022): non-empty write_set + no pool now requires an
+    // explicit opt-in.
+    let result = execute_runbook_unlocked_for_tests(
+        &store,
+        id,
+        None,
+        &recorder,
+        UnlockedExecutionToken::allow_unlocked_execution_for_tests(),
+    )
+    .await
+    .unwrap();
     assert!(matches!(
         result.final_status,
         CompiledRunbookStatus::Completed { .. }
@@ -484,12 +495,28 @@ async fn test_concurrent_lock_contention() {
     let id2 = rb2.id;
     store2.insert(&rb2).await.unwrap();
 
-    let r1 = execute_runbook(&store1, id1, None, &SuccessExecutor)
-        .await
-        .unwrap();
-    let r2 = execute_runbook(&store2, id2, None, &SuccessExecutor)
-        .await
-        .unwrap();
+    // T0.3 (closes C-022): non-empty write_set + no pool now requires an
+    // explicit opt-in. This test's whole point is exercising the write_set
+    // overlap detection in-memory (no Postgres), so unlocked execution is
+    // exactly what it intends.
+    let r1 = execute_runbook_unlocked_for_tests(
+        &store1,
+        id1,
+        None,
+        &SuccessExecutor,
+        UnlockedExecutionToken::allow_unlocked_execution_for_tests(),
+    )
+    .await
+    .unwrap();
+    let r2 = execute_runbook_unlocked_for_tests(
+        &store2,
+        id2,
+        None,
+        &SuccessExecutor,
+        UnlockedExecutionToken::allow_unlocked_execution_for_tests(),
+    )
+    .await
+    .unwrap();
     assert!(matches!(
         r1.final_status,
         CompiledRunbookStatus::Completed { .. }
