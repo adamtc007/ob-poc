@@ -1,3 +1,4 @@
+# ob-poc-control-plane | features=all | HEAD=e029ebd941f9367aede5336d4222be2394a80072 | 2026-07-10T16:49:16Z
 pub mod ob_poc_control_plane
 pub mod ob_poc_control_plane::audit
 pub mod ob_poc_control_plane::authority_gate
