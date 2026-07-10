@@ -100,14 +100,8 @@ allowed_verbs:
   - structure.setup
   - tollgate.evaluate
   - tollgate.override
-  - ubo.allege
-  - ubo.approve
   - ubo.discover
-  - ubo.expire
-  - ubo.promote
-  - ubo.reject
   - ubo.trace-chains
-  - ubo.verify
 
 forbidden_verbs:
   - entity.delete
