@@ -8,16 +8,101 @@
 //! module never gates dispatch; persistence is best-effort (failures are
 //! logged, never propagated — same posture as `agent::telemetry::store`).
 
+use std::collections::HashMap;
+
 use sem_os_policy::abac::ActorContext;
 use uuid::Uuid;
 
 use crate::agent::sem_os_context_envelope::{PruneReason, SemOsContextEnvelope};
+use crate::repl::verb_config_index::VerbConfigIndex;
+
+/// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
+/// verb's resolved args are entity references, by contract — not by
+/// regexing values for UUID shape (`write_set.rs::derive_write_set_heuristic`
+/// was explicitly ruled out as a G2 input source during the T9.1-pre design
+/// pass: a UUID-shaped string isn't necessarily a bound entity, and a
+/// missed one is a silently ungraded binding). Uses
+/// `VerbConfigIndex::entries[fqn].args[].lookup_entity_type` (the same
+/// contract metadata `write_set.rs`'s A4 contract-driven path already
+/// consumes) to find entity-typed args, then resolves each matched arg
+/// name against `entry_args` for its UUID value. Args present in the
+/// contract but absent from `entry_args`, or whose value doesn't parse as
+/// a UUID, are silently skipped — not every entity-typed arg is required
+/// to be bound for every verb (optional args), and a non-UUID value here
+/// indicates the arg wasn't resolved to an entity reference at all (e.g.
+/// still a symbol placeholder), not a binding failure this function should
+/// report.
+pub(crate) fn entity_binding_requests(
+    verb_config_index: &VerbConfigIndex,
+    verb_fqn: &str,
+    entry_args: &HashMap<String, String>,
+) -> Vec<(Uuid, String)> {
+    let Some(entry) = verb_config_index.get(verb_fqn) else {
+        return Vec::new();
+    };
+    entry
+        .args
+        .iter()
+        .filter_map(|arg| {
+            let entity_type = arg.lookup_entity_type.as_ref()?;
+            let raw = entry_args.get(&arg.name)?;
+            let id = Uuid::parse_str(raw.trim()).ok()?;
+            Some((id, entity_type.clone()))
+        })
+        .collect()
+}
+
+/// Converts a batched [`ob_poc_boundary::entity_facts::EntityFactsRow`]
+/// lookup result into G2's `EntityBindingInput`. Every `(entity_id, kind)`
+/// in `requests` gets an entry — entities missing from `facts` (the
+/// `EntityFactsSource` contract: absent means not found) become an
+/// honest `exists: false` fact rather than being silently dropped, so a
+/// dangling reference is graded `NotFound`, not skipped.
+pub(crate) fn build_entity_binding_input(
+    requests: &[(Uuid, String)],
+    facts: &HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>,
+) -> ob_poc_control_plane::entity_binding::EntityBindingInput {
+    let entities = requests
+        .iter()
+        .map(|(id, kind)| match facts.get(id) {
+            Some(row) => row.facts.clone(),
+            None => ob_poc_control_plane::entity_binding::EntityFacts {
+                entity_id: *id,
+                exists: false,
+                expected_kind: kind.clone(),
+                actual_kind: String::new(),
+                lifecycle_state_readable: false,
+                availability_blocked: false,
+                availability_reason: None,
+                in_active_pack: false,
+            },
+        })
+        .collect();
+    ob_poc_control_plane::entity_binding::EntityBindingInput { entities }
+}
 
 /// Builds the T2/T9.1-wired portion of `EvaluationContext`.
 ///
 /// **Wired with real data (not fabricated) as of T9.1c/T9.1d
 /// (EOP-PLAN-CONTROLPLANE-001 Addendum B):**
 /// - G1 (intent admission, T2.1): `envelope.allowed_verbs`/`pruned_verbs`.
+/// - G2 (entity binding, T9.1-pre): `entity_binding` is `Some(input)`
+///   whenever the caller *attempted* binding at all — including a verb
+///   with zero entity-typed args, which correctly yields
+///   `Some(EntityBindingInput { entities: vec![] })`. Per
+///   `entity_binding.rs::decide`, an empty `entities` list is vacuous
+///   `Success` (nothing to check, so nothing failed) — passing `None`
+///   instead for the no-entity-args case would incorrectly turn every
+///   entity-less verb (e.g. `session.info`) into a hard
+///   `GateResult::Failure("no EntityBindingInput supplied")`, exactly the
+///   "guaranteed-wrong signal" class of bug the T9.1c/d empirical probe
+///   exists to catch. Reserve `None` for when the caller genuinely
+///   couldn't attempt the check at all (no DB access) — an honest "we
+///   don't know", appropriately graded `Failure`, not "there was nothing
+///   to check". The caller does the I/O
+///   (`ob_poc_boundary::entity_facts::EntityFactsSource`, §9.1's
+///   decision-assembler law); this function only assembles what it's
+///   given via [`build_entity_binding_input`].
 /// - G5 (authority, T9.1c): `access_decision` is `Deny` iff `envelope.pruned_verbs`
 ///   carries an `AbacDenied` entry for this verb, else `Allow` — the only
 ///   authority-specific signal this call site has. `actor_id`/`role` come
@@ -62,6 +147,7 @@ pub(crate) fn build_evaluation_context(
     verb_fqn: &str,
     intent_id: Uuid,
     actor: &ActorContext,
+    entity_binding: Option<ob_poc_control_plane::entity_binding::EntityBindingInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -82,6 +168,7 @@ pub(crate) fn build_evaluation_context(
     let deny_reason = abac_denied.map(|pruned| format!("{:?}", pruned.reason));
 
     ob_poc_control_plane::context::EvaluationContext {
+        entity_binding,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -226,7 +313,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor());
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -243,7 +330,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor());
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -262,7 +349,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor());
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -274,7 +361,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor());
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -287,7 +374,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor());
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -315,5 +402,149 @@ mod tests {
         // Legacy agrees (not blocked) -> no divergence.
         let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, false);
         assert!(!row.diverged);
+    }
+
+    // ── T9.1-pre (Addendum B): entity_binding_requests + G2 reachability ──
+
+    fn verb_config_with_entity_arg(
+        verb_fqn: &str,
+        arg_name: &str,
+        entity_type: &str,
+    ) -> VerbConfigIndex {
+        use crate::repl::verb_config_index::{ArgSummary, VerbIndexEntry};
+        let mut index = VerbConfigIndex::empty();
+        index.insert_test_entry(VerbIndexEntry {
+            fqn: verb_fqn.to_string(),
+            description: String::new(),
+            invocation_phrases: Vec::new(),
+            sentence_templates: Vec::new(),
+            sentences: None,
+            args: vec![ArgSummary {
+                name: arg_name.to_string(),
+                arg_type: "uuid".to_string(),
+                required: true,
+                description: None,
+                maps_to: None,
+                lookup_entity_type: Some(entity_type.to_string()),
+            }],
+            crud_key: None,
+            confirm_policy: crate::repl::runbook::ConfirmPolicy::Always,
+            precondition_checks: Vec::new(),
+        });
+        index
+    }
+
+    #[test]
+    fn entity_binding_requests_finds_contract_typed_arg() {
+        let index = verb_config_with_entity_arg("cbu.confirm", "cbu-id", "cbu");
+        let id = Uuid::new_v4();
+        let mut args = HashMap::new();
+        args.insert("cbu-id".to_string(), id.to_string());
+
+        let requests = entity_binding_requests(&index, "cbu.confirm", &args);
+        assert_eq!(requests, vec![(id, "cbu".to_string())]);
+    }
+
+    #[test]
+    fn entity_binding_requests_skips_unresolved_and_non_uuid_values() {
+        let index = verb_config_with_entity_arg("cbu.confirm", "cbu-id", "cbu");
+
+        // Arg not present in entry_args at all.
+        let requests = entity_binding_requests(&index, "cbu.confirm", &HashMap::new());
+        assert!(requests.is_empty());
+
+        // Arg present but not a UUID (unresolved symbol placeholder).
+        let mut args = HashMap::new();
+        args.insert("cbu-id".to_string(), "@some-symbol".to_string());
+        let requests = entity_binding_requests(&index, "cbu.confirm", &args);
+        assert!(requests.is_empty());
+    }
+
+    #[test]
+    fn entity_binding_requests_empty_for_verb_with_no_entity_args() {
+        let index = VerbConfigIndex::empty();
+        let requests = entity_binding_requests(&index, "session.info", &HashMap::new());
+        assert!(requests.is_empty());
+    }
+
+    #[test]
+    fn build_entity_binding_input_marks_missing_facts_as_not_found() {
+        let id = Uuid::new_v4();
+        let requests = vec![(id, "cbu".to_string())];
+        let facts = HashMap::new(); // batched lookup found nothing for `id`
+        let input = build_entity_binding_input(&requests, &facts);
+        assert_eq!(input.entities.len(), 1);
+        assert!(!input.entities[0].exists);
+        assert_eq!(input.entities[0].expected_kind, "cbu");
+    }
+
+    #[test]
+    fn empty_entity_binding_input_is_vacuous_success_not_failure() {
+        // The doc-corrected contract this test locks in: a verb with zero
+        // entity-typed args must pass G2 (Some(entities: vec![]) ->
+        // vacuous Success), not fail it via a spurious None.
+        let envelope = SemOsContextEnvelope::test_with_verbs(&["session.info"]);
+        let entity_binding = Some(ob_poc_control_plane::entity_binding::EntityBindingInput {
+            entities: Vec::new(),
+        });
+        let ctx = build_evaluation_context(
+            &envelope,
+            "session.info",
+            Uuid::nil(),
+            &test_actor(),
+            entity_binding,
+        );
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::EntityBinding),
+            Some(&ob_poc_control_plane::gate::GateResult::Success)
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn g2_reaches_success_end_to_end_against_a_real_cbu_row() {
+        // Empirical reachability proof (this session's established
+        // discipline — verified via evaluate_shadow, not assumed from
+        // reading GATE_DEPENDENCIES): contract-typed arg detection ->
+        // real batched DB fetch -> EntityBindingInput -> evaluate_shadow
+        // actually reports G2 Success, for a verb whose only prerequisite
+        // (per GATE_DEPENDENCIES, EntityBinding has none) is satisfied.
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("at least one cbu row exists in the dev database");
+
+        let index = verb_config_with_entity_arg("test.verb-with-cbu-arg", "cbu-id", "cbu");
+        let mut args = HashMap::new();
+        args.insert("cbu-id".to_string(), cbu_id.to_string());
+
+        let requests = entity_binding_requests(&index, "test.verb-with-cbu-arg", &args);
+        assert_eq!(requests, vec![(cbu_id, "cbu".to_string())]);
+
+        let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool: &pool };
+        let facts = ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &requests)
+            .await
+            .expect("batched fetch succeeds");
+
+        let entity_binding = Some(build_entity_binding_input(&requests, &facts));
+        let envelope = SemOsContextEnvelope::test_with_verbs(&["test.verb-with-cbu-arg"]);
+        let ctx = build_evaluation_context(
+            &envelope,
+            "test.verb-with-cbu-arg",
+            Uuid::nil(),
+            &test_actor(),
+            entity_binding,
+        );
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::EntityBinding),
+            Some(&ob_poc_control_plane::gate::GateResult::Success),
+            "G2 must report a real, non-not_evaluated Success against a real cbu row"
+        );
     }
 }

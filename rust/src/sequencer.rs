@@ -7792,11 +7792,51 @@ impl ReplOrchestratorV2 {
         // return value; this only observes and records.
         #[cfg(feature = "database")]
         if let Some(pool) = self.pool() {
+            // T9.1-pre (Addendum B): resolve G2's EntityBindingInput from
+            // real per-entity DB facts. `Some(entities: vec![])` for a
+            // verb with no entity-typed args (vacuous success, not a
+            // NotEvaluated failure — see build_evaluation_context's doc).
+            // `None` only when the batched lookup itself errors (an
+            // unmapped entity_kind — an actionable gap, logged, never
+            // silently promoted to a wrong-but-passing fact).
+            let entity_requests = crate::agent::control_plane_shadow::entity_binding_requests(
+                &self.verb_config_index,
+                &entry.verb,
+                &entry.args,
+            );
+            let entity_binding = if entity_requests.is_empty() {
+                Some(ob_poc_control_plane::entity_binding::EntityBindingInput {
+                    entities: Vec::new(),
+                })
+            } else {
+                let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool };
+                match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(
+                    &source,
+                    &entity_requests,
+                )
+                .await
+                {
+                    Ok(facts) => Some(crate::agent::control_plane_shadow::build_entity_binding_input(
+                        &entity_requests,
+                        &facts,
+                    )),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            verb = %entry.verb,
+                            "T9.1-pre: entity_facts lookup failed — G2 shadow-evaluates as not-attempted"
+                        );
+                        None
+                    }
+                }
+            };
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
                 entry_id,
                 &actor,
+                entity_binding,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(

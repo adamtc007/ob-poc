@@ -1,4 +1,4 @@
-# ob-poc-boundary | features=all | HEAD=35d840d97708a13fc4acda12527f49401cd25eea | 2026-07-10T13:12:46Z
+# ob-poc-boundary | features=all | HEAD=302b61fa8b7c69d58978daf929dd3c1c29a37a5b | 2026-07-11T10:23:40Z
 pub mod ob_poc_boundary
 pub mod ob_poc_boundary::acp
 pub enum ob_poc_boundary::acp::AcpAdapterError
@@ -7844,6 +7844,96 @@ pub type ob_poc_boundary::dsl_drafter::DslDrafterValidationStep::Output = T
 impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_boundary::dsl_drafter::DslDrafterValidationStep where V: ppv_lite86::types::MultiLane<T>
 pub fn ob_poc_boundary::dsl_drafter::DslDrafterValidationStep::vzip(self) -> V
 pub fn ob_poc_boundary::dsl_drafter::validate_workbook_for_dry_run(&ob_poc_boundary::workbook::ExecutionWorkbook, ob_poc_boundary::dsl_drafter::DslDrafterExecutionMode) -> core::result::Result<ob_poc_boundary::dsl_drafter::DslDrafterDryRunResult, ob_poc_boundary::dsl_drafter::DslDrafterValidationError>
+pub mod ob_poc_boundary::entity_facts
+pub struct ob_poc_boundary::entity_facts::EntityFactsRow
+pub ob_poc_boundary::entity_facts::EntityFactsRow::facts: ob_poc_control_plane::entity_binding::EntityFacts
+pub ob_poc_boundary::entity_facts::EntityFactsRow::row_version: i64
+impl core::clone::Clone for ob_poc_boundary::entity_facts::EntityFactsRow
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::clone(&self) -> ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::cmp::Eq for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::cmp::PartialEq for ob_poc_boundary::entity_facts::EntityFactsRow
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::eq(&self, &ob_poc_boundary::entity_facts::EntityFactsRow) -> bool
+impl core::fmt::Debug for ob_poc_boundary::entity_facts::EntityFactsRow
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::marker::Freeze for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::marker::Send for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::marker::Sync for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::marker::Unpin for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::marker::UnsafeUnpin for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_boundary::entity_facts::EntityFactsRow
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_boundary::entity_facts::EntityFactsRow
+impl<Q, K> equivalent::Equivalent<K> for ob_poc_boundary::entity_facts::EntityFactsRow where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_poc_boundary::entity_facts::EntityFactsRow where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_poc_boundary::entity_facts::EntityFactsRow where U: core::convert::From<T>
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_boundary::entity_facts::EntityFactsRow where U: core::convert::Into<T>
+pub type ob_poc_boundary::entity_facts::EntityFactsRow::Error = core::convert::Infallible
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_boundary::entity_facts::EntityFactsRow where U: core::convert::TryFrom<T>
+pub type ob_poc_boundary::entity_facts::EntityFactsRow::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_boundary::entity_facts::EntityFactsRow where T: core::clone::Clone
+pub type ob_poc_boundary::entity_facts::EntityFactsRow::Owned = T
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::clone_into(&self, &mut T)
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_boundary::entity_facts::EntityFactsRow where T: 'static + ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_boundary::entity_facts::EntityFactsRow where T: ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_boundary::entity_facts::EntityFactsRow where T: ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_boundary::entity_facts::EntityFactsRow where T: core::clone::Clone
+pub unsafe fn ob_poc_boundary::entity_facts::EntityFactsRow::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_boundary::entity_facts::EntityFactsRow
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_boundary::entity_facts::EntityFactsRow
+impl<T> tracing::instrument::Instrument for ob_poc_boundary::entity_facts::EntityFactsRow
+impl<T> tracing::instrument::WithSubscriber for ob_poc_boundary::entity_facts::EntityFactsRow
+impl<T> typenum::type_operators::Same for ob_poc_boundary::entity_facts::EntityFactsRow
+pub type ob_poc_boundary::entity_facts::EntityFactsRow::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_boundary::entity_facts::EntityFactsRow where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_boundary::entity_facts::EntityFactsRow::vzip(self) -> V
+pub struct ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+pub ob_poc_boundary::entity_facts::PgEntityFactsSource::pool: &'a sqlx_postgres::PgPool
+impl<'a> ob_poc_boundary::entity_facts::EntityFactsSource for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::entity_facts<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 [(uuid::Uuid, alloc::string::String)]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<std::collections::hash::map::HashMap<uuid::Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+impl<'a> core::marker::Freeze for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<'a> core::marker::Send for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<'a> core::marker::Sync for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<'a> core::marker::Unpin for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<'a> core::marker::UnsafeUnpin for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<T, U> core::convert::Into<U> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where U: core::convert::From<T>
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where U: core::convert::Into<T>
+pub type ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::Error = core::convert::Infallible
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where U: core::convert::TryFrom<T>
+pub type ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> core::any::Any for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where T: 'static + ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where T: ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where T: ?core::marker::Sized
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::from(T) -> T
+impl<T> either::into_either::IntoEither for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<T> tracing::instrument::Instrument for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<T> tracing::instrument::WithSubscriber for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+impl<T> typenum::type_operators::Same for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+pub type ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::vzip(self) -> V
+pub trait ob_poc_boundary::entity_facts::EntityFactsSource: core::marker::Send + core::marker::Sync
+pub fn ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 [(uuid::Uuid, alloc::string::String)]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<std::collections::hash::map::HashMap<uuid::Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
+impl<'a> ob_poc_boundary::entity_facts::EntityFactsSource for ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>
+pub fn ob_poc_boundary::entity_facts::PgEntityFactsSource<'a>::entity_facts<'life0, 'life1, 'async_trait>(&'life0 self, &'life1 [(uuid::Uuid, alloc::string::String)]) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<std::collections::hash::map::HashMap<uuid::Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
 pub mod ob_poc_boundary::envelope_builder
 pub struct ob_poc_boundary::envelope_builder::EnvelopeInputs<'a>
 pub ob_poc_boundary::envelope_builder::EnvelopeInputs::args: serde_json::value::Value
