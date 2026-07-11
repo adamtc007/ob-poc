@@ -105,28 +105,40 @@ pub(crate) async fn check_admission(
     }
 }
 
-/// T9.2: [`check_admission`] against an already-open `PgTransactionScope`'s
-/// connection — the T9.2 atomic-admission entry point. Same decision
-/// logic, but the underlying consume (when enforced) runs via
-/// [`try_consume_in_scope`], so the envelope's `FOR UPDATE` lock and the
-/// consumption itself live inside the caller's own transaction, not a
-/// separate one that commits before the write even begins.
+/// T9.2 → T10.2: [`check_admission`] against an already-open
+/// `PgTransactionScope`'s connection — the atomic-admission entry point.
+/// Same decision logic, but the underlying consume (when enforced) runs
+/// via [`try_consume_in_scope_with_pins`], so the envelope's `FOR UPDATE`
+/// lock and the consumption itself live inside the caller's own
+/// transaction, not a separate one that commits before the write even
+/// begins.
+///
+/// T10.2 widened the return from a bare [`AdmissionDecision`] to also
+/// carry the consumed envelope's [`SnapshotPins`](ob_poc_control_plane::snapshot::SnapshotPins)
+/// (recovered from the `record` column T10.1 started persisting) — the
+/// caller (`execute_verb_admitting_envelope`) is the one that must run
+/// [`ob_poc_boundary::toctou_recheck::verify_pins_in_scope`] against them
+/// before dispatch, since only it holds the scope for the write that
+/// follows. `None` on any decision other than `Admitted`, and also on
+/// `Admitted` for pre-T10.1 rows / rows sealed with no snapshot pins
+/// (`record` is NULL, or deserialises to no pinned entities) — both are
+/// legitimate "nothing to verify" cases, not errors.
 #[cfg(feature = "database")]
 pub(crate) async fn check_admission_in_scope(
     conn: &mut sqlx::PgConnection,
     enforced: &EnforcedVerbs,
     verb_fqn: &str,
     envelope_handle: Option<EnvelopeHandle>,
-) -> anyhow::Result<AdmissionDecision> {
+) -> anyhow::Result<(AdmissionDecision, Option<ob_poc_control_plane::snapshot::SnapshotPins>)> {
     if !enforced.is_enforced(verb_fqn) {
-        return Ok(AdmissionDecision::NotEnforced);
+        return Ok((AdmissionDecision::NotEnforced, None));
     }
     let Some(handle) = envelope_handle else {
-        return Ok(AdmissionDecision::RejectedNoEnvelope);
+        return Ok((AdmissionDecision::RejectedNoEnvelope, None));
     };
-    match try_consume_in_scope(conn, &handle).await? {
-        ConsumeOutcome::Consumed => Ok(AdmissionDecision::Admitted),
-        other => Ok(AdmissionDecision::RejectedConsumeFailed(other)),
+    match try_consume_in_scope_with_pins(conn, &handle).await? {
+        (ConsumeOutcome::Consumed, pins) => Ok((AdmissionDecision::Admitted, pins)),
+        (other, _) => Ok((AdmissionDecision::RejectedConsumeFailed(other), None)),
     }
 }
 
@@ -376,6 +388,52 @@ pub(crate) async fn try_consume_in_scope(
     handle: &EnvelopeHandle,
 ) -> anyhow::Result<ConsumeOutcome> {
     consume_core(conn, handle.id(), Some(&handle.content_hash_hex())).await
+}
+
+/// T10.2: [`try_consume_in_scope`], then — only on `Consumed` — reads the
+/// same row's `record` column back and recovers its
+/// [`SnapshotPins`](ob_poc_control_plane::snapshot::SnapshotPins), so the
+/// caller can pin-verify before its own write. The follow-up `SELECT` runs
+/// on the same connection, inside the same transaction, against a row
+/// [`consume_core`] already holds under `FOR UPDATE` — it observes exactly
+/// the row this call just consumed, not a possibly-different concurrent
+/// write (there can be none; the lock is still held). `record` deserialising
+/// to `None` (never persisted — pre-T10.1 row — or a genuine parse failure,
+/// logged) degrades to "no pins to verify," matching `verify_pins_in_scope`'s
+/// own "empty pins never drift" posture rather than failing a dispatch over
+/// bookkeeping that predates pin capture.
+#[cfg(feature = "database")]
+pub(crate) async fn try_consume_in_scope_with_pins(
+    conn: &mut sqlx::PgConnection,
+    handle: &EnvelopeHandle,
+) -> anyhow::Result<(ConsumeOutcome, Option<ob_poc_control_plane::snapshot::SnapshotPins>)> {
+    let outcome = try_consume_in_scope(conn, handle).await?;
+    if outcome != ConsumeOutcome::Consumed {
+        return Ok((outcome, None));
+    }
+
+    let row: Option<(Option<serde_json::Value>,)> = sqlx::query_as(
+        r#"SELECT record FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#,
+    )
+    .bind(handle.id())
+    .fetch_optional(&mut *conn)
+    .await?;
+
+    let pins = row.and_then(|(v,)| v).and_then(|v| {
+        serde_json::from_value::<ob_poc_control_plane::envelope::EnvelopeRecord>(v)
+            .map_err(|err| {
+                tracing::warn!(
+                    error = %err,
+                    envelope_id = %handle.id(),
+                    "control_plane_envelopes.record failed to deserialise into EnvelopeRecord \
+                     (degrading to no-pins-to-verify)"
+                );
+            })
+            .ok()
+            .map(|record| record.snapshot)
+    });
+
+    Ok((outcome, pins))
 }
 
 /// Attempts to consume `handle` exactly once, verifying its content hash
@@ -798,25 +856,89 @@ mod tests {
         let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
 
         let mut tx = pool.begin().await.unwrap();
-        let decision = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", Some(handle))
+        let (decision, _pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", Some(handle))
             .await
             .unwrap();
         tx.commit().await.unwrap();
         assert_eq!(decision, AdmissionDecision::Admitted);
 
         let mut tx = pool.begin().await.unwrap();
-        let decision = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", None)
+        let (decision, _pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", None)
             .await
             .unwrap();
         tx.commit().await.unwrap();
         assert_eq!(decision, AdmissionDecision::RejectedNoEnvelope);
 
         let mut tx = pool.begin().await.unwrap();
-        let decision = check_admission_in_scope(&mut tx, &EnforcedVerbs::default(), "cbu.confirm", None)
+        let (decision, _pins) = check_admission_in_scope(&mut tx, &EnforcedVerbs::default(), "cbu.confirm", None)
             .await
             .unwrap();
         tx.commit().await.unwrap();
         assert_eq!(decision, AdmissionDecision::NotEnforced);
+    }
+
+    /// T10.2: proves `check_admission_in_scope` recovers real, non-empty
+    /// `SnapshotPins` from a sealed envelope's persisted `record` — not
+    /// just that the decision is `Admitted`. Uses a fixture with a real
+    /// pinned entity (unlike `sealed_envelope`'s empty
+    /// `entity_row_versions`, built for the decision-only test above).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn check_admission_in_scope_recovers_real_pins_from_the_record_column() {
+        let pool = test_pool().await;
+        let now = Utc::now();
+
+        let entity_id = Uuid::new_v4();
+        let intent = ob_poc_control_plane::intent_admission::tests_support::admitted(Uuid::new_v4(), "cbu.confirm");
+        let binding = ob_poc_control_plane::entity_binding::tests_support::bound(vec![entity_id]);
+        let pack = ob_poc_control_plane::pack_resolution::tests_support::resolved("ob-poc.cbu");
+        let dag =
+            ob_poc_control_plane::dag_proof::tests_support::legal(entity_id, "VALIDATION_PENDING", "VALIDATED");
+        let authority = ob_poc_control_plane::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
+        let evidence = ob_poc_control_plane::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
+        let write_set = ob_poc_control_plane::write_set::tests_support::proof(
+            vec![entity_id],
+            vec!["validation_state".into()],
+            vec!["ob-poc.cbus".into()],
+            vec!["status".into()],
+            "idem-2",
+        );
+        let runbook = ob_poc_control_plane::proof::CompiledRunbookRef::new(Uuid::new_v4());
+        let snapshot = ob_poc_control_plane::snapshot::tests_support::pins(
+            Some(Uuid::new_v4()),
+            None,
+            None,
+            vec![(entity_id, "cbu".to_string(), 7)],
+        );
+        let envelope = ob_poc_control_plane::envelope::test_support::seal(
+            intent,
+            binding,
+            pack,
+            dag,
+            authority,
+            evidence,
+            write_set,
+            runbook,
+            snapshot,
+            ValidityWindow::new(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5)),
+        );
+        let handle = envelope.handle();
+        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+
+        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
+        let mut tx = pool.begin().await.unwrap();
+        let (decision, pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", Some(handle))
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+
+        assert_eq!(decision, AdmissionDecision::Admitted);
+        let pins = pins.expect("a sealed envelope with real pins must recover them, not None");
+        assert_eq!(
+            pins.entity_kinds_and_versions(),
+            &[(entity_id, "cbu".to_string(), 7)],
+            "recovered pins must match exactly what the fixture sealed"
+        );
     }
 
     // ── T9.3 (Addendum B): admit_plan_checked ──────────────────────────────

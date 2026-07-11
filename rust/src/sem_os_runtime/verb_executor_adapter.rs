@@ -114,26 +114,33 @@ impl ObPocVerbExecutor {
 
 #[cfg(feature = "database")]
 impl ObPocVerbExecutor {
-    /// T9.2 (§3, §4): admission-checks `verb_fqn` against the
-    /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` set (read fresh from the
-    /// environment on every call — matches `LifecycleGateMode::from_env()`'s
-    /// existing per-call-read pattern, `dsl_v2/executor.rs`) using the
-    /// caller's own `&mut PgConnection` rather than a fresh pool checkout,
-    /// so the envelope consume and the verb dispatch it gates are joined
-    /// to one transaction. Superseded the pool-based `admit()` (removed —
-    /// its only caller, `execute_verb_admitting_envelope`, now opens one
-    /// scope up front and calls this instead). A rejection here rolls the
-    /// whole scope back (the caller does this), which per the design doc's
-    /// rollback-retry corollary correctly leaves the envelope reconsumable
-    /// rather than burning it on a rejected attempt.
+    /// T9.2 (§3, §4) → T10.2 (pin verification): admission-checks
+    /// `verb_fqn` against the `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` set
+    /// (read fresh from the environment on every call — matches
+    /// `LifecycleGateMode::from_env()`'s existing per-call-read pattern,
+    /// `dsl_v2/executor.rs`) using the caller's own `&mut PgConnection`
+    /// rather than a fresh pool checkout, so the envelope consume and the
+    /// verb dispatch it gates are joined to one transaction. Superseded the
+    /// pool-based `admit()` (removed — its only caller,
+    /// `execute_verb_admitting_envelope`, now opens one scope up front and
+    /// calls this instead). A rejection here rolls the whole scope back
+    /// (the caller does this), which per the design doc's rollback-retry
+    /// corollary correctly leaves the envelope reconsumable rather than
+    /// burning it on a rejected attempt.
+    ///
+    /// T10.2: returns the consumed envelope's recovered `SnapshotPins`
+    /// (`None` when not applicable — not enforced, no pins were sealed, or
+    /// admission was rejected) so the caller can run
+    /// `verify_pins_in_scope` before dispatch — the first real consumer of
+    /// `record`, per T10.1's own "T10.2 is the first consumer" note.
     async fn admit_in_scope(
         &self,
         verb_fqn: &str,
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
         conn: &mut sqlx::PgConnection,
-    ) -> dsl_runtime::Result<()> {
+    ) -> dsl_runtime::Result<Option<ob_poc_control_plane::snapshot::SnapshotPins>> {
         let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
-        let decision = crate::agent::control_plane_envelope_store::check_admission_in_scope(
+        let (decision, pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
             conn,
             &enforced,
             verb_fqn,
@@ -144,7 +151,7 @@ impl ObPocVerbExecutor {
 
         match decision {
             crate::agent::control_plane_envelope_store::AdmissionDecision::NotEnforced
-            | crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => Ok(()),
+            | crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => Ok(pins),
             crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedNoEnvelope => {
                 Err(SemOsError::InvalidInput(format!(
                     "{verb_fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) but no sealed envelope was presented"
@@ -520,18 +527,43 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             ))
         })?;
 
-        if let Err(e) = self
+        let pins = match self
             .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
             .await
         {
-            if let Err(rollback_err) = scope.rollback().await {
-                tracing::warn!(
-                    verb_fqn,
-                    %rollback_err,
-                    "execute_verb_admitting_envelope: rollback failed after admission rejection"
-                );
+            Ok(pins) => pins,
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        verb_fqn,
+                        %rollback_err,
+                        "execute_verb_admitting_envelope: rollback failed after admission rejection"
+                    );
+                }
+                return Err(e);
             }
-            return Err(e);
+        };
+
+        // T10.2: pin verification, inside the same scope, before dispatch —
+        // the locked re-read (`FOR UPDATE`, §5a) holds pinned entity rows
+        // until this scope's own commit/rollback, so nothing can move them
+        // between this check and the write that follows. `pins` is `None`
+        // for anything not admitted-with-pins (not enforced, no snapshot
+        // pins sealed, pre-T10.1 row) — matching `verify_pins_in_scope`'s
+        // own "empty pins never drift" posture, not skipped as a special case.
+        if let Some(pins) = &pins {
+            if let Err(e) = ob_poc_boundary::toctou_recheck::verify_pins_in_scope(pins, scope.executor()).await {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        verb_fqn,
+                        %rollback_err,
+                        "execute_verb_admitting_envelope: rollback failed after pin verification failure"
+                    );
+                }
+                return Err(SemOsError::InvalidInput(format!(
+                    "{verb_fqn} rejected: pinned entity state drifted since gating ({e})"
+                )));
+            }
         }
 
         let scope_dyn: &mut dyn dsl_runtime::TransactionScope = &mut scope;
@@ -1183,13 +1215,13 @@ mod t4_1_envelope_admission_tests {
         verb_fqn: &str,
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
         pool: &sqlx::PgPool,
-    ) -> dsl_runtime::Result<()> {
+    ) -> dsl_runtime::Result<Option<ob_poc_control_plane::snapshot::SnapshotPins>> {
         let mut scope = PgTransactionScope::begin(pool).await.expect("begin scope");
         let result = executor
             .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
             .await;
         match &result {
-            Ok(()) => scope.commit().await.expect("commit"),
+            Ok(_) => scope.commit().await.expect("commit"),
             Err(_) => scope.rollback().await.expect("rollback"),
         }
         result
@@ -1198,11 +1230,26 @@ mod t4_1_envelope_admission_tests {
     /// Guards `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` mutation so these tests
     /// can't interleave with each other (env vars are process-global) and
     /// always restores the unset production default on drop.
-    struct EnvGuard;
+    // T10.2: `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` is process-global — under
+    // default parallel `cargo test`, two `EnvGuard`-holding tests racing
+    // each other (one's `set` landing between another's `set` and its own
+    // assertions) makes `shadow_default_admits_every_verb_with_no_envelope`
+    // observe someone else's enforced verb, or an enforced-verb test
+    // observe the default's empty set. `EnvGuard` itself only ever
+    // provided cleanup-on-drop, not mutual exclusion between tests — this
+    // mutex closes that gap (found while adding T10.2's pin-verification
+    // tests to this module and re-running the whole suite in parallel, per
+    // this session's established practice of proving fixes via repeated
+    // live-DB runs; the race pre-dates this tranche, same PIR-D-004 shape:
+    // fix test isolation, not product code).
+    static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
     impl EnvGuard {
         fn set(verb_fqn: &str) -> Self {
+            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
             std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", verb_fqn);
-            Self
+            Self(guard)
         }
     }
     impl Drop for EnvGuard {
@@ -1214,6 +1261,7 @@ mod t4_1_envelope_admission_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn shadow_default_admits_every_verb_with_no_envelope() {
+        let _guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS"); // explicit production default
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
@@ -1375,6 +1423,104 @@ mod t4_1_envelope_admission_tests {
             .expect(
                 "the envelope must still be consumable after a dispatch failure — \
                  a rolled-back scope must leave the consume undone",
+            );
+    }
+
+    /// T10.2: end-to-end proof that a sealed envelope pinning a stale
+    /// `row_version` is rejected at admission — not merely that
+    /// `verify_pins_in_scope` rejects in isolation (`toctou_recheck`'s own
+    /// unit tests already prove that), but that
+    /// `execute_verb_admitting_envelope` actually calls it, in the right
+    /// place, against a real row, and rolls the whole scope back
+    /// (including the envelope consume) rather than partially admitting.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+
+        let (cbu_id, real_row_version): (Uuid, i64) =
+            sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus ORDER BY cbu_id LIMIT 1 OFFSET 2"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least 3 cbu rows exist in the dev database (offsets 0/1 used by crud_executor tests)");
+
+        let intent = ob_poc_control_plane::intent_admission::tests_support::admitted(Uuid::new_v4(), "cbu.confirm");
+        let binding = ob_poc_control_plane::entity_binding::tests_support::bound(vec![cbu_id]);
+        let pack = ob_poc_control_plane::pack_resolution::tests_support::resolved("ob-poc.cbu");
+        let dag =
+            ob_poc_control_plane::dag_proof::tests_support::legal(cbu_id, "VALIDATION_PENDING", "VALIDATED");
+        let authority = ob_poc_control_plane::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
+        let evidence = ob_poc_control_plane::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
+        let write_set = ob_poc_control_plane::write_set::tests_support::proof(
+            vec![cbu_id],
+            vec!["validation_state".into()],
+            vec!["ob-poc.cbus".into()],
+            vec!["status".into()],
+            "idem-pin-drift",
+        );
+        let runbook = ob_poc_control_plane::proof::CompiledRunbookRef::new(Uuid::new_v4());
+        // Deliberately stale: pin the row one version behind its real,
+        // current value — exactly what a concurrent writer having moved
+        // the row since gate time would produce.
+        let snapshot = ob_poc_control_plane::snapshot::tests_support::pins(
+            Some(Uuid::new_v4()),
+            None,
+            None,
+            vec![(cbu_id, "cbu".to_string(), real_row_version - 1)],
+        );
+        let now = chrono::Utc::now();
+        let envelope = ob_poc_control_plane::envelope::test_support::seal(
+            intent,
+            binding,
+            pack,
+            dag,
+            authority,
+            evidence,
+            write_set,
+            runbook,
+            snapshot,
+            ob_poc_control_plane::envelope::ValidityWindow::new(
+                now - chrono::Duration::minutes(1),
+                now + chrono::Duration::minutes(5),
+            ),
+        );
+        let handle = envelope.handle();
+        assert!(
+            crate::agent::control_plane_envelope_store::persist_sealed(
+                &pool,
+                Uuid::new_v4(),
+                "cbu.confirm",
+                &envelope
+            )
+            .await
+        );
+
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let mut ctx = VerbExecutionContext::new(sem_os_core::principal::Principal::system());
+
+        let dispatch_err = executor
+            .execute_verb_admitting_envelope(
+                "cbu.confirm",
+                serde_json::json!({ "cbu-id": cbu_id.to_string() }),
+                &mut ctx,
+                Some(handle),
+            )
+            .await
+            .expect_err("a stale pinned row_version must reject at admission, before dispatch");
+        assert!(
+            dispatch_err.to_string().contains("pinned entity state drifted"),
+            "must fail for the pin-drift reason, not some other cause: {dispatch_err}"
+        );
+
+        // The consume must have rolled back with the rest of the scope —
+        // the envelope is still consumable (same rollback-retry corollary
+        // the dispatch-failure test above proves for the write path).
+        admit_in_scope_committed(&executor, "cbu.confirm", Some(handle), &pool)
+            .await
+            .expect(
+                "a pin-drift rejection must leave the envelope reconsumable — \
+                 the whole scope, including the consume, rolled back together",
             );
     }
 }
