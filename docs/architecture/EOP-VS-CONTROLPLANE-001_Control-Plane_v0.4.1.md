@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Document** | EOP-VS-CONTROLPLANE-001 |
-| **Version** | v0.4 (Draft) |
+| **Version** | v0.4.1 (Draft) |
 | **Type** | Vision & Scope |
 | **Status** | Draft — fit for peer review |
 | **Purpose** | Define the Control Plane as a first-class capability for AI-led, governed, deterministic execution in the Enterprise Onboarding Platform, mapped to the NIST AI Risk Management Framework as a control crosswalk. |
@@ -19,6 +19,7 @@
 | v0.2 | Capability renamed **Control Plane** (see §1.1). Added: NIST AI RMF mapping (Appendix A); decision snapshot semantics (§6.15); envelope single-use, expiry and pre-state pinning (§6.10); type-level envelope provenance and proof-carrying construction (§9.4); pipeline evaluation strategy (§6.16); Phase 0 control inventory (§13); write-set attestation ownership (§6.7); resolution of probabilistic-signal handling (§6.13.1). Tightened repetition between §7 and §12. |
 | v0.3 | Review hardening. NIST language softened from "formalised against" to design **crosswalk** with an explicit pre-Phase-5 caveat (Appendix A). Write-set attestation failure semantics sharpened: abort-before-commit default, post-durability quarantine (§6.7.1). Evidence ownership deduplicated between authority gate and evidence gate (§6.5/§6.6). Durable/queued execution note added: `EnvelopeHandle` rehydration through Control Plane verification (§6.10.4). Gate dependencies declared, with dependency table (§6.16.1). Version-pin precision note for legacy non-versioned (Mode-1) state (§6.10.1). Terminology: `ControlPlaneProof` used consistently; "approved runtime admission path" replaces "runtime execution path" (§6.9). |
 | v0.4 | Amendment 1: Clearing-House Mandate. New §15 (mediation topology; leakproof L1–L3; coverage C1–C3; pack universality K1–K3; read-lens decision §15.5; migration posture). §8 relationship directions inverted. §12 criteria 13–15 added. v0.3 checkpoint topology reclassified as transitional. |
+| v0.4.1 | Micro-amendment: C3 constitutive clarification (ruling on MCA-002 escalation E-4). §15.3's C3 ("every agent-originated state transition has a Control Plane decision record reachable from its audit trail") is **constitutive at mediation completion (T12), not owed during checkpoint topology (T0–T11)**. Best-effort, non-blocking shadow-decision persistence is the conformant posture through T11; C3 graduates to a hard guarantee only when enforce-mode/mediation is live. C3 is reclassified MIGRATION-PENDING, sharing AB1's T12/mediation terminus, not a T11 exit criterion. |
 
 ---
 
@@ -1074,7 +1075,7 @@ Coverage is continuously attested, not periodically reviewed:
 
 - **C1 — Compile-time coverage**: L1's graph gate green ⇒ no alternative route exists to compile.
 - **C2 — Runtime coverage attestation**: every capability entry point counts invocations by provenance. The metric `capability_invocations_without_cp_provenance` is on the assurance plane (§6.14) with an alert threshold of **zero**. During migration this number is the honest measure of remaining mesh; at completion it is the standing proof of the directive.
-- **C3 — Audit closure**: every agent-originated state transition has a Control Plane decision record reachable from its audit trail (§6.11 unchanged; C1+C2 are what make its universality provable rather than asserted).
+- **C3 — Audit closure**: every agent-originated state transition has a Control Plane decision record reachable from its audit trail (§6.11 unchanged; C1+C2 are what make its universality provable rather than asserted). **(v0.4.1 — ruling on MCA-002 E-4.)** This is **constitutive of mediation completion, not an obligation of checkpoint topology**: during T0–T11 (§15.6), best-effort, non-blocking shadow-decision persistence is the conformant posture — a decision record NOT being written on a given turn (a failed insert, a dispatch path that doesn't yet call the shadow evaluator) does not itself make that turn nonconformant, because checkpoint topology never promised universal reachability in the first place. C3 becomes a hard guarantee only when mediation (§15.1) is live and every agent-originated flow provably passes through the clearing house — at that point "reachable from its audit trail" is true by construction (the CP is the only path in), not by a persistence-layer promise that could silently fail. Treat C3, through T11, the same way §15.6 already treats the rest of checkpoint topology: real, valuable, explicitly transitional.
 
 ## 15.4 Pack universality (the ALL-packs clause)
 
@@ -1140,4 +1141,4 @@ The design intent is that every RMF function above is exercised on **every** pro
 
 ---
 
-*End of document — EOP-VS-CONTROLPLANE-001 v0.4*
+*End of document — EOP-VS-CONTROLPLANE-001 v0.4.1*
