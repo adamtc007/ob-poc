@@ -526,3 +526,19 @@ Registered at the B2 ratification (T10.1's closure entry, condition 1) as MIGRAT
 - **B5**: `cargo tree -p ob-poc-control-plane` carries no `ob-poc` dependency edge — the crate's layering is unaffected by this change (it's a pure intra-crate function split).
 
 **Convergence status: CLOSED.** No further owed items remain from the T10.1 B2 ratification's three conditions.
+
+## MCA-001 addendum — AB5 classification rule (standing) + verdict (2026-07-11, same day)
+
+**Standing classification rule for agent-local vs. operational session-state writes** (ratified in response to MCA-001's E-3 escalation): a write is **operational** if any capability, gate, or audit-of-record path reads it — i.e. the write can influence a decision. A write is **agent-local** only if the sole consumer is the agent tier itself, for conversational continuity, with no downstream decision consuming it. Durability and DB-persistence are irrelevant to the classification; readership is the only test. This rule governs every future AB5-shaped classification, not just the instance below.
+
+**Applying the rule — traced, not assumed:** MCA-001 (AB5) found a real Postgres-backed session checkpoint write mid-clarification-loop (`persist_session_checkpoint_inner` → `save_session_snapshot`, `src/sequencer.rs:785-845`) with no CP crossing. Traced its readers per the rule's trap-check ("does this feed anything G1's admission consumes — the session verb surface"):
+
+1. The checkpoint persists `ReplSessionV2`'s full `state` (including the clarification loop's `ScopeGate { pending_input, candidates }`, `src/sequencer.rs:4237-4240`) into `"ob-poc".repl_sessions_v2.state` JSONB.
+2. `SessionRepository::load_session` (`src/repl/session_repository.rs:235-294`) reads that row back and reconstructs `ReplSessionV2.scope`/`.stage_focus` (among other fields) on session resume.
+3. Those exact fields feed `VerbSurfaceContext` at `src/agent/orchestrator.rs:435-448` (`stage_focus: ctx.stage_focus.as_deref()`, `has_group_scope`/`is_infrastructure_scope` derived from `ctx.scope`).
+4. `compute_session_verb_surface(&surface_ctx)` (`src/agent/verb_surface.rs:324`) consumes that context to produce `SessionVerbSurface.allowed_fqns()`.
+5. That surface directly gates dispatch-adjacent behaviour: `orchestrator.rs:1846-1865` narrows `surface_allowed` to a constrained-match verb only when `surface_allowed.contains(constrained_verb)` — the checkpoint-derived surface is load-bearing for what a subsequent turn is even allowed to search/consider.
+
+**Verdict: AB5 is NONCONFORMANT** (not MODEL-SILENT, per MCA-001's original hedge — resolved by applying the ratified rule). The checkpoint write is decision-relevant by the readership test, therefore operational, therefore should cross the CP under AB5 as written, and currently does not. Added to the T11 mesh-retirement backlog (MCA-4) as a fourth open item, same severity class as AB4/AB7 (moderate — not L2/§9.4/§6.7.1, so not BLOCKER-tier) — no retirement path registered yet.
+
+**Also worth noting for the T11 scoping pass**: `ob_poc_sage::session_context::load_entity_states_for_group` (the AB4 finding's own crate) is itself a *second*, independent decision-relevant read, found while tracing this rule — its output (`entity_states`) feeds `compute_valid_verb_set_for_constellations` → `resolve_constrained_hybrid`, whose resolved verb is checked against `surface_allowed` at the same `orchestrator.rs:1846` site. AB4 and this AB5 finding converge on the identical gate (`surface_allowed`/`SessionVerbSurface`) — reinforcing the architect's ruling that AB2's tier-split is the correct root remedy: once direct `sqlx` is unreachable from the agent tier (AB2's fix), both AB4's and this AB5 instance's violations close as a structural consequence, not two separate patches.
