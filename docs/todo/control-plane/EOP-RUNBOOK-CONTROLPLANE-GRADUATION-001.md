@@ -263,3 +263,17 @@ legacy check it's being compared to.
 - **Path B/C admission-hook design** (§4) — not yet designed, larger than
   a config flip; needs its own short plan before Path B graduation can
   even begin queuing evidence.
+- **G1-only state at Path A (§2/§3) is still accurate as of this line**,
+  but the path off it is now dependency-ordered, not five independent
+  sub-tranches. EOP-PLAN-CONTROLPLANE-001 Addendum B's T9.1c/T9.1d wiring
+  landed (`150831b3`, real `AuthorityInput`/`EvidenceInput`), but an
+  empirical probe against `evaluate_shadow()` showed both gates still
+  report `NotEvaluated` — they transitively depend on G3 PackResolution,
+  which depends on G2 EntityBinding, which nothing at the shadow call site
+  supplies at all. T9.1's original "any order" framing is REVOKED (it
+  contradicted its own basis document, V&S §6.16.1's dependency table);
+  see the ownership ledger's "Tranche T9.1c/T9.1d" entry for the amended
+  six-tranche dependency-ordered sequence, starting with the previously
+  omitted G2 (T9.1-pre). §2/§3 of this runbook will need a follow-up
+  update once T9.1-pre/T9.1a land and Path A's real gate coverage moves
+  past G1.

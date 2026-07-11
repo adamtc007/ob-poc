@@ -152,3 +152,33 @@ Both items T8.6 left as "still owed" are now closed.
 - **PIR-D-006 — CLOSED (ticketed).** `docs/todo/workspace-hygiene-001.md` filed, covering both items with fresh-reproduced evidence (both failures independently re-confirmed 2026-07-11, identical to the PIR-001 review's original findings — stable pre-existing state, neither resolved nor worsened): `ob-poc-boundary`'s 3 golden-count assertion failures (`acp_dag_semantic`/`acp_registry_projection`, expected-vs-actual counts drifted, e.g. `left: 97, right: 74`) and `dsl-runtime`'s 1 doctest failure (`compute_reducer_revision` no longer re-exported at the crate root the doctest imports from). This is that link.
 
 E5's scope annotation (T8.6) now reads: workspace green is scoped to C-0xx-dispositioned crates, and the excluded pre-existing failures are tracked at `docs/todo/workspace-hygiene-001.md`, not merely named.
+
+## Tranche T9.1c/T9.1d — wired, not closed; T9.1 amended (Addendum B, 2026-07-11)
+
+**Empirical probe before trusting the dependency table (habit worth naming):** before claiming T9.1c (G5 Authority) and T9.1d (G6 Evidence) closed, `build_evaluation_context` was extended with real `AuthorityInput` (actor_id/role from the `ActorContext` already resolved at this call site for G1; `access_decision` derived from an actual `PruneReason::AbacDenied` match on `envelope.pruned_verbs`, not fabricated) and real `EvidenceInput` (`evidence_gaps` mapped directly from `SemOsContextEnvelope.evidence_gaps`). 6/6 unit tests passed. Rather than trust a reading of `GATE_DEPENDENCIES` (`crates/ob-poc-control-plane/src/gate.rs`) to conclude the wiring was reachable, a throwaway probe test called `ob_poc_control_plane::evaluate_shadow()` against a context built by the real function, shaped exactly as today's call site produces it (`entity_binding: None`, `pack_resolution: None`). Result:
+
+```
+EntityBinding = Failure("no EntityBindingInput supplied")
+PackResolution = NotEvaluated { blocked_by: [EntityBinding] }
+Authority = NotEvaluated { blocked_by: [PackResolution] }
+Evidence = NotEvaluated { blocked_by: [EntityBinding, PackResolution] }
+```
+
+Both gates report `NotEvaluated` regardless of the real input now wired — the wiring is correct but currently unread. Landed anyway (commit `150831b3`), explicitly documented as not satisfying T9.1's exit criterion, rather than held back or, worse, claimed closed.
+
+**What this demonstrates architecturally:** the declared-dependency, collect-where-independent evaluator design (V&S §6.16) did exactly the job it exists to do. Had gate dependencies been inferred ad hoc instead of declared and enforced — the thing §6.16.1 exists to forbid — the wired-but-unread `AuthorityInput`/`EvidenceInput` could have produced plausible-looking `Allow`/`Sufficient` results assembled from data the gates never actually consumed, and T9.1c/T9.1d could have been marked closed on fiction. The hard `NotEvaluated { blocked_by }` chain made the gap undeniable instead of silently wrong. Worth carrying forward as a design point, not just a bug catch: the dependency graph caught its own planner's scoping error.
+
+**Root cause (architect's own characterization, recorded verbatim in spirit):** Addendum B's T9.1 framing — "complete [G3, G4, G5, G6, G7] in any order" — directly contradicts the V&S §6.16.1 dependency table the same document is built on: `G3<-G2`, `G4/G5/G6<-G3`, `G7<-G4`. The five sub-tranches were never independent. Worse, the five-way split dropped **G2 (EntityBinding)** entirely — nothing at the shadow call site supplies `EntityBindingInput` at all, not even attempted — even though T8.4's original wording ("non-`not_evaluated` results for every implemented gate") always implicitly required it. This is the addendum contradicting its own basis document, not a margin gap in the addendum.
+
+**T9.1 is amended, effective this entry — the original "any order" clause is REVOKED:**
+
+> **T9.1 (amended): six sub-tranches in dependency order, per V&S §6.16.1.**
+> - **T9.1-pre — G2 EntityBinding input** (the omitted root): populate `EntityBindingInput` at the shadow call site from the runbook step's resolved entity refs (binding was proven at compile time by dsl-resolution; this wiring surfaces it to the gate — plumbing, not new resolution logic). Exit: G2 non-`not_evaluated` on real Path A dispatch. **Watch-point:** if the resolved entity refs are not cleanly available at the sequencer call site (e.g. dropped by stage 6 as a compilation artefact), that is a second stop-and-flag, not a placeholder-bridgeable gap — a G2 fed synthetic bindings would poison every downstream gate's shadow evidence, and the two weeks of divergence data this graduation clock is about to accumulate is only worth having if its inputs are real.
+> - **T9.1a — G3 PackResolution** (unchanged scope, now unblockable once T9.1-pre lands).
+> - **T9.1b — G4 DagProof**, **T9.1c — G5 Authority** (wiring already landed in `150831b3`; closure now means the gate actually reads it, not new wiring), **T9.1d — G6 Evidence** (same — wiring landed, closure is reachability) — any order among these three, since all three depend only on G3.
+> - **T9.1e — G7 WriteSet** (depends on G4's legal transition — must follow T9.1b).
+> - Clock-start condition unchanged in substance, sharpened in scope: all implemented gates non-`not_evaluated` on every live verb family — which now genuinely includes G2, as T8.4's original wording always required and the five-way split had silently dropped.
+
+**Option considered and rejected:** de-scoping G5/G6 back to "deferred" alongside G3/G4/G7 was considered and rejected — it would defer the graduation clock for no saving, since the same G2/G3 prerequisite gates the whole pipeline regardless of which sub-tranches are nominally excluded. The wiring is done; it stays landed, inert-but-honestly-labeled, pending T9.1-pre/T9.1a.
+
+**T9.1c/T9.1d status: WIRED, NOT CLOSED.** Reopens as closed only once T9.1-pre and T9.1a land and a live Path A dispatch shows non-`not_evaluated` Authority/Evidence results recorded in `control_plane_shadow_decisions`.
