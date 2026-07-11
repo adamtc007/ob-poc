@@ -56,9 +56,9 @@ pub trait EntityFactsSource: Send + Sync {
 /// columns match `toctou_recheck.rs::SqlRowVersionProvider::row_version`
 /// exactly — same 5 kinds, same columns, so a `row_version` read here and
 /// there can never silently diverge.
-struct KindMapping {
-    table: &'static str,
-    pk: &'static str,
+pub(crate) struct KindMapping {
+    pub(crate) table: &'static str,
+    pub(crate) pk: &'static str,
     /// SQL boolean expression (referencing the row's own columns) that is
     /// `true` when the entity is locked/archived/otherwise unavailable
     /// for mutation. `NULL`-safe — every kind's availability predicate is
@@ -66,7 +66,12 @@ struct KindMapping {
     availability_sql: &'static str,
 }
 
-fn kind_mapping(kind: &str) -> Result<KindMapping> {
+/// `pub(crate)` (not private): T9.2's `verify_pins_in_scope`
+/// (`toctou_recheck.rs`) reuses this exact table/PK mapping for its
+/// locked pin re-read, per the T9.2 design doc's "one mapping, two
+/// consumers" note — unlocked batched facts here at shadow-evaluation
+/// time (T9.1-pre), locked pin re-read at admission time (T9.2).
+pub(crate) fn kind_mapping(kind: &str) -> Result<KindMapping> {
     Ok(match kind {
         "cbu" => KindMapping {
             table: "cbus",
