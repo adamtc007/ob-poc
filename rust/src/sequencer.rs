@@ -7945,22 +7945,14 @@ impl ReplOrchestratorV2 {
                 runbook_proof,
                 version_pinning,
             );
-            let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
-            let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                session.id,
-                entry_id,
-                &entry.verb,
-                &report,
-                legacy_outcome.is_some(),
-            );
-
-            // T10.1 (EOP-PLAN-CONTROLPLANE-001 Addendum C): shadow sealing.
-            // The real evaluate() entry point (crate-internal orchestration,
-            // §9.3) runs over the exact same cp_ctx already built above —
-            // when every proof-bearing gate genuinely succeeded and G8
-            // classifies StpExecutable, this constructs and persists a real
-            // sealed ExecutionEnvelope. Nothing here consumes, gates, or
-            // blocks dispatch: legacy_outcome (computed earlier) remains
+            // T10.1 (EOP-PLAN-CONTROLPLANE-001 Addendum C) → T10.2 owed-
+            // convergence closure: a single `evaluate_with_report` call now
+            // produces both the shadow-decision audit row's `report` and
+            // the sealed-envelope-or-rejection `decision` — previously two
+            // separate calls (`evaluate_shadow` then `evaluate`, which
+            // re-ran the identical dependency-aware gate walk internally)
+            // over the exact same `cp_ctx`. Nothing here consumes, gates,
+            // or blocks dispatch: legacy_outcome (computed earlier) remains
             // the sole return value. A 5-minute validity window matches
             // this crate's own test convention (no production TTL policy
             // exists yet to draw from — see envelope_store.rs).
@@ -7968,7 +7960,15 @@ impl ReplOrchestratorV2 {
                 chrono::Utc::now(),
                 chrono::Utc::now() + chrono::Duration::minutes(5),
             );
-            let decision = ob_poc_control_plane::decision::evaluate(&cp_ctx, validity);
+            let (report, decision) =
+                ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+            let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                session.id,
+                entry_id,
+                &entry.verb,
+                &report,
+                legacy_outcome.is_some(),
+            );
             let sealed = matches!(decision, ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_));
             let session_id = session.id;
             let entry_verb = entry.verb.clone();

@@ -125,11 +125,42 @@ fn rejection_from_report(
 ///
 /// `validity` is supplied by the caller (this crate does no clock I/O of
 /// its own, §9.1) — typically "now" plus a short shadow-sealing TTL.
+///
+/// Thin wrapper over [`evaluate_with_report`] — kept for callers that only
+/// need the decision. Prefer `evaluate_with_report` when the caller also
+/// needs the underlying [`EvaluationReport`] (e.g. to build a shadow-
+/// decision audit row) — see that function's doc for why this split
+/// exists (T10.2's owed-convergence item).
 pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPlaneDecision {
+    evaluate_with_report(ctx, validity).1
+}
+
+/// [`evaluate`], but also returns the [`crate::gate::EvaluationReport`]
+/// [`crate::evaluate_shadow`] computed en route to the decision.
+///
+/// T10.1 landed `evaluate`/`evaluate_shadow` as two separate `pub` entry
+/// points into overlapping logic — every caller wanting both a shadow-
+/// decision row (built from a `report`) and a sealed-envelope-or-rejection
+/// (`evaluate`'s job) had to call `evaluate_shadow` once for the row and
+/// `evaluate` again for the decision, silently repeating the whole
+/// dependency-aware gate walk. Flagged at T10.1's B2 ratification as owed
+/// convergence, targeted at "whichever call site needs both" rather than
+/// invented speculatively — `sequencer.rs`'s `phase5_runtime_recheck` is
+/// that call site (T10.1's `report`/`decision` two-call pattern), closed
+/// by switching it to this function.
+///
+/// Not a widened `evaluate` signature (which would break every existing
+/// `ControlPlaneDecision`-only caller/test) — a new function, `evaluate`
+/// demoted to a one-line wrapper over it. Same computation either way: no
+/// behavioural change for existing `evaluate` callers.
+pub fn evaluate_with_report(
+    ctx: &EvaluationContext,
+    validity: ValidityWindow,
+) -> (crate::gate::EvaluationReport, ControlPlaneDecision) {
     let report = crate::evaluate_shadow(ctx);
 
     if let Some(rejection) = rejection_from_report(&report, &PROOF_BEARING_GATES) {
-        return ControlPlaneDecision::Rejected(rejection);
+        return (report, ControlPlaneDecision::Rejected(rejection));
     }
 
     // Every proof-bearing gate succeeded in `report` — re-derive each
@@ -154,7 +185,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
             _ => None,
         })
     else {
-        return internal_inconsistency(GateId::IntentAdmission);
+        return (report, internal_inconsistency(GateId::IntentAdmission));
     };
 
     let Some(binding) = ctx
@@ -162,7 +193,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
         .as_ref()
         .and_then(|i| crate::entity_binding::decide(i).success().cloned())
     else {
-        return internal_inconsistency(GateId::EntityBinding);
+        return (report, internal_inconsistency(GateId::EntityBinding));
     };
 
     let Some(pack) = ctx
@@ -173,7 +204,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
             _ => None,
         })
     else {
-        return internal_inconsistency(GateId::PackResolution);
+        return (report, internal_inconsistency(GateId::PackResolution));
     };
 
     let Some(dag) = ctx
@@ -184,7 +215,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
             _ => None,
         })
     else {
-        return internal_inconsistency(GateId::DagProof);
+        return (report, internal_inconsistency(GateId::DagProof));
     };
 
     let Some(authority) = ctx
@@ -195,7 +226,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
             _ => None,
         })
     else {
-        return internal_inconsistency(GateId::Authority);
+        return (report, internal_inconsistency(GateId::Authority));
     };
 
     let Some(evidence) = ctx
@@ -206,7 +237,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
             _ => None,
         })
     else {
-        return internal_inconsistency(GateId::Evidence);
+        return (report, internal_inconsistency(GateId::Evidence));
     };
 
     let Some(write_set) = ctx
@@ -217,11 +248,11 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
             _ => None,
         })
     else {
-        return internal_inconsistency(GateId::WriteSet);
+        return (report, internal_inconsistency(GateId::WriteSet));
     };
 
     let Some(snapshot) = ctx.snapshot.as_ref().map(crate::snapshot::build_pins) else {
-        return internal_inconsistency(GateId::DecisionSnapshot);
+        return (report, internal_inconsistency(GateId::DecisionSnapshot));
     };
 
     // G9 (RunbookProof) is not in PROOF_BEARING_GATES's own upstream set
@@ -239,12 +270,13 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
     };
 
     let Some(runbook) = runbook else {
-        return ControlPlaneDecision::Rejected(ControlPlaneRejection::new(vec![
-            GateFailure::Failed {
+        return (
+            report,
+            ControlPlaneDecision::Rejected(ControlPlaneRejection::new(vec![GateFailure::Failed {
                 gate: GateId::RunbookProof,
                 reason: "no compiled runbook reference available".to_string(),
-            },
-        ]));
+            }])),
+        );
     };
 
     let proof = ControlPlaneProof::new(
@@ -265,7 +297,7 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
     // is the one place `evaluate` calls `classify` directly rather than
     // reading `report`.
     let stp = ctx.stp_classifier.as_ref().map(crate::stp_classifier::classify);
-    match stp {
+    let decision = match stp {
         Some(crate::stp_classifier::StpEligibilityDecision::StpExecutable) => {
             let ControlPlaneProof {
                 intent,
@@ -293,7 +325,8 @@ pub fn evaluate(ctx: &EvaluationContext, validity: ValidityWindow) -> ControlPla
                 reason: "rejected or no StpClassifierInput supplied".to_string(),
             }]))
         }
-    }
+    };
+    (report, decision)
 }
 
 #[cfg(test)]
@@ -429,6 +462,31 @@ mod tests {
         assert_eq!(envelope.intent().verb_fqn(), "cbu.confirm");
         assert_eq!(envelope.binding().entity_ids(), &[Uuid::nil()]);
         assert_eq!(envelope.runbook().runbook_id(), Uuid::nil());
+    }
+
+    /// T10.2 owed-convergence closure: `evaluate_with_report`'s `report`
+    /// must be identical to a standalone `evaluate_shadow` call (proving
+    /// the convergence didn't change what the report says), and its
+    /// `decision` must be identical to `evaluate`'s own result (proving
+    /// `evaluate`'s demotion to a one-line wrapper changed nothing
+    /// observable for existing callers).
+    #[test]
+    fn evaluate_with_report_matches_the_separate_evaluate_shadow_and_evaluate_calls() {
+        let ctx = sealable_context();
+        let window = now_window();
+
+        let standalone_report = crate::evaluate_shadow(&ctx);
+        let standalone_decision = evaluate(&ctx, window.clone());
+        let (report, decision) = evaluate_with_report(&ctx, window);
+
+        assert_eq!(report, standalone_report);
+        match (&decision, &standalone_decision) {
+            (ControlPlaneDecision::ApprovedStp(a), ControlPlaneDecision::ApprovedStp(b)) => {
+                assert_eq!(a.intent().verb_fqn(), b.intent().verb_fqn());
+                assert_eq!(a.binding().entity_ids(), b.binding().entity_ids());
+            }
+            other => panic!("expected both to seal ApprovedStp, got {other:?}"),
+        }
     }
 
     #[test]
