@@ -22,6 +22,7 @@ use crate::authority_gate::Authorised;
 use crate::dag_proof::LegalTransition;
 use crate::entity_binding::BoundEntities;
 use crate::evidence_gate::EvidenceSufficient;
+use crate::gate::{Gate, GateId, GateResult};
 use crate::intent_admission::AdmittedIntent;
 use crate::pack_resolution::ResolvedPack;
 use crate::snapshot::SnapshotPins;
@@ -98,6 +99,46 @@ impl ControlPlaneProof {
     }
 }
 
+/// T9.7: pre-computed input for the G9 shadow gate. Deliberately the
+/// smallest honest fact this call site can supply — whether a genuine
+/// `CompiledRunbookRef` exists for the entry being rechecked. `try_compile_entry`
+/// populates `entry.compiled_runbook_id` before the execution loop reaches
+/// the shadow call site (INV-3: "raw DSL execution without a
+/// CompiledRunbookId is never permitted"), so this is a real, already
+/// production-enforced fact — not a placeholder awaiting future
+/// infrastructure, unlike G10/G11.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct RunbookProofInput {
+    pub has_compiled_runbook_ref: bool,
+}
+
+/// T9.7 adapter: `Gate<crate::context::EvaluationContext>` impl for G9.
+///
+/// This gate's declared predecessors (`gate::GATE_DEPENDENCIES`) are the
+/// eight gates whose proof types are literally the fields of
+/// `ControlPlaneProof` above — `evaluate_collect_where_independent` only
+/// calls `evaluate` here once all eight have genuinely succeeded, so a
+/// `Success` here really does mean "every proof this artefact would embed
+/// is available, and the runbook reference is real," not merely "the
+/// runbook reference is real in isolation."
+pub struct RunbookProofGate;
+
+impl Gate<crate::context::EvaluationContext> for RunbookProofGate {
+    fn id(&self) -> GateId {
+        GateId::RunbookProof
+    }
+
+    fn evaluate(&self, ctx: &crate::context::EvaluationContext) -> GateResult {
+        match &ctx.runbook_proof {
+            Some(input) if input.has_compiled_runbook_ref => GateResult::Success,
+            Some(_) => {
+                GateResult::Failure("entry has no compiled runbook reference".to_string())
+            }
+            None => GateResult::Failure("no RunbookProofInput supplied".to_string()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -124,5 +165,42 @@ mod tests {
 
         assert_eq!(proof.intent.verb_fqn(), "cbu.confirm");
         assert_eq!(proof.runbook.runbook_id(), Uuid::nil());
+    }
+
+    // ── T9.7: RunbookProofGate ──
+
+    #[test]
+    fn runbook_proof_gate_fails_closed_when_input_missing() {
+        let ctx = crate::context::EvaluationContext::default();
+        assert!(matches!(
+            RunbookProofGate.evaluate(&ctx),
+            GateResult::Failure(_)
+        ));
+        assert_eq!(RunbookProofGate.id(), GateId::RunbookProof);
+    }
+
+    #[test]
+    fn runbook_proof_gate_fails_when_no_compiled_runbook_ref() {
+        let ctx = crate::context::EvaluationContext {
+            runbook_proof: Some(RunbookProofInput {
+                has_compiled_runbook_ref: false,
+            }),
+            ..Default::default()
+        };
+        assert!(matches!(
+            RunbookProofGate.evaluate(&ctx),
+            GateResult::Failure(_)
+        ));
+    }
+
+    #[test]
+    fn runbook_proof_gate_succeeds_when_compiled_runbook_ref_present() {
+        let ctx = crate::context::EvaluationContext {
+            runbook_proof: Some(RunbookProofInput {
+                has_compiled_runbook_ref: true,
+            }),
+            ..Default::default()
+        };
+        assert_eq!(RunbookProofGate.evaluate(&ctx), GateResult::Success);
     }
 }

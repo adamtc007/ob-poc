@@ -305,6 +305,45 @@ pub(crate) fn build_decision_snapshot_input(
     })
 }
 
+/// T9.7 (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G9's
+/// `RunbookProofInput` from the one real fact this call site has —
+/// whether the runbook entry being rechecked already carries a genuine
+/// `CompiledRunbookId`. `try_compile_entry()` populates this before the
+/// execution loop reaches `phase5_runtime_recheck` for entries created
+/// through the current pipeline (INV-3: raw DSL execution without a
+/// `CompiledRunbookId` is never permitted) — the fallback on-the-fly
+/// compile path only exists for legacy entries, so `false` here is a rare,
+/// legitimate case, not a systematic false negative.
+///
+/// Always `Some(_)` (never `None`) — unlike G2/G7/G8/G13, there is no
+/// fallible I/O step here to fail; the fact is read directly off the
+/// entry already in hand.
+pub(crate) fn build_runbook_proof_input(
+    has_compiled_runbook_ref: bool,
+) -> ob_poc_control_plane::proof::RunbookProofInput {
+    ob_poc_control_plane::proof::RunbookProofInput {
+        has_compiled_runbook_ref,
+    }
+}
+
+/// T9.7 (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G12's
+/// `VersionPinningInput`. Only `compiler_version` has a real source at
+/// this call site (`env!("CARGO_PKG_VERSION")`, this crate's own build
+/// version — the closest existing proxy for "DSL/compiler crate version",
+/// per `PinnedVersionSet`'s own field doc); `bus_catalogue_version`/
+/// `model_version`/`prompt_version` stay `None` — no production source
+/// for any of the three exists at this call site yet. Always `Some(_)`,
+/// same posture as G9: reading `env!` cannot fail.
+pub(crate) fn build_version_pinning_input() -> ob_poc_control_plane::versioning::VersionPinningInput
+{
+    ob_poc_control_plane::versioning::VersionPinningInput {
+        versions: ob_poc_control_plane::snapshot::PinnedVersionSet {
+            compiler_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            ..Default::default()
+        },
+    }
+}
+
 /// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
 /// verb's resolved args are entity references, by contract — not by
 /// regexing values for UUID shape (`write_set.rs::derive_write_set_heuristic`
@@ -456,6 +495,17 @@ pub(crate) fn build_entity_binding_input(
 ///   for those yet (`snapshot.rs`'s own module doc). `None` only when the
 ///   batched facts fetch itself errored (same posture as G2/G8).
 ///
+/// - G9 (runbook proof, T9.7): built by [`build_runbook_proof_input`] from
+///   `entry.compiled_runbook_id.is_some()` — real, INV-3-enforced. Declares
+///   real predecessors (`gate::GATE_DEPENDENCIES`) matching
+///   `ControlPlaneProof`'s own field list, so a `Success` here means every
+///   proof that artefact would embed genuinely succeeded, not just that
+///   the runbook reference happens to exist.
+///
+/// - G12 (version pinning, T9.7): built by [`build_version_pinning_input`]
+///   — only `compiler_version` (`env!("CARGO_PKG_VERSION")`) has a real
+///   source here; the other three `PinnedVersionSet` fields stay `None`.
+///
 /// `is_ai_originated`/`interpretation_attested` are conservatively `false`
 /// (no attestation requirement applied) because this call site has no
 /// Sage-pre-classification / intent-telemetry signal threaded through yet
@@ -475,6 +525,8 @@ pub(crate) fn build_evaluation_context(
     write_set: Option<ob_poc_control_plane::write_set::WriteSetInput>,
     stp_classifier: Option<ob_poc_control_plane::stp_classifier::StpClassifierInput>,
     snapshot: Option<ob_poc_control_plane::snapshot::SnapshotInput>,
+    runbook_proof: Option<ob_poc_control_plane::proof::RunbookProofInput>,
+    version_pinning: Option<ob_poc_control_plane::versioning::VersionPinningInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -501,6 +553,8 @@ pub(crate) fn build_evaluation_context(
         write_set,
         stp_classifier,
         snapshot,
+        runbook_proof,
+        version_pinning,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -645,7 +699,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -662,7 +716,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -681,7 +735,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -693,7 +747,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -706,7 +760,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None, None, None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -830,6 +884,8 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
         assert_eq!(
@@ -875,6 +931,8 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
+            None,
             None,
             None,
             None,
@@ -927,6 +985,8 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
+            None,
             None,
             None,
             None,
@@ -1052,6 +1112,8 @@ mod tests {
             &test_actor(),
             entity_binding,
             pack_resolution,
+            None,
+            None,
             None,
             None,
             None,
@@ -1207,6 +1269,8 @@ cross_workspace_constraints: []
             entity_binding,
             pack_resolution,
             Some(dag_proof),
+            None,
+            None,
             None,
             None,
             None,
@@ -1398,6 +1462,26 @@ domains:
         assert_eq!(input.entity_row_versions, vec![(entity_id, "cbu".to_string(), 7)]);
     }
 
+    // ── T9.7 (Addendum B): build_runbook_proof_input / build_version_pinning_input ──
+
+    #[test]
+    fn build_runbook_proof_input_threads_the_flag_through() {
+        assert!(build_runbook_proof_input(true).has_compiled_runbook_ref);
+        assert!(!build_runbook_proof_input(false).has_compiled_runbook_ref);
+    }
+
+    #[test]
+    fn build_version_pinning_input_carries_a_real_compiler_version() {
+        let input = build_version_pinning_input();
+        assert_eq!(
+            input.versions.compiler_version.as_deref(),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+        assert!(input.versions.bus_catalogue_version.is_none());
+        assert!(input.versions.model_version.is_none());
+        assert!(input.versions.prompt_version.is_none());
+    }
+
     #[tokio::test]
     async fn g7_reaches_success_end_to_end_given_a_legal_dag_transition() {
         // Empirical reachability proof, matching the g2/g3/g4 pattern:
@@ -1438,6 +1522,8 @@ domains:
             pack_resolution,
             Some(dag_proof),
             Some(write_set),
+            None,
+            None,
             None,
             None,
         );
@@ -1536,6 +1622,15 @@ domains:
         // already fetched above — one live cbu row, one real row_version.
         let snapshot = build_decision_snapshot_input(Some(&facts));
 
+        // G9 (runbook proof, T9.7): declares real predecessors (G1, G2,
+        // G3, G4, G5, G6, G7, G13 — all already legal above), so this
+        // reaches Success only because the whole chain does.
+        let runbook_proof = Some(build_runbook_proof_input(true));
+
+        // G12 (version pinning, T9.7): no declared dependency, real
+        // compiler_version from this crate's own build.
+        let version_pinning = Some(build_version_pinning_input());
+
         let ctx = build_evaluation_context(
             &envelope,
             verb_fqn,
@@ -1547,6 +1642,8 @@ domains:
             Some(write_set),
             stp_classifier,
             snapshot,
+            runbook_proof,
+            version_pinning,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1561,6 +1658,8 @@ domains:
             GateId::WriteSet,
             GateId::StpClassifier,
             GateId::DecisionSnapshot,
+            GateId::RunbookProof,
+            GateId::VersionPinning,
         ] {
             let result = report.get(gate_id);
             assert!(

@@ -9,8 +9,12 @@
 //! the C-0xx disposition driving each adapter. T3 wires the three gates
 //! with no production analogue at all (RR-8): G2 (entity binding), G13
 //! (decision snapshot pins), and G8 (STP classifier) — plus assembles the
-//! T3.4 `ControlPlaneProof` aggregate. Only the downstream artefact gates
-//! (G9-G12, G14) remain stubbed, pending T4/T5.
+//! T3.4 `ControlPlaneProof` aggregate. T9.7 wires two more of the
+//! "downstream artefact" gates (G9 RunbookProof, G12 VersionPinning),
+//! correcting an earlier assumption that they couldn't be graded from
+//! `EvaluationContext` — see that module's doc for the correction. G10
+//! (ExecutionEnvelope) and G11 (AuditReplay) remain stubbed: neither has
+//! any real production fact to grade yet.
 //!
 //! This crate must not depend on any execution-tier crate (§9.1 non-goals):
 //! it does not own LLM prompting, DSL parsing, DAG authoring, SemOS
@@ -75,13 +79,10 @@ pub fn evaluate_shadow(ctx: &EvaluationContext) -> EvaluationReport {
     let stp_classifier_gate = stp_classifier::StpClassifierGate;
     let decision_snapshot_gate = snapshot::DecisionSnapshotGate;
     let write_set_attestation_gate = write_set_attestation::WriteSetAttestationGate;
+    let runbook_proof_gate = proof::RunbookProofGate;
+    let version_pinning_gate = versioning::VersionPinningGate;
 
-    let stub_ids = [
-        GateId::RunbookProof,
-        GateId::ExecutionEnvelope,
-        GateId::AuditReplay,
-        GateId::VersionPinning,
-    ];
+    let stub_ids = [GateId::ExecutionEnvelope, GateId::AuditReplay];
     let stubs: Vec<UnimplementedGate> = stub_ids.iter().map(|id| UnimplementedGate(*id)).collect();
 
     let mut gates: BTreeMap<GateId, &dyn Gate<EvaluationContext>> = BTreeMap::new();
@@ -95,6 +96,8 @@ pub fn evaluate_shadow(ctx: &EvaluationContext) -> EvaluationReport {
     gates.insert(GateId::StpClassifier, &stp_classifier_gate);
     gates.insert(GateId::DecisionSnapshot, &decision_snapshot_gate);
     gates.insert(GateId::WriteSetAttestation, &write_set_attestation_gate);
+    gates.insert(GateId::RunbookProof, &runbook_proof_gate);
+    gates.insert(GateId::VersionPinning, &version_pinning_gate);
     for stub in &stubs {
         gates.insert(stub.0, stub);
     }
@@ -249,6 +252,15 @@ mod evaluate_shadow_tests {
                 expected_entity_ids: vec![entity],
                 expected_allowed_columns: vec!["status".to_string()],
             }),
+            runbook_proof: Some(proof::RunbookProofInput {
+                has_compiled_runbook_ref: true,
+            }),
+            version_pinning: Some(versioning::VersionPinningInput {
+                versions: snapshot::PinnedVersionSet {
+                    compiler_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                    ..Default::default()
+                },
+            }),
         }
     }
 
@@ -267,9 +279,27 @@ mod evaluate_shadow_tests {
             GateId::StpClassifier,
             GateId::DecisionSnapshot,
             GateId::WriteSetAttestation,
+            GateId::RunbookProof,
+            GateId::VersionPinning,
         ] {
             assert_eq!(report.get(id), Some(&gate::GateResult::Success), "{id:?} did not succeed");
         }
+    }
+
+    /// T9.7: RunbookProof (G9) declares real predecessors
+    /// (`gate::GATE_DEPENDENCIES`) — proves it is genuinely blocked, not
+    /// silently skipped, when one of them is absent, exactly the same
+    /// collect-where-independent proof this crate already has for G3/G4
+    /// blocking on a missing EntityBinding.
+    #[test]
+    fn runbook_proof_blocked_when_a_declared_predecessor_is_missing() {
+        let mut ctx = fully_admitted_context();
+        ctx.write_set = None;
+        let report = evaluate_shadow(&ctx);
+        assert!(matches!(
+            report.get(GateId::RunbookProof),
+            Some(&gate::GateResult::NotEvaluated { .. })
+        ));
     }
 
     /// Exit criterion: "same (intent, ctx, pins) -> identical decision

@@ -7918,6 +7918,19 @@ impl ReplOrchestratorV2 {
                 entity_facts_map.as_ref(),
             );
 
+            // T9.7 (Addendum B): resolve G9's RunbookProofInput from the
+            // entry's own compiled_runbook_id (INV-3), and G12's
+            // VersionPinningInput from this build's own CARGO_PKG_VERSION —
+            // see build_runbook_proof_input's/build_version_pinning_input's
+            // doc.
+            let runbook_proof = Some(
+                crate::agent::control_plane_shadow::build_runbook_proof_input(
+                    entry.compiled_runbook_id.is_some(),
+                ),
+            );
+            let version_pinning =
+                Some(crate::agent::control_plane_shadow::build_version_pinning_input());
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
@@ -7929,6 +7942,8 @@ impl ReplOrchestratorV2 {
                 write_set,
                 stp_classifier,
                 snapshot,
+                runbook_proof,
+                version_pinning,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(

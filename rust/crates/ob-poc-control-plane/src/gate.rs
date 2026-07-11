@@ -116,6 +116,17 @@ impl<Ctx> Gate<Ctx> for UnimplementedGate {
 /// gain real dependency semantics (if any) when their owning tranche wires
 /// them (T3–T5).
 ///
+/// **`RunbookProof`'s edge below (T9.7) is the one exception** — not
+/// invented from §6.16.1 (which has no entry for it), but derived from a
+/// fact already fixed elsewhere in this crate: `proof::ControlPlaneProof`
+/// (the artefact G9 represents) has a public field for exactly these eight
+/// gates' proof types (`proof.rs`'s own struct definition), so declaring
+/// the edge here documents a structural fact the crate already committed
+/// to, the same standard applied to every other row — contrast with
+/// Authority/Evidence below, deliberately *not* linked because §6.16.1
+/// states that relationship as conditional, not because dependency edges
+/// are avoided on principle.
+///
 /// Authority's evidence dependency is written in §6.16.1 as conditional
 /// ("+ evidence decision where policy requires") rather than an
 /// unconditional predecessor, so it is deliberately **not** encoded as a
@@ -155,7 +166,19 @@ pub const GATE_DEPENDENCIES: &[(GateId, &[GateId])] = &[
             GateId::WriteSet,
         ],
     ),
-    (GateId::RunbookProof, &[]),
+    (
+        GateId::RunbookProof,
+        &[
+            GateId::IntentAdmission,
+            GateId::EntityBinding,
+            GateId::PackResolution,
+            GateId::DagProof,
+            GateId::Authority,
+            GateId::Evidence,
+            GateId::WriteSet,
+            GateId::DecisionSnapshot,
+        ],
+    ),
     (GateId::ExecutionEnvelope, &[]),
     (GateId::AuditReplay, &[]),
     (GateId::VersionPinning, &[]),

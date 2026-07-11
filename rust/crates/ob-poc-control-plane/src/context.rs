@@ -29,17 +29,27 @@ use crate::entity_binding::EntityBindingInput;
 use crate::evidence_gate::EvidenceInput;
 use crate::intent_admission::IntentAdmissionInput;
 use crate::pack_resolution::PackResolutionInput;
+use crate::proof::RunbookProofInput;
 use crate::snapshot::SnapshotInput;
 use crate::stp_classifier::StpClassifierInput;
+use crate::versioning::VersionPinningInput;
 use crate::write_set::WriteSetInput;
 use crate::write_set_attestation::WriteSetAttestationInput;
 
-/// Shared evaluation context for every gate adapter wired so far (G1-G8,
-/// G13, G14). The remaining gates (G9-G12) are downstream/infrastructural
-/// artefacts (runbook proof, execution envelope, audit/replay, version
-/// pinning) that consume this context's *outputs* rather than being graded
-/// from within it — they stay `UnimplementedGate` in `evaluate_shadow`
-/// until T3.4/T4 follow-on work lands them.
+/// Shared evaluation context for every gate adapter wired so far (G1-G9,
+/// G12, G13, G14). **Corrected (T9.7):** this module's own earlier doc
+/// claimed G9-G12 "consume this context's *outputs* rather than being
+/// graded from within it" — G8 (`StpClassifier`) already disproved that as
+/// a general rule before this comment was written: a gate can both declare
+/// real predecessors in `gate::GATE_DEPENDENCIES` (so it's only evaluated
+/// once they've genuinely succeeded) *and* grade its own small primitive
+/// fact from this context, same as everything else here. G9 (`runbook_proof`)
+/// and G12 (`version_pinning`) follow that exact pattern. G10
+/// (`ExecutionEnvelope`) and G11 (`AuditReplay`) remain `UnimplementedGate`
+/// in `evaluate_shadow` — not because the pattern doesn't fit them, but
+/// because neither has any real production fact to grade yet (`envelope::seal`
+/// has zero non-test call sites; G11's owning audit-stream infrastructure,
+/// T7.1, doesn't exist).
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EvaluationContext {
     pub intent_admission: Option<IntentAdmissionInput>,
@@ -52,4 +62,6 @@ pub struct EvaluationContext {
     pub snapshot: Option<SnapshotInput>,
     pub stp_classifier: Option<StpClassifierInput>,
     pub write_set_attestation: Option<WriteSetAttestationInput>,
+    pub runbook_proof: Option<RunbookProofInput>,
+    pub version_pinning: Option<VersionPinningInput>,
 }
