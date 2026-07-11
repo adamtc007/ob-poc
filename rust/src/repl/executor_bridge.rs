@@ -72,6 +72,54 @@ impl RealDslExecutor {
 }
 
 impl RealDslExecutor {
+    /// T9.3a (EOP-PLAN-CONTROLPLANE-001 Addendum B): boundary-interposition
+    /// admission check for Path B/C (direct REPL dispatch through this
+    /// bridge). Ratified redesign — overrides the T6.3/T8.3 deferrals,
+    /// which were correct against the old design (touching
+    /// `dsl_v2::executor::DslExecutor`'s internal per-verb dispatch chain
+    /// directly, a high-risk shared hot path) but not against this one:
+    /// admit at the bridge's ingress, before delegating to the
+    /// (unmodified) internal engine, exactly as T6 did for the bus path
+    /// (`ObPocVerbExecutor::admit`) and the runbook path
+    /// (`step_executor_bridge.rs`'s `execute_verb_admitting_envelope`
+    /// call) — same admission primitive
+    /// (`agent::control_plane_envelope_store::check_admission`), same
+    /// `EnforcedVerbs::from_env()` fail-open-by-default posture, applied
+    /// per verb in the compiled plan rather than per single-verb call
+    /// (this bridge's DSL string may be a multi-statement plan; each
+    /// verb in it is checked independently, first rejection wins).
+    /// `envelope_handle: None` — this path has no envelope infrastructure
+    /// wired (same posture as Path A/D's `None` before an envelope is
+    /// actually minted), so this only bites while a verb is listed in
+    /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` (empty by production default).
+    async fn admit_plan(
+        &self,
+        plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
+    ) -> Result<(), String> {
+        let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
+        for step in &plan.steps {
+            let verb_fqn = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+            let decision = crate::agent::control_plane_envelope_store::check_admission(
+                &self.pool, &enforced, &verb_fqn, None,
+            )
+            .await
+            .map_err(|e| format!("envelope admission check failed for {verb_fqn}: {e}"))?;
+            match decision {
+                crate::agent::control_plane_envelope_store::AdmissionDecision::NotEnforced
+                | crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => {}
+                crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedNoEnvelope => {
+                    return Err(format!(
+                        "{verb_fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) but no sealed envelope was presented"
+                    ));
+                }
+                crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedConsumeFailed(outcome) => {
+                    return Err(format!("{verb_fqn} envelope admission rejected: {outcome:?}"));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Shared parse → compile → build context path used by both the
     /// self-scoped (`execute`) and in-scope (`execute_in_scope`) entry
     /// points.
@@ -120,6 +168,9 @@ impl DslExecutor for RealDslExecutor {
         // 2. Compile → ExecutionPlan (topological sort, injections).
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
 
+        // 2.5. T9.3a: admit every verb in the plan before dispatch.
+        self.admit_plan(&plan).await?;
+
         // 3. Build executor + context (shared with execute_in_scope).
         let (executor, mut ctx) = self.build_executor_and_ctx();
 
@@ -151,6 +202,9 @@ impl DslExecutor for RealDslExecutor {
     ) -> Result<serde_json::Value, String> {
         let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
+
+        // T9.3a: admit every verb in the plan before dispatch.
+        self.admit_plan(&plan).await?;
 
         let (executor, mut ctx) = self.build_executor_and_ctx();
 
