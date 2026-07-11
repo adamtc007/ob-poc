@@ -214,6 +214,53 @@ pub(crate) fn build_write_set_input(
     })
 }
 
+/// T9.5 (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G8's
+/// `StpClassifierInput` from the same `RuntimeBehavior` lookup
+/// `sem_os_runtime::verb_executor_adapter` already uses to route
+/// CRUD-vs-Plugin-vs-Durable dispatch (`RuntimeBehavior::Durable` is the
+/// "external workflow engine, e.g. BPMN-Lite" variant). `is_durable_verb`
+/// is `false`, honestly, whenever the FQN doesn't parse as `domain.verb`
+/// or the registry has no entry for it — an unregistered verb cannot be a
+/// durable one by definition (there's no `RuntimeDurableConfig` for it to
+/// carry).
+///
+/// `durable_execution_explicitly_allowed` is always `false` here, not a
+/// placeholder: this function is only ever called from
+/// `phase5_runtime_recheck`, which is Path A's own REPL/runbook dispatch
+/// — never a BPMN direct-worker context (the one place durable execution
+/// is actually permitted to run outside its owning engine). A verb that
+/// is both durable and reached this call site has, by construction,
+/// nothing granting the exception `StpClassifierInput` exists to check
+/// for.
+///
+/// `has_unpinned_entities` is threaded in by the caller rather than
+/// computed here: T4.3's `verify_pins`/`SnapshotPins` populator has zero
+/// production call sites (see the ownership ledger's T4 entries), so
+/// there is no real "this entity is pinned" fact anywhere in the system
+/// yet — every entity this call site binds is unpinned by construction.
+/// The caller passes `!entity_ids.is_empty()` (same entity list G7
+/// already resolves), which is the honest, conservative reading: zero
+/// entities means nothing to pin-check (vacuously not-unpinned), any
+/// bound entity is unpinned until a real pinning mechanism exists.
+pub(crate) fn build_stp_classifier_input(
+    verb_fqn: &str,
+    has_unpinned_entities: bool,
+) -> ob_poc_control_plane::stp_classifier::StpClassifierInput {
+    use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+
+    let is_durable_verb = verb_fqn
+        .split_once('.')
+        .and_then(|(domain, verb)| runtime_registry().get(domain, verb))
+        .map(|rv| matches!(rv.behavior, RuntimeBehavior::Durable(_)))
+        .unwrap_or(false);
+
+    ob_poc_control_plane::stp_classifier::StpClassifierInput {
+        is_durable_verb,
+        durable_execution_explicitly_allowed: false,
+        has_unpinned_entities,
+    }
+}
+
 /// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
 /// verb's resolved args are entity references, by contract — not by
 /// regexing values for UUID shape (`write_set.rs::derive_write_set_heuristic`
@@ -348,6 +395,15 @@ pub(crate) fn build_entity_binding_input(
 ///   column-level footprint exists yet); `WriteSetGate::decide` doesn't
 ///   require them.
 ///
+/// - G8 (STP classifier, T9.5): built by [`build_stp_classifier_input`]
+///   from the same `RuntimeBehavior` lookup the real dispatch router uses
+///   to distinguish CRUD/Plugin/GraphQuery/Durable verbs.
+///   `durable_execution_explicitly_allowed` is always `false` (this call
+///   site is Path A's own REPL dispatch, never a BPMN direct-worker
+///   context). `has_unpinned_entities` is `!entity_ids.is_empty()` — no
+///   production `SnapshotPins` populator exists yet (T4.3), so every
+///   bound entity is honestly unpinned.
+///
 /// `is_ai_originated`/`interpretation_attested` are conservatively `false`
 /// (no attestation requirement applied) because this call site has no
 /// Sage-pre-classification / intent-telemetry signal threaded through yet
@@ -355,6 +411,7 @@ pub(crate) fn build_entity_binding_input(
 /// marking every intent as AI-originated without a real attestation signal
 /// would make G1 fail unconditionally in shadow, which is not an honest
 /// reflection of anything this call site actually observed.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_evaluation_context(
     envelope: &SemOsContextEnvelope,
     verb_fqn: &str,
@@ -364,6 +421,7 @@ pub(crate) fn build_evaluation_context(
     pack_resolution: Option<ob_poc_control_plane::pack_resolution::PackResolutionInput>,
     dag_proof: Option<ob_poc_control_plane::dag_proof::DagProofInput>,
     write_set: Option<ob_poc_control_plane::write_set::WriteSetInput>,
+    stp_classifier: Option<ob_poc_control_plane::stp_classifier::StpClassifierInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -388,6 +446,7 @@ pub(crate) fn build_evaluation_context(
         pack_resolution,
         dag_proof,
         write_set,
+        stp_classifier,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -532,7 +591,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -549,7 +608,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -568,7 +627,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -580,7 +639,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -593,7 +652,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -715,6 +774,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
         assert_eq!(
@@ -760,6 +820,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
             None,
             None,
@@ -810,6 +871,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
             None,
             None,
@@ -933,6 +995,7 @@ mod tests {
             &test_actor(),
             entity_binding,
             pack_resolution,
+            None,
             None,
             None,
         );
@@ -1087,6 +1150,7 @@ cross_workspace_constraints: []
             pack_resolution,
             Some(dag_proof),
             None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1192,6 +1256,43 @@ domains:
         assert_eq!(ws.idempotency_key, format!("{entry_id}:deal.create"));
     }
 
+    // ── T9.5 (Addendum B): build_stp_classifier_input ──
+
+    #[test]
+    fn build_stp_classifier_input_false_for_unregistered_fqn() {
+        // No entry for this made-up verb in the real runtime_registry() —
+        // is_durable_verb must honestly report false, not panic or guess.
+        let input = build_stp_classifier_input("nonexistent-domain.nonexistent-verb", false);
+        assert!(!input.is_durable_verb);
+        assert!(!input.durable_execution_explicitly_allowed);
+        assert!(!input.has_unpinned_entities);
+    }
+
+    #[test]
+    fn build_stp_classifier_input_false_for_malformed_fqn() {
+        // No '.' separator at all -> split_once yields None -> honestly false.
+        let input = build_stp_classifier_input("noperiod", true);
+        assert!(!input.is_durable_verb);
+        assert!(input.has_unpinned_entities);
+    }
+
+    #[test]
+    fn build_stp_classifier_input_threads_has_unpinned_entities_from_caller() {
+        let input = build_stp_classifier_input("cbu.confirm", true);
+        assert!(input.has_unpinned_entities);
+        let input = build_stp_classifier_input("cbu.confirm", false);
+        assert!(!input.has_unpinned_entities);
+    }
+
+    #[test]
+    fn build_stp_classifier_input_never_allows_durable_execution_at_this_call_site() {
+        // Always false regardless of the durability finding — this call
+        // site (phase5_runtime_recheck) is Path A's own REPL dispatch,
+        // never a BPMN direct-worker context.
+        let input = build_stp_classifier_input("cbu.confirm", false);
+        assert!(!input.durable_execution_explicitly_allowed);
+    }
+
     #[tokio::test]
     async fn g7_reaches_success_end_to_end_given_a_legal_dag_transition() {
         // Empirical reachability proof, matching the g2/g3/g4 pattern:
@@ -1232,6 +1333,7 @@ domains:
             pack_resolution,
             Some(dag_proof),
             Some(write_set),
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1246,7 +1348,7 @@ domains:
         );
     }
 
-    // ── T9.1 closure sweep: all seven implemented gates, one dispatch ──
+    // ── T9.1/T9.5 closure sweep: all eight implemented gates, one dispatch ──
 
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
@@ -1259,7 +1361,10 @@ domains:
         // this is the first test that builds all seven inputs together
         // and checks the whole chain (G1 IntentAdmission through G7
         // WriteSet) in a single evaluate_shadow call, against a real cbu
-        // row for G2's entity facts.
+        // row for G2's entity facts. T9.5 extended it in place (not a
+        // new test) to also cover G8/StpClassifier, since G8 depends on
+        // all seven of the others (GATE_DEPENDENCIES) — the fixture this
+        // test already assembles is exactly G8's own precondition set.
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
         let pool = sqlx::PgPool::connect(&url).await.expect("connect");
         let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
@@ -1306,6 +1411,20 @@ domains:
         // here — they're derived inside build_evaluation_context from the
         // same envelope/actor already assembled above (no AbacDenied
         // prune, no evidence_gaps -> Allow / Sufficient).
+        //
+        // G8 (STP classifier, T9.5): depends on all seven gates above
+        // (GATE_DEPENDENCIES). This fixture's `RuntimeVerbRegistry` has no
+        // entry for "test.transition-verb", so is_durable_verb is
+        // honestly false. `has_unpinned_entities: false` here — not
+        // because pinning is real (it isn't; see build_stp_classifier_input's
+        // doc), but because `classify()`'s own logic maps any unpinned
+        // entity to `HumanGated` (-> GateResult::Failure), which is a
+        // correct, not a broken, outcome; this closure test's "every
+        // input was built to be legal" framing means "legal to reach
+        // Success", and StpExecutable's actual precondition is no
+        // unpinned entities.
+        let stp_classifier = Some(build_stp_classifier_input(verb_fqn, false));
+
         let ctx = build_evaluation_context(
             &envelope,
             verb_fqn,
@@ -1315,6 +1434,7 @@ domains:
             pack_resolution,
             Some(dag_proof),
             Some(write_set),
+            stp_classifier,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1327,6 +1447,7 @@ domains:
             GateId::Authority,
             GateId::Evidence,
             GateId::WriteSet,
+            GateId::StpClassifier,
         ] {
             let result = report.get(gate_id);
             assert!(

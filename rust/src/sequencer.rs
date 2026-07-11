@@ -7892,6 +7892,16 @@ impl ReplOrchestratorV2 {
                 entity_requests.iter().map(|(id, _)| *id).collect(),
             );
 
+            // T9.5 (Addendum B): resolve G8's StpClassifierInput from the
+            // same RuntimeBehavior lookup the real dispatch router uses —
+            // see build_stp_classifier_input's doc.
+            let stp_classifier = Some(
+                crate::agent::control_plane_shadow::build_stp_classifier_input(
+                    &entry.verb,
+                    !entity_requests.is_empty(),
+                ),
+            );
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
@@ -7901,6 +7911,7 @@ impl ReplOrchestratorV2 {
                 pack_resolution,
                 dag_proof,
                 write_set,
+                stp_classifier,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
