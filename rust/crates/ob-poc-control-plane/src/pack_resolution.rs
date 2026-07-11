@@ -66,7 +66,7 @@ pub struct PackResolutionInput {
     pub constraint_denies_intent: bool,
 }
 
-fn decide(input: &PackResolutionInput) -> PackResolutionOutcome {
+pub(crate) fn decide(input: &PackResolutionInput) -> PackResolutionOutcome {
     if !input.semreg_allowed_set_available {
         // C-016: unavailable allowed-set fails closed — never resolves.
         return PackResolutionOutcome::MissingPack;

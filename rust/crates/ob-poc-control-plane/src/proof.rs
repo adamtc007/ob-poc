@@ -99,17 +99,17 @@ impl ControlPlaneProof {
     }
 }
 
-/// T9.7: pre-computed input for the G9 shadow gate. Deliberately the
-/// smallest honest fact this call site can supply — whether a genuine
-/// `CompiledRunbookRef` exists for the entry being rechecked. `try_compile_entry`
-/// populates `entry.compiled_runbook_id` before the execution loop reaches
-/// the shadow call site (INV-3: "raw DSL execution without a
-/// CompiledRunbookId is never permitted"), so this is a real, already
-/// production-enforced fact — not a placeholder awaiting future
-/// infrastructure, unlike G10/G11.
+/// T9.7 (widened T10.1): pre-computed input for the G9 shadow gate. Carries
+/// the actual `compiled_runbook_id` — not just a presence flag — because
+/// T10.1's sealing path needs a real `CompiledRunbookRef` to construct, not
+/// merely a yes/no signal. `try_compile_entry` populates
+/// `entry.compiled_runbook_id` before the execution loop reaches the shadow
+/// call site (INV-3: "raw DSL execution without a CompiledRunbookId is
+/// never permitted"), so this is a real, already production-enforced fact
+/// — not a placeholder awaiting future infrastructure, unlike G10/G11.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct RunbookProofInput {
-    pub has_compiled_runbook_ref: bool,
+    pub compiled_runbook_id: Option<Uuid>,
 }
 
 /// T9.7 adapter: `Gate<crate::context::EvaluationContext>` impl for G9.
@@ -130,13 +130,21 @@ impl Gate<crate::context::EvaluationContext> for RunbookProofGate {
 
     fn evaluate(&self, ctx: &crate::context::EvaluationContext) -> GateResult {
         match &ctx.runbook_proof {
-            Some(input) if input.has_compiled_runbook_ref => GateResult::Success,
+            Some(input) if input.compiled_runbook_id.is_some() => GateResult::Success,
             Some(_) => {
                 GateResult::Failure("entry has no compiled runbook reference".to_string())
             }
             None => GateResult::Failure("no RunbookProofInput supplied".to_string()),
         }
     }
+}
+
+/// T10.1: grades a `RunbookProofInput` into the real `CompiledRunbookRef`
+/// proof, mirroring every other gate module's `decide()` shape (a
+/// `pub(crate)` pure function decision::evaluate calls to obtain the typed
+/// value once `evaluate_shadow` has already proven this gate `Success`).
+pub(crate) fn decide(input: &RunbookProofInput) -> Option<CompiledRunbookRef> {
+    input.compiled_runbook_id.map(CompiledRunbookRef::new)
 }
 
 #[cfg(test)]
@@ -183,7 +191,7 @@ mod tests {
     fn runbook_proof_gate_fails_when_no_compiled_runbook_ref() {
         let ctx = crate::context::EvaluationContext {
             runbook_proof: Some(RunbookProofInput {
-                has_compiled_runbook_ref: false,
+                compiled_runbook_id: None,
             }),
             ..Default::default()
         };
@@ -197,10 +205,30 @@ mod tests {
     fn runbook_proof_gate_succeeds_when_compiled_runbook_ref_present() {
         let ctx = crate::context::EvaluationContext {
             runbook_proof: Some(RunbookProofInput {
-                has_compiled_runbook_ref: true,
+                compiled_runbook_id: Some(Uuid::nil()),
             }),
             ..Default::default()
         };
         assert_eq!(RunbookProofGate.evaluate(&ctx), GateResult::Success);
+    }
+
+    // ── T10.1: decide() ──
+
+    #[test]
+    fn decide_none_when_no_compiled_runbook_id() {
+        assert!(decide(&RunbookProofInput {
+            compiled_runbook_id: None
+        })
+        .is_none());
+    }
+
+    #[test]
+    fn decide_some_ref_when_compiled_runbook_id_present() {
+        let id = Uuid::new_v4();
+        let runbook_ref = decide(&RunbookProofInput {
+            compiled_runbook_id: Some(id),
+        })
+        .expect("id supplied");
+        assert_eq!(runbook_ref.runbook_id(), id);
     }
 }

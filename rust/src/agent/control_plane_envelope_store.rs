@@ -209,20 +209,21 @@ async fn admit_plan_checked(
     Ok(())
 }
 
-/// Persists a freshly sealed envelope as `status = 'sealed'`. Best-effort:
-/// failures are logged, never propagated — matching
+/// Persists a freshly sealed envelope as `status = 'sealed'`, including its
+/// `record` (T10.1 — `EnvelopeRecord`, the flattened, storable projection
+/// `to_record()` produces; see that method's own doc for why this is safe
+/// to persist and read back without reopening a rehydration path).
+/// Best-effort: failures are logged, never propagated — matching
 /// `agent::telemetry::store`'s and `agent::control_plane_shadow`'s posture,
 /// since this is bookkeeping for later single-use/TTL enforcement, not a
 /// precondition for the envelope having been legitimately sealed (the seal
 /// itself already happened, in-process, before this call).
 ///
-/// No production call site yet: nothing in `ob-poc` calls
-/// `ExecutionEnvelope::seal()` today (that requires a full G1-G14
-/// orchestration `evaluate()` this plan hasn't reached — G9/G10/G11/G12/G14
-/// are still stubbed). Proven correct via the live-DB tests below; wiring a
-/// real seal-producing call site is T4/T5 follow-on, not claimed here.
+/// T10.1 (EOP-PLAN-CONTROLPLANE-001 Addendum C): first real production call
+/// site is `sequencer.rs`'s `phase5_runtime_recheck`, shadow-only — nothing
+/// consumes, nothing gates, nothing blocks. Proven correct via the live-DB
+/// tests below before this tranche; T10.2 is the first consumer of `record`.
 #[cfg(feature = "database")]
-#[allow(dead_code)]
 pub(crate) async fn persist_sealed(
     pool: &sqlx::PgPool,
     session_id: Uuid,
@@ -231,12 +232,24 @@ pub(crate) async fn persist_sealed(
 ) -> bool {
     let handle = envelope.handle();
     let window = envelope.validity();
+    let record = envelope.to_record();
+    let record_json = match serde_json::to_value(&record) {
+        Ok(v) => v,
+        Err(err) => {
+            tracing::warn!(
+                error = %err,
+                envelope_id = %handle.id(),
+                "EnvelopeRecord serialisation failed (best-effort, non-blocking)"
+            );
+            return false;
+        }
+    };
     let result = sqlx::query(
         r#"
         INSERT INTO "ob-poc".control_plane_envelopes (
             envelope_id, content_hash, session_id, verb_fqn,
-            status, not_before, not_after
-        ) VALUES ($1, $2, $3, $4, 'sealed', $5, $6)
+            status, not_before, not_after, record
+        ) VALUES ($1, $2, $3, $4, 'sealed', $5, $6, $7)
         "#,
     )
     .bind(handle.id())
@@ -245,6 +258,7 @@ pub(crate) async fn persist_sealed(
     .bind(verb_fqn)
     .bind(window.not_before())
     .bind(window.not_after())
+    .bind(record_json)
     .execute(pool)
     .await;
 
@@ -489,6 +503,73 @@ mod tests {
             snapshot,
             ValidityWindow::new(not_before, not_after),
         )
+    }
+
+    /// T10.1: proves `persist_sealed` actually writes a readable `record`
+    /// column, not just identity bookkeeping — reads the row back and
+    /// deserialises it into `EnvelopeRecord`, checking the real pins
+    /// (`entity_row_versions`) the fixture sealed round-trip through
+    /// Postgres JSONB intact.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn persist_sealed_stores_a_readable_record_with_real_pins() {
+        let pool = test_pool().await;
+        let now = Utc::now();
+        let entity_id = Uuid::new_v4();
+
+        let intent = ob_poc_control_plane::intent_admission::tests_support::admitted(Uuid::new_v4(), "cbu.confirm");
+        let binding = ob_poc_control_plane::entity_binding::tests_support::bound(vec![entity_id]);
+        let pack = ob_poc_control_plane::pack_resolution::tests_support::resolved("ob-poc.cbu");
+        let dag = ob_poc_control_plane::dag_proof::tests_support::legal(
+            entity_id,
+            "VALIDATION_PENDING",
+            "VALIDATED",
+        );
+        let authority = ob_poc_control_plane::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
+        let evidence = ob_poc_control_plane::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
+        let write_set = ob_poc_control_plane::write_set::tests_support::proof(
+            vec![entity_id],
+            vec!["validation_state".into()],
+            vec!["ob-poc.cbus".into()],
+            vec!["status".into()],
+            "idem-1",
+        );
+        let runbook = ob_poc_control_plane::proof::CompiledRunbookRef::new(Uuid::new_v4());
+        let snapshot = ob_poc_control_plane::snapshot::tests_support::pins(
+            Some(Uuid::new_v4()),
+            None,
+            None,
+            vec![(entity_id, "cbu".to_string(), 7)],
+        );
+        let envelope = ob_poc_control_plane::envelope::test_support::seal(
+            intent,
+            binding,
+            pack,
+            dag,
+            authority,
+            evidence,
+            write_set,
+            runbook,
+            snapshot,
+            ValidityWindow::new(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5)),
+        );
+        let expected = envelope.to_record();
+
+        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+
+        let raw: serde_json::Value = sqlx::query_scalar(
+            r#"SELECT record FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#,
+        )
+        .bind(envelope.id())
+        .fetch_one(&pool)
+        .await
+        .expect("row exists");
+
+        let record: ob_poc_control_plane::envelope::EnvelopeRecord =
+            serde_json::from_value(raw).expect("record column deserialises");
+        assert_eq!(record, expected);
+        assert_eq!(record.bound_entity_ids, vec![entity_id]);
+        assert_eq!(record.snapshot.entity_row_version(entity_id), Some(7));
     }
 
     #[tokio::test]

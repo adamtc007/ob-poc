@@ -114,7 +114,7 @@ pub struct IntentAdmissionInput {
 
 /// Grades an already-computed `IntentAdmissionInput`. Pure function — no I/O,
 /// no recomputation of surface membership.
-fn decide(input: &IntentAdmissionInput) -> IntentAdmissionDecision {
+pub(crate) fn decide(input: &IntentAdmissionInput) -> IntentAdmissionDecision {
     if !input.is_admitted {
         return if input.exclusion_reasons.iter().any(|r| r == "unknown_intent") {
             IntentAdmissionDecision::RejectedUnknownIntent

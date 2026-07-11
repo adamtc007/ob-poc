@@ -103,7 +103,7 @@ pub struct EntityBindingInput {
 /// (existence, kind, lifecycle readability, availability, pack membership),
 /// returning the first entity that fails any check. Pure function — no I/O,
 /// no entity lookup.
-fn decide(input: &EntityBindingInput) -> EntityBindingReport {
+pub(crate) fn decide(input: &EntityBindingInput) -> EntityBindingReport {
     for facts in &input.entities {
         let outcome = if !facts.exists {
             Some(EntityBindingOutcome::NotFound {

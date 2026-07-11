@@ -91,7 +91,7 @@ pub enum AccessDecisionKind {
     AllowWithMasking,
 }
 
-fn decide(input: &AuthorityInput) -> AuthorityOutcome {
+pub(crate) fn decide(input: &AuthorityInput) -> AuthorityOutcome {
     if input.segregation_of_duties_violated {
         return AuthorityOutcome::RejectedSegregationOfDuties;
     }

@@ -79,7 +79,7 @@ pub enum KycPreconditionFailure {
     StrategyNotSelected,
 }
 
-fn decide(input: &EvidenceInput) -> EvidenceOutcome {
+pub(crate) fn decide(input: &EvidenceInput) -> EvidenceOutcome {
     if input
         .kyc_precondition_failures
         .iter()

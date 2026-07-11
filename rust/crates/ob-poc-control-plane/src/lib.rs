@@ -253,7 +253,7 @@ mod evaluate_shadow_tests {
                 expected_allowed_columns: vec!["status".to_string()],
             }),
             runbook_proof: Some(proof::RunbookProofInput {
-                has_compiled_runbook_ref: true,
+                compiled_runbook_id: Some(Uuid::nil()),
             }),
             version_pinning: Some(versioning::VersionPinningInput {
                 versions: snapshot::PinnedVersionSet {

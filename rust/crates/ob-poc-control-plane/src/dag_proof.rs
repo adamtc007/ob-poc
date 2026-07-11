@@ -91,7 +91,7 @@ pub struct DagProofInput {
     pub lifecycle_gate_mode_fail_closed: bool,
 }
 
-fn decide(input: &DagProofInput) -> StateTransitionOutcome {
+pub(crate) fn decide(input: &DagProofInput) -> StateTransitionOutcome {
     if !input.blocking_violations.is_empty() {
         return StateTransitionOutcome::GuardFailed {
             reason: input.blocking_violations.join("; "),

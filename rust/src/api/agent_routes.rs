@@ -1166,6 +1166,10 @@ struct ControlPlaneMetricsResponse {
     write_attestation_breaches: crate::agent::control_plane_metrics::WriteAttestationBreachStats,
     write_attestation_breach_rate: f64,
     envelope_status_counts: Vec<crate::agent::control_plane_metrics::EnvelopeStatusCount>,
+    /// T10.1: per-verb-family sealable rate — the measured answer to "what
+    /// fraction of Path A would enforce cleanly today," derived from the
+    /// same `gate_results` `shadow_divergence`/`gate_outcomes` already read.
+    sealable_rate_by_verb: Vec<crate::agent::control_plane_metrics::SealableRateByVerb>,
 }
 
 async fn get_control_plane_metrics(
@@ -1198,6 +1202,13 @@ async fn get_control_plane_metrics(
                 tracing::error!(error = %e, "control-plane metrics: envelope_status_counts query failed");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
+    let sealable_rate_by_verb =
+        crate::agent::control_plane_metrics::sealable_rate_by_verb(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: sealable_rate_by_verb query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
     let shadow_divergence_rate = shadow_divergence.divergence_rate();
     let write_attestation_breach_rate = write_attestation_breaches.breach_rate();
@@ -1209,6 +1220,7 @@ async fn get_control_plane_metrics(
         write_attestation_breaches,
         write_attestation_breach_rate,
         envelope_status_counts,
+        sealable_rate_by_verb,
     }))
 }
 

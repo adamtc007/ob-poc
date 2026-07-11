@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mKG73w2RJsm8bhN3qsH3fsblnn2ePRKbLNHpf9c617KtQHR0fMMHlbucgAua5SD
+\restrict McOG9ABjrrGip5E6lfdlQWWepKIdOZBtArNdmkSl5vJ1GhHhywbzgCP6naeBZq8
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -10467,6 +10467,7 @@ CREATE TABLE "ob-poc".control_plane_envelopes (
     consumed_at timestamp with time zone,
     void_reason text,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    record jsonb,
     CONSTRAINT control_plane_envelopes_status_check CHECK ((status = ANY (ARRAY['sealed'::text, 'consumed'::text, 'expired'::text, 'voided'::text])))
 );
 
@@ -10476,6 +10477,13 @@ CREATE TABLE "ob-poc".control_plane_envelopes (
 --
 
 COMMENT ON TABLE "ob-poc".control_plane_envelopes IS 'T4.2 sealed ExecutionEnvelope identity + single-use/TTL bookkeeping (EOP-PLAN-CONTROLPLANE-001). No envelope content is stored, only its handle identity and lifecycle status; rehydration is a status-checked consume, never a raw deserialize.';
+
+
+--
+-- Name: COLUMN control_plane_envelopes.record; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_envelopes.record IS 'T10.1: serialised EnvelopeRecord (flattened, primitive-typed projection of the sealed envelope — pins, bound entities, pack id, validity). NULL for pre-T10.1 rows and any row inserted without a real seal.';
 
 
 --
@@ -41169,5 +41177,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mKG73w2RJsm8bhN3qsH3fsblnn2ePRKbLNHpf9c617KtQHR0fMMHlbucgAua5SD
+\unrestrict McOG9ABjrrGip5E6lfdlQWWepKIdOZBtArNdmkSl5vJ1GhHhywbzgCP6naeBZq8
 

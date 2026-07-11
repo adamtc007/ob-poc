@@ -305,24 +305,26 @@ pub(crate) fn build_decision_snapshot_input(
     })
 }
 
-/// T9.7 (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G9's
-/// `RunbookProofInput` from the one real fact this call site has —
-/// whether the runbook entry being rechecked already carries a genuine
-/// `CompiledRunbookId`. `try_compile_entry()` populates this before the
-/// execution loop reaches `phase5_runtime_recheck` for entries created
-/// through the current pipeline (INV-3: raw DSL execution without a
-/// `CompiledRunbookId` is never permitted) — the fallback on-the-fly
-/// compile path only exists for legacy entries, so `false` here is a rare,
-/// legitimate case, not a systematic false negative.
+/// T9.7 (widened T10.1, EOP-PLAN-CONTROLPLANE-001 Addendum B/C): builds
+/// G9's `RunbookProofInput` from the one real fact this call site has —
+/// the runbook entry's own `CompiledRunbookId`, when present.
+/// `try_compile_entry()` populates this before the execution loop reaches
+/// `phase5_runtime_recheck` for entries created through the current
+/// pipeline (INV-3: raw DSL execution without a `CompiledRunbookId` is
+/// never permitted) — the fallback on-the-fly compile path only exists
+/// for legacy entries, so `None` here is a rare, legitimate case, not a
+/// systematic false negative. Widened from a bare `bool` (T9.7) to the
+/// real `Uuid` because T10.1's sealing path needs an actual
+/// `CompiledRunbookRef` to construct, not merely a presence signal.
 ///
 /// Always `Some(_)` (never `None`) — unlike G2/G7/G8/G13, there is no
 /// fallible I/O step here to fail; the fact is read directly off the
 /// entry already in hand.
 pub(crate) fn build_runbook_proof_input(
-    has_compiled_runbook_ref: bool,
+    compiled_runbook_id: Option<Uuid>,
 ) -> ob_poc_control_plane::proof::RunbookProofInput {
     ob_poc_control_plane::proof::RunbookProofInput {
-        has_compiled_runbook_ref,
+        compiled_runbook_id,
     }
 }
 
@@ -1465,9 +1467,10 @@ domains:
     // ── T9.7 (Addendum B): build_runbook_proof_input / build_version_pinning_input ──
 
     #[test]
-    fn build_runbook_proof_input_threads_the_flag_through() {
-        assert!(build_runbook_proof_input(true).has_compiled_runbook_ref);
-        assert!(!build_runbook_proof_input(false).has_compiled_runbook_ref);
+    fn build_runbook_proof_input_threads_the_id_through() {
+        let id = Uuid::new_v4();
+        assert_eq!(build_runbook_proof_input(Some(id)).compiled_runbook_id, Some(id));
+        assert_eq!(build_runbook_proof_input(None).compiled_runbook_id, None);
     }
 
     #[test]
@@ -1625,7 +1628,7 @@ domains:
         // G9 (runbook proof, T9.7): declares real predecessors (G1, G2,
         // G3, G4, G5, G6, G7, G13 — all already legal above), so this
         // reaches Success only because the whole chain does.
-        let runbook_proof = Some(build_runbook_proof_input(true));
+        let runbook_proof = Some(build_runbook_proof_input(Some(Uuid::new_v4())));
 
         // G12 (version pinning, T9.7): no declared dependency, real
         // compiler_version from this crate's own build.

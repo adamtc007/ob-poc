@@ -74,6 +74,23 @@ pub struct EnvelopeStatusCount {
     pub count: i64,
 }
 
+/// T10.1's graduation-telemetry answer to "what fraction of Path A would
+/// enforce cleanly today" — per verb family, over every recorded
+/// `control_plane_shadow_decisions` row (not a separate counter; derived
+/// from the same `gate_results` JSONB the shadow-divergence metric already
+/// reads, so this can never drift from what was actually observed at
+/// shadow-evaluation time). "Sealable" means every gate `decision::evaluate`
+/// requires for `ApprovedStp` reported `Success` in that row: the eight
+/// proof-bearing gates (`PROOF_BEARING_GATES`, `decision.rs`) plus
+/// `RunbookProof` and `StpClassifier`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SealableRateByVerb {
+    pub verb_fqn: String,
+    pub total: i64,
+    pub sealable: i64,
+}
+
+
 #[cfg(feature = "database")]
 pub(crate) async fn gate_outcome_counts(
     pool: &sqlx::PgPool,
@@ -169,6 +186,45 @@ pub(crate) async fn envelope_status_counts(
     Ok(rows
         .into_iter()
         .map(|(status, count)| EnvelopeStatusCount { status, count })
+        .collect())
+}
+
+#[cfg(feature = "database")]
+pub(crate) async fn sealable_rate_by_verb(
+    pool: &sqlx::PgPool,
+) -> Result<Vec<SealableRateByVerb>, sqlx::Error> {
+    let rows: Vec<(String, i64, i64)> = sqlx::query_as(
+        r#"
+        SELECT
+            verb_fqn,
+            COUNT(*) AS total,
+            COUNT(*) FILTER (WHERE
+                gate_results->>'IntentAdmission' = 'Success' AND
+                gate_results->>'EntityBinding' = 'Success' AND
+                gate_results->>'PackResolution' = 'Success' AND
+                gate_results->>'DagProof' = 'Success' AND
+                gate_results->>'Authority' = 'Success' AND
+                gate_results->>'Evidence' = 'Success' AND
+                gate_results->>'WriteSet' = 'Success' AND
+                gate_results->>'DecisionSnapshot' = 'Success' AND
+                gate_results->>'RunbookProof' = 'Success' AND
+                gate_results->>'StpClassifier' = 'Success'
+            ) AS sealable
+        FROM "ob-poc".control_plane_shadow_decisions
+        GROUP BY verb_fqn
+        ORDER BY verb_fqn
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(verb_fqn, total, sealable)| SealableRateByVerb {
+            verb_fqn,
+            total,
+            sealable,
+        })
         .collect())
 }
 
@@ -346,5 +402,67 @@ mod t7_2_metrics_tests {
             sealed_count >= 1,
             "expected at least the row just inserted to appear in the sealed bucket, got {counts:?}"
         );
+    }
+
+    /// T10.1: uses a unique-per-run `verb_fqn` (not a real verb) so this
+    /// test's exact counts can't be polluted by sibling tests concurrently
+    /// inserting `control_plane_shadow_decisions` rows for `cbu.confirm`
+    /// (same discipline as the write-attestation test above's
+    /// `>=`-vs-exact reasoning — here exact is safe because the verb_fqn
+    /// itself is exclusive to this test run).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn sealable_rate_by_verb_counts_only_rows_with_every_required_gate_success() {
+        let pool = test_pool().await;
+        let verb_fqn = format!("test.sealable-rate-{}", Uuid::new_v4());
+
+        let sealable_report = {
+            let mut report = ob_poc_control_plane::gate::EvaluationReport::default();
+            for gate in [
+                ob_poc_control_plane::gate::GateId::IntentAdmission,
+                ob_poc_control_plane::gate::GateId::EntityBinding,
+                ob_poc_control_plane::gate::GateId::PackResolution,
+                ob_poc_control_plane::gate::GateId::DagProof,
+                ob_poc_control_plane::gate::GateId::Authority,
+                ob_poc_control_plane::gate::GateId::Evidence,
+                ob_poc_control_plane::gate::GateId::WriteSet,
+                ob_poc_control_plane::gate::GateId::DecisionSnapshot,
+                ob_poc_control_plane::gate::GateId::RunbookProof,
+                ob_poc_control_plane::gate::GateId::StpClassifier,
+            ] {
+                report
+                    .results
+                    .insert(gate, ob_poc_control_plane::gate::GateResult::Success);
+            }
+            report
+        };
+        let unsealable_report = {
+            let mut report = sealable_report.clone();
+            report.results.insert(
+                ob_poc_control_plane::gate::GateId::Authority,
+                ob_poc_control_plane::gate::GateResult::Failure("denied".to_string()),
+            );
+            report
+        };
+
+        for report in [&sealable_report, &sealable_report, &unsealable_report] {
+            let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                &verb_fqn,
+                report,
+                false,
+            );
+            assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
+        }
+
+        let rates = sealable_rate_by_verb(&pool).await.expect("query failed");
+        let row = rates
+            .iter()
+            .find(|r| r.verb_fqn == verb_fqn)
+            .unwrap_or_else(|| panic!("expected a row for {verb_fqn}, got {rates:?}"));
+        assert_eq!(row.total, 3);
+        assert_eq!(row.sealable, 2);
+        assert!((row.sealable as f64 / row.total as f64 - (2.0 / 3.0)).abs() < 1e-9);
     }
 }
