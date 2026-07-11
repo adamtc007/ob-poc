@@ -41,13 +41,32 @@ impl PgCrudExecutor {
 /// without duplicating the ~14 operation methods.
 ///
 /// `Pool(&PgPool)` is `Copy`-cheap to re-borrow every helper call.
-/// `Conn(&mut PgConnection)` is reborrowed (`&mut **c`) per call, the same
-/// pattern `TransactionScope::executor()` establishes elsewhere in this
-/// crate — sequential statements against the same scope compose without
-/// fighting the borrow checker.
+/// `Scope(&mut dyn TransactionScope)` is reborrowed (`.executor()`) per
+/// call, the same pattern established elsewhere in this crate —
+/// sequential statements against the same scope compose without fighting
+/// the borrow checker.
+///
+/// T10.3 (EOP-PLAN-CONTROLPLANE-001 Addendum C): widened from
+/// `Conn(&mut sqlx::PgConnection)` to `Scope(&mut dyn TransactionScope)`
+/// so write-capture (`record_write`) is reachable — SQL dispatch is
+/// otherwise unchanged (`scope.executor()` yields the same
+/// `&mut PgConnection` the old `Conn` variant held directly).
 pub(crate) enum CrudExec<'e> {
     Pool(&'e PgPool),
-    Conn(&'e mut sqlx::PgConnection),
+    Scope(&'e mut dyn crate::TransactionScope),
+}
+
+impl CrudExec<'_> {
+    /// T10.3: self-report a write for G14's write-set attestation.
+    /// No-op for `Pool` — the pool-based `execute_crud` fast path never
+    /// runs inside a caller's admitting scope (pre-T9.2 legacy path), so
+    /// there is nothing honest to attest against; only `Scope` dispatches
+    /// (T9.2's atomic-admission branch) participate in capture.
+    fn record_write(&mut self, table: &str, entity_id: Uuid, columns: &[String]) {
+        if let CrudExec::Scope(s) = self {
+            s.record_write(table, entity_id, columns);
+        }
+    }
 }
 
 #[async_trait]
@@ -67,9 +86,9 @@ impl CrudExecutionPort for PgCrudExecutor {
         contract: &VerbContractBody,
         args: serde_json::Value,
         _ctx: &VerbExecutionContext,
-        conn: &mut sqlx::PgConnection,
+        scope: &mut dyn crate::TransactionScope,
     ) -> crate::Result<VerbExecutionOutcome> {
-        let mut exec = CrudExec::Conn(conn);
+        let mut exec = CrudExec::Scope(scope);
         self.dispatch(contract, args, &mut exec).await
     }
 }
@@ -251,6 +270,7 @@ impl PgCrudExecutor {
 
         let new_id = Uuid::new_v4();
         let mut columns = vec![format!("\"{}\"", pk_col)];
+        let mut raw_columns = vec![pk_col.to_string()];
         let mut placeholders = vec!["$1".to_string()];
         let mut bind_values: Vec<SqlValue> = vec![SqlValue::Uuid(new_id)];
         let mut idx = 2;
@@ -262,6 +282,7 @@ impl PgCrudExecutor {
                         continue;
                     }
                     columns.push(format!("\"{}\"", col));
+                    raw_columns.push(col.clone());
                     placeholders.push(format!("${idx}"));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
                     idx += 1;
@@ -305,6 +326,12 @@ impl PgCrudExecutor {
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
+        // T10.3: self-report for G14. Recorded unconditionally on success,
+        // including the idempotent-no-op branch (ON CONFLICT DO NOTHING
+        // fell through to the existing row) — a slight over-report, never
+        // an under-report, and harmless to attestation since it's the
+        // same row/table this operation already declares it targets.
+        exec.record_write(&format!("{schema}.{table}"), uuid, &raw_columns);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -325,6 +352,7 @@ impl PgCrudExecutor {
         })?;
 
         let mut sets = Vec::new();
+        let mut raw_columns = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
         let mut key_value: Option<SqlValue> = None;
         let mut idx = 1;
@@ -337,6 +365,7 @@ impl PgCrudExecutor {
                             Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
                     } else {
                         sets.push(format!("\"{}\" = ${}", col, idx));
+                        raw_columns.push(col.clone());
                         bind_values.push(json_to_sql_value(
                             value,
                             &arg_def.arg_type,
@@ -365,8 +394,24 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len() + 1, "CrudExecutionPort UPDATE");
 
+        // T10.3: capture requires a real entity id to attest against — only
+        // a UUID key qualifies (matches CapturedWrite's own type). A
+        // non-UUID key (rare; most tables in this schema use UUID PKs per
+        // CLAUDE.md's own PostgreSQL<->Rust type table) means this write
+        // goes unrecorded — an honest coverage gap, not a fabricated one.
+        let key_entity_id = if let SqlValue::Uuid(id) = &key_val {
+            Some(*id)
+        } else {
+            None
+        };
+
         bind_values.push(key_val);
         let affected = execute_non_query(exec, &sql, &bind_values).await?;
+        if affected > 0 {
+            if let Some(entity_id) = key_entity_id {
+                exec.record_write(&format!("{schema}.{table}"), entity_id, &raw_columns);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -387,6 +432,10 @@ impl PgCrudExecutor {
         let mut conditions = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
         let mut idx = 1;
+        // T10.3: only the single-key_column path has an unambiguous entity
+        // id to attest against — the multi-condition else-branch below is
+        // an honest coverage gap (PARTIAL), not a fabricated capture.
+        let mut capture_entity_id: Option<Uuid> = None;
 
         // Use key_column if specified, otherwise all maps_to columns
         if let Some(key_col) = crud.key_column.as_deref() {
@@ -397,8 +446,12 @@ impl PgCrudExecutor {
             let value = args_map.get(&key_arg.name).ok_or_else(|| {
                 SemOsError::InvalidInput(format!("Missing key arg: {}", key_arg.name))
             })?;
+            let key_val = json_to_sql_value(value, &key_arg.arg_type, &key_arg.name)?;
+            if let SqlValue::Uuid(id) = &key_val {
+                capture_entity_id = Some(*id);
+            }
             conditions.push(format!("\"{key_col}\" = $1"));
-            bind_values.push(json_to_sql_value(value, &key_arg.arg_type, &key_arg.name)?);
+            bind_values.push(key_val);
         } else {
             for arg_def in arg_defs {
                 if let Some(col) = &arg_def.maps_to {
@@ -440,6 +493,17 @@ impl PgCrudExecutor {
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort DELETE");
 
         let affected = execute_non_query(exec, &sql, &bind_values).await?;
+        if affected > 0 {
+            if let Some(entity_id) = capture_entity_id {
+                // Soft delete writes `deleted_at`; hard delete removes the
+                // row entirely — an empty column list makes no per-column
+                // claim (vacuously within any declared bound), only the
+                // table+entity assertion applies.
+                let columns: Vec<String> =
+                    if is_soft { vec!["deleted_at".to_string()] } else { vec![] };
+                exec.record_write(&format!("{schema}.{table}"), entity_id, &columns);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -522,6 +586,8 @@ impl PgCrudExecutor {
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
+        // T10.3: self-report for G14 — same posture as execute_insert.
+        exec.record_write(&format!("{schema}.{table}"), uuid, &insert_cols);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -1348,7 +1414,7 @@ async fn execute_query_one(
     }
     let result = match exec {
         CrudExec::Pool(p) => query.fetch_one(*p).await,
-        CrudExec::Conn(c) => query.fetch_one(&mut **c).await,
+        CrudExec::Scope(s) => query.fetch_one(s.executor()).await,
     };
     result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
@@ -1364,7 +1430,7 @@ async fn execute_non_query(
     }
     let result = match exec {
         CrudExec::Pool(p) => query.execute(*p).await,
-        CrudExec::Conn(c) => query.execute(&mut **c).await,
+        CrudExec::Scope(s) => query.execute(s.executor()).await,
     };
     let result = result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))?;
     Ok(result.rows_affected())
@@ -1381,7 +1447,7 @@ async fn execute_query(
     }
     let result = match exec {
         CrudExec::Pool(p) => query.fetch_all(*p).await,
-        CrudExec::Conn(c) => query.fetch_all(&mut **c).await,
+        CrudExec::Scope(s) => query.fetch_all(s.executor()).await,
     };
     result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
@@ -1668,6 +1734,56 @@ mod db_integration_tests {
         PgPool::connect(&url).await.expect("connect")
     }
 
+    /// T10.3: minimal test-only `TransactionScope` wrapper. `dsl-runtime`
+    /// has no concrete `TransactionScope` impl of its own (the real one,
+    /// `PgTransactionScope`, lives in `ob-poc` — see `tx.rs`'s module doc
+    /// for why the txn-opener stays out of this crate) — this exists
+    /// purely so these tests can exercise `execute_crud_in_scope`'s
+    /// `&mut dyn TransactionScope` signature without depending on `ob-poc`.
+    struct TestScope {
+        tx: sqlx::Transaction<'static, sqlx::Postgres>,
+        pool: PgPool,
+        id: ob_poc_types::TransactionScopeId,
+        captured: Vec<(String, Uuid, Vec<String>)>,
+    }
+
+    impl TestScope {
+        async fn begin(pool: &PgPool) -> Self {
+            Self {
+                tx: pool.begin().await.expect("begin"),
+                pool: pool.clone(),
+                id: ob_poc_types::TransactionScopeId::new(),
+                captured: Vec::new(),
+            }
+        }
+
+        async fn rollback(self) {
+            self.tx.rollback().await.expect("rollback");
+        }
+
+        async fn commit(self) {
+            self.tx.commit().await.expect("commit");
+        }
+    }
+
+    impl crate::TransactionScope for TestScope {
+        fn scope_id(&self) -> ob_poc_types::TransactionScopeId {
+            self.id
+        }
+
+        fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
+            &mut self.tx
+        }
+
+        fn pool(&self) -> &PgPool {
+            &self.pool
+        }
+
+        fn record_write(&mut self, table: &str, entity_id: Uuid, columns: &[String]) {
+            self.captured.push((table.to_string(), entity_id, columns.to_vec()));
+        }
+    }
+
     fn default_contract_body() -> VerbContractBody {
         VerbContractBody {
             fqn: String::new(),
@@ -1789,12 +1905,12 @@ mod db_integration_tests {
             .await
             .expect("pool-based select");
 
-        let mut tx = pool.begin().await.unwrap();
+        let mut scope = TestScope::begin(&pool).await;
         let scope_result = executor
-            .execute_crud_in_scope(&contract, args, &ctx, &mut tx)
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
             .await
             .expect("scope-based select");
-        tx.rollback().await.unwrap();
+        scope.rollback().await;
 
         assert_eq!(
             format!("{:?}", pool_result),
@@ -1811,11 +1927,19 @@ mod db_integration_tests {
         // caller's transaction, not committed independently the way the old
         // per-statement-autocommit CRUD fast path always was.
         let pool = test_pool().await;
-        let (cbu_id, original_description): (Uuid, Option<String>) =
-            sqlx::query_as(r#"SELECT cbu_id, description FROM "ob-poc".cbus LIMIT 1"#)
-                .fetch_one(&pool)
-                .await
-                .expect("at least one cbu row exists in the dev database");
+        // T10.3: deterministic OFFSET 0 — must be a *different* physical
+        // row than the commit-path counterpart test below (OFFSET 1),
+        // otherwise the two tests race for the same row's lock and one's
+        // commit can leak into the other's "after rollback" read (both run
+        // concurrently by default under `cargo test`). Fixed as a test-
+        // isolation issue, not a product-code one, matching this project's
+        // established PIR-D-004 precedent (shared mutable fixture races).
+        let (cbu_id, original_description): (Uuid, Option<String>) = sqlx::query_as(
+            r#"SELECT cbu_id, description FROM "ob-poc".cbus ORDER BY cbu_id LIMIT 1 OFFSET 0"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("at least one cbu row exists in the dev database");
 
         let executor = PgCrudExecutor::new(pool.clone());
         let contract = update_description_contract();
@@ -1823,13 +1947,13 @@ mod db_integration_tests {
         let args = serde_json::json!({ "cbu-id": cbu_id.to_string(), "description": marker });
         let ctx = fake_ctx();
 
-        let mut tx = pool.begin().await.unwrap();
+        let mut scope = TestScope::begin(&pool).await;
         let outcome = executor
-            .execute_crud_in_scope(&contract, args, &ctx, &mut tx)
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
             .await
             .expect("scope-based update");
         assert!(matches!(outcome, VerbExecutionOutcome::Affected(1)));
-        tx.rollback().await.unwrap();
+        scope.rollback().await;
 
         let (after,): (Option<String>,) =
             sqlx::query_as(r#"SELECT description FROM "ob-poc".cbus WHERE cbu_id = $1"#)
@@ -1851,11 +1975,14 @@ mod db_integration_tests {
         // scope, IS durable — this is the whole point of joining CRUD to
         // the admitting transaction rather than leaving it autocommitted.
         let pool = test_pool().await;
-        let (cbu_id, original_description): (Uuid, Option<String>) =
-            sqlx::query_as(r#"SELECT cbu_id, description FROM "ob-poc".cbus LIMIT 1"#)
-                .fetch_one(&pool)
-                .await
-                .expect("at least one cbu row exists in the dev database");
+        // T10.3: OFFSET 1 — the deliberately distinct row from the
+        // rollback test's OFFSET 0 (see the isolation note there).
+        let (cbu_id, original_description): (Uuid, Option<String>) = sqlx::query_as(
+            r#"SELECT cbu_id, description FROM "ob-poc".cbus ORDER BY cbu_id LIMIT 1 OFFSET 1"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("at least two cbu rows exist in the dev database");
 
         let executor = PgCrudExecutor::new(pool.clone());
         let contract = update_description_contract();
@@ -1863,12 +1990,12 @@ mod db_integration_tests {
         let args = serde_json::json!({ "cbu-id": cbu_id.to_string(), "description": marker.clone() });
         let ctx = fake_ctx();
 
-        let mut tx = pool.begin().await.unwrap();
+        let mut scope = TestScope::begin(&pool).await;
         executor
-            .execute_crud_in_scope(&contract, args, &ctx, &mut tx)
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
             .await
             .expect("scope-based update");
-        tx.commit().await.unwrap();
+        scope.commit().await;
 
         let (after,): (Option<String>,) =
             sqlx::query_as(r#"SELECT description FROM "ob-poc".cbus WHERE cbu_id = $1"#)

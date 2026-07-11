@@ -103,7 +103,7 @@ pub trait CrudExecutionPort: Send + Sync {
 
     /// T9.2 (§3 Branch 2, EOP-PLAN-CONTROLPLANE-001 Addendum B): the same
     /// dispatch as [`execute_crud`](Self::execute_crud), but against a
-    /// caller-supplied connection already inside a `PgTransactionScope`
+    /// caller-supplied scope already inside a `PgTransactionScope`
     /// rather than a fresh pool checkout.
     ///
     /// Deliberately has **no default implementation** (OQ2, resolved during
@@ -114,12 +114,20 @@ pub trait CrudExecutionPort: Send + Sync {
     /// the `try_consume_by_id` two-APIs-one-weaker lesson (PIR-D-008) one
     /// gate later. Every implementor of this trait must decide for itself
     /// how (or whether) to honor this method.
+    ///
+    /// T10.3 (EOP-PLAN-CONTROLPLANE-001 Addendum C): widened from
+    /// `conn: &mut sqlx::PgConnection` to `scope: &mut dyn TransactionScope`
+    /// — SQL dispatch still goes through `scope.executor()` (unchanged
+    /// behaviour), but implementors now also have `scope.record_write(...)`
+    /// available to self-report writes for G14's write-set attestation.
+    /// Flagged and ratified as a genuine trait-signature change, not added
+    /// silently (see the ownership ledger's T10.3 entry).
     async fn execute_crud_in_scope(
         &self,
         contract: &VerbContractBody,
         args: serde_json::Value,
         ctx: &VerbExecutionContext,
-        conn: &mut sqlx::PgConnection,
+        scope: &mut dyn crate::TransactionScope,
     ) -> Result<VerbExecutionOutcome>;
 }
 

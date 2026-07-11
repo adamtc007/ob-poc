@@ -113,20 +113,6 @@ impl PgTransactionScope {
         self.tx.rollback().await
     }
 
-    /// T5.1: self-report a write this scope's caller performed via
-    /// `scope.executor()`/`scope.transaction()`. sqlx offers no post-hoc
-    /// introspection of which table/columns a raw `sqlx::query!` touched,
-    /// so this is honestly self-reported, not independently observed — a
-    /// caller that writes without calling this under-reports its own
-    /// footprint. `commit_attested` can only catch what gets reported.
-    pub fn record_write(&mut self, table: impl Into<String>, entity_id: Uuid, columns: Vec<String>) {
-        self.captured_writes.push(CapturedWrite {
-            table: table.into(),
-            entity_id,
-            columns,
-        });
-    }
-
     /// T5.2: attach the declared bound this scope's writes must stay
     /// within. Optional — a scope with no expected write set behaves
     /// identically under `commit_attested` and `commit` (nothing to
@@ -233,6 +219,18 @@ impl TransactionScope for PgTransactionScope {
     fn pool(&self) -> &PgPool {
         &self.pool
     }
+
+    /// T5.1 (promoted onto the trait by T10.3 — see `dsl-runtime::tx`'s
+    /// module doc for why): self-report a write this scope's caller
+    /// performed via `scope.executor()`/`scope.transaction()`.
+    /// `commit_attested` can only catch what gets reported here.
+    fn record_write(&mut self, table: &str, entity_id: Uuid, columns: &[String]) {
+        self.captured_writes.push(CapturedWrite {
+            table: table.to_string(),
+            entity_id,
+            columns: columns.to_vec(),
+        });
+    }
 }
 
 #[cfg(all(test, feature = "database"))]
@@ -323,7 +321,7 @@ mod t5_write_set_attestation_tests {
         scope.record_write(
             "ob-poc.control_plane_envelopes",
             envelope_id,
-            vec!["status".to_string()],
+            &["status".to_string()],
         );
 
         let result = scope.commit_attested(None, Some("test.undeclared-write")).await;
@@ -374,7 +372,7 @@ mod t5_write_set_attestation_tests {
         scope.record_write(
             "ob-poc.control_plane_envelopes",
             envelope_id,
-            vec!["status".to_string()],
+            &["status".to_string()],
         );
 
         scope

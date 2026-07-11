@@ -257,7 +257,7 @@ impl ObPocVerbExecutor {
                 if let Some(rv) = runtime_verb.as_ref() {
                     let contract = runtime_verb_to_contract(rv);
                     match crud_port
-                        .execute_crud_in_scope(&contract, args.clone(), ctx, scope.executor())
+                        .execute_crud_in_scope(&contract, args.clone(), ctx, scope)
                         .await
                     {
                         Ok(outcome) => {
