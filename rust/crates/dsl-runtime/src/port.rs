@@ -100,6 +100,27 @@ pub trait CrudExecutionPort: Send + Sync {
         args: serde_json::Value,
         ctx: &VerbExecutionContext,
     ) -> Result<VerbExecutionOutcome>;
+
+    /// T9.2 (§3 Branch 2, EOP-PLAN-CONTROLPLANE-001 Addendum B): the same
+    /// dispatch as [`execute_crud`](Self::execute_crud), but against a
+    /// caller-supplied connection already inside a `PgTransactionScope`
+    /// rather than a fresh pool checkout.
+    ///
+    /// Deliberately has **no default implementation** (OQ2, resolved during
+    /// design): a silent pool-based fallback here would defeat T9.2's whole
+    /// purpose — the caller believes this CRUD verb's writes are joined to
+    /// its admitting scope, and a default degrading to `execute_crud`
+    /// would silently break that belief with no compiler signal, repeating
+    /// the `try_consume_by_id` two-APIs-one-weaker lesson (PIR-D-008) one
+    /// gate later. Every implementor of this trait must decide for itself
+    /// how (or whether) to honor this method.
+    async fn execute_crud_in_scope(
+        &self,
+        contract: &VerbContractBody,
+        args: serde_json::Value,
+        ctx: &VerbExecutionContext,
+        conn: &mut sqlx::PgConnection,
+    ) -> Result<VerbExecutionOutcome>;
 }
 
 // ── Test Support ────────────────────────────────────────────────

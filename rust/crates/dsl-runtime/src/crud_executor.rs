@@ -33,6 +33,23 @@ impl PgCrudExecutor {
     }
 }
 
+/// T9.2 (§3 Branch 2): the one executor abstraction shared by the pool-based
+/// `execute_crud` and the scope-based `execute_crud_in_scope` — every
+/// per-operation method below takes `exec: &mut CrudExec<'_>` instead of
+/// reading `self.pool` directly, so the same dispatch logic runs atomically
+/// inside a caller-supplied `PgTransactionScope` when one is provided,
+/// without duplicating the ~14 operation methods.
+///
+/// `Pool(&PgPool)` is `Copy`-cheap to re-borrow every helper call.
+/// `Conn(&mut PgConnection)` is reborrowed (`&mut **c`) per call, the same
+/// pattern `TransactionScope::executor()` establishes elsewhere in this
+/// crate — sequential statements against the same scope compose without
+/// fighting the borrow checker.
+pub(crate) enum CrudExec<'e> {
+    Pool(&'e PgPool),
+    Conn(&'e mut sqlx::PgConnection),
+}
+
 #[async_trait]
 impl CrudExecutionPort for PgCrudExecutor {
     async fn execute_crud(
@@ -40,6 +57,29 @@ impl CrudExecutionPort for PgCrudExecutor {
         contract: &VerbContractBody,
         args: serde_json::Value,
         _ctx: &VerbExecutionContext,
+    ) -> crate::Result<VerbExecutionOutcome> {
+        let mut exec = CrudExec::Pool(&self.pool);
+        self.dispatch(contract, args, &mut exec).await
+    }
+
+    async fn execute_crud_in_scope(
+        &self,
+        contract: &VerbContractBody,
+        args: serde_json::Value,
+        _ctx: &VerbExecutionContext,
+        conn: &mut sqlx::PgConnection,
+    ) -> crate::Result<VerbExecutionOutcome> {
+        let mut exec = CrudExec::Conn(conn);
+        self.dispatch(contract, args, &mut exec).await
+    }
+}
+
+impl PgCrudExecutor {
+    async fn dispatch(
+        &self,
+        contract: &VerbContractBody,
+        args: serde_json::Value,
+        exec: &mut CrudExec<'_>,
     ) -> crate::Result<VerbExecutionOutcome> {
         let crud = contract.crud_mapping.as_ref().ok_or_else(|| {
             SemOsError::InvalidInput(format!("Verb {} has no crud_mapping", contract.fqn))
@@ -52,59 +92,59 @@ impl CrudExecutionPort for PgCrudExecutor {
 
         match crud.operation.as_str() {
             "select" => {
-                self.execute_select(schema, table, &contract.args, &args, &contract.returns)
+                self.execute_select(exec, schema, table, &contract.args, &args, &contract.returns)
                     .await
             }
             "insert" => {
-                self.execute_insert(schema, table, crud, &contract.args, &args)
+                self.execute_insert(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "update" => {
-                self.execute_update(schema, table, crud, &contract.args, &args)
+                self.execute_update(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "delete" => {
-                self.execute_delete(schema, table, crud, &contract.args, &args)
+                self.execute_delete(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "upsert" => {
-                self.execute_upsert(schema, table, crud, &contract.args, &args)
+                self.execute_upsert(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "link" => {
-                self.execute_link(schema, table, crud, &contract.args, &args)
+                self.execute_link(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "unlink" => {
-                self.execute_unlink(schema, table, crud, &contract.args, &args)
+                self.execute_unlink(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "role_link" => {
-                self.execute_role_link(schema, crud, &contract.args, &args)
+                self.execute_role_link(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "role_unlink" => {
-                self.execute_role_unlink(schema, crud, &contract.args, &args)
+                self.execute_role_unlink(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "list_by_fk" => {
-                self.execute_list_by_fk(schema, table, crud, &contract.args, &args)
+                self.execute_list_by_fk(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "list_parties" => {
-                self.execute_list_parties(schema, crud, &contract.args, &args)
+                self.execute_list_parties(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "select_with_join" => {
-                self.execute_select_with_join(schema, crud, &contract.args, &args)
+                self.execute_select_with_join(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "entitycreate" | "entity_create" => {
-                self.execute_entity_create(schema, table, crud, &contract.args, &args)
+                self.execute_entity_create(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "entityupsert" | "entity_upsert" => {
-                self.execute_entity_upsert(schema, table, crud, &contract.args, &args)
+                self.execute_entity_upsert(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             op => Err(SemOsError::InvalidInput(format!(
@@ -113,13 +153,12 @@ impl CrudExecutionPort for PgCrudExecutor {
             ))),
         }
     }
-}
 
-impl PgCrudExecutor {
     // ── SELECT ──────────────────────────────────────────────────
 
     async fn execute_select(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         arg_defs: &[VerbArgDef],
@@ -172,7 +211,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort SELECT");
 
-        let rows = execute_query(&self.pool, &sql, &bind_values).await?;
+        let rows = execute_query(exec, &sql, &bind_values).await?;
 
         // Single record vs record set based on return type
         let is_single = returns
@@ -196,6 +235,7 @@ impl PgCrudExecutor {
 
     async fn execute_insert(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -261,7 +301,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort INSERT");
 
-        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let row = execute_query_one(exec, &sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
@@ -272,6 +312,7 @@ impl PgCrudExecutor {
 
     async fn execute_update(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -325,7 +366,7 @@ impl PgCrudExecutor {
         debug!(sql = %sql, binds = bind_values.len() + 1, "CrudExecutionPort UPDATE");
 
         bind_values.push(key_val);
-        let affected = execute_non_query(&self.pool, &sql, &bind_values).await?;
+        let affected = execute_non_query(exec, &sql, &bind_values).await?;
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -333,6 +374,7 @@ impl PgCrudExecutor {
 
     async fn execute_delete(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -397,7 +439,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort DELETE");
 
-        let affected = execute_non_query(&self.pool, &sql, &bind_values).await?;
+        let affected = execute_non_query(exec, &sql, &bind_values).await?;
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -405,6 +447,7 @@ impl PgCrudExecutor {
 
     async fn execute_upsert(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -475,7 +518,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort UPSERT");
 
-        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let row = execute_query_one(exec, &sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
@@ -486,6 +529,7 @@ impl PgCrudExecutor {
 
     async fn execute_link(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -528,7 +572,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort LINK");
 
-        let affected = execute_non_query(&self.pool, &sql, &[from, to]).await?;
+        let affected = execute_non_query(exec, &sql, &[from, to]).await?;
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -536,6 +580,7 @@ impl PgCrudExecutor {
 
     async fn execute_unlink(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -578,7 +623,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort UNLINK");
 
-        let affected = execute_non_query(&self.pool, &sql, &[from, to]).await?;
+        let affected = execute_non_query(exec, &sql, &[from, to]).await?;
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -586,6 +631,7 @@ impl PgCrudExecutor {
 
     async fn execute_role_link(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -670,7 +716,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort ROLE_LINK");
 
-        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let row = execute_query_one(exec, &sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
@@ -681,6 +727,7 @@ impl PgCrudExecutor {
 
     async fn execute_role_unlink(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -729,7 +776,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort ROLE_UNLINK");
 
-        let affected = execute_non_query(&self.pool, &sql, &[from, to, role]).await?;
+        let affected = execute_non_query(exec, &sql, &[from, to, role]).await?;
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -737,6 +784,7 @@ impl PgCrudExecutor {
 
     async fn execute_list_parties(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -785,7 +833,7 @@ impl PgCrudExecutor {
         debug!(sql = %sql, "CrudExecutionPort LIST_PARTIES");
 
         let bind_values = vec![SqlValue::Uuid(fk_val), SqlValue::Date(as_of_date)];
-        let rows = execute_query(&self.pool, &sql, &bind_values).await?;
+        let rows = execute_query(exec, &sql, &bind_values).await?;
         let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
         Ok(VerbExecutionOutcome::RecordSet(records?))
     }
@@ -794,6 +842,7 @@ impl PgCrudExecutor {
 
     async fn execute_select_with_join(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -836,7 +885,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort SELECT_WITH_JOIN");
 
-        let rows = execute_query(&self.pool, &sql, &[sql_val]).await?;
+        let rows = execute_query(exec, &sql, &[sql_val]).await?;
         let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
         Ok(VerbExecutionOutcome::RecordSet(records?))
     }
@@ -845,6 +894,7 @@ impl PgCrudExecutor {
 
     async fn execute_list_by_fk(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -903,7 +953,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = all_values.len(), "CrudExecutionPort LIST_BY_FK");
 
-        let rows = execute_query(&self.pool, &sql, &all_values).await?;
+        let rows = execute_query(exec, &sql, &all_values).await?;
         let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
         Ok(VerbExecutionOutcome::RecordSet(records?))
     }
@@ -912,6 +962,7 @@ impl PgCrudExecutor {
 
     async fn execute_entity_create(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -931,7 +982,7 @@ impl PgCrudExecutor {
                LIMIT 1"#,
         );
         let type_row = execute_query_one(
-            &self.pool,
+            exec,
             &type_sql,
             &[SqlValue::String(type_code.clone())],
         )
@@ -968,7 +1019,7 @@ impl PgCrudExecutor {
             r#"SELECT entity_id FROM "{schema}".entities WHERE entity_type_id = $1 AND name = $2"#,
         );
         if let Ok(rows) = execute_query(
-            &self.pool,
+            exec,
             &existing_sql,
             &[
                 SqlValue::Uuid(entity_type_id),
@@ -991,7 +1042,7 @@ impl PgCrudExecutor {
             r#"INSERT INTO "{schema}".entities (entity_id, entity_type_id, name) VALUES ($1, $2, $3)"#,
         );
         execute_non_query(
-            &self.pool,
+            exec,
             &base_sql,
             &[
                 SqlValue::Uuid(entity_id),
@@ -1058,7 +1109,7 @@ impl PgCrudExecutor {
             placeholders.join(", ")
         );
         debug!(sql = %ext_sql, "CrudExecutionPort ENTITY_CREATE extension");
-        execute_non_query(&self.pool, &ext_sql, &bind_values).await?;
+        execute_non_query(exec, &ext_sql, &bind_values).await?;
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -1067,6 +1118,7 @@ impl PgCrudExecutor {
 
     async fn execute_entity_upsert(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -1084,7 +1136,7 @@ impl PgCrudExecutor {
                LIMIT 1"#,
         );
         let type_row = execute_query_one(
-            &self.pool,
+            exec,
             &type_sql,
             &[SqlValue::String(type_code.clone())],
         )
@@ -1123,7 +1175,7 @@ impl PgCrudExecutor {
                RETURNING entity_id"#,
         );
         let row = execute_query_one(
-            &self.pool,
+            exec,
             &base_sql,
             &[
                 SqlValue::Uuid(entity_type_id),
@@ -1210,7 +1262,7 @@ impl PgCrudExecutor {
         };
 
         debug!(sql = %ext_sql, "CrudExecutionPort ENTITY_UPSERT extension");
-        execute_non_query(&self.pool, &ext_sql, &bind_values).await?;
+        execute_non_query(exec, &ext_sql, &bind_values).await?;
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -1285,38 +1337,53 @@ fn bind_sql_value<'q>(
     }
 }
 
-async fn execute_query_one(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<PgRow> {
+async fn execute_query_one(
+    exec: &mut CrudExec<'_>,
+    sql: &str,
+    values: &[SqlValue],
+) -> crate::Result<PgRow> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
     }
-    query
-        .fetch_one(pool)
-        .await
-        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
+    let result = match exec {
+        CrudExec::Pool(p) => query.fetch_one(*p).await,
+        CrudExec::Conn(c) => query.fetch_one(&mut **c).await,
+    };
+    result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
 
-async fn execute_non_query(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<u64> {
+async fn execute_non_query(
+    exec: &mut CrudExec<'_>,
+    sql: &str,
+    values: &[SqlValue],
+) -> crate::Result<u64> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
     }
-    let result = query
-        .execute(pool)
-        .await
-        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))?;
+    let result = match exec {
+        CrudExec::Pool(p) => query.execute(*p).await,
+        CrudExec::Conn(c) => query.execute(&mut **c).await,
+    };
+    let result = result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))?;
     Ok(result.rows_affected())
 }
 
-async fn execute_query(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<Vec<PgRow>> {
+async fn execute_query(
+    exec: &mut CrudExec<'_>,
+    sql: &str,
+    values: &[SqlValue],
+) -> crate::Result<Vec<PgRow>> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
     }
-    query
-        .fetch_all(pool)
-        .await
-        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
+    let result = match exec {
+        CrudExec::Pool(p) => query.fetch_all(*p).await,
+        CrudExec::Conn(c) => query.fetch_all(&mut **c).await,
+    };
+    result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
 
 /// Infer the primary key column name from the table name.
@@ -1586,5 +1653,238 @@ mod tests {
         );
         assert_eq!(contract.fqn, "cbu.show");
         assert!(contract.crud_mapping.is_some());
+    }
+}
+
+// ── T9.2 §3 Branch 2: execute_crud_in_scope live-DB tests ────────
+
+#[cfg(all(test, feature = "database"))]
+mod db_integration_tests {
+    use super::*;
+    use sem_os_ontology::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping, VerbReturnSpec};
+
+    async fn test_pool() -> PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        PgPool::connect(&url).await.expect("connect")
+    }
+
+    fn default_contract_body() -> VerbContractBody {
+        VerbContractBody {
+            fqn: String::new(),
+            domain: String::new(),
+            action: String::new(),
+            description: String::new(),
+            behavior: String::new(),
+            args: vec![],
+            returns: None,
+            preconditions: vec![],
+            postconditions: vec![],
+            produces: None,
+            consumes: vec![],
+            invocation_phrases: vec![],
+            subject_kinds: vec![],
+            phase_tags: vec![],
+            harm_class: None,
+            action_class: None,
+            precondition_states: vec![],
+            requires_subject: true,
+            produces_focus: false,
+            metadata: None,
+            crud_mapping: None,
+            reads_from: vec![],
+            writes_to: vec![],
+            outputs: vec![],
+            produces_shared_facts: vec![],
+        }
+    }
+
+    fn cbu_id_arg() -> VerbArgDef {
+        VerbArgDef {
+            name: "cbu-id".to_string(),
+            arg_type: "uuid".to_string(),
+            required: true,
+            description: None,
+            lookup: None,
+            valid_values: None,
+            default: None,
+            maps_to: Some("cbu_id".to_string()),
+        }
+    }
+
+    fn select_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "cbu.show".to_string(),
+            domain: "cbu".to_string(),
+            action: "show".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![cbu_id_arg()],
+            returns: Some(VerbReturnSpec {
+                return_type: "record".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "select".to_string(),
+                table: Some("cbus".to_string()),
+                schema: Some("ob-poc".to_string()),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    fn update_description_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "cbu.set-description-test".to_string(),
+            domain: "cbu".to_string(),
+            action: "set-description-test".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![
+                cbu_id_arg(),
+                VerbArgDef {
+                    name: "description".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: Some("description".to_string()),
+                },
+            ],
+            returns: Some(VerbReturnSpec {
+                return_type: "affected".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "update".to_string(),
+                table: Some("cbus".to_string()),
+                schema: Some("ob-poc".to_string()),
+                key_column: Some("cbu_id".to_string()),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    fn fake_ctx() -> VerbExecutionContext {
+        VerbExecutionContext::new(sem_os_core::principal::Principal::system())
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_matches_execute_crud_for_select() {
+        let pool = test_pool().await;
+        let (cbu_id,): (Uuid,) = sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("at least one cbu row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = select_contract();
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string() });
+        let ctx = fake_ctx();
+
+        let pool_result = executor
+            .execute_crud(&contract, args.clone(), &ctx)
+            .await
+            .expect("pool-based select");
+
+        let mut tx = pool.begin().await.unwrap();
+        let scope_result = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut tx)
+            .await
+            .expect("scope-based select");
+        tx.rollback().await.unwrap();
+
+        assert_eq!(
+            format!("{:?}", pool_result),
+            format!("{:?}", scope_result),
+            "execute_crud_in_scope must return the same record execute_crud does"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_update_rolled_back_leaves_no_durable_trace() {
+        // The Branch 2 durability-on-failure proof (design doc §6): a write
+        // issued through execute_crud_in_scope must be scoped to the
+        // caller's transaction, not committed independently the way the old
+        // per-statement-autocommit CRUD fast path always was.
+        let pool = test_pool().await;
+        let (cbu_id, original_description): (Uuid, Option<String>) =
+            sqlx::query_as(r#"SELECT cbu_id, description FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = update_description_contract();
+        let marker = format!("t9.2-scope-test-{}", Uuid::new_v4());
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string(), "description": marker });
+        let ctx = fake_ctx();
+
+        let mut tx = pool.begin().await.unwrap();
+        let outcome = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut tx)
+            .await
+            .expect("scope-based update");
+        assert!(matches!(outcome, VerbExecutionOutcome::Affected(1)));
+        tx.rollback().await.unwrap();
+
+        let (after,): (Option<String>,) =
+            sqlx::query_as(r#"SELECT description FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            after, original_description,
+            "a rolled-back scope must leave zero durable trace of the write"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_update_committed_is_durable() {
+        // The commit-path counterpart to the rollback proof above: a write
+        // issued through execute_crud_in_scope, once the caller commits the
+        // scope, IS durable — this is the whole point of joining CRUD to
+        // the admitting transaction rather than leaving it autocommitted.
+        let pool = test_pool().await;
+        let (cbu_id, original_description): (Uuid, Option<String>) =
+            sqlx::query_as(r#"SELECT cbu_id, description FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = update_description_contract();
+        let marker = format!("t9.2-scope-test-{}", Uuid::new_v4());
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string(), "description": marker.clone() });
+        let ctx = fake_ctx();
+
+        let mut tx = pool.begin().await.unwrap();
+        executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut tx)
+            .await
+            .expect("scope-based update");
+        tx.commit().await.unwrap();
+
+        let (after,): (Option<String>,) =
+            sqlx::query_as(r#"SELECT description FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(after, Some(marker), "a committed scope's write must be durable");
+
+        // Cleanup — restore the original value so this test leaves no
+        // lasting side effect on the dev database.
+        sqlx::query(r#"UPDATE "ob-poc".cbus SET description = $1 WHERE cbu_id = $2"#)
+            .bind(&original_description)
+            .bind(cbu_id)
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 }
