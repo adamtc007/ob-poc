@@ -1,0 +1,11 @@
+error: cannot construct `ob_poc_control_plane::envelope::ExecutionEnvelope` with struct literal syntax due to private fields
+  --> tests/trybuild/decision_does_not_leak_envelope_construction.rs:14:9
+   |
+14 |         ob_poc_control_plane::envelope::ExecutionEnvelope {},
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: you might have meant to use the `seal` associated function
+   |
+14 -         ob_poc_control_plane::envelope::ExecutionEnvelope {},
+14 +         ob_poc_control_plane::envelope::ExecutionEnvelope::seal(_, _, _, _, _, _, _, _, _, _),
+   |

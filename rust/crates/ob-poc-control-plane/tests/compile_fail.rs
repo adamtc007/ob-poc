@@ -13,6 +13,13 @@
 //! (c) `ExecutionEnvelope` does not implement `serde::Deserialize` — the
 //!     runtime must obtain an envelope only via `seal`, never by
 //!     deserializing one from storage or the wire.
+//!
+//! T10.1 (B2 ratification, condition 2) adds a third fixture: making
+//! `ControlPlaneDecision` pub (it now carries `ExecutionEnvelope` in its
+//! `ApprovedStp` arm, per V&S §9.3's declared `evaluate()` return shape)
+//! must not transitively enable constructing an envelope from outside the
+//! crate — struct-literal construction stays blocked by private fields
+//! regardless of what public type wraps it.
 
 #[test]
 fn compile_fail_tests() {
