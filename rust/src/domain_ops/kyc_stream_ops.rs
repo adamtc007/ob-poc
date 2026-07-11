@@ -38,6 +38,7 @@ use ob_poc_kyc_substrate::fold::obligation::ObligationState as _ObligationStateC
 /// `verb_fqn`, `target`, and `payload` are verb-specific; everything else is
 /// threaded from `ctx`. If `validate_entry_fqn` is `Some`, the named lexicon
 /// entry's preconditions are checked under the lock.
+#[allow(clippy::too_many_arguments)] // each parameter is a distinct verb-call scalar/binding, not a bundle candidate shared across the 22 call sites below
 async fn stream_append(
     verb_fqn: &str,
     subject: SubjectId,

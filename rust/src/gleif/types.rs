@@ -126,9 +126,7 @@ impl Default for EntityStatus {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(dead_code)]
-// kept for serde deserialization
-#[allow(dead_code)]
+#[allow(dead_code)] // kept for serde deserialization
 pub enum RegistrationStatus {
     Issued,
     Lapsed,
@@ -201,9 +199,7 @@ impl Default for RegistrationStatus {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(dead_code)]
-// kept for serde deserialization
-#[allow(dead_code)]
+#[allow(dead_code)] // kept for serde deserialization
 pub enum CorroborationLevel {
     FullyCorroborated,
     PartiallyCorroborated,
@@ -255,9 +251,7 @@ impl Default for CorroborationLevel {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[allow(dead_code)]
-// kept for serde deserialization
-#[allow(dead_code)]
+#[allow(dead_code)] // kept for serde deserialization
 pub enum RelationshipType {
     IsDirectlyConsolidatedBy,
     IsUltimatelyConsolidatedBy,
