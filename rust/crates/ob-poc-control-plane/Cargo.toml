@@ -12,6 +12,13 @@ serde_json = "1.0"
 thiserror = "1.0"
 sha2 = "0.10"
 hex = "0.4"
+# T8.1 (EOP-PLAN-CONTROLPLANE-001): EnvelopeHandle moved to this
+# values-only boundary crate so dsl-runtime can carry a typed handle
+# across the VerbExecutionPort trait boundary without depending on
+# ob-poc-control-plane itself. This does not weaken the "no
+# execution-tier crate" constraint in this crate's own description:
+# ob-poc-types has zero execution-tier logic, only value types.
+ob-poc-types = { path = "../ob-poc-types" }
 
 [dev-dependencies]
 trybuild = "1"

@@ -150,9 +150,11 @@ impl VerbExecutor for ObPocVerbAdapter {
         }
 
         // T6.1: route through the T4.1 envelope-admission entry point —
-        // the bus is the first production caller. `envelope_id: None`
-        // because nothing issues a sealed `ExecutionEnvelope` for bus
-        // calls yet; with the production-default empty
+        // the bus is the first production caller. `envelope_handle: None`
+        // (T8.1 widened this parameter from a bare Uuid to a typed
+        // `ob_poc_types::EnvelopeHandle`) because nothing issues a sealed
+        // `ExecutionEnvelope` for bus calls yet (T6.1a); with the
+        // production-default empty
         // `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`, this is behaviourally
         // identical to the prior direct `execute_verb` call (`NotEnforced`)
         // for every verb — no dispatch outcome changes here. Flipping the

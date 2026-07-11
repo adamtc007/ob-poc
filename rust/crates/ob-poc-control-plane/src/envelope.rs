@@ -62,31 +62,23 @@ impl ValidityWindow {
     }
 }
 
-/// An opaque, serializable reference to a sealed `ExecutionEnvelope`
-/// (id + content hash). Unlike `ExecutionEnvelope` itself, `EnvelopeHandle`
-/// IS serializable (§9.3: "the runtime accepts only `ExecutionEnvelope`,
-/// not raw agent output" — a handle is how a *reference* to an already-
-/// sealed envelope crosses a persistence or wire boundary; T4.2 persists
-/// handles in `control_plane_envelopes` and rehydrates only through
-/// control-plane re-verification, never by deserializing a raw envelope).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct EnvelopeHandle {
-    id: Uuid,
-    /// SHA-256 of the envelope's sealed content, hex-encoded. Lets a
-    /// consumer detect a handle that no longer matches the envelope it was
-    /// minted from (defence in depth alongside the `id` lookup).
-    content_hash: [u8; 32],
-}
-
-impl EnvelopeHandle {
-    pub fn id(&self) -> Uuid {
-        self.id
-    }
-
-    pub fn content_hash_hex(&self) -> String {
-        hex::encode(self.content_hash)
-    }
-}
+/// `EnvelopeHandle` — an opaque, serializable reference to a sealed
+/// `ExecutionEnvelope` (id + content hash). Unlike `ExecutionEnvelope`
+/// itself, `EnvelopeHandle` IS serializable (§9.3: "the runtime accepts
+/// only `ExecutionEnvelope`, not raw agent output" — a handle is how a
+/// *reference* to an already-sealed envelope crosses a persistence or wire
+/// boundary; T4.2 persists handles in `control_plane_envelopes` and
+/// rehydrates only through control-plane re-verification, never by
+/// deserializing a raw envelope).
+///
+/// T8.1 (EOP-PLAN-CONTROLPLANE-001, closes PIR-D-008/PIR-D-010): the type
+/// itself now lives in `ob-poc-types::envelope_handle` — a values-only
+/// boundary crate `dsl-runtime` can depend on without pulling in this
+/// crate's gate logic — so `VerbExecutionPort::execute_verb_admitting_envelope`
+/// can carry a typed, content-hash-checked handle instead of a bare `Uuid`.
+/// Re-exported here so existing `ob_poc_control_plane::envelope::EnvelopeHandle`
+/// call sites are unaffected.
+pub use ob_poc_types::EnvelopeHandle;
 
 /// `ExecutionEnvelope` — the sealed, runtime-admissible artefact. Private
 /// fields, no public constructor, and deliberately **no `Deserialize`**
@@ -199,10 +191,7 @@ impl ExecutionEnvelope {
         let mut hasher = Sha256::new();
         hasher.update(&content);
         let content_hash: [u8; 32] = hasher.finalize().into();
-        EnvelopeHandle {
-            id: self.id,
-            content_hash,
-        }
+        EnvelopeHandle::new(self.id, content_hash)
     }
 }
 

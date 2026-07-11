@@ -1,4 +1,4 @@
-# ob-poc-types | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:03Z
+# ob-poc-types | features=all | HEAD=6ab569acc43b3c5f3ac2ec0304c0bd298dedce77 | 2026-07-11T08:03:53Z
 pub mod ob_poc_types
 pub mod ob_poc_types::batch_control
 pub struct ob_poc_types::batch_control::BatchControlResult
@@ -5301,6 +5301,58 @@ pub unsafe fn ob_poc_types::entity_query::EntityQueryResult::clone_to_uninit(&se
 impl<T> core::convert::From<T> for ob_poc_types::entity_query::EntityQueryResult
 pub fn ob_poc_types::entity_query::EntityQueryResult::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for ob_poc_types::entity_query::EntityQueryResult where T: for<'de> serde_core::de::Deserialize<'de>
+pub mod ob_poc_types::envelope_handle
+pub struct ob_poc_types::envelope_handle::EnvelopeHandle
+impl ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash(&self) -> [u8; 32]
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash_hex(&self) -> alloc::string::String
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::id(&self) -> uuid::Uuid
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::new(uuid::Uuid, [u8; 32]) -> Self
+impl core::clone::Clone for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone(&self) -> ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::Eq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::PartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::eq(&self, &ob_poc_types::envelope_handle::EnvelopeHandle) -> bool
+impl core::fmt::Debug for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::StructuralPartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl serde_core::ser::Serialize for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Send for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Sync for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Unpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::UnsafeUnpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl<T, U> core::convert::Into<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::From<T>
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::Into<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = core::convert::Infallible
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::TryFrom<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Owned = T
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_into(&self, &mut T)
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::envelope_handle::EnvelopeHandle where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub unsafe fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: for<'de> serde_core::de::Deserialize<'de>
 pub mod ob_poc_types::galaxy
 pub enum ob_poc_types::galaxy::AgentMode
 pub ob_poc_types::galaxy::AgentMode::Autopilot
@@ -25987,6 +26039,57 @@ pub unsafe fn ob_poc_types::resolution::EnumValue::clone_to_uninit(&self, *mut u
 impl<T> core::convert::From<T> for ob_poc_types::resolution::EnumValue
 pub fn ob_poc_types::resolution::EnumValue::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for ob_poc_types::resolution::EnumValue where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_types::EnvelopeHandle
+impl ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash(&self) -> [u8; 32]
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash_hex(&self) -> alloc::string::String
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::id(&self) -> uuid::Uuid
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::new(uuid::Uuid, [u8; 32]) -> Self
+impl core::clone::Clone for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone(&self) -> ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::Eq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::PartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::eq(&self, &ob_poc_types::envelope_handle::EnvelopeHandle) -> bool
+impl core::fmt::Debug for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::StructuralPartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl serde_core::ser::Serialize for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Send for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Sync for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Unpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::UnsafeUnpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl<T, U> core::convert::Into<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::From<T>
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::Into<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = core::convert::Infallible
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::TryFrom<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Owned = T
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_into(&self, &mut T)
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::envelope_handle::EnvelopeHandle where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub unsafe fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: for<'de> serde_core::de::Deserialize<'de>
 pub struct ob_poc_types::EnvelopeVersion(pub u16)
 impl ob_poc_types::gated_envelope::EnvelopeVersion
 pub const ob_poc_types::gated_envelope::EnvelopeVersion::CURRENT: ob_poc_types::gated_envelope::EnvelopeVersion

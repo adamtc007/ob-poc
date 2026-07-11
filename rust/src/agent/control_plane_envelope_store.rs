@@ -66,23 +66,30 @@ pub(crate) enum AdmissionDecision {
 
 /// T4.1 admission check: the single decision point
 /// `execute_verb_admitting_envelope` overrides delegate to. Pure
-/// orchestration over `EnforcedVerbs` + `try_consume_by_id` — kept as its
-/// own function so it's unit-testable without a live `VerbExecutionPort`
+/// orchestration over `EnforcedVerbs` + `try_consume` — kept as its own
+/// function so it's unit-testable without a live `VerbExecutionPort`
 /// implementor.
+///
+/// T8.1 (EOP-PLAN-CONTROLPLANE-001, closes PIR-D-008/PIR-D-010): widened
+/// from `envelope_id: Option<Uuid>` + `try_consume_by_id` to
+/// `envelope_handle: Option<EnvelopeHandle>` + `try_consume` — a caller
+/// presenting a handle whose id matches a real sealed envelope but whose
+/// content hash does not is now rejected here, not merely at the id-lookup
+/// level.
 #[cfg(feature = "database")]
 pub(crate) async fn check_admission(
     pool: &sqlx::PgPool,
     enforced: &EnforcedVerbs,
     verb_fqn: &str,
-    envelope_id: Option<Uuid>,
+    envelope_handle: Option<EnvelopeHandle>,
 ) -> anyhow::Result<AdmissionDecision> {
     if !enforced.is_enforced(verb_fqn) {
         return Ok(AdmissionDecision::NotEnforced);
     }
-    let Some(id) = envelope_id else {
+    let Some(handle) = envelope_handle else {
         return Ok(AdmissionDecision::RejectedNoEnvelope);
     };
-    match try_consume_by_id(pool, id).await? {
+    match try_consume(pool, &handle).await? {
         ConsumeOutcome::Consumed => Ok(AdmissionDecision::Admitted),
         other => Ok(AdmissionDecision::RejectedConsumeFailed(other)),
     }
@@ -255,19 +262,25 @@ pub(crate) async fn try_consume(pool: &sqlx::PgPool, handle: &EnvelopeHandle) ->
     try_consume_inner(pool, handle.id(), Some(&handle.content_hash_hex())).await
 }
 
-/// Id-only consume, with no content-hash check. Exists solely for the T4.1
-/// `VerbExecutionPort::execute_verb_admitting_envelope` trait boundary,
-/// which deliberately carries a bare `Uuid` rather than the full
-/// `EnvelopeHandle` type (so `dsl-runtime`, the pure execution-tier
-/// contract crate, does not need a dependency on `ob-poc-control-plane` —
-/// see that trait method's doc). This is a real, acknowledged weakening
-/// versus `try_consume`: a caller with only the id (not the content hash)
-/// cannot detect a handle minted from a different envelope. Strengthening
-/// this requires threading a typed handle through the dispatch boundary,
-/// which is follow-on work (not yet done — see the ownership ledger), not
-/// silently claimed here.
-#[cfg(feature = "database")]
-pub(crate) async fn try_consume_by_id(pool: &sqlx::PgPool, envelope_id: Uuid) -> anyhow::Result<ConsumeOutcome> {
+/// Id-only consume, with no content-hash check. Originally existed for the
+/// T4.1 `VerbExecutionPort::execute_verb_admitting_envelope` trait
+/// boundary, which at the time deliberately carried a bare `Uuid` rather
+/// than the full `EnvelopeHandle` type. T8.1 (EOP-PLAN-CONTROLPLANE-001,
+/// closes PIR-D-008/PIR-D-010) widened that boundary to carry the typed
+/// handle instead (via `ob-poc-types`, a values-only boundary crate
+/// `dsl-runtime` can depend on without depending on `ob-poc-control-plane`
+/// — see `port.rs`'s updated doc), so the id-only weakening this function
+/// existed to accommodate no longer has a production reason to exist.
+/// Demoted to `#[cfg(all(test, feature = "database"))]`: kept only as a
+/// regression fixture for `try_consume_inner`'s id-only code path. T8.1's
+/// exit criterion asks for "zero production call sites, grep-gated" — this
+/// is enforced more strongly than a grep gate could: this symbol does not
+/// exist at all in a non-test build, so no production code can reference
+/// it regardless of what a text-based CI check might miss. `grep -rn
+/// "try_consume_by_id" rust/src rust/crates` confirms the only remaining
+/// references are this definition and its own test.
+#[cfg(all(test, feature = "database"))]
+async fn try_consume_by_id(pool: &sqlx::PgPool, envelope_id: Uuid) -> anyhow::Result<ConsumeOutcome> {
     try_consume_inner(pool, envelope_id, None).await
 }
 
@@ -441,13 +454,13 @@ mod tests {
         assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
 
         let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
-        let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle.id()))
+        let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle))
             .await
             .unwrap();
         assert_eq!(decision, AdmissionDecision::Admitted);
 
-        // Resubmission of the same envelope id must be rejected, not silently re-admitted.
-        let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle.id()))
+        // Resubmission of the same envelope handle must be rejected, not silently re-admitted.
+        let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle))
             .await
             .unwrap();
         assert_eq!(

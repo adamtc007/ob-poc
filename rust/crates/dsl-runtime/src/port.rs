@@ -48,26 +48,32 @@ pub trait VerbExecutionPort: Send + Sync {
 
     /// T4.1 (EOP-PLAN-CONTROLPLANE-001): envelope-admitting entry point.
     ///
-    /// `envelope_id` is `Some` only when the caller holds a sealed
+    /// `envelope_handle` is `Some` only when the caller holds a sealed
     /// control-plane `ExecutionEnvelope` (`ob-poc-control-plane`) for this
-    /// dispatch — a plain `Uuid` rather than the envelope-handle type
-    /// itself, so this trait (the pure execution-tier contract) does not
-    /// need a dependency on the control-plane crate; the implementor
-    /// re-resolves the id against its own envelope store to verify/consume
-    /// it.
+    /// dispatch. T8.1 widened this from a bare `Uuid` to the typed
+    /// `ob_poc_types::EnvelopeHandle` (id + content hash) — `ob-poc-types`
+    /// is a values-only boundary crate this trait (the pure execution-tier
+    /// contract) can depend on without depending on `ob-poc-control-plane`
+    /// itself (see `ob_poc_types::envelope_handle`'s module doc for why the
+    /// handle lives there). The implementor re-resolves the handle against
+    /// its own envelope store to verify/consume it, now checking the
+    /// content hash (`try_consume`) rather than id alone
+    /// (`try_consume_by_id`, retired — a handle minted from a different
+    /// envelope than the one sealed is now rejected here, not just at the
+    /// id-lookup level).
     ///
-    /// Default implementation ignores the id and degrades to the legacy
-    /// envelope-less `execute_verb` path — every existing implementor
-    /// (including test doubles) is behaviourally unchanged unless it
-    /// explicitly overrides this method, matching the plan's shadow-first
-    /// posture (§0): a gate/envelope concept landing in the trait must not,
-    /// by itself, change any dispatch outcome.
+    /// Default implementation ignores the handle and degrades to the
+    /// legacy envelope-less `execute_verb` path — every existing
+    /// implementor (including test doubles) is behaviourally unchanged
+    /// unless it explicitly overrides this method, matching the plan's
+    /// shadow-first posture (§0): a gate/envelope concept landing in the
+    /// trait must not, by itself, change any dispatch outcome.
     async fn execute_verb_admitting_envelope(
         &self,
         verb_fqn: &str,
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        _envelope_id: Option<uuid::Uuid>,
+        _envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
     ) -> Result<VerbExecutionResult> {
         self.execute_verb(verb_fqn, args, ctx).await
     }

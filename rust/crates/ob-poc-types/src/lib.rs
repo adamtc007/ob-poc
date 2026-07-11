@@ -26,6 +26,7 @@ pub mod control;
 pub mod decision;
 pub mod disambiguation;
 pub mod entity_query;
+pub mod envelope_handle;
 pub mod galaxy;
 pub mod gated_envelope;
 pub mod graph_scene;
@@ -58,6 +59,7 @@ pub mod viewport;
 pub use bpmn_controller::{
     InstanceState, InstanceStatus, InstanceSummary, Pool, PoolConfig, PoolStatus, PoolType,
 };
+pub use envelope_handle::EnvelopeHandle;
 pub use state_token_resolver::{resolve_pending_state_advance, resolve_state_token};
 
 // --------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# ob-poc-control-plane | features=all | HEAD=e029ebd941f9367aede5336d4222be2394a80072 | 2026-07-10T16:49:16Z
+# ob-poc-control-plane | features=all | HEAD=6ab569acc43b3c5f3ac2ec0304c0bd298dedce77 | 2026-07-11T08:03:52Z
 pub mod ob_poc_control_plane
 pub mod ob_poc_control_plane::audit
 pub mod ob_poc_control_plane::authority_gate
@@ -834,66 +834,16 @@ impl<T> serde_core::de::DeserializeOwned for ob_poc_control_plane::entity_bindin
 impl<T> typenum::type_operators::Same for ob_poc_control_plane::entity_binding::EntityFacts
 pub type ob_poc_control_plane::entity_binding::EntityFacts::Output = T
 pub mod ob_poc_control_plane::envelope
+pub use ob_poc_control_plane::envelope::EnvelopeHandle
 pub mod ob_poc_control_plane::envelope::test_support
 pub fn ob_poc_control_plane::envelope::test_support::seal(ob_poc_control_plane::intent_admission::AdmittedIntent, ob_poc_control_plane::entity_binding::BoundEntities, ob_poc_control_plane::pack_resolution::ResolvedPack, ob_poc_control_plane::dag_proof::LegalTransition, ob_poc_control_plane::authority_gate::Authorised, ob_poc_control_plane::evidence_gate::EvidenceSufficient, ob_poc_control_plane::write_set::WriteSetProof, ob_poc_control_plane::proof::CompiledRunbookRef, ob_poc_control_plane::snapshot::SnapshotPins, ob_poc_control_plane::envelope::ValidityWindow) -> ob_poc_control_plane::envelope::ExecutionEnvelope
-pub struct ob_poc_control_plane::envelope::EnvelopeHandle
-impl ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::content_hash_hex(&self) -> alloc::string::String
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::id(&self) -> uuid::Uuid
-impl core::clone::Clone for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::clone(&self) -> ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::cmp::Eq for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::cmp::PartialEq for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::eq(&self, &ob_poc_control_plane::envelope::EnvelopeHandle) -> bool
-impl core::fmt::Debug for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::hash::Hash for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::hash<__H: core::hash::Hasher>(&self, &mut __H)
-impl core::marker::Copy for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::marker::StructuralPartialEq for ob_poc_control_plane::envelope::EnvelopeHandle
-impl serde_core::ser::Serialize for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::marker::Send for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::marker::Sync for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::marker::Unpin for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::marker::UnsafeUnpin for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_control_plane::envelope::EnvelopeHandle
-impl core::panic::unwind_safe::UnwindSafe for ob_poc_control_plane::envelope::EnvelopeHandle
-impl<T, U> core::convert::Into<U> for ob_poc_control_plane::envelope::EnvelopeHandle where U: core::convert::From<T>
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_poc_control_plane::envelope::EnvelopeHandle where U: core::convert::Into<T>
-pub type ob_poc_control_plane::envelope::EnvelopeHandle::Error = core::convert::Infallible
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_poc_control_plane::envelope::EnvelopeHandle where U: core::convert::TryFrom<T>
-pub type ob_poc_control_plane::envelope::EnvelopeHandle::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_poc_control_plane::envelope::EnvelopeHandle where T: core::clone::Clone
-pub type ob_poc_control_plane::envelope::EnvelopeHandle::Owned = T
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::clone_into(&self, &mut T)
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::to_owned(&self) -> T
-impl<T> core::any::Any for ob_poc_control_plane::envelope::EnvelopeHandle where T: 'static + ?core::marker::Sized
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_poc_control_plane::envelope::EnvelopeHandle where T: ?core::marker::Sized
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_poc_control_plane::envelope::EnvelopeHandle where T: ?core::marker::Sized
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_poc_control_plane::envelope::EnvelopeHandle where T: core::clone::Clone
-pub unsafe fn ob_poc_control_plane::envelope::EnvelopeHandle::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_poc_control_plane::envelope::EnvelopeHandle
-pub fn ob_poc_control_plane::envelope::EnvelopeHandle::from(T) -> T
-impl<T> serde_core::de::DeserializeOwned for ob_poc_control_plane::envelope::EnvelopeHandle where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> typenum::type_operators::Same for ob_poc_control_plane::envelope::EnvelopeHandle
-pub type ob_poc_control_plane::envelope::EnvelopeHandle::Output = T
 pub struct ob_poc_control_plane::envelope::ExecutionEnvelope
 impl ob_poc_control_plane::envelope::ExecutionEnvelope
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::authority(&self) -> &ob_poc_control_plane::authority_gate::Authorised
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::binding(&self) -> &ob_poc_control_plane::entity_binding::BoundEntities
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::dag(&self) -> &ob_poc_control_plane::dag_proof::LegalTransition
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::evidence(&self) -> &ob_poc_control_plane::evidence_gate::EvidenceSufficient
-pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::handle(&self) -> ob_poc_control_plane::envelope::EnvelopeHandle
+pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::handle(&self) -> ob_poc_types::envelope_handle::EnvelopeHandle
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::id(&self) -> uuid::Uuid
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::intent(&self) -> &ob_poc_control_plane::intent_admission::AdmittedIntent
 pub fn ob_poc_control_plane::envelope::ExecutionEnvelope::pack(&self) -> &ob_poc_control_plane::pack_resolution::ResolvedPack

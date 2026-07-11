@@ -124,14 +124,14 @@ impl ObPocVerbExecutor {
     async fn admit(
         &self,
         verb_fqn: &str,
-        envelope_id: Option<Uuid>,
+        envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
     ) -> dsl_runtime::Result<()> {
         let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
         let decision = crate::agent::control_plane_envelope_store::check_admission(
             self.executor.pool(),
             &enforced,
             verb_fqn,
-            envelope_id,
+            envelope_handle,
         )
         .await
         .map_err(|e| SemOsError::Internal(anyhow::anyhow!("envelope admission check failed: {e}")))?;
@@ -352,9 +352,9 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         verb_fqn: &str,
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
-        envelope_id: Option<Uuid>,
+        envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
     ) -> dsl_runtime::Result<VerbExecutionResult> {
-        self.admit(verb_fqn, envelope_id).await?;
+        self.admit(verb_fqn, envelope_handle).await?;
         self.execute_verb(verb_fqn, args, ctx).await
     }
 }
@@ -1017,15 +1017,18 @@ mod t4_1_envelope_admission_tests {
         let pool = test_pool().await;
 
         let envelope_id = Uuid::new_v4();
+        let content_hash: [u8; 32] = [0xAB; 32];
+        let handle = ob_poc_types::EnvelopeHandle::new(envelope_id, content_hash);
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".control_plane_envelopes (
                 envelope_id, content_hash, session_id, verb_fqn,
                 status, not_before, not_after
-            ) VALUES ($1, 'test-hash', $2, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+            ) VALUES ($1, $2, $3, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
             "#,
         )
         .bind(envelope_id)
+        .bind(handle.content_hash_hex())
         .bind(Uuid::new_v4())
         .execute(&pool)
         .await
@@ -1034,12 +1037,12 @@ mod t4_1_envelope_admission_tests {
         let executor = ObPocVerbExecutor::from_pool(pool);
 
         executor
-            .admit("cbu.confirm", Some(envelope_id))
+            .admit("cbu.confirm", Some(handle))
             .await
             .expect("sealed, unconsumed envelope must admit");
 
         let err = executor
-            .admit("cbu.confirm", Some(envelope_id))
+            .admit("cbu.confirm", Some(handle))
             .await
             .expect_err("resubmitting the same (now-consumed) envelope must be rejected");
         assert!(err.to_string().contains("AlreadyConsumed"));
@@ -1049,5 +1052,53 @@ mod t4_1_envelope_admission_tests {
             .admit("cbu.reject", None)
             .await
             .expect("cbu.reject is not in the enforced set — must admit regardless");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn envelope_with_wrong_content_hash_is_rejected_loudly() {
+        // T8.1 (EOP-PLAN-CONTROLPLANE-001, closes PIR-D-008/010): a handle
+        // with the correct id but a content hash that does not match the
+        // persisted row (e.g. minted from a different envelope, or
+        // tampered with) must be rejected — this is exactly the guarantee
+        // `try_consume_by_id` could not provide and `try_consume` can.
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+
+        let envelope_id = Uuid::new_v4();
+        let real_hash: [u8; 32] = [0x11; 32];
+        let real_handle = ob_poc_types::EnvelopeHandle::new(envelope_id, real_hash);
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".control_plane_envelopes (
+                envelope_id, content_hash, session_id, verb_fqn,
+                status, not_before, not_after
+            ) VALUES ($1, $2, $3, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+            "#,
+        )
+        .bind(envelope_id)
+        .bind(real_handle.content_hash_hex())
+        .bind(Uuid::new_v4())
+        .execute(&pool)
+        .await
+        .expect("insert sealed envelope row");
+
+        let executor = ObPocVerbExecutor::from_pool(pool);
+
+        // Same id, wrong hash — a forged/mismatched handle.
+        let wrong_hash: [u8; 32] = [0x22; 32];
+        let wrong_handle = ob_poc_types::EnvelopeHandle::new(envelope_id, wrong_hash);
+        let err = executor
+            .admit("cbu.confirm", Some(wrong_handle))
+            .await
+            .expect_err("content-hash mismatch must reject, not silently admit on id match alone");
+        assert!(err.to_string().contains("ContentHashMismatch"));
+
+        // The real handle is still consumable afterward — a rejected
+        // mismatched attempt must not have poisoned or consumed the row.
+        executor
+            .admit("cbu.confirm", Some(real_handle))
+            .await
+            .expect("the genuine handle must still admit after a mismatched attempt");
     }
 }
