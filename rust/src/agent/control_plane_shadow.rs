@@ -547,4 +547,56 @@ mod tests {
             "G2 must report a real, non-not_evaluated Success against a real cbu row"
         );
     }
+
+    /// Empirical confirmation (probed once, not a standing assertion on
+    /// unwired gates — see the ownership ledger's T9.1-pre entry): with
+    /// G2 now real, PackResolution's own NotEvaluated{blocked_by:
+    /// [EntityBinding]} correctly resolves to its own genuine
+    /// Failure("no PackResolutionInput supplied") rather than staying
+    /// blocked by EntityBinding — and Authority/Evidence are now blocked
+    /// *solely* by PackResolution, confirming T9.1a is the sole remaining
+    /// blocker for G5/G6 (not asserted here as a permanent test, since
+    /// G3's absence is exactly what T9.1a exists to fix; this was a
+    /// reachability check, run and recorded, not a regression guard).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn g3_is_now_the_sole_blocker_for_authority_and_evidence() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("cbu row exists");
+
+        let index = verb_config_with_entity_arg("cbu.confirm", "cbu-id", "cbu");
+        let mut args = std::collections::HashMap::new();
+        args.insert("cbu-id".to_string(), cbu_id.to_string());
+        let requests = entity_binding_requests(&index, "cbu.confirm", &args);
+        let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool: &pool };
+        let facts = ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &requests)
+            .await
+            .unwrap();
+        let entity_binding = Some(build_entity_binding_input(&requests, &facts));
+
+        let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), entity_binding);
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::EntityBinding),
+            Some(&ob_poc_control_plane::gate::GateResult::Success)
+        );
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::Authority),
+            Some(&ob_poc_control_plane::gate::GateResult::NotEvaluated {
+                blocked_by: vec![ob_poc_control_plane::gate::GateId::PackResolution],
+            })
+        );
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::Evidence),
+            Some(&ob_poc_control_plane::gate::GateResult::NotEvaluated {
+                blocked_by: vec![ob_poc_control_plane::gate::GateId::PackResolution],
+            })
+        );
+    }
 }
