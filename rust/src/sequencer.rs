@@ -7831,12 +7831,33 @@ impl ReplOrchestratorV2 {
                 }
             };
 
+            // T9.1a (Addendum B): resolve G3's PackResolutionInput from the
+            // REPL's live single-active-pack session state — see
+            // build_pack_resolution_input's doc for why this is the
+            // correct real source (not the SemOS Domain Pack taxonomy,
+            // which has no live runtime instance).
+            let active_pack_id = session.active_pack_id();
+            let active_pack = active_pack_id
+                .as_deref()
+                .and_then(|id| self.pack_router.get_pack(id))
+                .map(|(manifest, _hash)| manifest.as_ref());
+            let pack_resolution = Some(
+                crate::agent::control_plane_shadow::build_pack_resolution_input(
+                    active_pack_id
+                        .as_deref()
+                        .zip(active_pack),
+                    &entry.verb,
+                    !envelope.is_unavailable(),
+                ),
+            );
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
                 entry_id,
                 &actor,
                 entity_binding,
+                pack_resolution,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(

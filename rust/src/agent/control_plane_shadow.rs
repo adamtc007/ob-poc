@@ -14,7 +14,100 @@ use sem_os_policy::abac::ActorContext;
 use uuid::Uuid;
 
 use crate::agent::sem_os_context_envelope::{PruneReason, SemOsContextEnvelope};
+use crate::journey::pack::PackManifest;
 use crate::repl::verb_config_index::VerbConfigIndex;
+
+/// T9.1a (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G3's
+/// `PackResolutionInput` from the REPL's real, live single-active-pack
+/// session state — not from `sem_os_policy::domain_pack::DomainPackManifest`
+/// (the SemOS Domain Pack taxonomy system). This corrects an error in the
+/// T9.1-pre design pass, recorded in the ownership ledger's T9.1a entries:
+/// `pack_resolution.rs`'s own module doc names its designed production
+/// analogue as `src/runbook/constraint_gate.rs::check_pack_constraints`
+/// against `journey::pack_manager::{PackManager, EffectiveConstraints}` —
+/// and those operate on REPL *journey* packs (`config/packs/*.yaml`, bare
+/// ids like `"kyc-case"`), not SemOS Domain Packs (dotted ids like
+/// `"ob-poc.cbu"`). The design pass's caution about not conflating "pack"
+/// with `constellation_family`/`constellation_map` was correct in
+/// principle but pointed at the wrong "other" system — the SemOS Domain
+/// Pack taxonomy has no live runtime instance at all (confirmed: zero
+/// production `PackManager::new(` call sites, see the T9.1a ledger entry),
+/// while the REPL journey pack this function actually uses is real,
+/// live, and already tracked (`ReplSessionV2::active_pack_id()`,
+/// `ReplOrchestratorV2::pack_router`).
+///
+/// `PackManager` itself also has zero production callers — resolved here
+/// not by building new session-persistent activation tracking (which
+/// would duplicate what the REPL already tracks), but by constructing a
+/// **fresh, throwaway `PackManager`** per shadow-recheck call: register
+/// the single currently-active pack, activate it, and call the exact
+/// same `check_pack_constraints` the C-015/C-016 ledger rows say G3 was
+/// designed to invoke. `PackManager` is pure in-memory state (`HashMap`s,
+/// no I/O) — this is cheap, not a workaround.
+///
+/// `constraint_denies_intent` is always `false` here, not a placeholder:
+/// `EffectiveConstraints::is_empty_intersection()` can only be `true`
+/// when the *intersection* of multiple simultaneously-active packs'
+/// `allowed_verbs` is empty (`journey/pack_manager.rs::effective_constraints`'s
+/// intersection logic) — with exactly one active pack (this REPL's real
+/// model; `active_pack_id()` returns a single `Option<String>`, never a
+/// set), there is nothing to intersect against, so the condition is
+/// unreachable by construction. Whether the verb itself is permitted is
+/// carried by `candidate_pack_ids` instead (`vec![pack_id]` when
+/// `check_pack_constraints` returns `Ok`, `vec![]` — read as `MissingPack`
+/// by `decide()` — when it returns `Err`, i.e. the active pack forbids or
+/// doesn't declare this verb).
+///
+/// **Known limitation, not swept under the rug:** `pack_resolution.rs`'s
+/// own doc says "No active pack means no execution" — taken literally,
+/// `active_pack_id() == None` always yields `MissingPack`. Some verbs
+/// (navigation, `session.*`) legitimately execute outside any pack's
+/// InPack tollgate. This may over-report G3 failures for those verbs.
+/// Safe because this is shadow-only (never gates real dispatch) — a
+/// gating (non-shadow) use of this function would need this resolved
+/// first, not inherited as-is.
+pub(crate) fn build_pack_resolution_input(
+    active_pack: Option<(&str, &PackManifest)>,
+    verb_fqn: &str,
+    semreg_allowed_set_available: bool,
+) -> ob_poc_control_plane::pack_resolution::PackResolutionInput {
+    let candidate_pack_ids = match active_pack {
+        None => Vec::new(),
+        Some((pack_id, manifest)) => {
+            let mut manager = crate::journey::pack_manager::PackManager::new();
+            manager.register_pack(manifest.clone());
+            match manager.activate_pack(pack_id) {
+                Ok(()) => {
+                    let constraints = manager.effective_constraints();
+                    match crate::runbook::constraint_gate::check_pack_constraints(
+                        &[verb_fqn.to_string()],
+                        &constraints,
+                    ) {
+                        Ok(()) => vec![pack_id.to_string()],
+                        Err(_) => Vec::new(),
+                    }
+                }
+                Err(e) => {
+                    // Dormant -> Active should never fail for a freshly
+                    // registered pack; if it somehow does, fail honestly
+                    // (no candidate) rather than guess.
+                    tracing::warn!(
+                        error = %e,
+                        pack_id,
+                        "T9.1a: freshly-registered pack failed to activate — treating as MissingPack"
+                    );
+                    Vec::new()
+                }
+            }
+        }
+    };
+
+    ob_poc_control_plane::pack_resolution::PackResolutionInput {
+        candidate_pack_ids,
+        semreg_allowed_set_available,
+        constraint_denies_intent: false,
+    }
+}
 
 /// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
 /// verb's resolved args are entity references, by contract — not by
@@ -120,18 +213,20 @@ pub(crate) fn build_entity_binding_input(
 ///   whenever SemOS itself detected a gap — never a fabricated split
 ///   finer than what's actually observed.
 ///
-/// **Still `not_evaluated` (G3/G4/G7 — T9.1a/b/e, deferred, see the
-/// ownership ledger):** G3 needs a resolved SemOS *pack* identifier, which
-/// is a distinct concept from `envelope`'s constellation family/map (V&S
-/// §1.1's own naming note exists specifically to prevent conflating the
-/// two) and isn't exposed on `SemOsContextEnvelope` today — wiring it
-/// requires understanding the Domain Pack registry, not just reading a
-/// field. G4 needs a real proposed state transition (current entity state
-/// + declared to-state), which needs a DB read against the DAG/slot-state
-/// machinery this call site doesn't currently perform. G7 needs a richer
-/// write-set (tables, columns, state slots — not just entity ids) than
-/// the legacy `derive_write_set_heuristic` can produce, and that
-/// legacy function needs parsed verb args this call site doesn't have
+/// - G3 (pack resolution, T9.1a): built by [`build_pack_resolution_input`]
+///   from the REPL's live single-active-pack session state
+///   (`ReplSessionV2::active_pack_id()` + `ReplOrchestratorV2::pack_router`)
+///   — see that function's doc for the full design, including the
+///   correction of the T9.1-pre design pass's original (wrong) assumption
+///   that this needed the SemOS Domain Pack taxonomy.
+///
+/// **Still `not_evaluated` (G4/G7 — T9.1b/e, deferred, see the
+/// ownership ledger):** G4 needs a real proposed state transition (current
+/// entity state + declared to-state), which needs a DB read against the
+/// DAG/slot-state machinery this call site doesn't currently perform. G7
+/// needs a richer write-set (tables, columns, state slots — not just
+/// entity ids) than the legacy `derive_write_set_heuristic` can produce,
+/// and that legacy function needs parsed verb args this call site doesn't have
 /// (only the raw DSL string). None of these three should be guessed at;
 /// each is real follow-on integration work.
 ///
@@ -148,6 +243,7 @@ pub(crate) fn build_evaluation_context(
     intent_id: Uuid,
     actor: &ActorContext,
     entity_binding: Option<ob_poc_control_plane::entity_binding::EntityBindingInput>,
+    pack_resolution: Option<ob_poc_control_plane::pack_resolution::PackResolutionInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -169,6 +265,7 @@ pub(crate) fn build_evaluation_context(
 
     ob_poc_control_plane::context::EvaluationContext {
         entity_binding,
+        pack_resolution,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -313,7 +410,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -330,7 +427,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -349,7 +446,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -361,7 +458,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -374,7 +471,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -493,6 +590,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
         assert_eq!(
@@ -538,6 +636,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -548,19 +647,19 @@ mod tests {
         );
     }
 
-    /// Empirical confirmation (probed once, not a standing assertion on
-    /// unwired gates — see the ownership ledger's T9.1-pre entry): with
-    /// G2 now real, PackResolution's own NotEvaluated{blocked_by:
-    /// [EntityBinding]} correctly resolves to its own genuine
-    /// Failure("no PackResolutionInput supplied") rather than staying
-    /// blocked by EntityBinding — and Authority/Evidence are now blocked
-    /// *solely* by PackResolution, confirming T9.1a is the sole remaining
-    /// blocker for G5/G6 (not asserted here as a permanent test, since
-    /// G3's absence is exactly what T9.1a exists to fix; this was a
-    /// reachability check, run and recorded, not a regression guard).
+    /// Historical snapshot (T9.1-pre, before T9.1a landed): with G2 real
+    /// but `pack_resolution: None` explicitly passed, PackResolution
+    /// reports its own genuine `Failure("no PackResolutionInput
+    /// supplied")` rather than staying blocked by EntityBinding, and
+    /// Authority/Evidence are blocked *solely* by PackResolution — this
+    /// is what motivated T9.1a. Kept as a regression check on the
+    /// `pack_resolution: None` code path specifically (a caller that
+    /// can't or doesn't supply pack data), not a claim that G3 is
+    /// globally unwired — see `g3_reaches_success_and_unblocks_authority_evidence`
+    /// below for the now-real end-to-end path.
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
-    async fn g3_is_now_the_sole_blocker_for_authority_and_evidence() {
+    async fn g3_none_leaves_authority_and_evidence_blocked() {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
         let pool = sqlx::PgPool::connect(&url).await.expect("connect");
         let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
@@ -579,7 +678,14 @@ mod tests {
         let entity_binding = Some(build_entity_binding_input(&requests, &facts));
 
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), entity_binding);
+        let ctx = build_evaluation_context(
+            &envelope,
+            "cbu.confirm",
+            Uuid::nil(),
+            &test_actor(),
+            entity_binding,
+            None,
+        );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
         assert_eq!(
@@ -597,6 +703,128 @@ mod tests {
             Some(&ob_poc_control_plane::gate::GateResult::NotEvaluated {
                 blocked_by: vec![ob_poc_control_plane::gate::GateId::PackResolution],
             })
+        );
+    }
+
+    // ── T9.1a (Addendum B): build_pack_resolution_input ────────────────────
+
+    fn test_pack_manifest(pack_id: &str, allowed_verbs: Vec<&str>) -> PackManifest {
+        PackManifest {
+            id: pack_id.to_string(),
+            name: pack_id.to_string(),
+            version: "1.0.0".to_string(),
+            description: String::new(),
+            invocation_phrases: Vec::new(),
+            required_context: Vec::new(),
+            optional_context: Vec::new(),
+            workspaces: Vec::new(),
+            allowed_verbs: allowed_verbs.into_iter().map(String::from).collect(),
+            forbidden_verbs: Vec::new(),
+            risk_policy: Default::default(),
+            required_questions: Vec::new(),
+            optional_questions: Vec::new(),
+            stop_rules: Vec::new(),
+            templates: Vec::new(),
+            pack_summary_template: None,
+            section_layout: Vec::new(),
+            definition_of_done: Vec::new(),
+            progress_signals: Vec::new(),
+            handoff_target: None,
+        }
+    }
+
+    #[test]
+    fn no_active_pack_yields_missing_pack_candidates() {
+        let input = build_pack_resolution_input(None, "cbu.confirm", true);
+        assert!(input.candidate_pack_ids.is_empty());
+        assert!(!input.constraint_denies_intent);
+        assert!(input.semreg_allowed_set_available);
+    }
+
+    #[test]
+    fn active_pack_allowing_the_verb_resolves_it_as_candidate() {
+        let manifest = test_pack_manifest("cbu-maintenance", vec!["cbu.confirm"]);
+        let input = build_pack_resolution_input(Some(("cbu-maintenance", &manifest)), "cbu.confirm", true);
+        assert_eq!(input.candidate_pack_ids, vec!["cbu-maintenance".to_string()]);
+        assert!(!input.constraint_denies_intent);
+    }
+
+    #[test]
+    fn active_pack_not_declaring_the_verb_yields_no_candidates() {
+        let manifest = test_pack_manifest("cbu-maintenance", vec!["cbu.confirm"]);
+        let input = build_pack_resolution_input(Some(("cbu-maintenance", &manifest)), "kyc-case.approve", true);
+        assert!(input.candidate_pack_ids.is_empty());
+        assert!(!input.constraint_denies_intent);
+    }
+
+    #[test]
+    fn active_pack_forbidding_the_verb_yields_no_candidates() {
+        let mut manifest = test_pack_manifest("cbu-maintenance", vec![]); // unconstrained allowed set
+        manifest.forbidden_verbs = vec!["cbu.confirm".to_string()];
+        let input = build_pack_resolution_input(Some(("cbu-maintenance", &manifest)), "cbu.confirm", true);
+        assert!(input.candidate_pack_ids.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn g3_reaches_success_and_unblocks_authority_evidence() {
+        // Empirical reachability proof (this session's established
+        // discipline): with G2 real (T9.1-pre) and G3 now real (T9.1a),
+        // verify via evaluate_shadow — not assumed from GATE_DEPENDENCIES
+        // — that Authority/Evidence stop being NotEvaluated once both
+        // their prerequisites genuinely succeed.
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("cbu row exists");
+
+        let index = verb_config_with_entity_arg("cbu.confirm", "cbu-id", "cbu");
+        let mut args = std::collections::HashMap::new();
+        args.insert("cbu-id".to_string(), cbu_id.to_string());
+        let requests = entity_binding_requests(&index, "cbu.confirm", &args);
+        let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool: &pool };
+        let facts = ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &requests)
+            .await
+            .unwrap();
+        let entity_binding = Some(build_entity_binding_input(&requests, &facts));
+
+        let manifest = test_pack_manifest("cbu-maintenance", vec!["cbu.confirm"]);
+        let pack_resolution = Some(build_pack_resolution_input(
+            Some(("cbu-maintenance", &manifest)),
+            "cbu.confirm",
+            true,
+        ));
+
+        let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
+        let ctx = build_evaluation_context(
+            &envelope,
+            "cbu.confirm",
+            Uuid::nil(),
+            &test_actor(),
+            entity_binding,
+            pack_resolution,
+        );
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::EntityBinding),
+            Some(&ob_poc_control_plane::gate::GateResult::Success)
+        );
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::PackResolution),
+            Some(&ob_poc_control_plane::gate::GateResult::Success)
+        );
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::Authority),
+            Some(&ob_poc_control_plane::gate::GateResult::Success),
+            "Authority must reach a real outcome now that its declared dependencies (IntentAdmission, PackResolution) both succeed"
+        );
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::Evidence),
+            Some(&ob_poc_control_plane::gate::GateResult::Success),
+            "Evidence must reach a real outcome now that its declared dependencies (EntityBinding, PackResolution) both succeed"
         );
     }
 }
