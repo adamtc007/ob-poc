@@ -562,6 +562,22 @@ impl<'a> SheetExecutor<'a> {
         // Create execution context
         let mut ctx = ExecutionContext::new();
 
+        // T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): admit every verb in
+        // this statement before dispatch. `execute_dsl` below parses and
+        // compiles internally and constructs `DslExecutor` directly,
+        // bypassing the bus/runbook admission checkpoints entirely — this
+        // parses/compiles once more up front purely to admission-check;
+        // the actual execution parse in `execute_dsl` is unchanged.
+        {
+            let ast = super::parser::parse_program(source)
+                .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
+            let plan = super::execution_plan::compile(&ast)
+                .map_err(|e| anyhow::anyhow!("Compile error: {:?}", e))?;
+            crate::agent::control_plane_envelope_store::admit_plan(self.pool, &plan)
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
+        }
+
         // Create executor
         let executor = DslExecutor::new(self.pool.clone());
 

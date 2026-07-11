@@ -118,6 +118,62 @@ pub(crate) enum ConsumeOutcome {
     Voided,
 }
 
+/// T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): boundary-interposition
+/// admission check for every production ingress point that constructs
+/// `dsl_v2::executor::DslExecutor` directly rather than going through the
+/// bus path (T6, `ObPocVerbExecutor::admit`) or the runbook path
+/// (`step_executor_bridge.rs`, `execute_verb_admitting_envelope`). Checks
+/// every verb in a compiled plan against [`check_admission`] and returns
+/// the first rejection; `envelope_handle: None` at every call since none of
+/// these paths has envelope infrastructure wired yet (same posture as
+/// every other Path A/B/C/D call site before an envelope is actually
+/// minted — this only bites while a verb is listed in
+/// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`, empty by production default).
+///
+/// Single source of truth for this check — do not re-implement the
+/// per-step loop at a call site; call this.
+///
+/// Reads `EnforcedVerbs::from_env()` fresh on every call (matches
+/// `ObPocVerbExecutor::admit`'s existing per-call-read pattern). The
+/// per-step logic itself lives in [`admit_plan_checked`], which takes
+/// `EnforcedVerbs` as a parameter so it's testable without mutating
+/// process-global env state.
+#[cfg(feature = "database")]
+pub(crate) async fn admit_plan(
+    pool: &sqlx::PgPool,
+    plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
+) -> Result<(), String> {
+    admit_plan_checked(pool, &EnforcedVerbs::from_env(), plan).await
+}
+
+/// Pure-parameter core of [`admit_plan`] — checks every verb in `plan`
+/// against `enforced`/[`check_admission`], first rejection wins.
+#[cfg(feature = "database")]
+async fn admit_plan_checked(
+    pool: &sqlx::PgPool,
+    enforced: &EnforcedVerbs,
+    plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
+) -> Result<(), String> {
+    for step in &plan.steps {
+        let verb_fqn = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+        let decision = check_admission(pool, enforced, &verb_fqn, None)
+            .await
+            .map_err(|e| format!("envelope admission check failed for {verb_fqn}: {e}"))?;
+        match decision {
+            AdmissionDecision::NotEnforced | AdmissionDecision::Admitted => {}
+            AdmissionDecision::RejectedNoEnvelope => {
+                return Err(format!(
+                    "{verb_fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) but no sealed envelope was presented"
+                ));
+            }
+            AdmissionDecision::RejectedConsumeFailed(outcome) => {
+                return Err(format!("{verb_fqn} envelope admission rejected: {outcome:?}"));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Persists a freshly sealed envelope as `status = 'sealed'`. Best-effort:
 /// failures are logged, never propagated — matching
 /// `agent::telemetry::store`'s and `agent::control_plane_shadow`'s posture,
@@ -483,5 +539,80 @@ mod tests {
             try_consume_by_id(&pool, handle.id()).await.unwrap(),
             ConsumeOutcome::AlreadyConsumed
         );
+    }
+
+    // ── T9.3 (Addendum B): admit_plan_checked ──────────────────────────────
+    //
+    // Hand-built ExecutionPlan/ExecutionStep — bypasses parse/compile and
+    // the verb registry entirely, since admit_plan_checked only reads
+    // step.verb_call.{domain,verb}. This is the shared function every T9.3
+    // ingress point (RealDslExecutor, the MCP dsl_execute tool, the legacy
+    // raw-execute route, the batch/sheet executors) now delegates to.
+
+    fn plan_with_verbs(fqns: &[&str]) -> crate::dsl_v2::execution_plan::ExecutionPlan {
+        use crate::dsl_v2::execution_plan::ExecutionStep;
+        use dsl_core::{Argument, Span, VerbCall};
+        let steps = fqns
+            .iter()
+            .enumerate()
+            .map(|(i, fqn)| {
+                let (domain, verb) = fqn.split_once('.').expect("fqn has domain.verb");
+                ExecutionStep {
+                    verb_call: VerbCall {
+                        domain: domain.to_string(),
+                        verb: verb.to_string(),
+                        arguments: Vec::<Argument>::new(),
+                        lens_override: None,
+                        binding: None,
+                        span: Span::default(),
+                    },
+                    injections: Vec::new(),
+                    resource_dependencies: Vec::new(),
+                    dag_edges: Vec::new(),
+                    bind_as: None,
+                    produces_entity_type: None,
+                    step_index: i,
+                    behavior: crate::dsl_v2::verb_registry::VerbBehavior::Crud,
+                    custom_op_id: None,
+                }
+            })
+            .collect();
+        crate::dsl_v2::execution_plan::ExecutionPlan::from_steps(steps)
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn admit_plan_checked_passes_when_nothing_enforced() {
+        let pool = test_pool().await;
+        let plan = plan_with_verbs(&["cbu.confirm", "session.info"]);
+        let enforced = EnforcedVerbs::default();
+        assert!(admit_plan_checked(&pool, &enforced, &plan).await.is_ok());
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn admit_plan_checked_rejects_when_any_step_is_enforced_without_envelope() {
+        let pool = test_pool().await;
+        // Second step in the plan is enforced — proves the whole plan is
+        // walked, not just its first verb.
+        let plan = plan_with_verbs(&["session.info", "cbu.confirm"]);
+        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
+        let err = admit_plan_checked(&pool, &enforced, &plan)
+            .await
+            .expect_err("plan must be rejected");
+        assert!(err.contains("cbu.confirm"), "error should name the rejected verb: {err}");
+        assert!(err.contains("no sealed envelope"), "error should explain why: {err}");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn admit_plan_checked_admits_enforced_verb_via_admit_plan_wrapper() {
+        // Proves the public admit_plan() (env-reading) wrapper delegates
+        // correctly — the two other tests exercise admit_plan_checked
+        // directly to avoid mutating process-global env under parallel
+        // test execution.
+        let pool = test_pool().await;
+        let plan = plan_with_verbs(&["session.info"]);
+        assert!(admit_plan(&pool, &plan).await.is_ok());
     }
 }

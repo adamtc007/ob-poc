@@ -92,32 +92,17 @@ impl RealDslExecutor {
     /// wired (same posture as Path A/D's `None` before an envelope is
     /// actually minted), so this only bites while a verb is listed in
     /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` (empty by production default).
+    ///
+    /// Delegates to the shared
+    /// `agent::control_plane_envelope_store::admit_plan` — every T9.3
+    /// ingress point (this bridge, the MCP `dsl_execute` tool, the legacy
+    /// raw-execute route, the batch/sheet executors) calls the same
+    /// function so the check can't drift between call sites.
     async fn admit_plan(
         &self,
         plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
     ) -> Result<(), String> {
-        let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
-        for step in &plan.steps {
-            let verb_fqn = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
-            let decision = crate::agent::control_plane_envelope_store::check_admission(
-                &self.pool, &enforced, &verb_fqn, None,
-            )
-            .await
-            .map_err(|e| format!("envelope admission check failed for {verb_fqn}: {e}"))?;
-            match decision {
-                crate::agent::control_plane_envelope_store::AdmissionDecision::NotEnforced
-                | crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => {}
-                crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedNoEnvelope => {
-                    return Err(format!(
-                        "{verb_fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) but no sealed envelope was presented"
-                    ));
-                }
-                crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedConsumeFailed(outcome) => {
-                    return Err(format!("{verb_fqn} envelope admission rejected: {outcome:?}"));
-                }
-            }
-        }
-        Ok(())
+        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, plan).await
     }
 
     /// Shared parse → compile → build context path used by both the
