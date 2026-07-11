@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Document** | EOP-VS-CONTROLPLANE-001 |
-| **Version** | v0.3 (Draft) |
+| **Version** | v0.4 (Draft) |
 | **Type** | Vision & Scope |
 | **Status** | Draft — fit for peer review |
 | **Purpose** | Define the Control Plane as a first-class capability for AI-led, governed, deterministic execution in the Enterprise Onboarding Platform, mapped to the NIST AI Risk Management Framework as a control crosswalk. |
@@ -18,6 +18,7 @@
 | v0.1 | Initial draft as "EOP Control Pack" (EOP-VS-CONTROLPACK-001). |
 | v0.2 | Capability renamed **Control Plane** (see §1.1). Added: NIST AI RMF mapping (Appendix A); decision snapshot semantics (§6.15); envelope single-use, expiry and pre-state pinning (§6.10); type-level envelope provenance and proof-carrying construction (§9.4); pipeline evaluation strategy (§6.16); Phase 0 control inventory (§13); write-set attestation ownership (§6.7); resolution of probabilistic-signal handling (§6.13.1). Tightened repetition between §7 and §12. |
 | v0.3 | Review hardening. NIST language softened from "formalised against" to design **crosswalk** with an explicit pre-Phase-5 caveat (Appendix A). Write-set attestation failure semantics sharpened: abort-before-commit default, post-durability quarantine (§6.7.1). Evidence ownership deduplicated between authority gate and evidence gate (§6.5/§6.6). Durable/queued execution note added: `EnvelopeHandle` rehydration through Control Plane verification (§6.10.4). Gate dependencies declared, with dependency table (§6.16.1). Version-pin precision note for legacy non-versioned (Mode-1) state (§6.10.1). Terminology: `ControlPlaneProof` used consistently; "approved runtime admission path" replaces "runtime execution path" (§6.9). |
+| v0.4 | Amendment 1: Clearing-House Mandate. New §15 (mediation topology; leakproof L1–L3; coverage C1–C3; pack universality K1–K3; read-lens decision §15.5; migration posture). §8 relationship directions inverted. §12 criteria 13–15 added. v0.3 checkpoint topology reclassified as transitional. |
 
 ---
 
@@ -86,6 +87,7 @@ The Control Plane makes the distinction explicit:
 > The AI may propose intent.
 > The Control Plane decides whether that intent is executable.
 > The runtime, not the AI, moves state.
+> …and the Control Plane is the only party that can ask it to.
 
 ---
 
@@ -731,7 +733,7 @@ This is the line between AI-assisted work and AI-executed regulated work. The su
 
 ## 8.1 Sage
 
-Sage interprets operator intent, asks clarifying questions, and proposes candidate semantic commands, each carrying an interpretation attestation (§6.13.1).
+**(v0.4 — direction inverted per §15.1; see Amendment 1.)** The Control Plane receives the utterance and invokes Sage as its interpretation capability, granting the interpretation context (per §15.5). Sage returns candidate intents with attestations; Sage holds no capability keys and cannot dispatch.
 
 Sage does not execute.
 
@@ -759,11 +761,15 @@ The REPL/compiler validates, resolves and compiles the command into an executabl
 
 The Control Plane consumes compiler proof and decides whether the runbook may proceed to execution.
 
+**(v0.4 — direction inverted per §15.1; see Amendment 1.)** The compiler is invoked by, and only by, the clearing house on agent-originated flows — it is a delegated call from the hub, not an upstream stage the Control Plane is inserted after.
+
 ## 8.6 Runtime
 
 The runtime executes only approved envelopes, verifies pre-state pins before execution (§6.10.1), enforces envelope single-use and expiry (§6.10.2), and performs write-set attestation in its commit path (§6.7.1).
 
 It does not accept direct AI instructions.
+
+**(v0.4 — direction inverted per §15.1; see Amendment 1.)** The runtime is invoked by, and only by, the clearing house on agent-originated flows — it is a delegated call from the hub, not an upstream stage the Control Plane is inserted after.
 
 ## 8.7 Migration from the ad-hoc control plane
 
@@ -942,6 +948,12 @@ The Control Plane is successful when the platform can prove, before execution:
 11. replay of the decision reproduces the decision; replay of the envelope is rejected;
 12. audit reconstruction (§6.11) is guaranteed.
 
+**(v0.4 additions — Amendment 1, §15):**
+
+13. the dependency-graph gate (L1) is green with zero agent→capability edges outside the Control Plane;
+14. `capability_invocations_without_cp_provenance` ≡ 0 over a full graduation window, on all packs, attested on the assurance plane;
+15. a newly authored pack demonstrates K3: full coverage with zero pack-specific coverage work, evidenced at onboarding.
+
 It is also successful when the platform can reject unsafe AI output deterministically.
 
 A rejected AI action should be a normal, auditable control outcome — not an exception to the architecture.
@@ -1030,6 +1042,65 @@ The Control Plane does not make AI safe by trusting the model. It makes AI-led w
 
 ---
 
+# 15. Target Topology: The Clearing House
+
+**(Amendment 1, ratified.)** The architect directive this section converts into enforceable architecture:
+
+> The Control Plane is the ONLY clearing house between the agents (Sage, REPL, and any future agent surface) and the guts of the solution — DSL, DAG, SemOS, runtime, stores, and every other capability. To be auditable it must be a leakproof, 100%-coverage gateway, and it MUST cover all packs.
+
+Everything in v0.3 — gates, proofs, envelope lifecycle, snapshot semantics, shadow→enforce graduation — is unchanged. What changes is **topology ownership**: v0.3 described a control plane inserted into an existing pipeline (checkpoint); v0.4 makes the control plane the pipeline (mediator).
+
+## 15.1 Mediation, not interception
+
+The Control Plane intercepts at the **utterance** — before parsing, before pack/domain selection — and owns the sequence from that point. The former pipeline stages become capabilities it invokes:
+
+- Sage is not upstream proposing intents to the Control Plane; Sage is an **interpretation capability** the Control Plane invokes with the utterance and the context it grants.
+- Pack/domain selection happens **inside** the clearing house (G3 is not consulted about a resolution made elsewhere; it IS the resolution point).
+- Compilation, DAG proof, authority, evidence, execution: delegated calls from the hub, returning borrowed proofs (§4/§9.1 unchanged — the decision-assembler law was always hub-shaped; this section makes the call topology match the decision topology).
+
+No capability calls another capability laterally on an agent-originated flow. The point-to-point mesh is not gated; it is **retired**.
+
+## 15.2 Leakproof, defined structurally
+
+"Leakproof" is a compile-time property, not an audit finding:
+
+- **L1 — Dependency direction lock.** Agent crates carry zero dependency edges to capability crates except via `ob-poc-control-plane`. Enforced by a CI dependency-graph gate (the `cargo tree` companion to the pub-surface ratchet). A new lateral edge fails CI the way a new pub item does.
+- **L2 — Keyed doors.** Each capability crate exposes exactly one entry surface, and that surface requires a **`CapabilityInvocation` context type constructible only by the Control Plane** — the seal pattern (§9.4) applied to invocation, not just execution. Holding the type proves clearing-house provenance; code that didn't cross the clearing house cannot type-check a capability call.
+- **L3 — Lateral surface deletion.** Existing pub items that enabled point-to-point calls are deleted, not deprecated — each deletion a one-commit baseline reduction the ratchet locks (the FIA-4B shrink list is this section's opening backlog).
+
+## 15.3 100% coverage, defined measurably
+
+Coverage is continuously attested, not periodically reviewed:
+
+- **C1 — Compile-time coverage**: L1's graph gate green ⇒ no alternative route exists to compile.
+- **C2 — Runtime coverage attestation**: every capability entry point counts invocations by provenance. The metric `capability_invocations_without_cp_provenance` is on the assurance plane (§6.14) with an alert threshold of **zero**. During migration this number is the honest measure of remaining mesh; at completion it is the standing proof of the directive.
+- **C3 — Audit closure**: every agent-originated state transition has a Control Plane decision record reachable from its audit trail (§6.11 unchanged; C1+C2 are what make its universality provable rather than asserted).
+
+## 15.4 Pack universality (the ALL-packs clause)
+
+Coverage is inherited by construction, never wired per pack:
+
+- **K1** — Pack resolution executes inside the clearing house; there is no pack-scoped entry that precedes or bypasses it.
+- **K2** — A pack cannot register verbs, routes, handlers, or tools that dispatch outside the Control Plane: the registration surfaces themselves require the L2 context type, so an out-of-house dispatch is unregistrable, not merely forbidden.
+- **K3** — Pack onboarding requires no coverage work and permits no coverage exemption: pack N+1 is covered by the same compile-time proof as pack 1. Any proposed pack-scoped exception to the clearing house is a V&S amendment, not a configuration.
+
+## 15.5 Reads — ratified: R-a, typed read-only lenses
+
+**(Ratified 2026-07-11.)** Two conformant designs for agent read access (e.g. Sage's interpretation-context reads against SemOS) were considered:
+
+- **(R-a, RATIFIED) CP-issued read lenses**: the clearing house grants session-scoped, **typed read-only lenses** — capability views that provably cannot reach a write surface (no write types importable through the lens; enforced by the same visibility discipline). Interpretation stays hot-path-fast; leakproofness holds because a lens cannot move state and cannot be minted outside the clearing house.
+- (R-b, not selected) Full mediation: every read brokered through the hub. Purest form; adds a hop inside interpretation loops; reserved as the fallback if lens discipline proves unenforceable.
+
+Under R-a, C1–C3 and K1–K3 apply unchanged to all invocations and writes. MCA-001 (2026-07-11) found two live read-path violations of this section prior to ratification — `ob-poc-sage::session_context`'s direct `sqlx` access (AB4) and the session-checkpoint read-back feeding `SessionVerbSurface` (AB5) — both are the R-a conformance target these findings now have a concrete remedy against; see the ownership ledger's T11 mesh-retirement backlog.
+
+## 15.6 Migration posture
+
+Checkpoint topology (v0.3 as built, T0–T10) is the **transitional state**, not a rival design: everything built relocates into the hub unchanged — gates, envelope lifecycle, admission scope, shadow telemetry. The migration ratchet is: C2's without-provenance count falls as lateral surfaces are deleted (L3), tranche by tranche, and CI locks each fall; the terminal state is C2 ≡ 0 locked by C1. The multi-path graduation story of the runbook collapses, at completion, to a single ingress — a simplification of the enforce-mode endgame, not an extension of it.
+
+**Ratification record:** §15.1 mediation topology ratified as the target state; §15.5 ratified R-a (typed read-only lenses); §15.6 checkpoint work (T0–T10) confirmed as transitional, relocating not discarded. Applied to the repo copy same session as ratification, per Amendment 1's own authorization.
+
+---
+
 # Appendix A — NIST AI Risk Management Framework Mapping
 
 This capability is structured using the NIST AI RMF (AI 100-1) Govern / Map / Measure / Manage functions, expressed as executable platform controls. The mapping below is the **proposed crosswalk** for Risk, Controls and Audit review: each RMF function is intended to be realised by named, testable capabilities with named output artefacts.
@@ -1069,4 +1140,4 @@ The design intent is that every RMF function above is exercised on **every** pro
 
 ---
 
-*End of document — EOP-VS-CONTROLPLANE-001 v0.3*
+*End of document — EOP-VS-CONTROLPLANE-001 v0.4*
