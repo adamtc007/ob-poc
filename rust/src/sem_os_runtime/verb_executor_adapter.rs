@@ -114,21 +114,27 @@ impl ObPocVerbExecutor {
 
 #[cfg(feature = "database")]
 impl ObPocVerbExecutor {
-    /// T4.1 (EOP-PLAN-CONTROLPLANE-001): admission-check `verb_fqn` against
-    /// the `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` set before dispatching.
-    /// Read fresh from the environment on every call rather than cached at
-    /// construction — matches `LifecycleGateMode::from_env()`'s existing
-    /// per-call-read pattern (`dsl_v2/executor.rs`) so a config change
-    /// takes effect without a process restart, which matters for a
-    /// mechanism whose whole purpose is incremental per-path graduation.
-    async fn admit(
+    /// T9.2 (§3, §4): admission-checks `verb_fqn` against the
+    /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` set (read fresh from the
+    /// environment on every call — matches `LifecycleGateMode::from_env()`'s
+    /// existing per-call-read pattern, `dsl_v2/executor.rs`) using the
+    /// caller's own `&mut PgConnection` rather than a fresh pool checkout,
+    /// so the envelope consume and the verb dispatch it gates are joined
+    /// to one transaction. Superseded the pool-based `admit()` (removed —
+    /// its only caller, `execute_verb_admitting_envelope`, now opens one
+    /// scope up front and calls this instead). A rejection here rolls the
+    /// whole scope back (the caller does this), which per the design doc's
+    /// rollback-retry corollary correctly leaves the envelope reconsumable
+    /// rather than burning it on a rejected attempt.
+    async fn admit_in_scope(
         &self,
         verb_fqn: &str,
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        conn: &mut sqlx::PgConnection,
     ) -> dsl_runtime::Result<()> {
         let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
-        let decision = crate::agent::control_plane_envelope_store::check_admission(
-            self.executor.pool(),
+        let decision = crate::agent::control_plane_envelope_store::check_admission_in_scope(
+            conn,
             &enforced,
             verb_fqn,
             envelope_handle,
@@ -150,6 +156,149 @@ impl ObPocVerbExecutor {
                 )))
             }
         }
+    }
+
+    /// T9.2 (§2/§3): the scope-threaded dispatch core shared by
+    /// `execute_verb_admitting_envelope` — mirrors `execute_verb`'s
+    /// 3-branch routing (SemOS-native ops / CRUD fast path / DslExecutor
+    /// default) but every branch runs against the ONE caller-supplied
+    /// scope instead of opening its own, so admission-check, pin
+    /// verification (when wired — see G13's zero-production-caller note
+    /// in `ob-poc-control-plane::snapshot`), and the verb's own writes all
+    /// commit or roll back together (§2's one-scope-before-branching
+    /// principle; closes the check_admission/dispatch TOCTOU window the
+    /// architect review flagged as this tranche's BLOCKER).
+    async fn execute_verb_in_open_scope(
+        &self,
+        verb_fqn: &str,
+        args: serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn dsl_runtime::TransactionScope,
+    ) -> dsl_runtime::Result<VerbExecutionResult> {
+        let (domain, verb) = split_fqn(verb_fqn)?;
+
+        use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+        let registry = runtime_registry();
+        let runtime_verb = registry.get(&domain, &verb);
+
+        let is_crud = runtime_verb
+            .as_ref()
+            .map(|rv| matches!(rv.behavior, RuntimeBehavior::Crud(_)))
+            .unwrap_or(false);
+
+        tracing::debug!(
+            verb_fqn,
+            has_crud_port = self.crud_port.is_some(),
+            has_sem_os_ops = self.sem_os_ops.is_some(),
+            "VerbExecutionPort: routing verb (in-scope)"
+        );
+
+        // Branch 1: SemOS-native ops — dispatch against the caller's scope
+        // directly (no nested begin/commit; the outer scope owns lifecycle).
+        if let Some(ref ops) = self.sem_os_ops {
+            if let Some(op) = ops.get(verb_fqn) {
+                ctx.services = self.executor.service_registry();
+                let pool = self.executor.pool();
+
+                let mut args = args;
+                if let Some(pre_fetched) = op.pre_fetch(&args, ctx, pool).await.map_err(|e| {
+                    SemOsError::Internal(anyhow::anyhow!(
+                        "sem_os_ops({}) pre_fetch failed: {}",
+                        verb_fqn,
+                        e
+                    ))
+                })? {
+                    if let (Some(existing_obj), serde_json::Value::Object(pf_obj)) =
+                        (args.as_object_mut(), pre_fetched)
+                    {
+                        for (k, v) in pf_obj {
+                            existing_obj.insert(k, v);
+                        }
+                    }
+                }
+
+                let pre_symbols = ctx.symbols.clone();
+                let pre_symbol_types = ctx.symbol_types.clone();
+
+                let outcome = op.execute(&args, ctx, scope).await.map_err(|e| {
+                    SemOsError::Internal(anyhow::anyhow!("sem_os_ops({}) failed: {}", verb_fqn, e))
+                })?;
+
+                let mut new_bindings = std::collections::HashMap::new();
+                let mut new_binding_types = std::collections::HashMap::new();
+                for (name, uuid) in &ctx.symbols {
+                    if pre_symbols.get(name) != Some(uuid) {
+                        new_bindings.insert(name.clone(), *uuid);
+                    }
+                }
+                for (name, ty) in &ctx.symbol_types {
+                    if pre_symbol_types.get(name) != Some(ty) {
+                        new_binding_types.insert(name.clone(), ty.clone());
+                    }
+                }
+
+                return Ok(VerbExecutionResult {
+                    outcome,
+                    side_effects: VerbSideEffects {
+                        new_bindings,
+                        new_binding_types,
+                        platform_state: serde_json::Value::Null,
+                    },
+                    ..Default::default()
+                });
+            }
+        }
+
+        // Branch 2: CRUD fast path — execute_crud_in_scope (T9.2 §3), no
+        // pool-based fallback (CrudExecutionPort::execute_crud_in_scope has
+        // no default impl per OQ2).
+        if is_crud {
+            if let Some(ref crud_port) = self.crud_port {
+                if let Some(rv) = runtime_verb.as_ref() {
+                    let contract = runtime_verb_to_contract(rv);
+                    match crud_port
+                        .execute_crud_in_scope(&contract, args.clone(), ctx, scope.executor())
+                        .await
+                    {
+                        Ok(outcome) => {
+                            return Ok(VerbExecutionResult::from_outcome(outcome));
+                        }
+                        Err(SemOsError::InvalidInput(msg)) if msg.contains("not yet migrated") => {
+                            tracing::debug!(verb_fqn, "CRUD port (in-scope): falling through to DslExecutor");
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+            }
+        }
+
+        // Branch 3: default path — DslExecutor dispatch chain via the
+        // scope-accepting sibling (T9.2 §3 Branch 3: trivial swap).
+        let vc = build_verb_call(&domain, &verb, &args);
+        let mut exec_ctx = to_dsl_context(ctx);
+
+        let result = self
+            .executor
+            .execute_verb_in_scope(&vc, &mut exec_ctx, scope)
+            .await
+            .map_err(|e| SemOsError::Internal(anyhow::anyhow!("Verb execution failed: {e}")))?;
+
+        let side_effects = collect_side_effects(ctx, &exec_ctx);
+
+        for (name, uuid) in &side_effects.new_bindings {
+            ctx.symbols.insert(name.clone(), *uuid);
+        }
+        for (name, entity_type) in &side_effects.new_binding_types {
+            ctx.symbol_types.insert(name.clone(), entity_type.clone());
+        }
+
+        let outcome = to_verb_outcome(&result);
+
+        Ok(VerbExecutionResult {
+            outcome,
+            side_effects,
+            ..Default::default()
+        })
     }
 }
 
@@ -340,13 +489,20 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         })
     }
 
-    /// T4.1: admission-checks `verb_fqn` before delegating to
-    /// `execute_verb`. With the production-default empty
-    /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`, `admit()` always returns
-    /// `Ok(())` immediately (`NotEnforced`) — this override is
-    /// behaviourally identical to the default trait impl for every path
-    /// until a verb is explicitly added to that set, matching the plan's
-    /// shadow-first posture (§0).
+    /// T4.1 → T9.2: admission-checks `verb_fqn` and dispatches it inside
+    /// ONE `PgTransactionScope` (§2's one-scope-before-branching
+    /// principle) — the admission check (envelope consume), and the
+    /// verb's own dispatch/writes, commit or roll back together. Before
+    /// T9.2 these ran as two independent transactions (`admit()` against a
+    /// fresh pool checkout, then `execute_verb` opening its own scope per
+    /// branch), leaving a real TOCTOU window between "envelope admitted"
+    /// and "verb executed" under READ COMMITTED. With the production-default
+    /// empty `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`, admission is always
+    /// `NotEnforced` and this path is behaviourally unchanged for
+    /// everything except: CRUD verbs now execute atomically with the rest
+    /// of the scope instead of autocommitting per statement (§6, an
+    /// intentional correctness improvement, not a no-op — see the design
+    /// doc's reframe of the original "behaviorally invisible" claim).
     async fn execute_verb_admitting_envelope(
         &self,
         verb_fqn: &str,
@@ -354,8 +510,54 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         ctx: &mut VerbExecutionContext,
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
     ) -> dsl_runtime::Result<VerbExecutionResult> {
-        self.admit(verb_fqn, envelope_handle).await?;
-        self.execute_verb(verb_fqn, args, ctx).await
+        use crate::sequencer_tx::PgTransactionScope;
+        use dsl_runtime::TransactionScope;
+
+        let pool = self.executor.pool();
+        let mut scope = PgTransactionScope::begin(pool).await.map_err(|e| {
+            SemOsError::Internal(anyhow::anyhow!(
+                "execute_verb_admitting_envelope({verb_fqn}): begin txn failed: {e}"
+            ))
+        })?;
+
+        if let Err(e) = self
+            .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
+            .await
+        {
+            if let Err(rollback_err) = scope.rollback().await {
+                tracing::warn!(
+                    verb_fqn,
+                    %rollback_err,
+                    "execute_verb_admitting_envelope: rollback failed after admission rejection"
+                );
+            }
+            return Err(e);
+        }
+
+        let scope_dyn: &mut dyn dsl_runtime::TransactionScope = &mut scope;
+        match self
+            .execute_verb_in_open_scope(verb_fqn, args, ctx, scope_dyn)
+            .await
+        {
+            Ok(result) => {
+                scope.commit().await.map_err(|e| {
+                    SemOsError::Internal(anyhow::anyhow!(
+                        "execute_verb_admitting_envelope({verb_fqn}): commit failed: {e}"
+                    ))
+                })?;
+                Ok(result)
+            }
+            Err(e) => {
+                if let Err(rollback_err) = scope.rollback().await {
+                    tracing::warn!(
+                        verb_fqn,
+                        %rollback_err,
+                        "execute_verb_admitting_envelope: rollback failed after dispatch error"
+                    );
+                }
+                Err(e)
+            }
+        }
     }
 }
 
@@ -962,10 +1164,35 @@ mod tests {
 #[cfg(all(test, feature = "database"))]
 mod t4_1_envelope_admission_tests {
     use super::*;
+    use crate::sequencer_tx::PgTransactionScope;
+    use dsl_runtime::TransactionScope;
 
     async fn test_pool() -> sqlx::PgPool {
         let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
         sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    /// T9.2: `admit()` (pool-based) was removed in favor of `admit_in_scope`
+    /// — these tests now open their own scope per call, exactly mirroring
+    /// what `execute_verb_admitting_envelope` does in production. A
+    /// consume only durably persists once the scope commits, so tests
+    /// asserting a prior consume is visible to a later call must commit
+    /// between them.
+    async fn admit_in_scope_committed(
+        executor: &ObPocVerbExecutor,
+        verb_fqn: &str,
+        envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        pool: &sqlx::PgPool,
+    ) -> dsl_runtime::Result<()> {
+        let mut scope = PgTransactionScope::begin(pool).await.expect("begin scope");
+        let result = executor
+            .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
+            .await;
+        match &result {
+            Ok(()) => scope.commit().await.expect("commit"),
+            Err(_) => scope.rollback().await.expect("rollback"),
+        }
+        result
     }
 
     /// Guards `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` mutation so these tests
@@ -989,9 +1216,8 @@ mod t4_1_envelope_admission_tests {
     async fn shadow_default_admits_every_verb_with_no_envelope() {
         std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS"); // explicit production default
         let pool = test_pool().await;
-        let executor = ObPocVerbExecutor::from_pool(pool);
-        executor
-            .admit("cbu.confirm", None)
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        admit_in_scope_committed(&executor, "cbu.confirm", None, &pool)
             .await
             .expect("unset OB_POC_CONTROL_PLANE_ENFORCE_VERBS must admit every verb, envelope or not");
     }
@@ -1001,10 +1227,9 @@ mod t4_1_envelope_admission_tests {
     async fn enforced_verb_without_envelope_is_rejected() {
         let _guard = EnvGuard::set("cbu.confirm");
         let pool = test_pool().await;
-        let executor = ObPocVerbExecutor::from_pool(pool);
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
 
-        let err = executor
-            .admit("cbu.confirm", None)
+        let err = admit_in_scope_committed(&executor, "cbu.confirm", None, &pool)
             .await
             .expect_err("enforced verb with no envelope must be rejected");
         assert!(err.to_string().contains("no sealed envelope was presented"));
@@ -1034,22 +1259,19 @@ mod t4_1_envelope_admission_tests {
         .await
         .expect("insert sealed envelope row");
 
-        let executor = ObPocVerbExecutor::from_pool(pool);
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
 
-        executor
-            .admit("cbu.confirm", Some(handle))
+        admit_in_scope_committed(&executor, "cbu.confirm", Some(handle), &pool)
             .await
             .expect("sealed, unconsumed envelope must admit");
 
-        let err = executor
-            .admit("cbu.confirm", Some(handle))
+        let err = admit_in_scope_committed(&executor, "cbu.confirm", Some(handle), &pool)
             .await
             .expect_err("resubmitting the same (now-consumed) envelope must be rejected");
         assert!(err.to_string().contains("AlreadyConsumed"));
 
         // A different, non-enforced verb is untouched by this envelope's fate.
-        executor
-            .admit("cbu.reject", None)
+        admit_in_scope_committed(&executor, "cbu.reject", None, &pool)
             .await
             .expect("cbu.reject is not in the enforced set — must admit regardless");
     }
@@ -1083,22 +1305,76 @@ mod t4_1_envelope_admission_tests {
         .await
         .expect("insert sealed envelope row");
 
-        let executor = ObPocVerbExecutor::from_pool(pool);
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
 
         // Same id, wrong hash — a forged/mismatched handle.
         let wrong_hash: [u8; 32] = [0x22; 32];
         let wrong_handle = ob_poc_types::EnvelopeHandle::new(envelope_id, wrong_hash);
-        let err = executor
-            .admit("cbu.confirm", Some(wrong_handle))
+        let err = admit_in_scope_committed(&executor, "cbu.confirm", Some(wrong_handle), &pool)
             .await
             .expect_err("content-hash mismatch must reject, not silently admit on id match alone");
         assert!(err.to_string().contains("ContentHashMismatch"));
 
         // The real handle is still consumable afterward — a rejected
         // mismatched attempt must not have poisoned or consumed the row.
-        executor
-            .admit("cbu.confirm", Some(real_handle))
+        admit_in_scope_committed(&executor, "cbu.confirm", Some(real_handle), &pool)
             .await
             .expect("the genuine handle must still admit after a mismatched attempt");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_verb_admitting_envelope_rolls_back_the_consume_when_dispatch_fails() {
+        // T9.2's whole point, end to end: `execute_verb_admitting_envelope`
+        // now runs admission-check and verb dispatch inside ONE scope
+        // (§2's one-scope-before-branching principle). Before this
+        // tranche, `admit()` committed its own transaction independently
+        // of dispatch — a failed dispatch after a successful admission
+        // permanently burned the envelope even though the verb never ran.
+        // Proves the fix: dispatch a verb guaranteed to fail (unknown
+        // FQN), then show the envelope is STILL consumable afterward —
+        // the whole scope, including the consume, rolled back.
+        let _guard = EnvGuard::set("nonexistent.verb");
+        let pool = test_pool().await;
+
+        let envelope_id = Uuid::new_v4();
+        let content_hash: [u8; 32] = [0x33; 32];
+        let handle = ob_poc_types::EnvelopeHandle::new(envelope_id, content_hash);
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".control_plane_envelopes (
+                envelope_id, content_hash, session_id, verb_fqn,
+                status, not_before, not_after
+            ) VALUES ($1, $2, $3, 'nonexistent.verb', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+            "#,
+        )
+        .bind(envelope_id)
+        .bind(handle.content_hash_hex())
+        .bind(Uuid::new_v4())
+        .execute(&pool)
+        .await
+        .expect("insert sealed envelope row");
+
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let mut ctx = VerbExecutionContext::new(sem_os_core::principal::Principal::system());
+
+        let dispatch_err = executor
+            .execute_verb_admitting_envelope("nonexistent.verb", serde_json::json!({}), &mut ctx, Some(handle))
+            .await
+            .expect_err("dispatching an unknown FQN must fail");
+        assert!(
+            !dispatch_err.to_string().contains("envelope admission rejected"),
+            "the failure must come from dispatch, not admission: {dispatch_err}"
+        );
+
+        // If the scope truly rolled back together, the envelope must still
+        // be consumable — a second admission attempt with the same handle
+        // succeeds exactly as if the first attempt never happened.
+        admit_in_scope_committed(&executor, "nonexistent.verb", Some(handle), &pool)
+            .await
+            .expect(
+                "the envelope must still be consumable after a dispatch failure — \
+                 a rolled-back scope must leave the consume undone",
+            );
     }
 }
