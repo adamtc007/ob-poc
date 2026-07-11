@@ -1245,4 +1245,99 @@ domains:
             "G7 must report a real, non-not_evaluated Success once its DagProof dependency succeeds"
         );
     }
+
+    // ── T9.1 closure sweep: all seven implemented gates, one dispatch ──
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn t9_1_closure_all_seven_gates_reach_a_real_outcome_on_one_dispatch() {
+        // The actual amended-T9.1 exit criterion (ownership ledger,
+        // "T9.1 is amended" entry): "all implemented gates non-
+        // not_evaluated on every live verb family" — not seven pairwise
+        // proofs, one combined dispatch. Every prior T9.1 sub-tranche
+        // proved its own gate reachable given its declared dependency;
+        // this is the first test that builds all seven inputs together
+        // and checks the whole chain (G1 IntentAdmission through G7
+        // WriteSet) in a single evaluate_shadow call, against a real cbu
+        // row for G2's entity facts.
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("at least one cbu row exists in the dev database");
+
+        let verb_fqn = "test.transition-verb";
+
+        // G1: envelope admits the verb.
+        let envelope = SemOsContextEnvelope::test_with_verbs(&[verb_fqn]);
+
+        // G2: real per-entity facts for the live cbu row.
+        let requests = vec![(cbu_id, "cbu".to_string())];
+        let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool: &pool };
+        let facts = ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &requests)
+            .await
+            .expect("batched fetch succeeds");
+        let entity_binding = Some(build_entity_binding_input(&requests, &facts));
+
+        // G3: one active pack declaring the verb.
+        let manifest = test_pack_manifest("fixture-pack", vec![verb_fqn]);
+        let pack_resolution = Some(build_pack_resolution_input(
+            Some(("fixture-pack", &manifest)),
+            verb_fqn,
+            true,
+        ));
+
+        // G4: fixture DAG/GateChecker, legal transition.
+        let pipe = test_gate_pipeline();
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), cbu_id.to_string());
+        let dag_proof = build_dag_proof_input(Some(&pipe), verb_fqn, &args)
+            .await
+            .expect("verb has transition_args and a matching DAG transition");
+
+        // G7: fixture domain-metadata write footprint.
+        let metadata = test_domain_metadata(verb_fqn, vec!["\"testtable\""]);
+        let entry_id = Uuid::new_v4();
+        let write_set = build_write_set_input(Some(&metadata), verb_fqn, entry_id, vec![cbu_id])
+            .expect("verb has a non-empty write footprint");
+
+        // G5 (Authority) and G6 (Evidence) need no separate build_* input
+        // here — they're derived inside build_evaluation_context from the
+        // same envelope/actor already assembled above (no AbacDenied
+        // prune, no evidence_gaps -> Allow / Sufficient).
+        let ctx = build_evaluation_context(
+            &envelope,
+            verb_fqn,
+            entry_id,
+            &test_actor(),
+            entity_binding,
+            pack_resolution,
+            Some(dag_proof),
+            Some(write_set),
+        );
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+
+        use ob_poc_control_plane::gate::{GateId, GateResult};
+        for gate_id in [
+            GateId::IntentAdmission,
+            GateId::EntityBinding,
+            GateId::PackResolution,
+            GateId::DagProof,
+            GateId::Authority,
+            GateId::Evidence,
+            GateId::WriteSet,
+        ] {
+            let result = report.get(gate_id);
+            assert!(
+                !matches!(result, Some(GateResult::NotEvaluated { .. }) | None),
+                "T9.1 closure: {gate_id:?} must reach a real (non-not_evaluated) outcome, got {result:?}"
+            );
+            assert_eq!(
+                result,
+                Some(&GateResult::Success),
+                "T9.1 closure: {gate_id:?} expected Success given every input was built to be legal, got {result:?}"
+            );
+        }
+    }
 }
