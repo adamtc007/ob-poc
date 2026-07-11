@@ -181,7 +181,9 @@ Both gates report `NotEvaluated` regardless of the real input now wired — the 
 
 **Option considered and rejected:** de-scoping G5/G6 back to "deferred" alongside G3/G4/G7 was considered and rejected — it would defer the graduation clock for no saving, since the same G2/G3 prerequisite gates the whole pipeline regardless of which sub-tranches are nominally excluded. The wiring is done; it stays landed, inert-but-honestly-labeled, pending T9.1-pre/T9.1a.
 
-**T9.1c/T9.1d status: WIRED, NOT CLOSED.** Reopens as closed only once T9.1-pre and T9.1a land and a live Path A dispatch shows non-`not_evaluated` Authority/Evidence results recorded in `control_plane_shadow_decisions`.
+**T9.1c/T9.1d status: WIRED, NOT CLOSED** (accurate when written — corrected below). Reopens as closed only once T9.1-pre and T9.1a land and a live Path A dispatch shows non-`not_evaluated` Authority/Evidence results recorded in `control_plane_shadow_decisions`.
+
+**Update: T9.1c/T9.1d now CLOSED (2026-07-11, same day, commit `15835f7d`)** — T9.1-pre (G2) and T9.1a (G3) both landed later this session. `g3_reaches_success_and_unblocks_authority_evidence` (`agent::control_plane_shadow::tests`) proves via `evaluate_shadow` that Authority and Evidence both reach real `Success`, not `NotEvaluated`, once their declared dependencies genuinely succeed. The exit criterion this entry set is met.
 
 ## T9.1-pre reclassified: "plumbing" was wrong in principle, not just in practice (2026-07-11)
 
@@ -262,3 +264,14 @@ Addendum B's own sonnet execution note pre-authorized this outcome: *"T9.2 is th
 **Practical effect on T9.1's dependency order:** per `GATE_DEPENDENCIES` (`crates/ob-poc-control-plane/src/gate.rs`), G4/G5/G6/G7 all transitively require G3. **T9.1 is now blocked at G2** (closed) pending T9.1a. T9.1c/d's landed wiring (Authority/Evidence) will not report real, non-`not_evaluated` outcomes until this is resolved — confirmed empirically in the T9.1-pre closure entry above (`g3_is_now_the_sole_blocker_for_authority_and_evidence`).
 
 **T9.1a status: FLAGGED, not attempted.** No code changed. Options for the architect, not picked unilaterally: (a) scope a minimal PackManager session-activation wiring sub-project as its own tranche (size/shape TBD — needs its own investigation into where pack activation/suspension state should live: session record, a new table, or derived per-turn from something else entirely); (b) an architect-specified alternative real pack-identity source not yet identified; (c) accept T9.1 stops at G2 for the current graduation cycle and revisit the graduation-window definition (`EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001`) accordingly.
+
+### Correction (2026-07-11, same day, option (a) picked): the "build new infrastructure" conclusion above was wrong
+
+The finding that `PackManager` has zero production construction sites was, and remains, accurate — left as-is above rather than deleted. **The conclusion drawn from it was not:** re-investigating before starting the "build it" work turned up two already-live pieces of session state that make new session-persistent pack-activation infrastructure unnecessary:
+
+- `ReplSessionV2::active_pack_id() -> Option<String>` (`src/repl/session_v2.rs:949`) — already computed from `self.staged_pack`/`self.runbook.pack_id`. Confirmed via a direct schema check (`grep "^id:" config/packs/*.yaml`) that REPL journey pack ids are bare strings (`"kyc-case"`, `"book-setup"`), not the SemOS-Domain-Pack dotted format (`"ob-poc.cbu"`) `pack_resolution.rs`'s own test fixtures happened to use — confirming `constraint_gate.rs`/`PackManager`'s designed analogue really is the REPL journey pack system, not SemOS Domain Packs, resolving the ambiguity the original flag didn't fully chase down.
+- `ReplOrchestratorV2::pack_router: PackRouter` (`src/sequencer.rs:229`) — already holds every loaded journey-pack manifest in memory (`PackRouter::get_pack(pack_id) -> Option<&(Arc<PackManifest>, String)>`), already used extensively elsewhere in `sequencer.rs`.
+
+`PackManager` itself is pure in-memory state (two `HashMap`s, no I/O, no async) — a fresh, throwaway instance built per shadow-recheck call (register the one active pack, activate it, call `effective_constraints()` + the already-tested `check_pack_constraints`) is cheap and correct for the REPL's real single-active-pack model, not a workaround. No new session-persistent activation tracking was needed. **T9.1a CLOSED** (commit `15835f7d`) — see the implementation entry below for the full design and the empirical proof that Authority/Evidence now reach real `Success`.
+
+Lesson for the ledger, not just this tranche: the original flag stopped at "no live instance of the thing the doc comment points to" without checking whether a *different, already-live* piece of state could feed the same real logic without new infrastructure. Worth the extra look before flagging "needs new infrastructure" as a conclusion, not just a hypothesis.
