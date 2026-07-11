@@ -7824,10 +7824,16 @@ impl ReplOrchestratorV2 {
                 &entry.verb,
                 &entry.args,
             );
-            let entity_binding = if entity_requests.is_empty() {
-                Some(ob_poc_control_plane::entity_binding::EntityBindingInput {
-                    entities: Vec::new(),
-                })
+            // T9.6 (Addendum B): capture the raw facts map (not just G2's
+            // derived EntityBindingInput) so G13's row_version pins can be
+            // read from the exact same rows — no second query. `Some(..)`
+            // for the empty-requests case too (vacuously: nothing to bind,
+            // nothing to pin, not a failed attempt); `None` only on a real
+            // fetch error, same posture entity_binding itself has always had.
+            let entity_facts_map: Option<
+                HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>,
+            > = if entity_requests.is_empty() {
+                Some(HashMap::new())
             } else {
                 let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool };
                 match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(
@@ -7836,20 +7842,23 @@ impl ReplOrchestratorV2 {
                 )
                 .await
                 {
-                    Ok(facts) => Some(crate::agent::control_plane_shadow::build_entity_binding_input(
-                        &entity_requests,
-                        &facts,
-                    )),
+                    Ok(facts) => Some(facts),
                     Err(e) => {
                         tracing::warn!(
                             error = %e,
                             verb = %entry.verb,
-                            "T9.1-pre: entity_facts lookup failed — G2 shadow-evaluates as not-attempted"
+                            "T9.1-pre: entity_facts lookup failed — G2/G13 shadow-evaluate as not-attempted"
                         );
                         None
                     }
                 }
             };
+            let entity_binding = entity_facts_map.as_ref().map(|facts| {
+                crate::agent::control_plane_shadow::build_entity_binding_input(
+                    &entity_requests,
+                    facts,
+                )
+            });
 
             // T9.1a (Addendum B): resolve G3's PackResolutionInput from the
             // REPL's live single-active-pack session state — see
@@ -7902,6 +7911,13 @@ impl ReplOrchestratorV2 {
                 ),
             );
 
+            // T9.6 (Addendum B): resolve G13's SnapshotInput from the same
+            // entity_facts_map fetched above for G2 — see
+            // build_decision_snapshot_input's doc.
+            let snapshot = crate::agent::control_plane_shadow::build_decision_snapshot_input(
+                entity_facts_map.as_ref(),
+            );
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
@@ -7912,6 +7928,7 @@ impl ReplOrchestratorV2 {
                 dag_proof,
                 write_set,
                 stp_classifier,
+                snapshot,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(

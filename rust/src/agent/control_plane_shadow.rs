@@ -261,6 +261,50 @@ pub(crate) fn build_stp_classifier_input(
     }
 }
 
+/// T9.6 (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G13's `SnapshotInput`
+/// from the exact same batched entity-facts rows G2 already fetches —
+/// `EntityFactsRow.row_version` was added specifically for this convergence
+/// (see `entity_facts.rs`'s own module doc: "T9.2's `SnapshotPins` need
+/// `row_version` from the same rows"), so this reads no new data at all.
+///
+/// `sem_reg_snapshot_id` / `session_snapshot_id` / `kyc_manifest_hash` /
+/// `versions` (the `PinnedVersionSet`) all stay at their `Option::None` /
+/// `Default` values — not a placeholder, but this call site's honest
+/// answer: `snapshot.rs`'s own module doc says plainly "No production
+/// analogue exists today" for those four pins specifically (SemReg
+/// snapshot-set id, session snapshot id, KYC manifest hash, and the T4.4
+/// compiler/model/prompt version bundle). Only the per-entity
+/// `row_version` pin has a real, live source at this call site.
+///
+/// `DecisionSnapshotGate::decide` (see `snapshot.rs`) only checks whether
+/// `Some(_)` was supplied at all — an empty-but-present `SnapshotInput` is
+/// `Success` by the gate's own design ("this gate pins whatever was read,
+/// it doesn't judge it"), so `None` is reserved for the one case that
+/// means "we didn't even attempt a read": the batched facts fetch itself
+/// erroring. A verb with zero entity-typed args legitimately gets
+/// `Some(SnapshotInput { entity_row_versions: vec![], .. })` — vacuously
+/// nothing to pin, not a failed attempt — matching G2's own
+/// zero-entity-args posture (`build_evaluation_context`'s doc).
+pub(crate) fn build_decision_snapshot_input(
+    facts: Option<&HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>>,
+) -> Option<ob_poc_control_plane::snapshot::SnapshotInput> {
+    let facts = facts?;
+    let entity_row_versions = facts
+        .values()
+        .map(|row| {
+            (
+                row.facts.entity_id,
+                row.facts.expected_kind.clone(),
+                row.row_version,
+            )
+        })
+        .collect();
+    Some(ob_poc_control_plane::snapshot::SnapshotInput {
+        entity_row_versions,
+        ..Default::default()
+    })
+}
+
 /// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
 /// verb's resolved args are entity references, by contract — not by
 /// regexing values for UUID shape (`write_set.rs::derive_write_set_heuristic`
@@ -404,6 +448,14 @@ pub(crate) fn build_entity_binding_input(
 ///   production `SnapshotPins` populator exists yet (T4.3), so every
 ///   bound entity is honestly unpinned.
 ///
+/// - G13 (decision snapshot, T9.6): built by
+///   [`build_decision_snapshot_input`] from the same batched entity-facts
+///   rows G2 already fetches (`EntityFactsRow.row_version`, no second
+///   query). `sem_reg_snapshot_id`/`session_snapshot_id`/`kyc_manifest_hash`/
+///   `versions` all stay at their defaults — no production source exists
+///   for those yet (`snapshot.rs`'s own module doc). `None` only when the
+///   batched facts fetch itself errored (same posture as G2/G8).
+///
 /// `is_ai_originated`/`interpretation_attested` are conservatively `false`
 /// (no attestation requirement applied) because this call site has no
 /// Sage-pre-classification / intent-telemetry signal threaded through yet
@@ -422,6 +474,7 @@ pub(crate) fn build_evaluation_context(
     dag_proof: Option<ob_poc_control_plane::dag_proof::DagProofInput>,
     write_set: Option<ob_poc_control_plane::write_set::WriteSetInput>,
     stp_classifier: Option<ob_poc_control_plane::stp_classifier::StpClassifierInput>,
+    snapshot: Option<ob_poc_control_plane::snapshot::SnapshotInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -447,6 +500,7 @@ pub(crate) fn build_evaluation_context(
         dag_proof,
         write_set,
         stp_classifier,
+        snapshot,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -591,7 +645,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -608,7 +662,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -627,7 +681,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -639,7 +693,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -652,7 +706,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None, None, None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -775,6 +829,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
         assert_eq!(
@@ -820,6 +875,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
             None,
             None,
@@ -871,6 +927,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
             None,
             None,
@@ -995,6 +1052,7 @@ mod tests {
             &test_actor(),
             entity_binding,
             pack_resolution,
+            None,
             None,
             None,
             None,
@@ -1151,6 +1209,7 @@ cross_workspace_constraints: []
             Some(dag_proof),
             None,
             None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1293,6 +1352,52 @@ domains:
         assert!(!input.durable_execution_explicitly_allowed);
     }
 
+    // ── T9.6 (Addendum B): build_decision_snapshot_input ──
+
+    fn fixture_entity_facts_row(entity_id: Uuid, kind: &str, row_version: i64) -> ob_poc_boundary::entity_facts::EntityFactsRow {
+        ob_poc_boundary::entity_facts::EntityFactsRow {
+            facts: ob_poc_control_plane::entity_binding::EntityFacts {
+                entity_id,
+                exists: true,
+                expected_kind: kind.to_string(),
+                actual_kind: kind.to_string(),
+                lifecycle_state_readable: true,
+                availability_blocked: false,
+                availability_reason: None,
+                in_active_pack: true,
+            },
+            row_version,
+        }
+    }
+
+    #[test]
+    fn build_decision_snapshot_input_none_when_facts_fetch_not_attempted() {
+        // Mirrors G2's own None-on-fetch-error posture — not a fabricated
+        // empty-but-successful snapshot.
+        assert!(build_decision_snapshot_input(None).is_none());
+    }
+
+    #[test]
+    fn build_decision_snapshot_input_some_empty_when_no_entities_requested() {
+        // Vacuous: nothing to pin, not a failed attempt — Some(default),
+        // matching DecisionSnapshotGate's own "empty pins still succeed" law.
+        let facts = HashMap::new();
+        let input = build_decision_snapshot_input(Some(&facts)).expect("attempted, even if empty");
+        assert!(input.entity_row_versions.is_empty());
+        assert!(input.sem_reg_snapshot_id.is_none());
+        assert!(input.session_snapshot_id.is_none());
+        assert!(input.kyc_manifest_hash.is_none());
+    }
+
+    #[test]
+    fn build_decision_snapshot_input_carries_real_row_versions() {
+        let entity_id = Uuid::new_v4();
+        let mut facts = HashMap::new();
+        facts.insert(entity_id, fixture_entity_facts_row(entity_id, "cbu", 7));
+        let input = build_decision_snapshot_input(Some(&facts)).expect("facts supplied");
+        assert_eq!(input.entity_row_versions, vec![(entity_id, "cbu".to_string(), 7)]);
+    }
+
     #[tokio::test]
     async fn g7_reaches_success_end_to_end_given_a_legal_dag_transition() {
         // Empirical reachability proof, matching the g2/g3/g4 pattern:
@@ -1333,6 +1438,7 @@ domains:
             pack_resolution,
             Some(dag_proof),
             Some(write_set),
+            None,
             None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
@@ -1425,6 +1531,11 @@ domains:
         // unpinned entities.
         let stp_classifier = Some(build_stp_classifier_input(verb_fqn, false));
 
+        // G13 (decision snapshot, T9.6): no declared dependency
+        // (GATE_DEPENDENCIES), built from the exact same `facts` map G2
+        // already fetched above — one live cbu row, one real row_version.
+        let snapshot = build_decision_snapshot_input(Some(&facts));
+
         let ctx = build_evaluation_context(
             &envelope,
             verb_fqn,
@@ -1435,6 +1546,7 @@ domains:
             Some(dag_proof),
             Some(write_set),
             stp_classifier,
+            snapshot,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1448,6 +1560,7 @@ domains:
             GateId::Evidence,
             GateId::WriteSet,
             GateId::StpClassifier,
+            GateId::DecisionSnapshot,
         ] {
             let result = report.get(gate_id);
             assert!(
