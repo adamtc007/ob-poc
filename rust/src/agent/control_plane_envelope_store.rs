@@ -95,6 +95,31 @@ pub(crate) async fn check_admission(
     }
 }
 
+/// T9.2: [`check_admission`] against an already-open `PgTransactionScope`'s
+/// connection — the T9.2 atomic-admission entry point. Same decision
+/// logic, but the underlying consume (when enforced) runs via
+/// [`try_consume_in_scope`], so the envelope's `FOR UPDATE` lock and the
+/// consumption itself live inside the caller's own transaction, not a
+/// separate one that commits before the write even begins.
+#[cfg(feature = "database")]
+pub(crate) async fn check_admission_in_scope(
+    conn: &mut sqlx::PgConnection,
+    enforced: &EnforcedVerbs,
+    verb_fqn: &str,
+    envelope_handle: Option<EnvelopeHandle>,
+) -> anyhow::Result<AdmissionDecision> {
+    if !enforced.is_enforced(verb_fqn) {
+        return Ok(AdmissionDecision::NotEnforced);
+    }
+    let Some(handle) = envelope_handle else {
+        return Ok(AdmissionDecision::RejectedNoEnvelope);
+    };
+    match try_consume_in_scope(conn, &handle).await? {
+        ConsumeOutcome::Consumed => Ok(AdmissionDecision::Admitted),
+        other => Ok(AdmissionDecision::RejectedConsumeFailed(other)),
+    }
+}
+
 /// The outcome of attempting to consume a sealed envelope exactly once.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ConsumeOutcome {
@@ -226,21 +251,24 @@ pub(crate) async fn persist_sealed(
     }
 }
 
-/// Attempts to consume `handle` exactly once. Runs inside its own
-/// transaction with `SELECT ... FOR UPDATE` on the envelope row so two
-/// concurrent dispatch attempts against the same handle cannot both
-/// observe `sealed` (the second blocks on the row lock, then observes the
-/// first's `consumed` write). Internal — shared by `try_consume` (content-
-/// hash checked) and `try_consume_by_id` (id-only, see that fn's doc for
-/// why a weaker variant exists at all).
+/// T9.2 (EOP-PLAN-CONTROLPLANE-001 Addendum B): pure query logic for
+/// consuming an envelope exactly once — `SELECT ... FOR UPDATE` on the
+/// envelope row, then the appropriate status branch — against a caller-
+/// supplied connection, with **no `begin()`/`commit()` of its own**. The
+/// caller owns the transaction boundary: [`try_consume_inner`] wraps this
+/// in its own `pool.begin()`/`commit()` for standalone (pool-based) use;
+/// [`try_consume_in_scope`] runs it directly against an already-open
+/// `PgTransactionScope`'s connection, so the `FOR UPDATE` lock is held
+/// for the scope's full lifetime (through the verb's write), not just for
+/// this one call — closing the TOCTOU gap the T9.2 design doc's §5a
+/// section exists to close, the same locking pattern §5a also requires
+/// for `verify_pins_in_scope`.
 #[cfg(feature = "database")]
-async fn try_consume_inner(
-    pool: &sqlx::PgPool,
+async fn consume_core(
+    conn: &mut sqlx::PgConnection,
     envelope_id: Uuid,
     expected_content_hash: Option<&str>,
 ) -> anyhow::Result<ConsumeOutcome> {
-    let mut tx = pool.begin().await?;
-
     let row: Option<(String, String, chrono::DateTime<Utc>, chrono::DateTime<Utc>)> = sqlx::query_as(
         r#"
         SELECT content_hash, status, not_before, not_after
@@ -250,34 +278,23 @@ async fn try_consume_inner(
         "#,
     )
     .bind(envelope_id)
-    .fetch_optional(&mut *tx)
+    .fetch_optional(&mut *conn)
     .await?;
 
     let Some((content_hash, status, _not_before, not_after)) = row else {
-        tx.commit().await?;
         return Ok(ConsumeOutcome::NotFound);
     };
 
     if let Some(expected) = expected_content_hash {
         if content_hash != expected {
-            tx.commit().await?;
             return Ok(ConsumeOutcome::ContentHashMismatch);
         }
     }
 
     match status.as_str() {
-        "consumed" => {
-            tx.commit().await?;
-            return Ok(ConsumeOutcome::AlreadyConsumed);
-        }
-        "voided" => {
-            tx.commit().await?;
-            return Ok(ConsumeOutcome::Voided);
-        }
-        "expired" => {
-            tx.commit().await?;
-            return Ok(ConsumeOutcome::Expired);
-        }
+        "consumed" => return Ok(ConsumeOutcome::AlreadyConsumed),
+        "voided" => return Ok(ConsumeOutcome::Voided),
+        "expired" => return Ok(ConsumeOutcome::Expired),
         _ => {}
     }
 
@@ -286,9 +303,8 @@ async fn try_consume_inner(
             r#"UPDATE "ob-poc".control_plane_envelopes SET status = 'expired' WHERE envelope_id = $1"#,
         )
         .bind(envelope_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
-        tx.commit().await?;
         return Ok(ConsumeOutcome::Expired);
     }
 
@@ -300,10 +316,42 @@ async fn try_consume_inner(
         "#,
     )
     .bind(envelope_id)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
-    tx.commit().await?;
     Ok(ConsumeOutcome::Consumed)
+}
+
+/// Attempts to consume `handle` exactly once. Runs inside its own
+/// transaction with `SELECT ... FOR UPDATE` on the envelope row so two
+/// concurrent dispatch attempts against the same handle cannot both
+/// observe `sealed` (the second blocks on the row lock, then observes the
+/// first's `consumed` write). Internal — shared by `try_consume` (content-
+/// hash checked) and `try_consume_by_id` (id-only, see that fn's doc for
+/// why a weaker variant exists at all). Standalone/pool-based use only —
+/// see [`try_consume_in_scope`] for the T9.2 atomic-admission path.
+#[cfg(feature = "database")]
+async fn try_consume_inner(
+    pool: &sqlx::PgPool,
+    envelope_id: Uuid,
+    expected_content_hash: Option<&str>,
+) -> anyhow::Result<ConsumeOutcome> {
+    let mut tx = pool.begin().await?;
+    let outcome = consume_core(&mut tx, envelope_id, expected_content_hash).await?;
+    tx.commit().await?;
+    Ok(outcome)
+}
+
+/// T9.2: [`consume_core`] against an already-open `PgTransactionScope`'s
+/// connection — no `begin()`/`commit()` here; the caller's outer scope
+/// owns that boundary and the `FOR UPDATE` lock this acquires is held
+/// until the caller's own commit/rollback, not released after this call
+/// returns.
+#[cfg(feature = "database")]
+pub(crate) async fn try_consume_in_scope(
+    conn: &mut sqlx::PgConnection,
+    handle: &EnvelopeHandle,
+) -> anyhow::Result<ConsumeOutcome> {
+    consume_core(conn, handle.id(), Some(&handle.content_hash_hex())).await
 }
 
 /// Attempts to consume `handle` exactly once, verifying its content hash
@@ -539,6 +587,145 @@ mod tests {
             try_consume_by_id(&pool, handle.id()).await.unwrap(),
             ConsumeOutcome::AlreadyConsumed
         );
+    }
+
+    // ── T9.2: try_consume_in_scope / check_admission_in_scope ──────────────
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn try_consume_in_scope_matches_try_consume_behavior() {
+        let pool = test_pool().await;
+        let now = Utc::now();
+        let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
+        let handle = envelope.handle();
+        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+
+        let mut tx = pool.begin().await.unwrap();
+        let outcome = try_consume_in_scope(&mut tx, &handle).await.unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(outcome, ConsumeOutcome::Consumed);
+
+        // Second attempt, fresh scope: already consumed.
+        let mut tx = pool.begin().await.unwrap();
+        let outcome = try_consume_in_scope(&mut tx, &handle).await.unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(outcome, ConsumeOutcome::AlreadyConsumed);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn try_consume_in_scope_rolled_back_leaves_envelope_reconsumable() {
+        // The T9.2 design doc's "rollback-then-retry corollary": if the
+        // outer scope that consumed the envelope rolls back (e.g. because
+        // the write that followed failed), consumption rolls back too —
+        // single-use semantics working as designed, not a bug.
+        let pool = test_pool().await;
+        let now = Utc::now();
+        let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
+        let handle = envelope.handle();
+        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+
+        let mut tx = pool.begin().await.unwrap();
+        let outcome = try_consume_in_scope(&mut tx, &handle).await.unwrap();
+        assert_eq!(outcome, ConsumeOutcome::Consumed);
+        tx.rollback().await.unwrap();
+
+        let mut tx = pool.begin().await.unwrap();
+        let outcome = try_consume_in_scope(&mut tx, &handle).await.unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(
+            outcome,
+            ConsumeOutcome::Consumed,
+            "a rolled-back scope must not leave the envelope durably consumed"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn concurrent_consume_in_scope_blocks_then_observes_winner() {
+        // The actual proof of the FOR UPDATE lock-hold semantics
+        // consume_core relies on: two concurrent scopes racing to consume
+        // the same envelope. The loser must BLOCK on the row lock (not
+        // race to a wrong answer), then observe the winner's outcome once
+        // unblocked. This is the concurrent-consume probe the T9.2 design
+        // doc's §6 testing strategy calls for, exercised against the new
+        // in-scope path specifically (the old try_consume's own
+        // consumed_envelope_resubmission_is_rejected test proves single-
+        // use correctness but not the blocking behavior under real
+        // concurrency, since it runs both attempts sequentially).
+        let pool = test_pool().await;
+        let now = Utc::now();
+        let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
+        let handle = envelope.handle();
+        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+
+        let mut winner_tx = pool.begin().await.unwrap();
+        let winner_outcome = try_consume_in_scope(&mut winner_tx, &handle).await.unwrap();
+        assert_eq!(winner_outcome, ConsumeOutcome::Consumed);
+
+        // Second connection attempts to consume the same handle while the
+        // winner's transaction is still open (uncommitted) — must block,
+        // not return immediately.
+        let pool2 = pool.clone();
+        let handle2 = handle;
+        let loser = tokio::spawn(async move {
+            let mut tx = pool2.begin().await.unwrap();
+            let outcome = try_consume_in_scope(&mut tx, &handle2).await.unwrap();
+            tx.commit().await.unwrap();
+            outcome
+        });
+
+        // Give the loser a moment to reach the lock and (correctly) block.
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(
+            !loser.is_finished(),
+            "loser must still be blocked on the row lock while the winner's scope is open"
+        );
+
+        winner_tx.commit().await.unwrap();
+
+        let loser_outcome = tokio::time::timeout(std::time::Duration::from_secs(5), loser)
+            .await
+            .expect("loser must unblock once the winner commits")
+            .unwrap();
+        assert_eq!(
+            loser_outcome,
+            ConsumeOutcome::AlreadyConsumed,
+            "loser must observe the winner's committed consumption, not race to Consumed itself"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn check_admission_in_scope_matches_check_admission_behavior() {
+        let pool = test_pool().await;
+        let now = Utc::now();
+        let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
+        let handle = envelope.handle();
+        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+
+        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
+
+        let mut tx = pool.begin().await.unwrap();
+        let decision = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", Some(handle))
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(decision, AdmissionDecision::Admitted);
+
+        let mut tx = pool.begin().await.unwrap();
+        let decision = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", None)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(decision, AdmissionDecision::RejectedNoEnvelope);
+
+        let mut tx = pool.begin().await.unwrap();
+        let decision = check_admission_in_scope(&mut tx, &EnforcedVerbs::default(), "cbu.confirm", None)
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(decision, AdmissionDecision::NotEnforced);
     }
 
     // ── T9.3 (Addendum B): admit_plan_checked ──────────────────────────────
