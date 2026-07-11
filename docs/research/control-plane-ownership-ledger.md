@@ -222,3 +222,19 @@ New live-DB tests for `admit_plan_checked` (11/11 passing): a 2-verb plan is rej
 **Allowlist updated:** `audits/surface/_verb-execution-context-allowlist.txt`'s `src/dsl_v2/executor.rs` entry reclassified `KNOWN-BYPASS` → `ADMISSION-WIRED` (construction site itself unchanged — `git diff --stat` confirms zero changes to `dsl_v2/executor.rs`, per the redesign's own exit criterion — but every production caller reaching it now pre-admits). Gate output: `ALLOWLISTED (ADMISSION-WIRED): src/dsl_v2/executor.rs` — **zero `KNOWN-BYPASS` entries remain.**
 
 **T9.3 status: CLOSED.** All production DSL dispatch ingress points in the running service are admission-checked (mechanism-only while `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` is empty by production default — same shadow-first posture as every other T9 sub-tranche). `cargo build` clean (`ob-poc` lib with/without `database` feature, `ob-poc-web`), `cargo clippy` clean on all touched files.
+
+## Tranche T9.2 — FLAGGED, not attempted (2026-07-11)
+
+Addendum B's own sonnet execution note pre-authorized this outcome: *"T9.2 is the one sub-tranche where 'STOP and flag' is the expected outcome if the transaction restructure surfaces a constraint this addendum didn't anticipate... a flagged design constraint beats a shipped approximation."* It did.
+
+**What "atomic admission" requires:** envelope consumption + `verify_pins` (`ob-poc-boundary::toctou_recheck` — has **zero production call sites today**, so even the pin-check half of T9.2 is currently entirely unwired) + the verb's own write, all inside one transaction, so nothing can commit a conflicting change between the admission check and the write.
+
+**Why it can't be done as a scoped change:** `ObPocVerbExecutor::execute_verb` (`src/sem_os_runtime/verb_executor_adapter.rs`) routes a dispatched verb to one of three structurally different, all-live-in-production transaction strategies, selected by verb behavior at runtime:
+
+1. **SemOS-native ops** (~line 225-289) — explicit `PgTransactionScope::begin(pool)` / `commit()` / `rollback()`.
+2. **CRUD fast path** (~line 293-309, `PgCrudExecutor`, wired in production at `crates/ob-poc-web/src/main.rs:1588`) — holds a bare `pool: PgPool`; each `execute_select`/`execute_insert`/etc. (`crates/dsl-runtime/src/crud_executor.rs`) is its own implicit autocommit statement, no transaction at all today.
+3. **Generic path** (~line 311-320) — delegates into `dsl_v2::executor::DslExecutor`, which opens its own transaction internally (`execute_verb_inner`/`execute_verb_in_scope`).
+
+`execute_verb_admitting_envelope` today calls `self.admit(...)` (its own pool-acquired `try_consume` UPDATE, committed independently) then `self.execute_verb(...)` (one of the three above, its own separate transaction) — two fully independent commits with a real gap between them. Closing that gap for real means opening one outer transaction before branch selection, threading that same connection through whichever of the three branches gets used, and stopping each branch from opening its own nested transaction when a caller-supplied one is already active — a structural rewrite of the busiest shared dispatch path in the system, spanning three independently-evolved subsystems (`sem_os_ops` registry, `CrudExecutionPort`, `dsl_v2::executor::DslExecutor`). Not a scoped, reversible single-session change; a wrong move risks silently wrong commit/rollback semantics or deadlocks across every domain, not just control-plane paths.
+
+**T9.2 status: FLAGGED, not attempted.** No code changed. Options for how to proceed, put to the architect rather than picked unilaterally: (a) a short design doc for the three-branch transaction-scope unification, reviewed before any code lands; (b) hold T9.2 open indefinitely while other T9 work proceeds; (c) architect-specified alternative mechanism.
