@@ -50,11 +50,22 @@ pub struct SnapshotPins {
     sem_reg_snapshot_id: Option<Uuid>,
     session_snapshot_id: Option<Uuid>,
     kyc_manifest_hash: Option<String>,
-    /// Entity id -> observed row_version, for every bound entity where a
-    /// version pin is available. An entity absent from this map has no
-    /// comparable version pin (RR-5 Mode-1) and is STP-ineligible per plan
-    /// A5 until the row-version migration (C-045) lands for its family.
-    entity_row_versions: Vec<(Uuid, i64)>,
+    /// Entity id, kind, and observed row_version, for every bound entity
+    /// where a version pin is available. An entity absent from this list
+    /// has no comparable version pin (RR-5 Mode-1) and is STP-ineligible
+    /// per plan A5 until the row-version migration (C-045) lands for its
+    /// family.
+    ///
+    /// T9.2 (EOP-PLAN-CONTROLPLANE-001 Addendum B): widened from
+    /// `Vec<(Uuid, i64)>` to include `kind` — neither this pin nor G2's
+    /// own `BoundEntities` proof previously carried entity kind anywhere
+    /// in the sealed envelope, so a real (non-shadow) pin re-check at
+    /// admission time had no honest source for the table to lock, short
+    /// of re-deriving it from the verb's *current* args — exactly the
+    /// check-time re-derivation the sealed-envelope design exists to
+    /// prevent. G13 has zero production callers today, so this widening
+    /// is additive with no live caller to break.
+    entity_row_versions: Vec<(Uuid, String, i64)>,
     versions: PinnedVersionSet,
 }
 
@@ -66,7 +77,7 @@ impl SnapshotPins {
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
         kyc_manifest_hash: Option<String>,
-        entity_row_versions: Vec<(Uuid, i64)>,
+        entity_row_versions: Vec<(Uuid, String, i64)>,
         versions: PinnedVersionSet,
     ) -> Self {
         Self {
@@ -93,8 +104,17 @@ impl SnapshotPins {
     pub fn entity_row_version(&self, entity_id: Uuid) -> Option<i64> {
         self.entity_row_versions
             .iter()
-            .find(|(id, _)| *id == entity_id)
-            .map(|(_, version)| *version)
+            .find(|(id, _, _)| *id == entity_id)
+            .map(|(_, _, version)| *version)
+    }
+
+    /// T9.2: entity id + kind + pinned row_version, for every pinned
+    /// entity — the single source of truth `verify_pins_in_scope` reads
+    /// from directly, rather than requiring a separately-supplied
+    /// `entity_kinds` list that could drift from what was actually pinned
+    /// at gate time.
+    pub fn entity_kinds_and_versions(&self) -> &[(Uuid, String, i64)] {
+        &self.entity_row_versions
     }
 
     pub fn versions(&self) -> &PinnedVersionSet {
@@ -120,7 +140,7 @@ pub mod tests_support {
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
         kyc_manifest_hash: Option<String>,
-        entity_row_versions: Vec<(Uuid, i64)>,
+        entity_row_versions: Vec<(Uuid, String, i64)>,
     ) -> SnapshotPins {
         SnapshotPins::new(
             sem_reg_snapshot_id,
@@ -135,7 +155,7 @@ pub mod tests_support {
         sem_reg_snapshot_id: Option<Uuid>,
         session_snapshot_id: Option<Uuid>,
         kyc_manifest_hash: Option<String>,
-        entity_row_versions: Vec<(Uuid, i64)>,
+        entity_row_versions: Vec<(Uuid, String, i64)>,
         versions: PinnedVersionSet,
     ) -> SnapshotPins {
         SnapshotPins::new(
@@ -157,7 +177,7 @@ pub struct SnapshotInput {
     pub sem_reg_snapshot_id: Option<Uuid>,
     pub session_snapshot_id: Option<Uuid>,
     pub kyc_manifest_hash: Option<String>,
-    pub entity_row_versions: Vec<(Uuid, i64)>,
+    pub entity_row_versions: Vec<(Uuid, String, i64)>,
     pub versions: PinnedVersionSet,
 }
 
@@ -202,7 +222,7 @@ mod tests {
             sem_reg_snapshot_id: Some(Uuid::nil()),
             session_snapshot_id: None,
             kyc_manifest_hash: Some("hash-1".to_string()),
-            entity_row_versions: vec![(entity, 5)],
+            entity_row_versions: vec![(entity, "cbu".to_string(), 5)],
             versions: PinnedVersionSet {
                 bus_catalogue_version: Some("v3".to_string()),
                 ..Default::default()
@@ -237,7 +257,7 @@ mod tests {
     #[test]
     fn snapshot_pins_is_constructible_within_its_own_module() {
         let entity = Uuid::nil();
-        let pins = SnapshotPins::new(Some(Uuid::nil()), None, None, vec![(entity, 3)], PinnedVersionSet::default());
+        let pins = SnapshotPins::new(Some(Uuid::nil()), None, None, vec![(entity, "cbu".to_string(), 3)], PinnedVersionSet::default());
         assert_eq!(pins.entity_row_version(entity), Some(3));
     }
 
@@ -245,7 +265,7 @@ mod tests {
     fn unpinned_entities_reports_bound_entities_missing_a_version() {
         let pinned = Uuid::from_u128(1);
         let unpinned = Uuid::from_u128(2);
-        let pins = SnapshotPins::new(None, None, None, vec![(pinned, 1)], PinnedVersionSet::default());
+        let pins = SnapshotPins::new(None, None, None, vec![(pinned, "cbu".to_string(), 1)], PinnedVersionSet::default());
         let result: Vec<Uuid> = pins.unpinned_entities(&[pinned, unpinned]).collect();
         assert_eq!(result, vec![unpinned]);
     }

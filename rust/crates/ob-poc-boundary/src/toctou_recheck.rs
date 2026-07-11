@@ -471,14 +471,14 @@ mod tests {
         assert!(err.is_err(), "one entity drifted → drift detected");
     }
 
-    fn pins_with(entries: Vec<(Uuid, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
+    fn pins_with(entries: Vec<(Uuid, String, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
         ob_poc_control_plane::snapshot::tests_support::pins(None, None, None, entries)
     }
 
     #[tokio::test]
     async fn verify_pins_matches_when_row_version_unchanged() {
         let entity_id = Uuid::new_v4();
-        let pins = pins_with(vec![(entity_id, 42)]);
+        let pins = pins_with(vec![(entity_id, "cbu".to_string(), 42)]);
         let mut map = HashMap::new();
         map.insert(entity_id, 42u64);
         let provider = MockProvider(Mutex::new(map));
@@ -491,7 +491,7 @@ mod tests {
     #[tokio::test]
     async fn verify_pins_detects_drift_when_row_version_bumped() {
         let entity_id = Uuid::new_v4();
-        let pins = pins_with(vec![(entity_id, 42)]);
+        let pins = pins_with(vec![(entity_id, "cbu".to_string(), 42)]);
         let mut map = HashMap::new();
         map.insert(entity_id, 43u64);
         let provider = MockProvider(Mutex::new(map));
@@ -511,7 +511,7 @@ mod tests {
         // in entity_kinds has no pin recorded.
         let pinned = Uuid::new_v4();
         let unpinned = Uuid::new_v4();
-        let pins = pins_with(vec![(pinned, 1)]);
+        let pins = pins_with(vec![(pinned, "cbu".to_string(), 1)]);
         let mut map = HashMap::new();
         map.insert(pinned, 1u64);
         // deliberately no row_version for `unpinned` in the provider map —
@@ -541,7 +541,7 @@ mod db_integration_tests {
         sqlx::PgPool::connect(&url).await.expect("connect")
     }
 
-    fn pins_with(entries: Vec<(Uuid, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
+    fn pins_with(entries: Vec<(Uuid, String, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
         ob_poc_control_plane::snapshot::tests_support::pins(None, None, None, entries)
     }
 
@@ -557,12 +557,12 @@ mod db_integration_tests {
 
         let provider = SqlRowVersionProvider { pool: &pool };
 
-        let matching_pins = pins_with(vec![(cbu_id, current_row_version)]);
+        let matching_pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version)]);
         verify_pins(&matching_pins, &[(cbu_id, "cbu".to_string())], &provider)
             .await
             .expect("pin matching the live row_version must not drift");
 
-        let stale_pins = pins_with(vec![(cbu_id, current_row_version - 1)]);
+        let stale_pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version - 1)]);
         let err = verify_pins(&stale_pins, &[(cbu_id, "cbu".to_string())], &provider)
             .await
             .expect_err("a pin one version behind the live row must drift");

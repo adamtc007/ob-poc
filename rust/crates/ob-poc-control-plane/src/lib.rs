@@ -231,7 +231,7 @@ mod evaluate_shadow_tests {
                 sem_reg_snapshot_id: Some(Uuid::nil()),
                 session_snapshot_id: None,
                 kyc_manifest_hash: None,
-                entity_row_versions: vec![(entity, 1)],
+                entity_row_versions: vec![(entity, "cbu".to_string(), 1)],
                 versions: snapshot::PinnedVersionSet::default(),
             }),
             stp_classifier: Some(StpClassifierInput {

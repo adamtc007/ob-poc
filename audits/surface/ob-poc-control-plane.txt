@@ -1,4 +1,4 @@
-# ob-poc-control-plane | features=all | HEAD=6ab569acc43b3c5f3ac2ec0304c0bd298dedce77 | 2026-07-11T08:03:52Z
+# ob-poc-control-plane | features=all | HEAD=7ebdd46a2ac8f4ea722ab6791d74753b214f091d | 2026-07-11T13:45:26Z
 pub mod ob_poc_control_plane
 pub mod ob_poc_control_plane::audit
 pub mod ob_poc_control_plane::authority_gate
@@ -1820,8 +1820,8 @@ impl<T> typenum::type_operators::Same for ob_poc_control_plane::proof::ControlPl
 pub type ob_poc_control_plane::proof::ControlPlaneProof::Output = T
 pub mod ob_poc_control_plane::snapshot
 pub mod ob_poc_control_plane::snapshot::tests_support
-pub fn ob_poc_control_plane::snapshot::tests_support::pins(core::option::Option<uuid::Uuid>, core::option::Option<uuid::Uuid>, core::option::Option<alloc::string::String>, alloc::vec::Vec<(uuid::Uuid, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins
-pub fn ob_poc_control_plane::snapshot::tests_support::pins_with_versions(core::option::Option<uuid::Uuid>, core::option::Option<uuid::Uuid>, core::option::Option<alloc::string::String>, alloc::vec::Vec<(uuid::Uuid, i64)>, ob_poc_control_plane::snapshot::PinnedVersionSet) -> ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::tests_support::pins(core::option::Option<uuid::Uuid>, core::option::Option<uuid::Uuid>, core::option::Option<alloc::string::String>, alloc::vec::Vec<(uuid::Uuid, alloc::string::String, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::tests_support::pins_with_versions(core::option::Option<uuid::Uuid>, core::option::Option<uuid::Uuid>, core::option::Option<alloc::string::String>, alloc::vec::Vec<(uuid::Uuid, alloc::string::String, i64)>, ob_poc_control_plane::snapshot::PinnedVersionSet) -> ob_poc_control_plane::snapshot::SnapshotPins
 pub struct ob_poc_control_plane::snapshot::DecisionSnapshotGate
 impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::snapshot::DecisionSnapshotGate
 pub fn ob_poc_control_plane::snapshot::DecisionSnapshotGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
@@ -1903,7 +1903,7 @@ impl<T> serde_core::de::DeserializeOwned for ob_poc_control_plane::snapshot::Pin
 impl<T> typenum::type_operators::Same for ob_poc_control_plane::snapshot::PinnedVersionSet
 pub type ob_poc_control_plane::snapshot::PinnedVersionSet::Output = T
 pub struct ob_poc_control_plane::snapshot::SnapshotInput
-pub ob_poc_control_plane::snapshot::SnapshotInput::entity_row_versions: alloc::vec::Vec<(uuid::Uuid, i64)>
+pub ob_poc_control_plane::snapshot::SnapshotInput::entity_row_versions: alloc::vec::Vec<(uuid::Uuid, alloc::string::String, i64)>
 pub ob_poc_control_plane::snapshot::SnapshotInput::kyc_manifest_hash: core::option::Option<alloc::string::String>
 pub ob_poc_control_plane::snapshot::SnapshotInput::sem_reg_snapshot_id: core::option::Option<uuid::Uuid>
 pub ob_poc_control_plane::snapshot::SnapshotInput::session_snapshot_id: core::option::Option<uuid::Uuid>
@@ -1956,6 +1956,7 @@ impl<T> typenum::type_operators::Same for ob_poc_control_plane::snapshot::Snapsh
 pub type ob_poc_control_plane::snapshot::SnapshotInput::Output = T
 pub struct ob_poc_control_plane::snapshot::SnapshotPins
 impl ob_poc_control_plane::snapshot::SnapshotPins
+pub fn ob_poc_control_plane::snapshot::SnapshotPins::entity_kinds_and_versions(&self) -> &[(uuid::Uuid, alloc::string::String, i64)]
 pub fn ob_poc_control_plane::snapshot::SnapshotPins::entity_row_version(&self, uuid::Uuid) -> core::option::Option<i64>
 pub fn ob_poc_control_plane::snapshot::SnapshotPins::kyc_manifest_hash(&self) -> core::option::Option<&str>
 pub fn ob_poc_control_plane::snapshot::SnapshotPins::sem_reg_snapshot_id(&self) -> core::option::Option<uuid::Uuid>
