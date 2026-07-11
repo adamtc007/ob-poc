@@ -109,6 +109,70 @@ pub(crate) fn build_pack_resolution_input(
     }
 }
 
+/// T9.1b (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G4's
+/// `DagProofInput` by reusing the real v1.3 gate's own resolution
+/// mechanism — `resolve_transition_probe`, extracted from
+/// `pre_dispatch_gate_check`'s original inline body (see that function's
+/// doc for the extraction's equivalence proof) — rather than re-deriving
+/// verb→transition resolution from scratch. This is the same
+/// `entity_id_arg`/`target_state_arg`/`target_workspace`/`target_slot`
+/// (`transition_args`, 87 verbs declaring it) and the same
+/// `GateChecker::check_transition` the real dispatch-path gate uses.
+///
+/// `gate_pipeline` is `ReplOrchestratorV2`'s own `GatePipeline` (built at
+/// `ob-poc-web::main` startup) — already reachable at this call site
+/// since `phase5_runtime_recheck` is a method on the same struct; no new
+/// plumbing needed.
+///
+/// Returns `None` when: no `GatePipeline` is wired (shadow simply has
+/// nothing to observe yet — not an error); the verb has no
+/// `transition_args` declared (most verbs are not state transitions at
+/// all); the DAG has no matching transition for this verb; or resolution
+/// itself failed (missing/invalid entity_id arg, unresolvable
+/// workspace — logged, not silently promoted to a wrong-but-passing
+/// fact, same posture as `build_entity_binding_input`'s entity_facts
+/// lookup failure).
+///
+/// `lifecycle_fail_open_class` stays `None` and
+/// `lifecycle_gate_mode_fail_closed` stays `false` — T0.2's
+/// `enforce_requires_states_precondition` needs a live `&mut dyn
+/// TransactionScope` (designed for real dispatch, not read-only shadow
+/// observation); unifying it here is real follow-on work, not silently
+/// folded into this tranche (see the ownership ledger).
+pub(crate) async fn build_dag_proof_input(
+    gate_pipeline: Option<&crate::runbook::step_executor_bridge::GatePipeline>,
+    verb_fqn: &str,
+    entry_args: &HashMap<String, String>,
+) -> Option<ob_poc_control_plane::dag_proof::DagProofInput> {
+    let pipe = gate_pipeline?;
+    let probe = crate::runbook::step_executor_bridge::resolve_transition_probe(
+        pipe,
+        verb_fqn,
+        |arg| entry_args.get(arg).map(|s| s.as_str()),
+    )
+    .await;
+
+    match probe {
+        Ok(Some(probe)) => Some(ob_poc_control_plane::dag_proof::DagProofInput {
+            entity_id: probe.entity_id,
+            from_state: probe.from_state,
+            to_state: probe.to_state,
+            blocking_violations: probe.blocking_violations,
+            lifecycle_fail_open_class: None,
+            lifecycle_gate_mode_fail_closed: false,
+        }),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!(
+                verb_fqn,
+                error = %e,
+                "T9.1b: DAG transition probe resolution failed — G4 shadow-evaluates as not-attempted"
+            );
+            None
+        }
+    }
+}
+
 /// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
 /// verb's resolved args are entity references, by contract — not by
 /// regexing values for UUID shape (`write_set.rs::derive_write_set_heuristic`
@@ -220,15 +284,26 @@ pub(crate) fn build_entity_binding_input(
 ///   correction of the T9.1-pre design pass's original (wrong) assumption
 ///   that this needed the SemOS Domain Pack taxonomy.
 ///
-/// **Still `not_evaluated` (G4/G7 — T9.1b/e, deferred, see the
-/// ownership ledger):** G4 needs a real proposed state transition (current
-/// entity state + declared to-state), which needs a DB read against the
-/// DAG/slot-state machinery this call site doesn't currently perform. G7
-/// needs a richer write-set (tables, columns, state slots — not just
-/// entity ids) than the legacy `derive_write_set_heuristic` can produce,
-/// and that legacy function needs parsed verb args this call site doesn't have
-/// (only the raw DSL string). None of these three should be guessed at;
-/// each is real follow-on integration work.
+/// - G4 (DAG transition proof, T9.1b): built by [`build_dag_proof_input`]
+///   by reusing the real v1.3 gate's own resolution mechanism
+///   (`step_executor_bridge::resolve_transition_probe`, extracted from
+///   `pre_dispatch_gate_check` — see that function's doc) against the
+///   `GatePipeline` already carried on `ReplOrchestratorV2`. `None` when
+///   no `GatePipeline` is wired, the verb has no `transition_args`
+///   declared, or the DAG has no matching transition — all legitimate
+///   (most verbs are not state transitions at all). `lifecycle_fail_open_class`
+///   stays `None` / `lifecycle_gate_mode_fail_closed` stays `false`: T0.2's
+///   `enforce_requires_states_precondition` needs a live `&mut dyn
+///   TransactionScope` (it's designed for real dispatch, not a read-only
+///   shadow observation) — unifying it here is real follow-on work, not
+///   silently folded into this tranche.
+///
+/// **Still `not_evaluated` (G7 — T9.1e, deferred, see the ownership
+/// ledger):** G7 needs a richer write-set (tables, columns, state slots —
+/// not just entity ids) than the legacy `derive_write_set_heuristic` can
+/// produce, and that legacy function needs parsed verb args this call site
+/// doesn't have (only the raw DSL string). Should not be guessed at — real
+/// follow-on integration work.
 ///
 /// `is_ai_originated`/`interpretation_attested` are conservatively `false`
 /// (no attestation requirement applied) because this call site has no
@@ -244,6 +319,7 @@ pub(crate) fn build_evaluation_context(
     actor: &ActorContext,
     entity_binding: Option<ob_poc_control_plane::entity_binding::EntityBindingInput>,
     pack_resolution: Option<ob_poc_control_plane::pack_resolution::PackResolutionInput>,
+    dag_proof: Option<ob_poc_control_plane::dag_proof::DagProofInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -266,6 +342,7 @@ pub(crate) fn build_evaluation_context(
     ob_poc_control_plane::context::EvaluationContext {
         entity_binding,
         pack_resolution,
+        dag_proof,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -410,7 +487,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -427,7 +504,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -446,7 +523,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -458,7 +535,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -471,7 +548,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -591,6 +668,7 @@ mod tests {
             &test_actor(),
             entity_binding,
             None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
         assert_eq!(
@@ -636,6 +714,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
@@ -684,6 +763,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
@@ -805,6 +885,7 @@ mod tests {
             &test_actor(),
             entity_binding,
             pack_resolution,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -826,5 +907,158 @@ mod tests {
             Some(&ob_poc_control_plane::gate::GateResult::Success),
             "Evidence must reach a real outcome now that its declared dependencies (EntityBinding, PackResolution) both succeed"
         );
+    }
+
+    // ── T9.1b (Addendum B): build_dag_proof_input ──────────────────────
+
+    #[tokio::test]
+    async fn build_dag_proof_input_none_when_no_gate_pipeline() {
+        let args = HashMap::new();
+        let dag_proof = build_dag_proof_input(None, "cbu.confirm", &args).await;
+        assert!(dag_proof.is_none(), "no GatePipeline wired -> nothing to observe, not an error");
+    }
+
+    /// Minimal self-contained GatePipeline fixture — no live DB, no
+    /// `harness` feature, same in-memory pattern
+    /// `step_executor_bridge`'s equivalence tests use.
+    struct FixedSlotState(std::collections::HashMap<(String, String, Uuid), Option<String>>);
+
+    #[async_trait::async_trait]
+    impl dsl_runtime::cross_workspace::SlotStateProvider for FixedSlotState {
+        async fn read_slot_state(
+            &self,
+            workspace: &str,
+            slot: &str,
+            entity_id: Uuid,
+            _pool: &sqlx::PgPool,
+        ) -> anyhow::Result<Option<String>> {
+            Ok(self
+                .0
+                .get(&(workspace.to_string(), slot.to_string(), entity_id))
+                .cloned()
+                .unwrap_or(None))
+        }
+    }
+
+    struct FixedLookup(Option<dsl_core::TransitionArgs>);
+
+    impl crate::runbook::step_executor_bridge::VerbTransitionLookup for FixedLookup {
+        fn lookup(&self, _verb_fqn: &str) -> Option<dsl_core::TransitionArgs> {
+            self.0.clone()
+        }
+    }
+
+    const TEST_DAG_YAML: &str = r#"
+workspace: testws
+dag_id: test_dag
+slots:
+  - id: testslot
+    stateless: false
+    state_machine:
+      id: sm
+      states: [{ id: FROM, entry: true }, { id: TO }]
+      transitions:
+        - from: FROM
+          to: TO
+          via: test.transition-verb
+cross_workspace_constraints: []
+"#;
+
+    fn test_gate_pipeline() -> crate::runbook::step_executor_bridge::GatePipeline {
+        let dir = std::env::temp_dir().join(format!("t91b_shadow_test_dag_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("test.yaml"), TEST_DAG_YAML).unwrap();
+        let registry =
+            std::sync::Arc::new(dsl_runtime::cross_workspace::DagRegistry::from_dir(&dir).unwrap());
+        std::fs::remove_dir_all(&dir).ok();
+
+        let gate_checker = std::sync::Arc::new(dsl_runtime::GateChecker::new(
+            registry.clone(),
+            std::sync::Arc::new(FixedSlotState(Default::default())),
+            std::sync::Arc::new(dsl_runtime::cross_workspace::SameEntityResolver),
+        ));
+        let verb_metadata: std::sync::Arc<dyn crate::runbook::step_executor_bridge::VerbTransitionLookup> =
+            std::sync::Arc::new(FixedLookup(Some(dsl_core::TransitionArgs {
+                entity_id_arg: "entity-id".into(),
+                target_state_arg: None,
+                target_workspace: Some("testws".into()),
+                target_slot: Some("testslot".into()),
+            })));
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://harness-mock-never-connects")
+            .expect("connect_lazy with a valid-shaped URL never fails");
+
+        crate::runbook::step_executor_bridge::GatePipeline {
+            registry,
+            gate_checker,
+            verb_metadata,
+            pool: std::sync::Arc::new(pool),
+            cascade_planner: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn g4_reaches_success_end_to_end_against_a_fixture_dag() {
+        // Empirical reachability proof (this session's established
+        // discipline, matching g2_reaches_success/g3_reaches_success
+        // above): build_dag_proof_input -> build_evaluation_context ->
+        // evaluate_shadow actually reports G4 Success for a verb whose
+        // declared transition_args resolve cleanly against a legal
+        // transition with no blocking violations.
+        let pipe = test_gate_pipeline();
+        let entity_id = Uuid::new_v4();
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), entity_id.to_string());
+
+        let dag_proof = build_dag_proof_input(Some(&pipe), "test.transition-verb", &args)
+            .await
+            .expect("verb has transition_args and a matching DAG transition");
+        assert_eq!(dag_proof.entity_id, entity_id);
+        assert!(dag_proof.blocking_violations.is_empty());
+
+        // G4 depends on EntityBinding + PackResolution (GATE_DEPENDENCIES)
+        // — both must genuinely succeed too, or G4 stays NotEvaluated
+        // regardless of dag_proof's own content.
+        let entity_binding = Some(ob_poc_control_plane::entity_binding::EntityBindingInput {
+            entities: Vec::new(),
+        });
+        let pack_resolution = Some(ob_poc_control_plane::pack_resolution::PackResolutionInput {
+            candidate_pack_ids: vec!["fixture-pack".to_string()],
+            semreg_allowed_set_available: true,
+            constraint_denies_intent: false,
+        });
+
+        let envelope = SemOsContextEnvelope::test_with_verbs(&["test.transition-verb"]);
+        let ctx = build_evaluation_context(
+            &envelope,
+            "test.transition-verb",
+            Uuid::nil(),
+            &test_actor(),
+            entity_binding,
+            pack_resolution,
+            Some(dag_proof),
+        );
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::DagProof),
+            Some(&ob_poc_control_plane::gate::GateResult::Success),
+            "G4 must report a real, non-not_evaluated Success against a legal DAG transition"
+        );
+    }
+
+    #[tokio::test]
+    async fn build_dag_proof_input_none_when_dag_has_no_matching_transition() {
+        let pipe = test_gate_pipeline();
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), Uuid::new_v4().to_string());
+        // FixedLookup returns Some(transition_args) for every verb_fqn
+        // (it doesn't discriminate), but the fixture DAG only declares a
+        // transition `via: test.transition-verb` — "unrelated.verb" has
+        // no matching TransitionRef, so candidates come back empty ->
+        // None, exactly like a real verb with transition_args declared
+        // but no matching DAG transition.
+        let dag_proof = build_dag_proof_input(Some(&pipe), "unrelated.verb", &args).await;
+        assert!(dag_proof.is_none());
     }
 }

@@ -7851,6 +7851,17 @@ impl ReplOrchestratorV2 {
                 ),
             );
 
+            // T9.1b (Addendum B): resolve G4's DagProofInput by reusing
+            // the real v1.3 gate's own resolution mechanism against this
+            // orchestrator's own GatePipeline (already wired at startup,
+            // no new plumbing) — see build_dag_proof_input's doc.
+            let dag_proof = crate::agent::control_plane_shadow::build_dag_proof_input(
+                self.gate_pipeline.as_ref(),
+                &entry.verb,
+                &entry.args,
+            )
+            .await;
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
@@ -7858,6 +7869,7 @@ impl ReplOrchestratorV2 {
                 &actor,
                 entity_binding,
                 pack_resolution,
+                dag_proof,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
