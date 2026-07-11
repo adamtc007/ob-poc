@@ -7796,6 +7796,7 @@ impl ReplOrchestratorV2 {
                 &envelope,
                 &entry.verb,
                 entry_id,
+                &actor,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
