@@ -4634,6 +4634,7 @@ dependencies = [
  "ob-semantic-matcher",
  "sem_os_client",
  "sem_os_core",
+ "sem_os_obpoc_adapter",
  "sem_os_ontology",
  "sem_os_policy",
  "sem_os_postgres",

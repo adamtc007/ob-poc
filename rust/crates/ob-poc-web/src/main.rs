@@ -1568,6 +1568,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        // T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): load the verb→table
+        // write-footprint for G7 shadow evaluation. Best-effort, not
+        // production-fatal — unlike GatePipeline's DAG registry (which
+        // gates real dispatch), this only feeds a shadow-only observation;
+        // a missing/malformed file just leaves G7 shadow-unwired (logged),
+        // exactly like an absent GatePipeline leaves G4 shadow-unwired.
+        {
+            use ob_poc::dsl_v2::ConfigLoader;
+            use sem_os_obpoc_adapter::metadata::DomainMetadata;
+
+            let cfg_loader = ConfigLoader::from_env();
+            let domain_metadata_path = cfg_loader
+                .config_dir()
+                .join("sem_os_seeds/domain_metadata.yaml");
+            match DomainMetadata::from_file(&domain_metadata_path) {
+                Ok(metadata) => {
+                    orchestrator = orchestrator.with_domain_metadata(Arc::new(metadata));
+                    tracing::info!("T9.1e domain metadata loaded (G7 shadow write-footprint)");
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        path = %domain_metadata_path.display(),
+                        "T9.1e domain metadata failed to load — G7 shadow-evaluates as not-attempted"
+                    );
+                }
+            }
+        }
+
         // Wire the VerbExecutionPort — lookup order:
         //   1. SemOsVerbOpRegistry (post-Phase-5c-migrate slice #80: the sole
         //      home for plugin verb implementations).

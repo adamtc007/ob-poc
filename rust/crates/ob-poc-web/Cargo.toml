@@ -63,6 +63,9 @@ sem_os_postgres = { path = "../sem_os_postgres" }
 # means the startup wiring now imports it from this crate.
 dsl-runtime = { path = "../dsl-runtime" }
 
+# T9.1e — verb->table write-footprint loader (G7 shadow evaluation).
+sem_os_obpoc_adapter = { path = "../sem_os_obpoc_adapter" }
+
 # T2B.9 — federated DSL bus (extracted to github.com/adamtc007/bpmn-lite v0.2.0).
 dsl-bus-client.workspace = true
 dsl-bus-server.workspace = true

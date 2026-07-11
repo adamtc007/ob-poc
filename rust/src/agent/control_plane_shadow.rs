@@ -173,6 +173,47 @@ pub(crate) async fn build_dag_proof_input(
     }
 }
 
+/// T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G7's
+/// `WriteSetInput` from the verb's declared write footprint
+/// (`config/sem_os_seeds/domain_metadata.yaml`'s per-verb `writes: [...]`,
+/// loaded once at startup into `domain_metadata`). `WriteSetGate::decide`
+/// (`write_set.rs`) only checks `contract_derived` and non-empty `tables`
+/// — `state_slots`/`allowed_columns` may legitimately stay empty (no
+/// production source for column-level footprint exists yet, and the gate
+/// doesn't require it).
+///
+/// Returns `None` (not a fabricated `CannotDerive`) when: no
+/// `DomainMetadata` is wired; the verb has no footprint entry at all; or
+/// the footprint's `writes` list is empty — a read-only verb legitimately
+/// writes nothing, and grading it against a write-bounding gate would be
+/// the same false-negative-by-construction class of bug flagged elsewhere
+/// in this module (compare G4's "no matching transition" `None` case).
+///
+/// `idempotency_key` is a deterministic `entry_id:verb_fqn` pair — shadow
+/// only, not the real T5.1 write-set attestation mechanism (which owns
+/// its own idempotency key derivation for actual dispatch correlation).
+pub(crate) fn build_write_set_input(
+    domain_metadata: Option<&sem_os_obpoc_adapter::metadata::DomainMetadata>,
+    verb_fqn: &str,
+    entry_id: Uuid,
+    entity_ids: Vec<Uuid>,
+) -> Option<ob_poc_control_plane::write_set::WriteSetInput> {
+    let metadata = domain_metadata?;
+    let footprint = metadata.find_verb_footprint(verb_fqn)?;
+    if footprint.writes.is_empty() {
+        return None;
+    }
+
+    Some(ob_poc_control_plane::write_set::WriteSetInput {
+        entity_ids,
+        state_slots: Vec::new(),
+        tables: footprint.writes.clone(),
+        allowed_columns: Vec::new(),
+        idempotency_key: format!("{entry_id}:{verb_fqn}"),
+        contract_derived: true,
+    })
+}
+
 /// T9.1-pre (EOP-PLAN-CONTROLPLANE-001 Addendum B): identifies which of a
 /// verb's resolved args are entity references, by contract — not by
 /// regexing values for UUID shape (`write_set.rs::derive_write_set_heuristic`
@@ -298,12 +339,14 @@ pub(crate) fn build_entity_binding_input(
 ///   shadow observation) — unifying it here is real follow-on work, not
 ///   silently folded into this tranche.
 ///
-/// **Still `not_evaluated` (G7 — T9.1e, deferred, see the ownership
-/// ledger):** G7 needs a richer write-set (tables, columns, state slots —
-/// not just entity ids) than the legacy `derive_write_set_heuristic` can
-/// produce, and that legacy function needs parsed verb args this call site
-/// doesn't have (only the raw DSL string). Should not be guessed at — real
-/// follow-on integration work.
+/// - G7 (write-set, T9.1e): built by [`build_write_set_input`] from the
+///   verb's declared write footprint (`domain_metadata.yaml`, loaded once
+///   at startup). `None` when no `DomainMetadata` is wired, the verb has
+///   no footprint entry, or the footprint declares no writes (read-only
+///   verbs legitimately write nothing) — all legitimate, not fabricated.
+///   `state_slots`/`allowed_columns` stay empty (no production source for
+///   column-level footprint exists yet); `WriteSetGate::decide` doesn't
+///   require them.
 ///
 /// `is_ai_originated`/`interpretation_attested` are conservatively `false`
 /// (no attestation requirement applied) because this call site has no
@@ -320,6 +363,7 @@ pub(crate) fn build_evaluation_context(
     entity_binding: Option<ob_poc_control_plane::entity_binding::EntityBindingInput>,
     pack_resolution: Option<ob_poc_control_plane::pack_resolution::PackResolutionInput>,
     dag_proof: Option<ob_poc_control_plane::dag_proof::DagProofInput>,
+    write_set: Option<ob_poc_control_plane::write_set::WriteSetInput>,
 ) -> ob_poc_control_plane::context::EvaluationContext {
     let is_admitted = envelope.allowed_verbs.contains(verb_fqn);
     let exclusion_reasons = envelope
@@ -343,6 +387,7 @@ pub(crate) fn build_evaluation_context(
         entity_binding,
         pack_resolution,
         dag_proof,
+        write_set,
         intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
             intent_id,
             verb_fqn: verb_fqn.to_string(),
@@ -487,7 +532,7 @@ mod tests {
     #[test]
     fn admitted_verb_builds_true_is_admitted() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(input.is_admitted);
         assert!(input.exclusion_reasons.is_empty());
@@ -504,7 +549,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
         let input = ctx.intent_admission.expect("intent_admission set");
         assert!(!input.is_admitted);
         assert_eq!(input.exclusion_reasons.len(), 1);
@@ -523,7 +568,7 @@ mod tests {
                 },
             }],
         );
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -535,7 +580,7 @@ mod tests {
     #[test]
     fn no_abac_denial_maps_to_authority_allow() {
         let envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
         let input = ctx.authority.expect("authority set");
         assert_eq!(
             input.access_decision,
@@ -548,7 +593,7 @@ mod tests {
     fn evidence_gaps_thread_through_from_envelope() {
         let mut envelope = SemOsContextEnvelope::test_with_verbs(&["cbu.confirm"]);
         envelope.evidence_gaps = vec!["missing_source_of_wealth".to_string()];
-        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None);
+        let ctx = build_evaluation_context(&envelope, "cbu.confirm", Uuid::nil(), &test_actor(), None, None, None, None);
         let input = ctx.evidence.expect("evidence set");
         assert_eq!(input.evidence_gaps, vec!["missing_source_of_wealth".to_string()]);
     }
@@ -669,6 +714,7 @@ mod tests {
             entity_binding,
             None,
             None,
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
         assert_eq!(
@@ -714,6 +760,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
             None,
         );
@@ -763,6 +810,7 @@ mod tests {
             Uuid::nil(),
             &test_actor(),
             entity_binding,
+            None,
             None,
             None,
         );
@@ -885,6 +933,7 @@ mod tests {
             &test_actor(),
             entity_binding,
             pack_resolution,
+            None,
             None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
@@ -1037,6 +1086,7 @@ cross_workspace_constraints: []
             entity_binding,
             pack_resolution,
             Some(dag_proof),
+            None,
         );
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
@@ -1060,5 +1110,139 @@ cross_workspace_constraints: []
         // but no matching DAG transition.
         let dag_proof = build_dag_proof_input(Some(&pipe), "unrelated.verb", &args).await;
         assert!(dag_proof.is_none());
+    }
+
+    // ── T9.1e (Addendum B): build_write_set_input ──────────────────────
+
+    fn test_domain_metadata(verb_fqn: &str, writes: Vec<&str>) -> sem_os_obpoc_adapter::metadata::DomainMetadata {
+        let yaml = format!(
+            r#"
+domains:
+  test:
+    description: test domain
+    verb_data_footprint:
+      {verb_fqn}:
+        writes: [{writes}]
+"#,
+            writes = writes.join(", ")
+        );
+        sem_os_obpoc_adapter::metadata::DomainMetadata::from_yaml(&yaml).expect("valid fixture YAML")
+    }
+
+    #[test]
+    fn real_domain_metadata_yaml_loads_and_has_at_least_one_write_footprint() {
+        // Regression guard, not just a fixture check: the real
+        // config/sem_os_seeds/domain_metadata.yaml this loader reads at
+        // ob-poc-web startup must actually parse and carry at least one
+        // non-empty writes: [...] entry, or T9.1e's wiring is silently
+        // dead in production (build_write_set_input always None).
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("config/sem_os_seeds/domain_metadata.yaml");
+        let metadata = sem_os_obpoc_adapter::metadata::DomainMetadata::from_file(&path)
+            .expect("real domain_metadata.yaml must parse");
+        let has_a_write_footprint = metadata.domains.values().any(|domain| {
+            domain
+                .verb_data_footprint
+                .values()
+                .any(|footprint| !footprint.writes.is_empty())
+        });
+        assert!(
+            has_a_write_footprint,
+            "real domain_metadata.yaml has zero non-empty writes: [...] entries — T9.1e's wiring would be silently dead"
+        );
+    }
+
+    #[test]
+    fn build_write_set_input_none_when_no_domain_metadata() {
+        let entry_id = Uuid::new_v4();
+        let ws = build_write_set_input(None, "cbu.confirm", entry_id, vec![]);
+        assert!(ws.is_none());
+    }
+
+    #[test]
+    fn build_write_set_input_none_when_verb_has_no_footprint() {
+        let metadata = test_domain_metadata("deal.create", vec!["\"deals\""]);
+        let entry_id = Uuid::new_v4();
+        let ws = build_write_set_input(Some(&metadata), "unrelated.verb", entry_id, vec![]);
+        assert!(ws.is_none());
+    }
+
+    #[test]
+    fn build_write_set_input_none_when_footprint_declares_no_writes() {
+        let metadata = test_domain_metadata("cbu.show", vec![]);
+        let entry_id = Uuid::new_v4();
+        // Empty writes list -> None, not a fabricated CannotDerive: a
+        // read-only verb legitimately writes nothing.
+        let ws = build_write_set_input(Some(&metadata), "cbu.show", entry_id, vec![]);
+        assert!(ws.is_none());
+    }
+
+    #[test]
+    fn build_write_set_input_some_with_tables_when_footprint_declares_writes() {
+        let metadata = test_domain_metadata("deal.create", vec!["\"deals\""]);
+        let entry_id = Uuid::new_v4();
+        let entity_id = Uuid::new_v4();
+        let ws = build_write_set_input(Some(&metadata), "deal.create", entry_id, vec![entity_id])
+            .expect("verb has a non-empty write footprint");
+        assert_eq!(ws.tables, vec!["deals".to_string()]);
+        assert!(ws.contract_derived);
+        assert_eq!(ws.entity_ids, vec![entity_id]);
+        assert!(ws.state_slots.is_empty());
+        assert!(ws.allowed_columns.is_empty());
+        assert_eq!(ws.idempotency_key, format!("{entry_id}:deal.create"));
+    }
+
+    #[tokio::test]
+    async fn g7_reaches_success_end_to_end_given_a_legal_dag_transition() {
+        // Empirical reachability proof, matching the g2/g3/g4 pattern:
+        // build_write_set_input -> build_evaluation_context ->
+        // evaluate_shadow actually reports G7 Success once its declared
+        // dependency (G4/DagProof — GATE_DEPENDENCIES) genuinely succeeds
+        // too, not just because write_set itself is populated.
+        let pipe = test_gate_pipeline();
+        let entity_id = Uuid::new_v4();
+        let mut args = HashMap::new();
+        args.insert("entity-id".to_string(), entity_id.to_string());
+
+        let dag_proof = build_dag_proof_input(Some(&pipe), "test.transition-verb", &args)
+            .await
+            .expect("verb has transition_args and a matching DAG transition");
+
+        let metadata = test_domain_metadata("test.transition-verb", vec!["\"testtable\""]);
+        let entry_id = Uuid::new_v4();
+        let write_set = build_write_set_input(Some(&metadata), "test.transition-verb", entry_id, vec![entity_id])
+            .expect("verb has a non-empty write footprint");
+
+        let entity_binding = Some(ob_poc_control_plane::entity_binding::EntityBindingInput {
+            entities: Vec::new(),
+        });
+        let pack_resolution = Some(ob_poc_control_plane::pack_resolution::PackResolutionInput {
+            candidate_pack_ids: vec!["fixture-pack".to_string()],
+            semreg_allowed_set_available: true,
+            constraint_denies_intent: false,
+        });
+
+        let envelope = SemOsContextEnvelope::test_with_verbs(&["test.transition-verb"]);
+        let ctx = build_evaluation_context(
+            &envelope,
+            "test.transition-verb",
+            Uuid::nil(),
+            &test_actor(),
+            entity_binding,
+            pack_resolution,
+            Some(dag_proof),
+            Some(write_set),
+        );
+        let report = ob_poc_control_plane::evaluate_shadow(&ctx);
+
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::DagProof),
+            Some(&ob_poc_control_plane::gate::GateResult::Success)
+        );
+        assert_eq!(
+            report.get(ob_poc_control_plane::gate::GateId::WriteSet),
+            Some(&ob_poc_control_plane::gate::GateResult::Success),
+            "G7 must report a real, non-not_evaluated Success once its DagProof dependency succeeds"
+        );
     }
 }

@@ -272,6 +272,13 @@ pub struct ReplOrchestratorV2 {
     /// loaded DAG taxonomies before execution. See
     /// `docs/backlog/catalogue-platform-refinement-v1_3.md` §3.3.
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
+    /// T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): verb→table write
+    /// footprint (`config/sem_os_seeds/domain_metadata.yaml`), loaded once
+    /// at startup — a small, static, in-memory lookup (no I/O per call).
+    /// Feeds G7's `WriteSetInput.tables`. `None` when the file failed to
+    /// load or wasn't configured; shadow-only, so this is best-effort, not
+    /// production-fatal the way `gate_pipeline`'s DAG registry load is.
+    domain_metadata: Option<Arc<sem_os_obpoc_adapter::metadata::DomainMetadata>>,
     /// R8 single-path unification (2026-05-11): ACP session-input draft-mode
     /// selection. Configured once at orchestrator construction (typically
     /// via [`ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
@@ -326,6 +333,7 @@ impl ReplOrchestratorV2 {
             lookup_service: None,
             orchestrated_verbs: HashSet::new(),
             gate_pipeline: None,
+            domain_metadata: None,
             acp_session_input_draft_mode:
                 ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
             runbook_step_timeout: std::time::Duration::from_secs(5),
@@ -559,6 +567,18 @@ impl ReplOrchestratorV2 {
         pipeline: crate::runbook::step_executor_bridge::GatePipeline,
     ) -> Self {
         self.gate_pipeline = Some(pipeline);
+        self
+    }
+
+    /// Attach the verb→table write-footprint lookup (T9.1e). Feeds G7's
+    /// `WriteSetInput.tables` in shadow evaluation. Optional — `None`
+    /// leaves G7 shadow-unwired (`build_write_set_input` returns `None`),
+    /// same posture as an absent `gate_pipeline` for G4.
+    pub fn with_domain_metadata(
+        mut self,
+        domain_metadata: Arc<sem_os_obpoc_adapter::metadata::DomainMetadata>,
+    ) -> Self {
+        self.domain_metadata = Some(domain_metadata);
         self
     }
 
@@ -7862,6 +7882,16 @@ impl ReplOrchestratorV2 {
             )
             .await;
 
+            // T9.1e (Addendum B): resolve G7's WriteSetInput from the
+            // verb's declared write footprint (domain_metadata.yaml,
+            // loaded once at startup) — see build_write_set_input's doc.
+            let write_set = crate::agent::control_plane_shadow::build_write_set_input(
+                self.domain_metadata.as_deref(),
+                &entry.verb,
+                entry_id,
+                entity_requests.iter().map(|(id, _)| *id).collect(),
+            );
+
             let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
                 &envelope,
                 &entry.verb,
@@ -7870,6 +7900,7 @@ impl ReplOrchestratorV2 {
                 entity_binding,
                 pack_resolution,
                 dag_proof,
+                write_set,
             );
             let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
