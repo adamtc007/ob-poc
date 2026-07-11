@@ -1170,6 +1170,13 @@ struct ControlPlaneMetricsResponse {
     /// fraction of Path A would enforce cleanly today," derived from the
     /// same `gate_results` `shadow_divergence`/`gate_outcomes` already read.
     sealable_rate_by_verb: Vec<crate::agent::control_plane_metrics::SealableRateByVerb>,
+    /// T11.0: v0.4.1 §15.3 C2 — `capability_invocations_without_cp_provenance`,
+    /// per instrumented capability entry point. In-process counters, not a
+    /// DB query (see `capability_provenance.rs`'s module doc for why, and
+    /// for this first slice's known coverage gap — pool-based capability
+    /// access that never opens a `PgTransactionScope` is not yet counted).
+    capability_invocations_without_cp_provenance:
+        Vec<crate::agent::capability_provenance::CapabilityProvenanceCount>,
 }
 
 async fn get_control_plane_metrics(
@@ -1213,6 +1220,9 @@ async fn get_control_plane_metrics(
     let shadow_divergence_rate = shadow_divergence.divergence_rate();
     let write_attestation_breach_rate = write_attestation_breaches.breach_rate();
 
+    let capability_invocations_without_cp_provenance =
+        crate::agent::capability_provenance::capability_invocations_without_cp_provenance();
+
     Ok(Json(ControlPlaneMetricsResponse {
         gate_outcomes,
         shadow_divergence,
@@ -1221,6 +1231,7 @@ async fn get_control_plane_metrics(
         write_attestation_breach_rate,
         envelope_status_counts,
         sealable_rate_by_verb,
+        capability_invocations_without_cp_provenance,
     }))
 }
 

@@ -68,6 +68,14 @@ impl PgTransactionScope {
     /// runs.
     pub async fn begin(pool: &PgPool) -> Result<Self, sqlx::Error> {
         let tx = pool.begin().await?;
+        // T11.0 (EOP-PLAN-CONTROLPLANE-002): C2 provenance metric. Always
+        // `false` today — no CP-issued marker exists to be present until
+        // T11.2's keyed doors land; see capability_provenance.rs's module
+        // doc for why that's the expected, honest state pre-L2.
+        crate::agent::capability_provenance::record_capability_invocation(
+            "PgTransactionScope::begin",
+            false,
+        );
         Ok(Self {
             tx,
             pool: pool.clone(),
@@ -83,7 +91,7 @@ impl PgTransactionScope {
     /// Callers should use this instead of `begin()` in production dispatch paths
     /// to prevent indefinite hangs when the connection pool is exhausted.
     pub async fn begin_timeout(pool: &PgPool, timeout: Duration) -> Result<Self, anyhow::Error> {
-        tokio::time::timeout(timeout, pool.begin())
+        let result = tokio::time::timeout(timeout, pool.begin())
             .await
             .map_err(|_| {
                 anyhow::anyhow!(
@@ -98,7 +106,16 @@ impl PgTransactionScope {
                 captured_writes: Vec::new(),
                 expected_write_set: None,
             })
-            .map_err(Into::into)
+            .map_err(Into::into);
+        // T11.0: same instrumentation as `begin()`, recorded regardless of
+        // outcome — a timed-out acquisition attempt is still a capability
+        // invocation attempt, and undercounting attempts would understate
+        // the mesh remainder, not just its provenance split.
+        crate::agent::capability_provenance::record_capability_invocation(
+            "PgTransactionScope::begin_timeout",
+            false,
+        );
+        result
     }
 
     /// Commit the transaction. Consumes the scope. Unattested — does not
@@ -415,5 +432,40 @@ mod t5_write_set_attestation_tests {
             .expect("no expectation set -> commits unconditionally, same as plain commit()");
 
         assert_eq!(envelope_row_count(&pool, envelope_id).await, 1);
+    }
+
+    /// T11.0: proves `PgTransactionScope::begin` — the real production
+    /// entry point, not the in-process counter module tested in isolation
+    /// — actually increments the C2 provenance metric on every real scope
+    /// open, with `has_cp_provenance = false` (honest, since no marker
+    /// exists yet pre-T11.2). Reads the snapshot before and after to
+    /// isolate this test's own contribution from whatever else in the
+    /// process (other tests, if run non-serially) also opened a scope.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn begin_records_a_capability_invocation_without_cp_provenance() {
+        let pool = test_pool().await;
+
+        let before = crate::agent::capability_provenance::capability_invocations_without_cp_provenance()
+            .into_iter()
+            .find(|r| r.capability_entry == "PgTransactionScope::begin")
+            .map(|r| r.without_provenance)
+            .unwrap_or(0);
+
+        let scope = PgTransactionScope::begin(&pool).await.expect("begin");
+        scope.rollback().await.expect("rollback");
+
+        let after = crate::agent::capability_provenance::capability_invocations_without_cp_provenance()
+            .into_iter()
+            .find(|r| r.capability_entry == "PgTransactionScope::begin")
+            .map(|r| r.without_provenance)
+            .unwrap_or(0);
+
+        assert_eq!(
+            after,
+            before + 1,
+            "a real PgTransactionScope::begin() call must record exactly one \
+             without-provenance capability invocation"
+        );
     }
 }
