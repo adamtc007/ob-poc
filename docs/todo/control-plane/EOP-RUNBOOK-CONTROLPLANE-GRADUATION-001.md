@@ -251,11 +251,14 @@ legacy check it's being compared to.
   Path D); implementation (actually writing/reading `domain_payload` in the
   relevant bpmn-lite process definitions and wiring `ObPocVerbAdapter` to
   pass the real handle through) not yet done.
-- **EOP-VS-CONTROLPLANE-001 v0.3** (missing V&S source doc) — needed to
-  re-evidence T7.1/T7.3/T7.4; this runbook doesn't strictly depend on it
-  (graduation mechanics are code-verified, not V&S-derived), but the NIST
-  crosswalk / "conformance is a property of the execution path" closing
-  claim does.
+- ~~**EOP-VS-CONTROLPLANE-001 v0.3** (missing V&S source doc)~~ — RESOLVED
+  (T9.4, EOP-PLAN-CONTROLPLANE-001 Addendum B): the document was in the
+  repo since the T7 re-evidence session, just at
+  `docs/todo/control-plane/`; `git mv`'d to
+  `docs/architecture/EOP-VS-CONTROLPLANE-001_Control-Plane_v0.3.md`. The
+  NIST crosswalk / "conformance is a property of the execution path"
+  closing claim can now be walked against the actual document at its
+  permanent location.
 - **Soak window length** (§5 step 4) — placeholder value, not yet decided.
 - **Path B/C admission-hook design** (§4) — not yet designed, larger than
   a config flip; needs its own short plan before Path B graduation can
