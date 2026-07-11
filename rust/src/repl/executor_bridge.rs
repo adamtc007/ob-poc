@@ -80,7 +80,9 @@ impl RealDslExecutor {
     /// directly, a high-risk shared hot path) but not against this one:
     /// admit at the bridge's ingress, before delegating to the
     /// (unmodified) internal engine, exactly as T6 did for the bus path
-    /// (`ObPocVerbExecutor::admit`) and the runbook path
+    /// (`ObPocVerbExecutor::execute_verb_admitting_envelope`, whose T9.2
+    /// rewrite now calls the scope-threaded `admit_in_scope` internally —
+    /// same admission decision, atomic with dispatch) and the runbook path
     /// (`step_executor_bridge.rs`'s `execute_verb_admitting_envelope`
     /// call) — same admission primitive
     /// (`agent::control_plane_envelope_store::check_admission`), same

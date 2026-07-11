@@ -64,11 +64,9 @@ pub(crate) enum AdmissionDecision {
     RejectedConsumeFailed(ConsumeOutcome),
 }
 
-/// T4.1 admission check: the single decision point
-/// `execute_verb_admitting_envelope` overrides delegate to. Pure
-/// orchestration over `EnforcedVerbs` + `try_consume` — kept as its own
-/// function so it's unit-testable without a live `VerbExecutionPort`
-/// implementor.
+/// T4.1 admission check: pool-based, pure orchestration over
+/// `EnforcedVerbs` + `try_consume` — kept as its own function so it's
+/// unit-testable without a live `VerbExecutionPort` implementor.
 ///
 /// T8.1 (EOP-PLAN-CONTROLPLANE-001, closes PIR-D-008/PIR-D-010): widened
 /// from `envelope_id: Option<Uuid>` + `try_consume_by_id` to
@@ -76,6 +74,18 @@ pub(crate) enum AdmissionDecision {
 /// presenting a handle whose id matches a real sealed envelope but whose
 /// content hash does not is now rejected here, not merely at the id-lookup
 /// level.
+///
+/// T9.2 (Addendum B) gave `execute_verb_admitting_envelope` its own scope-
+/// threaded sibling, [`check_admission_in_scope`], which it now calls
+/// instead of this one (single-verb dispatch is atomic with its own
+/// admission check). This pool-based variant is NOT dead code, though —
+/// `admit_plan_checked` (below, T9.3's plan-level pre-flight admission
+/// gate) genuinely needs a per-verb check across a whole multi-step plan
+/// *before* any single step's transaction scope exists, which doesn't fit
+/// the in-scope shape. Ownership-ledger closure sweep (2026-07-11)
+/// confirmed this via `grep -rn "check_admission(" rust/src rust/crates`
+/// before concluding it should stay — not assumed dead by pattern-matching
+/// against `try_consume_by_id`'s different (genuinely zero-caller) case.
 #[cfg(feature = "database")]
 pub(crate) async fn check_admission(
     pool: &sqlx::PgPool,
@@ -146,8 +156,8 @@ pub(crate) enum ConsumeOutcome {
 /// T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): boundary-interposition
 /// admission check for every production ingress point that constructs
 /// `dsl_v2::executor::DslExecutor` directly rather than going through the
-/// bus path (T6, `ObPocVerbExecutor::admit`) or the runbook path
-/// (`step_executor_bridge.rs`, `execute_verb_admitting_envelope`). Checks
+/// bus path (T6, `ObPocVerbExecutor::execute_verb_admitting_envelope`) or
+/// the runbook path (`step_executor_bridge.rs`, `execute_verb_admitting_envelope`). Checks
 /// every verb in a compiled plan against [`check_admission`] and returns
 /// the first rejection; `envelope_handle: None` at every call since none of
 /// these paths has envelope infrastructure wired yet (same posture as
@@ -159,7 +169,7 @@ pub(crate) enum ConsumeOutcome {
 /// per-step loop at a call site; call this.
 ///
 /// Reads `EnforcedVerbs::from_env()` fresh on every call (matches
-/// `ObPocVerbExecutor::admit`'s existing per-call-read pattern). The
+/// `ObPocVerbExecutor::admit_in_scope`'s existing per-call-read pattern). The
 /// per-step logic itself lives in [`admit_plan_checked`], which takes
 /// `EnforcedVerbs` as a parameter so it's testable without mutating
 /// process-global env state.

@@ -176,7 +176,21 @@ impl std::error::Error for PinDrift {}
 /// *first* drift found — like `verify_toctou`, this is a hard stop (void +
 /// `stale_state` exception per the plan), not a collect-all report; a
 /// caller wanting every drift can call this per-entity instead.
-pub async fn verify_pins(
+///
+/// Test-only (T9.2 ownership-ledger closure, EOP-PLAN-CONTROLPLANE-001
+/// Addendum B): this is the shadow-only, plain-read half of the pin-check
+/// pair T9.2's design doc discusses — `verify_pins_in_scope` (below) is
+/// the real, locked, admission-time check every production caller uses.
+/// `grep -rn "verify_pins(" rust/src rust/crates` confirmed zero
+/// production callers (only this function's own tests, both the
+/// `MockProvider`-based unit tests and the live-DB `db_integration_tests`
+/// module) before this gate was added — same "two APIs, one weaker" shape
+/// PIR-D-008 named, closed the same way T8.1 closed it for
+/// `try_consume_by_id`: the weaker variant does not exist at all in a
+/// non-test build, so no production code can reference it regardless of
+/// what a text-based CI check might miss.
+#[cfg(test)]
+pub(crate) async fn verify_pins(
     pins: &ob_poc_control_plane::snapshot::SnapshotPins,
     entity_kinds: &[(Uuid, String)],
     provider: &dyn RowVersionProvider,
