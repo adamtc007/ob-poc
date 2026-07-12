@@ -654,4 +654,4 @@ Full document: `docs/todo/control-plane/EOP-DESIGN-CONTROLPLANE-T11.1a-BOUNDARY-
 
 Cross-crate items (`ob-poc-agent`'s E-5 stale "Forbidden dep: ob-poc" question, `ob-poc-web`'s startup-wiring scope) remain open, non-blocking for `ob-poc`-internal T11.1b, carried against the series completion invariant (E-T11.A).
 
-**T11.1a status: RATIFIED.** T11.1b (mechanical extraction of the 8-module slice) may proceed once B7 clears — still blocked pending the v0.4.1 micro-amendment (E-4's C3 constitutive clarification), queued as this session's next action (the "queued batch" step).
+**T11.1a status: RATIFIED, T11.1b UNBLOCKED.** Correction to this entry's earlier draft: B7 is already satisfied — v0.4.1 (ratified earlier this session) already carries the E-4/C3 constitutive clarification, and T11.F.2's code landed under that same clearance. The still-queued "step 3" batch (§7 definitional/judgmental clarification, not yet drafted; `ob-poc-agent`'s E-5 header-comment fix) is separate, smaller housekeeping — neither blocks T11.1b's mechanical extraction of the 8-module slice.
