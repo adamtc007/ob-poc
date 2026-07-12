@@ -2,7 +2,7 @@
 
 ### Basis: EOP-PLAN-CONTROLPLANE-002 v0.1, Tranche T11.1a ("the highest-judgment artifact in the series")
 ### Status: RATIFIED (2026-07-12). T11.1b (mechanical extraction) is unblocked.
-### B7 correction (2026-07-12): this doc's earlier header line ("still blocked... v0.4.1 micro-amendment has not been supplied") was stale — v0.4.1 already carries the E-4/C3 constitutive clarification (change-log row + §15.3 body, verified directly in `EOP-VS-CONTROLPLANE-001_Control-Plane_v0.4.1.md`), and T11.F.2's code (this session) already landed under that same clearance. B7 is satisfied. The still-outstanding items are two SEPARATE, smaller amendments queued in the session's "step 3" batch (§7 definitional/judgmental clarification, not yet drafted; the E-5 header-comment fix in `ob-poc-agent`) — neither blocks T11.1b.
+### B7 correction (2026-07-12): this doc's earlier header line ("still blocked... v0.4.1 micro-amendment has not been supplied") was stale — v0.4.1 already carries the E-4/C3 constitutive clarification (change-log row + §15.3 body, verified directly in `EOP-VS-CONTROLPLANE-001_Control-Plane_v0.4.2.md`), and T11.F.2's code (this session) already landed under that same clearance. B7 is satisfied. The still-outstanding items are two SEPARATE, smaller amendments queued in the session's "step 3" batch (§7 definitional/judgmental clarification, not yet drafted; the E-5 header-comment fix in `ob-poc-agent`) — neither blocks T11.1b.
 
 ## 0. Ratification (2026-07-12)
 

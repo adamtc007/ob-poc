@@ -22,9 +22,7 @@ use sqlx::PgPool;
 
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::agent::telemetry;
-use crate::agent::verb_surface::{
-    compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
-};
+use crate::agent::verb_surface::SessionVerbSurface;
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
 use crate::dsl_v2::enrich_program;
 use crate::dsl_v2::execution::runtime_registry_arc;
@@ -382,74 +380,17 @@ async fn prepare_turn_context(
 
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent);
-    let envelope = resolve_sem_reg_verbs(
+
+    let grant = crate::agent::legality_grant::mint_legality_grant(
         ctx,
         utterance,
         sage_intent,
         semreg_entity_kind.as_deref(),
         use_generic_task_subject,
+        lookup_result.as_ref(),
     )
     .await;
-
-    let fail_policy = if ctx.policy_gate.semreg_fail_closed() {
-        VerbSurfaceFailPolicy::FailClosed
-    } else {
-        VerbSurfaceFailPolicy::FailOpen
-    };
-    let has_group_scope = ctx.scope.as_ref().and_then(|s| s.client_group_id).is_some();
-
-    // Load group composite state for state-to-intent bias
-    #[cfg(feature = "database")]
-    let composite_state = if has_group_scope {
-        // Use session CBU IDs to load composite state
-        let cbu_ids: Vec<uuid::Uuid> = ctx.session_cbu_ids.as_deref().unwrap_or(&[]).to_vec();
-        if !cbu_ids.is_empty() {
-            match crate::agent::composite_state_loader::load_group_composite_state(
-                &ctx.pool, &cbu_ids,
-            )
-            .await
-            {
-                Ok(state) => state,
-                Err(e) => {
-                    tracing::warn!("Failed to load composite state: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    #[cfg(not(feature = "database"))]
-    let composite_state: Option<crate::agent::composite_state::GroupCompositeState> = None;
-
-    // Extract entity state from SemOS grounded action surface.
-    // SemOS is the source of truth for current state — the state machine determines
-    // which verbs are reachable. Every utterance is a delta against current state.
-    let grounded_entity_state: Option<String> = envelope
-        .grounded_action_surface
-        .as_ref()
-        .and_then(|gas| gas.current_state.clone());
-
-    let surface_ctx = VerbSurfaceContext {
-        agent_mode: ctx.agent_mode,
-        stage_focus: ctx.stage_focus.as_deref(),
-        envelope: &envelope,
-        fail_policy,
-        entity_state: grounded_entity_state.as_deref(),
-        has_group_scope,
-        is_infrastructure_scope: ctx
-            .scope
-            .as_ref()
-            .and_then(|s| s.client_group_id)
-            .is_some_and(|id| id == uuid::Uuid::nil()),
-        composite_state: composite_state.as_ref(),
-    };
-    let surface = compute_session_verb_surface(&surface_ctx);
-
-    let phase2 = Phase2Service::evaluate(lookup_result.clone(), Some(envelope.clone()));
-    let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
+    let sem_reg_verb_names = Phase2Service::legal_verb_names(&grant.phase2.artifacts);
 
     PreparedTurnContext {
         lookup_result,
@@ -457,9 +398,9 @@ async fn prepare_turn_context(
         dominant_entity_kind,
         entity_candidates,
         sem_reg_verb_names,
-        envelope,
-        surface,
-        composite_state,
+        envelope: grant.envelope,
+        surface: grant.surface,
+        composite_state: grant.composite_state,
     }
 }
 
@@ -1596,40 +1537,30 @@ pub(crate) async fn legacy_handle_utterance(
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
-    // -- Step 2: Sem OS context resolution -> SemOsContextEnvelope --
+    // -- Step 2/2.5: mint LegalityGrant (SemOS envelope + SessionVerbSurface + Phase 2) --
+    // T11.1b/slice 2: previously this hand-rolled its own copy of the same
+    // sequence `prepare_turn_context` runs, but without `composite_state`/
+    // `entity_state` (marked TODO below) — a real drift between the two
+    // paths. Now both call the single `mint_legality_grant`, so this path
+    // gains grounded-state/composite-state bias it was previously missing.
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent.as_ref());
-    let envelope = resolve_sem_reg_verbs(
+    let grant = crate::agent::legality_grant::mint_legality_grant(
         ctx,
         utterance,
         sage_intent.as_ref(),
         semreg_entity_kind.as_deref(),
         use_generic_task_subject,
+        lookup_result.as_ref(),
     )
     .await;
-
-    // -- Step 2.5: Compute SessionVerbSurface (all governance layers) --
-    let fail_policy = if policy.semreg_fail_closed() {
-        VerbSurfaceFailPolicy::FailClosed
-    } else {
-        VerbSurfaceFailPolicy::FailOpen
-    };
-    let has_group_scope_2 = ctx.scope.as_ref().and_then(|s| s.client_group_id).is_some();
-    let surface_ctx = VerbSurfaceContext {
-        agent_mode: ctx.agent_mode,
-        stage_focus: ctx.stage_focus.as_deref(),
-        envelope: &envelope,
-        fail_policy,
-        entity_state: None, // Lifecycle filtering deferred to Phase 3
-        has_group_scope: has_group_scope_2,
-        is_infrastructure_scope: ctx
-            .scope
-            .as_ref()
-            .and_then(|s| s.client_group_id)
-            .is_some_and(|id| id == uuid::Uuid::nil()),
-        composite_state: None, // TODO: load from group composite when available
-    };
-    let surface = compute_session_verb_surface(&surface_ctx);
+    let crate::agent::legality_grant::LegalityGrant {
+        envelope,
+        surface,
+        phase2,
+        composite_state,
+        ..
+    } = grant;
 
     tracing::debug!(
         total = surface.filter_summary.total_registry,
@@ -1642,7 +1573,6 @@ pub(crate) async fn legacy_handle_utterance(
         "SessionVerbSurface computed"
     );
 
-    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
     if !phase2.is_available {
         let prepared = PreparedTurnContext {
             lookup_result,
@@ -1652,7 +1582,7 @@ pub(crate) async fn legacy_handle_utterance(
             sem_reg_verb_names: None,
             envelope,
             surface,
-            composite_state: None,
+            composite_state: composite_state.clone(),
         };
         return build_semos_unavailable_outcome(ctx, utterance, prepared, sage_intent.clone())
             .await;
@@ -1667,7 +1597,7 @@ pub(crate) async fn legacy_handle_utterance(
             sem_reg_verb_names: None,
             envelope,
             surface,
-            composite_state: None,
+            composite_state: composite_state.clone(),
         };
         return build_semos_discovery_outcome(ctx, utterance, prepared, sage_intent.clone()).await;
     }
@@ -2971,9 +2901,14 @@ pub async fn handle_utterance_with_forced_verb(
     // Even though the user selected this verb, we still validate it against
     // the current SemReg allowed set. This closes the TOCTOU gap where the
     // verb was allowed at discovery time but may have been revoked since.
-    let envelope = resolve_sem_reg_verbs(ctx, "", None, semreg_entity_kind.as_deref(), false).await;
-
-    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    let (envelope, phase2) = crate::agent::legality_grant::verify_envelope_legality(
+        ctx,
+        "",
+        None,
+        semreg_entity_kind.as_deref(),
+        false,
+    )
+    .await;
     let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
 
     let allowed_verbs_fingerprint = phase2.fingerprint();

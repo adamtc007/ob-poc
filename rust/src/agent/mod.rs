@@ -14,6 +14,7 @@ pub(crate) mod control_plane_shadow;
 pub(crate) mod control_plane_write_attestation_store;
 pub mod harness;
 pub mod learning;
+pub(crate) mod legality_grant;
 pub mod narration_engine;
 pub mod onboarding_state_view;
 pub mod orchestrator;
