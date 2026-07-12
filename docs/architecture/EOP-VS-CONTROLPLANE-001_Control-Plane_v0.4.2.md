@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Document** | EOP-VS-CONTROLPLANE-001 |
-| **Version** | v0.4.1 (Draft) |
+| **Version** | v0.4.2 (Draft) |
 | **Type** | Vision & Scope |
 | **Status** | Draft — fit for peer review |
 | **Purpose** | Define the Control Plane as a first-class capability for AI-led, governed, deterministic execution in the Enterprise Onboarding Platform, mapped to the NIST AI Risk Management Framework as a control crosswalk. |
@@ -20,6 +20,7 @@
 | v0.3 | Review hardening. NIST language softened from "formalised against" to design **crosswalk** with an explicit pre-Phase-5 caveat (Appendix A). Write-set attestation failure semantics sharpened: abort-before-commit default, post-durability quarantine (§6.7.1). Evidence ownership deduplicated between authority gate and evidence gate (§6.5/§6.6). Durable/queued execution note added: `EnvelopeHandle` rehydration through Control Plane verification (§6.10.4). Gate dependencies declared, with dependency table (§6.16.1). Version-pin precision note for legacy non-versioned (Mode-1) state (§6.10.1). Terminology: `ControlPlaneProof` used consistently; "approved runtime admission path" replaces "runtime execution path" (§6.9). |
 | v0.4 | Amendment 1: Clearing-House Mandate. New §15 (mediation topology; leakproof L1–L3; coverage C1–C3; pack universality K1–K3; read-lens decision §15.5; migration posture). §8 relationship directions inverted. §12 criteria 13–15 added. v0.3 checkpoint topology reclassified as transitional. |
 | v0.4.1 | Micro-amendment: C3 constitutive clarification (ruling on MCA-002 escalation E-4). §15.3's C3 ("every agent-originated state transition has a Control Plane decision record reachable from its audit trail") is **constitutive at mediation completion (T12), not owed during checkpoint topology (T0–T11)**. Best-effort, non-blocking shadow-decision persistence is the conformant posture through T11; C3 graduates to a hard guarantee only when enforce-mode/mediation is live. C3 is reclassified MIGRATION-PENDING, sharing AB1's T12/mediation terminus, not a T11 exit criterion. |
+| v0.4.2 | Micro-amendment: new §7.1, definitional vs judgmental clauses within the Binary Tollgate (T11.F.2 implementation work). Three of the nine §7 clauses (intent recognition, active pack, DAG legality) each conflate an unconditional structural fact with a judgmental policy/authority sub-case; §7.1 names the split for those three and states its enforcement posture (definitional core unconditional from T11.F onward, independent of shadow-vs-enforce mode; judgmental sub-cases stay shadow-first/graduated, unchanged terminus at T12). The remaining six §7 clauses are unamended — architect ruling: they are "more technical fails," not conflations requiring the same split. |
 
 ---
 
@@ -727,6 +728,18 @@ The Control Plane defines the binary gate for AI execution:
 > No audit/replay path — no execution.
 
 This is the line between AI-assisted work and AI-executed regulated work. The success criteria in §12 are the testable form of this gate; the two sections state one rule.
+
+## 7.1 Definitional vs judgmental clauses within the Tollgate
+
+**(v0.4.2 — T11.F.2 implementation finding, ratified.)** Each bullet above states an unconditional rule, but the underlying gate's real outcome space is not uniformly unconditional. Three of the nine clauses conflate a **definitional** core (a structural fact no legitimate traffic can produce — e.g. the named verb does not exist in the runtime registry at all) with **judgmental** sub-cases (policy/authority/evidence-shaped determinations — e.g. the verb exists but ABAC denies this actor):
+
+- **"No recognised intent"** (Intent Admission, §6.1): definitional = the verb_fqn is absent from the runtime registry. Judgmental = the verb exists but is pruned by ABAC/entity-kind/agent-mode/policy (`PruneReason`'s four variants).
+- **"No active SemOS pack"** (Pack Resolution, §6.3): definitional = no candidate pack resolves, or more than one does (`MissingPack`/`AmbiguousPack`). Judgmental = a resolved pack's own authored rule denies the intent or entity (`PackDeniesIntent`/`PackDeniesEntity`).
+- **"No DAG legality"** (DAG/State Proof, §6.4): definitional = the transition does not exist in the declared DAG topology, including a violated `CrossWorkspaceConstraint` (v1.3 Mode A). Judgmental = a lifecycle fail-open/fail-closed policy setting.
+
+The remaining six clauses (Entity Binding, Authority, Evidence, Write-Set, Runbook, Execution Envelope/Audit) are **not** reclassified by this amendment. Ratified as **technical failure modes, not definitional/judgmental conflations** — each already fails on a single, uniform kind of check (a binding either succeeds or it doesn't; a runbook either compiles or it doesn't), so this subsection's split does not apply to them.
+
+**Enforcement posture (§15.6 migration posture applies unchanged):** the definitional core of each of these three clauses is enforced unconditionally, independent of shadow-vs-enforce mode, from T11.F onward — this is not itself full mediation (§15.1) and does not change AB1/C3's T12 terminus. The judgmental sub-cases remain shadow-first/graduated per existing policy, unaffected by this amendment.
 
 ---
 
