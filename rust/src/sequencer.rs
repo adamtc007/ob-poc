@@ -7891,6 +7891,57 @@ impl ReplOrchestratorV2 {
             )
             .await;
 
+            // T11.F.2 slice 3: the definitional floor's G3/G4 check, run
+            // synchronously and unconditionally here (not shadow-only,
+            // not gated by EnforcedVerbs) — the one point on Path A where
+            // both `pack_resolution` and `dag_proof` are already resolved
+            // as real values before `evaluate_with_report` re-derives
+            // them a second time (see that function's own doc for why it
+            // duplicates `decide()` rather than widening `Gate`). A floor
+            // hit here short-circuits with a `Failed` `StepOutcome` before
+            // dispatch — the same shape `legacy_outcome` already produces
+            // for its own failure cases below — and records an audit row
+            // via the same fire-and-forget `tokio::spawn` posture this
+            // function already uses for `insert_shadow_decision`.
+            if let Some(pr) = pack_resolution.as_ref() {
+                if ob_poc_control_plane::floor::g3_input_is_floor_eligible(pr) {
+                    let reason = format!("{}: G3 pack resolution floor (MissingPack/AmbiguousPack)", entry.verb);
+                    let row = crate::agent::control_plane_floor::FloorRejectionRow {
+                        session_id: session.id,
+                        entry_id,
+                        verb_fqn: entry.verb.clone(),
+                        floor_gate: "G3",
+                        floor_reason: reason.clone(),
+                    };
+                    let pool = pool.clone();
+                    tokio::spawn(async move {
+                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+                    });
+                    return Some(StepOutcome::Failed {
+                        error: format!("T11.F floor rejection [G3]: {reason}"),
+                    });
+                }
+            }
+            if let Some(dp) = dag_proof.as_ref() {
+                if ob_poc_control_plane::floor::g4_input_is_floor_eligible(dp) {
+                    let reason = format!("{}: G4 DAG legality floor (blocking_violations or topological)", entry.verb);
+                    let row = crate::agent::control_plane_floor::FloorRejectionRow {
+                        session_id: session.id,
+                        entry_id,
+                        verb_fqn: entry.verb.clone(),
+                        floor_gate: "G4",
+                        floor_reason: reason.clone(),
+                    };
+                    let pool = pool.clone();
+                    tokio::spawn(async move {
+                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+                    });
+                    return Some(StepOutcome::Failed {
+                        error: format!("T11.F floor rejection [G4]: {reason}"),
+                    });
+                }
+            }
+
             // T9.1e (Addendum B): resolve G7's WriteSetInput from the
             // verb's declared write footprint (domain_metadata.yaml,
             // loaded once at startup) — see build_write_set_input's doc.

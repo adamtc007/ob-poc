@@ -101,6 +101,28 @@ pub fn g4_blocking_violations_are_floor_eligible(blocking_violations: &[String])
     !blocking_violations.is_empty()
 }
 
+/// G3 floor check from the raw, publicly-constructible
+/// [`PackResolutionInput`](crate::pack_resolution::PackResolutionInput) —
+/// the entry point external callers (`ob-poc`'s `phase5_runtime_recheck`)
+/// actually use, since `pack_resolution::decide` is `pub(crate)` and stays
+/// that way (only this module needs to call it to classify floor
+/// eligibility; widening its visibility would let callers bypass this
+/// single source of truth and hand-roll their own classification).
+pub fn g3_input_is_floor_eligible(input: &crate::pack_resolution::PackResolutionInput) -> bool {
+    g3_is_floor_eligible(&crate::pack_resolution::decide(input))
+}
+
+/// G4 floor check from the raw, publicly-constructible
+/// [`DagProofInput`](crate::dag_proof::DagProofInput) — same rationale as
+/// [`g3_input_is_floor_eligible`]. Checks `blocking_violations` directly
+/// (per this module's own doc: `GuardFailed` is not classified at the
+/// outcome level because it conflates two sources) alongside the five
+/// topological variants.
+pub fn g4_input_is_floor_eligible(input: &crate::dag_proof::DagProofInput) -> bool {
+    g4_blocking_violations_are_floor_eligible(&input.blocking_violations)
+        || g4_is_floor_eligible(&crate::dag_proof::decide(input))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,5 +188,51 @@ mod tests {
             "v1.3 gate violation [c1]: blocked".to_string()
         ]));
         assert!(!g4_blocking_violations_are_floor_eligible(&[]));
+    }
+
+    #[test]
+    fn g3_input_missing_pack_is_floor_eligible() {
+        let input = crate::pack_resolution::PackResolutionInput {
+            candidate_pack_ids: vec![],
+            semreg_allowed_set_available: false,
+            constraint_denies_intent: false,
+        };
+        assert!(g3_input_is_floor_eligible(&input));
+    }
+
+    #[test]
+    fn g3_input_pack_denies_intent_is_not_floor_eligible() {
+        let input = crate::pack_resolution::PackResolutionInput {
+            candidate_pack_ids: vec!["pack.a".to_string()],
+            semreg_allowed_set_available: true,
+            constraint_denies_intent: true,
+        };
+        assert!(!g3_input_is_floor_eligible(&input));
+    }
+
+    #[test]
+    fn g4_input_blocking_violation_is_floor_eligible() {
+        let input = crate::dag_proof::DagProofInput {
+            entity_id: Uuid::nil(),
+            from_state: "A".to_string(),
+            to_state: "B".to_string(),
+            blocking_violations: vec!["v1.3 gate violation [c1]: blocked".to_string()],
+            lifecycle_fail_open_class: None,
+            lifecycle_gate_mode_fail_closed: false,
+        };
+        assert!(g4_input_is_floor_eligible(&input));
+    }
+
+    #[test]
+    fn g4_input_lifecycle_fail_open_is_not_floor_eligible() {
+        let input = crate::dag_proof::DagProofInput {
+            entity_id: Uuid::nil(),
+            from_state: "A".to_string(),
+            to_state: "B".to_string(),
+            blocking_violations: vec![],
+            lifecycle_fail_open_class: Some("some-class".to_string()),
+            lifecycle_gate_mode_fail_closed: true,
+        };
+        assert!(!g4_input_is_floor_eligible(&input));
     }
 }
