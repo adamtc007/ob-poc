@@ -139,6 +139,33 @@ impl ObPocVerbExecutor {
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
         conn: &mut sqlx::PgConnection,
     ) -> dsl_runtime::Result<Option<ob_poc_control_plane::snapshot::SnapshotPins>> {
+        // T11.F.2 slice 4: G1's definitional floor, mirroring slice 2's
+        // placement in `admit_plan_checked` (Path A/B/C/MCP) — the only
+        // other production admission chokepoint. Unconditional, ahead of
+        // and independent from `EnforcedVerbs`: an unregistered verb_fqn
+        // is rejected before the enforce-mode envelope check even runs,
+        // let alone before a scope-held connection touches any table.
+        // Same known scope limitation as slice 2: no session id is
+        // threaded into this per-verb admission check, so the audit
+        // row's session_id is `Uuid::nil()`.
+        if !crate::agent::control_plane_floor::g1_verb_is_registered(verb_fqn) {
+            let reason = format!("{verb_fqn} is not present in the runtime verb registry");
+            let row = crate::agent::control_plane_floor::FloorRejectionRow {
+                session_id: Uuid::nil(),
+                entry_id: Uuid::new_v4(),
+                verb_fqn: verb_fqn.to_string(),
+                floor_gate: "G1",
+                floor_reason: reason.clone(),
+            };
+            let pool = self.executor.pool().clone();
+            tokio::spawn(async move {
+                crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+            });
+            return Err(SemOsError::InvalidInput(format!(
+                "T11.F floor rejection [G1]: {reason}"
+            )));
+        }
+
         let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
         let (decision, pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
             conn,
@@ -1379,14 +1406,80 @@ mod t4_1_envelope_admission_tests {
         // tranche, `admit()` committed its own transaction independently
         // of dispatch — a failed dispatch after a successful admission
         // permanently burned the envelope even though the verb never ran.
-        // Proves the fix: dispatch a verb guaranteed to fail (unknown
-        // FQN), then show the envelope is STILL consumable afterward —
-        // the whole scope, including the consume, rolled back.
-        let _guard = EnvGuard::set("nonexistent.verb");
+        // Proves the fix: dispatch a verb guaranteed to fail past
+        // admission (registered — passes T11.F.2's G1 floor — but with no
+        // args, so dispatch itself fails), then show the envelope is
+        // STILL consumable afterward — the whole scope, including the
+        // consume, rolled back.
+        //
+        // T11.F.2 slice 4 note: this test previously used
+        // "nonexistent.verb" to force a guaranteed dispatch failure —
+        // that input is now floor-rejected at `admit_in_scope`, before a
+        // scope/dispatch ever runs at all, so it no longer exercises this
+        // test's actual subject (rollback-together semantics for a
+        // failure that occurs *inside* the open scope). Switched to a
+        // real registered verb with no args instead; the new
+        // `execute_verb_admitting_envelope_floor_rejects_an_unregistered_verb_before_any_scope_or_consume`
+        // test below covers the floor-rejection case this one used to.
+        let _guard = EnvGuard::set("cbu.confirm");
         let pool = test_pool().await;
 
         let envelope_id = Uuid::new_v4();
         let content_hash: [u8; 32] = [0x33; 32];
+        let handle = ob_poc_types::EnvelopeHandle::new(envelope_id, content_hash);
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".control_plane_envelopes (
+                envelope_id, content_hash, session_id, verb_fqn,
+                status, not_before, not_after
+            ) VALUES ($1, $2, $3, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+            "#,
+        )
+        .bind(envelope_id)
+        .bind(handle.content_hash_hex())
+        .bind(Uuid::new_v4())
+        .execute(&pool)
+        .await
+        .expect("insert sealed envelope row");
+
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let mut ctx = VerbExecutionContext::new(sem_os_core::principal::Principal::system());
+
+        let dispatch_err = executor
+            .execute_verb_admitting_envelope("cbu.confirm", serde_json::json!({}), &mut ctx, Some(handle))
+            .await
+            .expect_err("dispatching cbu.confirm with no args must fail");
+        assert!(
+            !dispatch_err.to_string().contains("envelope admission rejected")
+                && !dispatch_err.to_string().contains("T11.F floor rejection"),
+            "the failure must come from dispatch, not admission or the floor: {dispatch_err}"
+        );
+
+        // If the scope truly rolled back together, the envelope must still
+        // be consumable — a second admission attempt with the same handle
+        // succeeds exactly as if the first attempt never happened.
+        admit_in_scope_committed(&executor, "cbu.confirm", Some(handle), &pool)
+            .await
+            .expect(
+                "the envelope must still be consumable after a dispatch failure — \
+                 a rolled-back scope must leave the consume undone",
+            );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_verb_admitting_envelope_floor_rejects_an_unregistered_verb_before_any_scope_or_consume(
+    ) {
+        // T11.F.2 slice 4: an unregistered verb_fqn is rejected by G1's
+        // floor check inside `admit_in_scope`, unconditionally — even
+        // when a validly sealed envelope is presented for it (proving
+        // this is NOT an envelope/EnforcedVerbs decision at all; it fires
+        // before that logic even runs). Fault-injection matrix item
+        // (design doc §5): "unknown verb on Path A and Path D."
+        let pool = test_pool().await;
+
+        let envelope_id = Uuid::new_v4();
+        let content_hash: [u8; 32] = [0x44; 32];
         let handle = ob_poc_types::EnvelopeHandle::new(envelope_id, content_hash);
         sqlx::query(
             r#"
@@ -1406,24 +1499,28 @@ mod t4_1_envelope_admission_tests {
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
         let mut ctx = VerbExecutionContext::new(sem_os_core::principal::Principal::system());
 
-        let dispatch_err = executor
+        let err = executor
             .execute_verb_admitting_envelope("nonexistent.verb", serde_json::json!({}), &mut ctx, Some(handle))
             .await
-            .expect_err("dispatching an unknown FQN must fail");
+            .expect_err("an unregistered verb must be floor-rejected");
         assert!(
-            !dispatch_err.to_string().contains("envelope admission rejected"),
-            "the failure must come from dispatch, not admission: {dispatch_err}"
+            err.to_string().contains("T11.F floor rejection [G1]"),
+            "must be the floor, not some other failure: {err}"
         );
 
-        // If the scope truly rolled back together, the envelope must still
-        // be consumable — a second admission attempt with the same handle
-        // succeeds exactly as if the first attempt never happened.
-        admit_in_scope_committed(&executor, "nonexistent.verb", Some(handle), &pool)
-            .await
-            .expect(
-                "the envelope must still be consumable after a dispatch failure — \
-                 a rolled-back scope must leave the consume undone",
-            );
+        // The floor fires before the envelope consume even runs — prove
+        // it directly: the sealed row is untouched.
+        let status: String = sqlx::query_scalar(
+            r#"SELECT status FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#,
+        )
+        .bind(envelope_id)
+        .fetch_one(&pool)
+        .await
+        .expect("envelope row must still exist");
+        assert_eq!(
+            status, "sealed",
+            "the floor rejection must never have touched the envelope's consume state"
+        );
     }
 
     /// T10.2: end-to-end proof that a sealed envelope pinning a stale
