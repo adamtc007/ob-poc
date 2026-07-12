@@ -1,8 +1,18 @@
 # EOP-DESIGN-CONTROLPLANE-T11.1a — Boundary Map (Design Pass, No Code)
 
 ### Basis: EOP-PLAN-CONTROLPLANE-002 v0.1, Tranche T11.1a ("the highest-judgment artifact in the series")
-### Status: DRAFT for architect ratification. No code changes ride with this document. T11.1b (mechanical extraction) does not start until this map is ratified.
-### Blocked from proceeding to T11.1b (and from any T11 code at all) by B7 — the v0.4.1 micro-amendment (E-4's C3 constitutive clarification) has not been supplied.
+### Status: RATIFIED (2026-07-12). T11.1b (mechanical extraction) may proceed once B7 clears (see below).
+### Still blocked from any T11 code by B7 — the v0.4.1 micro-amendment (E-4's C3 constitutive clarification) has not been supplied. Queued as the next action (step 3 of the session's sequencing).
+
+## 0. Ratification (2026-07-12)
+
+Architect ruling on the three open questions in §4:
+
+1. **Ship the 8-module high-confidence slice now.** The 4 flagged modules (`agent/`, `dsl_v2/`, `mcp/`, `repl/`) get their own follow-up pass, scheduled as **Priority 1 immediately after this tranche** — not deferred indefinitely, the first thing T11.1's next slice does once T11.1b's mechanical extraction of the 8-module slice lands.
+2. **`mcp/`'s interpretation-shaped surface is T12 scope, not T11.** Defer until "the dust has settled" on T11's checkpoint-topology work — MCP-surface leakproofing rides the full mediation cutover, not the checkpoint-topology tranche.
+3. **`agent/orchestrator.rs` needs splitting, not a single tier verdict.** The file conflates two genuinely different roles — CP-adjacent dispatch/session-state plumbing and utterance-parsing/interpretation logic — under one 4,890-line file. Ratified direction: decompose along that seam (CP-adjacent half stays; utterance-parsing half becomes an agent-tier extraction candidate) rather than force a single classification onto mixed content. This decomposition is itself now a design task, not a mechanical move — scope it as its own sub-pass before any part of `orchestrator.rs` is extracted (same "flagged, needs its own finer-grained pass" discipline the doc already applies to the other 3 hard cases, now sharpened to "split along the CP/utterance-parsing seam" specifically for this file).
+
+Cross-crate items (`ob-poc-agent`'s E-5 stale-rule question, `ob-poc-web`'s startup-wiring scope question) remain open, non-blocking for `ob-poc`-internal T11.1b — carried forward against the series completion invariant (E-T11.A).
 
 ---
 
@@ -54,9 +64,9 @@ Two crates outside `ob-poc` root independently violate L1 today and are **not co
 
 **Cross-crate items needing confirmation (not blocking `ob-poc`-internal T11.1b, but blocking series completion invariant E-T11.A):** `ob-poc-agent`'s stale isolation-rule question (E-5), `ob-poc-web`'s startup-wiring scope question.
 
-**Architect ratification needed on, specifically:**
-1. Is the high-confidence list above sufficient for a first T11.1b extraction slice, with the flagged modules deferred to a T11.1a-follow-up pass? (Recommended: yes — ship the unambiguous win first, don't let the four hard cases block the whole tranche.)
-2. Is `mcp/`'s interpretation-shaped surface in T11 scope or T12 scope?
-3. `agent/orchestrator.rs`'s long-term tier — this is the single highest-leverage classification call in the whole map and the plan's own text doesn't resolve it.
+**Architect ratification needed on, specifically:** see §0 above — all three ratified 2026-07-12.
+1. Ship the high-confidence list as T11.1b's first extraction slice — **ratified**. The 4 flagged modules move to a Priority-1 follow-up pass scheduled immediately after this tranche.
+2. `mcp/`'s interpretation-shaped surface — **ratified T12 scope**, not T11.
+3. `agent/orchestrator.rs`'s long-term tier — **ratified: split along the CP-adjacent / utterance-parsing seam**, not a single verdict. Own design sub-pass before extraction.
 
 **Still blocking any code regardless of the above (B7):** the v0.4.1 micro-amendment / E-4 ruling has not been supplied.
