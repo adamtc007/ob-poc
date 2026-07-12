@@ -655,3 +655,38 @@ Full document: `docs/todo/control-plane/EOP-DESIGN-CONTROLPLANE-T11.1a-BOUNDARY-
 Cross-crate items (`ob-poc-agent`'s E-5 stale "Forbidden dep: ob-poc" question, `ob-poc-web`'s startup-wiring scope) remain open, non-blocking for `ob-poc`-internal T11.1b, carried against the series completion invariant (E-T11.A).
 
 **T11.1a status: RATIFIED, T11.1b UNBLOCKED.** Correction to this entry's earlier draft: B7 is already satisfied — v0.4.1 (ratified earlier this session) already carries the E-4/C3 constitutive clarification, and T11.F.2's code landed under that same clearance. The still-queued "step 3" batch (§7 definitional/judgmental clarification, not yet drafted; `ob-poc-agent`'s E-5 header-comment fix) is separate, smaller housekeeping — neither blocks T11.1b's mechanical extraction of the 8-module slice.
+
+## v0.4.2 ratified — §7.1 definitional/judgmental clarification + E-5 closed (2026-07-12)
+
+Closes the "step 3" housekeeping batch queued behind T11.F.2:
+
+**E-5** (`ob-poc-agent`'s "Forbidden dep: ob-poc" comment): confirmed via `Cargo.toml` inspection the rule is technically satisfied (no `ob-poc` path dep) but is narrower than v0.4's L1 now requires — the crate has direct `dsl-runtime`/`sem_os_client` deps with no `ob-poc-control-plane` edge, so capability calls here are not yet CP-mediated. Fixed by inline comment clarification, not a dependency-graph change (that's T11.2/T12 scope) — a future reader can no longer mistake "no ob-poc dep" for "L1-compliant."
+
+**§7.1** (new subsection, `EOP-VS-CONTROLPLANE-001_Control-Plane_v0.4.2.md`): drafted as a proposal (never fabricated as ratified text — this session's standing discipline), presented for review, ratified with one clarification the architect supplied directly: the 3 tollgate clauses T11.F.2's implementation actually investigated (intent recognition/G1, active pack/G3, DAG legality/G4) get the definitional/judgmental split; **the other 6 clauses are "more technical fails"** — each already fails on one uniform kind of check, not a conflation the split applies to. §7.1 states the enforcement posture explicitly: definitional cores unconditional from T11.F onward (independent of shadow-vs-enforce mode), judgmental sub-cases stay shadow-first/graduated, AB1/C3's T12 terminus unchanged. This is new model vocabulary ("definitional"/"judgmental" did not exist anywhere in v0.4.1 — T11.F's implementation plan coined it without prior model ratification) now formally backed into the model text it was implicitly relying on.
+
+File renamed `v0.4.1` → `v0.4.2` via `git mv` (history preserved, matching this session's established rename discipline). All stale in-repo filename references updated (`check_floor_is_unconditional.sh`, T11.1a boundary map doc); historical citations in dated MCA/ledger entries left untouched (they describe what was true at time of writing, not current state).
+
+**Step 3 housekeeping batch: CLOSED.** T11.1b may proceed.
+
+## Tranche T11.1b — agent-tier extraction, slice 1 landed (2026-07-12)
+
+Basis: EOP-PLAN-CONTROLPLANE-002 v0.1, Tranche T11.1, executing the T11.1a-ratified 8-module list. Full detail in the commit message (`feat(control-plane): T11.1b — agent-tier extraction slice 1`); summarised here for the ledger's own record.
+
+**Headline finding, reshapes the T11.1a map's own confidence claim:** the design doc's directory-level "zero `sqlx::`/`dsl_runtime::`/`sem_os_postgres::` hits" census was a real signal for capability-*crate* coupling, but a materially different (and untested) question from "does this module reference other `ob-poc`-internal modules that stay behind." Per-file tracing of `use crate::X` across all 8 modules found real cross-module coupling to `mcp`, `repl`, `graph`, `runbook`, `sem_os_runtime`, `gleif` — none flagged by the original census. Landed with the user's explicit steer (align on capabilities; maintain interface/visibility discipline; no `pub` scope explosion) resolving the fork: capabilities (real I/O — `HybridVerbSearcher`, `constellation_runtime`, `GleifClient`) stay in `ob-poc` as **named T11.2 keyed-door targets**, framed per the user's own architecture point — pre-CP these were directly managed/called by agent/journey code; post-CP, the Control Plane should manage the call, with Sage/journey/repl left holding only the *result data structs*, not the capability handle. Plain data with zero capability coupling (`IntentArgValue`, `StructuredIntent`, `PackCandidate`, `assemble_dsl_string`) moved to `ob-poc-types` instead of staying duplicated or trapped behind the wrong crate boundary.
+
+**Landed (slice 1):** `semtaxonomy_v2/` (whole), `research/` minus `sources/gleif/{loader,normalize}.rs`, `journey/{mod,pack_manager,providers,router}.rs`, `sage/{arg_assembly,deterministic,drafter,llm_sage,verb_index,verb_resolve}.rs` — merged into the existing `ob-poc-agent` crate (not a new crate — architect ruling: capability alignment, `ob-poc-agent` already has the Sage/journey/dsl-runtime dep shape, only the CP edge itself is genuinely new).
+
+**Excluded from slice 1, each for a traced (not assumed) reason:**
+- `navigation/` (whole) — `executor.rs` deeply coupled to `graph::EntityGraph` (implements `NavExecutor` for it, real mutation, not just the `ProngFilter` data type its sibling `parser.rs` needs); same parse/execute split shape T11.1a already flagged for `dsl_v2/`. Its own follow-up pass.
+- `lookup/` (whole) — `service.rs` (its only real content) wraps `Arc<HybridVerbSearcher>` directly as a builder field, not just a function-call dependency.
+- `plan_builder/` (whole) — `errors.rs` constructs real `OrchestratorResponse::Clarification` values (deep `runbook::response`/`runbook::types::CompiledRunbook` coupling), not a superficial doc-comment reference; its own `mod.rs` already documented `verb_classifier`/`constraint_gate` as staying in `runbook/` by original design.
+- `journey/{playback,template}.rs` — `Runbook`/`SentenceGenerator` coupling, the same `repl::session_v2` inversion blocker `acp_runtime_context.rs` already self-documents (Phase 3 slice 2d.4, 2026-05-12).
+- `sage/{constrained_match,valid_verb_set}.rs` — direct `HybridVerbSearcher`/`constellation_runtime` reach.
+- `research/sources/gleif/{loader,normalize}.rs` — direct `GleifClient` reach; nothing else in `research/` references `GleifLoader` by name (confirmed via grep, not assumed), so the whole `gleif/` subtree stays as an orphaned-but-compiling leaf under a slim `ob-poc::research::sources` remnant.
+- `acp_runtime_context.rs` (whole file) — same repl-inversion blocker as `journey::playback`/`template`, self-documented already.
+
+**T11.2 target list (named here for the record, not yet scoped as a tranche):** `mcp::verb_search::HybridVerbSearcher`, `sem_os_runtime::constellation_runtime`, `gleif::GleifClient` — first three real capability-crate keyed-door candidates, framed per the user's CP-management principle above.
+
+**Verified:** full workspace build clean (incl. `ob-poc-web`), `cargo clippy -p ob-poc --lib --features database -D warnings` clean, `cargo tree -p ob-poc-agent` shows no `ob-poc` edge (no cycle, L1 holds for the moved code), `dsl_v2/executor.rs` untouched (B4), 2145/0 `ob-poc` lib tests (unchanged pass count pre/post move), 3 `ob-poc-boundary` test failures and 7 `db_integration` test failures both confirmed pre-existing via `git stash` (unrelated seed/config drift — not introduced by this tranche).
+
+**T11.1b status: SLICE 1 LANDED.** Slice 2 (the 4 MIXED modules `agent/`, `dsl_v2/`, `mcp/`, `repl/`) is the ratified Priority-1 follow-up, not yet started.
