@@ -231,6 +231,42 @@ mod tests {
         assert_eq!(decide(&input), IntentAdmissionDecision::RejectedUnknownIntent);
     }
 
+    /// T11.F.2 §6.2 regression test (ownership ledger, "Defect register —
+    /// G1", 2026-07-12): pins the current, documented-broken behaviour so
+    /// a future edit cannot silently half-heal it (e.g. fix the
+    /// `"deprecated"` match but not `"outside_pack"`) without this test
+    /// failing loudly. `decide()` string-matches `exclusion_reasons`
+    /// against the literals `"unknown_intent"`/`"outside_pack"`/
+    /// `"deprecated"`, but the real production producer
+    /// (`ob-poc`'s `control_plane_shadow.rs`) Debug-formats
+    /// `PruneReason`'s four actual variants
+    /// (`AbacDenied`/`EntityKindMismatch`/`AgentModeBlocked`/
+    /// `PolicyDenied`) — none of which ever equal those literals. This
+    /// test uses the real Debug shape of `AbacDenied` (not the bare
+    /// `"AbacDenied"` token `pruned_verb_is_rejected_unauthorised_surface_by_default`
+    /// above uses) to prove the collapse happens even for a
+    /// well-formed, realistic production string, not just a contrived
+    /// unmatched token. NOT a target to remove when this defect is
+    /// eventually fixed — invert the assertion at that point instead (the
+    /// scoped fix ticket, §6.3, is the tracked precondition).
+    #[test]
+    fn known_defect_g1_cannot_discriminate_real_prune_reasons() {
+        let real_producer_shape =
+            r#"AbacDenied { actor_role: "viewer", required: "cbu_write" }"#.to_string();
+        let input = IntentAdmissionInput {
+            is_admitted: false,
+            exclusion_reasons: vec![real_producer_shape],
+            ..base_input()
+        };
+        assert_eq!(
+            decide(&input),
+            IntentAdmissionDecision::RejectedUnauthorisedSurface,
+            "if this fails, G1's decide() has started discriminating real \
+             PruneReason values — update this test to assert the correct \
+             per-reason outcome and close the ledger's G1 defect entry"
+        );
+    }
+
     #[test]
     fn gate_evaluate_reports_success_on_admission() {
         let ctx = crate::context::EvaluationContext {
