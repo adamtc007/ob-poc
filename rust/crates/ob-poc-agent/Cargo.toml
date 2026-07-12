@@ -22,6 +22,17 @@ description = "Sage ACP runtime — planning loop, GoalFrame, frontier computati
 # ob-poc; the binary integrator wires the impl into the agent at
 # startup. Sage ACP is intended to ship as a standalone productisable
 # artefact (V&S §3, R5), so no application-tier dep.
+#
+# MCA-002 escalation E-5 (2026-07-12): this rule is satisfied (no
+# `ob-poc` path dep below) but is narrower than what EOP-VS-CONTROLPLANE-001
+# v0.4's L1 (dependency-direction lock) now actually requires — this
+# crate has direct `dsl-runtime`/`sem_os_client` deps below with no
+# `ob-poc-control-plane` edge, so its capability calls are not yet CP-
+# mediated. Not a defect against T11 (checkpoint topology does not
+# require mediation) — flagged as owed work against T11.2 (keyed doors)
+# / T12 (mediation cutover), carried in the ownership ledger's series
+# completion invariant (E-T11.A). Do not read "no ob-poc dep" as "L1-
+# compliant" until that lands.
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
