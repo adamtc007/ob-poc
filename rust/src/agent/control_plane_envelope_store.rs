@@ -195,6 +195,21 @@ pub(crate) async fn admit_plan(
 
 /// Pure-parameter core of [`admit_plan`] — checks every verb in `plan`
 /// against `enforced`/[`check_admission`], first rejection wins.
+///
+/// T11.F.2: also runs G1's definitional-floor check ahead of the
+/// enforce-mode envelope check, unconditionally (not gated by
+/// `EnforcedVerbs`/shadow-vs-enforce mode at all — see
+/// `agent::control_plane_floor`'s module doc). A verb absent from the
+/// runtime registry is rejected here regardless of whether it was ever
+/// going to reach `check_admission`. `admit_plan`'s four call sites (Path
+/// A `sheet_executor`, Path B `batch_executor`, Path C
+/// `repl::executor_bridge`, MCP `dsl_execute`) don't uniformly carry a
+/// session id into this pure-parameter function today; the floor
+/// rejection's audit record uses `Uuid::nil()` for `session_id` when one
+/// isn't available rather than threading a wider signature change through
+/// all four call sites in this slice (deferred, not silently dropped —
+/// ownership ledger notes it as owed). The rejection itself never depends
+/// on the audit write succeeding.
 #[cfg(feature = "database")]
 async fn admit_plan_checked(
     pool: &sqlx::PgPool,
@@ -203,6 +218,23 @@ async fn admit_plan_checked(
 ) -> Result<(), String> {
     for step in &plan.steps {
         let verb_fqn = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+
+        if !crate::agent::control_plane_floor::g1_verb_is_registered(&verb_fqn) {
+            let reason = format!("{verb_fqn} is not present in the runtime verb registry");
+            let row = crate::agent::control_plane_floor::FloorRejectionRow {
+                session_id: Uuid::nil(),
+                entry_id: Uuid::new_v4(),
+                verb_fqn: verb_fqn.clone(),
+                floor_gate: "G1",
+                floor_reason: reason.clone(),
+            };
+            let pool = pool.clone();
+            tokio::spawn(async move {
+                crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+            });
+            return Err(format!("T11.F floor rejection [G1]: {reason}"));
+        }
+
         let decision = check_admission(pool, enforced, &verb_fqn, None)
             .await
             .map_err(|e| format!("envelope admission check failed for {verb_fqn}: {e}"))?;

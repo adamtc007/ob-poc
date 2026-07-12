@@ -48,9 +48,13 @@ Four production ingress points reach dispatch today (per the ownership ledger's 
 
 `pack_resolution.rs::decide()`'s `MissingPack`/`AmbiguousPack` outcomes (no pack candidate / more than one) are genuinely definitional — a structural fact about the world (SemOS pack-resolution state), not a policy judgment. `PackDeniesIntent`/`PackDeniesEntity` are pack-authored business rules — judgmental. Unlike G1, there is no string-matching bug here; the four outcomes are cleanly produced by real, distinct branches (`semreg_allowed_set_available`, `constraint_denies_intent`, and the candidate-count match). **Floor scope: `MissingPack` and `AmbiguousPack` only.** `PackDeniesIntent`/`PackDeniesEntity` stay judgmental/shadow.
 
-### G4 (DAG Legality): same pattern, needs one more precondition traced before commit
+### G4 (DAG Legality): traced and resolved (was an open item; closed during implementation)
 
-`dag_proof.rs::decide()`'s `IllegalFromState`/`IllegalToState`/`Unreachable`/`WrongLifecycleAxis`/`TransitionUnimplemented` are topology facts about the DAG (does this transition exist in the graph at all) — definitional. `GuardFailed { reason }` is produced by two different upstream conditions bundled into one variant: `blocking_violations` (transition-slot-scoped structural preconditions — arguably part of "is this transition legal in this DAG," i.e. definitional) and `lifecycle_fail_open_class`/`lifecycle_gate_mode_fail_closed` (an explicitly policy-flavored fail-open/fail-closed mode setting — judgmental). **This split needs one more trace before T11.F.2 implementation** — specifically, whether `blocking_violations` can ever contain a judgmental (non-topological) reason in practice (its producer, `GateChecker::check_transition`, wasn't re-read this pass). Flagged, not resolved here — recommend either (a) tracing `blocking_violations`' producer before committing to "GuardFailed via blocking_violations is floor-eligible," or (b) the conservative default: treat the entire `GuardFailed` variant as judgmental for T11.F.2 (only `IllegalFromState`/`IllegalToState`/`Unreachable`/`WrongLifecycleAxis`/`TransitionUnimplemented` are floor), revisiting once (a) is done. This document recommends (b) — safer default, narrower floor, no risk of a policy check accidentally hard-rejecting.
+`dag_proof.rs::decide()`'s `IllegalFromState`/`IllegalToState`/`Unreachable`/`WrongLifecycleAxis`/`TransitionUnimplemented` are topology facts about the DAG (does this transition exist in the graph at all) — definitional. `GuardFailed { reason }` is produced by two different upstream conditions bundled into one variant: `blocking_violations` and `lifecycle_fail_open_class`/`lifecycle_gate_mode_fail_closed`.
+
+**Traced** (`crates/dsl-runtime/src/cross_workspace/gate_checker.rs::check_transition`, its call site `src/runbook/step_executor_bridge.rs::resolve_transition_probe`, lines 277-303): `blocking_violations` is populated only from `GateViolation`s with `severity == "error"`, sourced from `CrossWorkspaceConstraint`s — DAG-taxonomy-declared, YAML-authored cross-workspace state-dependency rules (v1.3's Mode A blocking stack). This is structurally the same category as `IllegalFromState`/`Unreachable` — a declared, static topology fact (extended across workspace boundaries), not a runtime ABAC/authority/policy judgment. **`blocking_violations`-sourced `GuardFailed` is floor-eligible.** `lifecycle_fail_open_class`'s contribution remains judgmental — a fail-open/fail-closed mode setting is an operational policy choice, not a taxonomy fact.
+
+Since `decide()` collapses both sources into one untyped `GuardFailed { reason: String }` with no structural discriminator (the same conflation shape as G1, but manifesting inside an already-produced string rather than at the input layer), the floor's G4 check — like G1's — does not route through `decide()` for this determination: it inspects `DagProofInput.blocking_violations` directly (`!blocking_violations.is_empty()` → floor match), before `decide()` ever runs.
 
 ### Summary: the floor's real, precise scope
 
@@ -58,7 +62,7 @@ Four production ingress points reach dispatch today (per the ownership ledger's 
 |---|---|---|
 | G1 | A verb_fqn absent from `runtime_registry()` (new fast-path check, bypasses `decide()`'s buggy string-match entirely) | `RejectedOutsidePack`/`RejectedDeprecated`/`RejectedUnauthorisedSurface`/`RejectedAttestationInsufficient` (everything `decide()` currently actually produces) |
 | G3 | `MissingPack`, `AmbiguousPack` | `PackDeniesIntent`, `PackDeniesEntity` |
-| G4 | `IllegalFromState`, `IllegalToState`, `Unreachable`, `WrongLifecycleAxis`, `TransitionUnimplemented` | `GuardFailed` (conservative default — see above) |
+| G4 | `IllegalFromState`, `IllegalToState`, `Unreachable`, `WrongLifecycleAxis`, `TransitionUnimplemented`, and `GuardFailed` when sourced from non-empty `blocking_violations` (checked directly on `DagProofInput`, not via `decide()`) | `GuardFailed` when sourced from `lifecycle_fail_open_class` only |
 
 ---
 
@@ -122,7 +126,7 @@ A follow-on ticket (not this tranche, not bundled into T11.F.2's implementation)
 
 ## 7. Open items carried forward, not resolved by this document
 
-- **G4's `GuardFailed`/`blocking_violations` producer trace** (§2) — needed before implementation locks in the conservative default, or to widen the floor if the trace shows `blocking_violations` is purely topological.
+- ~~G4's `GuardFailed`/`blocking_violations` producer trace~~ — **resolved** (§2, above): `blocking_violations` is error-severity-filtered, DAG-taxonomy-declared, definitional; floor scope widened accordingly.
 - **The two small ledger lines requested alongside this document** (synthetic-corpus caveat on T11.F.1, no graduation window genuinely started) are recorded in the ownership ledger, not repeated here — see the ledger entry accompanying this document's commit.
 
 ---
