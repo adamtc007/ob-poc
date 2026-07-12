@@ -554,9 +554,13 @@ mod tests {
 
     use dsl_core::{ActionClass, HarmClass};
 
-    use crate::sage::outcome::{Clarification, DrafterHandoff, EntityRef, SageExplain, UtteranceHints};
+    use crate::sage::outcome::{
+        Clarification, DrafterHandoff, EntityRef, SageExplain, UtteranceHints,
+    };
     use crate::sage::verb_index::VerbMeta;
-    use crate::sage::{IntentPolarity, ObservationPlane, OutcomeAction, OutcomeStep, SageConfidence};
+    use crate::sage::{
+        IntentPolarity, ObservationPlane, OutcomeAction, OutcomeStep, SageConfidence,
+    };
 
     fn index_with(entries: Vec<VerbMeta>) -> VerbMetadataIndex {
         let mut by_fqn = HashMap::new();

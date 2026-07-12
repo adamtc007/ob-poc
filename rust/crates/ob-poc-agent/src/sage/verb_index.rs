@@ -522,7 +522,7 @@ fn action_tags(
 /// Compare the metadata index size to the runtime registry size.
 #[cfg(test)]
 pub fn runtime_registry_parity() -> anyhow::Result<(usize, usize)> {
-    use crate::dsl_v2::runtime_registry::RuntimeVerbRegistry;
+    use dsl_analysis::runtime_registry::RuntimeVerbRegistry;
     use dsl_core::ConfigLoader;
     let config = ConfigLoader::from_env().load_verbs()?;
     let index = VerbMetadataIndex::from_config(&config);

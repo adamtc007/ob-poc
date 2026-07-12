@@ -30,6 +30,7 @@ pub mod envelope_handle;
 pub mod galaxy;
 pub mod gated_envelope;
 pub mod graph_scene;
+pub mod intent;
 pub mod investor_register;
 // Phase 3C-prep of capability-crate restructure (2026-05-13). Pack
 // manifest DTOs hoisted from ob-poc-boundary::journey::pack per plan §6.5.

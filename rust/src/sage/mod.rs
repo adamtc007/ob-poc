@@ -1,27 +1,14 @@
-//! Sage — intent understanding layer for the utterance→DSL pipeline.
+//! Sage module — slim remnant after T11.1b (2026-07-12, agent-tier
+//! extraction).
 //!
-//! The Sage understands WHAT the user wants (intent) without ever resolving
-//! HOW to do it (verb FQNs, DSL assembly). That is the Drafter's job.
+//! `arg_assembly`/`deterministic`/`drafter`/`llm_sage`/`verb_index`/
+//! `verb_resolve` moved to `ob-poc-agent::sage` — re-exported here so
+//! every existing `crate::sage::*` caller continues to resolve unchanged.
 //!
-//! ## Architecture
-//!
-//! ```text
-//! User utterance (raw text)
-//!      │
-//!      ▼  Stage 1.5 — BEFORE entity linking (E-SAGE-1)
-//! ┌─────────────────────────────────────────────────────┐
-//! │  SageEngine::classify(utterance, SageContext)        │
-//! │  ┌───────────────────────────────────────────────┐  │
-//! │  │ pre_classify() — deterministic, no LLM         │  │
-//! │  │   1. ObservationPlane from session context    │  │
-//! │  │   2. IntentPolarity from clue words           │  │
-//! │  │   3. Domain hints from keyword scan            │  │
-//! │  └───────────────────────────────────────────────┘  │
-//! │  → OutcomeIntent (plane, polarity, domain, action)  │
-//! └─────────────────────────────────────────────────────┘
-//!      │
-//!      ▼  Stage 3 — entity linking runs here (after Sage)
-//! ```
+//! `constrained_match`/`valid_verb_set` stay here — both reach real
+//! capabilities directly (`mcp::verb_search::HybridVerbSearcher`,
+//! `sem_os_runtime::constellation_runtime`), named as T11.2 keyed-door
+//! targets in the ownership ledger's T11.1b entry.
 //!
 //! ## Invariants
 //!
@@ -37,33 +24,39 @@
 pub mod constrained_match;
 // Phase 2A of the capability-crate restructure (2026-05-13) — the eight
 // pure-type sage modules moved out of `ob-poc-boundary::sage::*` into
-// `ob-poc-sage::*` at the top level. Sibling Sage engines in this crate
-// (deterministic, llm_sage, coder, verb_resolve, verb_index,
-// arg_assembly, clash_matrix, valid_verb_set) continue to reach them via
-// `super::{outcome, plane, polarity, context, drafter_result,
-// verb_resolve_types, disposition, pre_classify}` through these
-// re-exports. See docs/todo/capability-crate-restructure-v1.md §2.2.
+// `ob-poc-sage::*` at the top level. `valid_verb_set` (still here) and the
+// six engines now in `ob-poc-agent::sage` continue to reach them via this
+// crate's or that crate's own `pub use ob_poc_sage::*` re-export
+// respectively. See docs/todo/capability-crate-restructure-v1.md §2.2.
+//
+// T11.1b (2026-07-12): `drafter_result`/`verb_resolve_types` dropped from
+// this crate's re-export list — their only consumers (`drafter.rs`/
+// `verb_resolve.rs`) moved to `ob-poc-agent::sage`, which re-exports them
+// independently; `constrained_match.rs`/`valid_verb_set.rs` (still here)
+// never used them.
 pub use ob_poc_sage::context;
 pub use ob_poc_sage::disposition;
-pub use ob_poc_sage::drafter_result;
 pub use ob_poc_sage::outcome;
 pub use ob_poc_sage::plane;
 pub use ob_poc_sage::polarity;
 pub use ob_poc_sage::pre_classify;
 // Phase 2B (2026-05-13) — session_context with its sqlx::PgPool loaders
 // joined the other eight sage modules in ob-poc-sage. The
-// ob-poc-boundary::sage submodule is gone.
+// ob-poc-boundary::sage submodule is gone. Deliberately NOT re-exported
+// from ob-poc-agent::sage (MCA-001's AB4 finding — a capability-shaped
+// re-export, T11.3's read-lens remedy, not carried into the agent-tier
+// crate) — stays here, orchestrator.rs's only consumer is in ob-poc too.
 pub use ob_poc_sage::session_context;
-pub use ob_poc_sage::verb_resolve_types;
 pub mod valid_verb_set;
 
-// Phase 1.4
-pub mod arg_assembly;
-pub mod deterministic;
-pub mod drafter;
-pub mod llm_sage;
-pub mod verb_index;
-pub mod verb_resolve;
+// T11.1b (2026-07-12): re-export the six moved engines' flattened public
+// surface so every existing `crate::sage::{DeterministicSage,DrafterEngine,
+// LlmSage,...}` caller continues to resolve unchanged. `verb_index`/
+// `verb_resolve` omitted as bare module paths — nothing in `ob-poc`
+// references them by that path (only via the flattened re-exports below,
+// which don't need them); `ob_poc_agent::sage::{verb_index,verb_resolve}`
+// remains reachable directly for any future caller that does.
+pub use ob_poc_agent::sage::{arg_assembly, deterministic, drafter, llm_sage};
 
 // Re-export core types for convenience
 pub use context::{RecentIntent, SageContext};

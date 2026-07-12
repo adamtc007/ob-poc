@@ -20,8 +20,6 @@ use super::outcome::{
 use super::pre_classify::{pre_classify, SagePreClassification};
 use super::{IntentPolarity, SageEngine};
 
-
-
 const READ_DOMAINS: &[&str] = &[
     "cbu",
     "entity",

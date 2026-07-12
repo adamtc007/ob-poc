@@ -3,9 +3,7 @@
 use anyhow::{anyhow, Result};
 use dsl_core::{ArgType, VerbConfig};
 
-use crate::mcp::intent_pipeline::{
-    IntentArgValue, IntentArgument, StructuredIntent,
-};
+use ob_poc_types::intent::{IntentArgValue, IntentArgument, StructuredIntent};
 
 use super::outcome::OutcomeStep;
 
@@ -16,7 +14,7 @@ pub fn assemble_args_from_step(
     config: &VerbConfig,
 ) -> Result<String> {
     let intent = structured_intent_from_step(verb_fqn, step, config)?;
-    crate::mcp::intent_pipeline::assemble_dsl_string(&intent)
+    ob_poc_types::intent::assemble_dsl_string(&intent)
 }
 
 /// Assemble a structured intent from one `OutcomeStep` and a target verb config.

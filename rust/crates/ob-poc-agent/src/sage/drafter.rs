@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use dsl_core::ConfigLoader;
 use dsl_core::{HarmClass, VerbConfig, VerbsConfig};
 
-use crate::mcp::intent_pipeline::IntentArgValue;
+use ob_poc_types::intent::IntentArgValue;
 
 use super::arg_assembly::structured_intent_from_step;
 use super::outcome::{OutcomeIntent, OutcomeStep};
@@ -216,7 +216,7 @@ impl DrafterEngine {
                 _ => None,
             })
             .collect::<Vec<_>>();
-        let dsl = crate::mcp::intent_pipeline::assemble_dsl_string(&structured)?;
+        let dsl = ob_poc_types::intent::assemble_dsl_string(&structured)?;
 
         let resolution =
             if candidate.score >= 0.75 && missing_args.is_empty() && unresolved_refs.is_empty() {

@@ -145,8 +145,8 @@ mod tests {
         NormalizedControlHolder, NormalizedEntity, NormalizedOfficer,
     };
     use crate::research::sources::traits::{
-        FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
-        SearchCandidate, SearchOptions,
+        FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, SearchCandidate,
+        SearchOptions,
     };
     use anyhow::Result;
     use async_trait::async_trait;

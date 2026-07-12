@@ -7,8 +7,8 @@ use crate::research::sources::normalized::{
     NormalizedEntity, NormalizedOfficer,
 };
 use crate::research::sources::traits::{
-    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
-    SearchCandidate, SearchOptions, SourceDataType, SourceLoader,
+    FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions, SearchCandidate, SearchOptions,
+    SourceDataType, SourceLoader,
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;

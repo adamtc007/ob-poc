@@ -31,6 +31,13 @@ bpmn-controller = { path = "crates/bpmn-controller" }
 # Empty skeletons populated by Phases 2–5.
 ob-poc-sage = { path = "crates/ob-poc-sage" }           # Sage intent understanding (Phase 2 dest)
 ob-poc-journey = { path = "crates/ob-poc-journey" }     # Pack-guided workflows (Phase 3 dest)
+# T11.1b (2026-07-12): ob-poc-agent now hosts the relocated production
+# sage/journey/research/semtaxonomy_v2 engines (agent-tier extraction,
+# EOP-PLAN-CONTROLPLANE-002). ob-poc depends on it so the ~9 call sites
+# (agent/orchestrator.rs, api/agent_state.rs) that dispatch into these
+# engines keep resolving; ob-poc-agent has no reverse dep on ob-poc
+# (checked — no cycle).
+ob-poc-agent = { path = "crates/ob-poc-agent" }
 # ob-poc-domain split v1 (docs/todo/ob-poc-domain-split-v1.md) — 9
 # per-business-capability crates carved out of ob-poc-domain. The
 # original ob-poc-domain crate was deleted in Slice D (2026-05-14).

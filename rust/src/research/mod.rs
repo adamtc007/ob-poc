@@ -1,57 +1,28 @@
-//! Research Macro System
+//! Research module — slim remnant after T11.1b (2026-07-12, agent-tier
+//! extraction).
 //!
-//! Bridges fuzzy LLM discovery → human review → deterministic GLEIF DSL verbs.
+//! The real content (macro registry, executor, LLM client, definitions,
+//! and the `companies_house`/`sec_edgar`/`traits`/`normalized`/`registry`
+//! source-loader modules) moved to `ob-poc-agent::research` — see that
+//! crate's doc for the full scope/exclusion rationale.
 //!
-//! # Architecture
+//! What stays here: `sources::gleif`, because `GleifLoader` wraps
+//! `GleifClient`, a real HTTP capability — `ob-poc-agent` cannot depend on
+//! it directly (L1). Named as a T11.2 keyed-door target in the ownership
+//! ledger's T11.1b entry, same class as `mcp::verb_search::HybridVerbSearcher`
+//! and `sem_os_runtime::constellation_runtime`.
 //!
-//! ```text
-//! ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-//! │ Research Macro  │ ──► │  Human Review   │ ──► │  GLEIF Verbs    │
-//! │ (LLM + search)  │     │  (approve/edit) │     │  (deterministic)│
-//! └─────────────────┘     └─────────────────┘     └─────────────────┘
-//!       fuzzy                   gate                   100% reliable
-//! ```
-//!
-//! # Usage
-//!
-//! ```rust,no_run
-//! use ob_poc::research::{ResearchMacroRegistry, ResearchExecutor, ClaudeResearchClient};
-//! use std::collections::HashMap;
-//!
-//! // Load macros from config
-//! let registry = ResearchMacroRegistry::load_from_dir("config/macros/research".as_ref()).unwrap();
-//!
-//! // Create executor with LLM client
-//! let client = ClaudeResearchClient::from_env().unwrap();
-//! let executor = ResearchExecutor::new(registry, client);
-//!
-//! // Execute a research macro
-//! let params = HashMap::from([
-//!     ("client_name".to_string(), serde_json::json!("Allianz")),
-//! ]);
-//! // let result = executor.execute("client-discovery", params).await?;
-//! ```
-//!
-//! # Modules
-//!
-//! - `definition`: Types for macro definitions loaded from YAML
-//! - `registry`: Macro registry with YAML loading and search
-//! - `executor`: Research execution with LLM and validation
-//! - `llm_client`: LLM client trait with tool use support
-//! - `error`: Error types
-//! - `sources`: Pluggable source loaders (GLEIF, Companies House, SEC EDGAR)
+//! Everything else is re-exported from `ob-poc-agent` so every existing
+//! `crate::research::*` caller in `ob-poc` continues to resolve unchanged.
 
-pub mod definition;
-pub mod error;
-pub mod executor;
-pub mod llm_client;
-pub mod registry;
+// `executor` re-exported as a module path (not just its flattened types)
+// because `session::research_context`'s `#[cfg(test)]` module reaches
+// `executor::SearchQuality` directly — invisible to a plain lib build,
+// hence the allow.
+#[allow(unused_imports)]
+pub use ob_poc_agent::research::{
+    executor, ApprovedResearch, ClaudeResearchClient, ResearchExecutor, ResearchMacroRegistry,
+    ResearchResult, ReviewRequirement,
+};
+
 pub mod sources;
-
-// Re-exports for convenience
-pub use definition::ReviewRequirement;
-pub use executor::{ApprovedResearch, ResearchExecutor, ResearchResult};
-pub use llm_client::ClaudeResearchClient;
-pub use registry::ResearchMacroRegistry;
-
-// Source loader re-exports

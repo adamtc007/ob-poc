@@ -11,8 +11,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::journey::pack::{load_pack_from_file, PackLoadError, PackManifest};
-use crate::repl::types_v2::{PackCandidate, WorkspaceKind};
+use ob_poc_boundary::session::WorkspaceKind;
+use ob_poc_journey::pack::{load_pack_from_file, PackLoadError, PackManifest};
+use ob_poc_types::journey::pack_candidate::PackCandidate;
 
 // ---------------------------------------------------------------------------
 // PackSemanticScorer trait

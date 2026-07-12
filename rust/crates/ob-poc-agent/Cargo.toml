@@ -72,6 +72,20 @@ sem_os_core.workspace = true
 # the same protocol shape.
 sem_os_mcp = { path = "../sem_os_mcp" }
 
+# T11.1b (2026-07-12): deps needed by the relocated sage/journey/research/
+# semtaxonomy_v2 engines (see crate doc). dsl-analysis is the real home of
+# runtime_registry/verb_registry (sage::verb_index reaches it directly, not
+# through ob-poc's dsl_v2 compat re-export). ob-poc-semtaxonomy is the
+# governed-registry-authored taxonomy client semtaxonomy_v2 compiles
+# against.
+dsl-analysis = { path = "../dsl-analysis" }
+ob-poc-semtaxonomy = { path = "../ob-poc-semtaxonomy" }
+handlebars = "6.0"
+regex = "1.12.2"
+rust_decimal = { version = "1.33", features = ["serde"] }
+serde_yaml = "0.9"
+jsonschema = { version = "0.29", default-features = false, features = ["resolve-file"] }
+
 # Async runtime.
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"

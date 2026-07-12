@@ -2,9 +2,7 @@
 //!
 //! The core abstraction for pluggable research source loaders.
 
-use super::normalized::{
-    NormalizedControlHolder, NormalizedEntity, NormalizedOfficer,
-};
+use super::normalized::{NormalizedControlHolder, NormalizedEntity, NormalizedOfficer};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -151,7 +149,6 @@ impl FetchOfficersOptions {
         self.include_resigned = true;
         self
     }
-
 }
 
 // =============================================================================

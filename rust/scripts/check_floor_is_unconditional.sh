@@ -3,8 +3,8 @@
 # branches must never be wrapped by an env-var/feature toggle — that would
 # turn a definitional control (no legitimate traffic can produce it) into a
 # judgmental one gated by operator convenience, exactly what T11.F's model
-# text forbids (see EOP-VS-CONTROLPLANE-001_Control-Plane_v0.4.1.md, T11.F
-# design doc §0/§1).
+# text forbids (see EOP-VS-CONTROLPLANE-001_Control-Plane_v0.4.2.md §7.1,
+# and the T11.F design doc §0/§1).
 #
 # This is a source-scanning heuristic, not call-graph analysis (same caveat
 # lint_write_paths.sh documents for its own allowlist): it checks the lines
