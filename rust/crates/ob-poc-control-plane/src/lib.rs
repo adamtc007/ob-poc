@@ -42,6 +42,7 @@ pub mod write_set_attestation;
 
 pub mod audit;
 pub mod exceptions;
+pub mod floor;
 pub mod metrics;
 pub mod versioning;
 
