@@ -2038,6 +2038,89 @@ impl DslExecutor {
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
 
+        // ── G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 items 3-5):
+        // Path B/C shadow-gate evaluation, extending the G1-G14 pipeline
+        // beyond Path A's sole prior call site (`phase5_runtime_recheck`).
+        // Best-effort, non-blocking (matches Path A's own posture: a
+        // shadow-decision persistence failure must never affect the
+        // request it observed) — spawned so it never adds latency or a
+        // new failure mode to real dispatch.
+        //
+        // Deliberately bounded, not a full re-implementation of
+        // `build_evaluation_context`: only the gates whose Path-A input
+        // source generalizes cleanly to this seam without Sequencer-
+        // specific state are wired for real: G1 (via `runtime_registry`
+        // resolution) and G12 (`build_version_pinning_input`, no
+        // session/pack/envelope argument at all) are independently
+        // *substantive* here (both have zero declared predecessors in
+        // `gate::GATE_DEPENDENCIES`). G8's `StpClassifierInput` is also
+        // built (`build_stp_classifier_input`, same no-dependency-argument
+        // reuse) but is NOT independently substantive yet: it declares 7
+        // predecessors (IntentAdmission, EntityBinding, PackResolution,
+        // DagProof, Authority, Evidence, WriteSet), none of which are
+        // wired here, so it correctly reports `NotEvaluated`, not
+        // `Success`/`Failure`, under collect-where-independent semantics
+        // -- confirmed live by the E3 matrix probe's first run (see the
+        // G5 session doc). G3/G9 are
+        // the ratified NotApplicable cells (`ob_poc_control_plane::
+        // applicability`). The remaining gates (G2, G4-G7, G10, G11, G13,
+        // G14) are left `None` here -- an honest "not observed at this
+        // seam yet", not a fabricated pass -- because their Path-A
+        // builders (`build_entity_binding_input`, `build_dag_proof_input`
+        // via `GatePipeline`, `build_write_set_input`, the evidence/
+        // authority envelope-derived fields, `build_decision_snapshot_input`)
+        // all assume `SemOsContextEnvelope`/`ReplOrchestratorV2::
+        // GatePipeline`/batched entity-facts state that does not exist on
+        // this engine (confirmed: `RealDslExecutor`/`DslExecutor` carry no
+        // such fields -- see the G5 session doc's generalization-gap
+        // finding). Wiring those for B/C is real follow-on work, not
+        // silently folded into this tranche.
+        #[cfg(feature = "database")]
+        {
+            let fqn = format!("{}.{}", vc.domain, vc.verb);
+            let path = ctx.execution_path;
+            if matches!(
+                path,
+                ob_poc_types::ExecutionPath::DslDirect | ob_poc_types::ExecutionPath::WorkflowDispatched
+            ) {
+                let pool = self.pool.clone();
+                let session_id = ctx.session_id.unwrap_or_else(Uuid::nil);
+                let entry_id = Uuid::new_v4();
+                let is_durable_verb = matches!(&runtime_verb.behavior, RuntimeBehavior::Durable(_));
+                tokio::spawn(async move {
+                    let cp_ctx = ob_poc_control_plane::context::EvaluationContext {
+                        intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
+                            intent_id: entry_id,
+                            verb_fqn: fqn.clone(),
+                            // The closest real fact this seam has: the
+                            // verb resolved in the runtime registry at
+                            // all. Weaker evidence than Path A's SemOS
+                            // ABAC/pack-pruning grade (this function
+                            // wouldn't have reached this point on an
+                            // unresolvable verb) -- disclosed, not
+                            // fabricated as an equivalent signal.
+                            is_admitted: true,
+                            exclusion_reasons: Vec::new(),
+                            is_ai_originated: false,
+                            interpretation_attested: false,
+                        }),
+                        stp_classifier: Some(
+                            crate::agent::control_plane_shadow::build_stp_classifier_input(&fqn, false)
+                        ),
+                        version_pinning: Some(crate::agent::control_plane_shadow::build_version_pinning_input()),
+                        ..Default::default()
+                    };
+                    let _ = is_durable_verb; // captured for future STP wiring parity; unused today
+                    let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
+                    let report = ob_poc_control_plane::applicability::apply_matrix(report, path);
+                    let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                        session_id, entry_id, &fqn, &report, false, path,
+                    );
+                    crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+                });
+            }
+        }
+
         // ── Phase 3 C1: execution-time `requires_states` precondition ──────
         // The "validate" half of select-then-validate. Classification stays
         // membership-scoped (discovery); executability is checked here against

@@ -596,8 +596,18 @@ pub(crate) fn build_evaluation_context(
 }
 
 /// One row for `"ob-poc".control_plane_shadow_decisions`.
+///
+/// `pub` (not `pub(crate)`) since G5 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001`
+/// §3 item 4): `ob-poc-web`'s `bus_runtime.rs` (Path D's adapter, a
+/// different crate) needs to build and persist a shadow-decision row for
+/// bus-federated dispatch, the same shape Path A already persists. This is
+/// a deliberate, disclosed pub-surface widening (flagged in the G5 session
+/// doc's blind-review summary, not silently absorbed) — the alternative
+/// (duplicating the row shape / INSERT statement inside `ob-poc-web`)
+/// would be exactly the "parallel, redundant tracking mechanism" the
+/// mission brief said not to build.
 #[derive(Debug, Clone)]
-pub(crate) struct ShadowDecisionRow {
+pub struct ShadowDecisionRow {
     pub session_id: Uuid,
     pub entry_id: Uuid,
     pub verb_fqn: String,
@@ -605,6 +615,13 @@ pub(crate) struct ShadowDecisionRow {
     pub legacy_outcome_blocked: bool,
     pub shadow_intent_admission_blocked: bool,
     pub diverged: bool,
+    /// G5 (migration `20260713_control_plane_shadow_decisions_execution_path.sql`):
+    /// which `ExecutionPath` this decision was evaluated under. Every
+    /// caller must now pass this explicitly (no more implicit
+    /// Path-A-only assumption) — Path A's own call sites pass
+    /// `ExecutionPath::RunbookSequencer` like every other caller, not a
+    /// default.
+    pub execution_path: ob_poc_types::ExecutionPath,
 }
 
 /// Serialises an `EvaluationReport` into the `gate_results` JSONB column:
@@ -631,12 +648,13 @@ pub(crate) fn report_to_json(report: &ob_poc_control_plane::gate::EvaluationRepo
 
 /// Builds the persistable row: compares the shadow G1 outcome against the
 /// legacy Phase 5 recheck's block/allow decision for this entry.
-pub(crate) fn build_shadow_decision_row(
+pub fn build_shadow_decision_row(
     session_id: Uuid,
     entry_id: Uuid,
     verb_fqn: &str,
     report: &ob_poc_control_plane::gate::EvaluationReport,
     legacy_outcome_blocked: bool,
+    execution_path: ob_poc_types::ExecutionPath,
 ) -> ShadowDecisionRow {
     let shadow_intent_admission_blocked = !matches!(
         report.get(ob_poc_control_plane::gate::GateId::IntentAdmission),
@@ -651,19 +669,21 @@ pub(crate) fn build_shadow_decision_row(
         legacy_outcome_blocked,
         shadow_intent_admission_blocked,
         diverged: shadow_intent_admission_blocked != legacy_outcome_blocked,
+        execution_path,
     }
 }
 
 /// Best-effort insert. Never returns `Err` — a shadow-decision persistence
 /// failure must not affect the request it was observing.
 #[cfg(feature = "database")]
-pub(crate) async fn insert_shadow_decision(pool: &sqlx::PgPool, row: &ShadowDecisionRow) -> bool {
+pub async fn insert_shadow_decision(pool: &sqlx::PgPool, row: &ShadowDecisionRow) -> bool {
     let result = sqlx::query(
         r#"
         INSERT INTO "ob-poc".control_plane_shadow_decisions (
             session_id, entry_id, verb_fqn, gate_results,
-            legacy_outcome_blocked, shadow_intent_admission_blocked, diverged
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            legacy_outcome_blocked, shadow_intent_admission_blocked, diverged,
+            execution_path
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
     )
     .bind(row.session_id)
@@ -673,6 +693,7 @@ pub(crate) async fn insert_shadow_decision(pool: &sqlx::PgPool, row: &ShadowDeci
     .bind(row.legacy_outcome_blocked)
     .bind(row.shadow_intent_admission_blocked)
     .bind(row.diverged)
+    .bind(row.execution_path.as_letter())
     .execute(pool)
     .await;
 
@@ -789,12 +810,12 @@ mod tests {
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
         // Shadow says admitted (not blocked); legacy says blocked -> diverged.
-        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, true);
+        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, true, ob_poc_types::ExecutionPath::RunbookSequencer);
         assert!(!row.shadow_intent_admission_blocked);
         assert!(row.diverged);
 
         // Legacy agrees (not blocked) -> no divergence.
-        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, false);
+        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, false, ob_poc_types::ExecutionPath::RunbookSequencer);
         assert!(!row.diverged);
     }
 

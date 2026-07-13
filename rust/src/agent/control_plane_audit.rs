@@ -718,6 +718,7 @@ mod tests {
             let entry_a = Uuid::new_v4();
             let row_without_audit = crate::agent::control_plane_shadow::build_shadow_decision_row(
                 session_a, entry_a, "cbu.confirm", &report, false,
+                ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row_without_audit).await);
 
@@ -738,6 +739,7 @@ mod tests {
             );
             let row_with_audit = crate::agent::control_plane_shadow::build_shadow_decision_row(
                 session_b, entry_b, "cbu.confirm", &report, false,
+                ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row_with_audit).await);
             assert!(

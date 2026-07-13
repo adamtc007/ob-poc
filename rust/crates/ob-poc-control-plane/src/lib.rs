@@ -27,6 +27,7 @@
 //! `dsl-runtime`, `ob-poc-boundary`, and `ob-poc-kyc-substrate`.
 #![deny(unreachable_pub)]
 
+pub mod applicability;
 pub mod authority_gate;
 pub mod context;
 pub mod dag_proof;

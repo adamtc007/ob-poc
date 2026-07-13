@@ -103,6 +103,37 @@ fn rejection_from_report(
                 gate: *id,
                 reason: "not implemented".to_string(),
             }),
+            // G5 sweep (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 1):
+            // this is the ONE site in the whole `NotApplicable`
+            // compiler-driven sweep whose correct behaviour is genuinely
+            // ambiguous, not mechanical — flagged as a disclosed
+            // STOP-condition in the G5 session doc rather than guessed
+            // through. `evaluate`/`evaluate_with_report` (this function's
+            // only callers) serve Path A exclusively, and Path A never
+            // applies a path-conditional `NotApplicable` override (see
+            // `GateResult::NotApplicable`'s own doc) — so this arm is
+            // reachable at compile time but not with any real Path A
+            // data today. Whether a future path-aware caller of
+            // `evaluate`/`evaluate_with_report` should treat
+            // `NotApplicable` among `PROOF_BEARING_GATES` as vacuously
+            // satisfied (like `Success`) or as a hard block is a real
+            // design question this sweep does not answer: the envelope/
+            // proof-assembly code immediately below `rejection_from_report`
+            // unconditionally re-derives a typed proof value for every
+            // proof-bearing gate, and no typed proof value exists for a
+            // gate whose `Input` was never built because it was marked
+            // not-applicable. Resolved here as fail-CLOSED (a defensive
+            // rejection, not a silent pass) until a real path-aware caller
+            // of this function exists and that design question gets its
+            // own review — see G5's session doc.
+            Some(GateResult::NotApplicable(reason)) => Some(GateFailure::Failed {
+                gate: *id,
+                reason: format!(
+                    "gate marked NotApplicable ({reason}), but evaluate()/evaluate_with_report() \
+                     is Path-A-only and Path A never applies a path-conditional NotApplicable \
+                     override — treated as a defensive failure, not a silent pass (G5 STOP-condition)"
+                ),
+            }),
         })
         .collect();
     if failures.is_empty() {

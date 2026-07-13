@@ -1170,6 +1170,13 @@ struct ControlPlaneMetricsResponse {
     /// fraction of Path A would enforce cleanly today," derived from the
     /// same `gate_results` `shadow_divergence`/`gate_outcomes` already read.
     sealable_rate_by_verb: Vec<crate::agent::control_plane_metrics::SealableRateByVerb>,
+    /// G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 5): the
+    /// per-(gate, path) breakdown `gate_outcomes` above cannot answer
+    /// (path-blind). Real production consumer of
+    /// `gate_outcome_counts_by_path` -- the operator-facing surface for
+    /// "is the ratified applicability matrix holding on real B/C/D
+    /// traffic," not just the E3 test-suite probe.
+    gate_outcomes_by_path: Vec<crate::agent::control_plane_metrics::GateOutcomeCountByPath>,
     /// T11.0: v0.4.1 §15.3 C2 — `capability_invocations_without_cp_provenance`,
     /// per instrumented capability entry point. In-process counters, not a
     /// DB query (see `capability_provenance.rs`'s module doc for why, and
@@ -1216,6 +1223,13 @@ async fn get_control_plane_metrics(
                 tracing::error!(error = %e, "control-plane metrics: sealable_rate_by_verb query failed");
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
+    let gate_outcomes_by_path =
+        crate::agent::control_plane_metrics::gate_outcome_counts_by_path(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: gate_outcome_counts_by_path query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
     let shadow_divergence_rate = shadow_divergence.divergence_rate();
     let write_attestation_breach_rate = write_attestation_breaches.breach_rate();
@@ -1231,6 +1245,7 @@ async fn get_control_plane_metrics(
         write_attestation_breach_rate,
         envelope_status_counts,
         sealable_rate_by_verb,
+        gate_outcomes_by_path,
         capability_invocations_without_cp_provenance,
     }))
 }

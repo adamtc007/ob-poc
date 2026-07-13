@@ -330,7 +330,7 @@ gate_e3() {
   local compile_result=$?
 
   echo ""
-  echo "  Live half (gate_outcome_counts over real control_plane_shadow_decisions rows):"
+  echo "  Live half (gate_outcome_counts over real control_plane_shadow_decisions rows, Path A):"
   local result
   if [ -z "${DATABASE_URL:-}" ]; then
     echo "    SKIPPED — DATABASE_URL not set (this is a #[ignore]-gated live-DB test)"
@@ -362,6 +362,23 @@ gate_e3() {
         echo "  ** E3 live half: INVARIANT FAILURE — verified against a live DB, N/14 gates genuinely empty. **"
       fi
     fi
+
+    # G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 5,
+    # EOP-DESIGN-CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001): the
+    # per-(gate, path) amendment against the ratified applicability
+    # matrix — Path B/C/D shadow-wired cells (G1/G12 substantive,
+    # G3/G9 ratified NotApplicable) plus the window-discipline proof
+    # (Path A never produces NotApplicable). Exercises real production
+    # code with synthetic traffic where B/C/D have none yet (per the
+    # tranche's own exit-gate allowance).
+    echo ""
+    echo "  Live half — G5 per-(gate, path) matrix probe (Path B/C/D + window discipline):"
+    local matrix_output
+    matrix_output="$(cd rust && cargo test -p ob-poc --lib --features database \
+      -- --ignored --nocapture e3_matrix_invariant_probe g5_path_a_never_produces_not_applicable 2>&1)"
+    local matrix_result=$?
+    echo "$matrix_output" | tail -30
+    result=$((result + matrix_result))
   fi
 
   if [ "$result" -eq 0 ]; then

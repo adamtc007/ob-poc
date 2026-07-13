@@ -8030,6 +8030,7 @@ impl ReplOrchestratorV2 {
                 &entry.verb,
                 &report,
                 legacy_outcome.is_some(),
+                ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             let sealed = matches!(decision, ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_));
             let session_id = session.id;
@@ -8268,6 +8269,7 @@ impl ReplOrchestratorV2 {
             &entry.verb,
             &report,
             false,
+            ob_poc_types::ExecutionPath::RunbookSequencer,
         );
         let session_id = session.id;
         let entry_verb = entry.verb.clone();

@@ -83,6 +83,13 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
 
     let adapter = ObPocVerbAdapter {
         executor: config.verb_executor,
+        // G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 4): best-effort
+        // shadow-decision persistence needs its own pool handle,
+        // independent of the `TransactionScope` the real dispatch runs
+        // under (same posture as Path A's `phase5_runtime_recheck`,
+        // which spawns its shadow insert against a cloned pool, never
+        // the request's own scope).
+        pool: config.pool.clone(),
     };
     let handler = ObPocBusHandler::new(adapter).with_catalogue_version(config.catalogue_version);
 
@@ -117,6 +124,10 @@ pub(crate) async fn start(config: BusRuntimeConfig) -> anyhow::Result<BusRuntime
 /// bus-protocol bindings to/from `VerbExecutionContext` arg JSON.
 struct ObPocVerbAdapter {
     executor: Arc<ObPocVerbExecutor>,
+    /// G5: shadow-decision persistence pool (see the `start()` construction
+    /// site comment for why this is a separate handle from the dispatch
+    /// transaction scope).
+    pool: PgPool,
 }
 
 #[async_trait]
@@ -165,6 +176,89 @@ impl VerbExecutor for ObPocVerbAdapter {
         // envelope, so defaulting to enforce would reject every live bus
         // verb call outright. That flip needs an explicit architect
         // decision, not a default flipped silently inside this adapter.
+        // G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 items 4-5): Path D
+        // shadow-gate evaluation, extending the G1-G14 pipeline to the
+        // bus adapter. Same bounded-and-disclosed posture as the G4 seam
+        // (`dsl_v2::executor::execute_verb_in_scope`): G1 (weak "verb
+        // resolved" signal) and G12 are independently substantive here
+        // (zero declared predecessors); G8's input is also built but not
+        // independently substantive yet -- it declares 7 predecessors in
+        // `gate::GATE_DEPENDENCIES`, none wired at this adapter, so it
+        // correctly reports `NotEvaluated` under collect-where-independent
+        // semantics (confirmed live by the E3 matrix probe -- see the G5
+        // session doc). G3/G9 are
+        // the ratified NotApplicable cells (bus dispatch has no REPL pack
+        // or runbook object at all — `ob_poc_control_plane::applicability`,
+        // matching R:§B6's own confirmed finding for Path D). The
+        // remaining gates stay unwired here for the same reason as the
+        // G4 seam: `ob-poc-web` cannot reach `ob-poc`'s crate-private
+        // `agent::control_plane_shadow` input builders (they are
+        // `pub(crate)` to `ob-poc`, not `ob-poc-web` — a genuine
+        // crate-boundary generalization gap, documented rather than
+        // widening that module's pub surface to force it through in this
+        // tranche). Best-effort, spawned, never blocks real dispatch.
+        // No `#[cfg(feature = "database")]` gate here — unlike `ob-poc`
+        // (whose `dsl_v2::executor` seam is compiled both with and
+        // without the `database` feature), `ob-poc-web` declares no such
+        // feature at all (`Cargo.toml` has `default = []` only); sqlx is
+        // unconditionally available in this crate.
+        {
+            use ob_poc::dsl_v2::execution::{runtime_registry, RuntimeBehavior};
+            let fqn = local_verb_id.to_string();
+            let pool = self.pool.clone();
+            let entry_id = ctx.execution_id;
+            let is_durable_verb = fqn
+                .split_once('.')
+                .and_then(|(d, v)| runtime_registry().get(d, v))
+                .map(|rv| matches!(rv.behavior, RuntimeBehavior::Durable(_)))
+                .unwrap_or(false);
+            tokio::spawn(async move {
+                let cp_ctx = ob_poc_control_plane::context::EvaluationContext {
+                    intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
+                        intent_id: entry_id,
+                        verb_fqn: fqn.clone(),
+                        is_admitted: true,
+                        exclusion_reasons: Vec::new(),
+                        is_ai_originated: false,
+                        interpretation_attested: false,
+                    }),
+                    stp_classifier: Some(ob_poc_control_plane::stp_classifier::StpClassifierInput {
+                        is_durable_verb,
+                        // Path D IS a legitimate durable-execution-allowed
+                        // context in principle (the bus is how an external
+                        // workflow engine reaches ob-poc), unlike Path A's
+                        // shadow call site -- but no attestation signal for
+                        // "this specific durable dispatch was authorised"
+                        // exists at this adapter today, so this stays
+                        // conservatively `false` (same "no signal means no
+                        // fabricated pass" posture used throughout this
+                        // gate stack).
+                        durable_execution_explicitly_allowed: false,
+                        has_unpinned_entities: false,
+                    }),
+                    version_pinning: Some(ob_poc_control_plane::versioning::VersionPinningInput {
+                        versions: ob_poc_control_plane::snapshot::PinnedVersionSet {
+                            compiler_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                            ..Default::default()
+                        },
+                    }),
+                    ..Default::default()
+                };
+                let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
+                let report =
+                    ob_poc_control_plane::applicability::apply_matrix(report, ob_poc_types::ExecutionPath::BusFederated);
+                let row = ob_poc::agent::control_plane_shadow::build_shadow_decision_row(
+                    Uuid::nil(),
+                    entry_id,
+                    &fqn,
+                    &report,
+                    false,
+                    ob_poc_types::ExecutionPath::BusFederated,
+                );
+                ob_poc::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+            });
+        }
+
         let result = self
             .executor
             .execute_verb_admitting_envelope(

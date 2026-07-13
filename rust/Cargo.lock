@@ -4640,6 +4640,7 @@ dependencies = [
  "ob-poc-authoring",
  "ob-poc-boundary",
  "ob-poc-bus-handler",
+ "ob-poc-control-plane",
  "ob-poc-entity-linking",
  "ob-poc-types",
  "ob-semantic-matcher",

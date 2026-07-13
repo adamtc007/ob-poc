@@ -74,6 +74,31 @@ pub enum GateResult {
     /// never return it directly.
     NotEvaluated { blocked_by: Vec<GateId> },
     NotImplemented,
+    /// G5 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001` §3, `EOP-DESIGN-
+    /// CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001`): this gate does not
+    /// apply, by construction, to the `ExecutionPath` the surrounding
+    /// decision was evaluated for — e.g. `PackResolution` on Path D
+    /// (bus-federated dispatch has no REPL journey-pack concept at all).
+    /// This is a **first-class outcome, not a synonym for `NotEvaluated`**:
+    /// `NotEvaluated` means "would apply here, but a declared predecessor
+    /// didn't succeed"; `NotApplicable` means "the concept this gate
+    /// grades does not exist on this path, full stop." The `String` is the
+    /// ratified justification (matches a cell in the applicability matrix
+    /// doc referenced above) — never fabricated per call site.
+    ///
+    /// **No gate adapter's own `Gate::evaluate` impl constructs this
+    /// variant** (every existing adapter in this crate only ever builds
+    /// `Success`/`Failure`, same as `NotEvaluated`'s "the evaluator
+    /// produces this automatically" doc above) — `NotApplicable` is
+    /// applied by path-aware *callers* of `evaluate_shadow` (in `ob-poc`,
+    /// the execution tier), as a post-processing override for the specific
+    /// `(GateId, ExecutionPath)` cells the ratified matrix marks
+    /// not-applicable, never inside this crate's own evaluation loop. In
+    /// particular, Path A's call site never applies this override —
+    /// window discipline (standing rule 3) holds by construction, not by
+    /// convention; see `g5_path_a_never_produces_not_applicable` in
+    /// `ob-poc`'s test suite for the live proof.
+    NotApplicable(String),
 }
 
 impl GateResult {

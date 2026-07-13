@@ -131,6 +131,10 @@ pub(crate) async fn gate_outcome_counts(
                     WHEN kv.value LIKE 'NotEvaluated%' THEN 'NotEvaluated'
                     WHEN kv.value = 'NotImplemented' THEN 'NotImplemented'
                     WHEN kv.value = 'missing' THEN 'NotRegistered'
+                    -- G5 (EOP-DESIGN-CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001):
+                    -- a first-class outcome, not folded into NotEvaluated (the
+                    -- Debug rendering is `NotApplicable("<reason>")`).
+                    WHEN kv.value LIKE 'NotApplicable%' THEN 'NotApplicable'
                     ELSE 'Unrecognised'
                 END AS outcome_kind,
                 'shadow_eval' AS provenance
@@ -176,6 +180,74 @@ pub(crate) async fn gate_outcome_counts(
             gate,
             outcome_kind,
             provenance,
+            count,
+        })
+        .collect())
+}
+
+/// G5 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001` §3 item 5,
+/// `EOP-DESIGN-CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001`): one row of
+/// the per-(gate, path) outcome breakdown — the dimension
+/// `gate_outcome_counts` above cannot answer (it groups by (gate,
+/// outcome_kind, provenance), with no path column anywhere in that
+/// query). Additive sibling function over the SAME `shadow_eval` source
+/// table (`gate_outcome_counts` reads `control_plane_shadow_decisions`
+/// too) — not a parallel/redundant tracking mechanism, the same table
+/// grouped along an additional dimension the G5 migration added a real
+/// column for.
+///
+/// Scoped to `shadow_eval` provenance only: G10 (`consume_seam`) and G14
+/// (`post_dispatch`) samples come from `control_plane_audit`, which does
+/// not carry an `execution_path` column as of this tranche — attributing
+/// those two gates' B/C/D samples per-path is out of G5's scope (it would
+/// require G1/G2's audit-stream work to grow its own path dimension, not
+/// named in this tranche's work items). The E3 probe's per-(gate, path)
+/// amendment (below) is scoped accordingly: it only asserts per-path
+/// substantive samples for the 12 `shadow_eval`-provenance gates, and
+/// falls back to `gate_outcome_counts`' existing path-blind check for
+/// G10/G14.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GateOutcomeCountByPath {
+    pub execution_path: String,
+    pub gate: String,
+    pub outcome_kind: String,
+    pub count: i64,
+}
+
+#[cfg(feature = "database")]
+pub(crate) async fn gate_outcome_counts_by_path(
+    pool: &sqlx::PgPool,
+) -> Result<Vec<GateOutcomeCountByPath>, sqlx::Error> {
+    let rows: Vec<(String, String, String, i64)> = sqlx::query_as(
+        r#"
+        SELECT
+            d.execution_path,
+            kv.key AS gate,
+            CASE
+                WHEN kv.value = 'Success' THEN 'Success'
+                WHEN kv.value LIKE 'Failure%' THEN 'Failure'
+                WHEN kv.value LIKE 'NotEvaluated%' THEN 'NotEvaluated'
+                WHEN kv.value = 'NotImplemented' THEN 'NotImplemented'
+                WHEN kv.value = 'missing' THEN 'NotRegistered'
+                WHEN kv.value LIKE 'NotApplicable%' THEN 'NotApplicable'
+                ELSE 'Unrecognised'
+            END AS outcome_kind,
+            COUNT(*) AS count
+        FROM "ob-poc".control_plane_shadow_decisions d,
+             LATERAL jsonb_each_text(d.gate_results) AS kv(key, value)
+        GROUP BY d.execution_path, kv.key, outcome_kind
+        ORDER BY d.execution_path, kv.key, outcome_kind
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(execution_path, gate, outcome_kind, count)| GateOutcomeCountByPath {
+            execution_path,
+            gate,
+            outcome_kind,
             count,
         })
         .collect())
@@ -352,6 +424,7 @@ mod t7_2_metrics_tests {
                 report
             },
             false,
+            ob_poc_types::ExecutionPath::RunbookSequencer,
         );
         assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
 
@@ -387,6 +460,7 @@ mod t7_2_metrics_tests {
             "cbu.confirm",
             &ob_poc_control_plane::gate::EvaluationReport::default(),
             false,
+            ob_poc_types::ExecutionPath::RunbookSequencer,
         );
         assert!(diverging_row.diverged, "fixture must actually diverge");
         assert!(
@@ -540,6 +614,7 @@ mod t7_2_metrics_tests {
                 &verb_fqn,
                 report,
                 false,
+                ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
         }
@@ -779,6 +854,7 @@ mod t7_2_metrics_tests {
             "cbu.confirm",
             &full_report,
             false,
+            ob_poc_types::ExecutionPath::RunbookSequencer,
         );
         assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
 
@@ -813,9 +889,18 @@ mod t7_2_metrics_tests {
         // The sentinel-fix delta, enumerated in its own assertion (not
         // folded into the loop above): every "missing" sentinel that used
         // to inflate legacy's `Unrecognised` bucket must now appear under
-        // `NotRegistered` in the rebuilt query, and legacy's Unrecognised
-        // count for that gate must equal (rebuilt Unrecognised + rebuilt
-        // NotRegistered) for the same gate.
+        // `NotRegistered` in the rebuilt query, and (G5 addition, this
+        // session) every `NotApplicable("...")` value -- which the legacy
+        // query's CASE has no branch for either, so it also fell into
+        // `Unrecognised` there -- must now appear under `NotApplicable` in
+        // the rebuilt query. Legacy's Unrecognised count for a gate must
+        // equal (rebuilt Unrecognised + rebuilt NotRegistered + rebuilt
+        // NotApplicable) for that same gate. This live dev database is
+        // shared across this whole test module's runs (including G5's own
+        // new `e3_matrix_invariant_probe` fixture rows, which persist
+        // `NotApplicable` PackResolution/RunbookProof rows) -- this
+        // three-way split is what keeps this comparison exact rather than
+        // merely `>=`.
         let legacy_unrecognised: std::collections::HashMap<&str, i64> = legacy
             .iter()
             .filter(|(_, o, _)| o == "Unrecognised")
@@ -832,11 +917,17 @@ mod t7_2_metrics_tests {
                 .find(|(g, o, _)| g == gate && o == "NotRegistered")
                 .map(|(_, _, c)| *c)
                 .unwrap_or(0);
+            let rebuilt_not_applicable = rebuilt_shadow_eval
+                .iter()
+                .find(|(g, o, _)| g == gate && o == "NotApplicable")
+                .map(|(_, _, c)| *c)
+                .unwrap_or(0);
             assert_eq!(
-                rebuilt_unrecognised + rebuilt_not_registered,
+                rebuilt_unrecognised + rebuilt_not_registered + rebuilt_not_applicable,
                 *legacy_count,
                 "W3 sentinel-fix delta violation for gate={gate}: legacy Unrecognised={legacy_count}, \
-                 rebuilt Unrecognised={rebuilt_unrecognised} + NotRegistered={rebuilt_not_registered}"
+                 rebuilt Unrecognised={rebuilt_unrecognised} + NotRegistered={rebuilt_not_registered} \
+                 + NotApplicable={rebuilt_not_applicable}"
             );
         }
         // This fixture's own WriteSetAttestation row specifically must
@@ -849,6 +940,181 @@ mod t7_2_metrics_tests {
         assert!(
             write_set_attestation_not_registered >= 1,
             "expected at least one WriteSetAttestation/NotRegistered row from this fixture's own insert, got {rebuilt_shadow_eval:?}"
+        );
+    }
+
+    /// G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 5,
+    /// EOP-DESIGN-CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001): the E3
+    /// probe's per-(gate, path) amendment. Per the plan's exit gate:
+    /// "E3 probe green per-matrix on all shadow-wired cells for whatever
+    /// traffic exists (synthetic acceptable for B/C/D initially)."
+    ///
+    /// "Shadow-wired cells" (this tranche's actual scope, not the full
+    /// 56-cell matrix -- see the G5 session doc's disclosed generalization
+    /// gap): G1/G8/G12 at the dsl_v2 seam (Path B/C) and the bus adapter
+    /// (Path D); G3/G9's ratified NotApplicable cells at B/C/D. Every
+    /// other (gate, path) cell for B/C/D is deliberately NOT asserted here
+    /// -- their Path-A input builders don't yet generalize to those
+    /// engines (documented, not silently skipped).
+    ///
+    /// Exercises the REAL production functions
+    /// (`ob_poc_control_plane::evaluate_shadow` +
+    /// `ob_poc_control_plane::applicability::apply_matrix` +
+    /// `control_plane_shadow::build_shadow_decision_row` +
+    /// `insert_shadow_decision`) against a synthetic-but-real context, the
+    /// same shape the dsl_v2 seam / bus adapter build in production, to
+    /// generate genuine B/C/D samples in the absence of real production
+    /// traffic on this dev database (per the exit gate's own "synthetic
+    /// acceptable... initially" allowance) -- not a fabricated DB row.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn e3_matrix_invariant_probe() {
+        use ob_poc_control_plane::gate::GateId;
+
+        let database_url = std::env::var("DATABASE_URL")
+            .expect("E3_INFRASTRUCTURE_FAILURE: DATABASE_URL must be set");
+        let pool = match sqlx::PgPool::connect(&database_url).await {
+            Ok(p) => p,
+            Err(e) => panic!("E3_INFRASTRUCTURE_FAILURE: could not connect to database: {e}"),
+        };
+
+        // Generate one synthetic-but-real shadow decision per non-Path-A
+        // ExecutionPath, exercising the exact same production call
+        // sequence the G4 seam / bus adapter use.
+        for path in [
+            ob_poc_types::ExecutionPath::DslDirect,
+            ob_poc_types::ExecutionPath::WorkflowDispatched,
+            ob_poc_types::ExecutionPath::BusFederated,
+        ] {
+            let verb_fqn = format!("test.e3-matrix-probe-{}", uuid::Uuid::new_v4());
+            let cp_ctx = ob_poc_control_plane::context::EvaluationContext {
+                intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
+                    intent_id: uuid::Uuid::new_v4(),
+                    verb_fqn: verb_fqn.clone(),
+                    is_admitted: true,
+                    exclusion_reasons: Vec::new(),
+                    is_ai_originated: false,
+                    interpretation_attested: false,
+                }),
+                stp_classifier: Some(ob_poc_control_plane::stp_classifier::StpClassifierInput {
+                    is_durable_verb: false,
+                    durable_execution_explicitly_allowed: false,
+                    has_unpinned_entities: false,
+                }),
+                version_pinning: Some(ob_poc_control_plane::versioning::VersionPinningInput {
+                    versions: ob_poc_control_plane::snapshot::PinnedVersionSet {
+                        compiler_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+                        ..Default::default()
+                    },
+                }),
+                ..Default::default()
+            };
+            let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
+            let report = ob_poc_control_plane::applicability::apply_matrix(report, path);
+            let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                Uuid::new_v4(),
+                Uuid::new_v4(),
+                &verb_fqn,
+                &report,
+                false,
+                path,
+            );
+            assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
+        }
+
+        let counts = match gate_outcome_counts_by_path(&pool).await {
+            Ok(c) => c,
+            Err(e) => panic!("E3_INFRASTRUCTURE_FAILURE: gate_outcome_counts_by_path query failed: {e}"),
+        };
+
+        // The wired-for-real gates this tranche actually built at the
+        // B/C/D call sites that are ALSO independently substantive under
+        // `gate::GATE_DEPENDENCIES`'s collect-where-independent semantics
+        // -- must show a substantive (Success/Failure) sample at each of
+        // B/C/D. G8 (StpClassifier) is deliberately excluded here despite
+        // this tranche building its `StpClassifierInput` at both call
+        // sites: `GATE_DEPENDENCIES` declares it depends on
+        // [IntentAdmission, EntityBinding, PackResolution, DagProof,
+        // Authority, Evidence, WriteSet] -- since G2/G4-G7 are not wired
+        // at B/C/D this session, StpClassifier is correctly
+        // `NotEvaluated{blocked_by:[...]}`, never `Success`/`Failure`,
+        // under `evaluate_collect_where_independent`'s real (not
+        // fabricated) blocking semantics. Confirmed live this session
+        // (the first run of this probe caught exactly this and is why
+        // G8 is not claimed here) -- see the G5 session doc's finding.
+        const WIRED_GATES: [GateId; 2] = [GateId::IntentAdmission, GateId::VersionPinning];
+        // The ratified NotApplicable cells (G5 item 2's resolved UNKNOWNs)
+        // -- must show a NotApplicable sample at each of B/C/D.
+        const NOT_APPLICABLE_GATES: [GateId; 2] = [GateId::PackResolution, GateId::RunbookProof];
+
+        let mut failing: Vec<String> = Vec::new();
+        for path in [
+            ob_poc_types::ExecutionPath::DslDirect,
+            ob_poc_types::ExecutionPath::WorkflowDispatched,
+            ob_poc_types::ExecutionPath::BusFederated,
+        ] {
+            let letter = path.as_letter();
+            for gate in WIRED_GATES {
+                let label = format!("{gate:?}");
+                let substantive: i64 = counts
+                    .iter()
+                    .filter(|c| {
+                        c.execution_path == letter
+                            && c.gate == label
+                            && (c.outcome_kind == "Success" || c.outcome_kind == "Failure")
+                    })
+                    .map(|c| c.count)
+                    .sum();
+                println!("[E3-matrix] path={letter} gate={label}: {substantive} substantive samples");
+                if substantive == 0 {
+                    failing.push(format!("{label}@{letter} (expected Applicable+wired, zero substantive samples)"));
+                }
+            }
+            for gate in NOT_APPLICABLE_GATES {
+                let label = format!("{gate:?}");
+                let not_applicable: i64 = counts
+                    .iter()
+                    .filter(|c| c.execution_path == letter && c.gate == label && c.outcome_kind == "NotApplicable")
+                    .map(|c| c.count)
+                    .sum();
+                println!("[E3-matrix] path={letter} gate={label}: {not_applicable} NotApplicable samples");
+                if not_applicable == 0 {
+                    failing.push(format!("{label}@{letter} (expected ratified NotApplicable, zero NotApplicable samples)"));
+                }
+            }
+        }
+
+        assert!(
+            failing.is_empty(),
+            "E3_INVARIANT_FAILURE: {} shadow-wired (gate, path) cell(s) failed the matrix check: {failing:?}",
+            failing.len()
+        );
+    }
+
+    /// G5 window-discipline proof (standing rule 3, item 1's own
+    /// requirement: "no Path-A gate returns NotApplicable, verified by
+    /// test"). Live-DB check over every persisted
+    /// `control_plane_shadow_decisions` row tagged `execution_path='A'`:
+    /// none of them may carry a `NotApplicable` outcome for any gate --
+    /// `apply_matrix` is never called from Path A's real call site
+    /// (`sequencer.rs`'s `phase5_runtime_recheck` and its `HumanGate`
+    /// re-seal sibling), so this must hold for every row ever persisted,
+    /// not just this session's own fixtures.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn g5_path_a_never_produces_not_applicable() {
+        let pool = test_pool().await;
+        let counts = gate_outcome_counts_by_path(&pool).await.expect("query failed");
+
+        let violators: Vec<&str> = counts
+            .iter()
+            .filter(|c| c.execution_path == "A" && c.outcome_kind == "NotApplicable")
+            .map(|c| c.gate.as_str())
+            .collect();
+        assert!(
+            violators.is_empty(),
+            "window-discipline violation: Path A produced NotApplicable for gate(s) {violators:?} -- \
+             apply_matrix must never be called from Path A's real call site"
         );
     }
 }
