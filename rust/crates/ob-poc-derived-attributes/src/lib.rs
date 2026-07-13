@@ -12,5 +12,12 @@
 //! `crate::derived_attributes::*` — the canonical derived-value plane.
 #![deny(unreachable_pub)]
 
+// Both modules are unconditionally sqlx-backed (every row type derives
+// sqlx::FromRow, every accessor is `PgPool`/`PgConnection`-typed) — gated
+// to keep the crate buildable at --no-default-features (2026-07-13 E5 fix,
+// membrane check §6.2). `default = ["database"]` above means normal builds
+// are unaffected.
+#[cfg(feature = "database")]
 pub mod advisory_lock;
+#[cfg(feature = "database")]
 pub mod derived_attributes;

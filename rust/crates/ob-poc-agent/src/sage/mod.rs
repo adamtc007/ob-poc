@@ -42,6 +42,11 @@ pub use ob_poc_sage::pre_classify;
 // Phase 2B (2026-05-13) — session_context with its sqlx::PgPool loaders
 // joined the other eight sage modules in ob-poc-sage. The
 // ob-poc-boundary::sage submodule is gone.
+//
+// Gated: session_context is only compiled in ob-poc-sage behind its own
+// `database` feature, so this re-export must be gated identically or
+// isolated builds of this crate fail unconditionally (2026-07-13 E5 fix).
+#[cfg(feature = "database")]
 pub use ob_poc_sage::session_context;
 pub use ob_poc_sage::verb_resolve_types;
 

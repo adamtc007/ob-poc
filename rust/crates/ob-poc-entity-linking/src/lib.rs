@@ -46,6 +46,12 @@
 //! ```
 #![deny(unreachable_pub)]
 
+// compiler is the sole sqlx-backed module (build-time: DB tables ->
+// snapshot binary). Everything else in this crate is the in-memory
+// runtime resolution hot path, no DB access, per the module doc comment
+// above — gated to keep the crate buildable at --no-default-features
+// (2026-07-13 E5 fix, membrane check §6.2).
+#[cfg(feature = "database")]
 pub mod compiler;
 pub mod mention;
 pub mod normalize;
@@ -54,6 +60,7 @@ pub mod resolver;
 pub mod snapshot;
 
 // Re-exports
+#[cfg(feature = "database")]
 pub use compiler::{compile_entity_snapshot, lint_entity_data, LintSeverity, LintWarning};
 pub use mention::{MentionExtractor, MentionSpan};
 pub use normalize::{normalize_entity_text, tokenize};

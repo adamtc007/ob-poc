@@ -89,6 +89,38 @@ status = "fail"
 # taxonomy, ob-poc-trading-profile) are the same defect shape — real
 # unconditional `sqlx::` usage in source (e.g. `derived_attributes/
 # repository.rs`), not a Cargo.toml-only feature-declaration gap as
-# previously characterized. Both need a source-level cfg-gating fix
-# (their own scoped session), not a hygiene-slice edit. cargo build/test
-# themselves remain green.
+# previously characterized.
+#
+# UPDATED 2026-07-13 (later same day, follow-up scoped fix): both (1) and
+# (2) are now FIXED. `verify_pins_in_scope` (toctou_recheck.rs) gated
+# `#[cfg(feature = "database")]`; `ob-poc-agent`'s own unconditional
+# re-export of `ob_poc_sage::session_context` (itself database-gated in
+# ob-poc-sage) gated to match, with a new `database` feature added to
+# ob-poc-agent's own (previously feature-less) Cargo.toml, cascaded from
+# root's `database` feature. The 4 crates: each had one or two fully-
+# sqlx-dependent modules (advisory_lock/derived_attributes,
+# compiler.rs, view_config_service.rs, document_ops.rs/resolve.rs) gated
+# at the mod-declaration level, matching the `ast_db` pattern
+# ob-poc-trading-profile already used elsewhere in the same crate;
+# ob-poc-entity-linking also had an independent, unrelated bug uncovered
+# once the sqlx leak stopped masking it (`smallvec`'s `serde` feature was
+# never explicitly requested — fixed). Membrane check §2 (the sqlx/
+# PgPool/PgConnection --no-default-features floor) and §3 (test-double
+# leak) sections are now both clean with zero findings. `ob-poc-agent`'s
+# ratchet baseline refreshed for the first time since 2026-07-01 (was
+# unmeasurable this whole time due to the bug above) — 12146 lines, 0
+# removals, a clean first-successful-capture, not a mixed diff requiring
+# review the way `ob-poc`'s own stale baseline does (still untouched,
+# still a STOP, unrelated to this fix). cargo build/test (workspace,
+# default features, and each touched crate's own default/database/
+# --no-default-features combinations) all green; the two pre-existing
+# ob-poc-boundary test failures (acp_dag_semantic, acp_registry_projection
+# — verb-registry/DAG count drift) were confirmed pre-existing via
+# `git stash`, unrelated to this fix, not touched.
+#
+# Remaining open E5 items: ob-poc's own stale baseline (still a STOP,
+# needs its own review — tower_http trait-impl surface widening mixed
+# with toolchain Send/Sync-ordering noise across many crates); the
+# broader ratchet-trip sweep across dsl-analysis/dsl-lsp/entity-gateway/
+# ob-agentic/sem_os_postgres/etc. (same Send/Sync-ordering nightly-
+# toolchain noise, pre-existing, out of scope for this fix).

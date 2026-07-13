@@ -241,6 +241,7 @@ pub(crate) async fn verify_pins(
 /// the pin set" case (a different, upstream condition: never pinned at
 /// all), this is "was pinned, has now vanished," which the write must not
 /// proceed against either.
+#[cfg(feature = "database")]
 pub async fn verify_pins_in_scope(
     pins: &ob_poc_control_plane::snapshot::SnapshotPins,
     conn: &mut sqlx::PgConnection,

@@ -23,7 +23,14 @@
 pub mod ast_builder;
 #[cfg(feature = "database")]
 pub mod ast_db;
+// Unconditionally sqlx-backed (sqlx::query!/query_scalar! macros
+// throughout, plus a sqlx::Error variant on ResolveError) — gated to
+// keep the crate buildable at --no-default-features (2026-07-13 E5 fix,
+// membrane check §6.2). Sole consumer is `src/domain_ops/trading_profile.rs`
+// in the root `ob-poc` crate, which always builds with `database` on.
+#[cfg(feature = "database")]
 pub mod document_ops;
+#[cfg(feature = "database")]
 pub mod resolve;
 pub mod types;
 pub mod validate;
@@ -31,6 +38,7 @@ pub mod validate;
 pub use ast_builder::{apply_op, AstBuildError, AstBuildResult};
 #[cfg(feature = "database")]
 pub use ast_db::{apply_and_save, load_document, ApplyError, AstDbError};
+#[cfg(feature = "database")]
 pub use resolve::{resolve_entity_ref, ResolveError};
 // Allowlist re-export of types consumed externally (mostly through
 // `crate::trading_profile::*` paths in `src/domain_ops/trading_profile.rs`).

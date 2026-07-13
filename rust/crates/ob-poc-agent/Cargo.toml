@@ -118,5 +118,22 @@ lsp-types = "0.95"
 [dev-dependencies]
 tempfile = "3"
 
+[features]
+default = []
+# `ob-poc-sage::session_context` (sqlx::PgPool-backed loaders) is only
+# reachable when this crate's own `database` feature is on, cascading to
+# `ob-poc-sage/database`. Without this, `cargo build -p ob-poc-agent`
+# (any feature combination of THIS crate's own, empty, [features] set)
+# unconditionally failed: `sage/mod.rs`'s `pub use
+# ob_poc_sage::session_context` referenced a module ob-poc-sage only
+# compiles behind its own `database` feature, which nothing in
+# ob-poc-agent's dependency declaration ever requested. Building the full
+# `ob-poc` binary masked this — root's own `database` feature enables
+# `ob-poc-sage/database` directly, and Cargo's feature unification made
+# that available to the copy of ob-poc-sage reached via ob-poc-agent too
+# — but `ob-poc-agent` could never be built, tested, or `cargo doc`'d in
+# isolation. Found via the control-plane graduation G0 E5 slice, 2026-07-13.
+database = ["ob-poc-sage/database"]
+
 [lints.rust]
 unreachable_pub = "deny"
