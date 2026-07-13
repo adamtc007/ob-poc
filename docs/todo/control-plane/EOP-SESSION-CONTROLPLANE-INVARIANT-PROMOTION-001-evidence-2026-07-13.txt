@@ -9,11 +9,13 @@
   [e1] exit=1
 
 == E2: execution only via envelope admission (structural + dynamic) ==
-  -- structural (per RR-2 path) --
-    Path A (runbook/step_executor_bridge.rs): admitting entry point present
+  -- structural (per RR-2 path: admitting-call locus + bare-call exclusivity) --
+    Path A (runbook/step_executor_bridge.rs): admitting entry point present — rust/src/runbook/step_executor_bridge.rs:553:            .execute_verb_admitting_envelope(&step.verb, args, &mut ctx, None)
+    Path A (runbook/step_executor_bridge.rs): no bare execute_verb() call sites — admitting call is the sole route
     Path B (api/agent_routes.rs raw execute): FAIL — no admitting-entry-point call
     Path C (bpmn_integration/dispatcher.rs, domain_ops/bpmn_controller_ops.rs): FAIL — no admitting-entry-point call
-    Path D (ob-poc-web/src/bus_runtime.rs): admitting entry point present
+    Path D (ob-poc-web/src/bus_runtime.rs): admitting entry point present — rust/crates/ob-poc-web/src/bus_runtime.rs:170:            .execute_verb_admitting_envelope(local_verb_id, args, &mut ctx, None)
+    Path D (ob-poc-web/src/bus_runtime.rs): no bare execute_verb() call sites — admitting call is the sole route
   -- dynamic (live DB, Path D's shared admission mechanism) --
     |
     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
@@ -35,12 +37,12 @@ warning: `ob-poc` (lib test) generated 3 warnings
      Running unittests src/lib.rs (target/debug/deps/ob_poc-00ea6772870bf2b0)
 
 running 7 tests
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::envelope_with_wrong_content_hash_is_rejected_loudly ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_floor_rejects_an_unregistered_verb_before_any_scope_or_consume ... ok
 test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::enforced_verb_without_envelope_is_rejected ... ok
 test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::shadow_default_admits_every_verb_with_no_envelope ... ok
-test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_floor_rejects_an_unregistered_verb_before_any_scope_or_consume ... ok
-test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable ... ok
-test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::envelope_with_wrong_content_hash_is_rejected_loudly ... ok
 test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_rolls_back_the_consume_when_dispatch_fails ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable ... ok
 test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::enforced_verb_with_consumed_envelope_admits_then_rejects_resubmission ... ok
 
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 2333 filtered out; finished in 0.10s
@@ -80,8 +82,8 @@ running 1 test
 [E3] DecisionSnapshot: 12 substantive (Success/Failure) production samples
 [E3] WriteSetAttestation: 0 substantive (Success/Failure) production samples
 
-thread 'agent::control_plane_metrics::t7_2_metrics_tests::e3_invariant_probe' (2177224) panicked at src/agent/control_plane_metrics.rs:562:9:
-E3 does not hold: 4/14 gates have zero substantive production shadow evaluations with metrics flowing: ["ExecutionEnvelope", "AuditReplay", "VersionPinning", "WriteSetAttestation"]
+thread 'agent::control_plane_metrics::t7_2_metrics_tests::e3_invariant_probe' (2237018) panicked at src/agent/control_plane_metrics.rs:584:9:
+E3_INVARIANT_FAILURE: 4/14 gates have zero substantive production shadow evaluations with metrics flowing: ["ExecutionEnvelope", "AuditReplay", "VersionPinning", "WriteSetAttestation"]
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 test agent::control_plane_metrics::t7_2_metrics_tests::e3_invariant_probe ... FAILED
 
@@ -93,6 +95,7 @@ failures:
 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2339 filtered out; finished in 0.02s
 
 error: test failed, to rerun pass `-p ob-poc --lib`
+  ** E3 live half: INVARIANT FAILURE — verified against a live DB, N/14 gates genuinely empty. **
   E3: DOES NOT HOLD (see harness output above)
   [e3] exit=101
 
@@ -123,17 +126,17 @@ error: test failed, to rerun pass `-p ob-poc --lib`
 
 == E5: workspace hygiene ==
   -- cargo build --workspace --features database --
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.30s
   -- cargo test -p ob-poc --lib --features database --
 test sequencer::tests::test_cross_orchestrator_stale_session_cannot_overwrite_newer_workbook_state ... ok
+test sequencer::tests::test_checkpoint_rejects_stale_version_without_overwriting_workbook_state ... ok
+test sequencer::tests::test_session_checkpoint_survives_missing_trace_table ... ok
+test repl::session_repository::tests::test_save_session_stack_is_not_aliased ... ok
 test sequencer::tests::test_concurrent_sage_checkpoints_preserve_shared_session_record ... ok
-test repl::session_repository::tests::test_save_load_preserves_bindings_cbu_ids_name ... ok
-test repl::session_repository::tests::test_save_load_preserves_entity_resolution_session_state ... ok
-test integration_tests::constellation_map_tests::tests::loads_all_constellation_map_yamls ... ok
 test templates::harness::tests::test_harness_from_registry ... ok
 test integration_tests::acp_dag_semantic_cbu::acp_session_prompt_routes_all_cbu_phrase_scenarios_to_structured_dag_semantic ... ok
 
-test result: ok. 2146 passed; 0 failed; 194 ignored; 0 measured; 0 filtered out; finished in 26.39s
+test result: ok. 2146 passed; 0 failed; 194 ignored; 0 measured; 0 filtered out; finished in 26.41s
 
   -- public API surface gate --
 == 1. Ratchet: --all-features surface vs committed baseline ==
@@ -232,60 +235,60 @@ test result: ok. 2146 passed; 0 failed; 194 ignored; 0 measured; 0 filtered out;
 == Public API surface gate FAILED ==
   -- unreachable_pub (crates that opt in via #![deny(unreachable_pub)]) --
     Crates enforcing unreachable_pub:
-      rust/crates/dsl-ast/src/lib.rs
-      rust/crates/bpmn-test-harness/src/lib.rs
       rust/crates/dsl-analysis/src/lib.rs
       rust/crates/dsl-atoms/src/lib.rs
+      rust/crates/bpmn-test-harness/src/lib.rs
+      rust/crates/dsl-ast/src/lib.rs
+      rust/crates/dsl-resolution/src/lib.rs
+      rust/crates/dsl-semos-frontend/src/lib.rs
+      rust/crates/dsl-runtime/src/lib.rs
+      rust/crates/ob-poc-compiler/src/lib.rs
+      rust/crates/ob-poc-derived-attributes/src/lib.rs
+      rust/crates/dsl-lowering/src/lib.rs
+      rust/crates/dsl-lsp/src/lib.rs
+      rust/crates/ob-poc-control-plane/src/lib.rs
+      rust/crates/dsl-diagnostics/src/lib.rs
+      rust/crates/dsl-bpmn-frontend/src/lib.rs
+      rust/crates/bpmn-controller/src/lib.rs
       rust/crates/dsl-sage/src/lib.rs
       rust/crates/dsl-migrate-verify/src/lib.rs
-      rust/crates/dsl-resolution/src/lib.rs
-      rust/crates/ob-poc-compiler/src/lib.rs
+      rust/crates/ob-poc-sage/src/lib.rs
+      rust/crates/dsl-migrate/src/lib.rs
+      rust/crates/bpmn-runtime/src/lib.rs
+      rust/crates/ob-poc-ontology/src/lib.rs
+      rust/crates/ob-poc-taxonomy/src/lib.rs
+      rust/crates/ob-agentic/src/lib.rs
+      rust/crates/ob-poc-agent/src/lib.rs
+      rust/crates/inspector-projection/src/lib.rs
       rust/crates/ob-poc-authoring/src/lib.rs
       rust/crates/ob-poc-deal/src/lib.rs
-      rust/crates/dsl-runtime/src/lib.rs
-      rust/crates/dsl-migrate/src/lib.rs
-      rust/crates/bpmn-controller/src/lib.rs
-      rust/crates/ob-poc-ontology/src/lib.rs
-      rust/crates/ob-poc-kyc-store/src/lib.rs
-      rust/crates/ob-poc-control-plane/src/lib.rs
-      rust/crates/ob-poc-bods/src/lib.rs
-      rust/crates/ob-poc-semtaxonomy/src/lib.rs
-      rust/crates/sem_os_mcp/src/lib.rs
-      rust/crates/dsl-lsp/src/lib.rs
-      rust/crates/ob-workflow/src/lib.rs
+      rust/crates/entity-gateway/src/lib.rs
       rust/crates/dsl-parser/src/lib.rs
-      rust/crates/sem_os_postgres/src/lib.rs
-      rust/crates/ob-poc-sage/src/lib.rs
-      rust/crates/ob-poc-kyc-substrate/src/lib.rs
-      rust/crates/dsl-lowering/src/lib.rs
-      rust/crates/ob-templates/src/lib.rs
-      rust/crates/ob-poc-agent/src/lib.rs
-      rust/crates/sem_os_obpoc_adapter/src/lib.rs
-      rust/crates/playbook-core/src/lib.rs
-      rust/crates/dsl-diagnostics/src/lib.rs
-      rust/crates/sem_os_harness/src/lib.rs
-      rust/crates/ob-poc-kyc-seam/src/lib.rs
-      rust/crates/ob-poc-boundary/src/lib.rs
-      rust/crates/ob-agentic/src/lib.rs
-      rust/crates/inspector-projection/src/lib.rs
+      rust/crates/ob-poc-bods/src/lib.rs
       rust/crates/dsl-render/src/lib.rs
+      rust/crates/sem_os_server/src/lib.rs
       rust/crates/ob-poc-journey/src/lib.rs
-      rust/crates/ob-semantic-matcher/src/lib.rs
-      rust/crates/ob-poc-types/src/lib.rs
-      rust/crates/dsl-bpmn-frontend/src/lib.rs
+      rust/crates/ob-poc-kyc-seam/src/lib.rs
+      rust/crates/ob-poc-semtaxonomy/src/lib.rs
+      rust/crates/ob-poc-boundary/src/lib.rs
+      rust/crates/ob-poc-kyc-store/src/lib.rs
+      rust/crates/ob-poc-entity-linking/src/lib.rs
       rust/crates/ob-poc-diagnostics/src/lib.rs
+      rust/crates/sem_os_obpoc_adapter/src/lib.rs
+      rust/crates/sem_os_postgres/src/lib.rs
+      rust/crates/ob-poc-bus-handler/src/lib.rs
+      rust/crates/sem_os_mcp/src/lib.rs
+      rust/crates/ob-semantic-matcher/src/lib.rs
+      rust/crates/ob-templates/src/lib.rs
+      rust/crates/ob-poc-kyc-substrate/src/lib.rs
+      rust/crates/sem_os_harness/src/lib.rs
+      rust/crates/ob-poc-types/src/lib.rs
+      rust/crates/ob-workflow/src/lib.rs
       rust/crates/ob-poc-trading-profile/src/lib.rs
-      rust/crates/sem_os_client/src/lib.rs
-      rust/crates/ob-poc-taxonomy/src/lib.rs
       rust/crates/ob-poc-macros/src/lib.rs
       rust/crates/ob-poc-manifest-export/src/lib.rs
-      rust/crates/ob-poc-entity-linking/src/lib.rs
-      rust/crates/dsl-semos-frontend/src/lib.rs
-      rust/crates/bpmn-runtime/src/lib.rs
-      rust/crates/ob-poc-derived-attributes/src/lib.rs
-      rust/crates/ob-poc-bus-handler/src/lib.rs
-      rust/crates/entity-gateway/src/lib.rs
-      rust/crates/sem_os_server/src/lib.rs
+      rust/crates/sem_os_client/src/lib.rs
+      rust/crates/playbook-core/src/lib.rs
   E5: DOES NOT HOLD
   [e5] exit=1
 

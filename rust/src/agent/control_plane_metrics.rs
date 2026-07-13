@@ -542,8 +542,26 @@ mod t7_2_metrics_tests {
             }
         }
 
-        let pool = test_pool().await;
-        let counts = gate_outcome_counts(&pool).await.expect("query failed");
+        // Connection/query failures are INFRASTRUCTURE problems, not
+        // invariant-failure evidence — an unreachable database proves
+        // nothing about whether the gates have production samples. Panic
+        // with a distinct E3_INFRASTRUCTURE_FAILURE marker so
+        // scripts/check-invariants.sh (and any human reading captured
+        // test output) cannot mistake "couldn't verify" for "verified
+        // failing" (2026-07-13 review finding #3: an expected-fail
+        // ratchet entry is satisfied identically by either, so the
+        // distinction has to be made here, in the only place that still
+        // has the real error).
+        let database_url = std::env::var("DATABASE_URL")
+            .expect("E3_INFRASTRUCTURE_FAILURE: DATABASE_URL must be set");
+        let pool = match sqlx::PgPool::connect(&database_url).await {
+            Ok(p) => p,
+            Err(e) => panic!("E3_INFRASTRUCTURE_FAILURE: could not connect to database: {e}"),
+        };
+        let counts = match gate_outcome_counts(&pool).await {
+            Ok(c) => c,
+            Err(e) => panic!("E3_INFRASTRUCTURE_FAILURE: gate_outcome_counts query failed: {e}"),
+        };
 
         let mut failing: Vec<&'static str> = Vec::new();
         for id in ob_poc_control_plane::gate::GateId::ALL {
@@ -559,9 +577,13 @@ mod t7_2_metrics_tests {
             }
         }
 
+        // E3_INVARIANT_FAILURE marker (as opposed to E3_INFRASTRUCTURE_FAILURE
+        // above): this is a real, verified, substantive result — the
+        // database was reachable, the query ran, and N/14 gates genuinely
+        // have zero production samples.
         assert!(
             failing.is_empty(),
-            "E3 does not hold: {}/14 gates have zero substantive production shadow evaluations with metrics flowing: {failing:?}",
+            "E3_INVARIANT_FAILURE: {}/14 gates have zero substantive production shadow evaluations with metrics flowing: {failing:?}",
             failing.len()
         );
     }

@@ -134,42 +134,83 @@ gate_e2() {
   local struct_fail=0
 
   # Structural: each RR-2 path's dispatch entry must resolve to
-  # execute_verb_admitting_envelope, not the bare execute_verb, as its
-  # sole route to the mutation terminus. Enumerated from RR-2 itself
-  # (Path A/B/C/D), not hardcoded independent of that source.
-  echo "  -- structural (per RR-2 path) --"
+  # execute_verb_admitting_envelope AS ITS SOLE ROUTE to the mutation
+  # terminus — presence of an admitting call is necessary but not
+  # sufficient; a path with an admitting call in one branch and a bare
+  # execute_verb() call in another still leaves the bypass open (the
+  # exact sentinel shape the session's governing principle warns about,
+  # applied one level up, per 2026-07-13 review finding #1). So for each
+  # path this now checks BOTH:
+  #   (a) admitting entry point present, with file:line printed so a
+  #       reviewer can confirm the match locus is a real call site, not
+  #       a comment/doc-reference/test-mock (review finding #2's ask);
+  #   (b) zero BARE execute_verb( call sites — same files, filtered to
+  #       exclude comment lines (//, ///) and fn/trait-method
+  #       DEFINITIONS (`fn execute_verb(` — a mock impl in a test module
+  #       is not a call site). Any bare call site fails the path even
+  #       if (a) also holds — exclusivity, not presence, is the bar.
+  # Enumerated from RR-2 itself (Path A/B/C/D), not hardcoded independent
+  # of that source.
+  echo "  -- structural (per RR-2 path: admitting-call locus + bare-call exclusivity) --"
 
-  # Path A: runbook step dispatch -> ObPocVerbExecutor.
-  if rg -q 'execute_verb_admitting_envelope' rust/src/runbook/step_executor_bridge.rs 2>/dev/null; then
-    echo "    Path A (runbook/step_executor_bridge.rs): admitting entry point present"
-  else
-    echo "    Path A (runbook/step_executor_bridge.rs): FAIL — no admitting-entry-point call"
-    struct_fail=$((struct_fail + 1))
-  fi
+  _e2_check_path() {
+    local label="$1"
+    shift
+    local files=("$@")
+    local admit_hit="" bare_hits=""
+    local f
+    for f in "${files[@]}"; do
+      [ -f "$f" ] || continue
+      local m
+      m="$(rg -n 'execute_verb_admitting_envelope' "$f" 2>/dev/null | head -1)"
+      if [ -n "$m" ] && [ -z "$admit_hit" ]; then
+        admit_hit="$f:$m"
+      fi
+      local b
+      b="$(rg -n 'execute_verb\(' "$f" 2>/dev/null \
+        | grep -v 'execute_verb_admitting_envelope' \
+        | grep -vE '^\s*[0-9]+:\s*///?' \
+        | grep -vE 'fn execute_verb\(')"
+      if [ -n "$b" ]; then
+        bare_hits="$bare_hits"$'\n'"$f: $b"
+      fi
+    done
+
+    if [ -n "$admit_hit" ]; then
+      echo "    $label: admitting entry point present — $admit_hit"
+    else
+      echo "    $label: FAIL — no admitting-entry-point call"
+      struct_fail=$((struct_fail + 1))
+      return
+    fi
+
+    if [ -n "$bare_hits" ]; then
+      echo "    $label: FAIL — bare execute_verb() call site(s) also present (exclusivity broken):$bare_hits"
+      struct_fail=$((struct_fail + 1))
+    else
+      echo "    $label: no bare execute_verb() call sites — admitting call is the sole route"
+    fi
+  }
+
+  # Path A: runbook step dispatch -> ObPocVerbExecutor. Wired by commit
+  # 5a704f4e ("PIR-D-002 — Path A now reaches the admission port"),
+  # governed by docs/todo/control-plane/EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001.md
+  # v0.2 §3-4 (Path A graduates first; G1-only coverage today per that
+  # runbook's §2 readiness table) — postdates the ledger's T7 hand-check
+  # this session's ground truth cited, which is why Path A's pass looked
+  # surprising against §1's predicted-fail framing (2026-07-13 review
+  # finding #2).
+  _e2_check_path "Path A (runbook/step_executor_bridge.rs)" rust/src/runbook/step_executor_bridge.rs
 
   # Path B: raw DSL execute handler.
-  if rg -q 'execute_verb_admitting_envelope' rust/src/api/agent_routes.rs 2>/dev/null; then
-    echo "    Path B (api/agent_routes.rs raw execute): admitting entry point present"
-  else
-    echo "    Path B (api/agent_routes.rs raw execute): FAIL — no admitting-entry-point call"
-    struct_fail=$((struct_fail + 1))
-  fi
+  _e2_check_path "Path B (api/agent_routes.rs raw execute)" rust/src/api/agent_routes.rs
 
   # Path C: BPMN/workflow dispatch.
-  if rg -q 'execute_verb_admitting_envelope' rust/src/bpmn_integration/dispatcher.rs rust/src/domain_ops/bpmn_controller_ops.rs 2>/dev/null; then
-    echo "    Path C (bpmn_integration/dispatcher.rs, domain_ops/bpmn_controller_ops.rs): admitting entry point present"
-  else
-    echo "    Path C (bpmn_integration/dispatcher.rs, domain_ops/bpmn_controller_ops.rs): FAIL — no admitting-entry-point call"
-    struct_fail=$((struct_fail + 1))
-  fi
+  _e2_check_path "Path C (bpmn_integration/dispatcher.rs, domain_ops/bpmn_controller_ops.rs)" \
+    rust/src/bpmn_integration/dispatcher.rs rust/src/domain_ops/bpmn_controller_ops.rs
 
   # Path D: bus adapter.
-  if rg -q 'execute_verb_admitting_envelope' rust/crates/ob-poc-web/src/bus_runtime.rs 2>/dev/null; then
-    echo "    Path D (ob-poc-web/src/bus_runtime.rs): admitting entry point present"
-  else
-    echo "    Path D (ob-poc-web/src/bus_runtime.rs): FAIL — no admitting-entry-point call"
-    struct_fail=$((struct_fail + 1))
-  fi
+  _e2_check_path "Path D (ob-poc-web/src/bus_runtime.rs)" rust/crates/ob-poc-web/src/bus_runtime.rs
 
   # Dynamic: drive the shared admission mechanism (admit_in_scope, the
   # thing every path's admitting entry point ultimately calls) against a
@@ -228,9 +269,30 @@ gate_e3() {
     echo "  E3: NOT VERIFIED (live half skipped) — does not count as HOLDS; absence of proof is not proof"
     return 1
   else
-    (cd rust && cargo test -p ob-poc --lib --features database e3_invariant_probe -- --ignored --nocapture 2>&1) | tail -30
+    local live_output
+    live_output="$(cd rust && cargo test -p ob-poc --lib --features database e3_invariant_probe -- --ignored --nocapture 2>&1)"
     local live_result=$?
+    echo "$live_output" | tail -30
     result=$((compile_result + live_result))
+
+    # A live_result != 0 is satisfied identically by "verified N/14 gates
+    # empty" and "couldn't reach the database at all" — an expected-fail
+    # ratchet entry can't distinguish those from the exit bit alone
+    # (2026-07-13 review finding #3). Match on the reason, not just the
+    # bit: the probe itself (rust/src/agent/control_plane_metrics.rs)
+    # panics with a distinct E3_INFRASTRUCTURE_FAILURE marker for
+    # connection/query failures vs E3_INVARIANT_FAILURE for a real,
+    # verified, substantive result.
+    if [ "$live_result" -ne 0 ]; then
+      if echo "$live_output" | grep -q 'E3_INFRASTRUCTURE_FAILURE'; then
+        echo "  ** E3 live half: INFRASTRUCTURE FAILURE — could not verify (DB unreachable/query failed). **"
+        echo "  ** This is NOT proof the invariant fails; it means the harness itself is broken/misconfigured. **"
+        echo "  ** If this shows up in CI once DATABASE_URL is wired in, it needs fixing immediately — an **"
+        echo "  ** infra failure masquerading as an expected 'fail' lets this gate rot silently. **"
+      elif echo "$live_output" | grep -q 'E3_INVARIANT_FAILURE'; then
+        echo "  ** E3 live half: INVARIANT FAILURE — verified against a live DB, N/14 gates genuinely empty. **"
+      fi
+    fi
   fi
 
   if [ "$result" -eq 0 ]; then
@@ -265,6 +327,17 @@ gate_e3() {
 #       not hidden).
 #   (b) HUMAN-GATED, TESTED — a named #[test] function that exists in the
 #       workspace and exercises a human-gate code path for this family.
+#
+# PROVISIONAL NAMING (2026-07-13 review finding #4): the pin-symbol and
+# test-name strings below (e.g. `SnapshotPins::entity_row_version`,
+# `raw_dsl_snapshot_pin`) were INVENTED in this gate-authoring session —
+# they name a target, not an observed fact. A tranche is free to
+# implement a given row's pin/test under a different, possibly better,
+# name; that is a legitimate outcome, not a gate failure to route around
+# by quietly editing this array. Renaming a row's target here is a SPEC
+# CHANGE and must get the same review visibility as an
+# invariants-expected.toml status flip — call it out explicitly in the
+# tranche's diff/summary, don't fold it into unrelated script edits.
 # ---------------------------------------------------------------------------
 gate_e4() {
   echo "== E4: Mode-1 register rows version-pinned or human-gated-and-tested =="

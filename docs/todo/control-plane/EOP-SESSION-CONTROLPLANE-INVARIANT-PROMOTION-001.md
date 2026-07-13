@@ -34,7 +34,76 @@ the full predicate restatement with ground-truth citations. Short form:
 - **Phase 4(a)'s visibility-tightening was correctly not attempted**, per the architect's own preemptive note: the structural check landed as a script-only check (grep for the admitting call), with `pub(in)` visibility restriction on the RR-2 path entry points deferred to whichever tranche reroutes the non-compliant callers (B, C) — attempting it now would break current callers.
 - **A pre-existing metrics-classification gap surfaced, not fixed:** `gate_outcome_counts`'s SQL (T7.2) classifies `report_to_json`'s `"missing"` sentinel (written when a gate wasn't yet registered in `evaluate_shadow`'s map at persist time — e.g. historical rows predating T9.7's G9/G12 addition) as `'Unrecognised'`, not distinguished from a genuine unrecognised value. This under-counts G12 specifically in the local dev DB sample (VersionPinning shows 0 substantive rows even though the adapter itself is real) — flagged in §1's E3 detail, not corrected (modifying T7.2's existing SQL is out of this session's scope).
 
-## 0. Headline finding — corrects the premise this session was framed against
+## Review response (2026-07-13, remediation commit)
+
+Reviewer verdict: accept, with four findings, two required before the next
+tranche relies on these gates. All four addressed in this remediation pass.
+
+**Corrections accepted, no action needed** — the stale-plan finding and E5's
+premise correction were both endorsed as the governing principle working as
+intended; no changes made in response to those beyond what already stood.
+
+**Finding 1 — E2 proved presence, not exclusivity (addressed).** A path
+could pass by having an admitting call in one branch while a bare
+`execute_verb()` call stood open in another. `gate_e2` in
+`scripts/check-invariants.sh` now checks both: the admitting call's
+file:line locus (also closes the verifiability gap the reviewer named —
+E1/E4 already printed resolve loci, E2's structural half didn't), AND zero
+bare `execute_verb(` call sites in the same files (comment lines and `fn
+execute_verb(` trait-mock definitions excluded from the bare-call count, so
+a doc reference or test-double impl can't trip a false fail). Re-run
+confirms Path A and D still pass on the exclusivity bar (no bare call sites
+found in either), Paths B/C still fail outright (no admitting call at all —
+unaffected by this change).
+
+**Finding 2 — Path A's pass, unexplained (addressed).** Confirmed by `git
+log -L` on the admitting call site: commit `5a704f4e` ("PIR-D-002 — Path A
+now reaches the admission port"), governed by a graduation runbook this
+session's ground-truth pass had not surfaced —
+`docs/todo/control-plane/EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001.md` v0.2 —
+which independently establishes a per-path graduation order (Path A first,
+then B, then C) and records Path A's coverage today as G1-only (not all 14
+gates). The match is a real production call site, not a comment/test
+artifact (`rust/src/runbook/step_executor_bridge.rs:553`, inside the live
+dispatch method, not the test module's mock at line 861). `gate_e2` now
+cites this provenance inline. This also means the recommended next-tranche
+sequencing in the original summary was working from an incomplete picture
+— the graduation runbook already has its own documented order and open
+items (§8), which should be consulted ahead of any fresh sequencing
+recommendation.
+
+**Finding 3 — E3's expected-fail could mask a broken probe (addressed).**
+`e3_invariant_probe` (`rust/src/agent/control_plane_metrics.rs`) now panics
+with a distinct `E3_INFRASTRUCTURE_FAILURE` marker for DB-connect/query
+failures, versus `E3_INVARIANT_FAILURE` for a real, verified, substantive
+result. `gate_e3` in the script greps captured test output for these
+markers and prints an explicit, loud distinction — an infra failure is
+flagged as "NOT proof the invariant fails" and as something needing
+immediate attention if it ever shows up once a live DB is wired into CI.
+Verified both branches locally: a bad `DATABASE_URL` produces the
+infrastructure-failure banner; the real dev DB produces the
+invariant-failure banner with the same 4/14-gate detail as before.
+`invariants-expected.toml`'s `[e3]` comment now carries this caution
+explicitly, since CI has no live DB today and this distinction only bites
+once one is added.
+
+**Finding 4 — E4's mapping is now normative by accident (addressed,
+option: marked provisional).** Chose "mark provisional" over "ratify now"
+— ratifying five invented names as the target contract in a gate-authoring
+session would itself be the kind of scope creep the session's own
+constraints warn against (this session's mandate is gates, not designing
+the pin mechanism). `scripts/check-invariants.sh`'s `gate_e4` comment now
+states explicitly that renaming a row's target is a spec change requiring
+the same review visibility as an `invariants-expected.toml` status flip —
+not a routine script edit.
+
+**Re-verification after remediation:** `cargo build --workspace --features
+database` clean; `cargo clippy -p ob-poc --lib --features database -- -D
+warnings` clean; `cargo test -p ob-poc --lib --features database` 2146
+passed/0 failed/194 ignored (unchanged); `DATABASE_URL=... check-invariants.sh
+all` exit 5 — all 5 invariants still correctly report DOES NOT HOLD,
+confirming the exclusivity and infra/invariant-distinction changes didn't
+flip any status. Evidence file overwritten with the post-remediation run.
 
 ## 0. Headline finding — corrects the premise this session was framed against
 

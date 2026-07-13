@@ -44,6 +44,17 @@ status = "fail"
 # G11 (AuditReplay), G12 (VersionPinning), G14 (WriteSetAttestation) have
 # zero — either never registered in evaluate_shadow's gate map at the
 # time existing rows were persisted, or never wired to a real call site.
+#
+# CAUTION (2026-07-13 review finding #3): this "fail" is satisfied
+# identically by a verified live result (E3_INVARIANT_FAILURE — what's
+# recorded above, from a real run against local Postgres) AND by an
+# unreachable database (E3_INFRASTRUCTURE_FAILURE — the probe cannot
+# even run). CI today has no live DB, so its e3 leg never runs the live
+# half at all (skip -> fail by design). If a live DB is ever wired into
+# CI for this job, check `scripts/check-invariants.sh e3`'s output for
+# an E3_INFRASTRUCTURE_FAILURE marker before trusting a "fail" as
+# verified — an infra failure must be fixed immediately, not left to
+# masquerade as this expected status indefinitely.
 
 [e4]
 status = "fail"
