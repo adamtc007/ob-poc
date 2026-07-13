@@ -921,7 +921,15 @@ traffic. `invariants-expected.toml`'s `[e3]` detail updated to
 remain genuinely zero under the same bar — this is a clarification of
 what the bar was measuring, not a relaxation of it).
 
-## G1 item 2 + G2 item 2 landed (2026-07-13)
+## G1 items 2-4 + G2 item 2 landed (2026-07-13)
+
+**Correction (2026-07-13, later same day):** this section originally
+read "G1 item 2 + G2 item 2" — an undercount. `01539938` implemented
+G1 items **2, 3, and 4** in one commit, not item 2 alone; corrected
+below after a follow-up verification session (see the "G1 items 3-4
+verification" entry further down) independently confirmed all three
+items' properties hold against current HEAD before catching the
+mislabel.
 
 G1 item 2 (seal→consume carrier): `control_plane_envelopes` gains an
 `entry_id` column (migration `20260713_control_plane_envelopes_entry_id.sql`).
@@ -932,6 +940,23 @@ fire-and-forget `tokio::spawn` to a synchronous `await` in
 G1's HumanGate re-seal requirement (design doc's own bar — an
 end-to-end test for this path is still owed, not written this
 session).
+
+G1 item 3 (live-DB proof from the real Path A call site): two new
+tests in `step_executor_bridge.rs`'s `g1_item2_path_a_tests` module —
+an enforced verb with a real sealed envelope admits, consumes, and
+completes dispatch, then a same-step retry with no re-seal finds
+nothing sealed and is rejected; the same enforced verb with nothing
+sealed for a fresh `entry_id` is rejected with the classified
+`RejectedNoEnvelope` message. Both drive `execute_step` directly, not
+the adapter's own isolated `t4_1` tests.
+
+G1 item 4 (non-eligible decisions reject with triage classification):
+confirmed by construction, not a separate test — `persist_sealed`
+only fires inside `phase5_runtime_recheck`'s `ApprovedStp` arm, so
+`RequiresHumanGate`/`Rejected` decisions never seal anything, and
+`execute_step` hits the identical no-envelope-found path item 3
+already proves rejects with `RejectedNoEnvelope`, not a silent
+fallthrough to allow.
 
 G2 item 2 (write-set attestation transport): investigated per its
 design doc's suggested wiring (`build_write_set_input` as the
@@ -1023,3 +1048,35 @@ falling into a legacy query's `Unrecognised` bucket was found and
 fixed within the same diff, not left latent. Committed as `79f2d27f`.
 `invariants-expected.toml` left untouched (recommend-only) — E3's
 underlying gaps are unchanged by this tranche.
+
+## G1 items 3-4 verification — already landed, no new code (2026-07-13)
+
+A session tasked with implementing G1 items 3-4 found, before writing
+any code, that the branch was already 82+ commits past `01539938` —
+the commit that had actually implemented items 2, 3, *and* 4 together
+(this ledger's "G1 item 2 + G2 item 2 landed" entry above undercounted
+it as item 2 alone; corrected in place, not left standing). Rather
+than re-implementing already-landed work, the session independently
+re-verified both named properties against *current* HEAD — after two
+further tranches (G4, G5) had changed adjacent signatures
+(`ExecutionPath`/`PathScope`, `check_admission*`'s new `path`
+parameter) — rather than trusting the prior session's now-stale
+citations. Both `g1_item2_path_a_tests` (item 3) and the
+by-construction non-eligible-decision argument (item 4) hold
+unchanged: `ob-poc` lib 2169/0 (+9 from G4/G5), `ob-poc-control-plane`
+120/0 (+4), control-plane live-DB sweep 33/1 (the 1 expected
+`e3_invariant_probe` failure), and the literal `check-invariants.sh
+ratchet` reproduced twice (once by the session, once independently by
+the reviewer after) both showing 0/5 divergence. Full detail:
+`docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-G1-ITEMS-3-4-IMPL-001.md`,
+committed as `202046ed`.
+
+Repeats two still-open recommendations rather than letting them go
+stale a second time: a dedicated HumanGate re-seal-at-resume live-DB
+test (design doc §10 assertion 4 — the code path
+(`reseal_for_human_gate_resume`) exists, the test doesn't), and an
+updated `[e2]` `invariants-expected.toml` wording (still not
+applied) reflecting that E2's structural leg is now 4/4 RR-2 paths
+(G4 landed B/C), not the 2/4 the current comment still says — status
+stays `fail` either way, since no verb is enforced by production
+default on any path.
