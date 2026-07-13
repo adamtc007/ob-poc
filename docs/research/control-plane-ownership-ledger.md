@@ -920,3 +920,106 @@ traffic. `invariants-expected.toml`'s `[e3]` detail updated to
 11/14, ruling recorded inline; status stays `fail` (G11/G12/G14
 remain genuinely zero under the same bar — this is a clarification of
 what the bar was measuring, not a relaxation of it).
+
+## G1 item 2 + G2 item 2 landed (2026-07-13)
+
+G1 item 2 (seal→consume carrier): `control_plane_envelopes` gains an
+`entry_id` column (migration `20260713_control_plane_envelopes_entry_id.sql`).
+`step_executor_bridge.rs`'s hardcoded `envelope_id: None` replaced
+with a real lookup via `lookup_sealed_handle`. Sealing changed from
+fire-and-forget `tokio::spawn` to a synchronous `await` in
+`sequencer.rs`, plus a new `reseal_for_human_gate_resume` method for
+G1's HumanGate re-seal requirement (design doc's own bar — an
+end-to-end test for this path is still owed, not written this
+session).
+
+G2 item 2 (write-set attestation transport): investigated per its
+design doc's suggested wiring (`build_write_set_input` as the
+`set_expected_write_set` source) and correctly hit a STOP-condition —
+that source always produces empty `allowed_columns`, which would
+misclassify every legitimate write as a breach (proven with a new
+unit test). Per instruction, only the safe transport landed:
+`execute_verb_admitting_envelope`'s commit call site now calls
+`commit_attested(None, Some(verb_fqn))` instead of plain `commit()`
+— no comparison armed, STOP-condition correctly not silently
+resolved.
+
+Both verified independently (build/test/clippy) and committed
+together as `01539938`.
+
+## G4 landed — Path B/C per-step admission, E2 structural complete (2026-07-13)
+
+`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001`'s ratified
+design implemented in full: `ExecutionPath` enum (`ob-poc-types`,
+`RunbookSequencer`/`DslDirect`/`WorkflowDispatched`/`BusFederated`);
+`EnforcedVerbs` reshaped `HashSet<String>` → `HashMap<String,
+PathScope>` (`PathScope::All | Only(HashSet<ExecutionPath>)`) with a
+new env-var grammar (`verb:path-tag`) per the ratified runbook v0.4;
+`check_admission`/`check_admission_in_scope`/`admit_plan`/
+`admit_plan_checked` all gained a `path` parameter. Path B's
+admission call wired into `dsl_v2::executor::execute_verb_in_scope`
+(new `g4_seam_admission_tests`, 4/4 passing live) via an additive,
+default-`None` `ExecutionContext.envelope_handle` field — a disclosed
+deviation from G3's ratified "Paths B/C always `None`" design,
+needed because G4's own item 4 requires atomicity/rollback tests
+against a real consumable envelope; zero production callers set it,
+so production behavior is unchanged. Path D tagged
+`ExecutionPath::BusFederated` at all 4 `RealDslExecutor` construction
+sites in `ob-poc-web`. `check-invariants.sh`'s `gate_e2` rewritten to
+check the real seam location instead of the stale claim it used to
+check. Mid-flight UUID-versioning question resolved (repo-wide count:
+1443 `Uuid::new_v4()` vs 18 `Uuid::now_v7()` in Rust, 242 vs 68 in the
+Postgres schema defaults — house convention leans v7 at the schema
+layer, unfollowed at the app layer) and applied narrowly: new
+control-plane IDs use `Uuid::now_v7()`, pre-existing call sites left
+untouched. Committed as `02816414`. E2 structural leg (2/4 → 4/4 RR-2
+paths reaching an admitting entry point) now complete; E2's dynamic
+leg (production enforcement still defaults to `NotEnforced`) is
+unchanged by design — enforcement is a deploy-time decision, not a
+code-completeness one.
+
+## G5 landed — gate applicability matrix + shadow-eval on Paths B/C/D (2026-07-13)
+
+`EOP-DESIGN-CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001.md`
+(new, left DRAFT pending architect ratification — status discipline
+honoured, not silently absorbed) specifies which of G1-G14 apply to
+which of Paths A/B/C/D. Implemented against the ratified plan v0.5's
+G5 tranche, 5 items: (1) `GateResult::NotApplicable(reason)` added to
+the crate's most-depended-on enum, full compiler-driven match sweep,
+one genuinely ambiguous site (`decision.rs::rejection_from_report`,
+a Path-A-only caller hitting a path-conditional variant it structurally
+can't apply) resolved fail-closed with a disclosed rationale, not
+silently guessed; (2) new `applicability.rs` module implementing the
+14×4 matrix, resolving the design doc's 3 UNKNOWNs by reading the
+actual gate implementations; (3-4) shadow-gate evaluation wired at
+Paths B/C/D call sites using the matrix to skip inapplicable gates;
+`ShadowDecisionRow` and friends widened `pub(crate)` → `pub`
+(disclosed E5 surface change) plus a new direct `ob-poc-web` →
+`ob-poc-control-plane` Cargo dependency, so Path D's adapter persists
+rows in the same shape Path A already does rather than duplicating
+the INSERT — reviewed and accepted, same "values + evaluator" edge
+already used elsewhere, no cycle; (5) `control_plane_shadow_decisions`
+gains an `execution_path` column (orthogonal to G2's
+`GateOutcomeProvenance` — source of the outcome vs which RR-2 path
+produced it), plus two new `check-invariants.sh` e3 probes
+(`g5_path_a_never_produces_not_applicable` — window-discipline proof
+that Path A's shadow eval never emits the new variant —  and
+`e3_matrix_invariant_probe`, 2/2 passing with real per-path
+substantive-sample evidence for B/C/D).
+
+Independently re-verified end to end (not taken on the agent's
+claim): forced rebuild clean after stale IDE diagnostics (4th
+occurrence this session of the same stale-diagnostics pattern);
+clippy clean (`-D warnings`) on the touched crates, one pre-existing
+`items_after_test_module` finding in `ob-poc-web/src/main.rs`
+confirmed via `git stash` to predate G5; `ob-poc` lib suite unchanged
+at 2169/0 (G5's new tests are `#[ignore]`-gated live-DB); `ob-poc-
+control-plane` lib suite 120/0 (+4 from G4); the literal `e3`
+check-invariants run reproduced exactly matching the session doc's
+claims — overall E3 verdict unchanged (`DOES NOT HOLD`), driven
+entirely by the pre-existing G11/G14 gaps this tranche wasn't scoped
+to close. A live-DB regression from the new `NotApplicable` sentinel
+falling into a legacy query's `Unrecognised` bucket was found and
+fixed within the same diff, not left latent. Committed as `79f2d27f`.
+`invariants-expected.toml` left untouched (recommend-only) — E3's
+underlying gaps are unchanged by this tranche.
