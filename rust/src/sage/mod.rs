@@ -62,6 +62,11 @@ pub use ob_poc_agent::sage::{arg_assembly, deterministic, drafter, llm_sage};
 pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;
 pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
+// `DrafterEngine` is only ever reached via the fully-qualified
+// `crate::sage::DrafterEngine::load()` path (orchestrator.rs, integration
+// tests) — never through a `use` statement — so it trips `unused_imports`
+// despite being load-bearing.
+#[allow(unused_imports)]
 pub use drafter::{DraftResult, DrafterEngine};
 pub use llm_sage::LlmSage;
 pub use outcome::{OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence};

@@ -39,13 +39,12 @@ use crate::mcp::verb_search::{
     HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult, VerbSearchSource,
 };
 use crate::sage::{
-    drafter::DraftResolution, DraftResult, ObservationPlane, OutcomeStep, PendingMutation,
-    SageConfidence, SageEngine, UtteranceDisposition,
+    DraftResult, ObservationPlane, OutcomeStep, PendingMutation, SageConfidence, SageEngine,
+    UtteranceDisposition,
 };
 use crate::sem_reg::abac::ActorContext;
 use crate::semtaxonomy_v2::{
-    compiler_input_from_outcome_intent, supports_cbu_compiler_slice, CompilerSelection,
-    IntentCompiler,
+    compiler_input_from_outcome_intent, supports_cbu_compiler_slice, IntentCompiler,
 };
 use crate::traceability::{
     build_phase2_unavailable_payload, build_phase5_unavailable_payload, build_phase_trace_payload,
@@ -149,15 +148,9 @@ pub struct OrchestratorOutcome {
     pub trace_id: Option<Uuid>,
 }
 
-struct SageStageOutcome {
-    intent: Option<crate::sage::OutcomeIntent>,
-}
-
-struct DraftStageOutcome {
-    result: Option<DraftResult>,
-    elapsed_ms: Option<u128>,
-    error: Option<String>,
-}
+// SageStageOutcome/DraftStageOutcome moved to `ob_poc_agent::sage::stages`
+// (T11.2 Part A, 2026-07-13) alongside `run_sage_stage`/`run_coder_stage`.
+use ob_poc_agent::sage::stages::{run_coder_stage, run_sage_stage};
 
 struct PreparedTurnContext {
     lookup_result: Option<crate::lookup::LookupResult>,
@@ -709,138 +702,6 @@ pub struct IntentTrace {
     /// Entity/context resolution confidence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_confidence: Option<f32>,
-}
-
-async fn run_sage_stage(
-    ctx: &crate::agent::agent_turn_context::AgentTurnContext,
-    utterance: &str,
-    enabled: bool,
-) -> SageStageOutcome {
-    if !enabled {
-        return SageStageOutcome { intent: None };
-    }
-
-    let sage_ctx = crate::sage::SageContext {
-        session_id: ctx.session_id,
-        stage_focus: ctx.stage_focus.clone(),
-        goals: ctx.goals.clone(),
-        entity_kind: ctx.pre_sage_entity_kind.clone(),
-        dominant_entity_name: ctx.pre_sage_entity_name.clone(),
-        last_intents: ctx.recent_sage_intents.clone(),
-    };
-    let sage_engine = ctx
-        .sage_engine
-        .clone()
-        .unwrap_or_else(|| Arc::new(crate::sage::DeterministicSage));
-
-    let intent = match sage_engine.classify(utterance, &sage_ctx).await {
-        Ok(intent) => {
-            tracing::info!(
-                sage_plane = ?intent.plane,
-                sage_polarity = ?intent.polarity,
-                sage_domain = %intent.domain_concept,
-                "Stage 1.5: Sage shadow classification"
-            );
-            Some(intent)
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, "Stage 1.5: SageEngine failed (non-fatal)");
-            None
-        }
-    };
-
-    SageStageOutcome { intent }
-}
-
-fn run_coder_stage(
-    ctx: &crate::agent::agent_turn_context::AgentTurnContext,
-    intent: Option<&crate::sage::OutcomeIntent>,
-) -> DraftStageOutcome {
-    let Some(intent) = intent else {
-        return DraftStageOutcome {
-            result: None,
-            elapsed_ms: None,
-            error: None,
-        };
-    };
-
-    let started_at = std::time::Instant::now();
-    if let Some(compiler) = &ctx.nlci_compiler {
-        let compiler_input = compiler_input_from_outcome_intent(
-            intent,
-            ctx.session_id,
-            ctx.dominant_entity_id,
-            ctx.pre_sage_entity_kind.as_deref(),
-            ctx.pre_sage_entity_name.as_deref(),
-        );
-        if supports_cbu_compiler_slice(&compiler_input) {
-            return match compiler.compile(compiler_input) {
-                Ok(output) => match output.selection {
-                    Some(selection) => DraftStageOutcome {
-                        result: Some(coder_result_from_compiler_selection(selection)),
-                        elapsed_ms: Some(started_at.elapsed().as_millis()),
-                        error: None,
-                    },
-                    None => DraftStageOutcome {
-                        result: None,
-                        elapsed_ms: Some(started_at.elapsed().as_millis()),
-                        error: Some(
-                            output
-                                .failure
-                                .map(|failure| failure.user_message)
-                                .unwrap_or_else(|| {
-                                    "NLCI compiler returned no selection for supported CBU intent"
-                                        .to_string()
-                                }),
-                        ),
-                    },
-                },
-                Err(error) => DraftStageOutcome {
-                    result: None,
-                    elapsed_ms: Some(started_at.elapsed().as_millis()),
-                    error: Some(error.to_string()),
-                },
-            };
-        }
-    }
-
-    match crate::sage::DrafterEngine::load().and_then(|engine| engine.resolve(intent)) {
-        Ok(drafter_result) => DraftStageOutcome {
-            result: Some(drafter_result),
-            elapsed_ms: Some(started_at.elapsed().as_millis()),
-            error: None,
-        },
-        Err(error) => DraftStageOutcome {
-            result: None,
-            elapsed_ms: Some(started_at.elapsed().as_millis()),
-            error: Some(error.to_string()),
-        },
-    }
-}
-
-fn coder_result_from_compiler_selection(selection: CompilerSelection) -> DraftResult {
-    let dsl = render_selection_dsl(&selection);
-    DraftResult {
-        verb_fqn: selection.verb_id,
-        dsl,
-        resolution: DraftResolution::Confident,
-        missing_args: vec![],
-        unresolved_refs: vec![],
-        diagnostics: None,
-    }
-}
-
-fn render_selection_dsl(selection: &CompilerSelection) -> String {
-    let args = selection
-        .arguments
-        .iter()
-        .map(|(name, value)| format!(" :{} {}", name, render_dsl_string(value)))
-        .collect::<String>();
-    format!("({}{})", selection.verb_id, args)
-}
-
-fn render_dsl_string(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,

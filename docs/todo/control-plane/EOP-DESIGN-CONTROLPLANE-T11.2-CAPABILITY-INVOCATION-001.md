@@ -98,4 +98,12 @@ Fields not yet read by `run_sage_stage`/`run_coder_stage` (`actor`, `case_id`, `
 
 `OrchestratorContext` itself is unchanged, as designed — still CP-tier-resident, still constructed at its 4 external sites. Physically moving `run_sage_stage`/`run_coder_stage` (and the rest of the confirmed-clean interpretation functions from the T11.1b/slice-2 trace) to `ob-poc-agent` is the next mechanical step this projection unblocks, not yet done in this pass.
 
-**Part B (`CapabilityInvocation` proper) remains undrafted**, per §4's sequencing note — Part A has now proven itself against two real consumers; scoping Part B is the next open decision.
+**Part A follow-up: the physical move landed too (2026-07-13, same day).** `AgentTurnContext` and `run_sage_stage`/`run_coder_stage`/`SageStageOutcome`/`DraftStageOutcome`/`coder_result_from_compiler_selection`/`render_selection_dsl`/`render_dsl_string` all now live in `ob-poc-agent` (`crates/ob-poc-agent/src/agent_turn_context.rs`, `crates/ob-poc-agent/src/sage/stages.rs`). `ob-poc`'s `orchestrator.rs` keeps only the projection method (`OrchestratorContext::agent_turn_context()`, now returning `ob_poc_agent::agent_turn_context::AgentTurnContext`) and calls the relocated functions via `use ob_poc_agent::sage::stages::{run_coder_stage, run_sage_stage};`.
+
+Two fields have no shared type between the two crates and needed field-by-field conversion at the projection boundary: `UtteranceSource` and `ScopeContext` are each duplicated in `ob-poc-agent` (small, behaviorless data types — `mcp/` stays in `ob-poc` per T11.1a, so there's no shared crate home yet) rather than shared; `ob-poc`'s `agent_turn_context.rs` now does the `UtteranceSource`/`ScopeContext` → `ob_poc_agent`-side variant mapping. Everything else (`ActorContext` from `sem_os_policy`, `RecentIntent`/`SageEngine` from `ob_poc_sage`, `IntentCompiler` from the already-relocated `semtaxonomy_v2`, `AgentMode` from `sem_os_types`) is the exact same nominal type on both sides of the boundary — no conversion needed, direct field assignment.
+
+New deps added to `ob-poc-agent`: `sem_os_policy`, `sem_os_types` (both already workspace deps used elsewhere in the tree; neither has an `ob-poc` edge).
+
+Verified: workspace build clean (incl. `ob-poc-web`), clippy `-D warnings` clean, `cargo tree -p ob-poc-agent --edges normal` shows no `ob-poc` edge (no cycle, L1 holds), all 64 `agent::orchestrator::tests` pass, full lib suite 2145/0 unchanged.
+
+**Part B (`CapabilityInvocation` proper) remains undrafted**, per §4's sequencing note — Part A has now proven itself against two real consumers, both physically relocated; scoping Part B is the next open decision.

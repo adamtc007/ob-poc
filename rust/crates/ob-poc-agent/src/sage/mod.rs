@@ -53,6 +53,10 @@ pub mod llm_sage;
 pub mod verb_index;
 pub mod verb_resolve;
 
+/// Sage-classification / Coder-drafting turn stages — T11.2 Part A
+/// (2026-07-13), relocated from `ob_poc::agent::orchestrator`.
+pub mod stages;
+
 // Re-export core types for convenience
 pub use context::{RecentIntent, SageContext};
 pub use deterministic::DeterministicSage;

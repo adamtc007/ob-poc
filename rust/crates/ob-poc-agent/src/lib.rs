@@ -196,6 +196,11 @@ pub mod audit;
 // module's own top doc for scope/exclusions.
 // ---------------------------------------------------------------------------
 
+/// The agent-tier projection of `ob-poc`'s `OrchestratorContext` — T11.2
+/// Part A (2026-07-13). See the module doc for why this crosses the crate
+/// boundary and `OrchestratorContext` itself does not.
+pub mod agent_turn_context;
+
 /// Sage's deterministic/LLM drafting engines. `constrained_match` and
 /// `valid_verb_set` stay in `ob-poc` (capability-coupled — see crate doc).
 pub mod sage;

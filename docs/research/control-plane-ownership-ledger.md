@@ -770,3 +770,13 @@ Verified: workspace build clean, clippy `-D warnings` clean, all 64 `agent::orch
 `OrchestratorContext` itself untouched, as designed. Physically relocating `run_sage_stage`/`run_coder_stage` (now unblocked, signature-wise) to `ob-poc-agent` is the next mechanical step — not done this pass; this pass proves the projection type, doesn't yet move code across the crate boundary. `CapabilityInvocation` proper (Part B) remains undrafted, per the design doc's own sequencing.
 
 Full detail: `docs/todo/control-plane/EOP-DESIGN-CONTROLPLANE-T11.2-CAPABILITY-INVOCATION-001.md` §5.
+
+## Tranche T11.2, Part A — physical relocation landed, same day (2026-07-13)
+
+"Carry on": moved `AgentTurnContext` and `run_sage_stage`/`run_coder_stage`/`SageStageOutcome`/`DraftStageOutcome`/`coder_result_from_compiler_selection`/`render_selection_dsl`/`render_dsl_string` into `ob-poc-agent` proper (`crates/ob-poc-agent/src/agent_turn_context.rs`, `crates/ob-poc-agent/src/sage/stages.rs`) — the mechanical step the same-day earlier entry flagged as not-yet-done. `ob-poc`'s `orchestrator.rs` keeps only the projection method, now building `ob_poc_agent::agent_turn_context::AgentTurnContext` and calling the relocated functions via `use ob_poc_agent::sage::stages::{run_coder_stage, run_sage_stage};`.
+
+Two fields (`UtteranceSource`, `ScopeContext`) have no shared type across the crate boundary — both are small, behaviorless data types duplicated in `ob-poc-agent` rather than shared (no shared-crate home exists yet since `mcp/` stays in `ob-poc` per T11.1a); the projection method does the field-by-field conversion. Everything else (`ActorContext`/`sem_os_policy`, `RecentIntent`/`SageEngine`/`ob_poc_sage`, `IntentCompiler`/already-relocated `semtaxonomy_v2`, `AgentMode`/`sem_os_types`) is the identical nominal type on both sides — direct assignment, no conversion. Two new workspace deps added to `ob-poc-agent` (`sem_os_policy`, `sem_os_types`), neither with an `ob-poc` edge.
+
+Verified: workspace build clean (incl. `ob-poc-web`), clippy `-D warnings` clean, `cargo tree -p ob-poc-agent --edges normal` shows no `ob-poc` edge (L1 holds), all 64 orchestrator tests pass, full lib suite 2145/0 unchanged.
+
+**T11.2 Part A: COMPLETE** — design, projection type, and physical relocation all landed same day. Part B (`CapabilityInvocation` proper — the call-request half) remains the next open, undrafted decision.
