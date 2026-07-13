@@ -758,3 +758,15 @@ Full text: `docs/todo/control-plane/EOP-DESIGN-CONTROLPLANE-T11.2-CAPABILITY-INV
 **Deliberately deferred, not drafted this pass:** `CapabilityInvocation` proper (the *call*-request half of T11.2, as opposed to this doc's *context*-read half). Recommend `AgentTurnContext` prove itself against a real consumer first (retrofit onto the already-moved `run_sage_stage`/`run_coder_stage`) before the harder half is designed.
 
 **Status: draft, not ratified, no code.** Awaiting review of the field census and the projection-not-restructure shape.
+
+## Tranche T11.2, Part A — `AgentTurnContext` implemented, both recommended consumers retrofitted (2026-07-13)
+
+Architect: "implement." `rust/src/agent/agent_turn_context.rs` (new module): `AgentTurnContext` per the design doc's §3 shape, `OrchestratorContext::agent_turn_context()` projection method. `run_sage_stage`/`run_coder_stage` — the design doc's own recommended first consumers — now take `&AgentTurnContext`; all 5 production call sites (`handle_utterance` ×3, `legacy_handle_utterance` ×2, each projecting once per turn: `let agent_turn = ctx.agent_turn_context();`) and 15 test call sites updated.
+
+No capability handle appears in `AgentTurnContext` — and unlike the field census (a design-time claim), this is now compiler-enforced: the type literally has no `PgPool`/`Arc<HybridVerbSearcher>`/`Arc<PolicyGate>`/`Arc<dyn SemOsClient>` field, so any future accidental capability read through this projection is a compile error, not something a per-file trace has to catch later.
+
+Verified: workspace build clean, clippy `-D warnings` clean, all 64 `agent::orchestrator::tests` pass, full lib suite 2145/0 unchanged.
+
+`OrchestratorContext` itself untouched, as designed. Physically relocating `run_sage_stage`/`run_coder_stage` (now unblocked, signature-wise) to `ob-poc-agent` is the next mechanical step — not done this pass; this pass proves the projection type, doesn't yet move code across the crate boundary. `CapabilityInvocation` proper (Part B) remains undrafted, per the design doc's own sequencing.
+
+Full detail: `docs/todo/control-plane/EOP-DESIGN-CONTROLPLANE-T11.2-CAPABILITY-INVOCATION-001.md` §5.

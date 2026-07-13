@@ -90,4 +90,12 @@ This doc only resolves the *context* half of the L1 problem — what agent-tier 
 
 ## 5. Status
 
-Draft, not ratified. No code. Awaiting review of the field census (§2) and the projection-not-restructure shape (§3) before implementation, and a decision on whether Part B (`CapabilityInvocation` proper) is scoped now or after Part A proves itself against a real move.
+**Part A: IMPLEMENTED (2026-07-13).** `rust/src/agent/agent_turn_context.rs` (new module): `AgentTurnContext` struct exactly per §3's shape, `OrchestratorContext::agent_turn_context()` projection method. `run_sage_stage` and `run_coder_stage` — the recommended first consumers — now take `&AgentTurnContext` instead of `&OrchestratorContext`; all 5 call sites (`handle_utterance` ×3, `legacy_handle_utterance` ×2) and 15 test call sites updated to project once (`let agent_turn = ctx.agent_turn_context();`) and pass the projection. No capability handle appears anywhere in `AgentTurnContext` — confirmed by the compiler, not just by the field census (the type has no `PgPool`/`Arc<HybridVerbSearcher>`/`Arc<PolicyGate>`/`Arc<dyn SemOsClient>` field, so any accidental capability read through it is a compile error, not a review-time judgment call).
+
+Verified: workspace build clean, clippy `-D warnings` clean, all 64 `agent::orchestrator::tests` pass, full lib suite 2145/0 unchanged.
+
+Fields not yet read by `run_sage_stage`/`run_coder_stage` (`actor`, `case_id`, `source`, `pre_sage_entity_confidence`, `discovery_selected_*`, `discovery_answers`, `session_cbu_ids`) are `#[allow(dead_code)]`-marked rather than trimmed — they're part of the agent-tier surface for the next functions this projection gets retrofitted onto (`route`, `build_journey_pipeline_result`, etc.), not speculative additions.
+
+`OrchestratorContext` itself is unchanged, as designed — still CP-tier-resident, still constructed at its 4 external sites. Physically moving `run_sage_stage`/`run_coder_stage` (and the rest of the confirmed-clean interpretation functions from the T11.1b/slice-2 trace) to `ob-poc-agent` is the next mechanical step this projection unblocks, not yet done in this pass.
+
+**Part B (`CapabilityInvocation` proper) remains undrafted**, per §4's sequencing note — Part A has now proven itself against two real consumers; scoping Part B is the next open decision.

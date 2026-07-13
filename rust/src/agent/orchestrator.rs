@@ -712,7 +712,7 @@ pub struct IntentTrace {
 }
 
 async fn run_sage_stage(
-    ctx: &OrchestratorContext,
+    ctx: &crate::agent::agent_turn_context::AgentTurnContext,
     utterance: &str,
     enabled: bool,
 ) -> SageStageOutcome {
@@ -753,7 +753,7 @@ async fn run_sage_stage(
 }
 
 fn run_coder_stage(
-    ctx: &OrchestratorContext,
+    ctx: &crate::agent::agent_turn_context::AgentTurnContext,
     intent: Option<&crate::sage::OutcomeIntent>,
 ) -> DraftStageOutcome {
     let Some(intent) = intent else {
@@ -1053,7 +1053,8 @@ pub(crate) async fn handle_utterance(
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
     let trace_scaffold = persist_trace_scaffold(ctx, utterance).await;
-    let sage_stage = run_sage_stage(ctx, utterance, true).await;
+    let agent_turn = ctx.agent_turn_context();
+    let sage_stage = run_sage_stage(&agent_turn, utterance, true).await;
     let Some(intent) = sage_stage.intent else {
         let outcome = legacy_handle_utterance(ctx, utterance).await?;
         return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
@@ -1096,7 +1097,7 @@ pub(crate) async fn handle_utterance(
                         .await?;
                 return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
-            let coder_stage = run_coder_stage(ctx, Some(&intent));
+            let coder_stage = run_coder_stage(&agent_turn, Some(&intent));
             let serve_candidate = coder_stage
                 .result
                 .clone()
@@ -1206,7 +1207,7 @@ pub(crate) async fn handle_utterance(
                 return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
 
-            let coder_stage = run_coder_stage(ctx, Some(&delegate.outcome));
+            let coder_stage = run_coder_stage(&agent_turn, Some(&delegate.outcome));
             let drafter_result = coder_stage.result.as_ref();
             let coder_complete = drafter_result
                 .map(|result| result.missing_args.is_empty() && result.unresolved_refs.is_empty())
@@ -1489,9 +1490,10 @@ pub(crate) async fn legacy_handle_utterance(
     let sage_fast_path_enabled = false;
     let sage_enabled = false;
 
-    let sage_stage = run_sage_stage(ctx, utterance, sage_enabled).await;
+    let agent_turn = ctx.agent_turn_context();
+    let sage_stage = run_sage_stage(&agent_turn, utterance, sage_enabled).await;
     let sage_intent = sage_stage.intent;
-    let coder_stage = run_coder_stage(ctx, sage_intent.as_ref());
+    let coder_stage = run_coder_stage(&agent_turn, sage_intent.as_ref());
     let sage_coder_result = coder_stage.result;
     let sage_coder_elapsed_ms = coder_stage.elapsed_ms;
     let sage_coder_error = coder_stage.error;
@@ -4046,7 +4048,7 @@ mod tests {
         let ctx = make_test_context();
         let intent = make_cbu_intent(crate::sage::OutcomeAction::Read, vec![]);
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.read");
@@ -4065,7 +4067,7 @@ mod tests {
             Some("show all cbus"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.list");
@@ -4080,7 +4082,7 @@ mod tests {
             vec![("jurisdiction", "LU"), ("client-type", "FUND")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.list");
@@ -4102,7 +4104,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4126,7 +4128,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4147,7 +4149,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4168,7 +4170,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4186,7 +4188,7 @@ mod tests {
             vec![("name", "Apex Growth Fund")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.rename");
@@ -4204,7 +4206,7 @@ mod tests {
             vec![("jurisdiction", "LU")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-jurisdiction");
@@ -4222,7 +4224,7 @@ mod tests {
             vec![("client-type", "FUND")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-client-type");
@@ -4243,7 +4245,7 @@ mod tests {
             )],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-commercial-client");
@@ -4261,7 +4263,7 @@ mod tests {
             vec![("category", "FUND_MANDATE")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-category");
@@ -4280,7 +4282,7 @@ mod tests {
             Some("move lifecycle into validation review"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.submit-for-validation");
@@ -4299,7 +4301,7 @@ mod tests {
             Some("move to update pending proof"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.request-proof-update");
@@ -4318,7 +4320,7 @@ mod tests {
             Some("move failed cbu back to validation"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.reopen-validation");

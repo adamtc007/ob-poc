@@ -3,6 +3,7 @@
 //! Contains the agent learning infrastructure for continuous improvement.
 //! Navigation commands go through the unified intent pipeline (view.* and session.* verbs).
 
+pub(crate) mod agent_turn_context;
 pub(crate) mod capability_provenance;
 pub mod composite_state;
 pub mod composite_state_loader;
