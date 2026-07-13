@@ -267,10 +267,24 @@ async fn admit_plan_checked(
 /// site is `sequencer.rs`'s `phase5_runtime_recheck`, shadow-only — nothing
 /// consumes, nothing gates, nothing blocks. Proven correct via the live-DB
 /// tests below before this tranche; T10.2 is the first consumer of `record`.
+///
+/// G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2.1): gained
+/// `entry_id` — the originating `RunbookEntry`/`CompiledStep.step_id` —
+/// so [`lookup_sealed_handle`] can correlate a sealed row to the specific
+/// step that produced it, not just `(session_id, verb_fqn)` (ambiguous
+/// when a runbook dispatches the same verb FQN twice). Callers that have
+/// no real per-step entry (none in production — every real caller is
+/// `phase5_runtime_recheck` or its `HumanGate` re-seal sibling, both of
+/// which always have an `entry_id`) would pass a fresh `Uuid::now_v7()`
+/// (this table has no DB-side UUID default and is high-insert/append-only
+/// — v7's time-ordering keeps new rows' index locality good, matching the
+/// house convention `master-schema.sql` already uses on 242 tables); no
+/// such caller exists today.
 #[cfg(feature = "database")]
 pub(crate) async fn persist_sealed(
     pool: &sqlx::PgPool,
     session_id: Uuid,
+    entry_id: Uuid,
     verb_fqn: &str,
     envelope: &ExecutionEnvelope,
 ) -> bool {
@@ -291,14 +305,15 @@ pub(crate) async fn persist_sealed(
     let result = sqlx::query(
         r#"
         INSERT INTO "ob-poc".control_plane_envelopes (
-            envelope_id, content_hash, session_id, verb_fqn,
+            envelope_id, content_hash, session_id, entry_id, verb_fqn,
             status, not_before, not_after, record
-        ) VALUES ($1, $2, $3, $4, 'sealed', $5, $6, $7)
+        ) VALUES ($1, $2, $3, $4, $5, 'sealed', $6, $7, $8)
         "#,
     )
     .bind(handle.id())
     .bind(handle.content_hash_hex())
     .bind(session_id)
+    .bind(entry_id)
     .bind(verb_fqn)
     .bind(window.not_before())
     .bind(window.not_after())
@@ -317,6 +332,59 @@ pub(crate) async fn persist_sealed(
             false
         }
     }
+}
+
+/// G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2.1, §3): the
+/// consume-site lookup. `CompiledStep.step_id` (`runbook/types.rs:139`)
+/// already equals the `RunbookEntry.id` that `phase5_runtime_recheck`
+/// seals under as `entry_id` — this is a straightforward correlated read,
+/// no new transport mechanism. `ORDER BY created_at DESC LIMIT 1` is
+/// defence-in-depth against a genuine double-seal for the same entry (a
+/// retry re-entering `phase5_runtime_recheck`, or a `HumanGate` resume
+/// re-seal alongside a stale pre-park row) — picks the freshest sealed
+/// row, matching §5's "a retry naturally consumes its own fresh envelope"
+/// design. Returns `None` (not an error) when nothing is sealed for this
+/// entry yet — a legitimate state for any non-`ApprovedStp` decision, or
+/// a not-yet-enforced verb whose seal failed to persist (best-effort).
+#[cfg(feature = "database")]
+pub(crate) async fn lookup_sealed_handle(
+    pool: &sqlx::PgPool,
+    session_id: Uuid,
+    entry_id: Uuid,
+) -> anyhow::Result<Option<EnvelopeHandle>> {
+    let row: Option<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT envelope_id, content_hash
+        FROM "ob-poc".control_plane_envelopes
+        WHERE session_id = $1 AND entry_id = $2 AND status = 'sealed'
+        ORDER BY created_at DESC
+        LIMIT 1
+        "#,
+    )
+    .bind(session_id)
+    .bind(entry_id)
+    .fetch_optional(pool)
+    .await?;
+
+    let Some((envelope_id, content_hash_hex)) = row else {
+        return Ok(None);
+    };
+    let content_hash: [u8; 32] = match hex::decode(&content_hash_hex) {
+        Ok(bytes) if bytes.len() == 32 => {
+            let mut arr = [0u8; 32];
+            arr.copy_from_slice(&bytes);
+            arr
+        }
+        _ => {
+            tracing::warn!(
+                envelope_id = %envelope_id,
+                content_hash_hex,
+                "control_plane_envelopes.content_hash did not decode to 32 bytes"
+            );
+            return Ok(None);
+        }
+    };
+    Ok(Some(EnvelopeHandle::new(envelope_id, content_hash)))
 }
 
 /// T9.2 (EOP-PLAN-CONTROLPLANE-001 Addendum B): pure query logic for
@@ -645,7 +713,7 @@ mod tests {
         );
         let expected = envelope.to_record();
 
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let raw: serde_json::Value = sqlx::query_scalar(
             r#"SELECT record FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#,
@@ -670,7 +738,7 @@ mod tests {
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
 
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
         assert_eq!(try_consume(&pool, &handle).await.unwrap(), ConsumeOutcome::Consumed);
         assert_eq!(try_consume(&pool, &handle).await.unwrap(), ConsumeOutcome::AlreadyConsumed);
     }
@@ -683,7 +751,7 @@ mod tests {
         let envelope = sealed_envelope(now - chrono::Duration::minutes(10), now - chrono::Duration::minutes(5));
         let handle = envelope.handle();
 
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
         assert_eq!(try_consume(&pool, &handle).await.unwrap(), ConsumeOutcome::Expired);
         // A second attempt against the now-`expired`-marked row must also reject.
         assert_eq!(try_consume(&pool, &handle).await.unwrap(), ConsumeOutcome::Expired);
@@ -706,7 +774,7 @@ mod tests {
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
 
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
         assert!(void(&pool, handle.id(), "stale_state").await);
         assert_eq!(try_consume(&pool, &handle).await.unwrap(), ConsumeOutcome::Voided);
     }
@@ -736,7 +804,7 @@ mod tests {
         let now = Utc::now();
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
         let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle))
@@ -762,7 +830,7 @@ mod tests {
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
 
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
         assert_eq!(try_consume_by_id(&pool, handle.id()).await.unwrap(), ConsumeOutcome::Consumed);
         assert_eq!(
             try_consume_by_id(&pool, handle.id()).await.unwrap(),
@@ -779,7 +847,7 @@ mod tests {
         let now = Utc::now();
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let mut tx = pool.begin().await.unwrap();
         let outcome = try_consume_in_scope(&mut tx, &handle).await.unwrap();
@@ -804,7 +872,7 @@ mod tests {
         let now = Utc::now();
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let mut tx = pool.begin().await.unwrap();
         let outcome = try_consume_in_scope(&mut tx, &handle).await.unwrap();
@@ -838,7 +906,7 @@ mod tests {
         let now = Utc::now();
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let mut winner_tx = pool.begin().await.unwrap();
         let winner_outcome = try_consume_in_scope(&mut winner_tx, &handle).await.unwrap();
@@ -883,7 +951,7 @@ mod tests {
         let now = Utc::now();
         let envelope = sealed_envelope(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5));
         let handle = envelope.handle();
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
 
@@ -955,7 +1023,7 @@ mod tests {
             ValidityWindow::new(now - chrono::Duration::minutes(1), now + chrono::Duration::minutes(5)),
         );
         let handle = envelope.handle();
-        assert!(persist_sealed(&pool, Uuid::new_v4(), "cbu.confirm", &envelope).await);
+        assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
         let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
         let mut tx = pool.begin().await.unwrap();

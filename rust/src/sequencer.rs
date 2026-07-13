@@ -3544,6 +3544,17 @@ impl ReplOrchestratorV2 {
             .unwrap_or_default();
         session.runbook.resume_entry(&correlation_key, None);
 
+        // G1 item 2, §4 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001):
+        // re-seal immediately before dispatch — never extend or reuse
+        // whatever `phase5_runtime_recheck` sealed at park time, which may
+        // be arbitrarily stale by now (a human approval can take minutes
+        // to days, far past the 5-minute validity window). AWAITED
+        // (synchronous), same requirement as the Sync/Durable path, so the
+        // fresh row exists by the time `execute_entry_via_gate` below
+        // reaches the consume site.
+        #[cfg(feature = "database")]
+        self.reseal_for_human_gate_resume(session, entry_id).await;
+
         // Now execute through the gate (INV-3: no raw DSL execution).
         let fallback_version = session.allocate_runbook_version();
         let entry_ref = &session.runbook.entries[idx];
@@ -8058,6 +8069,29 @@ impl ReplOrchestratorV2 {
                 snapshot_ref,
             };
 
+            // G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2, §4):
+            // the seal must be AWAITED (synchronous with this loop
+            // iteration), not fire-and-forget, so the row genuinely exists
+            // in `control_plane_envelopes` by the time this same iteration
+            // reaches `execute_entry_via_gate_impl` -> ... ->
+            // `VerbExecutionPortStepExecutor::execute_step`'s
+            // `lookup_sealed_handle` call a few function calls later
+            // (§1.2's genuine race, closed). The shadow-row insert and the
+            // DecisionEvaluated/EnvelopeSealed audit events stay best-
+            // effort/fire-and-forget below (unchanged posture, W1 window-
+            // discipline: additive only) — only the seal->consume
+            // correlation itself needs the synchronous guarantee.
+            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) = decision {
+                crate::agent::control_plane_envelope_store::persist_sealed(
+                    &pool,
+                    session_id,
+                    entry_id,
+                    &entry_verb,
+                    envelope,
+                )
+                .await;
+            }
+
             tokio::spawn(async move {
                 crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
                 if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
@@ -8079,13 +8113,6 @@ impl ReplOrchestratorV2 {
                         },
                     )
                     .await;
-                    crate::agent::control_plane_envelope_store::persist_sealed(
-                        &pool,
-                        session_id,
-                        &entry_verb,
-                        &envelope,
-                    )
-                    .await;
                 } else {
                     crate::agent::control_plane_audit::insert_audit_event(
                         &pool,
@@ -8104,6 +8131,214 @@ impl ReplOrchestratorV2 {
         }
 
         legacy_outcome
+    }
+
+    /// G1 item 2, §4 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001): re-seal
+    /// a `HumanGate` entry at resume time, immediately before dispatch,
+    /// rather than extending or reusing whatever `phase5_runtime_recheck`
+    /// sealed at park time (which may be arbitrarily stale — a human
+    /// approval can take minutes to days). Deliberately a smaller
+    /// re-derivation than `phase5_runtime_recheck` itself: it re-runs only
+    /// the control-plane shadow-evaluate-and-seal step (G2/G3/G4/G7/G8/G13/
+    /// G9/G12 input derivation -> `evaluate_with_report` -> synchronous
+    /// `persist_sealed`, same as §2's pseudocode), and deliberately does
+    /// NOT re-run `phase5_runtime_recheck`'s T11.F.2 definitional-floor
+    /// checks (G1/G3/G4, which can return `Some(StepOutcome::Failed)`) or
+    /// its legacy `shadow_envelope`/`legacy_outcome` machinery — those are
+    /// gating mechanisms with no re-seal-at-resume call site today; adding
+    /// one here would be a second, unreviewed production-behaviour change
+    /// beyond G1's scope (a HumanGate resume that could newly fail for a
+    /// reason it never could before). This function's own seal is
+    /// shadow-only, exactly like `phase5_runtime_recheck`'s: it never
+    /// blocks dispatch, only makes a fresh, non-stale envelope available
+    /// for `execute_step`'s consume-site lookup on `(session_id, entry_id)`
+    /// (§2.1's `ORDER BY created_at DESC LIMIT 1` picks this fresh row over
+    /// the stale pre-park one).
+    #[cfg(feature = "database")]
+    async fn reseal_for_human_gate_resume(&self, session: &ReplSessionV2, entry_id: Uuid) {
+        let Some(client) = self.sem_os_client.as_ref() else {
+            return;
+        };
+        let Some(pool) = self.pool() else {
+            return;
+        };
+        let Some(entry) = session.runbook.entries.iter().find(|e| e.id == entry_id) else {
+            return;
+        };
+
+        let tos = session.workspace_stack.last();
+        let constellation_family = tos.map(|f| f.constellation_family.clone());
+        let constellation_map = tos.map(|f| f.constellation_map.clone());
+        let actor = ob_poc_boundary::policy::ActorResolver::from_env();
+        let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+            client.as_ref(),
+            &actor,
+            Some(session.id),
+            constellation_family,
+            constellation_map,
+        )
+        .await;
+
+        let entity_requests = crate::agent::control_plane_shadow::entity_binding_requests(
+            &self.verb_config_index,
+            &entry.verb,
+            &entry.args,
+        );
+        let entity_facts_map: Option<HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>> =
+            if entity_requests.is_empty() {
+                Some(HashMap::new())
+            } else {
+                let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool };
+                match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &entity_requests)
+                    .await
+                {
+                    Ok(facts) => Some(facts),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            verb = %entry.verb,
+                            "reseal_for_human_gate_resume: entity_facts lookup failed — re-seal skipped"
+                        );
+                        None
+                    }
+                }
+            };
+        let entity_binding = entity_facts_map.as_ref().map(|facts| {
+            crate::agent::control_plane_shadow::build_entity_binding_input(&entity_requests, facts)
+        });
+
+        let active_pack_id = session.active_pack_id();
+        let active_pack = active_pack_id
+            .as_deref()
+            .and_then(|id| self.pack_router.get_pack(id))
+            .map(|(manifest, _hash)| manifest.as_ref());
+        let pack_resolution = Some(crate::agent::control_plane_shadow::build_pack_resolution_input(
+            active_pack_id.as_deref().zip(active_pack),
+            &entry.verb,
+            !envelope.is_unavailable(),
+        ));
+
+        let dag_proof = crate::agent::control_plane_shadow::build_dag_proof_input(
+            self.gate_pipeline.as_ref(),
+            &entry.verb,
+            &entry.args,
+        )
+        .await;
+
+        let write_set = crate::agent::control_plane_shadow::build_write_set_input(
+            self.domain_metadata.as_deref(),
+            &entry.verb,
+            entry_id,
+            entity_requests.iter().map(|(id, _)| *id).collect(),
+        );
+        let stp_classifier = Some(crate::agent::control_plane_shadow::build_stp_classifier_input(
+            &entry.verb,
+            !entity_requests.is_empty(),
+        ));
+        let snapshot =
+            crate::agent::control_plane_shadow::build_decision_snapshot_input(entity_facts_map.as_ref());
+        let runbook_proof = Some(crate::agent::control_plane_shadow::build_runbook_proof_input(
+            entry.compiled_runbook_id.map(|id| id.0),
+        ));
+        let version_pinning = Some(crate::agent::control_plane_shadow::build_version_pinning_input());
+
+        let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
+            &envelope,
+            &entry.verb,
+            entry_id,
+            &actor,
+            entity_binding,
+            pack_resolution,
+            dag_proof,
+            write_set,
+            stp_classifier,
+            snapshot,
+            runbook_proof,
+            version_pinning,
+        );
+
+        let validity = ob_poc_control_plane::envelope::ValidityWindow::new(
+            chrono::Utc::now(),
+            chrono::Utc::now() + chrono::Duration::minutes(5),
+        );
+        let (report, decision) = ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+        let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+            session.id,
+            entry_id,
+            &entry.verb,
+            &report,
+            false,
+        );
+        let session_id = session.id;
+        let entry_verb = entry.verb.clone();
+        let pool = pool.clone();
+
+        // Synchronous, matching §4's requirement: this must complete
+        // before `handle_human_gate_approval` calls `execute_entry_via_gate`
+        // a few lines later, in the SAME resume, so the fresh row exists
+        // by consume time.
+        if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) = decision {
+            crate::agent::control_plane_envelope_store::persist_sealed(
+                &pool,
+                session_id,
+                entry_id,
+                &entry_verb,
+                envelope,
+            )
+            .await;
+        }
+
+        let outcome_for_audit = match &decision {
+            ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_) => {
+                ob_poc_control_plane::audit::DecisionOutcome::ApprovedStp
+            }
+            ob_poc_control_plane::decision::ControlPlaneDecision::RequiresHumanGate(_) => {
+                ob_poc_control_plane::audit::DecisionOutcome::HumanGate
+            }
+            ob_poc_control_plane::decision::ControlPlaneDecision::Rejected(_) => {
+                ob_poc_control_plane::audit::DecisionOutcome::Rejected
+            }
+        };
+        let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
+        let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
+            outcome: outcome_for_audit,
+            snapshot_ref,
+        };
+
+        // Best-effort audit trail, same fire-and-forget posture as
+        // `phase5_runtime_recheck`'s own spawn (W1 window discipline:
+        // additive only).
+        tokio::spawn(async move {
+            crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
+                let decision_id = envelope.id();
+                crate::agent::control_plane_audit::insert_audit_event(
+                    &pool,
+                    decision_id,
+                    session_id,
+                    &decision_evaluated,
+                )
+                .await;
+                crate::agent::control_plane_audit::insert_audit_event(
+                    &pool,
+                    decision_id,
+                    session_id,
+                    &ob_poc_control_plane::audit::AuditEvent::EnvelopeSealed {
+                        envelope_id: decision_id,
+                        expires_at: envelope.validity().not_after(),
+                    },
+                )
+                .await;
+            } else {
+                crate::agent::control_plane_audit::insert_audit_event(
+                    &pool,
+                    Uuid::new_v4(),
+                    session_id,
+                    &decision_evaluated,
+                )
+                .await;
+            }
+        });
     }
 
     /// Compile a runbook entry on-the-fly for entries that lack a `compiled_runbook_id`.
@@ -8393,6 +8628,12 @@ impl ReplOrchestratorV2 {
             );
             if let Some(pipeline) = self.gate_pipeline.clone() {
                 bridge = bridge.with_gate_pipeline(pipeline);
+            }
+            // G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001):
+            // real pool so `execute_step` can look up the sealed envelope
+            // `phase5_runtime_recheck` persisted for this step's entry_id.
+            if let Some(pool) = self.pool() {
+                bridge = bridge.with_pool(pool.clone());
             }
             match run_through_gate(
                 store,

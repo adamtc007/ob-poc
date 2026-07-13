@@ -191,6 +191,47 @@ mod tests {
         assert!(matches!(attest(&captured, &proof), AttestationOutcome::Breach { .. }));
     }
 
+    /// EOP-SESSION-CONTROLPLANE-G1-ITEM2-G2-ITEM2-IMPL-001, G2 item 2
+    /// STOP-condition finding: `ob-poc::agent::control_plane_shadow::
+    /// build_write_set_input` — the only existing production source of a
+    /// `WriteSetInput`/`WriteSetProof` for a verb's *declared* footprint
+    /// (used today for G7's shadow evaluation) — always sets
+    /// `allowed_columns: Vec::new()` (it has no per-column knowledge, only
+    /// `domain_metadata.yaml`'s per-verb `writes: [table, ...]` list). This
+    /// test proves what that means for `attest()`: a write with ANY
+    /// nonempty `columns` is unconditionally a breach against an
+    /// empty-`allowed_columns` proof, even when the table and entity_id
+    /// both match exactly. `crud_executor.rs`'s real `record_write` calls
+    /// (T10.3, the scope-based CRUD dispatch path `execute_verb_admitting_
+    /// envelope` actually uses) always report nonempty columns for a real
+    /// INSERT/UPDATE. Wiring `commit_attested` with a `WriteSetProof`
+    /// built this way would therefore misclassify *every* real, legitimate
+    /// CRUD write as a breach and roll it back — not "catch a real excess
+    /// write," but reject all writes for any verb with a declared write
+    /// footprint. This is the concrete, provable basis for this session's
+    /// STOP-condition finding on G2 item 2: `set_expected_write_set` is not
+    /// wired from `build_write_set_input`'s output.
+    #[test]
+    fn empty_allowed_columns_breaches_every_write_with_any_column_even_on_exact_table_and_entity_match() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec![],
+            vec!["ob-poc.cbus".to_string()],
+            vec![], // build_write_set_input's real, always-empty allowed_columns
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(), // exact table match
+            entity_id: Uuid::nil(),           // exact entity match
+            columns: vec!["status".to_string()], // any real, nonempty column list
+        }];
+        let outcome = attest(&captured, &proof);
+        assert!(
+            matches!(&outcome, AttestationOutcome::Breach { excess } if excess.len() == 1),
+            "expected a spurious breach on an otherwise-legitimate write: {outcome:?}"
+        );
+    }
+
     #[test]
     fn breach_collects_every_excess_write_not_just_the_first() {
         let proof = crate::write_set::tests_support::proof(

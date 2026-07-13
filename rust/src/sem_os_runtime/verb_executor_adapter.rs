@@ -657,27 +657,68 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             .await
         {
             Ok(result) => {
-                // EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2/V3:
-                // `DispatchCommitted` (G14, provenance `PostDispatch`),
-                // emitted same-transaction immediately before `commit()` —
-                // the design doc's intended call site is
-                // `set_expected_write_set` + `commit_attested`
-                // (G2 item 2), which has NOT landed yet (V3 finding: zero
-                // production caller, confirmed via
-                // `control_plane_metrics.rs`'s own "no production caller
-                // invokes commit_attested yet" comment and a repo-wide
-                // grep). Rather than silently implement G2 item 2's
-                // production wiring here (a separate, not-yet-reviewed
-                // work item), this records the honest degraded signal:
-                // `attested: false` (no compare-and-attest ran) and a
-                // `NotEvaluated` gate_outcome for WriteSetAttestation —
-                // real event, real row, real provenance, but not yet a
-                // real attestation. Only emitted when a real envelope was
-                // actually in play (`envelope_id_for_commit_audit` is
-                // `Some`) -- a plain CRUD/legacy commit with no envelope
-                // has no `decision_id` to correlate to and is out of this
-                // stream's scope by construction (§2: the stream is a
-                // per-decision lifecycle record, not a per-commit log).
+                // G2 item 2 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3, G2
+                // item 2 / EOP-SESSION-CONTROLPLANE-G1-ITEM2-G2-ITEM2-IMPL-001):
+                // this call site now goes through the REAL `commit_attested`
+                // (not plain `commit()`), closing half of item 2's "wire
+                // set_expected_write_set + commit_attested into the
+                // sequencer's commit path" instruction — but
+                // `set_expected_write_set` is deliberately NOT called here.
+                //
+                // STOP-condition finding (the plan's own named production-
+                // behavior-change guard): the only existing production
+                // source of a `WriteSetProof` for a verb's *declared*
+                // footprint, `agent::control_plane_shadow::
+                // build_write_set_input` (used today for G7's shadow
+                // evaluation, the same helper the plan's own item-2 text
+                // points at), always sets `allowed_columns: Vec::new()` —
+                // it has no per-column knowledge, only
+                // `domain_metadata.yaml`'s per-verb `writes: [table, ...]`
+                // list. `write_set_attestation::attest`'s column check is
+                // `write.columns.iter().all(|c| expected.allowed_columns()
+                // .contains(c))` — with an empty `allowed_columns`, this is
+                // `false` for ANY write reporting a nonempty column list,
+                // regardless of table/entity match. `crud_executor.rs`'s
+                // real `record_write` calls (T10.3, the scope-based CRUD
+                // dispatch this function's Branch 2/3 actually use) always
+                // report real, nonempty columns for a genuine INSERT/
+                // UPDATE. Wiring `set_expected_write_set` from
+                // `build_write_set_input`'s output here would therefore
+                // misclassify EVERY real, legitimate CRUD write as a
+                // breach and roll it back for any verb with a declared
+                // write footprint — not "a real excess write gets caught,"
+                // but "every write gets rejected." Proven empirically:
+                // `ob-poc-control-plane::write_set_attestation::tests::
+                // empty_allowed_columns_breaches_every_write_with_any_column_even_on_exact_table_and_entity_match`.
+                // Per the plan's own instruction ("if implementation finds
+                // any verb's behavior changing, stop and flag for
+                // architect review even with green tests"), this is NOT
+                // wired. `commit_attested(None, Some(verb_fqn))` with no
+                // `expected_write_set` attached is provably behaviour-
+                // identical to plain `commit()` (`PgTransactionScope::
+                // commit_attested`'s own early-return: `let Some(expected)
+                // = self.expected_write_set.clone() else { self.tx.commit
+                // ().await...; return Ok(()); }` — the `attest` comparison
+                // never runs, so `Breach` is structurally unreachable from
+                // this call site). This closes the transport half (the
+                // real function is now called, real per-commit
+                // attestation-store bookkeeping exists as a mechanism) and
+                // leaves the actual bound-comparison half open pending a
+                // correctly column-aware `WriteSetProof` derivation — a
+                // separate, reviewed follow-up, not silently forced
+                // through here.
+                //
+                // `DispatchCommitted` (G14, provenance `PostDispatch`)
+                // still records the honest degraded signal: `attested:
+                // false` (no compare-and-attest genuinely ran — nothing
+                // was compared, matching the STOP-condition finding above)
+                // and a `NotEvaluated` gate_outcome, unchanged from the
+                // prior session's V3 finding. Only emitted when a real
+                // envelope was actually in play (`envelope_id_for_commit_audit`
+                // is `Some`) -- a plain CRUD/legacy commit with no
+                // envelope has no `decision_id` to correlate to and is out
+                // of this stream's scope by construction (§2: the stream
+                // is a per-decision lifecycle record, not a per-commit log).
                 if let Some(envelope_id) = envelope_id_for_commit_audit {
                     let event = ob_poc_control_plane::audit::AuditEvent::DispatchCommitted {
                         attested: false,
@@ -694,11 +735,14 @@ impl VerbExecutionPort for ObPocVerbExecutor {
                     )
                     .await;
                 }
-                scope.commit().await.map_err(|e| {
-                    SemOsError::Internal(anyhow::anyhow!(
-                        "execute_verb_admitting_envelope({verb_fqn}): commit failed: {e}"
-                    ))
-                })?;
+                scope
+                    .commit_attested(None, Some(verb_fqn))
+                    .await
+                    .map_err(|e| {
+                        SemOsError::Internal(anyhow::anyhow!(
+                            "execute_verb_admitting_envelope({verb_fqn}): commit failed: {e}"
+                        ))
+                    })?;
                 Ok(result)
             }
             Err(e) => {
@@ -1682,6 +1726,7 @@ mod t4_1_envelope_admission_tests {
             crate::agent::control_plane_envelope_store::persist_sealed(
                 &pool,
                 Uuid::new_v4(),
+                Uuid::now_v7(),
                 "cbu.confirm",
                 &envelope
             )

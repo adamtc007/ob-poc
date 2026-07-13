@@ -144,6 +144,12 @@ pub struct VerbExecutionPortStepExecutor {
     /// Optional v1.3 gate-check pipeline. When `Some`, every step is
     /// gate-checked against cross-workspace constraints before dispatch.
     gate_pipeline: Option<GatePipeline>,
+    /// G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2, §3):
+    /// pool used for `lookup_sealed_handle` at the consume site. `None`
+    /// when the caller has no pool available (the two in-crate unit-test
+    /// constructors below) — `execute_step` then falls back to the prior
+    /// hardcoded `None` handle, unchanged behaviour for those tests.
+    pool: Option<sqlx::PgPool>,
 }
 
 /// Wiring for the v1.3 cross-workspace gate hook.
@@ -322,7 +328,18 @@ impl VerbExecutionPortStepExecutor {
             principal,
             session_id,
             gate_pipeline: None,
+            pool: None,
         }
+    }
+
+    /// G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2, §3):
+    /// attach the pool `execute_step` uses to look up the sealed envelope
+    /// `phase5_runtime_recheck` (or its `HumanGate` re-seal sibling)
+    /// persisted for this step's `entry_id` — replaces the hardcoded
+    /// `None` handle at the consume call site.
+    pub fn with_pool(mut self, pool: sqlx::PgPool) -> Self {
+        self.pool = Some(pool);
+        self
     }
 
     /// Attach a v1.3 gate-check pipeline. When set, each `execute_step`
@@ -535,10 +552,9 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
         // T6.1-style admission wiring (EOP-PLAN-CONTROLPLANE-001, PIR-D-002):
         // routes through the T4.1 envelope-admission entry point instead of
         // the bare `execute_verb`, mirroring the bus adapter's change
-        // (`ob-poc-web/src/bus_runtime.rs`). `envelope_id: None` — nothing at
-        // this call site issues a sealed `ExecutionEnvelope` yet, so with the
-        // production-default empty `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` this
-        // is behaviourally identical to the prior direct `execute_verb` call
+        // (`ob-poc-web/src/bus_runtime.rs`). With the production-default
+        // empty `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` this remains
+        // behaviourally identical to the prior direct `execute_verb` call
         // (`NotEnforced`) for every verb dispatched through the runbook step
         // executor (Path A) — zero dispatch-outcome change. This closes the
         // "Path A never reaches the admission mechanism at all" gap
@@ -548,9 +564,43 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
         // §4) — Path A's shadow-evaluation window for any gate wired here
         // still starts fresh from this commit per the runbook's §1
         // graduation-window rule, not before.
+        //
+        // G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2, §3):
+        // the envelope handle is no longer hardcoded `None` — it's looked
+        // up from `control_plane_envelopes` by `(session_id, step.step_id)`
+        // (`step.step_id` already equals the `RunbookEntry.id`/`entry_id`
+        // that `phase5_runtime_recheck` sealed under, `runbook/types.rs`'s
+        // own doc comment). `None` (no pool attached, no session id, or
+        // nothing sealed for this entry) degrades to the exact same
+        // pre-G1 behaviour this comment above already documents as
+        // dispatch-outcome-neutral while `ENFORCE_VERBS` stays empty.
+        let envelope_handle = match (&self.pool, self.session_id) {
+            (Some(pool), Some(session_id)) => {
+                match crate::agent::control_plane_envelope_store::lookup_sealed_handle(
+                    pool,
+                    session_id,
+                    step.step_id,
+                )
+                .await
+                {
+                    Ok(handle) => handle,
+                    Err(err) => {
+                        tracing::warn!(
+                            step_id = %step.step_id,
+                            verb = %step.verb,
+                            error = %err,
+                            "lookup_sealed_handle failed (degrading to no-envelope, matching pre-G1 NotEnforced behaviour)"
+                        );
+                        None
+                    }
+                }
+            }
+            _ => None,
+        };
+
         let outcome = match self
             .port
-            .execute_verb_admitting_envelope(&step.verb, args, &mut ctx, None)
+            .execute_verb_admitting_envelope(&step.verb, args, &mut ctx, envelope_handle)
             .await
         {
             Ok(result) => {
@@ -1006,5 +1056,209 @@ cross_workspace_constraints:
             .await
             .expect_err("violating transition must be rejected");
         assert!(err.starts_with("v1.3 gate violation [test_gate]:"));
+    }
+}
+
+/// G1 item 2/3 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001,
+/// EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 G1 item 3): the `t4_1`
+/// property set proven from the REAL Path A call site —
+/// `VerbExecutionPortStepExecutor::execute_step`, via its real
+/// `lookup_sealed_handle` wiring — not just from the adapter's own direct
+/// `execute_verb_admitting_envelope`/`admit_in_scope` tests (which prove
+/// the mechanism works when handed a handle directly, not that Path A
+/// actually threads one to it).
+#[cfg(all(test, feature = "database"))]
+mod g1_item2_path_a_tests {
+    use super::*;
+    use crate::runbook::executor::StepExecutor;
+    use crate::runbook::types::ExecutionMode;
+    use crate::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
+
+    async fn test_pool() -> sqlx::PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    // Same process-global-env-var guard pattern as
+    // `sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::EnvGuard`
+    // — duplicated locally (module-private there) rather than widened to
+    // cross-module visibility for one shared test helper.
+    static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+    impl EnvGuard {
+        fn set(verb_fqn: &str) -> Self {
+            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", verb_fqn);
+            Self(guard)
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
+        }
+    }
+
+    fn path_a_step(step_id: Uuid, verb: &str, args: &[(&str, String)]) -> CompiledStep {
+        CompiledStep {
+            step_id,
+            sentence: "g1 item 2/3 path a test".into(),
+            verb: verb.to_string(),
+            dsl: format!("({verb})"),
+            args: args.iter().map(|(k, v)| (k.to_string(), v.clone())).collect(),
+            depends_on: vec![],
+            execution_mode: ExecutionMode::Sync,
+            write_set: vec![],
+            verb_contract_snapshot_id: None,
+        }
+    }
+
+    /// G1 item 3, assertion 2 / item 4: an enforced verb with NOTHING
+    /// sealed for this step's entry_id is rejected at the real Path A
+    /// call site — `lookup_sealed_handle` genuinely finds no row (not a
+    /// stubbed `None`), and the rejection carries the same triage-
+    /// classifiable message `admit_in_scope` produces
+    /// (`verb_executor_adapter.rs`'s own `"{verb_fqn} is enforce-mode
+    /// gated... but no sealed envelope was presented"`), not a bare
+    /// dispatch error indistinguishable from an unrelated failure. Proves
+    /// the outage framing (G1 design doc §0) is real from Path A's own
+    /// call pattern, not hypothetical, and stays real until a verb
+    /// graduates.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn no_sealed_envelope_for_this_entry_is_rejected_with_triage_classification() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+        let session_id = Uuid::now_v7();
+        let entry_id = Uuid::now_v7();
+
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let bridge = VerbExecutionPortStepExecutor::new(
+            std::sync::Arc::new(executor),
+            sem_os_core::principal::Principal::system(),
+            Some(session_id),
+        )
+        .with_pool(pool.clone());
+
+        let step = path_a_step(entry_id, "cbu.confirm", &[]);
+        let outcome = bridge.execute_step(&step).await;
+
+        match outcome {
+            crate::runbook::executor::StepOutcome::Failed { error } => {
+                assert!(
+                    error.contains("is enforce-mode gated") && error.contains("no sealed envelope was presented"),
+                    "expected the real admit_in_scope RejectedNoEnvelope message, got: {error}"
+                );
+            }
+            other => panic!("expected Failed (no envelope sealed for this entry), got {other:?}"),
+        }
+    }
+
+    /// G1 item 3, assertions 1 and 3: end-to-end admit-and-consume from
+    /// the real Path A call site, then single-use — a second `execute_step`
+    /// call against the SAME compiled step (simulating a caller bug: no
+    /// intervening re-seal) finds the row `lookup_sealed_handle` would
+    /// return already consumed (excluded by its own `status = 'sealed'`
+    /// filter), so the *system's* behaviour is "the stale handle is
+    /// simply not found again," matching §5's "a retry naturally consumes
+    /// its own fresh envelope, never a stale one" — Path A never
+    /// manufactures a raw resubmission of the same handle by construction
+    /// (that raw-resubmission property is already proven at the adapter
+    /// level, `t4_1_envelope_admission_tests`; this test is about Path
+    /// A's actual call pattern).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn admits_consumes_once_from_path_a_then_a_bare_retry_finds_nothing_sealed() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        // `enforce_requires_states_precondition_with_mode` fail-closes on
+        // `NoSlotMapping` when no `SlotStateProvider` is wired (only the
+        // real server startup path wires one) — set fail-open so this
+        // isolated unit test can exercise a real dispatch; unrelated to
+        // G1/G2's own subject, this is the pre-existing lifecycle-gate
+        // mechanism, matching its own doc's documented escape hatch.
+        std::env::set_var("OB_POC_LIFECYCLE_GATE_MODE", "fail-open");
+        let pool = test_pool().await;
+        let session_id = Uuid::now_v7();
+        let entry_id = Uuid::now_v7();
+
+        // A real, currently-VALIDATION_PENDING cbu row — test setup
+        // against the dev database, matching this file's neighbouring
+        // live-DB tests' own convention (e.g. T10.2's pin-drift test
+        // reads real `cbus` rows directly).
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("at least one cbu row exists in the dev database");
+        sqlx::query(r#"UPDATE "ob-poc".cbus SET status = 'VALIDATION_PENDING' WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(&pool)
+            .await
+            .expect("reset fixture cbu to VALIDATION_PENDING");
+
+        // Seal a real envelope for this entry_id — the same shape
+        // `persist_sealed` writes (raw INSERT, matching this crate's
+        // existing t4_1-style live-DB test convention rather than
+        // reaching across the module boundary for a pub(crate) helper).
+        let envelope_id = Uuid::now_v7();
+        let content_hash_hex = "0".repeat(64); // 32 zero bytes, hex-encoded — matches EnvelopeHandle::content_hash_hex's format
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".control_plane_envelopes (
+                envelope_id, content_hash, session_id, entry_id, verb_fqn,
+                status, not_before, not_after
+            ) VALUES ($1, $2, $3, $4, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+            "#,
+        )
+        .bind(envelope_id)
+        .bind(&content_hash_hex)
+        .bind(session_id)
+        .bind(entry_id)
+        .execute(&pool)
+        .await
+        .expect("insert sealed envelope row");
+
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let bridge = VerbExecutionPortStepExecutor::new(
+            std::sync::Arc::new(executor),
+            sem_os_core::principal::Principal::system(),
+            Some(session_id),
+        )
+        .with_pool(pool.clone());
+
+        let step = path_a_step(entry_id, "cbu.confirm", &[("cbu-id", cbu_id.to_string())]);
+
+        // First attempt: lookup_sealed_handle finds the sealed row and
+        // threads it into execute_verb_admitting_envelope, which must
+        // consume it AND actually dispatch cbu.confirm successfully.
+        let outcome = bridge.execute_step(&step).await;
+        assert!(
+            matches!(outcome, crate::runbook::executor::StepOutcome::Completed { .. }),
+            "expected the first Path A dispatch to admit, consume, and complete: {outcome:?}"
+        );
+
+        let status: String =
+            sqlx::query_scalar(r#"SELECT status FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#)
+                .bind(envelope_id)
+                .fetch_one(&pool)
+                .await
+                .expect("envelope row still exists");
+        assert_eq!(status, "consumed", "the real Path A consume must have durably transitioned the row");
+
+        // Second attempt: same compiled step, no re-seal in between.
+        // lookup_sealed_handle's own `WHERE status = 'sealed'` filter
+        // means it finds nothing for this entry_id now — not a raw
+        // resubmission of the consumed handle, but the honest system
+        // behaviour Path A actually exhibits.
+        let outcome2 = bridge.execute_step(&step).await;
+        match outcome2 {
+            crate::runbook::executor::StepOutcome::Failed { error } => {
+                assert!(
+                    error.contains("no sealed envelope was presented"),
+                    "expected RejectedNoEnvelope (nothing sealed for this entry anymore), got: {error}"
+                );
+            }
+            other => panic!("expected the bare retry to be rejected, got {other:?}"),
+        }
+
+        std::env::remove_var("OB_POC_LIFECYCLE_GATE_MODE");
     }
 }

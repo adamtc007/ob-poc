@@ -476,7 +476,7 @@ mod tests {
         let window = now_window();
 
         let standalone_report = crate::evaluate_shadow(&ctx);
-        let standalone_decision = evaluate(&ctx, window.clone());
+        let standalone_decision = evaluate(&ctx, window);
         let (report, decision) = evaluate_with_report(&ctx, window);
 
         assert_eq!(report, standalone_report);
