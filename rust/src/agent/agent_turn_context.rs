@@ -61,10 +61,22 @@ impl OrchestratorContext {
             agent_mode: self.agent_mode,
             goals: self.goals.clone(),
             stage_focus: self.stage_focus.clone(),
-            scope: self.scope.as_ref().map(|s| AgentScopeContext {
-                client_group_id: s.client_group_id,
-                client_group_name: s.client_group_name.clone(),
-                persona: s.persona.clone(),
+            // Exhaustive destructure, not field access: if
+            // `crate::mcp::scope_resolution::ScopeContext` gains a field,
+            // this pattern fails to compile until the mapping accounts for
+            // it — same drift-safety `source`'s match already has, pushed
+            // down to struct fields per the architect's review note.
+            scope: self.scope.as_ref().map(|s| {
+                let crate::mcp::scope_resolution::ScopeContext {
+                    client_group_id,
+                    client_group_name,
+                    persona,
+                } = s.clone();
+                AgentScopeContext {
+                    client_group_id,
+                    client_group_name,
+                    persona,
+                }
             }),
         }
     }

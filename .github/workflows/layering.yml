@@ -7,9 +7,23 @@ on:
 
 jobs:
   guard:
-    name: ob-poc has no hard-coded path dep on extracted crates
+    name: ob-poc has no hard-coded path dep on extracted crates; ob-poc-agent has no edge back to ob-poc
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Rust toolchain (for cargo tree, Rule 2)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-layering-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-layering-
       - name: Layering guard
         run: bash scripts/check-layering.sh
