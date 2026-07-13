@@ -600,7 +600,13 @@ impl super::executor::StepExecutor for VerbExecutionPortStepExecutor {
 
         let outcome = match self
             .port
-            .execute_verb_admitting_envelope(&step.verb, args, &mut ctx, envelope_handle)
+            .execute_verb_admitting_envelope(
+                &step.verb,
+                args,
+                &mut ctx,
+                envelope_handle,
+                ob_poc_types::ExecutionPath::RunbookSequencer,
+            )
             .await
         {
             Ok(result) => {

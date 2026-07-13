@@ -167,7 +167,13 @@ impl VerbExecutor for ObPocVerbAdapter {
         // decision, not a default flipped silently inside this adapter.
         let result = self
             .executor
-            .execute_verb_admitting_envelope(local_verb_id, args, &mut ctx, None)
+            .execute_verb_admitting_envelope(
+                local_verb_id,
+                args,
+                &mut ctx,
+                None,
+                ob_poc_types::ExecutionPath::BusFederated,
+            )
             .await
             .map_err(map_executor_error)?;
 

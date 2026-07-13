@@ -137,6 +137,7 @@ impl ObPocVerbExecutor {
         &self,
         verb_fqn: &str,
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        path: ob_poc_types::ExecutionPath,
         conn: &mut sqlx::PgConnection,
     ) -> dsl_runtime::Result<Option<ob_poc_control_plane::snapshot::SnapshotPins>> {
         // T11.F.2 slice 4: G1's definitional floor, mirroring slice 2's
@@ -181,11 +182,18 @@ impl ObPocVerbExecutor {
         // existing convention.
         let envelope_id_for_audit = envelope_handle.as_ref().map(|h| h.id());
 
-        let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
+        let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env()
+            .map_err(|e| {
+                SemOsError::Internal(anyhow::anyhow!(
+                    "OB_POC_CONTROL_PLANE_ENFORCE_VERBS is unparseable — refusing to guess at \
+                     enforcement state: {e}"
+                ))
+            })?;
         let (decision, pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
             conn,
             &enforced,
             verb_fqn,
+            path,
             envelope_handle,
         )
         .await
@@ -258,6 +266,7 @@ impl ObPocVerbExecutor {
         verb_fqn: &str,
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
+        path: ob_poc_types::ExecutionPath,
         scope: &mut dyn dsl_runtime::TransactionScope,
     ) -> dsl_runtime::Result<VerbExecutionResult> {
         let (domain, verb) = split_fqn(verb_fqn)?;
@@ -359,8 +368,21 @@ impl ObPocVerbExecutor {
 
         // Branch 3: default path — DslExecutor dispatch chain via the
         // scope-accepting sibling (T9.2 §3 Branch 3: trivial swap).
+        //
+        // G3 §3(e) (double-admission guard): this fallthrough reaches the
+        // SAME dsl_v2 seam (`execute_verb_in_scope`) that G4 instruments
+        // directly for Path B/C. Tag the converted context with the SAME
+        // `path` this outer call was already admitted under, and record
+        // that proof (`already_admitted_for`) so the seam's own admission
+        // check recognises this dispatch already cleared `EnforcedVerbs`
+        // and skips re-checking it — not a distinct "fallthrough" tag,
+        // per the design doc's own reasoning (a distinct tag would
+        // reintroduce, one layer down, the exact asymmetry AD-2(b) fixes
+        // one layer up).
         let vc = build_verb_call(&domain, &verb, &args);
         let mut exec_ctx = to_dsl_context(ctx);
+        exec_ctx.execution_path = path;
+        exec_ctx.already_admitted_for = Some(path);
 
         let result = self
             .executor
@@ -594,6 +616,7 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        path: ob_poc_types::ExecutionPath,
     ) -> dsl_runtime::Result<VerbExecutionResult> {
         use crate::sequencer_tx::PgTransactionScope;
         use dsl_runtime::TransactionScope;
@@ -613,7 +636,7 @@ impl VerbExecutionPort for ObPocVerbExecutor {
         let envelope_id_for_commit_audit = envelope_handle.as_ref().map(|h| h.id());
 
         let pins = match self
-            .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
+            .admit_in_scope(verb_fqn, envelope_handle, path, scope.executor())
             .await
         {
             Ok(pins) => pins,
@@ -653,7 +676,7 @@ impl VerbExecutionPort for ObPocVerbExecutor {
 
         let scope_dyn: &mut dyn dsl_runtime::TransactionScope = &mut scope;
         match self
-            .execute_verb_in_open_scope(verb_fqn, args, ctx, scope_dyn)
+            .execute_verb_in_open_scope(verb_fqn, args, ctx, path, scope_dyn)
             .await
         {
             Ok(result) => {
@@ -1382,9 +1405,29 @@ mod t4_1_envelope_admission_tests {
         envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
         pool: &sqlx::PgPool,
     ) -> dsl_runtime::Result<Option<ob_poc_control_plane::snapshot::SnapshotPins>> {
+        admit_in_scope_committed_on_path(
+            executor,
+            verb_fqn,
+            envelope_handle,
+            ob_poc_types::ExecutionPath::RunbookSequencer,
+            pool,
+        )
+        .await
+    }
+
+    /// Path-parameterised sibling of [`admit_in_scope_committed`] — added
+    /// for G3's per-path tests (§5 items 6-7 of
+    /// `EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001`).
+    async fn admit_in_scope_committed_on_path(
+        executor: &ObPocVerbExecutor,
+        verb_fqn: &str,
+        envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        path: ob_poc_types::ExecutionPath,
+        pool: &sqlx::PgPool,
+    ) -> dsl_runtime::Result<Option<ob_poc_control_plane::snapshot::SnapshotPins>> {
         let mut scope = PgTransactionScope::begin(pool).await.expect("begin scope");
         let result = executor
-            .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
+            .admit_in_scope(verb_fqn, envelope_handle, path, scope.executor())
             .await;
         match &result {
             Ok(_) => scope.commit().await.expect("commit"),
@@ -1585,7 +1628,7 @@ mod t4_1_envelope_admission_tests {
         let mut ctx = VerbExecutionContext::new(sem_os_core::principal::Principal::system());
 
         let dispatch_err = executor
-            .execute_verb_admitting_envelope("cbu.confirm", serde_json::json!({}), &mut ctx, Some(handle))
+            .execute_verb_admitting_envelope("cbu.confirm", serde_json::json!({}), &mut ctx, Some(handle), ob_poc_types::ExecutionPath::RunbookSequencer)
             .await
             .expect_err("dispatching cbu.confirm with no args must fail");
         assert!(
@@ -1639,7 +1682,7 @@ mod t4_1_envelope_admission_tests {
         let mut ctx = VerbExecutionContext::new(sem_os_core::principal::Principal::system());
 
         let err = executor
-            .execute_verb_admitting_envelope("nonexistent.verb", serde_json::json!({}), &mut ctx, Some(handle))
+            .execute_verb_admitting_envelope("nonexistent.verb", serde_json::json!({}), &mut ctx, Some(handle), ob_poc_types::ExecutionPath::RunbookSequencer)
             .await
             .expect_err("an unregistered verb must be floor-rejected");
         assert!(
@@ -1742,6 +1785,7 @@ mod t4_1_envelope_admission_tests {
                 serde_json::json!({ "cbu-id": cbu_id.to_string() }),
                 &mut ctx,
                 Some(handle),
+                ob_poc_types::ExecutionPath::RunbookSequencer,
             )
             .await
             .expect_err("a stale pinned row_version must reject at admission, before dispatch");

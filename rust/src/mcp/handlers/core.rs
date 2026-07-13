@@ -1056,7 +1056,7 @@ impl ToolHandlers {
         // the plan before dispatch. This tool constructs `DslExecutor`
         // directly (`build_dsl_executor()`), bypassing the bus/runbook
         // admission checkpoints entirely — closes that gap.
-        if let Err(e) = crate::agent::control_plane_envelope_store::admit_plan(&self.pool, &plan)
+        if let Err(e) = crate::agent::control_plane_envelope_store::admit_plan(&self.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
             .await
         {
             return Err(anyhow!("{e}"));

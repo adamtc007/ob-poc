@@ -35,6 +35,14 @@ pub struct RealDslExecutor {
     /// dispatch post-Phase-5c-migrate slice #80 — without it, plugin verbs
     /// fail with an actionable "no SemOsVerbOp registered" error.
     sem_os_ops: Option<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+    /// G3/G4 (`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` §3(d)):
+    /// which RR-2 ingress path this instance was constructed to serve.
+    /// Set once at construction (`.with_execution_path`), not per-dispatch
+    /// — matches every `main.rs` construction site tagging itself once at
+    /// wiring time. Default `DslDirect` — every construction site this
+    /// design's author missed fails safe into the Path-B umbrella tag
+    /// rather than an unset/panicking state.
+    execution_path: ob_poc_types::ExecutionPath,
 }
 
 impl RealDslExecutor {
@@ -44,6 +52,7 @@ impl RealDslExecutor {
             allow_durable_direct: false,
             service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
             sem_os_ops: None,
+            execution_path: ob_poc_types::ExecutionPath::DslDirect,
         }
     }
 
@@ -67,6 +76,14 @@ impl RealDslExecutor {
         ops: std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>,
     ) -> Self {
         self.sem_os_ops = Some(ops);
+        self
+    }
+
+    /// G3/G4: tag this instance with the RR-2 ingress path it serves.
+    /// Called once at construction (see `main.rs`'s per-instance call
+    /// sites) — never per-dispatch.
+    pub fn with_execution_path(mut self, path: ob_poc_types::ExecutionPath) -> Self {
+        self.execution_path = path;
         self
     }
 }
@@ -104,7 +121,8 @@ impl RealDslExecutor {
         &self,
         plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
     ) -> Result<(), String> {
-        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, plan).await
+        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, plan, self.execution_path)
+            .await
     }
 
     /// Shared parse → compile → build context path used by both the
@@ -117,6 +135,9 @@ impl RealDslExecutor {
             ExecutionContext::new()
         };
         ctx.execution_id = Uuid::new_v4();
+        // G3/G4: tag this dispatch's context with the instance's ingress
+        // path — read at the seam (`dsl_v2::executor::execute_verb_in_scope`).
+        ctx.execution_path = self.execution_path;
 
         let mut executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
             .with_services(self.service_registry.clone());

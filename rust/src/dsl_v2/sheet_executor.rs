@@ -573,7 +573,7 @@ impl<'a> SheetExecutor<'a> {
                 .map_err(|e| anyhow::anyhow!("Parse error: {}", e))?;
             let plan = super::execution_plan::compile(&ast)
                 .map_err(|e| anyhow::anyhow!("Compile error: {:?}", e))?;
-            crate::agent::control_plane_envelope_store::admit_plan(self.pool, &plan)
+            crate::agent::control_plane_envelope_store::admit_plan(self.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?;
         }

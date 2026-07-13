@@ -397,7 +397,7 @@ impl BatchExecutor {
         // verb in the plan before dispatch. This executor constructs
         // `DslExecutor` directly, bypassing the bus/runbook admission
         // checkpoints entirely — closes that gap.
-        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, &plan)
+        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
             .await
             .map_err(|e| anyhow!(e))?;
 

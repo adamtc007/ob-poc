@@ -2450,7 +2450,7 @@ async fn execute_session_dsl_raw(
     // plan before dispatch. This route constructs `state.dsl_v2_executor`
     // directly (`agent_state.rs`), bypassing the bus/runbook admission
     // checkpoints entirely — closes that gap.
-    if let Err(e) = crate::agent::control_plane_envelope_store::admit_plan(&state.pool, &plan)
+    if let Err(e) = crate::agent::control_plane_envelope_store::admit_plan(&state.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
         .await
     {
         return Ok(Json(ExecuteResponse {

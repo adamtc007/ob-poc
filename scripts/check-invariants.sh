@@ -202,12 +202,67 @@ gate_e2() {
   # finding #2).
   _e2_check_path "Path A (runbook/step_executor_bridge.rs)" rust/src/runbook/step_executor_bridge.rs
 
-  # Path B: raw DSL execute handler.
-  _e2_check_path "Path B (api/agent_routes.rs raw execute)" rust/src/api/agent_routes.rs
-
-  # Path C: BPMN/workflow dispatch.
-  _e2_check_path "Path C (bpmn_integration/dispatcher.rs, domain_ops/bpmn_controller_ops.rs)" \
-    rust/src/bpmn_integration/dispatcher.rs rust/src/domain_ops/bpmn_controller_ops.rs
+  # Path B/C (G4, EOP-SESSION-CONTROLPLANE-G4-IMPL-001): superseded the
+  # pre-G3/G4 placeholder check below, which pointed at
+  # api/agent_routes.rs and bpmn_integration/dispatcher.rs/domain_ops/
+  # bpmn_controller_ops.rs and looked for a literal
+  # `execute_verb_admitting_envelope` call in THOSE files. That shape
+  # never matched reality: G3's ratified design doc
+  # (EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001 §2.3, re-
+  # confirmed in the G4 session) found Path B and Path C converge on
+  # ONE shared seam, `dsl_v2::executor::DslExecutor::execute_verb_in_scope`
+  # (rust/src/dsl_v2/executor.rs) — every `admit_plan`/`RealDslExecutor`
+  # ingress point (agent_routes.rs's raw-execute route, batch/sheet
+  # executors, the MCP dsl_execute tool, bpmn_integration's
+  # WorkflowDispatcher-wrapped RealDslExecutor) reaches this same
+  # function per-step via `execute_plan`/`execute_plan_atomic_in_scope`,
+  # never by calling a bare, unguarded verb-dispatch primitive directly.
+  # G4 wired the per-step admission call INSIDE that seam (not as a
+  # separate wrapper function callers must remember to call), so the
+  # correct structural check is: the seam itself contains the admission
+  # call, and it runs unconditionally before all three dispatch branches
+  # (SemOS-native / CRUD / generic). _e2_check_seam below checks that
+  # shape directly, replacing the old per-ingress-file heuristic for B/C
+  # only (A/D's wrapper-function shape is unchanged and still checked by
+  # _e2_check_path above/below).
+  _e2_check_seam() {
+    local label="$1"
+    local f="rust/src/dsl_v2/executor.rs"
+    if [ ! -f "$f" ]; then
+      echo "    $label: FAIL — seam file not found: $f"
+      struct_fail=$((struct_fail + 1))
+      return
+    fi
+    # The admission call must appear inside execute_verb_in_scope,
+    # between its `ENTER` trace and the plugin/CRUD dispatch branches —
+    # approximated here by requiring check_admission_in_scope to appear
+    # after execute_verb_in_scope's signature and before its first
+    # runtime_registry().get(...) lookup (the first line of real
+    # dispatch logic), within the same function body.
+    local fn_start admit_line first_dispatch_line
+    fn_start="$(rg -n 'pub\(crate\) async fn execute_verb_in_scope' "$f" | head -1 | cut -d: -f1)"
+    if [ -z "$fn_start" ]; then
+      echo "    $label: FAIL — execute_verb_in_scope not found in $f"
+      struct_fail=$((struct_fail + 1))
+      return
+    fi
+    admit_line="$(tail -n "+$fn_start" "$f" | rg -n 'check_admission_in_scope' | head -1 | cut -d: -f1)"
+    first_dispatch_line="$(tail -n "+$fn_start" "$f" | rg -n 'let runtime_verb = runtime_registry\(\)' | head -1 | cut -d: -f1)"
+    if [ -z "$admit_line" ] || [ -z "$first_dispatch_line" ]; then
+      echo "    $label: FAIL — admission call or dispatch-branch anchor not found inside execute_verb_in_scope"
+      struct_fail=$((struct_fail + 1))
+      return
+    fi
+    if [ "$admit_line" -lt "$first_dispatch_line" ]; then
+      echo "    $label: admitting entry point present — $f:$((fn_start + admit_line - 1)) (execute_verb_in_scope, before dispatch branches at $f:$((fn_start + first_dispatch_line - 1)))"
+      echo "    $label: single shared seam — every execute_plan/execute_plan_atomic_in_scope step reaches this same admission call, no bare-bypass check applicable to this shape (see comment above)"
+    else
+      echo "    $label: FAIL — check_admission_in_scope found but AFTER the dispatch-branch anchor (not gating unconditionally)"
+      struct_fail=$((struct_fail + 1))
+    fi
+  }
+  _e2_check_seam "Path B (dsl_v2 seam, umbrella: agent_routes.rs raw-execute + batch/sheet executors + MCP dsl_execute + no-BPMN executor_v2 fallback)"
+  _e2_check_seam "Path C (dsl_v2 seam, WorkflowDispatcher-wrapped RealDslExecutor instance)"
 
   # Path D: bus adapter.
   _e2_check_path "Path D (ob-poc-web/src/bus_runtime.rs)" rust/crates/ob-poc-web/src/bus_runtime.rs
@@ -237,6 +292,20 @@ gate_e2() {
     echo "    Run manually: DATABASE_URL=... cargo test -p ob-poc --lib --features database t4_1_envelope_admission_tests -- --ignored"
   else
     (cd rust && cargo test -p ob-poc --lib --features database t4_1_envelope_admission_tests -- --ignored --nocapture 2>&1) | tail -30
+  fi
+
+  # G4 (EOP-SESSION-CONTROLPLANE-G4-IMPL-001): the dsl_v2 seam's own
+  # atomicity tests (item 4 — rollback-of-consume on dispatch failure,
+  # pin-drift rejection leaves the envelope reconsumable) and the
+  # double-admission guard's hard test (item 2 — Branch-3 fallthrough
+  # must neither double-consume nor reject a properly admitted
+  # dispatch), the Path B/C equivalents of Path D's t4_1 suite above.
+  echo "  -- dynamic (live DB, Path B/C dsl_v2 seam atomicity + double-admission guard) --"
+  if [ -z "${DATABASE_URL:-}" ]; then
+    echo "    SKIPPED — DATABASE_URL not set (these are #[ignore]-gated live-DB tests)"
+    echo "    Run manually: DATABASE_URL=... cargo test -p ob-poc --lib --features database g4_seam_admission_tests -- --ignored"
+  else
+    (cd rust && cargo test -p ob-poc --lib --features database g4_seam_admission_tests -- --ignored --nocapture 2>&1) | tail -30
   fi
 
   echo "  Structural failures: $struct_fail / 4 paths"

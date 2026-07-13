@@ -12,36 +12,100 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use ob_poc_control_plane::envelope::{EnvelopeHandle, ExecutionEnvelope};
+pub(crate) use ob_poc_types::ExecutionPath;
 
-/// T4.1: which verb FQNs, if any, require a consumed sealed envelope before
-/// `ObPocVerbExecutor::execute_verb_admitting_envelope` will dispatch them.
+/// G3 (`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` §3(b)): a
+/// verb's enforcement scope — every path (backward-compatible default for
+/// any verb pinned before this design landed) or a named subset.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PathScope {
+    /// Untagged entry — enforced on every path.
+    All,
+    /// Tagged entry — enforced only on the named paths.
+    Only(std::collections::HashSet<ExecutionPath>),
+}
+
+/// A single malformed entry in `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` fails
+/// the WHOLE config, not just the bad entry (G3 §3(c) — fail-closed for a
+/// safety-relevant admission gate; a caller that gets `Err` here must
+/// reject every dispatch it would otherwise have to guess about, never
+/// silently degrade to "nothing enforced").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct EnforcedVerbsParseError(pub(crate) String);
+
+impl std::fmt::Display for EnforcedVerbsParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "malformed OB_POC_CONTROL_PLANE_ENFORCE_VERBS entry: {}", self.0)
+    }
+}
+
+impl std::error::Error for EnforcedVerbsParseError {}
+
+/// T4.1 → G3: which verb FQNs, if any, require a consumed sealed envelope
+/// before dispatch on a given [`ExecutionPath`] will proceed.
 ///
 /// Default (empty) is the plan's shadow-first posture (§0): every path
 /// stays envelope-less/legacy until it individually graduates. Graduation
 /// criterion (§0): ≥500 production shadow evaluations with zero divergence
 /// between the control plane's shadow decision and the legacy outcome, or
 /// every divergence triaged as a legacy defect — nothing has accumulated
-/// that evidence yet (T2.7 shadow wiring only just landed), so this set is
-/// deliberately never populated by this tranche's own code; it exists so
-/// the mechanism is real and testable, not so any path graduates today.
+/// that evidence yet, so this set is deliberately never populated by this
+/// tranche's own code; it exists so the mechanism is real and testable,
+/// not so any path graduates today.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct EnforcedVerbs(std::collections::HashSet<String>);
+pub(crate) struct EnforcedVerbs(std::collections::HashMap<String, PathScope>);
 
 impl EnforcedVerbs {
-    /// Reads `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` (comma-separated FQNs).
-    /// Unset/empty — the production default — enforces nothing.
-    pub(crate) fn from_env() -> Self {
+    /// Reads `OB_POC_CONTROL_PLANE_ENFORCE_VERBS`
+    /// (`entry (',' entry)*`, `entry = verb-fqn (':' path-tag ('|' path-tag)*)?`,
+    /// `path-tag = 'A' | 'B' | 'C' | 'D'` — G3 §3(c)). Unset/empty — the
+    /// production default — enforces nothing. A single malformed entry
+    /// (unrecognised letter, empty tag list after a colon) fails the WHOLE
+    /// parse — see [`EnforcedVerbsParseError`].
+    pub(crate) fn from_env() -> Result<Self, EnforcedVerbsParseError> {
         let raw = std::env::var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS").unwrap_or_default();
-        Self(
-            raw.split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect(),
-        )
+        Self::parse(&raw)
     }
 
-    pub(crate) fn is_enforced(&self, verb_fqn: &str) -> bool {
-        self.0.contains(verb_fqn)
+    /// Pure-parameter core of [`Self::from_env`] — testable without
+    /// mutating process-global env state.
+    pub(crate) fn parse(raw: &str) -> Result<Self, EnforcedVerbsParseError> {
+        let mut map = std::collections::HashMap::new();
+        for entry in raw.split(',') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                continue;
+            }
+            match entry.split_once(':') {
+                None => {
+                    map.insert(entry.to_string(), PathScope::All);
+                }
+                Some((verb_fqn, tags_raw)) => {
+                    if verb_fqn.is_empty() {
+                        return Err(EnforcedVerbsParseError(entry.to_string()));
+                    }
+                    let mut tags = std::collections::HashSet::new();
+                    for letter in tags_raw.split('|') {
+                        let path = ExecutionPath::from_letter(letter)
+                            .ok_or_else(|| EnforcedVerbsParseError(entry.to_string()))?;
+                        tags.insert(path);
+                    }
+                    if tags.is_empty() {
+                        return Err(EnforcedVerbsParseError(entry.to_string()));
+                    }
+                    map.insert(verb_fqn.to_string(), PathScope::Only(tags));
+                }
+            }
+        }
+        Ok(Self(map))
+    }
+
+    pub(crate) fn is_enforced(&self, verb_fqn: &str, path: ExecutionPath) -> bool {
+        match self.0.get(verb_fqn) {
+            None => false,
+            Some(PathScope::All) => true,
+            Some(PathScope::Only(paths)) => paths.contains(&path),
+        }
     }
 }
 
@@ -91,9 +155,10 @@ pub(crate) async fn check_admission(
     pool: &sqlx::PgPool,
     enforced: &EnforcedVerbs,
     verb_fqn: &str,
+    path: ExecutionPath,
     envelope_handle: Option<EnvelopeHandle>,
 ) -> anyhow::Result<AdmissionDecision> {
-    if !enforced.is_enforced(verb_fqn) {
+    if !enforced.is_enforced(verb_fqn, path) {
         return Ok(AdmissionDecision::NotEnforced);
     }
     let Some(handle) = envelope_handle else {
@@ -128,9 +193,10 @@ pub(crate) async fn check_admission_in_scope(
     conn: &mut sqlx::PgConnection,
     enforced: &EnforcedVerbs,
     verb_fqn: &str,
+    path: ExecutionPath,
     envelope_handle: Option<EnvelopeHandle>,
 ) -> anyhow::Result<(AdmissionDecision, Option<ob_poc_control_plane::snapshot::SnapshotPins>)> {
-    if !enforced.is_enforced(verb_fqn) {
+    if !enforced.is_enforced(verb_fqn, path) {
         return Ok((AdmissionDecision::NotEnforced, None));
     }
     let Some(handle) = envelope_handle else {
@@ -189,8 +255,10 @@ pub(crate) enum ConsumeOutcome {
 pub(crate) async fn admit_plan(
     pool: &sqlx::PgPool,
     plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
+    path: ExecutionPath,
 ) -> Result<(), String> {
-    admit_plan_checked(pool, &EnforcedVerbs::from_env(), plan).await
+    let enforced = EnforcedVerbs::from_env().map_err(|e| e.to_string())?;
+    admit_plan_checked(pool, &enforced, plan, path).await
 }
 
 /// Pure-parameter core of [`admit_plan`] — checks every verb in `plan`
@@ -215,6 +283,7 @@ async fn admit_plan_checked(
     pool: &sqlx::PgPool,
     enforced: &EnforcedVerbs,
     plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
+    path: ExecutionPath,
 ) -> Result<(), String> {
     for step in &plan.steps {
         let verb_fqn = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
@@ -235,7 +304,7 @@ async fn admit_plan_checked(
             return Err(format!("T11.F floor rejection [G1]: {reason}"));
         }
 
-        let decision = check_admission(pool, enforced, &verb_fqn, None)
+        let decision = check_admission(pool, enforced, &verb_fqn, path, None)
             .await
             .map_err(|e| format!("envelope admission check failed for {verb_fqn}: {e}"))?;
         match decision {
@@ -602,22 +671,130 @@ pub(crate) async fn void(pool: &sqlx::PgPool, envelope_id: Uuid, reason: &str) -
 
 #[cfg(test)]
 mod enforced_verbs_tests {
-    use super::EnforcedVerbs;
+    use super::{EnforcedVerbs, ExecutionPath, PathScope};
 
+    /// Pre-G3 test semantics: "enforced everywhere" — `PathScope::All` for
+    /// each entry. Same assertions the pre-existing tests made; only the
+    /// call signature changed (§5 item 8 of the G3 design doc).
     fn set(verbs: &[&str]) -> EnforcedVerbs {
-        EnforcedVerbs(verbs.iter().map(|s| s.to_string()).collect())
+        EnforcedVerbs(
+            verbs
+                .iter()
+                .map(|s| (s.to_string(), PathScope::All))
+                .collect(),
+        )
+    }
+
+    fn set_scoped(entries: &[(&str, &[ExecutionPath])]) -> EnforcedVerbs {
+        EnforcedVerbs(
+            entries
+                .iter()
+                .map(|(fqn, paths)| {
+                    (
+                        fqn.to_string(),
+                        PathScope::Only(paths.iter().copied().collect()),
+                    )
+                })
+                .collect(),
+        )
     }
 
     #[test]
     fn empty_set_enforces_nothing() {
-        assert!(!EnforcedVerbs::default().is_enforced("cbu.confirm"));
+        for path in ExecutionPath::ALL {
+            assert!(!EnforcedVerbs::default().is_enforced("cbu.confirm", path));
+        }
+    }
+
+    /// §5 item 1: the core backward-compat claim — an untagged entry
+    /// enforces on every path.
+    #[test]
+    fn untagged_entry_enforces_on_every_path() {
+        let enforced = set(&["cbu.confirm"]);
+        for path in ExecutionPath::ALL {
+            assert!(enforced.is_enforced("cbu.confirm", path));
+        }
+        assert!(!enforced.is_enforced("cbu.reject", ExecutionPath::RunbookSequencer));
+    }
+
+    /// §5 item 2: a tagged entry enforces only on the named path(s).
+    #[test]
+    fn tagged_entry_enforces_only_named_path() {
+        let enforced = set_scoped(&[("cbu.confirm", &[ExecutionPath::RunbookSequencer])]);
+        assert!(enforced.is_enforced("cbu.confirm", ExecutionPath::RunbookSequencer));
+        assert!(!enforced.is_enforced("cbu.confirm", ExecutionPath::DslDirect));
+        assert!(!enforced.is_enforced("cbu.confirm", ExecutionPath::WorkflowDispatched));
+        assert!(!enforced.is_enforced("cbu.confirm", ExecutionPath::BusFederated));
+    }
+
+    /// §5 item 3: multi-tag entry.
+    #[test]
+    fn multi_tag_entry_enforces_named_paths_only() {
+        let enforced = set_scoped(&[(
+            "cbu.confirm",
+            &[ExecutionPath::RunbookSequencer, ExecutionPath::BusFederated],
+        )]);
+        assert!(enforced.is_enforced("cbu.confirm", ExecutionPath::RunbookSequencer));
+        assert!(enforced.is_enforced("cbu.confirm", ExecutionPath::BusFederated));
+        assert!(!enforced.is_enforced("cbu.confirm", ExecutionPath::DslDirect));
+        assert!(!enforced.is_enforced("cbu.confirm", ExecutionPath::WorkflowDispatched));
+    }
+
+    // ── §3(c) env-var grammar ────────────────────────────────────────────
+
+    #[test]
+    fn parse_untagged_entry_is_all_paths() {
+        let parsed = EnforcedVerbs::parse("cbu.confirm").unwrap();
+        for path in ExecutionPath::ALL {
+            assert!(parsed.is_enforced("cbu.confirm", path));
+        }
     }
 
     #[test]
-    fn listed_verb_is_enforced_others_are_not() {
-        let enforced = set(&["cbu.confirm"]);
-        assert!(enforced.is_enforced("cbu.confirm"));
-        assert!(!enforced.is_enforced("cbu.reject"));
+    fn parse_single_tag() {
+        let parsed = EnforcedVerbs::parse("cbu.confirm:A").unwrap();
+        assert!(parsed.is_enforced("cbu.confirm", ExecutionPath::RunbookSequencer));
+        assert!(!parsed.is_enforced("cbu.confirm", ExecutionPath::DslDirect));
+    }
+
+    #[test]
+    fn parse_multi_tag() {
+        let parsed = EnforcedVerbs::parse("cbu.confirm:A|D").unwrap();
+        assert!(parsed.is_enforced("cbu.confirm", ExecutionPath::RunbookSequencer));
+        assert!(parsed.is_enforced("cbu.confirm", ExecutionPath::BusFederated));
+        assert!(!parsed.is_enforced("cbu.confirm", ExecutionPath::DslDirect));
+        assert!(!parsed.is_enforced("cbu.confirm", ExecutionPath::WorkflowDispatched));
+    }
+
+    #[test]
+    fn parse_mixed_untagged_and_tagged() {
+        let parsed = EnforcedVerbs::parse("cbu.confirm,kyc.person.approve:A").unwrap();
+        for path in ExecutionPath::ALL {
+            assert!(parsed.is_enforced("cbu.confirm", path));
+        }
+        assert!(parsed.is_enforced("kyc.person.approve", ExecutionPath::RunbookSequencer));
+        assert!(!parsed.is_enforced("kyc.person.approve", ExecutionPath::DslDirect));
+    }
+
+    /// §5 item 4: a malformed tag fails the WHOLE config, not just the
+    /// entry — `cbu.confirm`'s otherwise-valid `A` tag must NOT be
+    /// silently applied.
+    #[test]
+    fn malformed_tag_fails_whole_config_not_just_the_entry() {
+        let result = EnforcedVerbs::parse("cbu.confirm:A,kyc.person.approve:Z");
+        assert!(result.is_err(), "unrecognised path letter must fail the whole parse");
+    }
+
+    /// §5 item 5: empty tag list after a colon fails.
+    #[test]
+    fn empty_tag_after_colon_fails() {
+        assert!(EnforcedVerbs::parse("cbu.confirm:").is_err());
+    }
+
+    #[test]
+    fn unset_env_var_parses_to_empty_enforced_set() {
+        let parsed = EnforcedVerbs::parse("").unwrap();
+        assert_eq!(parsed, EnforcedVerbs::default());
     }
 }
 
@@ -784,7 +961,7 @@ mod tests {
     async fn check_admission_not_enforced_when_verb_not_listed() {
         let pool = test_pool().await;
         let enforced = EnforcedVerbs::default(); // production default: nothing enforced
-        let decision = check_admission(&pool, &enforced, "cbu.confirm", None).await.unwrap();
+        let decision = check_admission(&pool, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, None).await.unwrap();
         assert_eq!(decision, AdmissionDecision::NotEnforced);
     }
 
@@ -792,8 +969,8 @@ mod tests {
     #[ignore = "requires DATABASE_URL"]
     async fn check_admission_rejects_enforced_verb_with_no_envelope() {
         let pool = test_pool().await;
-        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
-        let decision = check_admission(&pool, &enforced, "cbu.confirm", None).await.unwrap();
+        let enforced = EnforcedVerbs([("cbu.confirm".to_string(), PathScope::All)].into_iter().collect());
+        let decision = check_admission(&pool, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, None).await.unwrap();
         assert_eq!(decision, AdmissionDecision::RejectedNoEnvelope);
     }
 
@@ -806,14 +983,14 @@ mod tests {
         let handle = envelope.handle();
         assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
-        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
-        let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle))
+        let enforced = EnforcedVerbs([("cbu.confirm".to_string(), PathScope::All)].into_iter().collect());
+        let decision = check_admission(&pool, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, Some(handle))
             .await
             .unwrap();
         assert_eq!(decision, AdmissionDecision::Admitted);
 
         // Resubmission of the same envelope handle must be rejected, not silently re-admitted.
-        let decision = check_admission(&pool, &enforced, "cbu.confirm", Some(handle))
+        let decision = check_admission(&pool, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, Some(handle))
             .await
             .unwrap();
         assert_eq!(
@@ -953,24 +1130,24 @@ mod tests {
         let handle = envelope.handle();
         assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
-        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
+        let enforced = EnforcedVerbs([("cbu.confirm".to_string(), PathScope::All)].into_iter().collect());
 
         let mut tx = pool.begin().await.unwrap();
-        let (decision, _pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", Some(handle))
+        let (decision, _pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, Some(handle))
             .await
             .unwrap();
         tx.commit().await.unwrap();
         assert_eq!(decision, AdmissionDecision::Admitted);
 
         let mut tx = pool.begin().await.unwrap();
-        let (decision, _pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", None)
+        let (decision, _pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, None)
             .await
             .unwrap();
         tx.commit().await.unwrap();
         assert_eq!(decision, AdmissionDecision::RejectedNoEnvelope);
 
         let mut tx = pool.begin().await.unwrap();
-        let (decision, _pins) = check_admission_in_scope(&mut tx, &EnforcedVerbs::default(), "cbu.confirm", None)
+        let (decision, _pins) = check_admission_in_scope(&mut tx, &EnforcedVerbs::default(), "cbu.confirm", ExecutionPath::RunbookSequencer, None)
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -1025,9 +1202,9 @@ mod tests {
         let handle = envelope.handle();
         assert!(persist_sealed(&pool, Uuid::new_v4(), Uuid::now_v7(), "cbu.confirm", &envelope).await);
 
-        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
+        let enforced = EnforcedVerbs([("cbu.confirm".to_string(), PathScope::All)].into_iter().collect());
         let mut tx = pool.begin().await.unwrap();
-        let (decision, pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", Some(handle))
+        let (decision, pins) = check_admission_in_scope(&mut tx, &enforced, "cbu.confirm", ExecutionPath::RunbookSequencer, Some(handle))
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -1086,7 +1263,7 @@ mod tests {
         let pool = test_pool().await;
         let plan = plan_with_verbs(&["cbu.confirm", "session.info"]);
         let enforced = EnforcedVerbs::default();
-        assert!(admit_plan_checked(&pool, &enforced, &plan).await.is_ok());
+        assert!(admit_plan_checked(&pool, &enforced, &plan, ExecutionPath::DslDirect).await.is_ok());
     }
 
     #[tokio::test]
@@ -1096,8 +1273,8 @@ mod tests {
         // Second step in the plan is enforced — proves the whole plan is
         // walked, not just its first verb.
         let plan = plan_with_verbs(&["session.info", "cbu.confirm"]);
-        let enforced = EnforcedVerbs(["cbu.confirm".to_string()].into_iter().collect());
-        let err = admit_plan_checked(&pool, &enforced, &plan)
+        let enforced = EnforcedVerbs([("cbu.confirm".to_string(), PathScope::All)].into_iter().collect());
+        let err = admit_plan_checked(&pool, &enforced, &plan, ExecutionPath::DslDirect)
             .await
             .expect_err("plan must be rejected");
         assert!(err.contains("cbu.confirm"), "error should name the rejected verb: {err}");
@@ -1113,6 +1290,6 @@ mod tests {
         // test execution.
         let pool = test_pool().await;
         let plan = plan_with_verbs(&["session.info"]);
-        assert!(admit_plan(&pool, &plan).await.is_ok());
+        assert!(admit_plan(&pool, &plan, ExecutionPath::DslDirect).await.is_ok());
     }
 }

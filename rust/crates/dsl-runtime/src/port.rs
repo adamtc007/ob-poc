@@ -68,12 +68,20 @@ pub trait VerbExecutionPort: Send + Sync {
     /// unless it explicitly overrides this method, matching the plan's
     /// shadow-first posture (§0): a gate/envelope concept landing in the
     /// trait must not, by itself, change any dispatch outcome.
+    ///
+    /// G3 (`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` §3(d)):
+    /// `path` names which of the four RR-2 admission ingress points this
+    /// dispatch entered through — `EnforcedVerbs` can express "graduate
+    /// this verb on Path A only" against it. The default impl ignores it
+    /// exactly as it already ignores `envelope_handle` — same
+    /// degrades-safely precedent.
     async fn execute_verb_admitting_envelope(
         &self,
         verb_fqn: &str,
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
         _envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        _path: ob_poc_types::ExecutionPath,
     ) -> Result<VerbExecutionResult> {
         self.execute_verb(verb_fqn, args, ctx).await
     }
