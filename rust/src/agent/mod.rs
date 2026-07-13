@@ -8,6 +8,7 @@ pub(crate) mod capability_provenance;
 pub mod composite_state;
 pub mod composite_state_loader;
 pub mod constellation_verb_index;
+pub(crate) mod control_plane_audit;
 pub(crate) mod control_plane_envelope_store;
 pub(crate) mod control_plane_floor;
 pub(crate) mod control_plane_metrics;

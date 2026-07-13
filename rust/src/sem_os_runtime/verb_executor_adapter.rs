@@ -166,6 +166,21 @@ impl ObPocVerbExecutor {
             )));
         }
 
+        // EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2/§3: captured
+        // before `check_admission_in_scope` takes ownership of
+        // `envelope_handle` -- the real G10 consume-seam call site
+        // (AD-1(a): "G10 grades envelope validity at consume time").
+        // `EnvelopeConsumed` is emitted below for any genuine consume
+        // attempt (Admitted or RejectedConsumeFailed), same-transaction
+        // via `conn` (in-scope, not a detached spawn) -- G10's provenance
+        // is `ConsumeSeam` by construction (DD-3).
+        //
+        // No session id is threaded into this per-verb admission check
+        // (same known scope limitation as the G1 floor check above), so
+        // the audit row's session_id is `Uuid::nil()`, matching that
+        // existing convention.
+        let envelope_id_for_audit = envelope_handle.as_ref().map(|h| h.id());
+
         let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env();
         let (decision, pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
             conn,
@@ -176,15 +191,51 @@ impl ObPocVerbExecutor {
         .await
         .map_err(|e| SemOsError::Internal(anyhow::anyhow!("envelope admission check failed: {e}")))?;
 
+        let emit_envelope_consumed = |outcome_kind: &'static str| {
+            envelope_id_for_audit.map(|envelope_id| {
+                ob_poc_control_plane::audit::AuditEvent::EnvelopeConsumed {
+                    envelope_id,
+                    gate_outcome: ob_poc_control_plane::audit::GateOutcomeRecord::new(
+                        ob_poc_control_plane::gate::GateId::ExecutionEnvelope,
+                        outcome_kind,
+                    ),
+                }
+            })
+        };
+
         match decision {
-            crate::agent::control_plane_envelope_store::AdmissionDecision::NotEnforced
-            | crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => Ok(pins),
+            crate::agent::control_plane_envelope_store::AdmissionDecision::NotEnforced => Ok(pins),
+            crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted => {
+                if let Some(envelope_id) = envelope_id_for_audit {
+                    if let Some(event) = emit_envelope_consumed("Success") {
+                        crate::agent::control_plane_audit::insert_audit_event_in_scope(
+                            conn,
+                            envelope_id,
+                            Uuid::nil(),
+                            &event,
+                        )
+                        .await;
+                    }
+                }
+                Ok(pins)
+            }
             crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedNoEnvelope => {
                 Err(SemOsError::InvalidInput(format!(
                     "{verb_fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) but no sealed envelope was presented"
                 )))
             }
             crate::agent::control_plane_envelope_store::AdmissionDecision::RejectedConsumeFailed(outcome) => {
+                if let Some(envelope_id) = envelope_id_for_audit {
+                    if let Some(event) = emit_envelope_consumed("Failure") {
+                        crate::agent::control_plane_audit::insert_audit_event_in_scope(
+                            conn,
+                            envelope_id,
+                            Uuid::nil(),
+                            &event,
+                        )
+                        .await;
+                    }
+                }
                 Err(SemOsError::InvalidInput(format!(
                     "{verb_fqn} envelope admission rejected: {outcome:?}"
                 )))
@@ -554,6 +605,13 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             ))
         })?;
 
+        // EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2: captured
+        // before `admit_in_scope` takes ownership of `envelope_handle`, so
+        // a `DispatchCommitted` audit event (G14, provenance
+        // `PostDispatch`) can correlate to the same `decision_id` as this
+        // dispatch's `EnvelopeConsumed` event, below.
+        let envelope_id_for_commit_audit = envelope_handle.as_ref().map(|h| h.id());
+
         let pins = match self
             .admit_in_scope(verb_fqn, envelope_handle, scope.executor())
             .await
@@ -599,6 +657,43 @@ impl VerbExecutionPort for ObPocVerbExecutor {
             .await
         {
             Ok(result) => {
+                // EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2/V3:
+                // `DispatchCommitted` (G14, provenance `PostDispatch`),
+                // emitted same-transaction immediately before `commit()` —
+                // the design doc's intended call site is
+                // `set_expected_write_set` + `commit_attested`
+                // (G2 item 2), which has NOT landed yet (V3 finding: zero
+                // production caller, confirmed via
+                // `control_plane_metrics.rs`'s own "no production caller
+                // invokes commit_attested yet" comment and a repo-wide
+                // grep). Rather than silently implement G2 item 2's
+                // production wiring here (a separate, not-yet-reviewed
+                // work item), this records the honest degraded signal:
+                // `attested: false` (no compare-and-attest ran) and a
+                // `NotEvaluated` gate_outcome for WriteSetAttestation —
+                // real event, real row, real provenance, but not yet a
+                // real attestation. Only emitted when a real envelope was
+                // actually in play (`envelope_id_for_commit_audit` is
+                // `Some`) -- a plain CRUD/legacy commit with no envelope
+                // has no `decision_id` to correlate to and is out of this
+                // stream's scope by construction (§2: the stream is a
+                // per-decision lifecycle record, not a per-commit log).
+                if let Some(envelope_id) = envelope_id_for_commit_audit {
+                    let event = ob_poc_control_plane::audit::AuditEvent::DispatchCommitted {
+                        attested: false,
+                        gate_outcome: ob_poc_control_plane::audit::GateOutcomeRecord::new(
+                            ob_poc_control_plane::gate::GateId::WriteSetAttestation,
+                            "NotEvaluated",
+                        ),
+                    };
+                    crate::agent::control_plane_audit::insert_audit_event_in_scope(
+                        scope.executor(),
+                        envelope_id,
+                        Uuid::nil(),
+                        &event,
+                    )
+                    .await;
+                }
                 scope.commit().await.map_err(|e| {
                     SemOsError::Internal(anyhow::anyhow!(
                         "execute_verb_admitting_envelope({verb_fqn}): commit failed: {e}"

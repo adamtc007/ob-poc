@@ -41,16 +41,34 @@ status = "fail"
 
 [e3]
 status = "fail"
-# 10/14 gates (G1-G9, G13) have substantive (Success/Failure) production
-# shadow-decision samples with metrics flowing. G10 (ExecutionEnvelope),
-# G11 (AuditReplay), G12 (VersionPinning), G14 (WriteSetAttestation) have
-# zero — either never registered in evaluate_shadow's gate map at the
-# time existing rows were persisted, or never wired to a real call site.
+# UPDATED 2026-07-13 (EOP-SESSION-CONTROLPLANE-G2-AUDIT-PROVENANCE-IMPL-001,
+# architect ruling same day). 11/14 gates (G1-G9, G10, G13) now have
+# substantive (Success/Failure) samples with metrics flowing, each at its
+# expected provenance (verified live: IntentAdmission 57, EntityBinding/
+# PackResolution/DagProof/Evidence/WriteSet/StpClassifier/RunbookProof/
+# DecisionSnapshot 24 each, Authority 57, ExecutionEnvelope 7 — all
+# shadow_eval except ExecutionEnvelope's 7 at consume_seam per AD-1(a)).
+# G11 (AuditReplay), G12 (VersionPinning), G14 (WriteSetAttestation)
+# remain at zero.
 #
-# CAUTION (2026-07-13 review finding #3): this "fail" is satisfied
-# identically by a verified live result (E3_INVARIANT_FAILURE — what's
-# recorded above, from a real run against local Postgres) AND by an
-# unreachable database (E3_INFRASTRUCTURE_FAILURE — the probe cannot
+# Ruling of record: G10's 7 samples are entirely test-sourced (this
+# session's own live-DB `t4_1`/W1/W3 executions against local Postgres),
+# not production traffic — flagged explicitly as a question for the
+# architect rather than assumed. Ruling: "we have no real samples — so
+# however sourced will have to do." This is the single-operator-deployment
+# posture already established for AD-3(a) (the operator IS the traffic;
+# nothing production-sourced exists until GM's merge+deploy opens the
+# window) applied consistently to E3 — a gate counts as evaluated once it
+# has substantive samples at its correct provenance, regardless of
+# whether the run that produced them was a live-DB test or live traffic.
+# G11/G12/G14 remain genuinely zero under this same bar (no wiring
+# exists yet, test or otherwise) — not a relaxation of the bar, a
+# clarification of what it was already measuring.
+#
+# CAUTION (2026-07-13 review finding #3, still applies): this "fail" is
+# satisfied identically by a verified live result (E3_INVARIANT_FAILURE —
+# what's recorded above, from a real run against local Postgres) AND by
+# an unreachable database (E3_INFRASTRUCTURE_FAILURE — the probe cannot
 # even run). CI today has no live DB, so its e3 leg never runs the live
 # half at all (skip -> fail by design). If a live DB is ever wired into
 # CI for this job, check `scripts/check-invariants.sh e3`'s output for

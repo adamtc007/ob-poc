@@ -609,7 +609,13 @@ pub(crate) struct ShadowDecisionRow {
 
 /// Serialises an `EvaluationReport` into the `gate_results` JSONB column:
 /// `{"IntentAdmission": "Success", "PackResolution": "NotEvaluated { blocked_by: [...] }", ...}`.
-fn report_to_json(report: &ob_poc_control_plane::gate::EvaluationReport) -> serde_json::Value {
+///
+/// `pub(crate)` (not `pub`): the sole non-`#[cfg(test)]` external caller is
+/// `control_plane_audit`'s `rederivation_matches_evaluate_with_report_on_a_fully_admitted_context`
+/// test, which needs the exact same JSONB shape `insert_shadow_decision`
+/// persists in order to cross-check DD-4(ii)'s re-derivation against a
+/// real `evaluate_with_report` output, not a hand-copied fixture.
+pub(crate) fn report_to_json(report: &ob_poc_control_plane::gate::EvaluationReport) -> serde_json::Value {
     let map: serde_json::Map<String, serde_json::Value> = ob_poc_control_plane::gate::GateId::ALL
         .iter()
         .map(|id| {

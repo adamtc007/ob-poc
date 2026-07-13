@@ -8024,14 +8024,74 @@ impl ReplOrchestratorV2 {
             let session_id = session.id;
             let entry_verb = entry.verb.clone();
             let pool = pool.clone();
+
+            // EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2: emit the
+            // `DecisionEvaluated` audit event (and `EnvelopeSealed` when
+            // ApprovedStp) alongside the existing shadow-row insert, in the
+            // same best-effort tokio::spawn — additive only (W1): nothing
+            // here alters `row`, which is built and passed in unchanged.
+            //
+            // decision_id: the audit stream's correlating key across an
+            // envelope-bearing decision's later events (EnvelopeConsumed,
+            // DispatchCommitted) is the envelope's own id (minted fresh
+            // per decision by ExecutionEnvelope::seal) -- G1 items 2-4
+            // (the entry_id-correlated seal->consume wire) have not landed
+            // yet (V3/V4 finding), so envelope_id is the only value shared
+            // between the seal site and the not-yet-wired consume site.
+            // For non-ApprovedStp decisions (no envelope minted), a fresh
+            // id is used -- nothing downstream correlates to it, by
+            // construction (no envelope, no later events).
+            let outcome_for_audit = match &decision {
+                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_) => {
+                    ob_poc_control_plane::audit::DecisionOutcome::ApprovedStp
+                }
+                ob_poc_control_plane::decision::ControlPlaneDecision::RequiresHumanGate(_) => {
+                    ob_poc_control_plane::audit::DecisionOutcome::HumanGate
+                }
+                ob_poc_control_plane::decision::ControlPlaneDecision::Rejected(_) => {
+                    ob_poc_control_plane::audit::DecisionOutcome::Rejected
+                }
+            };
+            let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
+            let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
+                outcome: outcome_for_audit,
+                snapshot_ref,
+            };
+
             tokio::spawn(async move {
                 crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
                 if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
+                    let decision_id = envelope.id();
+                    crate::agent::control_plane_audit::insert_audit_event(
+                        &pool,
+                        decision_id,
+                        session_id,
+                        &decision_evaluated,
+                    )
+                    .await;
+                    crate::agent::control_plane_audit::insert_audit_event(
+                        &pool,
+                        decision_id,
+                        session_id,
+                        &ob_poc_control_plane::audit::AuditEvent::EnvelopeSealed {
+                            envelope_id: decision_id,
+                            expires_at: envelope.validity().not_after(),
+                        },
+                    )
+                    .await;
                     crate::agent::control_plane_envelope_store::persist_sealed(
                         &pool,
                         session_id,
                         &entry_verb,
                         &envelope,
+                    )
+                    .await;
+                } else {
+                    crate::agent::control_plane_audit::insert_audit_event(
+                        &pool,
+                        Uuid::new_v4(),
+                        session_id,
+                        &decision_evaluated,
                     )
                     .await;
                 }

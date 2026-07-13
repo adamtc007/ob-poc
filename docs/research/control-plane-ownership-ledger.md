@@ -884,3 +884,39 @@ unblocked** (G1 item 2 additionally still names G2 item 4's provenance
 dimension as a named dependency — not yet landed, tracked separately).
 G2b's audit-stream doc and G2 item 4 itself remain the plan's genuine
 critical path.
+
+## G2 items 3+4 implemented; E3 ruling on sample sourcing (2026-07-13)
+
+`EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001` v0.2 (RATIFIED)
+implemented: `control_plane_audit` migration + `AuditEvent` enum,
+`GateOutcomeProvenance` + rebuilt `gate_outcome_counts` (folding in the
+G2 item-1 sentinel fix in the same rewrite), G11 completeness +
+outcome re-derivation, W1-W4 window-discipline tests all green. V3/V4
+findings (expected): G2 item 2's `commit_attested` and G1 items 2-4's
+seal→consume wiring haven't landed, so `DispatchCommitted`/
+`EnvelopeConsumed` emit at the real-but-partial call sites available
+today, each degrading honestly (`attested: false`; `decision_id ==
+envelope_id` correlation, documented) rather than faking completeness.
+Full detail: `docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-G2-AUDIT-PROVENANCE-IMPL-001.md`.
+Two hygiene items the implementing session missed (dead-code on the
+G11 evaluation primitives — proven by tests, no live caller yet by
+design, since wiring one is a real decision this doc doesn't make;
+one clippy `collapsible_match`) fixed in the same pass, `-D warnings`
+clean, full `ob-poc` suite (2160) + `ob-poc-control-plane` (115) green.
+
+**E3 ruling:** the session flagged that its live-DB run moved E3's
+gate count 10/14 → 11/14 (G10/ExecutionEnvelope now has 7 substantive
+samples, correct `consume_seam` provenance) but every sample is
+test-sourced, not production traffic — and asked whether E3's bar is
+"substantive samples, however sourced" or specifically
+production-sourced evidence. **Architect ruling: "we have no real
+samples — so however sourced will have to do."** Applies the same
+single-operator-deployment posture already established for AD-3(a)
+(the operator IS the traffic; nothing production-sourced exists until
+GM's merge+deploy opens the window) consistently to E3 — a gate
+counts as evaluated once it has substantive samples at its correct
+provenance, regardless of whether the run was a live-DB test or live
+traffic. `invariants-expected.toml`'s `[e3]` detail updated to
+11/14, ruling recorded inline; status stays `fail` (G11/G12/G14
+remain genuinely zero under the same bar — this is a clarification of
+what the bar was measuring, not a relaxation of it).
