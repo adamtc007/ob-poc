@@ -1,13 +1,29 @@
 # GRADUATION RUNBOOK — ob-poc-control-plane enforce-mode rollout
-### EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001 v0.2
+### EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001 v0.3
 ### Basis: EOP-PLAN-CONTROLPLANE-001 v0.1 §0 (shadow-first strategy) + docs/research/control-plane-ownership-ledger.md
-### Status: DRAFT — precondition state verified against code 2026-07-10; no path has graduated yet.
+### Status: DRAFT — precondition state verified against code 2026-07-10, §2/§3/§4/§8 corrections applied 2026-07-13; no path has graduated yet.
 
 v0.2 (2026-07-10, architect review): added §1's graduation-window
 definition (a gate's window resets when its shadow inputs go from
 partial to full-pipeline coverage, or from the last CP-DEFECT fix,
 whichever is later — the general form of Path A's Step 0 finding) and
 §4 Path D's trust-boundary design note for T6.1a's rehydration path.
+
+v0.3 (2026-07-13, EOP-IMPL-CONTROLPLANE-GRADUATION-G0-001 Slice 2 /
+EOP-PLAN-CONTROLPLANE-GRADUATION-001 v0.3 G0 item 2): §2's readiness
+table corrected — Path A now calls `execute_verb_admitting_envelope`
+at `step_executor_bridge.rs:553` (commit `5a704f4e`, PIR-D-002), not
+the stale `:474` bare `execute_verb`; gate count corrected from the
+plan draft's "12/14" to **11/14** (G1-G9, G12 partial, G13 —
+GRADPLAN-D-002). §3's Path A ordering note updated to match. §4 Path A
+checklist box 1 flipped to DONE, citing `5a704f4e`. §8's T6.1a entry
+re-scoped as a **two-repo change**: the real bus-invocation producer
+is `bpmn-lite-engine::plan_walker::dispatch_callout`, a platform crate
+ob-poc does not own (`EOP-RESEARCH-CONTROLPLANE-GRADUATION-001.md`
+Q-block C) — the prior single-repo-scope claim and its
+supporting paragraph are deleted as wrong. New §1 clause added
+recalibrating "production evidence" for a single-operator deployment
+(AD-3(a) resolution, `EOP-PLAN-CONTROLPLANE-GRADUATION-001_v0.3.md`).
 
 ---
 
@@ -52,9 +68,11 @@ assuming "graduate Path A" means all 14 gates at once.
 enforce, not against whatever telemetry happens to already exist.**
 Concretely: `total_decisions >= 500` only counts decisions produced by the
 *same* evaluation the enforce flip will make binding. Shadow data collected
-while a call site only wires G1 (as Path A's does today — §2) is evidence
-about intent admission alone; it says nothing about the G1-G14 decision
-that verb would be bound to once enforced. Adding a gate's real inputs to
+while a call site wires only a subset of gates (Path A wired G1 alone at
+first — v0.2 of this table — before the 2026-07-13 correction below moved
+it to 11/14 real gates) is evidence about that subset alone; it says
+nothing about the full G1-G14 decision a verb would be bound to once
+enforced. Adding a gate's real inputs to
 an already-shadow-collecting call site (the precondition work in §4)
 **resets that gate's window to zero** — it does not inherit the prior
 partial-coverage telemetry, even if the surrounding path has been
@@ -66,35 +84,61 @@ Path A Step 0 precondition; recording it here so the same trap (assuming
 partial shadow coverage counts toward a full-pipeline enforce decision)
 doesn't recur when Path B or Path C reach this stage.
 
+**"Production evidence" for a single-operator deployment (added v0.3,
+AD-3(a)).** This deployment has exactly one operator, and the operator
+*is* the traffic — nothing accumulates in the window unattended, unlike a
+multi-user service where ≥500 decisions arrive passively over calendar
+time. Per `EOP-PLAN-CONTROLPLANE-GRADUATION-001_v0.3.md` (AD-3, tranches
+GM/GW): the window opens exactly once, at tranche GM's single merge +
+deploy (not at G0, and not incrementally per tranche), marked by a
+deploy-time marker (timestamp + HEAD hash, recorded in the ledger and/or
+a `control_plane_deploy_markers` row). "Real" decisions counted toward
+this criterion means genuine operator-driven dispatches through the full
+production stack post-marker, accumulated deliberately via a
+ledger-logged exercise campaign (tranche GW) — not passive traffic (there
+is none to wait for) and not synthetic test fixtures. The deploy marker
+plus session-id exclusion (`created_at`/`decided_at` after the marker
+timestamp, `session_id NOT IN` the known test-harness session ids
+enumerated at marker time — see GM's exit-gate predicate) is what
+structurally distinguishes an exercise-campaign row from a fixture row;
+scripting the exercise *scenarios* is fine, scripting *around* the stack
+(direct DB writes, harness-driven inserts standing in for real dispatches)
+would be gaming this criterion and is explicitly out of bounds.
+
 ---
 
 ## 2. Current readiness state per path (verified against code, 2026-07-10)
 
 | Path | Calls `execute_verb_admitting_envelope`? | Shadow evidence source | Gates with real (non-stub) shadow input at that call site |
 |---|---|---|---|
-| **A — Sequencer/runbook** | **No.** `runbook/step_executor_bridge.rs:474` calls the plain `execute_verb`. | `sequencer.rs::phase5_runtime_recheck` → `control_plane_shadow.rs::build_evaluation_context` | **G1 (IntentAdmission) only.** Every other `EvaluationContext` field is left `None` at this call site (T2.7's own doc: "G3/G4/G5/G6/G7 inputs require data this call site does not yet have"). |
+| **A — Sequencer/runbook** | **Yes (since commit `5a704f4e`, PIR-D-002).** `runbook/step_executor_bridge.rs:553` calls `execute_verb_admitting_envelope` (with `envelope_id: None` — production-default empty `ENFORCE_VERBS` makes this behaviourally identical to the prior plain `execute_verb` call; zero dispatch-outcome change). | `sequencer.rs::phase5_runtime_recheck` → `control_plane_shadow.rs::build_evaluation_context` | **11/14 gates (G1-G9, G12 partial, G13).** G10 and G11 are stubs; G14 is not-applicable at this call site (v0.3 correction, GRADPLAN-D-002 — the plan draft's "12/14" figure miscounted the research's own gate table). |
 | **B — REPL/direct (`RealDslExecutor`)** | **No — no admission mechanism reachable at all.** Runs through `dsl_v2::executor::DslExecutor::execute_plan`/`execute_plan_atomic_in_scope` (`repl/executor_bridge.rs`), a different, lower-level engine than `ObPocVerbExecutor`/`VerbExecutionPort` with no per-verb hook (T6.3 finding). | None. | None — not wired. |
 | **C — Workflow-dispatched (`WorkflowDispatcher` direct branch)** | **No — same engine as B.** `bpmn_integration/dispatcher.rs`'s direct branch delegates to the same `dsl_v2::executor::DslExecutor` (T6.3 finding). | None. | None — not wired. |
 | **D — Bus (`ObPocVerbAdapter`)** | **Yes (T6.1).** Calls `execute_verb_admitting_envelope` with `envelope_id: None` always — nothing issues bus callers an envelope yet (T6.1a). | None — bus has no shadow-decision call site at all yet. | None. |
 
 **Reading this table**: no path is graduation-ready today. Path A is
-*closest* (it already has a real, live-DB-provable G1 shadow signal once
-production traffic flows) but still needs its own `execute_verb` →
-`execute_verb_admitting_envelope` swap first — the exact one-line change
-T6.1 already proved out on bus. Paths B and C need materially more work
+*closest* — the `execute_verb` → `execute_verb_admitting_envelope` swap
+(the exact one-line change T6.1 already proved out on bus) landed at
+commit `5a704f4e`, and 11/14 gates now have real shadow input at that call
+site; what remains for Path A is the seal→consume wiring (plan
+`EOP-PLAN-CONTROLPLANE-GRADUATION-001_v0.3.md` tranche G1) so that an
+enforced verb can actually consume a threaded envelope, plus the ≥500
+real-decision window (§1, GM/GW). Paths B and C need materially more work
 (instrumenting or rerouting the legacy `DslExecutor` engine — T6.3 declined
 this as higher-risk than a single-session change). Path D needs T6.1a
-(envelope handle threading through bpmn-lite process variables) before an
-envelope can ever be non-`None` there.
+(envelope handle threading through bpmn-lite process variables, a
+two-repo change — see §8) before an envelope can ever be non-`None`
+there.
 
 ---
 
 ## 3. Graduation order (per the architect's direction, 2026-07-10)
 
-1. **Path A (Sequencer/runbook)** — richest *eventual* shadow data, but see
-   §2: G1 only, and the `execute_verb_admitting_envelope` wiring is not yet
-   done. That wiring is Step 0 of Path A's graduation, not part of the
-   config flip.
+1. **Path A (Sequencer/runbook)** — richest shadow data (11/14 gates real
+   per §2, corrected v0.3); the `execute_verb_admitting_envelope` wiring
+   landed at commit `5a704f4e` (Step 0 is DONE — see §4 box 1). What
+   remains is the seal→consume threading (plan tranche G1) before enforce
+   mode is safe on any Path A verb, plus the window itself (§1).
 2. **Path B (REPL/direct)** — after A.
 3. **Path C (workflow-dispatched)** — after B.
 4. **Path D (bus)** — last, gated on T6.1a landing `EnvelopeHandle`-through-
@@ -107,10 +151,11 @@ envelope can ever be non-`None` there.
 ## 4. Per-path preconditions (must all be true before starting §5's procedure)
 
 ### Path A
-- [ ] `step_executor_bridge.rs:474` calls `execute_verb_admitting_envelope`
-      instead of `execute_verb` (mirrors T6.1's bus change exactly — same
-      risk profile: default-`None` envelope_id, `NotEnforced` while the env
-      var is empty, zero behaviour change until a verb is added to the set).
+- [x] **DONE (commit `5a704f4e`, PIR-D-002).** `step_executor_bridge.rs:553`
+      calls `execute_verb_admitting_envelope` instead of `execute_verb`
+      (mirrors T6.1's bus change exactly — same risk profile: default-`None`
+      envelope_id, `NotEnforced` while the env var is empty, zero behaviour
+      change until a verb is added to the set).
 - [ ] `control_plane_shadow.rs::build_evaluation_context` wired with real
       inputs for the specific gate being graduated (G1 already real; G3-G7
       need their own call-site wiring per gate before *those* gates can
@@ -153,12 +198,35 @@ envelope can ever be non-`None` there.
       `EnvelopeHandle` as a `String` data object, write it at process start
       from wherever the envelope is issued, read it back at the task that
       dispatches over the bus and pass it through to `ObPocVerbAdapter`.
-      **This is an ob-poc-only change**: `domain_payload` and its
-      `String`-data-object routing already exist in bpmn-lite today —
-      nothing in the bpmn-lite platform crate needs to change, no version
-      bump, no federation-partner coordination. The only new artefacts are
-      an ob-poc-side BPMN process definition declaring the data object and
-      the dispatcher/bus-handler glue code that writes/reads it.
+      **CORRECTED (v0.3, 2026-07-13, `EOP-RESEARCH-CONTROLPLANE-GRADUATION-001.md`
+      Q-block C): this is NOT scoped to ob-poc alone.** This note
+      previously claimed the whole of T6.1a was containable within
+      ob-poc, with nothing in the bpmn-lite platform crate needing to
+      change — that was reasoned from the
+      `ExecFfi`/`domain_payload`/`json_path` mechanism (real, and
+      independently re-verified), but that mechanism does not feed the
+      `InvocationRequest`s `bus_runtime.rs::ObPocVerbAdapter` actually
+      admits. The real producer, traced this session, is
+      `bpmn-lite-engine::plan_walker::dispatch_callout`
+      (`plan_walker.rs:289-368`), which builds inputs via
+      `build_inputs(static_args, placeholder_vals)` from
+      `instance.placeholder_values` — a different `ProcessInstance` field
+      from `domain_payload` — and never touches `domain_payload` at all.
+      `dispatch_callout` sets `authority: None` and `snapshot_pin: None` on
+      the constructed request; the proto (`dsl-bus-protocol/proto/
+      dsl_bus.proto:137-153`) has unused `AuthorityContext authority=4` and
+      `Uuid snapshot_pin=7` fields, but `plan_walker.rs` never populates
+      `snapshot_pin` today. `plan_walker.rs` lives in the **bpmn-lite
+      platform crate**, which ob-poc does not own (its own git repo; ob-poc
+      does not track it as a submodule — CLAUDE.md). **This is therefore a
+      two-repo change**: either (a) a new `ProcessInstance`/
+      `placeholder_values`-sourced binding in `dispatch_callout` itself, or
+      (b) populate the dormant `snapshot_pin` proto field end-to-end
+      (`plan_walker.rs` → `dsl-bus-server::services.rs::InvocationContext`
+      widening → `ob-poc-bus-handler`'s `VerbExecutor::execute` trait
+      signature → `bus_runtime.rs`) — both require a bpmn-lite-side change,
+      riding that repo's own review/versioning flow (standing rule 5, plan
+      tranche G6a), not an ob-poc-only session.
       **Design note for whoever writes this (architect, 2026-07-10):** the
       handle riding in `domain_payload` is data crossing a trust
       boundary — a string in a process variable is not proof of anything
@@ -247,10 +315,14 @@ legacy check it's being compared to.
 
 ## 8. Open items this runbook depends on (not yet resolved)
 
-- **T6.1a** (bus envelope threading) — mechanism question answered (see §4
-  Path D); implementation (actually writing/reading `domain_payload` in the
-  relevant bpmn-lite process definitions and wiring `ObPocVerbAdapter` to
-  pass the real handle through) not yet done.
+- **T6.1a** (bus envelope threading) — **re-scoped v0.3 (2026-07-13,
+  `EOP-RESEARCH-CONTROLPLANE-GRADUATION-001.md` Q-block C)**: the real
+  bus-invocation producer is `bpmn-lite-engine::plan_walker::
+  dispatch_callout`, in the bpmn-lite platform crate ob-poc does not own —
+  see §4 Path D's corrected design note for the two carrier options and why
+  the earlier "ob-poc-only" framing (reasoned from the unrelated
+  `domain_payload`/`ExecFfi` mechanism) was wrong. Implementation is a
+  two-repo change (plan tranche G6a), not yet done.
 - ~~**EOP-VS-CONTROLPLANE-001 v0.3** (missing V&S source doc)~~ — RESOLVED
   (T9.4, EOP-PLAN-CONTROLPLANE-001 Addendum B): the document was in the
   repo since the T7 re-evidence session, just at

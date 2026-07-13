@@ -26,9 +26,11 @@
 
 [e1]
 status = "fail"
-# 3/45 RR-3 rows provably CLOSED (hash + resolving symbol cited):
-# C-022, C-030, C-037. C-001 is claimed CLOSED in prose but lacks a
-# commit-hash citation — correctly counted as unproven, not closed.
+# 4/45 RR-3 rows provably CLOSED (hash + resolving symbol cited):
+# C-001, C-022, C-030, C-037. C-001's commit-hash citation (1a194d40)
+# backfilled 2026-07-13 (EOP-IMPL-CONTROLPLANE-GRADUATION-G0-001 Slice 4,
+# G0 item 4 / GRADPLAN plan v0.3) — no new engineering, citation-only.
+# 41/45 rows remain genuinely open.
 
 [e2]
 status = "fail"
@@ -65,13 +67,28 @@ status = "fail"
 
 [e5]
 status = "fail"
-# Corrects this session's own initial premise ("workspace hygiene already
-# holds") — empirically false. Public API surface ratchet trips on 5
-# crates (dsl-runtime, ob-poc-control-plane, ob-poc-boundary, ob-poc,
-# ob-poc-types) with unrefreshed audits/surface/*.txt baselines spanning
-# several already-landed tranches; ob-poc-agent's surface measurement
-# errors outright; 4 crates (ob-poc-derived-attributes,
-# ob-poc-entity-linking, ob-poc-taxonomy, ob-poc-trading-profile) fail to
-# build at --no-default-features (pre-existing Cargo.toml feature gap).
-# cargo build/test themselves are green. Fixing the surface/membrane gaps
-# is real engineering out of this gate-authoring session's scope.
+# UPDATED 2026-07-13 (EOP-IMPL-CONTROLPLANE-GRADUATION-G0-001 Slice 1 /
+# GRADPLAN plan v0.3 G0 item 1). 4/5 named-stale baselines refreshed and
+# confirmed noise-only (dsl-runtime, ob-poc-control-plane, ob-poc-boundary,
+# ob-poc-types — each diff traced via `git log -S` to a real, already-
+# landed tranche commit dated 2026-07-11/07-12: T10.3/T9.2/T9.7/T11.1b).
+# ob-poc itself is a STOP (not refreshed): its diff is ~23k lines
+# including a genuinely new blanket `tower_http::follow_redirect::
+# policy::PolicyExt` impl (a dependency-version-driven surface widening,
+# not just already-shipped symbols) mixed with Send/Sync-ordering noise —
+# too large/mixed to safely eyeball in a grind slice per Slice 1's own
+# STOP-condition; needs its own review, not a silent baseline overwrite.
+# Two items RECLASSIFIED from hygiene to bug-fix (both STOP-conditions
+# fired, confirmed by direct build): (1) ob-poc-agent's `cargo public-api`
+# "measurement error" is NOT tooling-only — it fails because
+# `ob-poc-boundary::toctou_recheck::verify_pins_in_scope` (and its sqlx
+# imports) is NOT gated behind `#[cfg(feature = "database")]`, so building
+# ob-poc-boundary at less than its own default features breaks the
+# dependent crate's rustdoc-JSON build; (2) the 4 `--no-default-features`
+# failures (ob-poc-derived-attributes, ob-poc-entity-linking, ob-poc-
+# taxonomy, ob-poc-trading-profile) are the same defect shape — real
+# unconditional `sqlx::` usage in source (e.g. `derived_attributes/
+# repository.rs`), not a Cargo.toml-only feature-declaration gap as
+# previously characterized. Both need a source-level cfg-gating fix
+# (their own scoped session), not a hygiene-slice edit. cargo build/test
+# themselves remain green.

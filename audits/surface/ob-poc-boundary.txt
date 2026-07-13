@@ -1,4 +1,4 @@
-# ob-poc-boundary | features=all | HEAD=302b61fa8b7c69d58978daf929dd3c1c29a37a5b | 2026-07-11T10:23:40Z
+# ob-poc-boundary | features=all | HEAD=61540c0a5a03b25ed57a3e2a0117612e0f3fde6d | 2026-07-13T14:26:02Z
 pub mod ob_poc_boundary
 pub mod ob_poc_boundary::acp
 pub enum ob_poc_boundary::acp::AcpAdapterError
@@ -10823,7 +10823,7 @@ pub trait ob_poc_boundary::toctou_recheck::RowVersionProvider: core::marker::Sen
 pub fn ob_poc_boundary::toctou_recheck::RowVersionProvider::row_version<'life0, 'life1, 'async_trait>(&'life0 self, uuid::Uuid, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<u64>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
 impl<'a> ob_poc_boundary::toctou_recheck::RowVersionProvider for ob_poc_boundary::toctou_recheck::SqlRowVersionProvider<'a>
 pub fn ob_poc_boundary::toctou_recheck::SqlRowVersionProvider<'a>::row_version<'life0, 'life1, 'async_trait>(&'life0 self, uuid::Uuid, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<u64>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
-pub async fn ob_poc_boundary::toctou_recheck::verify_pins(&ob_poc_control_plane::snapshot::SnapshotPins, &[(uuid::Uuid, alloc::string::String)], &dyn ob_poc_boundary::toctou_recheck::RowVersionProvider) -> anyhow::Result<(), anyhow::Error>
+pub async fn ob_poc_boundary::toctou_recheck::verify_pins_in_scope(&ob_poc_control_plane::snapshot::SnapshotPins, &mut sqlx_postgres::connection::PgConnection) -> anyhow::Result<(), anyhow::Error>
 pub async fn ob_poc_boundary::toctou_recheck::verify_toctou(&ob_poc_types::gated_envelope::GatedVerbEnvelope, ob_poc_types::gated_envelope::WorkspaceSnapshotId, &dyn ob_poc_boundary::toctou_recheck::RowVersionProvider) -> anyhow::Result<(), anyhow::Error>
 pub mod ob_poc_boundary::traceability
 pub mod ob_poc_boundary::traceability::types
