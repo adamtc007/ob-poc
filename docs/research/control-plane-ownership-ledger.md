@@ -780,3 +780,107 @@ Two fields (`UtteranceSource`, `ScopeContext`) have no shared type across the cr
 Verified: workspace build clean (incl. `ob-poc-web`), clippy `-D warnings` clean, `cargo tree -p ob-poc-agent --edges normal` shows no `ob-poc` edge (L1 holds), all 64 orchestrator tests pass, full lib suite 2145/0 unchanged.
 
 **T11.2 Part A: COMPLETE** — design, projection type, and physical relocation all landed same day. Part B (`CapabilityInvocation` proper — the call-request half) remains the next open, undrafted decision.
+
+## EOP-PLAN-CONTROLPLANE-GRADUATION-001 — AD-1 + AD-2 ratified (2026-07-13)
+
+Architect ruling, same day as AD-3's resolution: **AD-1 → (a)** G10
+(ExecutionEnvelope) grades envelope validity at consume time, not
+prior-decision presence (b) or retirement from the input matrix (c).
+Rationale of record: matches what `t4_1` already proves; the PIR's
+own under-costing caveat (GRADPLAN-D-001 — the per-gate provenance
+dimension G10's consume-seam samples need) is absorbed because G2
+item 4 builds that dimension regardless of AD-1's outcome, so G1 item
+2's consume-seam recording rides machinery already scheduled rather
+than adding new scope.
+
+**AD-2 → (b)** `EnforcedVerbs` gains a path dimension, keyed by
+(verb FQN, path tag), backward-compatible (untagged = all-paths).
+Rationale of record: the PIR strengthened this option independently of
+the draft's own recommendation — E2's structural gate already reasons
+per-path, so a path-agnostic enforcement mechanism is the one
+component of the whole system that cannot express the runbook's own
+A→B→C→D graduation order; that asymmetry is exactly the shape of
+incident that surfaces at an operator's expense later, not at design
+time. Cost: one enum tag at four ingress points.
+
+All three architect decisions (AD-1, AD-2, AD-3) in the graduation plan
+are now ratified. Plan bumped to v0.4
+(`docs/todo/control-plane/EOP-PLAN-CONTROLPLANE-GRADUATION-001_v0.4.md`)
+recording both resolutions in AD-1/AD-2's own sections (matching AD-3's
+existing RESOLVED format) plus consequential edits to the dependency
+graph, §4's completion-mapping footnote, G1/G3/G7's tranche text, and
+§5's risk register (the "AD decisions pending" risk is retired,
+replaced by "design docs are the critical path").
+
+**No tranche in the plan is now blocked on an open architect decision.**
+The two concrete design-doc deliverables the resolutions unblocked —
+`EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001` (G1 item 1: the
+seal→consume correlation-carrier design GRADPLAN-D-006 required be
+split out, not inline session work) and
+`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` (G3: the
+concrete path-tag enum/keying/env-var spec AD-2(b) still needs before
+G4 can start) — are in progress, not yet landed. Neither existed
+before this entry.
+
+## EOP-PLAN-CONTROLPLANE-GRADUATION-001 — G1 + G3 design docs ratified (2026-07-13)
+
+Both design docs unblocked by AD-1/AD-2's ratification (above) landed
+and were ratified by the architect the same day.
+
+**`EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001.md` RATIFIED.** Carrier:
+a new `entry_id` column on `"ob-poc".control_plane_envelopes` (not
+"sequencer entry state," which the plan itself only offered as an
+unverified candidate — no struct at HEAD had the right lifetime).
+`HumanGate` entries (which can park indefinitely before dispatch)
+re-seal at resume rather than extending or reusing a pre-park envelope.
+Per-step sealing for multi-step runbooks, matching Path A/D's existing
+shape. No new crate edges. **Deviation found and recorded, not
+corrected here:** the plan's own citation of the T10.1
+`evaluate_shadow()`/`evaluate()` MIGRATION-PENDING split as still open
+is stale — that convergence was already closed 2026-07-11 (this
+ledger's own "Addendum C... CLOSED" entry), two days before the plan
+(v0.4) was drafted. Flagged for the plan's next correction pass.
+
+**`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001.md` RATIFIED.**
+`ExecutionPath` enum (`RunbookSequencer`/`DslDirect`/
+`WorkflowDispatched`/`BusFederated`) in `ob-poc-types`, zero new crate
+edges (all four ingress crates already depend on it). `EnforcedVerbs`
+reshaped to `HashMap<String, PathScope>` (`All | Only(HashSet<ExecutionPath>)`)
+— deliberately NOT the plan's own `HashSet<(String, PathTag)>` framing,
+which cannot express "untagged = all paths" without a non-physical
+sentinel. Env-var grammar `verb[:tag(|tag)*]`, fails the WHOLE config
+on any malformed entry (fail-closed, a deliberate safety call for an
+admission mechanism, not fail-open or silent-partial-apply). The
+Branch-3 double-admission fallthrough inside `ObPocVerbExecutor` must
+carry the SAME tag as its outer admission, never a distinct
+"fallthrough" tag — a distinct tag would reopen exactly the asymmetry
+AD-2(b) exists to close. **Correction recorded, does not overturn
+AD-2(b):** the ratification's own "one enum tag at four ingress points"
+cost claim is a tag-COUNT, not a location-count — Path C is one
+`RealDslExecutor` instance tagged once at construction, but Path B is
+an umbrella over several distinct callers (MCP `dsl_execute`, legacy
+raw-execute route, batch/sheet executors, the no-BPMN `executor_v2`
+fallback) sharing one tag since none can distinguish itself from the
+others today; flagged so G4's implementer isn't surprised mid-build.
+Also flagged, non-blocking: durable-verb resume via `JobWorker` has no
+clean tag answer yet, depending on T9.2's still-open OQ4 (park/resume
+re-entry trace).
+
+**Runbook amendment applied as part of ratification** (not deferred):
+`EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001.md` bumped v0.3 → v0.4. §5's
+graduation procedure now freezes `(verb-FQN, path-tag)`, never a bare
+untagged verb-FQN, as a first move (untagged entries reserved for a
+verb already independently graduated on all four paths); step 3's env
+var takes the `verb:path-tag` grammar; step 5's ledger record names
+the path tag(s) graduated.
+
+Plan bumped to v0.5
+(`docs/todo/control-plane/EOP-PLAN-CONTROLPLANE-GRADUATION-001_v0.5.md`)
+recording both ratifications; G1's dependency-graph bracket and G3's
+tranche header updated from "design doc not yet written" to ratified.
+
+**Consequence: G1 items 2-4 and G4's first line of code are now
+unblocked** (G1 item 2 additionally still names G2 item 4's provenance
+dimension as a named dependency — not yet landed, tracked separately).
+G2b's audit-stream doc and G2 item 4 itself remain the plan's genuine
+critical path.

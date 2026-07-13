@@ -1,7 +1,19 @@
 # GRADUATION RUNBOOK — ob-poc-control-plane enforce-mode rollout
-### EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001 v0.3
+### EOP-RUNBOOK-CONTROLPLANE-GRADUATION-001 v0.4
 ### Basis: EOP-PLAN-CONTROLPLANE-001 v0.1 §0 (shadow-first strategy) + docs/research/control-plane-ownership-ledger.md
-### Status: DRAFT — precondition state verified against code 2026-07-10, §2/§3/§4/§8 corrections applied 2026-07-13; no path has graduated yet.
+### Status: DRAFT — precondition state verified against code 2026-07-10, §2/§3/§4/§8 corrections applied 2026-07-13, §5 amended 2026-07-13 (AD-2(b) ratified); no path has graduated yet.
+
+v0.4 (2026-07-13, `EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001`
+§(f), ratified same day as AD-1/AD-2): §5's graduation procedure
+amended for AD-2(b)'s ratified per-(verb, path) enforcement dimension.
+Step 1 now freezes a `(verb-FQN, path-tag)` set, not a bare verb-FQN —
+graduating an untagged verb (`PathScope::All`) as a first move silently
+grants every path enforcement the moment any one path's window closes,
+defeating §3's per-path ordering; untagged entries are reserved for a
+verb already independently graduated on all four paths. Step 3's env
+var now takes `verb:path-tag` syntax (grammar + fail-closed parse-error
+behavior in the design doc's §3(c)). Step 5's ledger record now names
+the path tag(s) graduated, matching E2's own per-path reasoning.
 
 v0.2 (2026-07-10, architect review): added §1's graduation-window
 definition (a gate's window resets when its shadow inputs go from
@@ -249,19 +261,37 @@ there.
 
 ## 5. Graduation procedure (once all of §4's boxes are checked for a gate/path/verb-set)
 
-1. Freeze the exact verb-FQN set being graduated (e.g. `cbu.confirm`) —
-   never graduate `*` in one move.
+1. Freeze the exact `(verb-FQN, path-tag)` set being graduated — e.g.
+   `cbu.confirm:A` graduates `cbu.confirm` on Path A (Sequencer/runbook)
+   only, leaving it shadow-only on B/C/D. Never graduate a bare
+   untagged verb-FQN (`PathScope::All`) as a first move — the
+   graduation order in §3 exists precisely so each path earns its own
+   evidence window before being folded in; an untagged entry silently
+   grants every path enforcement the moment ANY one path's window
+   closes, which defeats §3's ordering. Untagged entries are reserved
+   for a verb that has already independently graduated on all four
+   paths (each with its own closed evidence window per §4) and is
+   being consolidated for operator-legibility, not for a first
+   graduation.
 2. Re-run the divergence query (§1) immediately before the flip — evidence
    can go stale between planning and execution.
-3. Set `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` to include the new verb(s),
-   additive to whatever's already enforced (comma-separated).
+3. Set `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` to include the new
+   `verb:path-tag` entry (or `verb:tag1|tag2` for multiple paths
+   graduating together, e.g. after both close their windows on the
+   same day), additive to whatever's already enforced (comma-separated).
+   See `EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001.md` §3(c)
+   for the exact grammar and its fail-closed parse-error behavior — a
+   malformed entry rejects every dispatch this env var would otherwise
+   gate, not just the malformed one.
 4. Watch `shadow_divergence_stats` AND application error rates for the
    enforced verb(s) for a defined soak window (suggest 24h minimum,
    matching an ordinary deploy soak — this plan doesn't specify one, so
    pick conservatively and record the choice here once decided).
 5. Record the graduation in the ownership ledger: which C-0xx rows this
    flip closes (moves from "mechanism proven" to "enforced in production"),
-   dated, with the divergence evidence window cited.
+   dated, with the divergence evidence window cited, naming the path
+   tag(s) graduated — provable per-path, matching E2's own per-path
+   reasoning, not just per-verb.
 
 ---
 
