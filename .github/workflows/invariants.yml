@@ -1,0 +1,52 @@
+name: Control plane completion invariants (E1-E5)
+
+# EOP-PLAN-CONTROLPLANE-001's plan-level completion invariants (E1-E5),
+# promoted from prose acceptance criteria to executable gates by the
+# invariant-promotion session
+# (docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-INVARIANT-PROMOTION-001.md).
+#
+# This is a RATCHET (invariants-expected.toml), not a pass/fail bar: it
+# fails if any invariant's actual status diverges from its recorded
+# expectation in EITHER direction — including unexpected green, which is
+# the sentinel-detection mechanism this gate exists for (see the session
+# doc's "Governing principle"). A tranche that closes an invariant flips
+# its row in invariants-expected.toml as part of that tranche's own diff.
+#
+# No live Postgres service is provisioned in this job. E2's dynamic half
+# and E3's live half (both #[ignore]-gated, requiring DATABASE_URL) are
+# correctly treated as NOT VERIFIED — not as passing — when skipped (see
+# scripts/check-invariants.sh's gate_e2/gate_e3), so the ratchet still
+# holds meaningfully without a DB service. Run
+# `DATABASE_URL=... scripts/check-invariants.sh ratchet` locally for the
+# full-strength check including the live halves.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ratchet:
+    name: check-invariants.sh ratchet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-invariants-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-invariants-
+
+      - name: Invariant ratchet (E1-E5 vs invariants-expected.toml)
+        run: bash scripts/check-invariants.sh ratchet

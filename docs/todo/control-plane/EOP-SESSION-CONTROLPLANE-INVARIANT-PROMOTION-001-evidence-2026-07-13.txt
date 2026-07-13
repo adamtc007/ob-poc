@@ -1,0 +1,292 @@
+
+== E1: ledger rows provably CLOSED ==
+  Total RR-3 rows: 45
+  Missing from ledger: 0
+  Provably CLOSED: 3
+  Not provably closed: 42
+  Non-closed/unproven IDs: C-001(claimed-closed,unproven:hash=0,symbol=1,resolves=1) C-002 C-003 C-004 C-005 C-006 C-007 C-008 C-009 C-010 C-011 C-012 C-013 C-014 C-015 C-016 C-017 C-018 C-019 C-020 C-021 C-023 C-024 C-025 C-026 C-027 C-028 C-029 C-031 C-032 C-033 C-034 C-035 C-036 C-038 C-039 C-040 C-041 C-042 C-043 C-044 C-045
+  E1: DOES NOT HOLD
+  [e1] exit=1
+
+== E2: execution only via envelope admission (structural + dynamic) ==
+  -- structural (per RR-2 path) --
+    Path A (runbook/step_executor_bridge.rs): admitting entry point present
+    Path B (api/agent_routes.rs raw execute): FAIL — no admitting-entry-point call
+    Path C (bpmn_integration/dispatcher.rs, domain_ops/bpmn_controller_ops.rs): FAIL — no admitting-entry-point call
+    Path D (ob-poc-web/src/bus_runtime.rs): admitting entry point present
+  -- dynamic (live DB, Path D's shared admission mechanism) --
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `compare_trace_ids` is never used
+   --> src/traceability/replay.rs:298:14
+    |
+298 | pub async fn compare_trace_ids(
+    |              ^^^^^^^^^^^^^^^^^
+
+warning: function `compare_session_traces` is never used
+   --> src/traceability/replay.rs:326:14
+    |
+326 | pub async fn compare_session_traces(
+    |              ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `ob-poc` (lib test) generated 3 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (target/debug/deps/ob_poc-00ea6772870bf2b0)
+
+running 7 tests
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::enforced_verb_without_envelope_is_rejected ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::shadow_default_admits_every_verb_with_no_envelope ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_floor_rejects_an_unregistered_verb_before_any_scope_or_consume ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::envelope_with_wrong_content_hash_is_rejected_loudly ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::execute_verb_admitting_envelope_rolls_back_the_consume_when_dispatch_fails ... ok
+test sem_os_runtime::verb_executor_adapter::t4_1_envelope_admission_tests::enforced_verb_with_consumed_envelope_admits_then_rejects_resubmission ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 2333 filtered out; finished in 0.10s
+
+  Structural failures: 2 / 4 paths
+  E2: DOES NOT HOLD (2/4 paths have no admitting entry point at all)
+  [e2] exit=1
+
+== E3: G1-G14 evaluated in production with metrics flowing ==
+  Compile-time half (exhaustive GateId match, no _ arm):
+
+warning: `ob-poc` (lib test) generated 3 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/ob_poc-00ea6772870bf2b0)
+
+running 1 test
+test agent::control_plane_metrics::t7_2_metrics_tests::e3_gate_label_match_is_exhaustive ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2339 filtered out; finished in 0.00s
+
+
+  Live half (gate_outcome_counts over real control_plane_shadow_decisions rows):
+
+running 1 test
+[E3] IntentAdmission: 31 substantive (Success/Failure) production samples
+[E3] EntityBinding: 12 substantive (Success/Failure) production samples
+[E3] PackResolution: 12 substantive (Success/Failure) production samples
+[E3] DagProof: 12 substantive (Success/Failure) production samples
+[E3] Authority: 31 substantive (Success/Failure) production samples
+[E3] Evidence: 12 substantive (Success/Failure) production samples
+[E3] WriteSet: 12 substantive (Success/Failure) production samples
+[E3] StpClassifier: 12 substantive (Success/Failure) production samples
+[E3] RunbookProof: 12 substantive (Success/Failure) production samples
+[E3] ExecutionEnvelope: 0 substantive (Success/Failure) production samples
+[E3] AuditReplay: 0 substantive (Success/Failure) production samples
+[E3] VersionPinning: 0 substantive (Success/Failure) production samples
+[E3] DecisionSnapshot: 12 substantive (Success/Failure) production samples
+[E3] WriteSetAttestation: 0 substantive (Success/Failure) production samples
+
+thread 'agent::control_plane_metrics::t7_2_metrics_tests::e3_invariant_probe' (2177224) panicked at src/agent/control_plane_metrics.rs:562:9:
+E3 does not hold: 4/14 gates have zero substantive production shadow evaluations with metrics flowing: ["ExecutionEnvelope", "AuditReplay", "VersionPinning", "WriteSetAttestation"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test agent::control_plane_metrics::t7_2_metrics_tests::e3_invariant_probe ... FAILED
+
+failures:
+
+failures:
+    agent::control_plane_metrics::t7_2_metrics_tests::e3_invariant_probe
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2339 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p ob-poc --lib`
+  E3: DOES NOT HOLD (see harness output above)
+  [e3] exit=101
+
+== E4: Mode-1 register rows version-pinned or human-gated-and-tested ==
+  (schema imposed on RR-5 by this gate — see script comment above)
+
+  [shadow_envelope_entities] Shadow envelope resolved entities (row_version:0, recheck_required:false)
+    version-pin symbol 'SnapshotPins::entity_row_version' resolves: 0
+    human-gate test 'shadow_envelope_entity_requires_human_gate' exists: 0
+  [toctou_entity_tables] Entity tables intended for TOCTOU (migration staged/pending)
+    version-pin symbol 'verify_pins_in_scope' resolves: 1
+    human-gate test 'toctou_unpinned_entity_requires_human_gate' exists: 0
+  [bus_operational_writes] Bus-invoked operational writes (Principal::system(), no runbook/envelope)
+    version-pin symbol 'PinnedVersionSet::bus_catalogue_version' resolves: 0
+    human-gate test 'bus_write_without_envelope_requires_human_gate' exists: 0
+  [bpmn_process_instances] BPMN process_instances (no row-version/CAS check found)
+    version-pin symbol 'process_instances_row_version' resolves: 0
+    human-gate test 'bpmn_process_instance_requires_human_gate' exists: 0
+  [raw_dsl_best_effort] Raw DSL best-effort execution (not routed through envelope/snapshot)
+    version-pin symbol 'raw_dsl_snapshot_pin' resolves: 0
+    human-gate test 'raw_dsl_execution_requires_human_gate' exists: 0
+
+  Total Mode-1 register rows: 5
+  Satisfied (pinned or human-gated-tested): 1
+  Unsatisfied: shadow_envelope_entities bus_operational_writes bpmn_process_instances raw_dsl_best_effort
+  E4: DOES NOT HOLD
+  [e4] exit=1
+
+== E5: workspace hygiene ==
+  -- cargo build --workspace --features database --
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+  -- cargo test -p ob-poc --lib --features database --
+test sequencer::tests::test_cross_orchestrator_stale_session_cannot_overwrite_newer_workbook_state ... ok
+test sequencer::tests::test_concurrent_sage_checkpoints_preserve_shared_session_record ... ok
+test repl::session_repository::tests::test_save_load_preserves_bindings_cbu_ids_name ... ok
+test repl::session_repository::tests::test_save_load_preserves_entity_resolution_session_state ... ok
+test integration_tests::constellation_map_tests::tests::loads_all_constellation_map_yamls ... ok
+test templates::harness::tests::test_harness_from_registry ... ok
+test integration_tests::acp_dag_semantic_cbu::acp_session_prompt_routes_all_cbu_phrase_scenarios_to_structured_dag_semantic ... ok
+
+test result: ok. 2146 passed; 0 failed; 194 ignored; 0 measured; 0 filtered out; finished in 26.39s
+
+  -- public API surface gate --
+== 1. Ratchet: --all-features surface vs committed baseline ==
+  RATCHET TRIP: dsl-runtime — public API changed vs audits/surface/dsl-runtime.txt
+10738a10739
+> pub fn dsl_runtime::PgCrudExecutor::execute_crud_in_scope<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext, &'life3 mut dyn dsl_runtime::TransactionScope) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+13331a13333
+> pub fn dsl_runtime::CrudExecutionPort::execute_crud_in_scope<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext, &'life3 mut dyn dsl_runtime::TransactionScope) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+13333a13336
+> pub fn dsl_runtime::PgCrudExecutor::execute_crud_in_scope<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext, &'life3 mut dyn dsl_runtime::TransactionScope) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
+13385a13389
+> pub fn dsl_runtime::TransactionScope::record_write(&mut self, &str, uuid::Uuid, &[alloc::string::String])
+  (refresh with: cargo +nightly public-api -p dsl-runtime --all-features | (echo "# dsl-runtime | features=all | HEAD=$(git rev-parse HEAD) | $(date -u +%Y-%m-%dT%H:%M:%SZ)"; cat) > audits/surface/dsl-runtime.txt)
+  RATCHET TRIP: ob-poc — public API changed vs audits/surface/ob-poc.txt
+12a13
+> pub use ob_poc::semtaxonomy_v2
+76a78,80
+> impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc::agent::composite_state::BlockedVerbHint where T: ?core::marker::Sized
+> pub fn ob_poc::agent::composite_state::BlockedVerbHint::and<P, B, E>(self, P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+> pub fn ob_poc::agent::composite_state::BlockedVerbHint::or<P, B, E>(self, P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+150a155,157
+> impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc::agent::composite_state::CbuStateSummary where T: ?core::marker::Sized
+> pub fn ob_poc::agent::composite_state::CbuStateSummary::and<P, B, E>(self, P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+> pub fn ob_poc::agent::composite_state::CbuStateSummary::or<P, B, E>(self, P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+230a238,240
+> impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc::agent::composite_state::GroupCompositeState where T: ?core::marker::Sized
+> pub fn ob_poc::agent::composite_state::GroupCompositeState::and<P, B, E>(self, P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+> pub fn ob_poc::agent::composite_state::GroupCompositeState::or<P, B, E>(self, P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+299a310,312
+> impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc::agent::composite_state::ScoredVerbHint where T: ?core::marker::Sized
+> pub fn ob_poc::agent::composite_state::ScoredVerbHint::and<P, B, E>(self, P) -> tower_http::follow_redirect::policy::and::And<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+> pub fn ob_poc::agent::composite_state::ScoredVerbHint::or<P, B, E>(self, P) -> tower_http::follow_redirect::policy::or::Or<T, P> where T: core::marker::Sized + tower_http::follow_redirect::policy::Policy<B, E>, P: tower_http::follow_redirect::policy::Policy<B, E>
+374a388,390
+> impl<T> tower_http::follow_redirect::policy::PolicyExt for ob_poc::agent::constellation_verb_index::ConstellationVerbIndex where T: ?core::marker::Sized
+  (refresh with: cargo +nightly public-api -p ob-poc --all-features | (echo "# ob-poc | features=all | HEAD=$(git rev-parse HEAD) | $(date -u +%Y-%m-%dT%H:%M:%SZ)"; cat) > audits/surface/ob-poc.txt)
+  MEASUREMENT FAILED: ob-poc-agent (cargo public-api errored — check build)
+  RATCHET TRIP: ob-poc-boundary — public API changed vs audits/surface/ob-poc-boundary.txt
+10825c10825
+< pub async fn ob_poc_boundary::toctou_recheck::verify_pins(&ob_poc_control_plane::snapshot::SnapshotPins, &[(uuid::Uuid, alloc::string::String)], &dyn ob_poc_boundary::toctou_recheck::RowVersionProvider) -> anyhow::Result<(), anyhow::Error>
+---
+> pub async fn ob_poc_boundary::toctou_recheck::verify_pins_in_scope(&ob_poc_control_plane::snapshot::SnapshotPins, &mut sqlx_postgres::connection::PgConnection) -> anyhow::Result<(), anyhow::Error>
+  (refresh with: cargo +nightly public-api -p ob-poc-boundary --all-features | (echo "# ob-poc-boundary | features=all | HEAD=$(git rev-parse HEAD) | $(date -u +%Y-%m-%dT%H:%M:%SZ)"; cat) > audits/surface/ob-poc-boundary.txt)
+  RATCHET TRIP: ob-poc-control-plane — public API changed vs audits/surface/ob-poc-control-plane.txt
+235a236
+> pub ob_poc_control_plane::context::EvaluationContext::runbook_proof: core::option::Option<ob_poc_control_plane::proof::RunbookProofInput>
+237a239
+> pub ob_poc_control_plane::context::EvaluationContext::version_pinning: core::option::Option<ob_poc_control_plane::versioning::VersionPinningInput>
+266a269,271
+> impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::proof::RunbookProofGate
+> pub fn ob_poc_control_plane::proof::RunbookProofGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
+> pub fn ob_poc_control_plane::proof::RunbookProofGate::id(&self) -> ob_poc_control_plane::gate::GateId
+272a278,280
+> impl ob_poc_control_plane::gate::Gate<ob_poc_control_plane::context::EvaluationContext> for ob_poc_control_plane::versioning::VersionPinningGate
+> pub fn ob_poc_control_plane::versioning::VersionPinningGate::evaluate(&self, &ob_poc_control_plane::context::EvaluationContext) -> ob_poc_control_plane::gate::GateResult
+> pub fn ob_poc_control_plane::versioning::VersionPinningGate::id(&self) -> ob_poc_control_plane::gate::GateId
+615a624,625
+> pub fn ob_poc_control_plane::decision::evaluate(&ob_poc_control_plane::context::EvaluationContext, ob_poc_control_plane::envelope::ValidityWindow) -> ob_poc_control_plane::decision::ControlPlaneDecision
+> pub fn ob_poc_control_plane::decision::evaluate_with_report(&ob_poc_control_plane::context::EvaluationContext, ob_poc_control_plane::envelope::ValidityWindow) -> (ob_poc_control_plane::gate::EvaluationReport, ob_poc_control_plane::decision::ControlPlaneDecision)
+838a849,900
+> pub struct ob_poc_control_plane::envelope::EnvelopeRecord
+> pub ob_poc_control_plane::envelope::EnvelopeRecord::bound_entity_ids: alloc::vec::Vec<uuid::Uuid>
+> pub ob_poc_control_plane::envelope::EnvelopeRecord::envelope_id: uuid::Uuid
+> pub ob_poc_control_plane::envelope::EnvelopeRecord::not_after: chrono::datetime::DateTime<chrono::offset::utc::Utc>
+  (refresh with: cargo +nightly public-api -p ob-poc-control-plane --all-features | (echo "# ob-poc-control-plane | features=all | HEAD=$(git rev-parse HEAD) | $(date -u +%Y-%m-%dT%H:%M:%SZ)"; cat) > audits/surface/ob-poc-control-plane.txt)
+  RATCHET TRIP: ob-poc-types — public API changed vs audits/surface/ob-poc-types.txt
+10254a10255,10395
+> pub mod ob_poc_types::intent
+> pub enum ob_poc_types::intent::IntentArgValue
+> pub ob_poc_types::intent::IntentArgValue::Boolean(bool)
+> pub ob_poc_types::intent::IntentArgValue::List(alloc::vec::Vec<ob_poc_types::intent::IntentArgValue>)
+> pub ob_poc_types::intent::IntentArgValue::Map(alloc::collections::btree::map::BTreeMap<alloc::string::String, ob_poc_types::intent::IntentArgValue>)
+> pub ob_poc_types::intent::IntentArgValue::Missing
+> pub ob_poc_types::intent::IntentArgValue::Missing::arg_name: alloc::string::String
+> pub ob_poc_types::intent::IntentArgValue::Number(f64)
+> pub ob_poc_types::intent::IntentArgValue::Reference(alloc::string::String)
+> pub ob_poc_types::intent::IntentArgValue::String(alloc::string::String)
+> pub ob_poc_types::intent::IntentArgValue::Unresolved
+> pub ob_poc_types::intent::IntentArgValue::Unresolved::entity_type: core::option::Option<alloc::string::String>
+> pub ob_poc_types::intent::IntentArgValue::Unresolved::value: alloc::string::String
+> pub ob_poc_types::intent::IntentArgValue::Uuid(alloc::string::String)
+> impl core::clone::Clone for ob_poc_types::intent::IntentArgValue
+> pub fn ob_poc_types::intent::IntentArgValue::clone(&self) -> ob_poc_types::intent::IntentArgValue
+> impl core::fmt::Debug for ob_poc_types::intent::IntentArgValue
+> pub fn ob_poc_types::intent::IntentArgValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+> impl serde_core::ser::Serialize for ob_poc_types::intent::IntentArgValue
+  (refresh with: cargo +nightly public-api -p ob-poc-types --all-features | (echo "# ob-poc-types | features=all | HEAD=$(git rev-parse HEAD) | $(date -u +%Y-%m-%dT%H:%M:%SZ)"; cat) > audits/surface/ob-poc-types.txt)
+
+== 2. Membrane check (§6.2): --no-default-features floor must carry no sqlx/PgPool ==
+  BUILD FAILED AT --no-default-features: ob-poc-derived-attributes (crate does not compile in isolation with zero features — a Cargo.toml feature-declaration gap, not a membrane leak)
+  BUILD FAILED AT --no-default-features: ob-poc-entity-linking (crate does not compile in isolation with zero features — a Cargo.toml feature-declaration gap, not a membrane leak)
+  BUILD FAILED AT --no-default-features: ob-poc-taxonomy (crate does not compile in isolation with zero features — a Cargo.toml feature-declaration gap, not a membrane leak)
+  BUILD FAILED AT --no-default-features: ob-poc-trading-profile (crate does not compile in isolation with zero features — a Cargo.toml feature-declaration gap, not a membrane leak)
+
+== 3. Test-double leak check (§8 subset — name scan, not the tests/-dir inventory): no Stub/Mock/Fake at the --no-default-features floor ==
+
+== Public API surface gate FAILED ==
+  -- unreachable_pub (crates that opt in via #![deny(unreachable_pub)]) --
+    Crates enforcing unreachable_pub:
+      rust/crates/dsl-ast/src/lib.rs
+      rust/crates/bpmn-test-harness/src/lib.rs
+      rust/crates/dsl-analysis/src/lib.rs
+      rust/crates/dsl-atoms/src/lib.rs
+      rust/crates/dsl-sage/src/lib.rs
+      rust/crates/dsl-migrate-verify/src/lib.rs
+      rust/crates/dsl-resolution/src/lib.rs
+      rust/crates/ob-poc-compiler/src/lib.rs
+      rust/crates/ob-poc-authoring/src/lib.rs
+      rust/crates/ob-poc-deal/src/lib.rs
+      rust/crates/dsl-runtime/src/lib.rs
+      rust/crates/dsl-migrate/src/lib.rs
+      rust/crates/bpmn-controller/src/lib.rs
+      rust/crates/ob-poc-ontology/src/lib.rs
+      rust/crates/ob-poc-kyc-store/src/lib.rs
+      rust/crates/ob-poc-control-plane/src/lib.rs
+      rust/crates/ob-poc-bods/src/lib.rs
+      rust/crates/ob-poc-semtaxonomy/src/lib.rs
+      rust/crates/sem_os_mcp/src/lib.rs
+      rust/crates/dsl-lsp/src/lib.rs
+      rust/crates/ob-workflow/src/lib.rs
+      rust/crates/dsl-parser/src/lib.rs
+      rust/crates/sem_os_postgres/src/lib.rs
+      rust/crates/ob-poc-sage/src/lib.rs
+      rust/crates/ob-poc-kyc-substrate/src/lib.rs
+      rust/crates/dsl-lowering/src/lib.rs
+      rust/crates/ob-templates/src/lib.rs
+      rust/crates/ob-poc-agent/src/lib.rs
+      rust/crates/sem_os_obpoc_adapter/src/lib.rs
+      rust/crates/playbook-core/src/lib.rs
+      rust/crates/dsl-diagnostics/src/lib.rs
+      rust/crates/sem_os_harness/src/lib.rs
+      rust/crates/ob-poc-kyc-seam/src/lib.rs
+      rust/crates/ob-poc-boundary/src/lib.rs
+      rust/crates/ob-agentic/src/lib.rs
+      rust/crates/inspector-projection/src/lib.rs
+      rust/crates/dsl-render/src/lib.rs
+      rust/crates/ob-poc-journey/src/lib.rs
+      rust/crates/ob-semantic-matcher/src/lib.rs
+      rust/crates/ob-poc-types/src/lib.rs
+      rust/crates/dsl-bpmn-frontend/src/lib.rs
+      rust/crates/ob-poc-diagnostics/src/lib.rs
+      rust/crates/ob-poc-trading-profile/src/lib.rs
+      rust/crates/sem_os_client/src/lib.rs
+      rust/crates/ob-poc-taxonomy/src/lib.rs
+      rust/crates/ob-poc-macros/src/lib.rs
+      rust/crates/ob-poc-manifest-export/src/lib.rs
+      rust/crates/ob-poc-entity-linking/src/lib.rs
+      rust/crates/dsl-semos-frontend/src/lib.rs
+      rust/crates/bpmn-runtime/src/lib.rs
+      rust/crates/ob-poc-derived-attributes/src/lib.rs
+      rust/crates/ob-poc-bus-handler/src/lib.rs
+      rust/crates/entity-gateway/src/lib.rs
+      rust/crates/sem_os_server/src/lib.rs
+  E5: DOES NOT HOLD
+  [e5] exit=1
+
+== Summary: 5/5 invariants do not hold ==

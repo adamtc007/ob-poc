@@ -465,4 +465,104 @@ mod t7_2_metrics_tests {
         assert_eq!(row.sealable, 2);
         assert!((row.sealable as f64 / row.total as f64 - (2.0 / 3.0)).abs() < 1e-9);
     }
+
+    /// E3 completion-invariant probe (invariant-promotion session,
+    /// 2026-07-13): "G1-G14 each evaluated in production (not
+    /// `NotImplemented`) with metrics flowing."
+    ///
+    /// `gate_label` is an EXHAUSTIVE match over `GateId` with no `_` arm —
+    /// per the session's governing principle, a 15th gate must break this
+    /// at compile time until this probe is updated to cover it, the same
+    /// discipline the codebase already applies to `PruneReason` and
+    /// `ValidationState`/`OperationalState`/`DispositionState` matches
+    /// elsewhere.
+    ///
+    /// For each of the 14 gates, queries `gate_outcome_counts` (the real,
+    /// already-wired T7.2 metrics function this session reuses rather than
+    /// duplicates) against real persisted `control_plane_shadow_decisions`
+    /// rows and requires at least one `Success` or `Failure` sample —
+    /// `NotEvaluated`/`NotImplemented`/`Unrecognised` (including the
+    /// `"missing"` sentinel `report_to_json` writes for a gate that wasn't
+    /// yet registered in `evaluate_shadow`'s gate map when an older row was
+    /// persisted — a real, separately-flagged gap in the existing T7.2
+    /// classifier SQL, not fixed here, out of this session's scope) do not
+    /// count as "evaluated," matching the invariant's literal text.
+    #[test]
+    fn e3_gate_label_match_is_exhaustive() {
+        // Compile-time proof only — see e3_invariant_probe for the live
+        // check. This function's body never runs meaningfully; its only
+        // job is to force a compile error if GateId gains a variant this
+        // match doesn't cover.
+        fn gate_label(id: ob_poc_control_plane::gate::GateId) -> &'static str {
+            use ob_poc_control_plane::gate::GateId;
+            match id {
+                GateId::IntentAdmission => "IntentAdmission",
+                GateId::EntityBinding => "EntityBinding",
+                GateId::PackResolution => "PackResolution",
+                GateId::DagProof => "DagProof",
+                GateId::Authority => "Authority",
+                GateId::Evidence => "Evidence",
+                GateId::WriteSet => "WriteSet",
+                GateId::StpClassifier => "StpClassifier",
+                GateId::RunbookProof => "RunbookProof",
+                GateId::ExecutionEnvelope => "ExecutionEnvelope",
+                GateId::AuditReplay => "AuditReplay",
+                GateId::VersionPinning => "VersionPinning",
+                GateId::DecisionSnapshot => "DecisionSnapshot",
+                GateId::WriteSetAttestation => "WriteSetAttestation",
+                // NO _ arm — a 15th GateId variant fails this match at
+                // compile time, not at gate-run time.
+            }
+        }
+        for id in ob_poc_control_plane::gate::GateId::ALL {
+            assert!(!gate_label(id).is_empty());
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn e3_invariant_probe() {
+        fn gate_label(id: ob_poc_control_plane::gate::GateId) -> &'static str {
+            use ob_poc_control_plane::gate::GateId;
+            match id {
+                GateId::IntentAdmission => "IntentAdmission",
+                GateId::EntityBinding => "EntityBinding",
+                GateId::PackResolution => "PackResolution",
+                GateId::DagProof => "DagProof",
+                GateId::Authority => "Authority",
+                GateId::Evidence => "Evidence",
+                GateId::WriteSet => "WriteSet",
+                GateId::StpClassifier => "StpClassifier",
+                GateId::RunbookProof => "RunbookProof",
+                GateId::ExecutionEnvelope => "ExecutionEnvelope",
+                GateId::AuditReplay => "AuditReplay",
+                GateId::VersionPinning => "VersionPinning",
+                GateId::DecisionSnapshot => "DecisionSnapshot",
+                GateId::WriteSetAttestation => "WriteSetAttestation",
+            }
+        }
+
+        let pool = test_pool().await;
+        let counts = gate_outcome_counts(&pool).await.expect("query failed");
+
+        let mut failing: Vec<&'static str> = Vec::new();
+        for id in ob_poc_control_plane::gate::GateId::ALL {
+            let label = gate_label(id);
+            let substantive: i64 = counts
+                .iter()
+                .filter(|c| c.gate == label && (c.outcome_kind == "Success" || c.outcome_kind == "Failure"))
+                .map(|c| c.count)
+                .sum();
+            println!("[E3] {label}: {substantive} substantive (Success/Failure) production samples");
+            if substantive == 0 {
+                failing.push(label);
+            }
+        }
+
+        assert!(
+            failing.is_empty(),
+            "E3 does not hold: {}/14 gates have zero substantive production shadow evaluations with metrics flowing: {failing:?}",
+            failing.len()
+        );
+    }
 }

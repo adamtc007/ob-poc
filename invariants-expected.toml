@@ -1,0 +1,66 @@
+# Expected status of EOP-PLAN-CONTROLPLANE-001's completion invariants
+# (E1-E5), as of the invariant-promotion session
+# (docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-INVARIANT-PROMOTION-001.md).
+#
+# This is a RATCHET, not a target list: CI fails if the actual status
+# (scripts/check-invariants.sh) diverges from what's recorded here IN
+# EITHER DIRECTION.
+#
+#   - actual=fail, expected=fail  -> CI green (known-incomplete, tracked)
+#   - actual=fail, expected=pass  -> CI red (a regression)
+#   - actual=pass, expected=fail  -> CI red (unexpected green — per the
+#     session's governing principle, a completion invariant going green
+#     before its expectation is flipped is itself a defect signal: either
+#     a real tranche closed it (flip the expectation, in the same diff, as
+#     a reviewed decision) or the gate was weakened/satisfied by
+#     convention (fix the gate). Silence is not an acceptable outcome for
+#     either case.
+#   - actual=pass, expected=pass  -> CI green (verified holding)
+#
+# A tranche that closes an invariant flips its row here AS PART OF that
+# tranche's diff — the flip is the reviewer's signal that a completion
+# claim is being made, not a side effect discovered later.
+#
+# Status as of 2026-07-13 (Phase 1-5 of the invariant-promotion session,
+# empirically run, not assumed):
+
+[e1]
+status = "fail"
+# 3/45 RR-3 rows provably CLOSED (hash + resolving symbol cited):
+# C-022, C-030, C-037. C-001 is claimed CLOSED in prose but lacks a
+# commit-hash citation — correctly counted as unproven, not closed.
+
+[e2]
+status = "fail"
+# Structural: 2/4 RR-2 paths (A, D) call execute_verb_admitting_envelope
+# at all; B, C have no admitting entry point. Dynamic (live DB): Path D's
+# admission mechanism works when enabled but OB_POC_CONTROL_PLANE_ENFORCE_VERBS
+# is unset by production default (NotEnforced) everywhere.
+
+[e3]
+status = "fail"
+# 10/14 gates (G1-G9, G13) have substantive (Success/Failure) production
+# shadow-decision samples with metrics flowing. G10 (ExecutionEnvelope),
+# G11 (AuditReplay), G12 (VersionPinning), G14 (WriteSetAttestation) have
+# zero — either never registered in evaluate_shadow's gate map at the
+# time existing rows were persisted, or never wired to a real call site.
+
+[e4]
+status = "fail"
+# 1/5 Mode-1 register rows (RR-5) have real, non-test production wiring:
+# toctou_entity_tables (verify_pins_in_scope, called for real in
+# verb_executor_adapter.rs). The other 4 have neither a load-bearing
+# version-pin call site nor a named human-gate test.
+
+[e5]
+status = "fail"
+# Corrects this session's own initial premise ("workspace hygiene already
+# holds") — empirically false. Public API surface ratchet trips on 5
+# crates (dsl-runtime, ob-poc-control-plane, ob-poc-boundary, ob-poc,
+# ob-poc-types) with unrefreshed audits/surface/*.txt baselines spanning
+# several already-landed tranches; ob-poc-agent's surface measurement
+# errors outright; 4 crates (ob-poc-derived-attributes,
+# ob-poc-entity-linking, ob-poc-taxonomy, ob-poc-trading-profile) fail to
+# build at --no-default-features (pre-existing Cargo.toml feature gap).
+# cargo build/test themselves are green. Fixing the surface/membrane gaps
+# is real engineering out of this gate-authoring session's scope.
