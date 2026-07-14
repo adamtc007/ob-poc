@@ -1496,3 +1496,68 @@ envelope rows if mint and admit are ever separated by a crash or
 future refactor; not acted on this session (harmless today since §7's
 gap means nothing actually mints in production yet). Everything else
 checked out solid.
+
+## G14 write-coverage tranche: record_write wired into the 6 missing CRUD ops (2026-07-14)
+
+Operator authorized "g14 next" — closing the write-capture half of the
+gap the adversarial review found above (finding (1)). `crud_executor.rs`
+now calls `record_write` from all 10 `CrudOperation` execute functions,
+not just the original 4 (Insert/Update/Delete/Upsert):
+
+- `execute_link`/`execute_unlink`: one call per Uuid-typed side
+  (`from`/`to`) of the junction row, gated on `affected > 0` (an
+  `ON CONFLICT DO NOTHING` re-link/already-absent-unlink is a genuine
+  no-op, not a write to attest against). Unlink uses an empty column
+  list — hard delete of the whole junction row, matching
+  `execute_delete`'s existing precedent for the same shape.
+- `execute_role_link`: recorded unconditionally on success — same
+  idempotent-INSERT-with-fallback-SELECT SQL shape as `execute_insert`,
+  same reasoning applies verbatim — keyed by the junction row's own
+  generated PK (the one of the six ops with its own row identity, unlike
+  link/unlink/role_unlink which have none).
+- `execute_role_unlink`: symmetric to unlink, one call per Uuid-typed
+  side among `from`/`to`/`role`.
+- `execute_entity_create`/`execute_entity_upsert`: two calls each (base
+  `entities` table, then the extension table), keyed by `entity_id` (the
+  semantic FK a caller's bound-entity-id list would actually contain),
+  not the extension table's own surrogate PK when one exists. The
+  idempotent early-return branch in `entity_create` (entity already
+  exists) correctly records nothing — no SQL write happens on that path.
+
+**Found and documented, not fixed (genuinely out of scope for this
+tranche):** `infer_pk_column` in `crud_executor.rs` has no case for any
+real entity extension table (`entity_proper_persons`,
+`entity_limited_companies`, `entity_funds`, ...) — it falls back to a
+literal `"id"` column that exists on none of them, so
+`execute_entity_create`'s extension-table INSERT fails for every real
+entity type today, independent of this change (confirmed: identical
+failure with the new `record_write` calls temporarily removed). The live
+production path for `entity.create` is a different, correct
+implementation (`dsl_v2::generic_executor.rs`'s own `infer_pk_column`,
+which has the real per-table mapping) — this `crud_executor.rs` copy of
+`execute_entity_create` is not yet wired into production for that verb.
+The new test proves the base-table capture (which runs and succeeds
+before the broken extension step) and documents the blocked second half
+rather than papering over it with a synthetic fixture.
+
+**Still open, deliberately not attempted this tranche:** the downstream
+`allowed_columns` derivation (`control_plane_shadow.rs`'s
+`derive_allowed_columns_for_operation`) still only covers
+Insert/Update/Upsert-with-explicit-`returning`; extending it to the same
+6 operation kinds is required before G14 could ever be armed for them,
+and is its own not-yet-scoped follow-up. **G14's gate remains unarmed in
+production** (`set_expected_write_set` still has no real call site) —
+this tranche is pure write-capture infrastructure, zero production
+behavior change.
+
+Independently re-verified (not just the landing agent's own claim):
+forced rebuild (`touch` + `cargo build -p dsl-runtime`, IDE diagnostics
+were stale as usual — a `cargo build --workspace` afterward was also
+clean), `cargo clippy -p dsl-runtime --lib -- -D warnings` clean, full
+`dsl-runtime` lib suite (185/0) and live-DB ignored suite (7/0,
+`DATABASE_URL`) green, and personally reproduced RED (reverted the
+base-table `record_write` call in `execute_entity_create`, got the exact
+predicted panic — `expected exactly 1 captured write ... got []`) then
+GREEN, confirming `git diff --stat` returned to its pre-probe size
+(263 insertions, 0 deletions) after restoring. Committed as `62f460fb`.
+`invariants-expected.toml` untouched — no arming decision was made.
