@@ -3863,6 +3863,61 @@ mod tests {
             );
         }
 
+        /// G6b (RR-5 row 5, E4 slug `raw_dsl_best_effort`) named human-gate
+        /// test. RR-5's original row text ("raw endpoint has its own
+        /// validation and execution modes") is stale for the literal
+        /// bypass it describes: `POST /api/session/:id/execute` rejects
+        /// any `req.dsl` in the request body outright (`StatusCode::
+        /// FORBIDDEN`, `agent_routes.rs::execute_session_dsl_raw`,
+        /// Slice 3.1, 2026-04-22 — see the deprecation table in
+        /// `CLAUDE.md`: "Direct DSL bypass (`dsl:` prefix)" removed).
+        /// What that endpoint actually executes today is
+        /// `session.run_sheet.runnable_dsl()` — DSL that already passed
+        /// through the compiled-runbook/SemOS pipeline — via this same
+        /// `DslExecutor::execute_verb_in_scope` seam, tagged
+        /// `ExecutionPath::DslDirect` (`executor_bridge.rs`).
+        ///
+        /// No production call site seals an envelope for Path B/C today
+        /// (`ctx.envelope_handle` is `None` at every real ingress —
+        /// see that field's own doc comment and G6b's session doc for why
+        /// building one is out of this tranche's scope: it is new sealing
+        /// infrastructure, not a populator at an already-established
+        /// seam). This test proves the property that actually matters
+        /// while that gap stands: an enforced verb on `DslDirect` with
+        /// nothing sealed is REJECTED (`RejectedNoEnvelope`, fail-closed),
+        /// never silently dispatched "best-effort" — the raw/direct path
+        /// cannot bypass an active enforcement pin by the mere absence of
+        /// envelope-minting infrastructure.
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn raw_dsl_execution_requires_human_gate() {
+            // "B" is DslDirect's `ExecutionPath::tag()` — see
+            // `execution_path.rs` (A=RunbookSequencer, B=DslDirect,
+            // C=WorkflowDispatched, D=BusFederated). Matches the sibling
+            // seam tests above (`seam_rolls_back_the_consume_when_dispatch_fails`
+            // et al.) which also enforce `cbu.confirm:B` for this exact path.
+            let _guard = EnvGuard::set("cbu.confirm:B");
+            let pool = test_pool().await;
+            let executor = DslExecutor::new(pool.clone());
+            let mut ctx = ctx_for(ob_poc_types::ExecutionPath::DslDirect);
+            assert!(ctx.envelope_handle.is_none(), "Path B's honest production posture: nothing sealed");
+            let vc = verb_call("cbu", "confirm", vec![]);
+
+            let mut scope = PgTransactionScope::begin(&pool).await.expect("begin scope");
+            let err = {
+                let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                executor
+                    .execute_verb_in_scope(&vc, &mut ctx, scope_dyn)
+                    .await
+                    .expect_err("an enforced verb on DslDirect with no envelope must be rejected")
+            };
+            scope.rollback().await.expect("rollback");
+            assert!(
+                err.to_string().contains("is enforce-mode gated") && err.to_string().contains("no sealed envelope was presented"),
+                "expected the real RejectedNoEnvelope message, got: {err}"
+            );
+        }
+
         /// Item 4: pin-drift rejection leaves the envelope reconsumable.
         /// Same property
         /// `execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable`

@@ -7963,13 +7963,20 @@ impl ReplOrchestratorV2 {
                 entity_requests.iter().map(|(id, _)| *id).collect(),
             );
 
-            // T9.5 (Addendum B): resolve G8's StpClassifierInput from the
-            // same RuntimeBehavior lookup the real dispatch router uses —
-            // see build_stp_classifier_input's doc.
+            // T9.5 (Addendum B) / G6b: resolve G8's StpClassifierInput from
+            // the same RuntimeBehavior lookup the real dispatch router
+            // uses, with `has_unpinned_entities` now the real per-entity
+            // pin fact derived from `entity_facts_map` (the same batched
+            // read G2/G13 already fetched above) instead of the blanket
+            // "any bound entity is unpinned" placeholder — see
+            // build_stp_classifier_input's and has_unpinned_entities' docs.
             let stp_classifier = Some(
                 crate::agent::control_plane_shadow::build_stp_classifier_input(
                     &entry.verb,
-                    !entity_requests.is_empty(),
+                    crate::agent::control_plane_shadow::has_unpinned_entities(
+                        &entity_requests,
+                        entity_facts_map.as_ref(),
+                    ),
                 ),
             );
 
@@ -8232,9 +8239,14 @@ impl ReplOrchestratorV2 {
             entry_id,
             entity_requests.iter().map(|(id, _)| *id).collect(),
         );
+        // G6b: real per-entity pin fact (see the primary call site's
+        // identical comment in `phase5_runtime_recheck`, above).
         let stp_classifier = Some(crate::agent::control_plane_shadow::build_stp_classifier_input(
             &entry.verb,
-            !entity_requests.is_empty(),
+            crate::agent::control_plane_shadow::has_unpinned_entities(
+                &entity_requests,
+                entity_facts_map.as_ref(),
+            ),
         ));
         let snapshot =
             crate::agent::control_plane_shadow::build_decision_snapshot_input(entity_facts_map.as_ref());

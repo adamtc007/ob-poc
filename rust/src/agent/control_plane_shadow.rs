@@ -234,14 +234,16 @@ pub(crate) fn build_write_set_input(
 /// for.
 ///
 /// `has_unpinned_entities` is threaded in by the caller rather than
-/// computed here: T4.3's `verify_pins`/`SnapshotPins` populator has zero
-/// production call sites (see the ownership ledger's T4 entries), so
-/// there is no real "this entity is pinned" fact anywhere in the system
-/// yet — every entity this call site binds is unpinned by construction.
-/// The caller passes `!entity_ids.is_empty()` (same entity list G7
-/// already resolves), which is the honest, conservative reading: zero
-/// entities means nothing to pin-check (vacuously not-unpinned), any
-/// bound entity is unpinned until a real pinning mechanism exists.
+/// computed here — see [`has_unpinned_entities`] (G6b, EOP-PLAN-
+/// CONTROLPLANE-GRADUATION-001, RR-5 row 2 "Entity tables intended for
+/// TOCTOU"), which now derives this bool from the same `entity_facts_map`
+/// G2/G13 already fetched for this call, replacing the blanket "any bound
+/// entity is unpinned" placeholder this doc used to describe (T4.3's
+/// populator: real per-entity `row_version` pins now flow end-to-end from
+/// `PgEntityFactsSource` through `build_decision_snapshot_input`/
+/// `build_pins` into a sealed envelope's `SnapshotPins`, so an entity that
+/// was actually found and pinned is no longer forced through
+/// `RequiresHumanGate`).
 pub(crate) fn build_stp_classifier_input(
     verb_fqn: &str,
     has_unpinned_entities: bool,
@@ -259,6 +261,44 @@ pub(crate) fn build_stp_classifier_input(
         durable_execution_explicitly_allowed: false,
         has_unpinned_entities,
     }
+}
+
+/// G6b (EOP-PLAN-CONTROLPLANE-GRADUATION-001, RR-5 row 2 — "Entity tables
+/// intended for TOCTOU"): the real "is this bound entity pinned" fact,
+/// derived from the exact same `entity_facts_map` batched read G2/G13
+/// already fetch (`entity_facts.rs::EntityFactsSource::entity_facts`,
+/// covering `cbu`/`entity`/`case`/`deal`/`client_group` — the five kinds
+/// the row_version migration (`20260422_row_version_entity_tables.sql`,
+/// confirmed applied 2026-07-14: `\d+ "ob-poc".cbus` shows the column and
+/// trigger live) actually covers).
+///
+/// An entity counts as pinned when it is present in `facts_map` — per
+/// `build_entity_binding_input`'s own contract, `EntityFactsSource`
+/// returns an entry *only* for a row it actually read (and captured
+/// `row_version` from in the same query); an entity missing from the map
+/// was not found (or its kind isn't one of the five covered ones), so
+/// there is no `row_version` to pin — honestly unpinned, matching G2's
+/// own `exists: false` grading for the identical condition.
+///
+/// `facts_map: None` (the batched fetch itself errored — see
+/// `entity_facts_map`'s construction in `phase5_runtime_recheck`/
+/// `reseal_for_human_gate_resume`) is unpinned for every requested entity,
+/// fail-closed: an I/O failure is not evidence of a pin.
+///
+/// Zero requested entities is vacuously **not** unpinned (nothing to
+/// pin-check) — same posture `build_entity_binding_input`/
+/// `build_write_set_input` already use for the empty case.
+pub(crate) fn has_unpinned_entities(
+    requests: &[(Uuid, String)],
+    facts_map: Option<&HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>>,
+) -> bool {
+    if requests.is_empty() {
+        return false;
+    }
+    let Some(facts_map) = facts_map else {
+        return true;
+    };
+    requests.iter().any(|(id, _)| !facts_map.contains_key(id))
 }
 
 /// T9.6 (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G13's `SnapshotInput`
@@ -1491,6 +1531,49 @@ domains:
         assert_eq!(input.entity_row_versions, vec![(entity_id, "cbu".to_string(), 7)]);
     }
 
+    // ── G6b: has_unpinned_entities ──────────────────────────────────────
+
+    #[test]
+    fn has_unpinned_entities_false_for_no_requests() {
+        assert!(!has_unpinned_entities(&[], None));
+        assert!(!has_unpinned_entities(&[], Some(&HashMap::new())));
+    }
+
+    #[test]
+    fn has_unpinned_entities_true_when_facts_fetch_failed() {
+        let entity_id = Uuid::new_v4();
+        let requests = vec![(entity_id, "cbu".to_string())];
+        assert!(has_unpinned_entities(&requests, None));
+    }
+
+    #[test]
+    fn has_unpinned_entities_true_when_entity_missing_from_facts() {
+        let entity_id = Uuid::new_v4();
+        let requests = vec![(entity_id, "cbu".to_string())];
+        // Fetch succeeded but returned no row for this id (not found, or
+        // an unsupported kind that the batched query silently omitted).
+        assert!(has_unpinned_entities(&requests, Some(&HashMap::new())));
+    }
+
+    #[test]
+    fn has_unpinned_entities_false_when_every_requested_entity_has_a_real_pin() {
+        let entity_id = Uuid::new_v4();
+        let requests = vec![(entity_id, "cbu".to_string())];
+        let mut facts = HashMap::new();
+        facts.insert(entity_id, fixture_entity_facts_row(entity_id, "cbu", 3));
+        assert!(!has_unpinned_entities(&requests, Some(&facts)));
+    }
+
+    #[test]
+    fn has_unpinned_entities_true_when_only_some_requested_entities_are_pinned() {
+        let pinned = Uuid::new_v4();
+        let unpinned = Uuid::new_v4();
+        let requests = vec![(pinned, "cbu".to_string()), (unpinned, "entity".to_string())];
+        let mut facts = HashMap::new();
+        facts.insert(pinned, fixture_entity_facts_row(pinned, "cbu", 3));
+        assert!(has_unpinned_entities(&requests, Some(&facts)));
+    }
+
     // ── T9.7 (Addendum B): build_runbook_proof_input / build_version_pinning_input ──
 
     #[test]
@@ -1634,18 +1717,17 @@ domains:
         // same envelope/actor already assembled above (no AbacDenied
         // prune, no evidence_gaps -> Allow / Sufficient).
         //
-        // G8 (STP classifier, T9.5): depends on all seven gates above
+        // G8 (STP classifier, T9.5/G6b): depends on all seven gates above
         // (GATE_DEPENDENCIES). This fixture's `RuntimeVerbRegistry` has no
         // entry for "test.transition-verb", so is_durable_verb is
-        // honestly false. `has_unpinned_entities: false` here — not
-        // because pinning is real (it isn't; see build_stp_classifier_input's
-        // doc), but because `classify()`'s own logic maps any unpinned
-        // entity to `HumanGated` (-> GateResult::Failure), which is a
-        // correct, not a broken, outcome; this closure test's "every
-        // input was built to be legal" framing means "legal to reach
-        // Success", and StpExecutable's actual precondition is no
-        // unpinned entities.
-        let stp_classifier = Some(build_stp_classifier_input(verb_fqn, false));
+        // honestly false. `has_unpinned_entities` is now the REAL G6b
+        // populator fact, `has_unpinned_entities(&requests, Some(&facts))`
+        // — not a hardcoded `false`. It resolves to `false` here because
+        // `cbu_id` is a genuinely live row and `PgEntityFactsSource`
+        // actually captured its `row_version` above (`facts` is non-empty
+        // for it) — this is the "populator is real" proof, not a fixture
+        // fabricated to make the gate pass.
+        let stp_classifier = Some(build_stp_classifier_input(verb_fqn, has_unpinned_entities(&requests, Some(&facts))));
 
         // G13 (decision snapshot, T9.6): no declared dependency
         // (GATE_DEPENDENCIES), built from the exact same `facts` map G2
@@ -1702,5 +1784,44 @@ domains:
                 "T9.1 closure: {gate_id:?} expected Success given every input was built to be legal, got {result:?}"
             );
         }
+    }
+
+    /// G6b (RR-5 row 2, E4 slug `toctou_entity_tables`) named human-gate
+    /// test: an entity request for a UUID that genuinely does not exist in
+    /// the dev database (real `PgEntityFactsSource` fetch, not a stub)
+    /// produces `has_unpinned_entities == true` end to end, which caps G8
+    /// at `HumanGated` — never `StpExecutable` — via the real
+    /// `classify()` policy. This is the fail-closed twin of the closure
+    /// test above: the populator being real does not mean every entity is
+    /// now treated as pinned, only entities `PgEntityFactsSource`
+    /// genuinely found and captured a `row_version` for.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn toctou_unpinned_entity_requires_human_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+
+        // A UUID with no corresponding row in `cbus` — astronomically
+        // unlikely to collide with a real fixture row.
+        let missing_cbu_id = Uuid::new_v4();
+        let requests = vec![(missing_cbu_id, "cbu".to_string())];
+        let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool: &pool };
+        let facts = ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &requests)
+            .await
+            .expect("batched fetch succeeds (kind is supported; the row just isn't found)");
+
+        // The real populator: absent from `facts` (nothing to read a
+        // row_version from) is unpinned.
+        assert!(
+            has_unpinned_entities(&requests, Some(&facts)),
+            "a not-found entity must be graded unpinned, not silently treated as pinned"
+        );
+
+        let input = build_stp_classifier_input("test.transition-verb", has_unpinned_entities(&requests, Some(&facts)));
+        assert_eq!(
+            ob_poc_control_plane::stp_classifier::classify(&input),
+            ob_poc_control_plane::stp_classifier::StpEligibilityDecision::HumanGated,
+            "an unpinned entity must cap STP eligibility at HumanGated (plan A5), never StpExecutable"
+        );
     }
 }
