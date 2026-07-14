@@ -1617,3 +1617,100 @@ answer rather than a silent gap. The gate remains **unarmed** in
 production (`set_expected_write_set` still has no real call site) — both
 tranches are infrastructure completeness, zero production behavior
 change. `invariants-expected.toml` untouched.
+
+## Arming decision: parked; CBU arming-blocker audit + 3 fixes (2026-07-14)
+
+Operator asked whether the write-coverage + derivation tranches above
+meant G14 was ready to arm. Answer: **no** — audited the real production
+CRUD dispatch path (not just the derivation code) and found arming today
+would roll back legitimate production writes on multiple live verbs. Not
+theoretical: traced through `verb_executor_adapter.rs`'s actual routing
+(confirmed `ObPocVerbExecutor::with_crud_port` IS wired in production,
+`ob-poc-web/src/main.rs:1636` — the scope-based `execute_crud_in_scope`
+branch, the one path where `record_write` isn't a no-op, is the one that
+matters for any future arming) and cross-referenced real verb YAML
+against `domain_metadata.yaml`. Operator: "park the arming - fix the
+issues." Three fixes landed this session, all *before* any arming
+decision, all independently verified (forced rebuild each time — IDE
+diagnostics were stale throughout, as every time this session).
+
+**Fix 1 — `cbu.delete` breach** (`1755d6ef`): `Delete` had no
+`allowed_columns` derivation, defaulting to an empty list, but
+soft-deletes always write `"deleted_at"`. Fixed by mirroring
+`crud_executor.rs::soft_delete_predicate`'s exact rule in
+`control_plane_shadow.rs`. Proven against the real `cbu.delete` verb via
+`runtime_registry()`, not a synthetic fixture.
+
+**Fix 2 — `team.create`/`team.add-member`/`team.remove-member`
+breach** (`1755d6ef`, same commit): corrected this session's own earlier
+mischaracterization — the prior tranche's `qualify_footprint_table` doc
+comment called these entries "inert"; they are not, all three are real,
+live, dispatchable CRUD verbs. `domain_metadata.yaml` declared bare
+`teams`/`memberships`, silently qualified to `ob-poc.teams`/
+`ob-poc.memberships`, but `config/verbs/team.yaml`'s real
+`crud_mapping.schema` is `teams` — `record_write` actually reports
+`teams.teams`/`teams.memberships`. Fixed the 3 `domain_metadata.yaml`
+entries directly (they were wrong per the file's own documented
+convention), not the derivation code. Re-audited `kyc.cases` (reads-only,
+irrelevant to this write-set consumer) and `kyc.ownership_snapshots`
+(`ownership.compute`'s writes: entry) — confirmed via grep that
+`ownership.compute`/`ownership.snapshot.list` correspond to zero real
+verbs in `config/verbs/*.yaml` today, almost certainly orphaned metadata
+from the 58-legacy-determination-verb deletion; left alone as a flagged,
+not urgent, cleanup opportunity (deleting footprint entries risks
+removing something a non-G14 consumer still reads, and it's provably
+unreachable from any real G14 dispatch).
+
+**Fix 3 — systemic entity_ids gap for freshly-created rows**
+(`aa110631`): the biggest finding. `WriteSetProof.entity_ids` is built
+only from entity args resolved *before* the verb runs
+(`sequencer.rs:7963`). But Insert/Upsert/RoleLink/EntityCreate/
+EntityUpsert all self-report their write against a freshly
+`Uuid::new_v4()`-generated (or newly-resolved) primary key that by
+construction cannot have existed before execution — `attest()`'s
+membership check would fail for every one of them, always. Not CBU-
+specific: `cbu.attach-evidence` (Insert) and `cbu.ensure` (Upsert) are
+just the two instances that surfaced it; this affects every
+row-creating verb call in the system. Fixed by adding
+`CapturedWrite.created_new_entity: bool` — `attest()`/`decide()`'s
+entity_id clause now reads `!write.created_new_entity &&
+!expected.entity_ids().contains(...)`, so a write against the row a
+verb just created is trivially in scope (nothing to have pre-bound it
+against), while writes against pre-existing entities still get the real
+membership check. Delegated to a background agent with the full
+per-operation `true`/`false` mapping pre-specified (10 call sites across
+`crud_executor.rs`, plus the `TransactionScope::record_write` trait
+widening and every real/mock implementor) to avoid it re-deriving the
+security-relevant semantics itself.
+
+**Verification discipline held across all three**: every fix
+independently re-verified (not the landing agent's own claim) via forced
+rebuild, scoped clippy, the relevant test suites (unit + live-DB where
+applicable), and a personal RED→GREEN reproduction against the real
+committed fix. For Fix 3 specifically, verified commit `1755d6ef` (Fixes
+1+2) compiles standalone via `git stash` before layering Fix 3 on top —
+each commit is independently buildable, not just the final combined
+state. `check-invariants.sh ratchet` 0/5 divergence throughout. A
+pre-existing, unrelated `cargo clippy --workspace --all-targets`
+failure (`kyc_slice.rs` lint violations, `ob-poc-bus-handler`
+type-complexity — neither touched by any of these fixes) was confirmed
+via `git stash` to predate this entire session; not a regression from
+this work.
+
+**G14 status now**: three confirmed false-breach bugs closed (soft-delete
+columns, `team.*` schema mismatch, freshly-created-entity IDs). The gate
+remains **unarmed** — arming was explicitly parked this session, not
+decided against permanently. Known **not yet addressed**, deliberately
+out of scope for this pass: the 6 non-`ob-poc` schema `domain_metadata.yaml`
+entries beyond `team.*` flagged (but not individually re-audited) in the
+prior tranche; `cbu.submit-for-validation`/`cbu.reopen-validation`/
+`cbu.request-proof-update` rely on `crud.set_values` (a literal
+YAML-declared SET), which `crud_executor.rs::execute_update` does not
+implement at all (only `dsl_v2::generic_executor.rs` does) — since
+`Update` is unconditionally handled by the wired `crud_port` fast path,
+these three verbs may currently be hitting a hard `"No columns to
+update"` error in production rather than falling through to the
+executor that knows about `set_values`; not confirmed live-broken, not
+investigated further this session, flagged as a real open question
+independent of G14. `invariants-expected.toml` untouched throughout —
+no arming decision was made.
