@@ -8072,9 +8072,14 @@ impl ReplOrchestratorV2 {
                 }
             };
             let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
+            // G2 item 3 (G11 wiring): entry_id is the same value `row`
+            // (the shadow-decision row built two statements above) was
+            // built with -- the join key the G11 replay surface needs to
+            // re-derive this decision's outcome from `gate_results`.
             let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
                 outcome: outcome_for_audit,
                 snapshot_ref,
+                entry_id,
             };
 
             // G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2, §4):
@@ -8314,9 +8319,11 @@ impl ReplOrchestratorV2 {
             }
         };
         let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
+        // G2 item 3 (G11 wiring): same entry_id `row` was built with above.
         let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
             outcome: outcome_for_audit,
             snapshot_ref,
+            entry_id,
         };
 
         // Best-effort audit trail, same fire-and-forget posture as

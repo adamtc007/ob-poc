@@ -174,7 +174,7 @@ pub(crate) async fn gate_outcome_counts(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let mut out: Vec<GateOutcomeCount> = rows
         .into_iter()
         .map(|(gate, outcome_kind, provenance, count)| GateOutcomeCount {
             gate,
@@ -182,7 +182,33 @@ pub(crate) async fn gate_outcome_counts(
             provenance,
             count,
         })
-        .collect())
+        .collect();
+
+    // G2 item 3 (G11 wiring): AuditReplay's samples are not stored in
+    // `gate_results` at all (see `expected_provenance`'s own doc: "G11
+    // evaluates *over* the audit stream itself") — they are computed
+    // on-demand here, at query time, over the audit stream's own rows.
+    // A best-effort failure here must not break the rest of this
+    // observational endpoint (matching this module's own posture: every
+    // query here is read-only, and a partial result is still useful) —
+    // logged, not propagated.
+    match crate::agent::control_plane_audit::audit_replay_outcome_counts(pool).await {
+        Ok(replay_counts) => {
+            for (outcome_kind, count) in replay_counts {
+                out.push(GateOutcomeCount {
+                    gate: "AuditReplay".to_string(),
+                    outcome_kind,
+                    provenance: ob_poc_control_plane::audit::GateOutcomeProvenance::ShadowEval.as_str().to_string(),
+                    count,
+                });
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "gate_outcome_counts: audit_replay_outcome_counts query failed (G11 samples omitted this call, not fatal)");
+        }
+    }
+
+    Ok(out)
 }
 
 /// G5 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001` §3 item 5,

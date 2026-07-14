@@ -173,14 +173,119 @@ pub(crate) async fn build_dag_proof_input(
     }
 }
 
+/// G2 item 2 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001` §3): a real,
+/// non-empty, provably-correct `allowed_columns` derivation for a narrow,
+/// exactly-verified subset of CRUD verbs — the piece the prior session's
+/// STOP-condition (`write_set_attestation.rs`'s
+/// `empty_allowed_columns_breaches_every_write_with_any_column_even_on_exact_table_and_entity_match`
+/// test) found missing. `domain_metadata.yaml`'s `writes: [...]` list is
+/// table-only (`sem_os_obpoc_adapter::metadata::VerbFootprint` has no
+/// column field at all — confirmed by direct read, not assumed); the only
+/// place a verb's actual write *columns* are declared anywhere in this
+/// codebase is the verb YAML's own `crud.args[].maps_to` mapping — the
+/// exact same source `dsl_runtime::crud_executor`'s real dispatch
+/// (`execute_insert`/`execute_update`/`execute_upsert`) reads to build its
+/// SQL and to self-report `record_write`'s captured columns.
+///
+/// **Scope, deliberately narrow — verified against `crud_executor.rs`'s
+/// exact column-selection logic per operation, not guessed:**
+/// - `CrudOperation::Insert` / `CrudOperation::Upsert`: `raw_columns`
+///   ALWAYS starts with the primary-key column
+///   (`execute_insert`/`execute_upsert`, `let mut raw_columns = vec![pk_col...]`)
+///   plus every `arg_defs[].maps_to` present in the call's `args`. This
+///   function returns the *superset* (every declared `maps_to` ∪ pk_col),
+///   safe because the real per-call `raw_columns` is always a subset of
+///   it (arg presence is the only thing that varies per call, not the
+///   declared mapping).
+/// - `CrudOperation::Update`: `raw_columns` is `arg_defs[].maps_to` minus
+///   the key column (the key becomes a `WHERE` bind, never a `SET`
+///   column) — this function's superset (all declared `maps_to`,
+///   including the key) is still safe, it just never gets exercised for
+///   the key column specifically.
+/// - **Insert/Upsert additionally require `crud.returning` to be
+///   EXPLICITLY set in the verb YAML.** When it is absent, the real
+///   dispatch falls back to `infer_pk_column` — a best-effort
+///   table-name-based heuristic with its own fallback arm this function
+///   does not re-verify exhaustively; guessing wrong here would
+///   UNDER-declare the allowed set (the unsafe direction, since a real
+///   pk write would then look like a breach), so those verbs return
+///   `None` rather than risk it.
+/// - **Every other `CrudOperation` variant (`Delete`, `Link`, `Unlink`,
+///   `RoleLink`, `RoleUnlink`, `ListByFk`, `ListParties`,
+///   `SelectWithJoin`, `Select`, `EntityCreate`, `EntityUpsert`) returns
+///   `None`, deliberately not attempted this session.** `Delete` alone
+///   is a proven case why: `crud_executor.rs::execute_delete`'s
+///   soft-delete branch writes a literal `"deleted_at"` column that
+///   never appears in any `arg_defs[].maps_to` mapping at all — a
+///   generic `maps_to`-only derivation would silently under-declare it.
+///   `Link`/`Unlink` write junction-table `from_col`/`to_col` pairs via a
+///   structurally different code path this function does not mirror.
+///
+/// **Known remaining gap, NOT fixed by this function (see the
+/// `derived_columns_are_correct_but_table_name_format_does_not_match_captured_writes`
+/// test below): even where `allowed_columns` is now correct,
+/// `WriteSetInput.tables` (from `domain_metadata.yaml`'s bare table
+/// names, e.g. `"deals"`) does not match `CapturedWrite.table`'s
+/// `record_write`-reported `"{schema}.{table}"` format (e.g.
+/// `"ob-poc.deals"`) — a second, independent reason `set_expected_write_set`
+/// is not wired to this session's output, on top of the (now-fixed)
+/// empty-`allowed_columns` reason.
+fn derive_crud_allowed_columns(
+    rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
+) -> Option<Vec<String>> {
+    use crate::dsl_v2::runtime_registry::RuntimeBehavior;
+
+    let RuntimeBehavior::Crud(crud) = &rv.behavior else {
+        return None;
+    };
+    let maps_to_cols: Vec<String> = rv.args.iter().filter_map(|a| a.maps_to.clone()).collect();
+    derive_allowed_columns_for_operation(crud.operation, crud.returning.clone(), maps_to_cols)
+}
+
+/// The pure per-operation half of [`derive_crud_allowed_columns`], split
+/// out so its Insert/Update/Upsert/"everything else" branch logic is unit
+/// testable without constructing a full `RuntimeVerb` fixture (that type
+/// has no `Default` impl and a dozen-plus fields unrelated to this
+/// decision).
+fn derive_allowed_columns_for_operation(
+    operation: dsl_core::CrudOperation,
+    returning: Option<String>,
+    maps_to_cols: Vec<String>,
+) -> Option<Vec<String>> {
+    use dsl_core::CrudOperation;
+
+    let mut columns = maps_to_cols;
+
+    match operation {
+        CrudOperation::Insert | CrudOperation::Upsert => {
+            let pk_col = returning?; // explicit only — see doc comment
+            columns.push(pk_col);
+        }
+        CrudOperation::Update => {
+            if columns.is_empty() {
+                return None;
+            }
+        }
+        _ => return None,
+    }
+
+    columns.sort();
+    columns.dedup();
+    Some(columns)
+}
+
 /// T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G7's
 /// `WriteSetInput` from the verb's declared write footprint
 /// (`config/sem_os_seeds/domain_metadata.yaml`'s per-verb `writes: [...]`,
 /// loaded once at startup into `domain_metadata`). `WriteSetGate::decide`
 /// (`write_set.rs`) only checks `contract_derived` and non-empty `tables`
-/// — `state_slots`/`allowed_columns` may legitimately stay empty (no
-/// production source for column-level footprint exists yet, and the gate
-/// doesn't require it).
+/// — `state_slots` may legitimately stay empty (no production source
+/// exists yet, and the gate doesn't require it). `allowed_columns` is now
+/// real (G2 item 2, `derive_crud_allowed_columns` above) for the narrow
+/// Insert/Update/Upsert-with-explicit-`returning` subset; every other
+/// verb still gets an empty list (honest "cannot derive," not a fabricated
+/// guess) — matching this function's own pre-existing `None`-on-cannot-
+/// derive posture for the table-level footprint.
 ///
 /// Returns `None` (not a fabricated `CannotDerive`) when: no
 /// `DomainMetadata` is wired; the verb has no footprint entry at all; or
@@ -204,11 +309,17 @@ pub(crate) fn build_write_set_input(
         return None;
     }
 
+    let allowed_columns = verb_fqn
+        .split_once('.')
+        .and_then(|(domain, verb)| crate::dsl_v2::runtime_registry::runtime_registry().get(domain, verb))
+        .and_then(derive_crud_allowed_columns)
+        .unwrap_or_default();
+
     Some(ob_poc_control_plane::write_set::WriteSetInput {
         entity_ids,
         state_slots: Vec::new(),
         tables: footprint.writes.clone(),
-        allowed_columns: Vec::new(),
+        allowed_columns,
         idempotency_key: format!("{entry_id}:{verb_fqn}"),
         contract_derived: true,
     })
@@ -1405,6 +1516,162 @@ domains:
         assert!(
             has_a_write_footprint,
             "real domain_metadata.yaml has zero non-empty writes: [...] entries — T9.1e's wiring would be silently dead"
+        );
+    }
+
+    // ── G2 item 2: derive_crud_allowed_columns ──
+
+    #[test]
+    fn derive_crud_allowed_columns_none_for_unregistered_verb() {
+        let ws = build_write_set_input(
+            Some(&test_domain_metadata("nonexistent-domain.nonexistent-verb", vec!["\"t\""])),
+            "nonexistent-domain.nonexistent-verb",
+            Uuid::new_v4(),
+            vec![],
+        )
+        .expect("footprint declares a write");
+        // No entry in runtime_registry() for this FQN -> derivation falls
+        // back to the honest empty default, same as before this session.
+        assert!(ws.allowed_columns.is_empty());
+    }
+
+    #[test]
+    fn derive_crud_allowed_columns_real_insert_verb_with_explicit_returning() {
+        // `capability-binding.draft` (config/verbs/capability-binding.yaml):
+        // operation: insert, returning: id, args mapping to
+        // application_instance_id / service_id / notes. This is the exact
+        // shape `crud_executor.rs::execute_insert` reads to build its SQL
+        // and to self-report `record_write`'s raw_columns (which always
+        // starts with the pk column, per that function's own
+        // `let mut raw_columns = vec![pk_col.to_string()]`).
+        let rv = crate::dsl_v2::runtime_registry::runtime_registry()
+            .get("capability-binding", "draft")
+            .expect("capability-binding.draft must be registered — verb YAML moved?");
+        let derived = derive_crud_allowed_columns(rv)
+            .expect("Insert with explicit `returning` must derive a non-empty set");
+        let mut expected = vec![
+            "application_instance_id".to_string(),
+            "service_id".to_string(),
+            "notes".to_string(),
+            "id".to_string(),
+        ];
+        expected.sort();
+        assert_eq!(derived, expected);
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_none_for_delete() {
+        // Delete must return None regardless of maps_to contents — this
+        // session did not mirror execute_delete's soft-delete `deleted_at`
+        // literal-column write, and a maps_to-only derivation would
+        // silently under-declare it (the unsafe direction).
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Delete,
+            None,
+            vec!["thing_id".to_string()],
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_none_for_link_and_unlink() {
+        assert!(derive_allowed_columns_for_operation(dsl_core::CrudOperation::Link, None, vec![]).is_none());
+        assert!(derive_allowed_columns_for_operation(dsl_core::CrudOperation::Unlink, None, vec![]).is_none());
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_none_for_insert_without_explicit_returning() {
+        // infer_pk_column's heuristic is not re-verified by this
+        // derivation — an Insert/Upsert verb with no explicit `returning`
+        // must fail closed to None, not guess.
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Insert,
+            None,
+            vec!["status".to_string()],
+        )
+        .is_none());
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Upsert,
+            None,
+            vec!["status".to_string()],
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_insert_includes_pk_and_maps_to() {
+        let derived = derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Insert,
+            Some("id".to_string()),
+            vec!["status".to_string(), "legal_name".to_string()],
+        )
+        .expect("explicit returning + non-empty maps_to must derive");
+        let mut expected = vec!["id".to_string(), "status".to_string(), "legal_name".to_string()];
+        expected.sort();
+        assert_eq!(derived, expected);
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_update_none_when_no_mapped_columns() {
+        // A verb with zero maps_to columns can never legitimately SET
+        // anything — None (cannot derive), not a fabricated empty Some.
+        assert!(derive_allowed_columns_for_operation(dsl_core::CrudOperation::Update, None, vec![]).is_none());
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_update_excludes_pk_requirement() {
+        // Update never needs `returning` — the key column is a WHERE
+        // bind, not a SET column, so no pk-guessing risk applies here.
+        let derived = derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Update,
+            None,
+            vec!["status".to_string()],
+        )
+        .expect("non-empty maps_to must derive");
+        assert_eq!(derived, vec!["status".to_string()]);
+    }
+
+    /// Second, independent gap this session found (documented in
+    /// `derive_crud_allowed_columns`'s own doc comment): even with a
+    /// correct, non-empty `allowed_columns`, `WriteSetInput.tables` (bare
+    /// table names from `domain_metadata.yaml`, e.g. `"deals"`) does not
+    /// match `CapturedWrite.table`'s `record_write`-reported
+    /// `"{schema}.{table}"` format (e.g. `"ob-poc.deals"`) —
+    /// `attest()`'s exact-string table check would misclassify every real
+    /// write as an excess (undeclared table) regardless of how correct
+    /// `allowed_columns` is. Proven directly against `attest()`, not
+    /// merely asserted in prose.
+    #[test]
+    fn derived_columns_are_correct_but_table_name_format_does_not_match_captured_writes() {
+        let metadata = test_domain_metadata("capability-binding.draft", vec!["\"capability_bindings\""]);
+        let ws = build_write_set_input(Some(&metadata), "capability-binding.draft", Uuid::new_v4(), vec![Uuid::nil()])
+            .expect("footprint declares a write");
+        assert!(
+            !ws.allowed_columns.is_empty(),
+            "sanity: the column derivation itself must be non-empty here"
+        );
+        assert_eq!(ws.tables, vec!["capability_bindings".to_string()]);
+
+        let proof = ob_poc_control_plane::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            ws.state_slots.clone(),
+            ws.tables.clone(),
+            ws.allowed_columns.clone(),
+            &ws.idempotency_key,
+        );
+        // The real capture format record_write uses in production
+        // (crud_executor.rs: `format!("{schema}.{table}")`).
+        let captured = vec![ob_poc_control_plane::write_set_attestation::CapturedWrite {
+            table: "ob-poc.capability_bindings".to_string(),
+            entity_id: Uuid::nil(),
+            columns: vec!["service_id".to_string()], // a genuinely-declared, legitimate column
+        }];
+        let outcome = ob_poc_control_plane::write_set_attestation::attest(&captured, &proof);
+        assert!(
+            matches!(&outcome, ob_poc_control_plane::write_set_attestation::AttestationOutcome::Breach { .. }),
+            "table-name-format mismatch means even a fully legitimate write on a correctly-derived \
+             column still misclassifies as a breach today: {outcome:?} — this is why set_expected_write_set \
+             stays unwired even for the narrow subset this session's allowed_columns derivation now covers"
         );
     }
 

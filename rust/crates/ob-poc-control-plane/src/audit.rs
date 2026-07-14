@@ -136,6 +136,22 @@ pub enum AuditEvent {
         /// session doc). Not a join key to any table; `None` when no
         /// snapshot input was collected.
         snapshot_ref: Option<Uuid>,
+        /// G2 item 3 (G11 wiring, `EOP-SESSION-CONTROLPLANE-G2-ITEMS-2-3-
+        /// CLOSURE-001`): the shadow entry this decision was evaluated
+        /// for -- `control_plane_shadow_decisions.entry_id`, the SAME
+        /// value `build_shadow_decision_row` is called with at the one
+        /// real emission site (`sequencer.rs::phase5_runtime_recheck`).
+        /// Needed so the G11 replay surface can join back to that row's
+        /// `gate_results` for DD-4(ii) outcome re-derivation -- nothing
+        /// else persisted on this event carries a stable link to it.
+        /// `#[serde(default)]` (defaults to `Uuid::nil()`, matching
+        /// `Uuid::default()`): any already-persisted `DecisionEvaluated`
+        /// row from before this field existed still deserializes; the
+        /// replay surface treats a nil `entry_id` as "no re-derivation
+        /// join available for this row" (see `audit_replay_outcome_counts`),
+        /// not a crash.
+        #[serde(default)]
+        entry_id: Uuid,
     },
     EnvelopeSealed {
         envelope_id: Uuid,
@@ -226,6 +242,7 @@ mod tests {
             AuditEvent::DecisionEvaluated {
                 outcome: DecisionOutcome::ApprovedStp,
                 snapshot_ref: Some(Uuid::nil()),
+                entry_id: Uuid::nil(),
             },
             AuditEvent::EnvelopeSealed {
                 envelope_id: Uuid::nil(),
