@@ -1139,3 +1139,33 @@ fixed, as out of G6c's small/standalone charter.
 cross-repo (bpmn-lite) architect-involved work per the plan's own
 tiering, not grind-suitable; needs an architect option choice (R:§C2's
 carrier (a) vs (b)) before any implementation begins.
+
+## Architect ruling — G6c row 4 is a bpmn-lite-side concern, not an ob-poc gap (2026-07-14)
+
+Operator clarification on G6c's recommendation above: bpmn-lite is not
+"a repo this session happened to lack source for" — it is a genuinely
+**separate execution runtime**, spun up as a byproduct of the DSL
+runtime dispatching a durable/orchestrated verb, running its own
+process lifecycle outside `ob-poc`'s own admission surface. **Ruling:
+RR-5 row 4's remediation path is entirely bpmn-lite's own concern,
+ridden on that repo's own governance/tag-bump flow (standing rule 5),
+not a lingering `ob-poc` gap to keep re-investigating from this side.**
+This confirms (does not change) G6c's own recommended classification —
+Mode-1, confirmed, distinct mechanism (lease_owner/lease_until, not
+row-version/CAS), unverifiable from `ob-poc` — as ratified, not merely
+proposed.
+
+Applied: `scripts/check-invariants.sh`'s `gate_e4` row array gained an
+explanatory comment above the `rows=(...)` block plus an inline
+"SEPARATE RUNTIME, remediation is bpmn-lite-side, not ob-poc's" marker
+on the `bpmn_process_instances` row's display text — annotation only,
+no logic change. The row still counts "unsatisfied" (it genuinely has
+no pin today; this is not a bar relaxation) and `E4`'s numeric output
+is byte-for-byte unchanged (verified: `[shadow_envelope_entities]`/
+`[bus_operational_writes]`/`[bpmn_process_instances]` still the 3
+unsatisfied slugs, `2/5` satisfied, `E4: DOES NOT HOLD`). The point of
+the annotation is that a future session reading this gate's output
+does not re-open row 4 as an `ob-poc` investigation a third time —
+its owner is bpmn-lite, and that's now on the record at the point
+where the gate itself is read, not only in a session doc that could
+go unread.

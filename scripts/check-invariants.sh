@@ -431,11 +431,31 @@ gate_e4() {
   echo ""
 
   # slug|RR-5 family text (verbatim, truncated for display)|pin-symbol|human-gate-test-name
+  #
+  # bpmn_process_instances ARCHITECT RULING (2026-07-14, G6c
+  # investigation + operator clarification): bpmn-lite is not "a repo
+  # this session couldn't read" incidentally — it is a genuinely
+  # separate execution runtime, spun up as a byproduct of the DSL
+  # runtime dispatching a durable/orchestrated verb, with its own
+  # process lifecycle and (per G6c's live-DB finding) its own
+  # lease_owner/lease_until concurrency primitive, not row-version/CAS.
+  # This row's pin/test symbols can therefore never resolve via an
+  # ob-poc-src grep by construction, not by gap: the mutation site that
+  # would need one lives entirely in bpmn-lite-engine/bpmn-lite-store
+  # (external git deps, source not vendored here). Row 4 stays counted
+  # "unsatisfied" below -- this is not a relaxation of the bar, the row
+  # genuinely has no pin today -- but its remediation path is
+  # bpmn-lite's own governance ("rides that repo's own flow, pinned by
+  # tag bump" per the plan's standing rule 5), not a lingering ob-poc
+  # gap to keep re-investigating from this side. See the ownership
+  # ledger's G6c entry and
+  # docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-G6B-G6C-IMPL-001.md
+  # §3 for the full finding.
   local rows=(
     "shadow_envelope_entities|Shadow envelope resolved entities (row_version:0, recheck_required:false)|SnapshotPins::entity_row_version|shadow_envelope_entity_requires_human_gate"
     "toctou_entity_tables|Entity tables intended for TOCTOU (migration staged/pending)|verify_pins_in_scope|toctou_unpinned_entity_requires_human_gate"
     "bus_operational_writes|Bus-invoked operational writes (Principal::system(), no runbook/envelope)|PinnedVersionSet::bus_catalogue_version|bus_write_without_envelope_requires_human_gate"
-    "bpmn_process_instances|BPMN process_instances (no row-version/CAS check found)|process_instances_row_version|bpmn_process_instance_requires_human_gate"
+    "bpmn_process_instances|BPMN process_instances (no row-version/CAS check found) -- SEPARATE RUNTIME, remediation is bpmn-lite-side, not ob-poc's|process_instances_row_version|bpmn_process_instance_requires_human_gate"
     "raw_dsl_best_effort|Raw DSL best-effort execution (not routed through envelope/snapshot)|raw_dsl_snapshot_pin|raw_dsl_execution_requires_human_gate"
   )
 
