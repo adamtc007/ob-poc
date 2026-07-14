@@ -1211,3 +1211,36 @@ scope, not in the implied infeasibility — every needed fixture (a
 `SemOsClient` stub, an in-memory `GatePipeline`, a synthetic
 `DomainMetadata`, a pre-inserted `CompiledRunbook`) had a reusable
 pattern already in the tree.
+
+## `ob-poc`'s own stale E5 baseline refreshed (2026-07-14)
+
+Closes the STOP `invariants-expected.toml`'s `[e5]` section recorded
+2026-07-13 (GRADPLAN G0 item 1): `ob-poc`'s public-API surface diff was
+too large/mixed (~23k lines) to safely eyeball in that grind slice and
+was deliberately left un-refreshed, unlike the other 4 crates that
+session did refresh.
+
+Decomposed the real diff (17,365 raw lines against HEAD `6c6a22eb`)
+exhaustively by mechanism, no unclassified residual: 6021 lines
+`tower_http::follow_redirect::policy::PolicyExt` blanket-impl fanout
+(traced to T11.1b making `ob-poc-agent` a real dependency of `ob-poc`,
+which activates a `reqwest` rustls-tls feature chain — reproduced
+absent at the exact pre-T11.1b commit in a throwaway worktree); 88
+lines the same chain one hop further (`iri_string`); 4018 lines (2009/
+2009, symmetric) Send/Sync auto-trait reordering, same nightly-noise
+pattern already accepted for the other 4 baselines; 7238 lines genuine
+already-ratified project work (95.8% of the removed side is T11.1b's
+agent-tier extraction; the added side is genuine G2/G4/G6b
+control-plane symbols, each traced via `git log -S` to a commit
+already in this ledger). Sum reconciles exactly to the raw total.
+
+Independently re-verified, not taken on the review's claim: regenerated
+the public-API dump from scratch and diffed it byte-for-byte against
+the new committed baseline (identical); independently reproduced the
+6021/88 bucket line counts against the actual diff;
+`check-invariants.sh ratchet` still 0/5 divergence after the refresh
+(`[e5]` status stays `fail`, unaffected — detail-comment-only change).
+Committed as `2c81e021`. Proposed `[e5]` wording update left in the
+session doc (`invariants-expected.toml` not edited, ratchet file, per
+this program's own discipline):
+`docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-OBPOC-BASELINE-REVIEW-001.md`.
