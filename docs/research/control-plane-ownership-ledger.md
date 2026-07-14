@@ -1244,3 +1244,101 @@ Committed as `2c81e021`. Proposed `[e5]` wording update left in the
 session doc (`invariants-expected.toml` not edited, ratchet file, per
 this program's own discipline):
 `docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-OBPOC-BASELINE-REVIEW-001.md`.
+
+## G6a landed — snapshot_pin envelope carrier end-to-end (2026-07-14)
+
+Operator ratified option (b) of R:§C2 (populate the dormant
+`snapshot_pin` proto field, not the `inputs` channel) and separately
+directed the bpmn-lite-side idempotency-race fix (§3.3 of the G6b/G6c
+session's finding) be fixed directly in that repo, since ob-poc's own
+investigation discovered it. Both landed this session, in parallel, in
+two separate repos.
+
+**G6a design** (`docs/todo/control-plane/EOP-DESIGN-CONTROLPLANE-G6A-SNAPSHOT-PIN-CARRIER-001.md`,
+DRAFT — one open question in §7 flagged for architect sign-off, not
+self-authorised): the architect's carrier choice left unresolved what
+a bare `Uuid` can carry, since `EnvelopeHandle` is a compound `{id,
+content_hash}` value. Investigation found bpmn-lite structurally
+cannot mint a real `ExecutionEnvelope` at all (none of `seal`'s 8
+proof inputs exist there — no pack registry, no compiled runbook
+object, no entity/authority/evidence readers). Resolution:
+`snapshot_pin` carries bpmn-lite's `callout_id` as a bare correlation
+id; `ob-poc` is the only party that can seal, so it mints its own
+envelope at admission time via a real `evaluate()` call, using the
+incoming pin only as `persist_sealed`'s `entry_id` audit column —
+never as a trusted foreign identity. T8.1's content-hash check (why
+`try_consume_by_id` was demoted to test-only) stays untouched, does
+not reopen that gap.
+
+**Self-corrected bug, found via live-DB testing not asserted from
+prose:** the design's first draft of `mint_envelope_for_bus` minted
+and consumed in one call; a live-DB test against that draft caught
+that this would run the consume in a separate transaction from
+dispatch, breaking T9.2's rollback-together atomicity. Corrected to
+mint-and-persist-only, deferring consume to the existing
+`execute_verb_admitting_envelope` call — Path D now has the identical
+atomicity Path A already has, not a weaker one.
+
+**Disclosed, not a security gap — a real functional limitation** (§6/
+§7): `evaluate()`'s `PROOF_BEARING_GATES` check unconditionally
+requires `GateId::PackResolution`/`GateId::RunbookProof`, both already
+confirmed `NotApplicable` to bus dispatch by G5's ratified matrix.
+Until `evaluate`/`evaluate_with_report` becomes path-aware (a
+separate, reviewed change, recommended but not self-authorised here),
+an operator who enforces a bus verb gets a permanent, honest
+`RejectedNoEnvelope` — proven live-DB (one of the 4 new tests), not
+asserted. Landed anyway: the wire threading and mint mechanism are
+real, independently tested infrastructure, immediately usable the
+moment that separate change lands.
+
+**Landed:** `ObPocVerbExecutor::mint_envelope_for_bus` +
+`bus_runtime.rs` wiring + `VerbExecutor::execute` trait widened
+(5th `snapshot_pin` param, every implementer updated) — ob-poc side,
+committed `f1c81e72`. bpmn-lite side (`dispatch_callout` populates
+`snapshot_pin`, `InvocationContext` widened + copied from the wire) —
+committed locally in `~/dev/bpmn-lite` as `2379d3f`, **not pushed, not
+tagged**; `rust/Cargo.toml`'s `v0.2.0` pin left untouched (a real tag
+bump is the operator's own cross-repo-coordinated release step).
+
+**Idempotency-race fix** (separate repo, same session, parallel task):
+`bpmn_spawn_idempotency.idempotency_key` was already a PRIMARY KEY,
+but `spawn_process_with_idempotency` did a bare pre-check SELECT
+outside any lock before calling the engine's real, side-effecting
+`start_process()` — two concurrent same-key callers could both pass
+the check, both spawn a duplicate instance, and the loser hit an
+unhandled unique-violation error instead of a graceful replay. Fixed
+with a transaction-scoped `pg_advisory_xact_lock` keyed on the
+idempotency key, acquired before any side-effecting work, re-checking
+under the lock. RED→GREEN proven. Committed locally in `~/dev/bpmn-lite`
+as `f75fd42`, not pushed/tagged.
+
+**Concurrent-session hazard, disclosed not hidden:** both tasks worked
+in the same non-isolated `~/dev/bpmn-lite` checkout at once. The
+idempotency-fix session's own working-tree changes (`lib.rs` + its new
+concurrency test) were overwritten mid-session by the G6a session's
+own edits to adjacent files in the same tree. Caught during this
+session's independent verification pass (not by either background
+task): the `lib.rs` fix was recovered byte-for-byte from a
+dropped-but-still-reachable `git stash` object (found via `git fsck
+--dangling`); the concurrency test had never been staged/stashed and
+was unrecoverable via git, so it was manually reconstructed against
+the same file's existing test patterns, independently RED→GREEN
+re-verified by the reviewer, and committed in `f75fd42`. **Lesson for
+future sessions: do not run two agents/tasks concurrently against the
+same non-isolated working tree** (this program's usual pattern —
+separate ob-poc-side work, or `isolation: 'worktree'` for genuinely
+parallel same-repo work — avoids this; the bpmn-lite cross-repo case
+wasn't recognised as needing the same discipline until it bit).
+
+Full verification (independently reproduced by the reviewer in both
+repos): forced rebuild clean in ob-poc; clippy `-D warnings` clean on
+`ob-poc`/`ob-poc-web`/`ob-poc-bus-handler`; `ob-poc` lib suite 2174/0
+(+4 ignored); all 4 new `g6a_bus_envelope_mint_tests` pass in
+isolation, matching the design doc's §8 plan exactly including case
+3's disclosed-limitation reproduction; `ob-poc-bus-handler` 7/7;
+`check-invariants.sh ratchet` 0/5 divergence. bpmn-lite side: clean
+build (one pre-existing unused-imports warning, confirmed identical at
+pre-fix HEAD); both new `snapshot_pin` wire tests pass; the recovered
+concurrency test RED→GREEN-reproduced independently by the reviewer;
+two pre-existing, unrelated test-ordering flakes from accumulated
+state in the shared `bpmn_lite_test` DB confirmed (pass in isolation).
