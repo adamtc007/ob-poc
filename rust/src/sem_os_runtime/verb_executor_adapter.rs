@@ -921,6 +921,7 @@ fn runtime_verb_to_contract(
             primary_table: crud.primary_table.clone(),
             join_table: crud.join_table.clone(),
             join_col: crud.join_col.clone(),
+            set_values: set_values_yaml_to_json(crud.set_values.as_ref()),
         })
     } else {
         None
@@ -984,6 +985,28 @@ fn runtime_verb_to_contract(
         outputs: vec![],
         produces_shared_facts: vec![],
     }
+}
+
+/// `RuntimeCrudConfig.set_values` is `HashMap<String, serde_yaml::Value>`
+/// (the YAML-loader's native representation) but `VerbCrudMapping.set_values`
+/// (the execution-plane contract `dsl-runtime::crud_executor` reads) is
+/// `HashMap<String, serde_json::Value>` — this crate's boundary already
+/// speaks JSON everywhere else (`VerbArgDef.default`, `json_to_sql_value`).
+/// `serde_yaml::Value` implements `Serialize`, so a round-trip through
+/// `serde_json::to_value` is exact for the scalar types `set_values`
+/// actually carries (string/bool/integer — the only variants
+/// `execute_update`/`generic_executor.rs` ever read). A conversion failure
+/// (never observed for these scalar types, but not provably impossible)
+/// drops that one entry rather than the whole map or panicking — an
+/// honest under-report, not a silent guess.
+fn set_values_yaml_to_json(
+    set_values: Option<&std::collections::HashMap<String, serde_yaml::Value>>,
+) -> Option<std::collections::HashMap<String, serde_json::Value>> {
+    set_values.map(|sv| {
+        sv.iter()
+            .filter_map(|(k, v)| serde_json::to_value(v).ok().map(|jv| (k.clone(), jv)))
+            .collect()
+    })
 }
 
 fn split_fqn(fqn: &str) -> dsl_runtime::Result<(String, String)> {

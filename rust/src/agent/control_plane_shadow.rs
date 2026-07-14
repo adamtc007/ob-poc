@@ -264,6 +264,15 @@ pub(crate) async fn build_dag_proof_input(
 /// - **`ListByFk`, `ListParties`, `SelectWithJoin`, `Select`**: still
 ///   `None` — read-only operations with no write to bound at all.
 ///
+/// **`Update` also includes `crud.set_values`'s keys** (2026-07-14, the
+/// `set_values` execution fix): those columns are literal, verb-declared
+/// `SET`s (e.g. status transitions) with no corresponding arg at all, so
+/// they never appear in `maps_to` — `execute_update` now writes them
+/// unconditionally (mirroring `dsl_v2::generic_executor.rs`), and
+/// `record_write`'s `raw_columns` includes them, so this derivation must
+/// too or a verb that only has `set_values` (no other mapped column,
+/// e.g. `cbu.submit-for-validation`) would derive an empty bound and
+/// misclassify its own write as a breach.
 fn derive_crud_allowed_columns(
     rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
 ) -> Option<Vec<String>> {
@@ -272,7 +281,10 @@ fn derive_crud_allowed_columns(
     let RuntimeBehavior::Crud(crud) = &rv.behavior else {
         return None;
     };
-    let maps_to_cols: Vec<String> = rv.args.iter().filter_map(|a| a.maps_to.clone()).collect();
+    let mut maps_to_cols: Vec<String> = rv.args.iter().filter_map(|a| a.maps_to.clone()).collect();
+    if let Some(set_values) = &crud.set_values {
+        maps_to_cols.extend(set_values.keys().cloned());
+    }
     derive_allowed_columns_for_operation(
         crud.operation,
         crud.returning.clone(),
@@ -1776,6 +1788,28 @@ domains:
         let derived = derive_crud_allowed_columns(rv)
             .expect("cbu.delete is soft-deletable and must now derive a non-empty set");
         assert_eq!(derived, vec!["deleted_at".to_string()]);
+    }
+
+    #[test]
+    fn derive_crud_allowed_columns_real_cbu_submit_for_validation_includes_set_values() {
+        // 2026-07-14 set_values execution fix: cbu.submit-for-validation
+        // (config/verbs/cbu.yaml, operation: update, key: cbu_id, only
+        // arg is cbu-id -> cbu_id, set_values: {status:
+        // VALIDATION_PENDING}) has zero maps_to columns besides the key —
+        // before crud.set_values was threaded through this derivation
+        // too, this would derive None (empty maps_to_cols), and the real
+        // executor's own write (now that it correctly applies
+        // set_values) would misclassify as a breach the moment arming
+        // ever happens.
+        let rv = crate::dsl_v2::runtime_registry::runtime_registry()
+            .get("cbu", "submit-for-validation")
+            .expect("cbu.submit-for-validation must be registered — verb YAML moved?");
+        let derived = derive_crud_allowed_columns(rv)
+            .expect("set_values must be enough to derive a non-empty set");
+        // "cbu_id" is included too — Update's own documented superset
+        // behavior includes every declared maps_to, including the key
+        // column, even though it's never exercised as a SET column.
+        assert_eq!(derived, vec!["cbu_id".to_string(), "status".to_string()]);
     }
 
     #[test]

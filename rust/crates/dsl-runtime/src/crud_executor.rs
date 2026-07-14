@@ -386,6 +386,49 @@ impl PgCrudExecutor {
         let key_val = key_value
             .ok_or_else(|| SemOsError::InvalidInput("Missing key argument for update".into()))?;
 
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`), not derived from any caller-supplied arg —
+        // e.g. status transitions (`status: VALIDATION_PENDING`). Mirrors
+        // `dsl_v2::generic_executor.rs`'s own set_values handling exactly
+        // (same now()/current_timestamp SQL-expression special case, same
+        // string/bool/integer bind types) so a verb using only set_values
+        // (no other mapped column) still has something to SET instead of
+        // failing "No columns to update" — the bug this block fixes.
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`), not derived from any caller-supplied arg —
+        // e.g. status transitions (`status: VALIDATION_PENDING`). Mirrors
+        // `dsl_v2::generic_executor.rs`'s own set_values handling exactly
+        // (same now()/current_timestamp SQL-expression special case, same
+        // string/bool/integer bind types) so a verb using only set_values
+        // (no other mapped column) still has something to SET instead of
+        // failing "No columns to update" — the bug this block fixes.
+        if let Some(set_values) = &crud.set_values {
+            for (col, value) in set_values {
+                if let Some(s) = value.as_str() {
+                    let s_lower = s.to_lowercase();
+                    if s_lower == "now()" || s_lower == "current_timestamp" {
+                        sets.push(format!("\"{col}\" = NOW()"));
+                        raw_columns.push(col.clone());
+                    } else {
+                        sets.push(format!("\"{}\" = ${}", col, idx));
+                        raw_columns.push(col.clone());
+                        bind_values.push(SqlValue::String(s.to_string()));
+                        idx += 1;
+                    }
+                } else if let Some(b) = value.as_bool() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    raw_columns.push(col.clone());
+                    bind_values.push(SqlValue::Boolean(b));
+                    idx += 1;
+                } else if let Some(n) = value.as_i64() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    raw_columns.push(col.clone());
+                    bind_values.push(SqlValue::Integer(n));
+                    idx += 1;
+                }
+            }
+        }
+
         if sets.is_empty() {
             return Err(SemOsError::InvalidInput("No columns to update".into()));
         }
@@ -546,6 +589,60 @@ impl PgCrudExecutor {
                     columns.push(format!("\"{}\"", col));
                     placeholders.push(format!("${idx}"));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                    insert_cols.push(col.clone());
+                    idx += 1;
+                }
+            }
+        }
+
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`) — mirrors `dsl_v2::generic_executor.rs`'s
+        // own `execute_upsert` set_values handling exactly (skip if an
+        // arg already mapped this column; same now()/current_timestamp
+        // SQL-expression special case; same string/bool/integer bind
+        // types). Real verb: `identifier.yaml`'s LEI upsert
+        // (`set_values: {scheme: LEI, scheme_name: ...}`). Adding to
+        // `insert_cols` (not just `columns`) means the ON CONFLICT DO
+        // UPDATE SET clause below picks these up automatically via its
+        // existing `insert_cols`-filtered `updates` derivation.
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`) — mirrors `dsl_v2::generic_executor.rs`'s
+        // own `execute_upsert` set_values handling exactly (skip if an
+        // arg already mapped this column; same now()/current_timestamp
+        // SQL-expression special case; same string/bool/integer bind
+        // types). Real verb: `identifier.yaml`'s LEI upsert
+        // (`set_values: {scheme: LEI, scheme_name: ...}`). Adding to
+        // `insert_cols` (not just `columns`) means the ON CONFLICT DO
+        // UPDATE SET clause below picks these up automatically via its
+        // existing `insert_cols`-filtered `updates` derivation.
+        if let Some(set_values) = &crud.set_values {
+            for (col, value) in set_values {
+                if insert_cols.contains(col) {
+                    continue;
+                }
+                if let Some(s) = value.as_str() {
+                    let s_lower = s.to_lowercase();
+                    if s_lower == "now()" || s_lower == "current_timestamp" {
+                        columns.push(format!("\"{col}\""));
+                        placeholders.push("NOW()".to_string());
+                        insert_cols.push(col.clone());
+                    } else {
+                        columns.push(format!("\"{col}\""));
+                        placeholders.push(format!("${idx}"));
+                        bind_values.push(SqlValue::String(s.to_string()));
+                        insert_cols.push(col.clone());
+                        idx += 1;
+                    }
+                } else if let Some(b) = value.as_bool() {
+                    columns.push(format!("\"{col}\""));
+                    placeholders.push(format!("${idx}"));
+                    bind_values.push(SqlValue::Boolean(b));
+                    insert_cols.push(col.clone());
+                    idx += 1;
+                } else if let Some(n) = value.as_i64() {
+                    columns.push(format!("\"{col}\""));
+                    placeholders.push(format!("${idx}"));
+                    bind_values.push(SqlValue::Integer(n));
                     insert_cols.push(col.clone());
                     idx += 1;
                 }
@@ -2033,6 +2130,167 @@ mod db_integration_tests {
 
     fn fake_ctx() -> VerbExecutionContext {
         VerbExecutionContext::new(sem_os_core::principal::Principal::system())
+    }
+
+    /// Mirrors `cbu.submit-for-validation`'s REAL crud_mapping exactly
+    /// (`config/verbs/cbu.yaml`, `operation: update`, `key: cbu_id`, one
+    /// arg `cbu-id -> cbu_id`, `set_values: {status: VALIDATION_PENDING}`).
+    /// Before this fix, `VerbCrudMapping` had no field to carry
+    /// `set_values` at all, so `execute_update` saw zero SET columns
+    /// (the only mapped arg IS the key) and errored "No columns to
+    /// update" — confirmed live-broken via this exact reproduction before
+    /// the fix landed.
+    fn submit_for_validation_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "cbu.submit-for-validation".to_string(),
+            domain: "cbu".to_string(),
+            action: "submit-for-validation".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![cbu_id_arg()],
+            returns: Some(VerbReturnSpec {
+                return_type: "affected".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "update".to_string(),
+                table: Some("cbus".to_string()),
+                schema: Some("ob-poc".to_string()),
+                key_column: Some("cbu_id".to_string()),
+                set_values: Some(
+                    [("status".to_string(), serde_json::json!("VALIDATION_PENDING"))]
+                        .into_iter()
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_update_applies_set_values_for_a_key_only_verb() {
+        let pool = test_pool().await;
+        let (cbu_id,): (Uuid,) = sqlx::query_as(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("a DISCOVERED cbu must exist");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = submit_for_validation_contract();
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string() });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let outcome = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("set_values-only update must now succeed");
+        assert!(matches!(outcome, VerbExecutionOutcome::Affected(1)));
+        assert_eq!(
+            scope.captured,
+            vec![(
+                "ob-poc.cbus".to_string(),
+                cbu_id,
+                vec!["status".to_string()],
+                false,
+            )],
+            "the set_values column must be self-reported for G14, keyed by the pre-bound cbu_id"
+        );
+        scope.rollback().await;
+    }
+
+    /// Mirrors `screening.start`'s (fqn not confirmed exactly, verb file
+    /// `config/verbs/screening.yaml`) REAL crud_mapping: `operation:
+    /// upsert`, `table: screenings`, `conflict_keys: [workstream_id,
+    /// screening_type]`, `set_values: {screening_type: CONSOLIDATED,
+    /// status: PENDING}` — the second real verb this fix covers (the
+    /// first, `identifier.yaml`'s LEI upsert, targets columns —
+    /// `scheme`/`id` — that don't exist on the real `entity_identifiers`
+    /// table, a separate pre-existing bug unrelated to this fix, so it
+    /// can't be used for a live proof).
+    fn screening_upsert_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "screening.start-test".to_string(),
+            domain: "screening".to_string(),
+            action: "start-test".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![VerbArgDef {
+                name: "workstream-id".to_string(),
+                arg_type: "uuid".to_string(),
+                required: true,
+                description: None,
+                lookup: None,
+                valid_values: None,
+                default: None,
+                maps_to: Some("workstream_id".to_string()),
+            }],
+            returns: Some(VerbReturnSpec {
+                return_type: "uuid".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "upsert".to_string(),
+                table: Some("screenings".to_string()),
+                schema: Some("ob-poc".to_string()),
+                returning: Some("screening_id".to_string()),
+                conflict_keys: vec!["workstream_id".to_string(), "screening_type".to_string()],
+                set_values: Some(
+                    [
+                        ("screening_type".to_string(), serde_json::json!("CONSOLIDATED")),
+                        ("status".to_string(), serde_json::json!("PENDING")),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_upsert_applies_set_values_for_a_conflict_only_verb() {
+        let pool = test_pool().await;
+        let (workstream_id,): (Uuid,) =
+            sqlx::query_as(r#"SELECT workstream_id FROM "ob-poc".entity_workstreams LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one entity_workstream row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = screening_upsert_contract();
+        let args = serde_json::json!({ "workstream-id": workstream_id.to_string() });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let outcome = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("upsert with only conflict_keys mapped + set_values columns must succeed");
+        let VerbExecutionOutcome::Uuid(screening_id) = outcome else {
+            panic!("expected Uuid outcome, got {outcome:?}");
+        };
+        assert_eq!(scope.captured.len(), 1);
+        let (table, entity_id, mut columns, created_new) = scope.captured[0].clone();
+        columns.sort();
+        assert_eq!(table, "ob-poc.screenings");
+        assert_eq!(entity_id, screening_id);
+        assert_eq!(
+            columns,
+            vec![
+                "screening_id".to_string(),
+                "screening_type".to_string(),
+                "status".to_string(),
+                "workstream_id".to_string(),
+            ],
+            "both set_values columns must be self-reported alongside the mapped/pk columns"
+        );
+        assert!(created_new);
+        scope.rollback().await;
     }
 
     /// Mirrors the real `entity.create` verb (`config/verbs/entity.yaml`,
