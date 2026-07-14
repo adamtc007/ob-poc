@@ -1561,3 +1561,59 @@ predicted panic — `expected exactly 1 captured write ... got []`) then
 GREEN, confirming `git diff --stat` returned to its pre-probe size
 (263 insertions, 0 deletions) after restoring. Committed as `62f460fb`.
 `invariants-expected.toml` untouched — no arming decision was made.
+
+## G14 derivation-side coverage: allowed_columns for Link/Unlink/RoleUnlink (2026-07-14)
+
+Operator called for "derivation side — let's close this aspect," closing
+out the other half of finding (1): `derive_allowed_columns_for_operation`
+(`control_plane_shadow.rs`) previously covered only Insert/Update/
+Upsert-with-explicit-`returning`, returning `None` for every other
+`CrudOperation` behind one blanket `_ => None`. Implemented directly
+(not delegated — a contained, single-file change), scoped by first
+checking what's actually reachable: a full grep of `config/verbs/*.yaml`
+confirmed zero real verbs use `Link`/`Unlink`/`RoleLink`; only
+`RoleUnlink` (`cbu.remove-role`) and `EntityCreate`/`EntityUpsert`
+(`entity.create`/`entity.ensure`, `fund.create`/`fund.ensure`) exist.
+
+Widened `derive_crud_allowed_columns` to also thread `crud.from_col`/
+`crud.to_col` through, and gave each of the 6 write-capture tranche's
+operation kinds an explicit, evidenced answer instead of a catch-all:
+
+- **`Link`**: `Some([from_col, to_col])` — deterministic straight from
+  the verb's own `crud_mapping` fields (matches `execute_link`'s own
+  capture exactly, no `maps_to` involved). `None` if either field is
+  undeclared.
+- **`Unlink`/`RoleUnlink`**: `Some(vec![])` unconditionally — both hard
+  deletes always record an empty column list in `crud_executor.rs`; this
+  is the known-correct answer, not a "cannot derive" placeholder.
+- **`RoleLink`**: stays `None` — its PK column has no `crud.returning`
+  override path at all (unlike Insert/Upsert, it's *always*
+  `infer_pk_column(junction)`); reimplementing that per-table heuristic
+  here would be the same cross-crate-drift risk this function already
+  declines elsewhere. Currently moot (zero real verbs).
+- **`EntityCreate`/`EntityUpsert`**: stay `None` — they write to a
+  second table (the extension table) whose *identity itself* is resolved
+  from `entity_types.table_name` at execution time, not derivable from
+  static verb YAML at all; and since `allowed_columns` is one flat list
+  shared across the whole write-set (not table-scoped), even a
+  base-table-only partial answer would be unsound to expose as `Some`.
+  (Separately, moot in practice today: the write-coverage tranche above
+  already found `infer_pk_column` broken for every real extension table,
+  so this half of the write never actually succeeds in production.)
+
+Independently re-verified: forced rebuild (`touch` + real `cargo build`,
+stale-diagnostics pattern again this session — confirmed clean both at
+crate and full-workspace scope), `cargo clippy -p ob-poc --lib --features
+database -- -D warnings` clean, the full `control_plane_shadow` test
+module (54/0 unit + 5/0 live-DB ignored, `DATABASE_URL`) green,
+`check-invariants.sh ratchet` 0/5 divergence, and personally reproduced
+RED (disabled the `Link` branch, got the exact predicted panic) then
+GREEN, confirming `git diff --stat` returned to its pre-probe size after
+restoring. Committed as `a3d2b5cb`.
+
+**G14 status after both tranches**: write-capture and derivation now
+agree on the same 6 operation kinds, each with a specific justified
+answer rather than a silent gap. The gate remains **unarmed** in
+production (`set_expected_write_set` still has no real call site) — both
+tranches are infrastructure completeness, zero production behavior
+change. `invariants-expected.toml` untouched.
