@@ -1169,3 +1169,45 @@ does not re-open row 4 as an `ob-poc` investigation a third time —
 its owner is bpmn-lite, and that's now on the record at the point
 where the gate itself is read, not only in a session doc that could
 go unread.
+
+## G1 design doc §10 assertion 4 closed — HumanGate reseal-at-resume, live-DB proven (2026-07-14)
+
+Closes a gap three prior sessions flagged as owed without attempting
+(`01539938`'s own session doc, the G1-items-3-4 verification session,
+the G6b/G6c session). New
+`human_gate_resume_reseals_fresh_envelope_not_the_stale_pre_park_one`
+(`sequencer.rs`) drives the real `ReplOrchestratorV2::execute_runbook`
+→ park → `handle_human_gate_approval` → `reseal_for_human_gate_resume`
+→ dispatch path end to end (not a simulation): parks a `HumanGate`
+entry (shadow-sealed `ApprovedStp` before the park branch runs, per
+`phase5_runtime_recheck`'s own ordering), ages the pre-park envelope
+past its 5-minute validity window while parked, approves, and asserts
+the pre-park envelope stays untouched (`sealed`) while a freshly-minted
+`envelope_id` is what actually transitions to `consumed`.
+
+**Disclosed deviation, verified not assumed:** the task's literal
+framing ("park an entry so it seals nothing at park time") turned out
+structurally unreachable — `has_unpinned_entities` and G2's
+entity-binding `NotFound` share the same underlying `facts_map`
+presence check, so an entity-bound verb can never be simultaneously
+G2-bound and G8-unpinned. Retargeted to the design doc's own literal
+§10 item 4 scenario: shadow-seal before park, stale the pre-park
+envelope, prove the resume-time reseal (not the stale one) is what
+gets consumed — the actual property being asked for.
+
+**Independently reproduced, not taken on the session's claim:** the
+reviewer personally reproduced the RED→GREEN proof (temporarily gated
+the reseal call behind an env var, confirmed the exact predicted
+`Expired` failure, reverted, confirmed green again, confirmed zero
+residual diff), plus forced rebuild, clippy `-D warnings`, full lib
+suite (2174/0, +1 ignored), and `check-invariants.sh ratchet` (0/5
+divergence) — all matching the session doc's own claims exactly.
+Committed as `29aa8df1`. Full detail:
+`docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-G1-HUMANGATE-RESEAL-TEST-001.md`.
+
+The three prior sessions' "materially larger integration-test
+build-out" concern was checked by actually attempting it: accurate in
+scope, not in the implied infeasibility — every needed fixture (a
+`SemOsClient` stub, an in-memory `GatePipeline`, a synthetic
+`DomainMetadata`, a pre-inserted `CompiledRunbook`) had a reusable
+pattern already in the tree.
