@@ -1342,3 +1342,61 @@ pre-fix HEAD); both new `snapshot_pin` wire tests pass; the recovered
 concurrency test RED→GREEN-reproduced independently by the reviewer;
 two pre-existing, unrelated test-ordering flakes from accumulated
 state in the shared `bpmn_lite_test` DB confirmed (pass in isolation).
+
+## G2 item 3 (G11) closed; item 2 (G14) real derivation, deliberately not armed (2026-07-14)
+
+**This is the actual gate to `GM`** — the plan's own text names G2's
+exit gate as GM's precondition ("G2's completion marks the last
+Path-A shadow-semantics change — GM is unblocked at its close").
+
+**G11/AuditReplay — CLOSED.** Made the "real decision" the ratified
+G2-audit-provenance design doc explicitly left open: G11 is an
+on-demand replay over `control_plane_audit`, called from the single
+existing `gate_outcome_counts` call site (consumed by both the E3
+probe and the operator-facing metrics endpoint) rather than writing
+anything new into `control_plane_shadow_decisions` or the audit
+stream itself. `DecisionEvaluated` gained a backward-compatible
+`entry_id` join key (`#[serde(default)]`, nil for pre-existing rows)
+to close a gap the prior session's own re-derivation logic needed but
+didn't have. A genuine concurrency bug (unstable `ORDER BY
+decision_id LIMIT 500`) was caught and fixed during implementation.
+**Live-verified, independently reproduced by the reviewer: AuditReplay
+moved 0 → 57 substantive samples at its correct provenance; E3 moves
+11/14 → 13/14 — `WriteSetAttestation` is now the only remaining
+zero/wrong-provenance gate.**
+
+**G14/WriteSetAttestation — PARTIAL, deliberately not armed.** Built a
+real, tested `allowed_columns` derivation for Insert/Update/Upsert
+verbs with an explicit `returning` (mirrored line-by-line against
+`crud_executor.rs`'s real column-selection logic, proven against the
+real `capability-binding.draft` verb) — Delete/Link/Unlink and
+`returning`-less Insert/Upsert correctly fail closed to `None` rather
+than guess. Found a **second, independent, previously-undocumented
+blocker** while checking whether this newly-correct subset was safe
+to arm: `domain_metadata.yaml`'s bare table names never match
+`record_write`'s real `"{schema}.{table}"` capture format, so
+`attest()`'s exact-string table check would misclassify every
+legitimate write as a breach regardless of column correctness —
+proven directly against `attest()`, not asserted. Per this program's
+own framing (G14 is "the plan's ONE production-behavior change" and
+deserves its own dedicated review), `set_expected_write_set` stays
+unwired; fixing the table-name-format mismatch is recommended as
+separate, bounded follow-up work, not bundled into this diff under
+time pressure.
+
+Independently re-verified (not taken on the agent's claim): several
+IDE diagnostics showing real-looking E0063 missing-field errors across
+the touched files turned out to be stale mid-edit artifacts (confirmed
+clean via forced rebuild); clippy clean; full lib suite 2183/0;
+live-DB control-plane sweep 39/1 (the E3 ratchet failure, now naming
+only `WriteSetAttestation`, counts independently reproduced matching
+the commit's claim); `check-invariants.sh ratchet` 0/5 divergence.
+Committed as `3b8b12e2`. `invariants-expected.toml` left untouched
+(recommend-only) — `[e3]` stays `fail`.
+
+**G2's remaining open item, precisely scoped for a future session:**
+the table-name-format normalization (`domain_metadata.yaml` schema-
+qualification, or a comparison-site fix) — once landed, the
+Insert/Update/Upsert-with-`returning` subset becomes arming-ready, at
+which point arming `set_expected_write_set` should be its own,
+separately reviewed diff, not bundled with the fix that enables it.
