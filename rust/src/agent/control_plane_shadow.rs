@@ -210,16 +210,51 @@ pub(crate) async fn build_dag_proof_input(
 ///   UNDER-declare the allowed set (the unsafe direction, since a real
 ///   pk write would then look like a breach), so those verbs return
 ///   `None` rather than risk it.
-/// - **Every other `CrudOperation` variant (`Delete`, `Link`, `Unlink`,
-///   `RoleLink`, `RoleUnlink`, `ListByFk`, `ListParties`,
-///   `SelectWithJoin`, `Select`, `EntityCreate`, `EntityUpsert`) returns
-///   `None`, deliberately not attempted this session.** `Delete` alone
-///   is a proven case why: `crud_executor.rs::execute_delete`'s
-///   soft-delete branch writes a literal `"deleted_at"` column that
-///   never appears in any `arg_defs[].maps_to` mapping at all — a
-///   generic `maps_to`-only derivation would silently under-declare it.
-///   `Link`/`Unlink` write junction-table `from_col`/`to_col` pairs via a
-///   structurally different code path this function does not mirror.
+/// - **`CrudOperation::Link`**: `crud_executor.rs::execute_link` records
+///   exactly `[from_col, to_col]` per write (T10.3, the G14 write-coverage
+///   tranche) — deterministic straight from the verb's own `crud_mapping`
+///   fields, no `maps_to`/pk-guessing involved. Requires both `from_col`
+///   and `to_col` to be declared; `None` otherwise (no real verb uses
+///   `Link` today, so an undeclared pair is currently only a theoretical
+///   input, not a live gap).
+/// - **`CrudOperation::Unlink` / `CrudOperation::RoleUnlink`**: both are
+///   hard deletes of a junction row; `execute_unlink`/`execute_role_unlink`
+///   always record an **empty** column list (no per-column claim, matching
+///   `execute_delete`'s own hard-delete precedent). `Some(vec![])` is the
+///   exact, known-correct answer here, unconditionally — not a fabricated
+///   guess, and not the same as "cannot derive."
+/// - **`CrudOperation::RoleLink`**: returns `None`. Unlike Insert/Upsert,
+///   `execute_role_link`'s PK column has no `crud.returning`-based
+///   override path at all — it is *always* `infer_pk_column(junction)`
+///   (`returning` only picks which column gets `RETURNING`'d, still
+///   defaulting to the same inferred name). Reimplementing that per-table
+///   heuristic here would be exactly the cross-crate-drift risk this
+///   function already declines elsewhere. (No real verb YAML uses
+///   `role_link` today — confirmed by grep across `config/verbs/*.yaml`
+///   — so this is currently moot, not a live gap.)
+/// - **`CrudOperation::EntityCreate` / `CrudOperation::EntityUpsert`**:
+///   returns `None`. These write to *two* tables — `entities` (a fixed,
+///   deterministic column set) and a caller-resolved extension table
+///   whose identity comes from an `entity_types.table_name` lookup at
+///   execution time. Both the extension table's PK column
+///   (`infer_pk_column`) and its optional display-name column
+///   (`infer_extension_name_column`) are per-table heuristics that cannot
+///   be derived from the verb's static YAML alone — and since
+///   `allowed_columns` is one flat list shared across the *whole*
+///   write-set (not table-scoped), a correct answer would require
+///   enumerating every real extension table's column shape, which is out
+///   of reach for a pure, no-I/O derivation. (Separately, and irrelevant
+///   to this function's own correctness:
+///   `crud_executor.rs::infer_pk_column` has no case for any real
+///   extension table today, so the extension-table half of this write
+///   never actually succeeds in production — see the G14 write-coverage
+///   tranche's ledger entry.)
+/// - **`CrudOperation::Delete`, `ListByFk`, `ListParties`,
+///   `SelectWithJoin`, `Select`**: still `None`, unchanged from the prior
+///   session. `Delete` alone is a proven case why: `execute_delete`'s
+///   soft-delete branch writes a literal `"deleted_at"` column that never
+///   appears in any `arg_defs[].maps_to` mapping — a generic
+///   `maps_to`-only derivation would silently under-declare it.
 ///
 fn derive_crud_allowed_columns(
     rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
@@ -230,18 +265,25 @@ fn derive_crud_allowed_columns(
         return None;
     };
     let maps_to_cols: Vec<String> = rv.args.iter().filter_map(|a| a.maps_to.clone()).collect();
-    derive_allowed_columns_for_operation(crud.operation, crud.returning.clone(), maps_to_cols)
+    derive_allowed_columns_for_operation(
+        crud.operation,
+        crud.returning.clone(),
+        maps_to_cols,
+        crud.from_col.clone(),
+        crud.to_col.clone(),
+    )
 }
 
 /// The pure per-operation half of [`derive_crud_allowed_columns`], split
-/// out so its Insert/Update/Upsert/"everything else" branch logic is unit
-/// testable without constructing a full `RuntimeVerb` fixture (that type
-/// has no `Default` impl and a dozen-plus fields unrelated to this
-/// decision).
+/// out so its branch logic is unit testable without constructing a full
+/// `RuntimeVerb` fixture (that type has no `Default` impl and a
+/// dozen-plus fields unrelated to this decision).
 fn derive_allowed_columns_for_operation(
     operation: dsl_core::CrudOperation,
     returning: Option<String>,
     maps_to_cols: Vec<String>,
+    from_col: Option<String>,
+    to_col: Option<String>,
 ) -> Option<Vec<String>> {
     use dsl_core::CrudOperation;
 
@@ -256,6 +298,15 @@ fn derive_allowed_columns_for_operation(
             if columns.is_empty() {
                 return None;
             }
+        }
+        CrudOperation::Link => {
+            let (Some(f), Some(t)) = (from_col, to_col) else {
+                return None;
+            };
+            columns = vec![f, t];
+        }
+        CrudOperation::Unlink | CrudOperation::RoleUnlink => {
+            return Some(Vec::new());
         }
         _ => return None,
     }
@@ -1652,14 +1703,108 @@ domains:
             dsl_core::CrudOperation::Delete,
             None,
             vec!["thing_id".to_string()],
+            None,
+            None,
         )
         .is_none());
     }
 
     #[test]
-    fn derive_allowed_columns_for_operation_none_for_link_and_unlink() {
-        assert!(derive_allowed_columns_for_operation(dsl_core::CrudOperation::Link, None, vec![]).is_none());
-        assert!(derive_allowed_columns_for_operation(dsl_core::CrudOperation::Unlink, None, vec![]).is_none());
+    fn derive_allowed_columns_for_operation_link_requires_both_cols() {
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Link,
+            None,
+            vec![],
+            None,
+            None
+        )
+        .is_none());
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Link,
+            None,
+            vec![],
+            Some("cbu_id".to_string()),
+            None
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_link_derives_from_col_and_to_col() {
+        // Mirrors crud_executor.rs::execute_link's `columns = vec![from_col,
+        // to_col]` exactly — no maps_to involvement at all.
+        let derived = derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Link,
+            None,
+            vec!["irrelevant".to_string()], // maps_to is ignored for Link
+            Some("cbu_id".to_string()),
+            Some("entity_id".to_string()),
+        )
+        .expect("Link with both from_col and to_col must derive");
+        let mut expected = vec!["cbu_id".to_string(), "entity_id".to_string()];
+        expected.sort();
+        assert_eq!(derived, expected);
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_unlink_and_role_unlink_are_always_empty() {
+        // execute_unlink/execute_role_unlink always record an empty column
+        // list (hard delete) — Some(vec![]), unconditionally, regardless
+        // of maps_to/from_col/to_col inputs.
+        assert_eq!(
+            derive_allowed_columns_for_operation(
+                dsl_core::CrudOperation::Unlink,
+                None,
+                vec!["irrelevant".to_string()],
+                None,
+                None
+            ),
+            Some(Vec::new())
+        );
+        assert_eq!(
+            derive_allowed_columns_for_operation(
+                dsl_core::CrudOperation::RoleUnlink,
+                None,
+                vec![],
+                None,
+                None
+            ),
+            Some(Vec::new())
+        );
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_none_for_role_link_and_entity_create_and_entity_upsert() {
+        // RoleLink: no crud.returning override path for its PK column
+        // exists at all (unlike Insert/Upsert) — reimplementing
+        // infer_pk_column's per-table heuristic here would risk drift.
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::RoleLink,
+            Some("id".to_string()),
+            vec!["role_id".to_string()],
+            None,
+            None
+        )
+        .is_none());
+        // EntityCreate/EntityUpsert: the extension table's identity is
+        // resolved at execution time from entity_types.table_name — not
+        // statically derivable from the verb's own YAML.
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::EntityCreate,
+            Some("entity_id".to_string()),
+            vec!["first_name".to_string(), "last_name".to_string()],
+            None,
+            None
+        )
+        .is_none());
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::EntityUpsert,
+            Some("entity_id".to_string()),
+            vec!["first_name".to_string(), "last_name".to_string()],
+            None,
+            None
+        )
+        .is_none());
     }
 
     #[test]
@@ -1671,12 +1816,16 @@ domains:
             dsl_core::CrudOperation::Insert,
             None,
             vec!["status".to_string()],
+            None,
+            None,
         )
         .is_none());
         assert!(derive_allowed_columns_for_operation(
             dsl_core::CrudOperation::Upsert,
             None,
             vec!["status".to_string()],
+            None,
+            None,
         )
         .is_none());
     }
@@ -1687,6 +1836,8 @@ domains:
             dsl_core::CrudOperation::Insert,
             Some("id".to_string()),
             vec!["status".to_string(), "legal_name".to_string()],
+            None,
+            None,
         )
         .expect("explicit returning + non-empty maps_to must derive");
         let mut expected = vec!["id".to_string(), "status".to_string(), "legal_name".to_string()];
@@ -1698,7 +1849,14 @@ domains:
     fn derive_allowed_columns_for_operation_update_none_when_no_mapped_columns() {
         // A verb with zero maps_to columns can never legitimately SET
         // anything — None (cannot derive), not a fabricated empty Some.
-        assert!(derive_allowed_columns_for_operation(dsl_core::CrudOperation::Update, None, vec![]).is_none());
+        assert!(derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Update,
+            None,
+            vec![],
+            None,
+            None
+        )
+        .is_none());
     }
 
     #[test]
@@ -1709,6 +1867,8 @@ domains:
             dsl_core::CrudOperation::Update,
             None,
             vec!["status".to_string()],
+            None,
+            None,
         )
         .expect("non-empty maps_to must derive");
         assert_eq!(derived, vec!["status".to_string()]);
