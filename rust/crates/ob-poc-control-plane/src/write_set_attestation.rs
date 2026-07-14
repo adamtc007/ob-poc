@@ -27,6 +27,18 @@ pub struct CapturedWrite {
     pub table: String,
     pub entity_id: Uuid,
     pub columns: Vec<String>,
+    /// True when this write created `entity_id` in this same transaction
+    /// (Insert / Upsert-that-created / RoleLink / EntityCreate /
+    /// EntityUpsert) — a fresh id can never have been in the
+    /// pre-execution `WriteSetProof.entity_ids()` bound (it didn't exist
+    /// yet to be resolved/bound), so `attest()` treats the entity_id
+    /// membership check as vacuously satisfied for these writes. False
+    /// for writes against a pre-existing, pre-bound entity (Update /
+    /// Delete / Link / Unlink / RoleUnlink), where the real membership
+    /// check still applies — that's the actual property this gate
+    /// protects: a command must not write to some OTHER entity's row it
+    /// was never given.
+    pub created_new_entity: bool,
 }
 
 /// `WriteSetAttestation` — V&S §6.7.1 "Output".
@@ -50,8 +62,11 @@ pub fn attest(captured: &[CapturedWrite], expected: &WriteSetProof) -> Attestati
         .iter()
         .filter(|write| {
             !expected.tables().contains(&write.table)
-                || !expected.entity_ids().contains(&write.entity_id)
-                || !write.columns.iter().all(|c| expected.allowed_columns().contains(c))
+                || (!write.created_new_entity && !expected.entity_ids().contains(&write.entity_id))
+                || !write
+                    .columns
+                    .iter()
+                    .all(|c| expected.allowed_columns().contains(c))
         })
         .cloned()
         .collect();
@@ -85,8 +100,12 @@ fn decide(input: &WriteSetAttestationInput) -> AttestationOutcome {
         .iter()
         .filter(|write| {
             !input.expected_tables.contains(&write.table)
-                || !input.expected_entity_ids.contains(&write.entity_id)
-                || !write.columns.iter().all(|c| input.expected_allowed_columns.contains(c))
+                || (!write.created_new_entity
+                    && !input.expected_entity_ids.contains(&write.entity_id))
+                || !write
+                    .columns
+                    .iter()
+                    .all(|c| input.expected_allowed_columns.contains(c))
         })
         .cloned()
         .collect();
@@ -111,9 +130,10 @@ impl Gate<crate::context::EvaluationContext> for WriteSetAttestationGate {
         };
         match decide(input) {
             AttestationOutcome::Bounded => GateResult::Success,
-            AttestationOutcome::Breach { excess } => {
-                GateResult::Failure(format!("write-set breach: {} excess write(s)", excess.len()))
-            }
+            AttestationOutcome::Breach { excess } => GateResult::Failure(format!(
+                "write-set breach: {} excess write(s)",
+                excess.len()
+            )),
         }
     }
 }
@@ -135,6 +155,7 @@ mod tests {
             table: "ob-poc.cbus".to_string(),
             entity_id: Uuid::nil(),
             columns: vec!["status".to_string()],
+            created_new_entity: false,
         }];
         assert_eq!(attest(&captured, &proof), AttestationOutcome::Bounded);
     }
@@ -152,6 +173,7 @@ mod tests {
             table: "ob-poc.entities".to_string(),
             entity_id: Uuid::nil(),
             columns: vec!["name".to_string()],
+            created_new_entity: false,
         }];
         let outcome = attest(&captured, &proof);
         assert!(matches!(&outcome, AttestationOutcome::Breach { excess } if excess.len() == 1));
@@ -170,8 +192,12 @@ mod tests {
             table: "ob-poc.cbus".to_string(),
             entity_id: Uuid::nil(),
             columns: vec!["status".to_string(), "legal_name".to_string()],
+            created_new_entity: false,
         }];
-        assert!(matches!(attest(&captured, &proof), AttestationOutcome::Breach { .. }));
+        assert!(matches!(
+            attest(&captured, &proof),
+            AttestationOutcome::Breach { .. }
+        ));
     }
 
     #[test]
@@ -187,8 +213,101 @@ mod tests {
             table: "ob-poc.cbus".to_string(),
             entity_id: Uuid::new_v4(),
             columns: vec!["status".to_string()],
+            created_new_entity: false,
         }];
-        assert!(matches!(attest(&captured, &proof), AttestationOutcome::Breach { .. }));
+        assert!(matches!(
+            attest(&captured, &proof),
+            AttestationOutcome::Breach { .. }
+        ));
+    }
+
+    /// A write against a freshly-created entity (Insert / Upsert-that-
+    /// created / RoleLink / EntityCreate / EntityUpsert,
+    /// `created_new_entity: true`) attests `Bounded` even when its
+    /// `entity_id` is NOT a member of the pre-execution `entity_ids()`
+    /// bound — a fresh id can never have been pre-bound (it didn't exist
+    /// yet), so the membership check is vacuously satisfied. Table and
+    /// columns still have to be within bounds.
+    #[test]
+    fn created_new_entity_bypasses_entity_id_membership_check_in_attest() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()], // pre-execution bound entity ids — does NOT include the new id below
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::new_v4(), // freshly generated, never in the pre-execution bound
+            columns: vec!["status".to_string()],
+            created_new_entity: true,
+        }];
+        assert_eq!(
+            attest(&captured, &proof),
+            AttestationOutcome::Bounded,
+            "a write against an entity created by this same verb must not breach on \
+             entity_id membership alone"
+        );
+    }
+
+    /// Regression proof: `created_new_entity: false` still enforces the
+    /// real entity_id membership check — this is the actual security
+    /// property G14 protects (don't let a command write to some OTHER
+    /// entity's row it wasn't given). The bypass above must not gut this.
+    #[test]
+    fn non_created_write_to_unbound_entity_still_breaches_in_attest() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::new_v4(), // not in the pre-execution bound
+            columns: vec!["status".to_string()],
+            created_new_entity: false,
+        }];
+        assert!(
+            matches!(attest(&captured, &proof), AttestationOutcome::Breach { .. }),
+            "a write against a pre-existing, unbound entity must still breach"
+        );
+    }
+
+    /// Same two cases through `decide()`/`WriteSetAttestationInput` (the
+    /// shadow-eval `Gate` adapter's twin comparison), not just `attest()`.
+    #[test]
+    fn created_new_entity_bypasses_entity_id_membership_check_in_decide() {
+        let input = WriteSetAttestationInput {
+            captured: vec![CapturedWrite {
+                table: "ob-poc.cbus".to_string(),
+                entity_id: Uuid::new_v4(), // not in expected_entity_ids below
+                columns: vec!["status".to_string()],
+                created_new_entity: true,
+            }],
+            expected_tables: vec!["ob-poc.cbus".to_string()],
+            expected_entity_ids: vec![Uuid::nil()],
+            expected_allowed_columns: vec!["status".to_string()],
+        };
+        assert_eq!(decide(&input), AttestationOutcome::Bounded);
+    }
+
+    #[test]
+    fn non_created_write_to_unbound_entity_still_breaches_in_decide() {
+        let input = WriteSetAttestationInput {
+            captured: vec![CapturedWrite {
+                table: "ob-poc.cbus".to_string(),
+                entity_id: Uuid::new_v4(), // not in expected_entity_ids below
+                columns: vec!["status".to_string()],
+                created_new_entity: false,
+            }],
+            expected_tables: vec!["ob-poc.cbus".to_string()],
+            expected_entity_ids: vec![Uuid::nil()],
+            expected_allowed_columns: vec!["status".to_string()],
+        };
+        assert!(matches!(decide(&input), AttestationOutcome::Breach { .. }));
     }
 
     /// EOP-SESSION-CONTROLPLANE-G1-ITEM2-G2-ITEM2-IMPL-001, G2 item 2
@@ -212,7 +331,8 @@ mod tests {
     /// STOP-condition finding on G2 item 2: `set_expected_write_set` is not
     /// wired from `build_write_set_input`'s output.
     #[test]
-    fn empty_allowed_columns_breaches_every_write_with_any_column_even_on_exact_table_and_entity_match() {
+    fn empty_allowed_columns_breaches_every_write_with_any_column_even_on_exact_table_and_entity_match(
+    ) {
         let proof = crate::write_set::tests_support::proof(
             vec![Uuid::nil()],
             vec![],
@@ -221,9 +341,10 @@ mod tests {
             "idem-1",
         );
         let captured = vec![CapturedWrite {
-            table: "ob-poc.cbus".to_string(), // exact table match
-            entity_id: Uuid::nil(),           // exact entity match
+            table: "ob-poc.cbus".to_string(),    // exact table match
+            entity_id: Uuid::nil(),              // exact entity match
             columns: vec!["status".to_string()], // any real, nonempty column list
+            created_new_entity: false,
         }];
         let outcome = attest(&captured, &proof);
         assert!(
@@ -246,11 +367,13 @@ mod tests {
                 table: "ob-poc.entities".to_string(),
                 entity_id: Uuid::nil(),
                 columns: vec!["name".to_string()],
+                created_new_entity: false,
             },
             CapturedWrite {
                 table: "ob-poc.cases".to_string(),
                 entity_id: Uuid::nil(),
                 columns: vec!["status".to_string()],
+                created_new_entity: false,
             },
         ];
         match attest(&captured, &proof) {
@@ -265,6 +388,7 @@ mod tests {
                 table: "ob-poc.cbus".to_string(),
                 entity_id: Uuid::nil(),
                 columns: vec!["status".to_string()],
+                created_new_entity: false,
             }],
             expected_tables: vec!["ob-poc.cbus".to_string()],
             expected_entity_ids: vec![Uuid::nil()],
@@ -290,6 +414,7 @@ mod tests {
                     table: "ob-poc.entities".to_string(),
                     entity_id: Uuid::nil(),
                     columns: vec!["name".to_string()],
+                    created_new_entity: false,
                 }],
                 ..base_input()
             }),

@@ -97,11 +97,24 @@ pub trait TransactionScope: Send + Sync {
     /// self-reported, not independently observed — a caller that writes
     /// without calling this under-reports its own footprint.
     ///
+    /// `created_new_entity`: true when this write created `entity_id` in
+    /// this same transaction (a fresh id can never have been in the
+    /// pre-execution write-set bound). See
+    /// `ob-poc-control-plane::write_set_attestation::CapturedWrite` for
+    /// the full reasoning this param feeds into.
+    ///
     /// Default no-op: only `ob-poc`'s concrete `PgTransactionScope`
     /// overrides this (it owns the `captured_writes` accumulator T5.1-T5.3
     /// already built); every other implementor (test mocks, harness
     /// executors) is unaffected.
-    fn record_write(&mut self, _table: &str, _entity_id: Uuid, _columns: &[String]) {}
+    fn record_write(
+        &mut self,
+        _table: &str,
+        _entity_id: Uuid,
+        _columns: &[String],
+        _created_new_entity: bool,
+    ) {
+    }
 }
 
 #[cfg(test)]

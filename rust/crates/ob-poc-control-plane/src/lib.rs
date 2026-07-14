@@ -249,6 +249,7 @@ mod evaluate_shadow_tests {
                     table: "ob-poc.cbus".to_string(),
                     entity_id: entity,
                     columns: vec!["status".to_string()],
+                    created_new_entity: false,
                 }],
                 expected_tables: vec!["ob-poc.cbus".to_string()],
                 expected_entity_ids: vec![entity],

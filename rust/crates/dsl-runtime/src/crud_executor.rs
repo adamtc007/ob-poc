@@ -62,9 +62,15 @@ impl CrudExec<'_> {
     /// runs inside a caller's admitting scope (pre-T9.2 legacy path), so
     /// there is nothing honest to attest against; only `Scope` dispatches
     /// (T9.2's atomic-admission branch) participate in capture.
-    fn record_write(&mut self, table: &str, entity_id: Uuid, columns: &[String]) {
+    fn record_write(
+        &mut self,
+        table: &str,
+        entity_id: Uuid,
+        columns: &[String],
+        created_new_entity: bool,
+    ) {
         if let CrudExec::Scope(s) = self {
-            s.record_write(table, entity_id, columns);
+            s.record_write(table, entity_id, columns, created_new_entity);
         }
     }
 }
@@ -331,7 +337,7 @@ impl PgCrudExecutor {
         // fell through to the existing row) — a slight over-report, never
         // an under-report, and harmless to attestation since it's the
         // same row/table this operation already declares it targets.
-        exec.record_write(&format!("{schema}.{table}"), uuid, &raw_columns);
+        exec.record_write(&format!("{schema}.{table}"), uuid, &raw_columns, true);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -409,7 +415,7 @@ impl PgCrudExecutor {
         let affected = execute_non_query(exec, &sql, &bind_values).await?;
         if affected > 0 {
             if let Some(entity_id) = key_entity_id {
-                exec.record_write(&format!("{schema}.{table}"), entity_id, &raw_columns);
+                exec.record_write(&format!("{schema}.{table}"), entity_id, &raw_columns, false);
             }
         }
         Ok(VerbExecutionOutcome::Affected(affected))
@@ -501,7 +507,7 @@ impl PgCrudExecutor {
                 // table+entity assertion applies.
                 let columns: Vec<String> =
                     if is_soft { vec!["deleted_at".to_string()] } else { vec![] };
-                exec.record_write(&format!("{schema}.{table}"), entity_id, &columns);
+                exec.record_write(&format!("{schema}.{table}"), entity_id, &columns, false);
             }
         }
         Ok(VerbExecutionOutcome::Affected(affected))
@@ -587,7 +593,7 @@ impl PgCrudExecutor {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
         // T10.3: self-report for G14 — same posture as execute_insert.
-        exec.record_write(&format!("{schema}.{table}"), uuid, &insert_cols);
+        exec.record_write(&format!("{schema}.{table}"), uuid, &insert_cols, true);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -653,10 +659,10 @@ impl PgCrudExecutor {
             let junction_table = format!("{schema}.{junction}");
             let columns = vec![from_col.to_string(), to_col.to_string()];
             if let Some(id) = from_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
             if let Some(id) = to_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
         }
         Ok(VerbExecutionOutcome::Affected(affected))
@@ -723,10 +729,10 @@ impl PgCrudExecutor {
             let junction_table = format!("{schema}.{junction}");
             let columns: Vec<String> = vec![];
             if let Some(id) = from_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
             if let Some(id) = to_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
         }
         Ok(VerbExecutionOutcome::Affected(affected))
@@ -842,7 +848,7 @@ impl PgCrudExecutor {
         // unconditionally on success). `uuid` is this junction row's own
         // generated PK, not `from`/`to` — role_link is the one of the six
         // ops with its own generated row identity, matching execute_insert.
-        exec.record_write(&format!("{schema}.{junction}"), uuid, &raw_columns);
+        exec.record_write(&format!("{schema}.{junction}"), uuid, &raw_columns, true);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -913,13 +919,13 @@ impl PgCrudExecutor {
             let junction_table = format!("{schema}.{junction}");
             let columns: Vec<String> = vec![];
             if let Some(id) = from_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
             if let Some(id) = to_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
             if let Some(id) = role_id {
-                exec.record_write(&junction_table, id, &columns);
+                exec.record_write(&junction_table, id, &columns, false);
             }
         }
         Ok(VerbExecutionOutcome::Affected(affected))
@@ -1204,7 +1210,7 @@ impl PgCrudExecutor {
             "entity_type_id".to_string(),
             "name".to_string(),
         ];
-        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols);
+        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols, true);
 
         // INSERT into extension table
         let ext_pk_col = infer_pk_column(&extension_table);
@@ -1283,6 +1289,7 @@ impl PgCrudExecutor {
             &format!("{schema}.{extension_table}"),
             entity_id,
             &raw_ext_columns,
+            true,
         );
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
@@ -1368,7 +1375,7 @@ impl PgCrudExecutor {
             "entity_type_id".to_string(),
             "name".to_string(),
         ];
-        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols);
+        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols, true);
 
         // Build extension columns
         let ext_pk_col = infer_pk_column(&extension_table);
@@ -1462,6 +1469,7 @@ impl PgCrudExecutor {
             &format!("{schema}.{extension_table}"),
             entity_id,
             &raw_ext_columns,
+            true,
         );
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
@@ -1878,7 +1886,7 @@ mod db_integration_tests {
         tx: sqlx::Transaction<'static, sqlx::Postgres>,
         pool: PgPool,
         id: ob_poc_types::TransactionScopeId,
-        captured: Vec<(String, Uuid, Vec<String>)>,
+        captured: Vec<(String, Uuid, Vec<String>, bool)>,
     }
 
     impl TestScope {
@@ -1913,8 +1921,15 @@ mod db_integration_tests {
             &self.pool
         }
 
-        fn record_write(&mut self, table: &str, entity_id: Uuid, columns: &[String]) {
-            self.captured.push((table.to_string(), entity_id, columns.to_vec()));
+        fn record_write(
+            &mut self,
+            table: &str,
+            entity_id: Uuid,
+            columns: &[String],
+            created_new_entity: bool,
+        ) {
+            self.captured
+                .push((table.to_string(), entity_id, columns.to_vec(), created_new_entity));
         }
     }
 
@@ -2258,8 +2273,13 @@ mod db_integration_tests {
              the extension insert fails), got {:?}",
             scope.captured
         );
-        let (base_table, _base_id, base_cols) = scope.captured[0].clone();
+        let (base_table, _base_id, base_cols, base_created_new_entity) =
+            scope.captured[0].clone();
         assert_eq!(base_table, "ob-poc.entities");
+        assert!(
+            base_created_new_entity,
+            "entity_create's base-table write always creates the entities row it writes to"
+        );
         assert_eq!(
             base_cols,
             vec![

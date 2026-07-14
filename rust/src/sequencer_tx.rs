@@ -241,11 +241,18 @@ impl TransactionScope for PgTransactionScope {
     /// module doc for why): self-report a write this scope's caller
     /// performed via `scope.executor()`/`scope.transaction()`.
     /// `commit_attested` can only catch what gets reported here.
-    fn record_write(&mut self, table: &str, entity_id: Uuid, columns: &[String]) {
+    fn record_write(
+        &mut self,
+        table: &str,
+        entity_id: Uuid,
+        columns: &[String],
+        created_new_entity: bool,
+    ) {
         self.captured_writes.push(CapturedWrite {
             table: table.to_string(),
             entity_id,
             columns: columns.to_vec(),
+            created_new_entity,
         });
     }
 }
@@ -339,6 +346,7 @@ mod t5_write_set_attestation_tests {
             "ob-poc.control_plane_envelopes",
             envelope_id,
             &["status".to_string()],
+            true, // fresh INSERT of a new envelope row keyed by envelope_id
         );
 
         let result = scope.commit_attested(None, Some("test.undeclared-write")).await;
@@ -390,6 +398,7 @@ mod t5_write_set_attestation_tests {
             "ob-poc.control_plane_envelopes",
             envelope_id,
             &["status".to_string()],
+            true, // fresh INSERT of a new envelope row keyed by envelope_id
         );
 
         scope

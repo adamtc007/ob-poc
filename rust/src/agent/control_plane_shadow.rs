@@ -2069,6 +2069,9 @@ domains:
             table: "ob-poc.capability_bindings".to_string(),
             entity_id: Uuid::nil(),
             columns: vec!["service_id".to_string()], // a genuinely-declared, legitimate column
+            // capability-binding.draft is `crud.operation: insert` — this
+            // captured write is against the row it just created.
+            created_new_entity: true,
         }];
         let outcome = ob_poc_control_plane::write_set_attestation::attest(&captured, &proof);
         assert_eq!(
