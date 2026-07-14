@@ -1400,3 +1400,43 @@ qualification, or a comparison-site fix) — once landed, the
 Insert/Update/Upsert-with-`returning` subset becomes arming-ready, at
 which point arming `set_expected_write_set` should be its own,
 separately reviewed diff, not bundled with the fix that enables it.
+
+## G14's table-name-format mismatch fixed (2026-07-14)
+
+Closes the second blocker G2 item 2's own session (`3b8b12e2`) found
+and proved but explicitly deferred. New `qualify_footprint_table`
+(`control_plane_shadow.rs`) schema-qualifies `domain_metadata.yaml`'s
+bare table names at the derivation site — bare names default to
+`ob-poc.` (matching `crud_executor.rs`'s own convention), already-
+dotted names (the `sem_reg*` family) pass through verbatim. Rejected
+qualifying the YAML source itself (5 other consumers, and a real
+counter-case: `team.yaml` declares a `teams` schema for 3 verbs while
+`domain_metadata.yaml` gives them bare names — a naive source-side
+default would be actively wrong there, not just broader blast radius)
+and rejected normalizing at `attest()`'s comparison boundary (would
+weaken a security-relevant exact-match check for no added benefit).
+Verified operation-agnostic — confirmed all 4 `record_write` call
+sites (Insert/Update/Delete/Upsert) share the identical format, not
+just the 3 the prior session's column-derivation covered.
+
+The prior session's proof-of-breakage test is superseded by one
+proving the same real scenario now attests `Bounded`, not `Breach`.
+Two pre-existing, narrower `domain_metadata.yaml` data-quality bugs
+(a `kyc.` prefix naming a non-existent schema; the `team.*` domain's
+bare names that will now default wrongly) were found during
+verification and documented with real tests, not silently absorbed or
+ignored — flagged as separate, narrower follow-up work.
+
+**Scope discipline held**: `set_expected_write_set` remains unwired,
+independently re-confirmed by the reviewer via grep (its only two real
+call sites are test-only fault-injection scaffolding in
+`sequencer_tx.rs`'s own test module) — arming the real comparison
+stays the deliberately deferred, separately-reviewable decision this
+program has held it as since G2 item 2's original STOP.
+
+Independently re-verified (not taken on the agent's claim): forced
+rebuild clean, clippy clean, full lib suite 2187/0, all new tests pass
+in isolation, `check-invariants.sh ratchet` 0/5 divergence. Committed
+as `0c7c9441`. `invariants-expected.toml` untouched — this fix moves
+nothing in `[eN]` on its own (it's upstream of the arming decision
+that would).
