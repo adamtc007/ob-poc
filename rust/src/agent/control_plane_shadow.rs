@@ -221,15 +221,6 @@ pub(crate) async fn build_dag_proof_input(
 ///   `Link`/`Unlink` write junction-table `from_col`/`to_col` pairs via a
 ///   structurally different code path this function does not mirror.
 ///
-/// **Known remaining gap, NOT fixed by this function (see the
-/// `derived_columns_are_correct_but_table_name_format_does_not_match_captured_writes`
-/// test below): even where `allowed_columns` is now correct,
-/// `WriteSetInput.tables` (from `domain_metadata.yaml`'s bare table
-/// names, e.g. `"deals"`) does not match `CapturedWrite.table`'s
-/// `record_write`-reported `"{schema}.{table}"` format (e.g.
-/// `"ob-poc.deals"`) — a second, independent reason `set_expected_write_set`
-/// is not wired to this session's output, on top of the (now-fixed)
-/// empty-`allowed_columns` reason.
 fn derive_crud_allowed_columns(
     rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
 ) -> Option<Vec<String>> {
@@ -274,6 +265,63 @@ fn derive_allowed_columns_for_operation(
     Some(columns)
 }
 
+/// G2 item 4 (`EOP-SESSION-CONTROLPLANE-G14-TABLE-FORMAT-FIX-001`):
+/// schema-qualifies a `domain_metadata.yaml` `writes:`/`reads:` table entry
+/// to the exact `"{schema}.{table}"` string `crud_executor.rs`'s
+/// `record_write` self-reports in production (all 4 call sites —
+/// `execute_insert`/`execute_update`/`execute_delete`/`execute_upsert` —
+/// verified to use the identical `format!("{schema}.{table}")`, sourced
+/// from the same `dispatch()`-computed `schema`/`table` pair).
+///
+/// `domain_metadata.yaml`'s own file header documents its convention
+/// verbatim: *"Tables without a schema prefix default to `ob-poc`. Tables
+/// in other schemas use `schema.table` notation."* — this function
+/// implements exactly that stated convention: a bare name is qualified as
+/// `ob-poc.{table}`; a name that already contains a `.` is trusted
+/// verbatim (the file's own explicit schema declaration).
+///
+/// **Known, pre-existing, NOT fixed by this function:** cross-checking the
+/// real file against `migrations/master-schema.sql`'s `CREATE SCHEMA`
+/// list (`"ob-poc"`, `sem_reg`, `sem_reg_authoring`, `sem_reg_pub` — no
+/// `kyc` schema exists) found the stated convention is itself violated in
+/// two independent, narrow ways already present in the data, neither
+/// introduced or corrected by this fix:
+/// - `kyc.cases` / `kyc.ownership_snapshots` use a `kyc.` prefix that
+///   is **not a real Postgres schema** — both tables actually live in
+///   `"ob-poc"` (`CREATE TABLE "ob-poc".cases`, `CREATE TABLE
+///   "ob-poc".ownership_snapshots`). Passed through verbatim by this
+///   function (it trusts any dotted name), so `WriteSetInput.tables` for
+///   `kyc.set-case`/`ownership.compute`/`ownership.snapshot.list` will
+///   read `"kyc.cases"`/`"kyc.ownership_snapshots"` — a string that will
+///   never match any real `CapturedWrite.table` (which would report
+///   `"ob-poc.cases"`/`"ob-poc.ownership_snapshots"`).
+/// - `team.create`/`team.add-member`/`team.remove-member` declare bare
+///   names (`teams`, `memberships`) that this function therefore qualifies
+///   as `ob-poc.teams`/`ob-poc.memberships` — but `config/verbs/team.yaml`
+///   declares those verbs' real `crud_mapping.schema` as `teams`, not
+///   `ob-poc` (`record_write` will actually report `"teams.teams"`/
+///   `"teams.memberships"`).
+///
+/// Both are pre-existing data-quality defects in `domain_metadata.yaml`
+/// itself (wrong schema attribution, not a format mismatch this function
+/// is scoped to fix) — flagged, not silently absorbed; see this session's
+/// doc for the recommendation to correct the 5 affected entries in a
+/// follow-up. Every other domain in the file (confirmed by full-file grep:
+/// the only dotted prefixes appearing anywhere in `reads:`/`writes:` are
+/// `kyc.`, `sem_reg.`, `sem_reg_authoring.`, `sem_reg_pub.`) either matches
+/// its real schema already (`sem_reg*`) or has no footprint entry at all
+/// for any verb using a non-`ob-poc` `crud_mapping.schema` (confirmed:
+/// zero `access-review.*`/`application-instance.*` entries in
+/// `domain_metadata.yaml`, the only other verb YAMLs declaring a
+/// non-`ob-poc` schema besides `team.yaml`).
+fn qualify_footprint_table(table: &str) -> String {
+    if table.contains('.') {
+        table.to_string()
+    } else {
+        format!("ob-poc.{table}")
+    }
+}
+
 /// T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): builds G7's
 /// `WriteSetInput` from the verb's declared write footprint
 /// (`config/sem_os_seeds/domain_metadata.yaml`'s per-verb `writes: [...]`,
@@ -286,6 +334,11 @@ fn derive_allowed_columns_for_operation(
 /// verb still gets an empty list (honest "cannot derive," not a fabricated
 /// guess) — matching this function's own pre-existing `None`-on-cannot-
 /// derive posture for the table-level footprint.
+///
+/// `tables` is schema-qualified via [`qualify_footprint_table`] (G2 item
+/// 4) so it can actually be compared against `CapturedWrite.table`'s
+/// `"{schema}.{table}"` production format — see that function's doc for
+/// the verified convention and its two known, pre-existing exceptions.
 ///
 /// Returns `None` (not a fabricated `CannotDerive`) when: no
 /// `DomainMetadata` is wired; the verb has no footprint entry at all; or
@@ -315,10 +368,12 @@ pub(crate) fn build_write_set_input(
         .and_then(derive_crud_allowed_columns)
         .unwrap_or_default();
 
+    let tables = footprint.writes.iter().map(|t| qualify_footprint_table(t)).collect();
+
     Some(ob_poc_control_plane::write_set::WriteSetInput {
         entity_ids,
         state_slots: Vec::new(),
-        tables: footprint.writes.clone(),
+        tables,
         allowed_columns,
         idempotency_key: format!("{entry_id}:{verb_fqn}"),
         contract_derived: true,
@@ -1631,18 +1686,19 @@ domains:
         assert_eq!(derived, vec!["status".to_string()]);
     }
 
-    /// Second, independent gap this session found (documented in
-    /// `derive_crud_allowed_columns`'s own doc comment): even with a
-    /// correct, non-empty `allowed_columns`, `WriteSetInput.tables` (bare
-    /// table names from `domain_metadata.yaml`, e.g. `"deals"`) does not
-    /// match `CapturedWrite.table`'s `record_write`-reported
-    /// `"{schema}.{table}"` format (e.g. `"ob-poc.deals"`) —
-    /// `attest()`'s exact-string table check would misclassify every real
-    /// write as an excess (undeclared table) regardless of how correct
-    /// `allowed_columns` is. Proven directly against `attest()`, not
-    /// merely asserted in prose.
+    /// Supersedes the prior session's
+    /// `derived_columns_are_correct_but_table_name_format_does_not_match_captured_writes`
+    /// (`EOP-SESSION-CONTROLPLANE-G1-ITEM2-G2-ITEM2-IMPL-001`), which
+    /// proved a genuinely legitimate write on a correctly-derived column
+    /// still misclassified as a breach because `WriteSetInput.tables` was
+    /// a bare table name (`"capability_bindings"`) while `CapturedWrite`
+    /// carries `record_write`'s real `"{schema}.{table}"` format
+    /// (`"ob-poc.capability_bindings"`). `build_write_set_input` now
+    /// schema-qualifies via `qualify_footprint_table` (this session, G2
+    /// item 4) — this test proves the same scenario now attests `Bounded`,
+    /// not `Breach`.
     #[test]
-    fn derived_columns_are_correct_but_table_name_format_does_not_match_captured_writes() {
+    fn derived_columns_are_correct_and_table_name_now_matches_captured_writes() {
         let metadata = test_domain_metadata("capability-binding.draft", vec!["\"capability_bindings\""]);
         let ws = build_write_set_input(Some(&metadata), "capability-binding.draft", Uuid::new_v4(), vec![Uuid::nil()])
             .expect("footprint declares a write");
@@ -1650,7 +1706,9 @@ domains:
             !ws.allowed_columns.is_empty(),
             "sanity: the column derivation itself must be non-empty here"
         );
-        assert_eq!(ws.tables, vec!["capability_bindings".to_string()]);
+        // Schema-qualified now, matching crud_executor.rs's real
+        // record_write format exactly.
+        assert_eq!(ws.tables, vec!["ob-poc.capability_bindings".to_string()]);
 
         let proof = ob_poc_control_plane::write_set::tests_support::proof(
             vec![Uuid::nil()],
@@ -1667,11 +1725,56 @@ domains:
             columns: vec!["service_id".to_string()], // a genuinely-declared, legitimate column
         }];
         let outcome = ob_poc_control_plane::write_set_attestation::attest(&captured, &proof);
-        assert!(
-            matches!(&outcome, ob_poc_control_plane::write_set_attestation::AttestationOutcome::Breach { .. }),
-            "table-name-format mismatch means even a fully legitimate write on a correctly-derived \
-             column still misclassifies as a breach today: {outcome:?} — this is why set_expected_write_set \
-             stays unwired even for the narrow subset this session's allowed_columns derivation now covers"
+        assert_eq!(
+            outcome,
+            ob_poc_control_plane::write_set_attestation::AttestationOutcome::Bounded,
+            "a fully legitimate write on a correctly-derived column and now-matching \
+             schema-qualified table must attest Bounded: {outcome:?}"
+        );
+    }
+
+    /// G2 item 4: `qualify_footprint_table` schema-qualifies a bare
+    /// `domain_metadata.yaml` table name with the documented default
+    /// schema (`ob-poc`), matching `crud_executor.rs`'s own
+    /// `crud.schema.as_deref().unwrap_or("ob-poc")` default.
+    #[test]
+    fn qualify_footprint_table_bare_name_defaults_to_ob_poc() {
+        assert_eq!(qualify_footprint_table("deals"), "ob-poc.deals");
+        assert_eq!(qualify_footprint_table("capability_bindings"), "ob-poc.capability_bindings");
+    }
+
+    /// A table name that already carries a `schema.table` prefix (per
+    /// `domain_metadata.yaml`'s own documented convention) is trusted
+    /// verbatim, not re-qualified — this is the real, correct form for
+    /// the `sem_reg.*`/`sem_reg_authoring.*`/`sem_reg_pub.*` family, which
+    /// are genuine Postgres schemas (confirmed against
+    /// `migrations/master-schema.sql`'s `CREATE SCHEMA` list).
+    #[test]
+    fn qualify_footprint_table_already_dotted_name_passes_through_verbatim() {
+        assert_eq!(qualify_footprint_table("sem_reg.changesets"), "sem_reg.changesets");
+        assert_eq!(
+            qualify_footprint_table("sem_reg_authoring.governance_audit_log"),
+            "sem_reg_authoring.governance_audit_log"
+        );
+    }
+
+    /// Known, pre-existing, NOT fixed by this session (documented in
+    /// `qualify_footprint_table`'s own doc comment): `domain_metadata.yaml`
+    /// uses a `kyc.` prefix for `kyc.set-case`'s footprint even though no
+    /// `kyc` Postgres schema exists — the real table is
+    /// `"ob-poc".cases`. This function trusts any dotted name verbatim
+    /// (correct for the `sem_reg*` family), so this specific entry stays
+    /// wrong until `domain_metadata.yaml`'s own data is corrected — a
+    /// separate, narrower follow-up flagged in the session doc, not
+    /// silently swept under this fix.
+    #[test]
+    fn qualify_footprint_table_known_gap_kyc_prefix_is_not_a_real_schema() {
+        let qualified = qualify_footprint_table("kyc.cases");
+        assert_eq!(qualified, "kyc.cases", "documents the pass-through behavior as-is");
+        assert_ne!(
+            qualified, "ob-poc.cases",
+            "the real table (per master-schema.sql: CREATE TABLE \"ob-poc\".cases) — \
+             this assertion documents the known gap, not a claim this session fixed it"
         );
     }
 
@@ -1707,12 +1810,31 @@ domains:
         let entity_id = Uuid::new_v4();
         let ws = build_write_set_input(Some(&metadata), "deal.create", entry_id, vec![entity_id])
             .expect("verb has a non-empty write footprint");
-        assert_eq!(ws.tables, vec!["deals".to_string()]);
+        // Schema-qualified (G2 item 4) — matches crud_executor.rs's real
+        // record_write format, not the bare domain_metadata.yaml name.
+        assert_eq!(ws.tables, vec!["ob-poc.deals".to_string()]);
         assert!(ws.contract_derived);
         assert_eq!(ws.entity_ids, vec![entity_id]);
         assert!(ws.state_slots.is_empty());
         assert!(ws.allowed_columns.is_empty());
         assert_eq!(ws.idempotency_key, format!("{entry_id}:deal.create"));
+    }
+
+    /// A verb footprint declaring multiple write tables (real pattern in
+    /// `domain_metadata.yaml` — plugin verbs writing several tables in one
+    /// call, e.g. `cbu.assign-role: writes: [cbus, cbu_entity_roles]`)
+    /// must have every table schema-qualified, not just the first.
+    #[test]
+    fn build_write_set_input_qualifies_every_table_in_a_multi_table_footprint() {
+        let metadata =
+            test_domain_metadata("cbu.assign-role", vec!["\"cbus\"", "\"cbu_entity_roles\""]);
+        let entry_id = Uuid::new_v4();
+        let ws = build_write_set_input(Some(&metadata), "cbu.assign-role", entry_id, vec![])
+            .expect("verb has a non-empty write footprint");
+        assert_eq!(
+            ws.tables,
+            vec!["ob-poc.cbus".to_string(), "ob-poc.cbu_entity_roles".to_string()]
+        );
     }
 
     // ── T9.5 (Addendum B): build_stp_classifier_input ──
