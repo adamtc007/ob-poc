@@ -1080,3 +1080,62 @@ applied) reflecting that E2's structural leg is now 4/4 RR-2 paths
 (G4 landed B/C), not the 2/4 the current comment still says — status
 stays `fail` either way, since no verb is enforced by production
 default on any path.
+
+## G6b landed (RR-5 rows 2+5); G6c investigated, handed to architect (2026-07-14)
+
+**G6b, row 2 (`toctou_entity_tables`):** the real per-entity
+`row_version` populator (`build_decision_snapshot_input` → real
+`SnapshotPins` → `persist_sealed`) already existed but was dead code
+— `build_stp_classifier_input`'s `has_unpinned_entities` flag was
+hardcoded `!entity_requests.is_empty()` at both real call sites in
+`sequencer.rs`, capping every entity-bound verb at `HumanGated`
+regardless of whether a real pin existed. New `has_unpinned_entities()`
+(`control_plane_shadow.rs`) derives the fact honestly from the same
+`entity_facts_map` G2/G13 already fetch — pinned iff
+`PgEntityFactsSource` actually captured a `row_version`; a failed
+batched fetch is fail-closed unpinned-for-everything. New live-DB test
+proves a genuinely not-found entity still caps STP eligibility at
+`HumanGated` end to end.
+
+**G6b, row 5 (`raw_dsl_best_effort`):** RR-5's original
+characterization (raw-DSL-in-request-body bypass) is stale — Slice
+3.1 (2026-04-22) already closed that. What remains on Path C
+(`DslDirect`) has no envelope-minting infrastructure at all — building
+one is new-seam design work comparable in weight to G1's own
+seal-consume doc; correctly treated as a STOP-condition and not built.
+Instead, a new named test proves the honest current posture: an
+enforced verb on Path C with nothing sealed is rejected
+(`RejectedNoEnvelope`), never silently dispatched "best-effort" —
+satisfying E4's test-existence bar without fabricating a populator
+that doesn't exist.
+
+Net: `check-invariants.sh e4` moves 1/5 → 2/5 satisfied rows (exactly
+`toctou_entity_tables` and `raw_dsl_best_effort`, independently
+reproduced). `[e4]` status stays `fail` (rows 1/3/4 remain open).
+Full verification (build/clippy/2174-test lib suite/e4 probe/ratchet)
+independently reproduced by the reviewer, matching the session's own
+claims exactly; one cosmetic mislabel (a test assert message said
+"Path C" while testing `ExecutionPath::DslDirect`, which is Path B)
+caught and fixed during review. Committed as `9614be04`. Full detail:
+`docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-G6B-G6C-IMPL-001.md`.
+
+**G6c (RR-5 row 4, BPMN `process_instances`):** investigated,
+confirmed not closeable from `ob-poc`. Live `psql` inspection
+confirms no `row_version`/CAS on `process_instances`' mutable-state
+columns; the actual concurrency primitive appears to be a
+`lease_owner`/`lease_until` claim pattern whose write-side discipline
+lives entirely inside the external `bpmn-lite-engine`/
+`bpmn-lite-store` git dependencies (source not present in this
+checkout, correctly not touched — bpmn-lite changes ride that repo's
+own flow per the plan's standing rule 5). **Recommended architect
+classification: Row 4 = Mode-1, confirmed, distinct mechanism,
+unverifiable from `ob-poc`** — no fabricated symbol/test written to
+force a grep-satisfying closure. A secondary, narrower finding
+(`start_instance`'s idempotency check uses a non-unique index, a real
+create-path TOCTOU race distinct from row 4's question) flagged, not
+fixed, as out of G6c's small/standalone charter.
+
+**G6a remains parked**, unstarted this session by design — it's
+cross-repo (bpmn-lite) architect-involved work per the plan's own
+tiering, not grind-suitable; needs an architect option choice (R:§C2's
+carrier (a) vs (b)) before any implementation begins.
