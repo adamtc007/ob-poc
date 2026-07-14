@@ -638,7 +638,27 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort LINK");
 
+        // T10.3: capture entity ids before `from`/`to` are moved into the
+        // bind slice below.
+        let from_id = if let SqlValue::Uuid(id) = &from { Some(*id) } else { None };
+        let to_id = if let SqlValue::Uuid(id) = &to { Some(*id) } else { None };
+
         let affected = execute_non_query(exec, &sql, &[from, to]).await?;
+        if affected > 0 {
+            // T10.3: self-report for G14 — only when a row was actually
+            // inserted (ON CONFLICT DO NOTHING no-ops on a re-link, which
+            // makes no write at all to attest against). Junction rows have
+            // no own PK column here, so both known-Uuid sides are recorded
+            // against the junction table, one call per side.
+            let junction_table = format!("{schema}.{junction}");
+            let columns = vec![from_col.to_string(), to_col.to_string()];
+            if let Some(id) = from_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+            if let Some(id) = to_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -689,7 +709,26 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort UNLINK");
 
+        // T10.3: capture entity ids before `from`/`to` are moved into the
+        // bind slice below.
+        let from_id = if let SqlValue::Uuid(id) = &from { Some(*id) } else { None };
+        let to_id = if let SqlValue::Uuid(id) = &to { Some(*id) } else { None };
+
         let affected = execute_non_query(exec, &sql, &[from, to]).await?;
+        if affected > 0 {
+            // T10.3: self-report for G14 — symmetric to execute_link. Hard
+            // delete of the whole junction row: an empty column list makes
+            // no per-column claim (matches execute_delete's own hard-delete
+            // precedent), only the table+entity assertion applies.
+            let junction_table = format!("{schema}.{junction}");
+            let columns: Vec<String> = vec![];
+            if let Some(id) = from_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+            if let Some(id) = to_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -724,6 +763,7 @@ impl PgCrudExecutor {
         let mut to_val = None;
         let mut role_val = None;
         let mut extra_cols = Vec::new();
+        let mut extra_raw_cols = Vec::new();
         let mut extra_vals = Vec::new();
 
         for arg_def in arg_defs {
@@ -737,6 +777,7 @@ impl PgCrudExecutor {
                 } else if let Some(col) = &arg_def.maps_to {
                     if col != pk_col {
                         extra_cols.push(format!("\"{}\"", col));
+                        extra_raw_cols.push(col.clone());
                         extra_vals.push(json_to_sql_value(
                             value,
                             &arg_def.arg_type,
@@ -760,6 +801,16 @@ impl PgCrudExecutor {
             format!("\"{role_col}\""),
         ];
         columns.extend(extra_cols);
+
+        // T10.3: unquoted parallel vec for `record_write` — same technique
+        // as `execute_insert`'s `raw_columns`.
+        let mut raw_columns = vec![
+            pk_col.to_string(),
+            from_col.to_string(),
+            to_col.to_string(),
+            role_col.to_string(),
+        ];
+        raw_columns.extend(extra_raw_cols);
 
         let mut bind_values = vec![SqlValue::Uuid(new_id), from, to, role];
         bind_values.extend(extra_vals);
@@ -786,6 +837,12 @@ impl PgCrudExecutor {
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
+        // T10.3: self-report for G14 — same posture as execute_insert (same
+        // idempotent-INSERT-with-fallback-SELECT SQL shape, recorded
+        // unconditionally on success). `uuid` is this junction row's own
+        // generated PK, not `from`/`to` — role_link is the one of the six
+        // ops with its own generated row identity, matching execute_insert.
+        exec.record_write(&format!("{schema}.{junction}"), uuid, &raw_columns);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -842,7 +899,29 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort ROLE_UNLINK");
 
+        // T10.3: capture entity ids before `from`/`to`/`role` are moved
+        // into the bind slice below.
+        let from_id = if let SqlValue::Uuid(id) = &from { Some(*id) } else { None };
+        let to_id = if let SqlValue::Uuid(id) = &to { Some(*id) } else { None };
+        let role_id = if let SqlValue::Uuid(id) = &role { Some(*id) } else { None };
+
         let affected = execute_non_query(exec, &sql, &[from, to, role]).await?;
+        if affected > 0 {
+            // T10.3: self-report for G14 — hard delete of the composite-
+            // keyed junction row, same empty-column-list posture as
+            // execute_unlink; one call per known-Uuid side (from/to/role).
+            let junction_table = format!("{schema}.{junction}");
+            let columns: Vec<String> = vec![];
+            if let Some(id) = from_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+            if let Some(id) = to_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+            if let Some(id) = role_id {
+                exec.record_write(&junction_table, id, &columns);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -1117,6 +1196,15 @@ impl PgCrudExecutor {
             ],
         )
         .await?;
+        // T10.3: self-report for G14 — base-table half of the CTI write.
+        // The idempotent early-return above never reaches here, so this
+        // line only runs when a base `entities` row was genuinely inserted.
+        let base_write_cols = [
+            "entity_id".to_string(),
+            "entity_type_id".to_string(),
+            "name".to_string(),
+        ];
+        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols);
 
         // INSERT into extension table
         let ext_pk_col = infer_pk_column(&extension_table);
@@ -1137,6 +1225,14 @@ impl PgCrudExecutor {
                 3,
             )
         };
+        // T10.3: unquoted parallel vec for `record_write`, built in
+        // lockstep with `columns` — same technique as `execute_insert`'s
+        // `raw_columns`.
+        let mut raw_ext_columns: Vec<String> = if uses_shared_pk {
+            vec![ext_pk_col.to_string()]
+        } else {
+            vec![ext_pk_col.to_string(), "entity_id".to_string()]
+        };
 
         let base_cols = ["name", "external_id"];
         for arg_def in arg_defs {
@@ -1150,6 +1246,7 @@ impl PgCrudExecutor {
                         continue;
                     }
                     columns.push(format!("\"{col}\""));
+                    raw_ext_columns.push(col.clone());
                     placeholders.push(format!("${idx}"));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
                     idx += 1;
@@ -1163,6 +1260,7 @@ impl PgCrudExecutor {
             if !columns.contains(&quoted) {
                 if let Some(name) = args_map.get("name").and_then(|v| v.as_str()) {
                     columns.push(quoted);
+                    raw_ext_columns.push(name_col.to_string());
                     placeholders.push(format!("${idx}"));
                     bind_values.push(SqlValue::String(name.to_string()));
                 }
@@ -1176,6 +1274,16 @@ impl PgCrudExecutor {
         );
         debug!(sql = %ext_sql, "CrudExecutionPort ENTITY_CREATE extension");
         execute_non_query(exec, &ext_sql, &bind_values).await?;
+        // T10.3: self-report for G14 — extension-table half of the CTI
+        // write. Keyed by `entity_id` (the semantic FK tying this row to
+        // the entity), not `ext_pk_col`'s own surrogate value even when the
+        // extension table has a separate generated PK — `entity_id` is
+        // what a caller's bound-entity-id list actually contains.
+        exec.record_write(
+            &format!("{schema}.{extension_table}"),
+            entity_id,
+            &raw_ext_columns,
+        );
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -1252,6 +1360,15 @@ impl PgCrudExecutor {
         let entity_id: Uuid = row
             .try_get("entity_id")
             .map_err(|e| SemOsError::Internal(anyhow::anyhow!("{e}")))?;
+        // T10.3: self-report for G14 — base-table half of the CTI write,
+        // same posture as execute_entity_create (unconditional on success;
+        // this statement always runs — no idempotent-skip branch here).
+        let base_write_cols = [
+            "entity_id".to_string(),
+            "entity_type_id".to_string(),
+            "name".to_string(),
+        ];
+        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols);
 
         // Build extension columns
         let ext_pk_col = infer_pk_column(&extension_table);
@@ -1272,6 +1389,13 @@ impl PgCrudExecutor {
                 3,
             )
         };
+        // T10.3: unquoted parallel vec for `record_write`, built in
+        // lockstep with `columns` — same technique as execute_entity_create.
+        let mut raw_ext_columns: Vec<String> = if uses_shared_pk {
+            vec![ext_pk_col.to_string()]
+        } else {
+            vec![ext_pk_col.to_string(), "entity_id".to_string()]
+        };
 
         let mut update_cols: Vec<String> = Vec::new();
         let base_cols = ["name", "external_id"];
@@ -1286,6 +1410,7 @@ impl PgCrudExecutor {
                         continue;
                     }
                     columns.push(format!("\"{col}\""));
+                    raw_ext_columns.push(col.clone());
                     placeholders.push(format!("${idx}"));
                     update_cols.push(format!("\"{col}\" = EXCLUDED.\"{col}\""));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
@@ -1299,6 +1424,7 @@ impl PgCrudExecutor {
             if !columns.contains(&quoted) {
                 if let Some(name) = args_map.get("name").and_then(|v| v.as_str()) {
                     columns.push(quoted.clone());
+                    raw_ext_columns.push(name_col.to_string());
                     placeholders.push(format!("${idx}"));
                     update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
                     bind_values.push(SqlValue::String(name.to_string()));
@@ -1329,6 +1455,14 @@ impl PgCrudExecutor {
 
         debug!(sql = %ext_sql, "CrudExecutionPort ENTITY_UPSERT extension");
         execute_non_query(exec, &ext_sql, &bind_values).await?;
+        // T10.3: self-report for G14 — extension-table half of the CTI
+        // write, same posture as execute_entity_create: keyed by
+        // `entity_id`, not `ext_pk_col`'s own surrogate value.
+        exec.record_write(
+            &format!("{schema}.{extension_table}"),
+            entity_id,
+            &raw_ext_columns,
+        );
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -1886,6 +2020,61 @@ mod db_integration_tests {
         VerbExecutionContext::new(sem_os_core::principal::Principal::system())
     }
 
+    /// Mirrors the real `entity.create` verb (`config/verbs/entity.yaml`,
+    /// `operation: entity_create`) — same args/maps_to shape.
+    fn entity_create_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "entity.create".to_string(),
+            domain: "entity".to_string(),
+            action: "create".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![
+                VerbArgDef {
+                    name: "entity-type".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: None,
+                },
+                VerbArgDef {
+                    name: "first-name".to_string(),
+                    arg_type: "string".to_string(),
+                    required: false,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: Some("first_name".to_string()),
+                },
+                VerbArgDef {
+                    name: "last-name".to_string(),
+                    arg_type: "string".to_string(),
+                    required: false,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: Some("last_name".to_string()),
+                },
+            ],
+            returns: Some(VerbReturnSpec {
+                return_type: "uuid".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "entity_create".to_string(),
+                table: Some("entities".to_string()),
+                schema: Some("ob-poc".to_string()),
+                returning: Some("entity_id".to_string()),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn execute_crud_in_scope_matches_execute_crud_for_select() {
@@ -2013,5 +2202,79 @@ mod db_integration_tests {
             .execute(&pool)
             .await
             .unwrap();
+    }
+
+    /// T10.3: proves `execute_entity_create`'s base-`entities`-table
+    /// `record_write` call fires correctly.
+    ///
+    /// NOTE — pre-existing, unrelated bug discovered while writing this
+    /// test: `infer_pk_column` in *this* file (unlike its counterpart in
+    /// `dsl_v2::generic_executor.rs`, the actual live path for
+    /// `entity.create`) has no case for any entity extension table
+    /// (`entity_proper_persons`, `entity_limited_companies`,
+    /// `entity_funds`, ...) — it falls back to a literal `"id"` column,
+    /// which does not exist on any of them. `execute_entity_create`'s
+    /// extension-table INSERT therefore fails for every real entity type
+    /// today, independent of this task's `record_write` change (confirmed:
+    /// same failure with the `record_write` calls commented out). Fixing
+    /// `infer_pk_column` is out of scope for T10.3 (write-set-attestation
+    /// wiring only) — so this test proves the base-table capture (which
+    /// runs, and succeeds, before the broken extension step) and stops
+    /// short of the second capture, which cannot be live-DB-proven until
+    /// that separate bug is fixed. Real verb: `entity.create`
+    /// (`config/verbs/entity.yaml`, `operation: entity_create`).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_entity_create_records_base_table_write() {
+        let pool = test_pool().await;
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = entity_create_contract();
+        let marker_first = format!("t10.3-{}", Uuid::new_v4());
+        let args = serde_json::json!({
+            "entity-type": "proper-person",
+            "first-name": marker_first,
+            "last-name": "RecordWriteTest",
+        });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let result = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await;
+
+        // Expected to fail at the (pre-existing, unrelated) broken
+        // extension-table insert — see note above.
+        assert!(
+            result.is_err(),
+            "expected the pre-existing extension-table infer_pk_column bug \
+             to surface (if this now passes, that bug was fixed independently \
+             and this test should be upgraded to assert both captures)"
+        );
+
+        assert_eq!(
+            scope.captured.len(),
+            1,
+            "expected exactly 1 captured write (base entities row, before \
+             the extension insert fails), got {:?}",
+            scope.captured
+        );
+        let (base_table, _base_id, base_cols) = scope.captured[0].clone();
+        assert_eq!(base_table, "ob-poc.entities");
+        assert_eq!(
+            base_cols,
+            vec![
+                "entity_id".to_string(),
+                "entity_type_id".to_string(),
+                "name".to_string()
+            ]
+        );
+
+        // Postgres aborts the whole transaction on the extension-insert
+        // error (25P02: current transaction is aborted), so no further
+        // statement — including a same-tx existence check — can run
+        // against `scope` here. `scope.captured` is populated in-process
+        // by `record_write` independent of the SQL result, which is
+        // exactly what proves the base-table capture itself fired.
+        scope.rollback().await;
     }
 }
