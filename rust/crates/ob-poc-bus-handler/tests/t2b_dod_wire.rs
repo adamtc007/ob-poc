@@ -82,6 +82,7 @@ impl VerbExecutor for RecordingExecutor {
         _local_verb_id: &str,
         _catalogue_version: &str,
         _inputs: Vec<ResolvedBinding>,
+        _snapshot_pin: Option<Uuid>,
     ) -> Result<VerbOutcome, VerbExecutorError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(VerbOutcome {

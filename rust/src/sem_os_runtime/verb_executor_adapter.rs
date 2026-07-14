@@ -407,6 +407,114 @@ impl ObPocVerbExecutor {
             ..Default::default()
         })
     }
+
+    /// G6a (`EOP-DESIGN-CONTROLPLANE-G6A-SNAPSHOT-PIN-CARRIER-001` §4):
+    /// Path D's own admission-time envelope minting. Bus-federated
+    /// callers (bpmn-lite) cannot mint a real `ExecutionEnvelope`
+    /// themselves — they hold none of the proof-bearing gate inputs
+    /// `ExecutionEnvelope::seal` requires (no `SemReg` pack registry, no
+    /// compiled runbook object, no entity-lifecycle-state reader, no
+    /// authority/evidence store; see the design doc's §1). So unlike
+    /// [`execute_verb_admitting_envelope`](Self::execute_verb_admitting_envelope),
+    /// which only *consumes* an already-sealed handle (Path A's shape),
+    /// `ob-poc` is the only party in this exchange that can supply the
+    /// proof inputs, so it is the only party that can seal — this method
+    /// mints and persists (`status = 'sealed'`).
+    ///
+    /// **This method does NOT consume.** It deliberately mints/persists
+    /// only; the returned handle is threaded by the caller into the
+    /// ordinary `execute_verb_admitting_envelope` call, whose own
+    /// `admit_in_scope` → `check_admission_in_scope` →
+    /// `try_consume_in_scope_with_pins` chain performs the actual
+    /// consume, inside the same transaction scope as the dispatch it
+    /// gates. This preserves T9.2's rollback-together atomicity — a
+    /// dispatch failure after admission rolls the consume back too, so
+    /// the envelope is reconsumable, not permanently burned on a
+    /// transient failure. An earlier draft of this method consumed
+    /// inline; a live-DB test written against that draft
+    /// (`enforced_verb_with_full_context_mints_but_does_not_consume`,
+    /// found the row still `'sealed'` when the test expected `'consumed'`)
+    /// is what caught that the consume-inline shape would have run the
+    /// consume in a separate transaction from the dispatch, breaking that
+    /// atomicity property for Path D relative to Path A — see the design
+    /// doc's §4 correction note.
+    ///
+    /// Short-circuits to `None` whenever `verb_fqn` isn't enforce-gated
+    /// for [`ob_poc_types::ExecutionPath::BusFederated`] — zero added
+    /// cost (no `evaluate()` call, no DB write) on the production-default
+    /// (nothing enforced) path, matching `check_admission`'s own
+    /// early-return shape.
+    ///
+    /// `bus_pin` is the bare `Uuid` `plan_walker.rs::dispatch_callout`
+    /// (bpmn-lite) populates onto the wire's `InvocationRequest.
+    /// snapshot_pin` — used here purely as [`persist_sealed`](
+    /// crate::agent::control_plane_envelope_store::persist_sealed)'s
+    /// `entry_id` audit-correlation column, **never** as a foreign-minted
+    /// handle's identity. This method never calls `try_consume`/
+    /// `try_consume_by_id`/`try_consume_in_scope` at all — the content
+    /// hash the LATER consume (in the caller's own admission call)
+    /// checks against is always the one `envelope.handle()` computes
+    /// locally from the envelope this method sealed, never anything
+    /// bpmn-lite sent. See the design doc's §3 for why this does not
+    /// reopen T8.1's closed id-only-consume gap.
+    ///
+    /// **Known limitation, disclosed not hidden (design doc §6/§7):**
+    /// `ob_poc_control_plane::decision::evaluate`'s `PROOF_BEARING_GATES`
+    /// check requires `GateId::PackResolution` and `GateId::RunbookProof`
+    /// to succeed, and `applicability()` already confirms both are
+    /// structurally inapplicable to bus dispatch (no `SemReg` pack, no
+    /// compiled runbook object). Until `evaluate`/`evaluate_with_report`
+    /// becomes path-aware (a separate, reviewed change — not this one;
+    /// see the design doc's §7), this method's real-evaluation call can
+    /// never actually reach `ApprovedStp` for a genuinely Path-D-shaped
+    /// `cp_ctx` — an enforced bus verb is always rejected, honestly and
+    /// fail-closed, not silently bypassed.
+    pub async fn mint_envelope_for_bus(
+        &self,
+        verb_fqn: &str,
+        cp_ctx: &ob_poc_control_plane::context::EvaluationContext,
+        bus_pin: Option<Uuid>,
+    ) -> Option<ob_poc_types::EnvelopeHandle> {
+        let enforced =
+            crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env().ok()?;
+        if !enforced.is_enforced(verb_fqn, ob_poc_types::ExecutionPath::BusFederated) {
+            return None;
+        }
+
+        let now = chrono::Utc::now();
+        let validity = ob_poc_control_plane::envelope::ValidityWindow::new(
+            now,
+            now + chrono::Duration::minutes(5),
+        );
+        let decision = ob_poc_control_plane::decision::evaluate(cp_ctx, validity);
+        let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision
+        else {
+            // Rejected / RequiresHumanGate -> no envelope. Path D has no
+            // human-gate UX today, so `RequiresHumanGate` degrades to the
+            // same "no envelope" outcome as `Rejected` here — a future
+            // Path D human-gate flow is out of this method's scope.
+            return None;
+        };
+
+        let entry_id = bus_pin.unwrap_or_else(Uuid::new_v4);
+        let pool = self.executor.pool();
+        let persisted = crate::agent::control_plane_envelope_store::persist_sealed(
+            pool,
+            Uuid::nil(),
+            entry_id,
+            verb_fqn,
+            &envelope,
+        )
+        .await;
+        if !persisted {
+            // Best-effort persist failed — handing out an id that can't
+            // be found at consume time would just surface as `NotFound`
+            // anyway; short-circuiting here is honest, not a behaviour
+            // change (see `persist_sealed`'s own best-effort doc comment).
+            return None;
+        }
+        Some(envelope.handle())
+    }
 }
 
 #[cfg(feature = "database")]
@@ -1803,5 +1911,336 @@ mod t4_1_envelope_admission_tests {
                 "a pin-drift rejection must leave the envelope reconsumable — \
                  the whole scope, including the consume, rolled back together",
             );
+    }
+}
+
+/// G6a (`EOP-DESIGN-CONTROLPLANE-G6A-SNAPSHOT-PIN-CARRIER-001` §8):
+/// `mint_envelope_for_bus` end-to-end — proves the mechanism
+/// admits/rejects for real, not just that it compiles, and proves the
+/// design doc's §6/§7 disclosed limitation (today's realistic Path D
+/// `EvaluationContext` can never reach `ApprovedStp`) is real and
+/// reproducible, not asserted from prose alone.
+#[cfg(all(test, feature = "database"))]
+mod g6a_bus_envelope_mint_tests {
+    use super::*;
+    use dsl_runtime::TransactionScope;
+
+    async fn test_pool() -> sqlx::PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+    impl EnvGuard {
+        fn set(verb_fqn: &str) -> Self {
+            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", format!("{verb_fqn}:D"));
+            Self(guard)
+        }
+        fn unset() -> Self {
+            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
+            Self(guard)
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
+        }
+    }
+
+    /// Today's actual `bus_runtime.rs::ObPocVerbAdapter::execute`
+    /// construction — only `intent_admission`/`stp_classifier`/
+    /// `version_pinning` populated. Structurally cannot reach
+    /// `ApprovedStp` (design doc §7): `entity_binding`, `pack_resolution`,
+    /// `dag_proof`, `authority`, `evidence`, `write_set`, `snapshot` are
+    /// all `None`, and a `None` field is a hard failure by
+    /// `EvaluationContext`'s own contract (`context.rs`'s module doc).
+    fn realistic_path_d_context(verb_fqn: &str, entry_id: Uuid) -> ob_poc_control_plane::context::EvaluationContext {
+        ob_poc_control_plane::context::EvaluationContext {
+            intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
+                intent_id: entry_id,
+                verb_fqn: verb_fqn.to_string(),
+                is_admitted: true,
+                exclusion_reasons: Vec::new(),
+                is_ai_originated: false,
+                interpretation_attested: false,
+            }),
+            stp_classifier: Some(ob_poc_control_plane::stp_classifier::StpClassifierInput {
+                is_durable_verb: false,
+                durable_execution_explicitly_allowed: false,
+                has_unpinned_entities: false,
+            }),
+            version_pinning: Some(ob_poc_control_plane::versioning::VersionPinningInput {
+                versions: ob_poc_control_plane::snapshot::PinnedVersionSet::default(),
+            }),
+            ..Default::default()
+        }
+    }
+
+    /// Every proof-bearing gate genuinely present — mirrors
+    /// `ob_poc_control_plane::decision::tests::sealable_context()`
+    /// (private to that crate's own test module, so rebuilt here rather
+    /// than widening that module's visibility for one cross-crate
+    /// caller). Proves the *mechanism* (mint → persist → consume →
+    /// dispatch) works correctly whenever all eight facts genuinely
+    /// exist — the honest state this infra is ready for the moment the
+    /// design doc's §7 path-awareness gap closes for Path D specifically.
+    fn full_sealable_context(verb_fqn: &str, entity: Uuid) -> ob_poc_control_plane::context::EvaluationContext {
+        use ob_poc_control_plane::authority_gate::{AccessDecisionKind, AuthorityInput};
+        use ob_poc_control_plane::dag_proof::DagProofInput;
+        use ob_poc_control_plane::entity_binding::{EntityBindingInput, EntityFacts};
+        use ob_poc_control_plane::evidence_gate::EvidenceInput;
+        use ob_poc_control_plane::intent_admission::IntentAdmissionInput;
+        use ob_poc_control_plane::pack_resolution::PackResolutionInput;
+        use ob_poc_control_plane::proof::RunbookProofInput;
+        use ob_poc_control_plane::snapshot::SnapshotInput;
+        use ob_poc_control_plane::stp_classifier::StpClassifierInput;
+        use ob_poc_control_plane::write_set::WriteSetInput;
+
+        ob_poc_control_plane::context::EvaluationContext {
+            intent_admission: Some(IntentAdmissionInput {
+                intent_id: Uuid::nil(),
+                verb_fqn: verb_fqn.to_string(),
+                is_admitted: true,
+                exclusion_reasons: vec![],
+                is_ai_originated: false,
+                interpretation_attested: false,
+            }),
+            entity_binding: Some(EntityBindingInput {
+                entities: vec![EntityFacts {
+                    entity_id: entity,
+                    exists: true,
+                    expected_kind: "cbu".to_string(),
+                    actual_kind: "cbu".to_string(),
+                    lifecycle_state_readable: true,
+                    availability_blocked: false,
+                    availability_reason: None,
+                    in_active_pack: true,
+                }],
+            }),
+            pack_resolution: Some(PackResolutionInput {
+                candidate_pack_ids: vec!["ob-poc.cbu".to_string()],
+                semreg_allowed_set_available: true,
+                constraint_denies_intent: false,
+            }),
+            dag_proof: Some(DagProofInput {
+                entity_id: entity,
+                from_state: "VALIDATION_PENDING".to_string(),
+                to_state: "VALIDATED".to_string(),
+                blocking_violations: vec![],
+                lifecycle_fail_open_class: None,
+                lifecycle_gate_mode_fail_closed: false,
+            }),
+            authority: Some(AuthorityInput {
+                actor_id: "bus-federated".to_string(),
+                role: "compliance_officer".to_string(),
+                access_decision: AccessDecisionKind::Allow,
+                deny_reason: None,
+                requires_human_approval: false,
+                requires_second_line_review: false,
+                segregation_of_duties_violated: false,
+                toctou_drifted: false,
+            }),
+            evidence: Some(EvidenceInput {
+                evidence_gaps: vec![],
+                kyc_precondition_failures: vec![],
+                satisfied_obligation_ids: vec!["obligation-1".to_string()],
+                open_obligation_ids: vec![],
+            }),
+            write_set: Some(WriteSetInput {
+                entity_ids: vec![entity],
+                state_slots: vec!["validation_state".to_string()],
+                tables: vec!["ob-poc.cbus".to_string()],
+                allowed_columns: vec!["status".to_string()],
+                idempotency_key: format!("g6a-test-{entity}"),
+                contract_derived: true,
+            }),
+            snapshot: Some(SnapshotInput {
+                sem_reg_snapshot_id: Some(Uuid::nil()),
+                session_snapshot_id: None,
+                kyc_manifest_hash: None,
+                entity_row_versions: vec![(entity, "cbu".to_string(), 1)],
+                versions: ob_poc_control_plane::snapshot::PinnedVersionSet::default(),
+            }),
+            stp_classifier: Some(StpClassifierInput {
+                is_durable_verb: false,
+                durable_execution_explicitly_allowed: false,
+                has_unpinned_entities: false,
+            }),
+            runbook_proof: Some(RunbookProofInput {
+                compiled_runbook_id: Some(Uuid::nil()),
+            }),
+            version_pinning: Some(ob_poc_control_plane::versioning::VersionPinningInput {
+                versions: ob_poc_control_plane::snapshot::PinnedVersionSet::default(),
+            }),
+            write_set_attestation: None,
+        }
+    }
+
+    /// Case 1: not-enforced verb → `None` regardless of `cp_ctx` content,
+    /// zero DB writes (the `EnforcedVerbs::is_enforced` short-circuit
+    /// fires before `evaluate()` or any query runs).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn not_enforced_short_circuits_to_none_without_touching_the_db() {
+        let _guard = EnvGuard::unset();
+        let pool = test_pool().await;
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let entity = Uuid::new_v4();
+        let ctx = full_sealable_context("cbu.confirm", entity);
+
+        // Baseline count first — this table is shared across the whole
+        // test suite's live-DB history (hundreds of pre-existing rows for
+        // 'cbu.confirm' from other tests), so an absolute-zero assertion
+        // would be a false failure. A before/after delta is the correct
+        // "this call wrote nothing" proof.
+        let before: i64 = sqlx::query_scalar(
+            r#"SELECT count(*) FROM "ob-poc".control_plane_envelopes WHERE verb_fqn = 'cbu.confirm'"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let handle = executor
+            .mint_envelope_for_bus("cbu.confirm", &ctx, Some(Uuid::new_v4()))
+            .await;
+        assert!(
+            handle.is_none(),
+            "an unenforced verb must never mint an envelope, even with a fully ApprovedStp-shaped context"
+        );
+
+        let after: i64 = sqlx::query_scalar(
+            r#"SELECT count(*) FROM "ob-poc".control_plane_envelopes WHERE verb_fqn = 'cbu.confirm'"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(before, after, "short-circuit must not have written anything");
+    }
+
+    /// Case 2: enforced verb + a full, genuinely-ApprovedStp-shaped
+    /// context → `Some(handle)`, and a `sealed` (NOT yet `consumed`) row
+    /// appears in `control_plane_envelopes` correlated by `entry_id =
+    /// bus_pin`. `mint_envelope_for_bus` mints and persists only —
+    /// consumption is deferred to the caller's own
+    /// `execute_verb_admitting_envelope`/`admit_in_scope` call (case 4),
+    /// preserving T9.2's rollback-together atomicity (design doc §4's
+    /// correction note — found by this test's first draft asserting
+    /// `'consumed'` here and getting a real, honest `'sealed'` back).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn enforced_verb_with_full_context_mints_but_does_not_consume() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let entity = Uuid::new_v4();
+        let bus_pin = Uuid::new_v4();
+        let ctx = full_sealable_context("cbu.confirm", entity);
+
+        let handle = executor
+            .mint_envelope_for_bus("cbu.confirm", &ctx, Some(bus_pin))
+            .await
+            .expect("a fully ApprovedStp-shaped context must mint a real envelope");
+
+        let row: (Uuid, String) = sqlx::query_as(
+            r#"SELECT entry_id, status FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#,
+        )
+        .bind(handle.id())
+        .fetch_one(&pool)
+        .await
+        .expect("the minted envelope's row must exist");
+        assert_eq!(row.0, bus_pin, "entry_id must correlate to the caller-supplied bus_pin");
+        assert_eq!(
+            row.1, "sealed",
+            "mint_envelope_for_bus must persist as sealed, not consume — consumption is the \
+             caller's job via execute_verb_admitting_envelope/admit_in_scope (case 4)"
+        );
+    }
+
+    /// Case 3: enforced verb + today's actual Path D-realistic context
+    /// (only intent_admission/stp_classifier/version_pinning populated)
+    /// → `None`. Reproduces the design doc's §6/§7 disclosed limitation
+    /// as a real, run test — not an assertion made only in prose.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn enforced_verb_with_todays_realistic_context_is_rejected() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let entry_id = Uuid::new_v4();
+        let ctx = realistic_path_d_context("cbu.confirm", entry_id);
+
+        let handle = executor
+            .mint_envelope_for_bus("cbu.confirm", &ctx, Some(Uuid::new_v4()))
+            .await;
+        assert!(
+            handle.is_none(),
+            "today's real Path D context is missing pack_resolution/runbook_proof by structural \
+             necessity (design doc §7) — it can never reach ApprovedStp, and this must fail \
+             closed (None), not panic or fabricate a pass"
+        );
+    }
+
+    /// Case 4: end-to-end — case 2's minted-but-unconsumed handle,
+    /// threaded into `admit_in_scope` (the same admission chain
+    /// `execute_verb_admitting_envelope` calls before dispatch), actually
+    /// admits on first use and is single-use (a second attempt with the
+    /// same handle is rejected `AlreadyConsumed`). This is the
+    /// RED→GREEN-provable claim: before this tranche, `bus_runtime.rs`
+    /// passed a hardcoded `None` here always — with `cbu.confirm`
+    /// enforced, that shape is `RejectedNoEnvelope` unconditionally. This
+    /// test proves a real minted handle now reaches admission and is
+    /// honoured by the already-proven T9.2/T10.2 mechanism, not a new one.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn minted_handle_gates_a_real_dispatch_and_is_single_use() {
+        let _guard = EnvGuard::set("cbu.confirm");
+        let pool = test_pool().await;
+        let executor = ObPocVerbExecutor::from_pool(pool.clone());
+        let entity = Uuid::new_v4();
+        let ctx = full_sealable_context("cbu.confirm", entity);
+
+        let handle = executor
+            .mint_envelope_for_bus("cbu.confirm", &ctx, Some(Uuid::new_v4()))
+            .await
+            .expect("full context must mint");
+
+        // First admission attempt: the sealed-but-unconsumed handle must
+        // be admitted — proving the real handle reaches and is honoured
+        // by the existing admission chain (not just persisted and
+        // ignored).
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+        executor
+            .admit_in_scope(
+                "cbu.confirm",
+                Some(handle),
+                ob_poc_types::ExecutionPath::BusFederated,
+                scope.executor(),
+            )
+            .await
+            .expect("a minted, sealed, unconsumed envelope must be admitted on first use");
+        scope.commit().await.expect("commit");
+
+        // Second admission attempt against the SAME (now-consumed)
+        // handle must observe AlreadyConsumed — single-use held.
+        let mut scope2 = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+        let err = executor
+            .admit_in_scope(
+                "cbu.confirm",
+                Some(handle),
+                ob_poc_types::ExecutionPath::BusFederated,
+                scope2.executor(),
+            )
+            .await
+            .expect_err("resubmitting an already-consumed handle must be rejected");
+        scope2.rollback().await.expect("rollback");
+        assert!(err.to_string().contains("AlreadyConsumed"));
     }
 }
