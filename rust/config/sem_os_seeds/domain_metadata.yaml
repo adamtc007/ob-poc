@@ -2000,14 +2000,24 @@ domains:
         classification: internal
         pii: false
     verb_data_footprint:
+      # 2026-07-14 (G14 arming-blocker audit): corrected from bare
+      # `teams`/`memberships` to the schema-qualified form — these 3 verbs'
+      # real `crud_mapping.schema` (config/verbs/team.yaml) is `teams`, not
+      # `ob-poc`. The bare form was silently qualified to `ob-poc.teams`/
+      # `ob-poc.memberships` by control_plane_shadow.rs's
+      # qualify_footprint_table (which defaults unqualified names to
+      # `ob-poc` per this file's own stated convention below) — a mismatch
+      # against the real captured-write table (`teams.teams`/
+      # `teams.memberships`) that would guarantee a G14 breach on every
+      # legitimate call to these verbs if the write-set gate were armed.
       team.create:
-        writes: [teams]
+        writes: [teams.teams]
       team.add-member:
-        reads: [teams]
-        writes: [memberships]
+        reads: [teams.teams]
+        writes: [teams.memberships]
       team.remove-member:
-        reads: [memberships]
-        writes: [memberships]
+        reads: [teams.memberships]
+        writes: [teams.memberships]
 
   # ---------------------------------------------------------------------------
   # AGENT — Learning & Semantic Pipeline

@@ -249,12 +249,20 @@ pub(crate) async fn build_dag_proof_input(
 ///   extension table today, so the extension-table half of this write
 ///   never actually succeeds in production — see the G14 write-coverage
 ///   tranche's ledger entry.)
-/// - **`CrudOperation::Delete`, `ListByFk`, `ListParties`,
-///   `SelectWithJoin`, `Select`**: still `None`, unchanged from the prior
-///   session. `Delete` alone is a proven case why: `execute_delete`'s
-///   soft-delete branch writes a literal `"deleted_at"` column that never
-///   appears in any `arg_defs[].maps_to` mapping — a generic
-///   `maps_to`-only derivation would silently under-declare it.
+/// - **`CrudOperation::Delete`**: `Some(["deleted_at"])` when the target
+///   table is one `crud_executor.rs::soft_delete_predicate` treats as
+///   soft-deletable (`schema == "ob-poc" && table in ["cbus",
+///   "entities"]` — that exact rule mirrored here verbatim, not
+///   reimplemented differently), because that's precisely the literal
+///   column `execute_delete`'s soft-delete branch writes, matching a
+///   confirmed real gap (`cbu.delete` breaches on every call without this).
+///   `Some(vec![])` for every other (hard-delete) table — a hard DELETE
+///   removes the whole row, and `execute_delete`'s own hard-delete branch
+///   already records an empty column list unconditionally (see
+///   `execute_unlink`'s identical precedent), so this is the exact known
+///   answer, not a guess.
+/// - **`ListByFk`, `ListParties`, `SelectWithJoin`, `Select`**: still
+///   `None` — read-only operations with no write to bound at all.
 ///
 fn derive_crud_allowed_columns(
     rv: &crate::dsl_v2::runtime_registry::RuntimeVerb,
@@ -271,7 +279,20 @@ fn derive_crud_allowed_columns(
         maps_to_cols,
         crud.from_col.clone(),
         crud.to_col.clone(),
+        &crud.schema,
+        &crud.table,
     )
+}
+
+/// Mirrors `crud_executor.rs::soft_delete_predicate` exactly (same schema
+/// string, same 2-table list) — duplicated rather than shared because that
+/// function is private to a different crate (`dsl-runtime`) and this
+/// heuristic is small enough (2 hardcoded table names) that keeping it in
+/// sync by inspection is lower risk than adding a cross-crate export for
+/// it. If `crud_executor.rs` ever grows this list, this copy must move
+/// with it — flagged here and at that function's own site.
+fn is_soft_deletable(schema: &str, table: &str) -> bool {
+    schema == "ob-poc" && matches!(table, "cbus" | "entities")
 }
 
 /// The pure per-operation half of [`derive_crud_allowed_columns`], split
@@ -284,6 +305,8 @@ fn derive_allowed_columns_for_operation(
     maps_to_cols: Vec<String>,
     from_col: Option<String>,
     to_col: Option<String>,
+    schema: &str,
+    table: &str,
 ) -> Option<Vec<String>> {
     use dsl_core::CrudOperation;
 
@@ -298,6 +321,13 @@ fn derive_allowed_columns_for_operation(
             if columns.is_empty() {
                 return None;
             }
+        }
+        CrudOperation::Delete => {
+            return Some(if is_soft_deletable(schema, table) {
+                vec!["deleted_at".to_string()]
+            } else {
+                Vec::new()
+            });
         }
         CrudOperation::Link => {
             let (Some(f), Some(t)) = (from_col, to_col) else {
@@ -331,38 +361,47 @@ fn derive_allowed_columns_for_operation(
 /// `ob-poc.{table}`; a name that already contains a `.` is trusted
 /// verbatim (the file's own explicit schema declaration).
 ///
-/// **Known, pre-existing, NOT fixed by this function:** cross-checking the
-/// real file against `migrations/master-schema.sql`'s `CREATE SCHEMA`
-/// list (`"ob-poc"`, `sem_reg`, `sem_reg_authoring`, `sem_reg_pub` — no
-/// `kyc` schema exists) found the stated convention is itself violated in
-/// two independent, narrow ways already present in the data, neither
-/// introduced or corrected by this fix:
-/// - `kyc.cases` / `kyc.ownership_snapshots` use a `kyc.` prefix that
-///   is **not a real Postgres schema** — both tables actually live in
-///   `"ob-poc"` (`CREATE TABLE "ob-poc".cases`, `CREATE TABLE
-///   "ob-poc".ownership_snapshots`). Passed through verbatim by this
-///   function (it trusts any dotted name), so `WriteSetInput.tables` for
-///   `kyc.set-case`/`ownership.compute`/`ownership.snapshot.list` will
-///   read `"kyc.cases"`/`"kyc.ownership_snapshots"` — a string that will
-///   never match any real `CapturedWrite.table` (which would report
-///   `"ob-poc.cases"`/`"ob-poc.ownership_snapshots"`).
-/// - `team.create`/`team.add-member`/`team.remove-member` declare bare
-///   names (`teams`, `memberships`) that this function therefore qualifies
-///   as `ob-poc.teams`/`ob-poc.memberships` — but `config/verbs/team.yaml`
+/// **2026-07-14 (G14 arming-blocker audit) — `team.*` FIXED, `kyc.*`
+/// confirmed inert:** cross-checking the real file against
+/// `migrations/master-schema.sql`'s `CREATE SCHEMA` list (`"ob-poc"`,
+/// `sem_reg`, `sem_reg_authoring`, `sem_reg_pub` — no `kyc` schema exists)
+/// found the file's own stated convention violated in two independent,
+/// narrow places:
+/// - `team.create`/`team.add-member`/`team.remove-member` declared bare
+///   names (`teams`, `memberships`), qualified by this function to
+///   `ob-poc.teams`/`ob-poc.memberships` — but `config/verbs/team.yaml`
 ///   declares those verbs' real `crud_mapping.schema` as `teams`, not
-///   `ob-poc` (`record_write` will actually report `"teams.teams"`/
-///   `"teams.memberships"`).
+///   `ob-poc`, so `record_write` actually reports `"teams.teams"`/
+///   `"teams.memberships"`. **Confirmed live** (all three are real,
+///   dispatchable CRUD verbs) — this would have guaranteed a G14 breach
+///   on every legitimate call. **Fixed** by correcting the 3
+///   `domain_metadata.yaml` entries to their real schema-qualified form
+///   (`teams.teams`/`teams.memberships`) rather than changing this
+///   function — the entries themselves were wrong per the file's own
+///   documented convention.
+/// - `kyc.cases` (a `reads:`-only reference — irrelevant to this
+///   function's `writes:`-only consumer, `build_write_set_input`) and
+///   `kyc.ownership_snapshots` (`ownership.compute`'s declared `writes:`)
+///   both use a `kyc.` prefix that is not a real Postgres schema (both
+///   tables actually live in `"ob-poc"`). **Confirmed currently inert,
+///   not fixed:** neither `ownership.compute` nor `ownership.snapshot.list`
+///   correspond to any verb defined in `config/verbs/*.yaml` today (grep
+///   confirms zero matches) — these are almost certainly orphaned
+///   footprint entries left over from the 58-legacy-determination-verb
+///   deletion (CLAUDE.md, "ubo/control/ownership/board write verbs
+///   replaced"). `find_verb_footprint("ownership.compute")` can never be
+///   reached from a real dispatch, so this is dead data, not a live G14
+///   gap — left as a flagged cleanup opportunity rather than touched here
+///   (deleting footprint entries is out of this fix's scope and risks
+///   removing something a non-G14 consumer still reads).
 ///
-/// Both are pre-existing data-quality defects in `domain_metadata.yaml`
-/// itself (wrong schema attribution, not a format mismatch this function
-/// is scoped to fix) — flagged, not silently absorbed; see this session's
-/// doc for the recommendation to correct the 5 affected entries in a
-/// follow-up. Every other domain in the file (confirmed by full-file grep:
-/// the only dotted prefixes appearing anywhere in `reads:`/`writes:` are
-/// `kyc.`, `sem_reg.`, `sem_reg_authoring.`, `sem_reg_pub.`) either matches
-/// its real schema already (`sem_reg*`) or has no footprint entry at all
-/// for any verb using a non-`ob-poc` `crud_mapping.schema` (confirmed:
-/// zero `access-review.*`/`application-instance.*` entries in
+/// Every other domain in the file (confirmed by full-file grep: the only
+/// dotted prefixes appearing anywhere in `reads:`/`writes:` are now
+/// `kyc.`, `teams.`, `sem_reg.`, `sem_reg_authoring.`, `sem_reg_pub.`)
+/// either matches its real schema already (`sem_reg*`, `teams.*` as of
+/// this fix) or has no footprint entry at all for any verb using a
+/// non-`ob-poc` `crud_mapping.schema` (confirmed: zero
+/// `access-review.*`/`application-instance.*` entries in
 /// `domain_metadata.yaml`, the only other verb YAMLs declaring a
 /// non-`ob-poc` schema besides `team.yaml`).
 fn qualify_footprint_table(table: &str) -> String {
@@ -1653,6 +1692,35 @@ domains:
         );
     }
 
+    #[test]
+    fn real_domain_metadata_yaml_team_footprints_are_schema_qualified() {
+        // Regression for the 2026-07-14 G14 arming-blocker fix: team.create/
+        // team.add-member/team.remove-member's writes: entries must be
+        // schema-qualified to "teams.*" (their real crud_mapping.schema),
+        // not bare names that qualify_footprint_table would silently
+        // default to "ob-poc.*" — a mismatch against the real captured
+        // write table that would guarantee a G14 breach on every call.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("config/sem_os_seeds/domain_metadata.yaml");
+        let metadata = sem_os_obpoc_adapter::metadata::DomainMetadata::from_file(&path)
+            .expect("real domain_metadata.yaml must parse");
+
+        let create = metadata
+            .find_verb_footprint("team.create")
+            .expect("team.create must have a footprint entry");
+        assert_eq!(create.writes, vec!["teams.teams".to_string()]);
+
+        let add_member = metadata
+            .find_verb_footprint("team.add-member")
+            .expect("team.add-member must have a footprint entry");
+        assert_eq!(add_member.writes, vec!["teams.memberships".to_string()]);
+
+        let remove_member = metadata
+            .find_verb_footprint("team.remove-member")
+            .expect("team.remove-member must have a footprint entry");
+        assert_eq!(remove_member.writes, vec!["teams.memberships".to_string()]);
+    }
+
     // ── G2 item 2: derive_crud_allowed_columns ──
 
     #[test]
@@ -1694,19 +1762,83 @@ domains:
     }
 
     #[test]
-    fn derive_allowed_columns_for_operation_none_for_delete() {
-        // Delete must return None regardless of maps_to contents — this
-        // session did not mirror execute_delete's soft-delete `deleted_at`
-        // literal-column write, and a maps_to-only derivation would
-        // silently under-declare it (the unsafe direction).
-        assert!(derive_allowed_columns_for_operation(
+    fn derive_crud_allowed_columns_real_cbu_delete_verb_derives_deleted_at() {
+        // The confirmed real gap this fix closes: cbu.delete
+        // (config/verbs/cbu.yaml, operation: delete, schema: ob-poc,
+        // table: cbus) previously derived None here, meaning
+        // build_write_set_input defaulted allowed_columns to empty — and
+        // execute_delete's real soft-delete branch always writes
+        // "deleted_at", so every real cbu.delete call would misclassify
+        // as a G14 breach if armed.
+        let rv = crate::dsl_v2::runtime_registry::runtime_registry()
+            .get("cbu", "delete")
+            .expect("cbu.delete must be registered — verb YAML moved?");
+        let derived = derive_crud_allowed_columns(rv)
+            .expect("cbu.delete is soft-deletable and must now derive a non-empty set");
+        assert_eq!(derived, vec!["deleted_at".to_string()]);
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_delete_soft_deletable_table_derives_deleted_at() {
+        // cbu.delete's exact shape: op=Delete, schema=ob-poc, table=cbus —
+        // the confirmed real gap this fix closes (was None -> empty
+        // allowed_columns -> guaranteed breach on every real soft delete).
+        let derived = derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Delete,
+            None,
+            vec!["thing_id".to_string()], // maps_to is ignored for Delete
+            None,
+            None,
+            "ob-poc",
+            "cbus",
+        )
+        .expect("soft-deletable table must derive");
+        assert_eq!(derived, vec!["deleted_at".to_string()]);
+
+        let derived = derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Delete,
+            None,
+            vec![],
+            None,
+            None,
+            "ob-poc",
+            "entities",
+        )
+        .expect("entities is also soft-deletable");
+        assert_eq!(derived, vec!["deleted_at".to_string()]);
+    }
+
+    #[test]
+    fn derive_allowed_columns_for_operation_delete_hard_delete_table_is_always_empty() {
+        // Any table outside soft_delete_predicate's exact 2-entry list is a
+        // hard DELETE — Some(vec![]), matching execute_delete's own
+        // hard-delete precedent (no per-column claim on a whole-row
+        // removal), not a "cannot derive" None.
+        let derived = derive_allowed_columns_for_operation(
             dsl_core::CrudOperation::Delete,
             None,
             vec!["thing_id".to_string()],
             None,
             None,
+            "ob-poc",
+            "service_delivery_map",
         )
-        .is_none());
+        .expect("hard-delete tables still derive — the known-empty answer");
+        assert_eq!(derived, Vec::<String>::new());
+
+        // Same table name, different schema ("teams" not "ob-poc") — must
+        // NOT be treated as soft-deletable; is_soft_deletable checks both.
+        let derived = derive_allowed_columns_for_operation(
+            dsl_core::CrudOperation::Delete,
+            None,
+            vec![],
+            None,
+            None,
+            "teams",
+            "entities",
+        )
+        .expect("wrong schema must not match the soft-delete rule");
+        assert_eq!(derived, Vec::<String>::new());
     }
 
     #[test]
@@ -1716,7 +1848,9 @@ domains:
             None,
             vec![],
             None,
-            None
+            None,
+            "ob-poc",
+            "irrelevant",
         )
         .is_none());
         assert!(derive_allowed_columns_for_operation(
@@ -1724,7 +1858,9 @@ domains:
             None,
             vec![],
             Some("cbu_id".to_string()),
-            None
+            None,
+            "ob-poc",
+            "irrelevant",
         )
         .is_none());
     }
@@ -1739,6 +1875,8 @@ domains:
             vec!["irrelevant".to_string()], // maps_to is ignored for Link
             Some("cbu_id".to_string()),
             Some("entity_id".to_string()),
+            "ob-poc",
+            "irrelevant",
         )
         .expect("Link with both from_col and to_col must derive");
         let mut expected = vec!["cbu_id".to_string(), "entity_id".to_string()];
@@ -1757,7 +1895,9 @@ domains:
                 None,
                 vec!["irrelevant".to_string()],
                 None,
-                None
+                None,
+                "ob-poc",
+                "irrelevant",
             ),
             Some(Vec::new())
         );
@@ -1767,7 +1907,9 @@ domains:
                 None,
                 vec![],
                 None,
-                None
+                None,
+                "ob-poc",
+                "irrelevant",
             ),
             Some(Vec::new())
         );
@@ -1783,7 +1925,9 @@ domains:
             Some("id".to_string()),
             vec!["role_id".to_string()],
             None,
-            None
+            None,
+            "ob-poc",
+            "irrelevant",
         )
         .is_none());
         // EntityCreate/EntityUpsert: the extension table's identity is
@@ -1794,7 +1938,9 @@ domains:
             Some("entity_id".to_string()),
             vec!["first_name".to_string(), "last_name".to_string()],
             None,
-            None
+            None,
+            "ob-poc",
+            "entities",
         )
         .is_none());
         assert!(derive_allowed_columns_for_operation(
@@ -1802,7 +1948,9 @@ domains:
             Some("entity_id".to_string()),
             vec!["first_name".to_string(), "last_name".to_string()],
             None,
-            None
+            None,
+            "ob-poc",
+            "entities",
         )
         .is_none());
     }
@@ -1818,6 +1966,8 @@ domains:
             vec!["status".to_string()],
             None,
             None,
+            "ob-poc",
+            "irrelevant",
         )
         .is_none());
         assert!(derive_allowed_columns_for_operation(
@@ -1826,6 +1976,8 @@ domains:
             vec!["status".to_string()],
             None,
             None,
+            "ob-poc",
+            "irrelevant",
         )
         .is_none());
     }
@@ -1838,6 +1990,8 @@ domains:
             vec!["status".to_string(), "legal_name".to_string()],
             None,
             None,
+            "ob-poc",
+            "irrelevant",
         )
         .expect("explicit returning + non-empty maps_to must derive");
         let mut expected = vec!["id".to_string(), "status".to_string(), "legal_name".to_string()];
@@ -1854,7 +2008,9 @@ domains:
             None,
             vec![],
             None,
-            None
+            None,
+            "ob-poc",
+            "irrelevant",
         )
         .is_none());
     }
@@ -1869,6 +2025,8 @@ domains:
             vec!["status".to_string()],
             None,
             None,
+            "ob-poc",
+            "irrelevant",
         )
         .expect("non-empty maps_to must derive");
         assert_eq!(derived, vec!["status".to_string()]);
