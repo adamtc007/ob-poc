@@ -1714,3 +1714,98 @@ executor that knows about `set_values`; not confirmed live-broken, not
 investigated further this session, flagged as a real open question
 independent of G14. `invariants-expected.toml` untouched throughout —
 no arming decision was made.
+
+## Fixed: `crud.set_values` execution bug — `cbu.submit-for-validation` etc. were live-broken (2026-07-14)
+
+Operator asked to look into the open question flagged above. Confirmed
+**empirically, not just by reading code**: ran the exact code path
+production's `crud_port` fast path uses
+(`PgCrudExecutor::execute_crud_in_scope`) against a real `DISCOVERED`
+CBU row in the dev DB with `cbu.submit-for-validation`'s real
+`crud_mapping` shape — `Err(InvalidInput("No columns to update"))`.
+Confirmed no plugin override rescues it (grepped `domain_ops/*.rs`,
+`sem_os_postgres/src/ops/*.rs` — none registered for this fqn) and that
+it's genuinely reachable (`session/view_state.rs`'s batch-status-change
+UI generates this exact DSL call).
+
+**Root cause**: `crud.set_values` (a literal YAML-declared `SET`, e.g.
+`status: VALIDATION_PENDING`, no corresponding caller-supplied arg) is
+read by `dsl_v2::generic_executor.rs`, but
+`sem_os_ontology::verb_contract::VerbCrudMapping` — the execution-plane
+contract `dsl-runtime::crud_executor.rs` actually reads — had **no
+field to carry it at all**, and `verb_executor_adapter.rs`'s conversion
+didn't copy it even from the layer that does have it
+(`dsl-analysis::RuntimeCrudConfig`). A verb whose only work is a status
+transition ends up with zero SET columns and hard-errors.
+
+**Fix, three layers, operator said "fix" and this landed as one
+combined effort** (external `dsl` repo commit `a043e7f`, `ob-poc` commit
+`64ba597c`):
+1. `dsl` repo: `VerbCrudMapping` gains `set_values: Option<HashMap<String,
+   serde_json::Value>>`. Committed locally to `main` in
+   `~/dev/dsl` (picked up automatically via the existing local `[patch]`
+   redirect) — **not pushed to the remote**, no push authorization was
+   given for this repo this session.
+2. `ob-poc`: two conversion call sites
+   (`verb_executor_adapter.rs::runtime_verb_to_contract` — the live
+   production path — and `sem_os_obpoc_adapter::scanner.rs`, a parallel
+   YAML→contract conversion) both gained a small `serde_yaml::Value` →
+   `serde_json::Value` helper (the raw YAML-loaded config types carry
+   `set_values` as `serde_yaml::Value`; the ontology contract now
+   speaks `serde_json::Value` like every other field on that struct).
+3. `dsl-runtime::crud_executor.rs`: **both** `execute_update` and
+   `execute_upsert` now apply `crud.set_values`, mirroring
+   `dsl_v2::generic_executor.rs`'s own handling exactly (`now()`/
+   `current_timestamp` SQL-expression special case, string/bool/integer
+   bind types; `execute_upsert` folds the columns into its existing
+   `insert_cols`-derived `ON CONFLICT DO UPDATE SET` clause, so both the
+   insert and update branch of the upsert get them). `record_write`'s
+   `raw_columns` now include `set_values` columns too, so G14's
+   self-report stays honest.
+
+**Scope was bigger than the 3 CBU verbs originally flagged** — found
+while auditing real YAML usage rather than assuming: `identifier.yaml`'s
+LEI upsert and `screening.yaml`'s dedup upsert also rely on
+`set_values` (`Upsert`, not just `Update`), and `screening.yaml` has 2
+more `Update`-operation verbs with the identical bug
+(`completed_at`/`reviewed_at` via `now()`). Both operation kinds are now
+fixed, not just the one that surfaced the bug.
+
+**Found, NOT fixed — separate, unrelated pre-existing defects,
+flagged for a future YAML-authoring audit:**
+- `identifier.yaml` has 5 `set_values:` blocks mis-indented at the
+  verb's top level instead of nested under `crud:` — silently ignored
+  by any executor regardless of this fix (a YAML structure bug, not an
+  execution bug).
+- `identifier.yaml`'s LEI upsert declares `set_values`/`maps_to`
+  columns (`scheme`, `id`) that don't exist on the real
+  `entity_identifiers` table (`identifier_type`, `identifier_value`) —
+  confirmed via `migrations/master-schema.sql`. This verb is dead
+  regardless of this fix; couldn't be used for the live-DB proof for
+  that reason (used `screening.yaml`'s dedup upsert instead).
+
+**Consistency close-out**: `derive_crud_allowed_columns`
+(`control_plane_shadow.rs`, G14's derivation layer, landed 3 commits
+ago in this same session) now also folds `crud.set_values`'s keys into
+its `Update`-branch column superset — otherwise this fix would have
+reopened exactly the false-breach class of bug already closed earlier
+today, for these same verbs, the moment `set_values` started actually
+being written. Proven against the real `cbu.submit-for-validation` verb.
+
+Verified per verb, empirically, live-DB: `cbu.submit-for-validation`
+(Update, zero other mapped columns) and `screening`'s dedup upsert
+(Upsert, conflict_keys only) both now execute successfully against real
+rows in the dev DB, correct columns self-reported for G14. Personally
+reproduced RED→GREEN twice (disabled `execute_update`'s block, got the
+exact original error; separately disabled `execute_upsert`'s block, got
+a real NOT NULL violation) then restored both, confirming `git diff
+--stat` returned to size each time. Full workspace build clean, clippy
+`-D warnings` clean on every touched crate in both repos, `dsl-runtime`
+live-DB suite 9/9, `control_plane_shadow` module 58/5,
+`check-invariants.sh ratchet` 0/5 divergence.
+
+G14's gate remains unarmed and parked — this fix is a CRUD-execution
+correctness bug, independent of G14, that happened to surface during
+the arming-blocker audit; the derivation-side consistency close-out is
+precautionary, not a response to any live arming decision.
+`invariants-expected.toml` untouched.
