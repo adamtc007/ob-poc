@@ -828,6 +828,24 @@ pub struct ShadowDecisionRow {
     /// `ExecutionPath::RunbookSequencer` like every other caller, not a
     /// default.
     pub execution_path: ob_poc_types::ExecutionPath,
+    /// G11 join fix (`EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001`, migration
+    /// `20260714_control_plane_shadow_decisions_decision_id.sql`): the
+    /// SAME `decision_id` the corresponding `control_plane_audit`
+    /// `DecisionEvaluated` row (when one is emitted for this shadow
+    /// evaluation) is keyed by — `envelope.id()` for `ApprovedStp`, a
+    /// fresh `Uuid::new_v4()` otherwise (see the `decision_id` local in
+    /// `sequencer.rs`'s own doc comment, right above where it builds that
+    /// audit event). This is the real per-shadow-eval-attempt-unique join
+    /// key DD-4(ii) re-derivation needs — `entry_id` alone is NOT unique
+    /// (the same `RunbookEntry`/`CompiledStep` id is reused across every
+    /// retry of the same runbook step, which was the root cause of the
+    /// G11 join bug this field fixes). `None` when the caller has no
+    /// audit-event correlation to offer at all (e.g. `bus_runtime.rs`'s
+    /// Path D shadow row, which never emits a `DecisionEvaluated` audit
+    /// event in the first place) — the DD-4(ii) join simply cannot and
+    /// will not match such a row, which is correct: there is nothing to
+    /// re-derive against.
+    pub decision_id: Option<Uuid>,
 }
 
 /// Serialises an `EvaluationReport` into the `gate_results` JSONB column:
@@ -854,9 +872,17 @@ pub(crate) fn report_to_json(report: &ob_poc_control_plane::gate::EvaluationRepo
 
 /// Builds the persistable row: compares the shadow G1 outcome against the
 /// legacy Phase 5 recheck's block/allow decision for this entry.
+///
+/// `decision_id` (G11 join fix): pass the SAME value the caller will use
+/// (or has used) to key this decision's `control_plane_audit` rows —
+/// `None` only when the caller genuinely has no such correlation to offer
+/// (see [`ShadowDecisionRow::decision_id`]'s doc). Passing `entry_id`
+/// here would silently reintroduce the bug this field exists to fix.
+#[allow(clippy::too_many_arguments)]
 pub fn build_shadow_decision_row(
     session_id: Uuid,
     entry_id: Uuid,
+    decision_id: Option<Uuid>,
     verb_fqn: &str,
     report: &ob_poc_control_plane::gate::EvaluationReport,
     legacy_outcome_blocked: bool,
@@ -876,6 +902,7 @@ pub fn build_shadow_decision_row(
         shadow_intent_admission_blocked,
         diverged: shadow_intent_admission_blocked != legacy_outcome_blocked,
         execution_path,
+        decision_id,
     }
 }
 
@@ -888,8 +915,8 @@ pub async fn insert_shadow_decision(pool: &sqlx::PgPool, row: &ShadowDecisionRow
         INSERT INTO "ob-poc".control_plane_shadow_decisions (
             session_id, entry_id, verb_fqn, gate_results,
             legacy_outcome_blocked, shadow_intent_admission_blocked, diverged,
-            execution_path
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            execution_path, decision_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         "#,
     )
     .bind(row.session_id)
@@ -900,6 +927,7 @@ pub async fn insert_shadow_decision(pool: &sqlx::PgPool, row: &ShadowDecisionRow
     .bind(row.shadow_intent_admission_blocked)
     .bind(row.diverged)
     .bind(row.execution_path.as_letter())
+    .bind(row.decision_id)
     .execute(pool)
     .await;
 
@@ -1016,12 +1044,12 @@ mod tests {
         let report = ob_poc_control_plane::evaluate_shadow(&ctx);
 
         // Shadow says admitted (not blocked); legacy says blocked -> diverged.
-        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, true, ob_poc_types::ExecutionPath::RunbookSequencer);
+        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), None, "cbu.confirm", &report, true, ob_poc_types::ExecutionPath::RunbookSequencer);
         assert!(!row.shadow_intent_admission_blocked);
         assert!(row.diverged);
 
         // Legacy agrees (not blocked) -> no divergence.
-        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), "cbu.confirm", &report, false, ob_poc_types::ExecutionPath::RunbookSequencer);
+        let row = build_shadow_decision_row(Uuid::nil(), Uuid::nil(), None, "cbu.confirm", &report, false, ob_poc_types::ExecutionPath::RunbookSequencer);
         assert!(!row.diverged);
     }
 

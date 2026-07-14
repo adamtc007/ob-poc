@@ -346,15 +346,38 @@ pub(crate) fn rederive_decision_outcome(
 /// been consumed yet, which DD-4(i)'s own grammar does not call a
 /// violation, and grading it now would produce a false `Failure`.
 ///
-/// **Re-derivation join (DD-4(ii)):** uses `DecisionEvaluated.entry_id`
-/// (this session's addition to the payload — see that field's own doc
-/// comment) to fetch the same decision's `gate_results` from
-/// `control_plane_shadow_decisions` and calls `rederive_decision_outcome`.
-/// A nil `entry_id` (pre-this-session rows, or the non-`ApprovedStp`
-/// fallback path that mints an uncorrelated id) or a missing shadow row
-/// makes re-derivation inconclusive for that decision — graded on
-/// completeness alone in that case, never silently counted as a failure
-/// for a join that was never possible.
+/// **Re-derivation join (DD-4(ii)):** fetches the same decision's
+/// `gate_results` from `control_plane_shadow_decisions` and calls
+/// `rederive_decision_outcome`. The join key is `decision_id` — the SAME
+/// value `audit_rows_for_decision`/`replay_grade_for_decision`'s own
+/// parameter already groups this decision's audit rows by (migration
+/// `20260714_control_plane_shadow_decisions_decision_id.sql`, G11 join
+/// fix, `EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001`) — **not**
+/// `DecisionEvaluated.entry_id`, which this function used until that fix
+/// and which is provably unsafe as a join key: `entry_id` is the
+/// `RunbookEntry`/`CompiledStep`'s own stable id
+/// (`sequencer.rs::phase5_runtime_recheck`'s `entry_id` parameter),
+/// reused across every retry/re-check of the SAME runbook step (e.g. a
+/// step rejected on attempt 1 for missing evidence, then approved on
+/// attempt 2 once the gap is fixed, both insert
+/// `control_plane_shadow_decisions` rows sharing one `entry_id` but
+/// carrying different `gate_results`). The old `WHERE entry_id = $1
+/// LIMIT 1` (no `ORDER BY`/tiebreaker) could therefore non-deterministically
+/// join a `DecisionEvaluated` audit event to a DIFFERENT attempt's
+/// `gate_results`, producing a false `Success` or false `Failure` grade —
+/// see `same_entry_id_retried_attempts_each_join_to_their_own_gate_results_not_the_others`
+/// below for a live-DB proof of the exact failure mode and its fix.
+/// `decision_id` is genuinely unique per shadow-eval attempt by
+/// construction (`envelope.id()` for `ApprovedStp`, a fresh
+/// `Uuid::new_v4()` otherwise — the same value used to key this
+/// decision's own `control_plane_audit` rows).
+///
+/// A missing shadow row (this decision's `decision_id` doesn't match any
+/// `control_plane_shadow_decisions` row — including every row from before
+/// this migration, which all have `decision_id IS NULL`) makes
+/// re-derivation inconclusive for that decision — graded on completeness
+/// alone in that case, never silently counted as a failure for a join
+/// that was never possible.
 ///
 /// **Bounded scan:** the most recent 500 eligible `decision_id`s
 /// (matching GW's own "≥500 real decisions" campaign-window language).
@@ -422,26 +445,38 @@ pub(crate) async fn replay_grade_for_decision(pool: &sqlx::PgPool, decision_id: 
     let completeness_ok = check_completeness(&events).is_ok();
 
     let mismatch = match events.first() {
-        Some(AuditEvent::DecisionEvaluated { outcome, entry_id, .. }) if *entry_id != Uuid::nil() => {
+        Some(AuditEvent::DecisionEvaluated { outcome, .. }) => {
+            // G11 join fix: `decision_id` (this function's own parameter)
+            // is the correct join key — it already groups exactly this
+            // decision's audit rows (`audit_rows_for_decision`'s `WHERE
+            // decision_id = $1`), and the SAME value was threaded onto
+            // `control_plane_shadow_decisions.decision_id` at insert time
+            // (`sequencer.rs`'s `decision_id` local, `ShadowDecisionRow::
+            // decision_id`). `entry_id` (the payload field) is NOT used
+            // here — it is the RunbookEntry's own stable id, reused
+            // across every retry of the same runbook step, and is
+            // therefore not unique per shadow-eval attempt. See this
+            // function's own doc comment above for the full history.
             let gate_results: Option<(serde_json::Value,)> = sqlx::query_as(
-                r#"SELECT gate_results FROM "ob-poc".control_plane_shadow_decisions WHERE entry_id = $1 LIMIT 1"#,
+                r#"SELECT gate_results FROM "ob-poc".control_plane_shadow_decisions WHERE decision_id = $1 LIMIT 1"#,
             )
-            .bind(*entry_id)
+            .bind(decision_id)
             .fetch_optional(pool)
             .await?;
             match gate_results {
                 Some((gr,)) => {
                     matches!(rederive_decision_outcome(&gr), Some(rederived) if rederived != *outcome)
                 }
-                // No shadow row found for a nonzero entry_id: inconclusive
+                // No shadow row found for this decision_id: inconclusive
                 // (a real, if odd, gap — best-effort insert may have
-                // failed), never treated as a failure it can't prove.
+                // failed, or this is a pre-migration row whose shadow
+                // counterpart has NULL decision_id), never treated as a
+                // failure it can't prove.
                 None => false,
             }
         }
-        // Nil entry_id (no join possible) or first event isn't
-        // DecisionEvaluated at all (the latter already counted as a
-        // completeness violation above).
+        // First event isn't DecisionEvaluated at all (already counted as
+        // a completeness violation above).
         _ => false,
     };
 
@@ -844,7 +879,7 @@ mod tests {
             let session_a = Uuid::new_v4();
             let entry_a = Uuid::new_v4();
             let row_without_audit = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                session_a, entry_a, "cbu.confirm", &report, false,
+                session_a, entry_a, None, "cbu.confirm", &report, false,
                 ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row_without_audit).await);
@@ -865,7 +900,7 @@ mod tests {
                 .await
             );
             let row_with_audit = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                session_b, entry_b, "cbu.confirm", &report, false,
+                session_b, entry_b, Some(decision_id), "cbu.confirm", &report, false,
                 ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row_with_audit).await);
@@ -936,7 +971,7 @@ mod tests {
             let entry_id = Uuid::new_v4();
 
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                session_id, entry_id, "cbu.confirm", &approved_stp_report(), false,
+                session_id, entry_id, Some(decision_id), "cbu.confirm", &approved_stp_report(), false,
                 ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
@@ -979,7 +1014,7 @@ mod tests {
             let session_id = Uuid::new_v4();
 
             let events = vec![
-                decision_evaluated(DecisionOutcome::ApprovedStp), // entry_id nil -> no re-derivation join, fine
+                decision_evaluated(DecisionOutcome::ApprovedStp), // no shadow row for this decision_id -> no re-derivation join, fine
                 AuditEvent::EnvelopeSealed {
                     envelope_id: decision_id,
                     expires_at: chrono::Utc::now() + chrono::Duration::minutes(5),
@@ -1019,7 +1054,7 @@ mod tests {
                 ob_poc_control_plane::gate::GateResult::Failure("denied".to_string()),
             );
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                session_id, entry_id, "cbu.confirm", &report, false,
+                session_id, entry_id, Some(decision_id), "cbu.confirm", &report, false,
                 ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);
@@ -1057,6 +1092,169 @@ mod tests {
 
             let graded_success = replay_grade_for_decision(&pool, decision_id).await.expect("query failed");
             assert!(!graded_success, "an ApprovedStp claim whose own gate_results re-derive to Rejected must grade Failure");
+        }
+
+        /// **The exact bug this session fixes (G11 join fix,
+        /// `EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001`), reproduced and
+        /// proven closed.** `sequencer.rs::phase5_runtime_recheck` reuses
+        /// the SAME `entry_id` (the `RunbookEntry`'s own stable id)
+        /// across every retry of the same runbook step -- a step
+        /// rejected on attempt 1 (e.g. missing evidence) and approved on
+        /// attempt 2 (once the gap is fixed) both insert
+        /// `control_plane_shadow_decisions` rows sharing one `entry_id`
+        /// but carrying different `gate_results`. The OLD join (`WHERE
+        /// entry_id = $1 LIMIT 1`, no `ORDER BY`/tiebreaker) could
+        /// therefore non-deterministically retrieve either attempt's row
+        /// when grading either attempt's `DecisionEvaluated` audit
+        /// event.
+        ///
+        /// This test constructs exactly that two-attempt scenario (same
+        /// `entry_id`, two distinct `decision_id`s, deliberately
+        /// DISAGREEING `gate_results` — one re-derives `Rejected`, the
+        /// other `ApprovedStp`) and proves it in three parts:
+        ///
+        /// 1. `entry_id` really is ambiguous in the persisted data: two
+        ///    distinct `control_plane_shadow_decisions` rows share one
+        ///    `entry_id`, with two DIFFERENT `gate_results` values — the
+        ///    old join's `LIMIT 1` had no principled way to pick the
+        ///    right one.
+        /// 2. The FIXED join (via `decision_id`, exercised through
+        ///    `replay_grade_for_decision`'s real production code path)
+        ///    resolves each attempt's `DecisionEvaluated` event to ITS
+        ///    OWN row, not the other's — attempt 1 (claims `Rejected`,
+        ///    backed by its own Authority-denied `gate_results`) grades
+        ///    `Success` (no mismatch); attempt 2 (claims `ApprovedStp`,
+        ///    backed by its own all-`Success` `gate_results`) also
+        ///    grades `Success`.
+        /// 3. The old-code counterfactual, made concrete rather than
+        ///    merely asserted: re-deriving attempt 1's claim against
+        ///    attempt 2's `gate_results` (what the old join could have
+        ///    non-deterministically returned) produces `ApprovedStp` —
+        ///    a mismatch against the recorded `Rejected` outcome, i.e. a
+        ///    false `Failure`. Symmetrically, re-deriving attempt 2's
+        ///    claim against attempt 1's `gate_results` produces
+        ///    `Rejected` — a mismatch against the recorded `ApprovedStp`
+        ///    outcome, also a false `Failure`. The old join was wrong
+        ///    for at least one of the two decisions regardless of which
+        ///    of the two ambiguous rows its unordered `LIMIT 1` happened
+        ///    to return.
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn same_entry_id_retried_attempts_each_join_to_their_own_gate_results_not_the_others() {
+            let pool = test_pool().await;
+            let session_id = Uuid::new_v4();
+            // Deliberately the SAME entry_id for both attempts -- the
+            // real sequencer.rs::phase5_runtime_recheck scenario: a
+            // runbook step retried after the reason for its first
+            // rejection was fixed.
+            let entry_id = Uuid::new_v4();
+
+            // Attempt 1: rejected (e.g. missing evidence -- Authority denied).
+            let decision_id_1 = Uuid::new_v4();
+            let mut report_1 = approved_stp_report();
+            report_1.results.insert(
+                ob_poc_control_plane::gate::GateId::Authority,
+                ob_poc_control_plane::gate::GateResult::Failure("denied".to_string()),
+            );
+            let row_1 = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                session_id, entry_id, Some(decision_id_1), "cbu.confirm", &report_1, true,
+                ob_poc_types::ExecutionPath::RunbookSequencer,
+            );
+            assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row_1).await);
+            assert!(
+                insert_audit_event(
+                    &pool,
+                    decision_id_1,
+                    session_id,
+                    &AuditEvent::DecisionEvaluated {
+                        outcome: DecisionOutcome::Rejected,
+                        snapshot_ref: None,
+                        entry_id, // SAME entry_id as attempt 2, deliberately
+                    },
+                )
+                .await
+            );
+            // Rejected is terminal immediately -- no envelope, no further events.
+
+            // Attempt 2: approved (the gap from attempt 1 was fixed) --
+            // SAME entry_id, all-Success report.
+            let decision_id_2 = Uuid::new_v4();
+            let report_2 = approved_stp_report();
+            let row_2 = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                session_id, entry_id, Some(decision_id_2), "cbu.confirm", &report_2, false,
+                ob_poc_types::ExecutionPath::RunbookSequencer,
+            );
+            assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row_2).await);
+            let events_2 = vec![
+                AuditEvent::DecisionEvaluated {
+                    outcome: DecisionOutcome::ApprovedStp,
+                    snapshot_ref: None,
+                    entry_id, // SAME entry_id as attempt 1, deliberately
+                },
+                AuditEvent::EnvelopeSealed {
+                    envelope_id: decision_id_2,
+                    expires_at: chrono::Utc::now() + chrono::Duration::minutes(5),
+                },
+                AuditEvent::EnvelopeConsumed {
+                    envelope_id: decision_id_2,
+                    gate_outcome: GateOutcomeRecord::new(GateId::ExecutionEnvelope, "Success"),
+                },
+                AuditEvent::DispatchCommitted {
+                    attested: false,
+                    gate_outcome: GateOutcomeRecord::new(GateId::WriteSetAttestation, "NotEvaluated"),
+                },
+            ];
+            for event in &events_2 {
+                assert!(insert_audit_event(&pool, decision_id_2, session_id, event).await);
+            }
+
+            // ── Part 1: entry_id really is ambiguous in the persisted data ──
+            let entry_id_matches: Vec<(serde_json::Value,)> = sqlx::query_as(
+                r#"SELECT gate_results FROM "ob-poc".control_plane_shadow_decisions WHERE entry_id = $1"#,
+            )
+            .bind(entry_id)
+            .fetch_all(&pool)
+            .await
+            .expect("query failed");
+            assert_eq!(
+                entry_id_matches.len(), 2,
+                "both attempts must share one entry_id -- this is the real ambiguity the old join hit"
+            );
+            assert_ne!(
+                entry_id_matches[0].0, entry_id_matches[1].0,
+                "the two attempts' gate_results must genuinely differ -- otherwise this isn't the failure mode"
+            );
+
+            // ── Part 2: the FIXED join (decision_id-based) resolves each
+            // attempt to its own row, via the real production function.
+            let graded_1 = replay_grade_for_decision(&pool, decision_id_1).await.expect("query failed");
+            assert!(
+                graded_1,
+                "attempt 1 (Rejected, backed by its OWN Authority-denied gate_results) must grade Success under the fixed decision_id join"
+            );
+
+            let graded_2 = replay_grade_for_decision(&pool, decision_id_2).await.expect("query failed");
+            assert!(
+                graded_2,
+                "attempt 2 (ApprovedStp, backed by its OWN all-Success gate_results) must grade Success under the fixed decision_id join"
+            );
+
+            // ── Part 3: the old entry_id-only join would have been wrong
+            // regardless of which ambiguous row its unordered LIMIT 1
+            // happened to return.
+            let rederived_from_row_1 = rederive_decision_outcome(&row_1.gate_results);
+            let rederived_from_row_2 = rederive_decision_outcome(&row_2.gate_results);
+            assert_eq!(rederived_from_row_1, Some(DecisionOutcome::Rejected));
+            assert_eq!(rederived_from_row_2, Some(DecisionOutcome::ApprovedStp));
+
+            assert_ne!(
+                rederived_from_row_2, Some(DecisionOutcome::Rejected),
+                "old entry_id-only join could have handed attempt 1's Rejected claim attempt 2's row -- a false Failure"
+            );
+            assert_ne!(
+                rederived_from_row_1, Some(DecisionOutcome::ApprovedStp),
+                "old entry_id-only join could have handed attempt 2's ApprovedStp claim attempt 1's row -- a false Failure"
+            );
         }
 
         /// A decision with only `DecisionEvaluated` (`ApprovedStp`) and no
@@ -1111,7 +1309,7 @@ mod tests {
             let entry_id = Uuid::new_v4();
 
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                session_id, entry_id, "cbu.confirm", &approved_stp_report(), false,
+                session_id, entry_id, Some(decision_id), "cbu.confirm", &approved_stp_report(), false,
                 ob_poc_types::ExecutionPath::RunbookSequencer,
             );
             assert!(crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await);

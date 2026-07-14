@@ -436,6 +436,7 @@ mod t7_2_metrics_tests {
         let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
             session_id,
             Uuid::new_v4(),
+            None,
             "cbu.confirm",
             &{
                 let mut report = ob_poc_control_plane::gate::EvaluationReport::default();
@@ -483,6 +484,7 @@ mod t7_2_metrics_tests {
         let diverging_row = crate::agent::control_plane_shadow::build_shadow_decision_row(
             session_id,
             Uuid::new_v4(),
+            None,
             "cbu.confirm",
             &ob_poc_control_plane::gate::EvaluationReport::default(),
             false,
@@ -637,6 +639,7 @@ mod t7_2_metrics_tests {
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
                 Uuid::new_v4(),
                 Uuid::new_v4(),
+                None,
                 &verb_fqn,
                 report,
                 false,
@@ -877,6 +880,7 @@ mod t7_2_metrics_tests {
         let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
             session_id,
             Uuid::new_v4(),
+            None,
             "cbu.confirm",
             &full_report,
             false,
@@ -1040,6 +1044,7 @@ mod t7_2_metrics_tests {
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
                 Uuid::new_v4(),
                 Uuid::new_v4(),
+                None,
                 &verb_fqn,
                 &report,
                 false,

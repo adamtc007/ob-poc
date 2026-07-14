@@ -8031,9 +8031,29 @@ impl ReplOrchestratorV2 {
             );
             let (report, decision) =
                 ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+            // G11 join fix (EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001):
+            // mint (or read) `decision_id` up front -- before building
+            // `row` -- so the SAME per-attempt-unique value threads into
+            // both the shadow-decisions row and the `control_plane_audit`
+            // rows emitted below. `envelope.id()` for `ApprovedStp` (only
+            // *peeked* via `&decision` here, not moved -- `decision` is
+            // still needed, unmoved, several statements further down);
+            // a fresh `Uuid::new_v4()` otherwise. This is the same value
+            // the `tokio::spawn` block below uses to key its
+            // `insert_audit_event` calls -- see that block's own comment.
+            // Must NOT be `entry_id`: `entry_id` is the `RunbookEntry`'s
+            // own stable id, reused across every retry of the same
+            // runbook step, and using it as this join key was exactly
+            // the bug this session fixed (see `ShadowDecisionRow::
+            // decision_id`'s doc).
+            let decision_id = match &decision {
+                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => envelope.id(),
+                _ => Uuid::new_v4(),
+            };
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
                 session.id,
                 entry_id,
+                Some(decision_id),
                 &entry.verb,
                 &report,
                 legacy_outcome.is_some(),
@@ -8050,16 +8070,20 @@ impl ReplOrchestratorV2 {
             // same best-effort tokio::spawn — additive only (W1): nothing
             // here alters `row`, which is built and passed in unchanged.
             //
-            // decision_id: the audit stream's correlating key across an
-            // envelope-bearing decision's later events (EnvelopeConsumed,
-            // DispatchCommitted) is the envelope's own id (minted fresh
-            // per decision by ExecutionEnvelope::seal) -- G1 items 2-4
-            // (the entry_id-correlated seal->consume wire) have not landed
-            // yet (V3/V4 finding), so envelope_id is the only value shared
+            // decision_id (computed above, before `row` was built): the
+            // audit stream's correlating key across an envelope-bearing
+            // decision's later events (EnvelopeConsumed, DispatchCommitted)
+            // is the envelope's own id (minted fresh per decision by
+            // ExecutionEnvelope::seal) -- G1 items 2-4 (the
+            // entry_id-correlated seal->consume wire) have not landed yet
+            // (V3/V4 finding), so envelope_id is the only value shared
             // between the seal site and the not-yet-wired consume site.
             // For non-ApprovedStp decisions (no envelope minted), a fresh
             // id is used -- nothing downstream correlates to it, by
-            // construction (no envelope, no later events).
+            // construction (no envelope, no later events). This is also
+            // now the SAME value `row.decision_id` carries (G11 join fix)
+            // -- the shadow row and this decision's audit rows correlate
+            // by construction.
             let outcome_for_audit = match &decision {
                 ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_) => {
                     ob_poc_control_plane::audit::DecisionOutcome::ApprovedStp
@@ -8072,10 +8096,16 @@ impl ReplOrchestratorV2 {
                 }
             };
             let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
-            // G2 item 3 (G11 wiring): entry_id is the same value `row`
-            // (the shadow-decision row built two statements above) was
-            // built with -- the join key the G11 replay surface needs to
-            // re-derive this decision's outcome from `gate_results`.
+            // entry_id here is informational (the RunbookEntry this
+            // decision was evaluated for) -- it is NOT the G11 replay
+            // join key. That key is `decision_id` (computed above),
+            // carried on `row.decision_id` and on this decision's
+            // `control_plane_audit` rows via the `insert_audit_event`
+            // calls below, which the G11 replay surface joins on
+            // directly (`replay_grade_for_decision`'s own `decision_id`
+            // parameter) -- see the G11 join fix session doc for why
+            // `entry_id` alone is unsafe to use for that join (it is
+            // reused across every retry of the same runbook step).
             let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
                 outcome: outcome_for_audit,
                 snapshot_ref,
@@ -8108,7 +8138,16 @@ impl ReplOrchestratorV2 {
             tokio::spawn(async move {
                 crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
                 if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
-                    let decision_id = envelope.id();
+                    // `decision_id` here is the SAME value computed above
+                    // (before `row` was built) and already carried on
+                    // `row.decision_id` -- not recomputed independently.
+                    // `envelope.id()` is stable/deterministic per
+                    // envelope, so re-deriving it here would happen to
+                    // produce the same value today, but reusing the
+                    // outer binding is what actually guarantees it (and
+                    // is what the G11 join fix's correctness proof
+                    // depends on, not a coincidence of two identical
+                    // computations staying in sync).
                     crate::agent::control_plane_audit::insert_audit_event(
                         &pool,
                         decision_id,
@@ -8127,9 +8166,14 @@ impl ReplOrchestratorV2 {
                     )
                     .await;
                 } else {
+                    // Same reuse: the non-ApprovedStp fresh id minted
+                    // above (`decision_id`) is what `row.decision_id`
+                    // already carries -- not a second, independent
+                    // `Uuid::new_v4()` that would silently desynchronise
+                    // the two.
                     crate::agent::control_plane_audit::insert_audit_event(
                         &pool,
-                        Uuid::new_v4(),
+                        decision_id,
                         session_id,
                         &decision_evaluated,
                     )
@@ -8280,9 +8324,19 @@ impl ReplOrchestratorV2 {
             chrono::Utc::now() + chrono::Duration::minutes(5),
         );
         let (report, decision) = ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+        // G11 join fix (EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001): same
+        // reasoning as `phase5_runtime_recheck`'s primary call site --
+        // mint/read `decision_id` before building `row`, then reuse this
+        // SAME binding for the `insert_audit_event` calls below, never
+        // `entry_id` (reused across retries of the same runbook step).
+        let decision_id = match &decision {
+            ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => envelope.id(),
+            _ => Uuid::new_v4(),
+        };
         let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
             session.id,
             entry_id,
+            Some(decision_id),
             &entry.verb,
             &report,
             false,
@@ -8319,7 +8373,11 @@ impl ReplOrchestratorV2 {
             }
         };
         let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
-        // G2 item 3 (G11 wiring): same entry_id `row` was built with above.
+        // entry_id here is informational only (the RunbookEntry this
+        // decision was evaluated for), NOT the G11 replay join key -- see
+        // the primary call site's identical comment above. That key is
+        // `decision_id` (computed above, before `row`), carried on both
+        // `row.decision_id` and the `control_plane_audit` rows below.
         let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
             outcome: outcome_for_audit,
             snapshot_ref,
@@ -8332,7 +8390,8 @@ impl ReplOrchestratorV2 {
         tokio::spawn(async move {
             crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
             if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
-                let decision_id = envelope.id();
+                // Reuses the outer `decision_id` binding (already carried
+                // on `row.decision_id`) -- not an independent recompute.
                 crate::agent::control_plane_audit::insert_audit_event(
                     &pool,
                     decision_id,
@@ -8351,9 +8410,13 @@ impl ReplOrchestratorV2 {
                 )
                 .await;
             } else {
+                // Reuses the outer `decision_id` binding (already carried
+                // on `row.decision_id`) -- not an independent
+                // `Uuid::new_v4()` that would silently desynchronise the
+                // two.
                 crate::agent::control_plane_audit::insert_audit_event(
                     &pool,
-                    Uuid::new_v4(),
+                    decision_id,
                     session_id,
                     &decision_evaluated,
                 )

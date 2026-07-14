@@ -2113,8 +2113,14 @@ impl DslExecutor {
                     let _ = is_durable_verb; // captured for future STP wiring parity; unused today
                     let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
                     let report = ob_poc_control_plane::applicability::apply_matrix(report, path);
+                    // G11 join fix: this seam (Path B, DslDirect) never
+                    // emits a corresponding `control_plane_audit`
+                    // `DecisionEvaluated` row (no `insert_audit_event`
+                    // call site exists in this file), so there is no
+                    // `decision_id` to correlate with -- `None` is the
+                    // honest answer.
                     let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
-                        session_id, entry_id, &fqn, &report, false, path,
+                        session_id, entry_id, None, &fqn, &report, false, path,
                     );
                     crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
                 });

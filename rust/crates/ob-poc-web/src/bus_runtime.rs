@@ -283,9 +283,15 @@ impl VerbExecutor for ObPocVerbAdapter {
                 let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
                 let report =
                     ob_poc_control_plane::applicability::apply_matrix(report, ob_poc_types::ExecutionPath::BusFederated);
+                // G11 join fix: this Path D adapter never emits a
+                // corresponding `control_plane_audit` `DecisionEvaluated`
+                // row at all (no `insert_audit_event` call site exists in
+                // this file), so there is no `decision_id` to correlate
+                // with — `None` is the honest answer, not a guess.
                 let row = ob_poc::agent::control_plane_shadow::build_shadow_decision_row(
                     Uuid::nil(),
                     entry_id,
+                    None,
                     &fqn,
                     &report,
                     false,
