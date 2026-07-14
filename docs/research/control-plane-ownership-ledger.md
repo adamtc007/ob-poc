@@ -1440,3 +1440,59 @@ in isolation, `check-invariants.sh ratchet` 0/5 divergence. Committed
 as `0c7c9441`. `invariants-expected.toml` untouched — this fix moves
 nothing in `[eN]` on its own (it's upstream of the arming decision
 that would).
+
+## Adversarial review pass; G11's non-unique-entry_id join bug found and fixed (2026-07-14)
+
+Operator called for a QA review pass before deciding whether to arm
+G14. Two parallel adversarial reviews (not implementation sessions —
+explicitly told to hunt for real bugs, not confirm the code looks
+fine) covered the write-set attestation chain and this session's
+other new logic (G6a's `mint_envelope_for_bus`, G11's audit replay).
+
+**Write-set attestation chain — verdict: not safe to arm, and the gap
+is bigger than either landing session's own STOP-conditions caught.**
+Two serious findings, independently spot-verified by the reviewer
+(not taken on the review's claim): (1) `record_write` is called from
+only 4 of 10 `CrudOperation` execute functions
+(`crud_executor.rs` — Insert/Update/Delete/Upsert); `Link`/`Unlink`/
+`RoleLink`/`RoleUnlink`/`EntityCreate`/`EntityUpsert` never self-report
+a write at all — `EntityCreate`/`EntityUpsert` are the core of
+person/company (CBU/UBO) onboarding. If armed, `attest()` would see an
+empty capture list for these and vacuously pass ANY write, legitimate
+or not — a structurally different and more severe gap than the
+already-disclosed "empty `allowed_columns` fails closed" class. (2)
+Trigger-driven columns (`row_version`, `updated_at` on `cbus`/`deals`/
+`entities`/`cases`/`client_group`) are structurally invisible to
+`attest()`. (3) `qualify_footprint_table`'s own safety-justification
+doc comment undercounted non-`ob-poc`-schema verb YAMLs by ~4-5x (9
+more files than the 2 it named) — currently inert only because
+`domain_metadata.yaml` lacks footprint entries for most of them.
+**Recommendation: do not arm G14.** The write-set coverage gap
+(Link/Unlink/EntityCreate/EntityUpsert self-reporting) is scoped as
+its own future tranche, not attempted this session.
+
+**G11/AuditReplay — a real correctness bug found and FIXED same
+session.** `replay_grade_for_decision`'s DD-4(ii) join
+(`WHERE entry_id = $1 LIMIT 1`, no tiebreaker) could non-deterministically
+join a `DecisionEvaluated` audit event to a DIFFERENT retry attempt's
+`gate_results` — `entry_id` is the RunbookEntry's own stable id, reused
+across every retry of the same runbook step, not unique per shadow-eval
+attempt. Confirmed real (not hypothetical) by the reviewer directly
+against the schema and `sequencer.rs`'s call sites before any fix was
+attempted. Fixed: new `decision_id UUID` column on
+`control_plane_shadow_decisions` (migration
+`20260714_control_plane_shadow_decisions_decision_id.sql`, nullable,
+no backfill), populated with the same `decision_id` value
+`control_plane_audit` already uses, join switched from `entry_id` to
+`decision_id`. New regression test proves two same-`entry_id` retry
+attempts with disagreeing `gate_results` now each grade against their
+own row. RED→GREEN independently reproduced by the reviewer (reverted
+the join, confirmed the exact predicted false-grade failure, restored,
+confirmed green). Committed as `73528d5c`.
+
+**G6a's `mint_envelope_for_bus`** — reviewed, one latent (currently
+dormant) gap noted: no expiry/sweep job exists for orphaned sealed
+envelope rows if mint and admit are ever separated by a crash or
+future refactor; not acted on this session (harmless today since §7's
+gap means nothing actually mints in production yet). Everything else
+checked out solid.
