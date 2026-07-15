@@ -385,11 +385,12 @@ impl SemOsVerbOp for UboDeterminationApplySmoFallback {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let payload = normalize_smo_fallback_payload(args);
         let outcome = stream_append(
             "ubo.determination.apply-smo-fallback",
             subject,
             TargetBinding::for_subject(subject),
-            args.clone(),
+            payload,
             "analyst.smo-fallback",
             None,
             ctx,
@@ -400,6 +401,24 @@ impl SemOsVerbOp for UboDeterminationApplySmoFallback {
             serde_json::json!({ "seq": outcome.seq }),
         ))
     }
+}
+
+/// Normalize `ubo.determination.apply-smo-fallback` payload: the YAML arg is
+/// kebab-case `smo-person-id`, but the fold reads snake_case `smo_person_id`
+/// (`fold::control::apply_one_control_event`, via `person_id(p, "smo_person_id")`)
+/// — without this the fold silently left `ControlState.smo_person_id` at
+/// `None`, meaning the entire SMO-fallback path (K-5's "never silent"
+/// escape hatch, consumed at `freeze` time) never actually populated
+/// anything even after a caller ran this verb. Same bug class as R3
+/// (structure_class) and the `edge.assert-control` kind/edge_kind mismatch.
+fn normalize_smo_fallback_payload(args: &serde_json::Value) -> serde_json::Value {
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        if let Some(v) = obj.remove("smo-person-id") {
+            obj.insert("smo_person_id".to_string(), v);
+        }
+    }
+    p
 }
 
 pub struct UboDeterminationFreeze;
@@ -472,12 +491,8 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .and_then(|v| v.as_f64())
             .unwrap_or(25.0);
 
-        let mut candidates: Vec<ProngCandidate> = strategy.resolve(
-            &control,
-            subject_entity_id,
-            &natural_persons,
-            threshold_pct,
-        );
+        let mut candidates: Vec<ProngCandidate> =
+            strategy.resolve(&control, subject_entity_id, &natural_persons, threshold_pct);
         candidates.sort_by_key(|c| c.person_id.0);
 
         let smo_result = match (control.smo_person_id, control.smo_event_id) {
@@ -787,6 +802,15 @@ impl SemOsVerbOp for KycObligationCreate {
         let _role = json_extract_string(args, "role")?;
         let mut payload = args.clone();
         payload["obligation_id"] = serde_json::Value::String(obligation_id.to_string());
+        // The YAML arg is kebab-case `cbu-role`, but the fold reads snake_case
+        // `cbu_role` (fold::obligation::str_field(p, "cbu_role"), K-24 exposure
+        // linkage) — without this the fold silently left ObligationBasis.cbu_role
+        // at None. Same bug class as R3 / the smo-person-id fix above.
+        if let Some(obj) = payload.as_object_mut() {
+            if let Some(v) = obj.remove("cbu-role") {
+                obj.insert("cbu_role".to_string(), v);
+            }
+        }
         let outcome = stream_append(
             "kyc.obligation.create",
             subject,

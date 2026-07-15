@@ -14,10 +14,14 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycPersonApprove, KycSubjectClassifyStructure, KycSubjectRegister,
-    UboDeterminationComputeFold, UboDeterminationFreeze, UboDeterminationSelectStrategy,
-    UboEdgeAssertControl, UboEdgeAssertEconomicInterest, UboEdgeReconcileConflict,
+    UboDeterminationApplySmoFallback, UboDeterminationComputeFold, UboDeterminationFreeze,
+    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
+    UboEdgeReconcileConflict,
 };
-use ob_poc_kyc_substrate::SubjectId;
+use ob_poc_kyc_store::PgKycEventStore;
+use ob_poc_kyc_substrate::{
+    fold_obligations_versioned, phase1_lexicon, FoldRegistry, SubjectId, V1FoldImpl,
+};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -533,6 +537,113 @@ async fn m3_4_unimplemented_strategy_fails_loudly_not_silently() {
     assert!(
         msg.contains("role_based_strategy") && msg.contains("no DeterminationStrategy"),
         "error should name the missing strategy; got: {msg}",
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
+// ── Payload-key regressions found auditing the fold-verb valid_values pattern
+// (2026-07-15) — same bug class as R3 (structure_class): a YAML arg name that
+// doesn't match the payload key the fold actually reads, silently dropped
+// instead of erroring, because these ops pass args straight through with no
+// normalize_*_payload step. ─────────────────────────────────────────────────
+
+#[tokio::test]
+async fn smo_person_id_round_trips_through_the_fold() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let smo_person = Uuid::new_v4();
+
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationApplySmoFallback,
+        serde_json::json!({ "subject-id": subject.0, "smo-person-id": smo_person }),
+        &pool,
+    )
+    .await;
+
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        &pool,
+    )
+    .await;
+
+    let smo_result = outcome.get("smo_result").cloned().unwrap_or_default();
+    assert_eq!(
+        smo_result
+            .get("Person")
+            .and_then(|p| p.get("person_id"))
+            .and_then(|v| v.as_str()),
+        Some(smo_person.to_string().as_str()),
+        "smo-person-id (kebab, YAML arg name) must reach ControlState.smo_person_id \
+         (snake_case, what the fold reads) — got smo_result={smo_result:?}",
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
+#[tokio::test]
+async fn cbu_role_round_trips_through_the_obligation_fold() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycObligationCreate,
+        serde_json::json!({
+            "subject-id": subject.0, "role": "shareholder", "cbu-role": "investor",
+        }),
+        &pool,
+    )
+    .await;
+
+    let mut conn = pool.acquire().await.expect("acquire connection");
+    let events = PgKycEventStore::load_events(&mut conn, subject)
+        .await
+        .expect("load events");
+    let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+    let mut registry = FoldRegistry::new();
+    registry.register(phase1_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
+    let state = fold_obligations_versioned(&refs, &registry).expect("fold obligations");
+
+    let cbu_roles: Vec<Option<String>> = state
+        .obligations
+        .values()
+        .map(|t| t.basis.cbu_role.clone())
+        .collect();
+    assert!(
+        cbu_roles.iter().any(|r| r.as_deref() == Some("investor")),
+        "cbu-role (kebab, YAML arg name) must reach ObligationBasis.cbu_role \
+         (snake_case, what the fold reads) — got cbu_roles={cbu_roles:?}",
     );
 
     cleanup(&pool, &[subject]).await;

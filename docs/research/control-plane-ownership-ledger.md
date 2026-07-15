@@ -2138,3 +2138,109 @@ those two verbs' packs are somehow also in scope for a "kyc" bootstrap)
 is real, separate follow-up work — not attempted here past 3 reproducible
 data points, to avoid burning further live LLM calls chasing a "magic
 phrase" that would prove nothing structural.
+
+## Two more payload-key regressions found (same bug class as R3) + valid_values completeness (2026-07-15)
+
+Following the KYC-vs-CBU structural completeness review (separate entry
+above — confirmed `kyc_dag.yaml`'s `dag_slots: intentionally_absent` is a
+documented design decision, not a gap; confirmed zero constellation-slot
+coverage and zero `lookup:` name-resolution metadata anywhere in the
+`dsl.kyc` verb family, both real, separate, larger follow-ups), operator
+asked for a targeted sweep for anything else obviously broken and
+mechanically fixable in the same family — the same bug class as the
+`edge_kind`/`kind` mismatch and R3's `structure_class` mismatch already
+fixed this session (a YAML arg name that doesn't match the payload key
+the corresponding fold actually reads, because the op passes `args.clone()`
+straight through with no `normalize_*_payload` step).
+
+Two real instances found and fixed:
+
+1. **`ubo.determination.apply-smo-fallback`'s `smo-person-id` (kebab) vs
+   `smo_person_id` (snake)** — `UboDeterminationApplySmoFallback::execute`
+   (`src/domain_ops/kyc_stream_ops.rs`) passed args straight through; the
+   fold reads `person_id(p, "smo_person_id")`
+   (`crates/ob-poc-kyc-substrate/src/fold/control.rs`). Result:
+   `ControlState.smo_person_id` was always `None` — the entire SMO-fallback
+   escape hatch (K-5's "a determination must never be silent" rule,
+   consumed at `freeze` time) never actually populated anything even after
+   a caller ran the verb correctly. Fixed with a
+   `normalize_smo_fallback_payload` function, same pattern as the existing
+   `normalize_classify_structure_payload`/`normalize_obligation_payload`.
+
+2. **`kyc.obligation.create`'s `cbu-role` (kebab) vs `cbu_role` (snake)** —
+   same bug shape; the fold reads `str_field(p, "cbu_role")`
+   (`crates/ob-poc-kyc-substrate/src/fold/obligation.rs`) into
+   `ObligationBasis.cbu_role` (K-24 — links an obligation to its commercial/
+   CBU exposure). `KycObligationCreate::execute` only stamped
+   `obligation_id`, never renamed `cbu-role`. Fixed inline (this verb
+   already builds its payload as a mutable `serde_json::Value`, so no new
+   free function was needed).
+
+Both proven RED→GREEN: reverted just `kyc_stream_ops.rs`'s fix (kept the
+two new tests), confirmed both new regression tests fail with exactly the
+expected symptom (`smo_result` empty / `cbu_roles=[None]`), restored the
+fix, confirmed green. New tests
+`smo_person_id_round_trips_through_the_fold` and
+`cbu_role_round_trips_through_the_obligation_fold` added to
+`tests/kyc_m3_remediation.rs` (7/7 passing) — the first drives the real
+verb stream end-to-end through `freeze` and asserts on the returned
+`smo_result.Person.person_id`; the second folds the real stream via
+`fold_obligations_versioned` and asserts on `ObligationBasis.cbu_role`.
+Neither existing test caught these because
+`tests/kyc_verb_coverage.rs`'s coverage tests only assert the event
+*landed* (`assert_event`), never that the fold actually resolved the
+field — same shallow-coverage pattern that let the original `edge_kind`
+bug hide.
+
+Also added `valid_values: [in_progress, satisfied, waived, deferred,
+expired, rejected]` to the `state` arg on `kyc.obligation.update-identity`,
+`kyc.obligation.update-screening`, `kyc.obligation.update-risk` — each
+already documented the closed set in free-text `description` but had no
+`valid_values`, and `track_state_from_event`
+(`crates/ob-poc-kyc-substrate/src/fold/obligation.rs`) matches exactly
+that set (falling through to `Pending`, silently, for anything else).
+Same standing rule from the earlier `selector_dispatch` documentation
+work: selector/state args always declare `valid_values` with the exact
+runtime match string.
+
+**Findings surfaced but deliberately NOT fixed this pass** (flagged, not
+silently dropped):
+- `apply_one_control_event`'s `"kyc.person.waive"` match arm
+  (`fold/control.rs`) has no corresponding verb anywhere — either stale
+  dead code or a planned-but-unbuilt verb. Left alone: unlike the
+  kebab/snake bugs above, there's no unambiguous "correct" fix (delete the
+  arm vs. build the verb), so this needs a design decision, not a
+  mechanical patch.
+- `kyc.person.approve`'s fold arm expects a `person_id` payload key the
+  verb never sends (its only arg is `subject-id`) — likely legacy/inert
+  scaffolding since the real K-23 gate lives in the obligation fold, not
+  here. Lower confidence than the two fixed bugs; flagged for a design
+  check rather than blind-fixed.
+- `ubo.board-controller.override` has zero fold effect in either
+  `fold/control.rs` or `fold/obligation.rs` — it appends to the stream
+  (audit trail) but nothing reads it back into state. Reads as
+  intended-but-unimplemented (the YAML's "D3 — supersede-never-delete"
+  description and `supersedes-event-id` arg suggest real design intent),
+  not a naming mismatch — flagged for design confirmation.
+- `entity-workstream.set-ubo`'s invocation_phrases (`"mark as ubo"`, `"set
+  ubo flag"`, etc.) are broad/generic enough to plausibly be the actual
+  cause of the verb-search ranking loss found in the live-pipeline probe
+  (previous ledger entry) — the OTHER verb's phrases look like the greedy
+  side of that collision, not `kyc.subject.register`'s. Diagnosis is
+  fairly confident; the fix (tightening that verb's phrases) is a wording
+  judgment call on a different, already-live verb — not made here.
+- The M2 lexicon-manifest gap (11 `kyc.role.*/kyc.obligation.*/
+  kyc.person.*` verbs have `NULL` `dsl_verbs.lexicon_hash`) is confirmed
+  coverage-only, not a runtime hazard: every `stream_append` call site for
+  those 11 verbs passes `validate_entry_fqn = None`, and `FoldRegistry`
+  dispatches by whole-manifest hash, not per-verb `LexiconEntry`
+  presence — folding works today regardless. Real gap, correctly
+  described in CLAUDE.md as open; fixing it means authoring 11
+  `LexiconEntry::build(...)` calls with real precondition/taxonomy
+  decisions, not a one-liner.
+
+Verified: full workspace build clean, `kyc_m3_remediation` (7/7),
+`kyc_verb_coverage` (17/17), `kyc_stream_ops`/`kyc_w7_oracle`/
+`kyc_w3_w5_w6` all green, `test_plugin_verb_coverage` green, scoped
+clippy clean, `cargo x verbs compile`/`check` clean (1277/0/0/0), `cargo
+fmt --check` clean on all touched files.

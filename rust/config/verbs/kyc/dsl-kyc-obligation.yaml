@@ -221,6 +221,7 @@ domains:
           required: true
           description: 'One of: in_progress, satisfied, waived, deferred, expired,
             rejected'
+          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
         - name: reason
           type: string
           required: false
@@ -277,6 +278,7 @@ domains:
           required: true
           description: 'One of: in_progress, satisfied, waived, deferred, expired,
             rejected'
+          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
         - name: reason
           type: string
           required: false
@@ -331,6 +333,7 @@ domains:
           required: true
           description: 'One of: in_progress, satisfied, waived, deferred, expired,
             rejected'
+          valid_values: [in_progress, satisfied, waived, deferred, expired, rejected]
         - name: reason
           type: string
           required: false
