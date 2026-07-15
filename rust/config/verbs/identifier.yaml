@@ -37,8 +37,8 @@ domains:
           returning: identifier_id
           conflict_keys:
             - entity_id
-            - scheme
-            - id
+            - identifier_type
+            - identifier_value
         args:
           - name: entity-id
             type: uuid
@@ -54,7 +54,7 @@ domains:
           - name: scheme
             type: string
             required: true
-            maps_to: scheme
+            maps_to: identifier_type
             description: Identifier scheme (e.g., LEI, CLEARSTREAM_KV, ISIN)
             valid_values:
               - LEI
@@ -70,7 +70,7 @@ domains:
           - name: id
             type: string
             required: true
-            maps_to: id
+            maps_to: identifier_value
             description: The identifier value
           - name: scheme-name
             type: string
@@ -141,10 +141,10 @@ domains:
           returning: identifier_id
           conflict_keys:
             - entity_id
-            - scheme
-            - id
+            - identifier_type
+            - identifier_value
           set_values:
-            scheme: LEI
+            identifier_type: LEI
             scheme_name: Legal Entity Identifier (GLEIF)
         args:
           - name: entity-id
@@ -160,7 +160,7 @@ domains:
           - name: lei
             type: string
             required: true
-            maps_to: id
+            maps_to: identifier_value
             description: 20-character LEI code
           - name: lei-status
             type: string
@@ -230,8 +230,8 @@ domains:
           returning: identifier_id
           conflict_keys:
             - entity_id
-            - scheme
-            - id
+            - identifier_type
+            - identifier_value
           set_values:
             scheme_name: Clearstream Banking Reference
         args:
@@ -248,12 +248,12 @@ domains:
           - name: reference
             type: string
             required: true
-            maps_to: id
+            maps_to: identifier_value
             description: Clearstream reference ID
           - name: reference-type
             type: string
             required: false
-            maps_to: scheme
+            maps_to: identifier_type
             default: CLEARSTREAM_KV
             valid_values:
               - CLEARSTREAM_KV
@@ -307,6 +307,9 @@ domains:
           table: entity_identifiers
           schema: ob-poc
           key: identifier_id
+          set_values:
+            is_validated: true
+            validated_at: now()
         args:
           - name: identifier-id
             type: uuid
@@ -317,9 +320,6 @@ domains:
             required: true
             maps_to: validation_source
             description: Source of validation (e.g., "GLEIF API", "Manual verification")
-        set_values:
-          is_validated: true
-          validated_at: now()
         returns:
           type: affected
 
@@ -357,6 +357,8 @@ domains:
           table: entity_identifiers
           schema: ob-poc
           key: identifier_id
+          set_values:
+            is_validated: false
         args:
           - name: identifier-id
             type: uuid
@@ -367,8 +369,6 @@ domains:
             required: false
             maps_to: effective_to
             description: Expiration date (defaults to today)
-        set_values:
-          is_validated: false
         returns:
           type: affected
 
@@ -455,7 +455,7 @@ domains:
           - name: scheme
             type: string
             required: false
-            maps_to: scheme
+            maps_to: identifier_type
             description: Filter by scheme (e.g., "LEI", "CLEARSTREAM_KV")
         returns:
           type: record_set
@@ -491,13 +491,13 @@ domains:
           operation: select
           table: entity_identifiers
           schema: ob-poc
+          set_values:
+            identifier_type: LEI
         args:
           - name: lei
             type: string
             required: true
-            maps_to: id
-        set_values:
-          scheme: LEI
+            maps_to: identifier_value
         returns:
           type: record
 
@@ -536,11 +536,11 @@ domains:
           - name: reference
             type: string
             required: true
-            maps_to: id
+            maps_to: identifier_value
           - name: reference-type
             type: string
             required: false
-            maps_to: scheme
+            maps_to: identifier_type
             default: CLEARSTREAM_KV
         returns:
           type: record
@@ -576,13 +576,13 @@ domains:
           operation: select
           table: entity_identifiers
           schema: ob-poc
+          set_values:
+            identifier_type: ISIN
         args:
           - name: isin
             type: string
             required: true
-            maps_to: id
-        set_values:
-          scheme: ISIN
+            maps_to: identifier_value
         returns:
           type: record
 
@@ -618,6 +618,8 @@ domains:
           table: entity_identifiers
           schema: ob-poc
           key: identifier_id
+          set_values:
+            validated_at: now()
         args:
           - name: identifier-id
             type: uuid
@@ -638,8 +640,6 @@ domains:
             type: date
             required: false
             maps_to: lei_next_renewal
-        set_values:
-          validated_at: now()
         returns:
           type: affected
         three_axis:
