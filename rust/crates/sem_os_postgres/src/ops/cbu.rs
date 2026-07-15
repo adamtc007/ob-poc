@@ -263,9 +263,10 @@ impl SemOsVerbOp for Create {
             let role_args = serde_json::json!({
                 "cbu-id": cbu_id,
                 "entity-id": fund_id,
-                "role": "ASSET_OWNER"
+                "role": "ASSET_OWNER",
+                "role-type": "FUND"
             });
-            dispatch_child_verb(self.fqn(), "cbu.assign-fund-role", &role_args, ctx, scope).await?;
+            dispatch_child_verb(self.fqn(), "cbu.assign-role", &role_args, ctx, scope).await?;
 
             let link_args = serde_json::json!({
                 "cbu-id": cbu_id,
@@ -279,9 +280,10 @@ impl SemOsVerbOp for Create {
             let role_args = serde_json::json!({
                 "cbu-id": cbu_id,
                 "entity-id": manco_id,
-                "role": "MANAGEMENT_COMPANY"
+                "role": "MANAGEMENT_COMPANY",
+                "role-type": "FUND"
             });
-            dispatch_child_verb(self.fqn(), "cbu.assign-fund-role", &role_args, ctx, scope).await?;
+            dispatch_child_verb(self.fqn(), "cbu.assign-role", &role_args, ctx, scope).await?;
         }
 
         let skipped_reason: Option<&str> = if is_new {
