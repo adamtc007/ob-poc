@@ -2413,3 +2413,71 @@ tested standalone. Fixed by adding `"ob-poc-boundary/database"` to the
 cascade; verified `cargo test -p ob-poc-agent --lib --features database`
 now builds clean and `cargo build -p ob-poc --lib` (both with and without
 `--features database`) still pass.
+
+## Universal pack-switch back-out (2026-07-15, commit `6cc8d357`)
+
+Live-browser follow-up to the pack-mismatch back-out above. Drove the
+actual UI (Chrome DevTools MCP against a running `ob-poc-web` server) to
+prove it end-to-end, not just via unit tests. First attempt failed:
+selected the `kyc-case` pack, answered its required questions, then typed
+"list mandates for this book" — the utterance matched `deal.list` as a
+single high-confidence proposal, auto-confirmed, and got rejected with a
+blunt `Pack constraint violation: 1 verb(s) violate active pack
+constraints: deal.list` — no switch-pack offer, `try_pack_mismatch_backout`
+never even ran.
+
+Root cause: two independent, differently-scoped "allowed verbs" sets exist
+in the pipeline. `MatchContext.allowed_verbs` (SemOS/CCIR governance,
+resolved via `resolve_allowed_verbs` + `Phase2Service`) feeds
+`verb_search.rs` and is what the earlier fix checked. The runbook
+compiler's `check_pack_constraints` (`src/runbook/constraint_gate.rs`)
+enforces a *separate*, usually narrower set — the active pack's own YAML
+`allowed_verbs:` list, built fresh in `try_compile_entry` from
+`ctx.pack_staged`/`pack_executed`. A verb can be legal under governance
+(so search returns it, and a high-confidence match auto-confirms straight
+past the empty-proposals hook) yet still be outside the pack's own
+declared universe — exactly the gap that was hit live. Owner's framing,
+verbatim: "all packs have the concept of global verbs (or should have)
+and we need the pack switch (do we have the verb?) in all packs — its a
+universal backout."
+
+Two fixes, both re-verified live against the same failing scenario:
+
+1. **Universal backout.** `try_compile_entry`'s `ConstraintViolation` arm
+   now checks `pack_router.packs_declaring_verb()` for the violating verb;
+   exactly one other owning pack routes into the *same*
+   `ReplStateV2::PackMismatchConfirm` state the search-layer path uses,
+   instead of a dead-end error. One state, one handler, two entry points —
+   whichever gate catches the mismatch, the user sees the same close/switch
+   prompt. Confirmed live: "'deal.list' isn't available in the 'kyc-case'
+   pack — it belongs to 'Deal Lifecycle'. Close 'kyc-case' and switch to
+   'Deal Lifecycle'?" → "yes" → "Closed pack 'kyc-case'. Switching to 'Deal
+   Lifecycle'." Full round trip, real server, real DB.
+2. **Global verbs.** `EffectiveConstraints` gained a
+   `GLOBAL_VERB_PREFIXES` exemption (`session.`, `view.`, `nav.`) checked
+   before both the allowed-set and forbidden-set logic in
+   `is_verb_allowed`/`check_verbs`. Audited all 12 pack YAMLs first: only
+   `book-setup.yaml` and `session-bootstrap.yaml` hand-declared any
+   `session.*`/`view.*`/`nav.*` verbs in their own `allowed_verbs` (2 lines
+   each, a partial subset) — the other 10 packs would have silently
+   blocked session/navigation verbs the moment they went active, with no
+   pack author ever asked to think about it. Centralised so "is this
+   global" has one answer, not N ad-hoc YAML lists that drift.
+
+Also discovered and left alone (out of scope for this pass, noted for
+whoever picks up `Remediation` next): `Remediation::WidenScope { suggested
+_packs }` on `ConstraintViolationDetail` was defined in
+`src/runbook/response.rs` but never constructed anywhere in
+`build_remediation` — a dead capability of exactly the shape this fix
+needed, sitting unused. The fix above reuses `PackMismatchConfirm`
+directly rather than wiring through `WidenScope`, since `WidenScope` only
+carries `suggested_packs: Vec<String>` (no state-machine hook) and
+`ConstraintViolationDetail`'s `remediation_options` were being discarded
+before this fix anyway (the old `Error` response never surfaced them). If
+`WidenScope` gets a real consumer later, reconcile the two rather than
+letting both exist.
+
+Verified: full `ob-poc` lib suite 2193/2193, `ob-poc-agent --features
+database` 251/251 (including 2 new `PackRouter::packs_declaring_verb`
+tests and 2 new `EffectiveConstraints` global-verb tests), clippy clean
+across both crates, live browser round-trip as described above.
