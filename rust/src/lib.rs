@@ -24,9 +24,6 @@ pub(crate) mod acp_runtime_context;
 // envelope surface at module top.
 pub(crate) mod acp_state_anchor;
 
-// Domain handlers for business logic
-pub(crate) mod domains;
-
 // Database integration (when enabled)
 #[cfg(feature = "database")]
 pub mod database;
@@ -186,9 +183,6 @@ pub use ob_poc_agent::semtaxonomy_v2;
 
 // Sage — intent understanding layer (plane, polarity, domain — no verb FQNs)
 pub(crate) mod sage;
-
-// Core domain capabilities
-pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 
 // Essential error types — re-exported from ob-poc-diagnostics so the
 // crate-root API (`ob_poc::DSLError`, `ob_poc::ParseError`) stays stable.
