@@ -88,6 +88,7 @@ pub mod research_normalize;
 pub mod research_workflow;
 pub mod schema;
 pub mod screening;
+pub mod selector_dispatch;
 pub mod semantic;
 pub mod service_options;
 pub mod service_pipeline;
