@@ -271,6 +271,19 @@ impl PackRouter {
         self.packs.iter().find(|(_, h)| h == hash)
     }
 
+    /// Find every loaded pack that admits a given verb FQN in its
+    /// `allowed_verbs`. Used by the pack-mismatch back-out flow: when an
+    /// utterance targets a verb outside the active pack's universe, this
+    /// answers "which pack(s) actually own this verb?" so the session can
+    /// offer a structured pack switch instead of a silent dead-end.
+    pub fn packs_declaring_verb(&self, verb_fqn: &str) -> Vec<&Arc<PackManifest>> {
+        self.packs
+            .iter()
+            .filter(|(m, _)| m.allowed_verbs.iter().any(|v| v == verb_fqn))
+            .map(|(m, _)| m)
+            .collect()
+    }
+
     /// Try to match explicit force-select patterns.
     ///
     /// Detects patterns like:
@@ -447,6 +460,9 @@ invocation_phrases:
   - "open kyc case"
   - "start kyc"
   - "compliance check"
+allowed_verbs:
+  - kyc.subject.register
+  - kyc-case.create
 "#
     }
 
@@ -701,5 +717,21 @@ invocation_phrases:
 
         assert_eq!(router.pack_count(), 1);
         assert!(router.get_pack("kyc-case").is_some());
+    }
+
+    #[test]
+    fn test_packs_declaring_verb_finds_owner() {
+        let router = make_router();
+        let owners = router.packs_declaring_verb("kyc.subject.register");
+        assert_eq!(owners.len(), 1);
+        assert_eq!(owners[0].id, "kyc-case");
+    }
+
+    #[test]
+    fn test_packs_declaring_verb_empty_for_unowned_verb() {
+        let router = make_router();
+        assert!(router
+            .packs_declaring_verb("entity-workstream.set-ubo")
+            .is_empty());
     }
 }

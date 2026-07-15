@@ -133,7 +133,17 @@ default = []
 # that available to the copy of ob-poc-sage reached via ob-poc-agent too
 # — but `ob-poc-agent` could never be built, tested, or `cargo doc`'d in
 # isolation. Found via the control-plane graduation G0 E5 slice, 2026-07-13.
-database = ["ob-poc-sage/database"]
+#
+# `ob-poc-boundary/database` cascade added 2026-07-15: the same masking
+# pattern applied to `ob-poc-boundary::entity_facts`'s `PgEntityFactsSource`
+# (sqlx-backed, `#[cfg(feature = "database")]`) — its `dead_code`-denied
+# `KindMapping`/`kind_mapping` support items only have a live caller behind
+# that same cfg gate, so building `ob-poc-agent` in isolation (even with
+# THIS crate's own `database` feature on) failed the same way until the
+# full `ob-poc` binary's feature unification masked it. Found running
+# `cargo test -p ob-poc-agent --lib` in isolation for the pack-mismatch
+# back-out feature's router tests.
+database = ["ob-poc-sage/database", "ob-poc-boundary/database"]
 
 [lints.rust]
 unreachable_pub = "deny"

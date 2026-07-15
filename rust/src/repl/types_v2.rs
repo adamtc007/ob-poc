@@ -68,6 +68,21 @@ pub enum ReplStateV2 {
         args: HashMap<String, String>,
     },
 
+    /// An utterance inside `InPack` targeted a verb outside the active
+    /// pack's `allowed_verbs` universe, and that verb is owned by exactly
+    /// one other loaded pack. Offers the structured back-out: close the
+    /// current pack and switch to the pack that actually owns the verb, or
+    /// stay put and let the user rephrase within the current pack.
+    PackMismatchConfirm {
+        current_pack_id: String,
+        current_required_slots_remaining: Vec<String>,
+        current_last_proposal_id: Option<Uuid>,
+        out_of_scope_verb: String,
+        suggested_pack_id: String,
+        suggested_pack_name: String,
+        original_input: String,
+    },
+
     /// Runbook exists and user is reviewing / editing it.
     RunbookEditing,
 

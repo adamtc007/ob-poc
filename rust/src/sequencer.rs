@@ -63,9 +63,9 @@ use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::session_v2::{MessageRole, ReplSessionV2};
 use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::repl::types_v2::{
-    ConstellationContextRef, ConstellationMapOption, ExecutionProgress, ReplCommandV2, ReplStateV2,
-    ResolvedConstellationContext, SessionFeedback, SubjectKind, UserInputV2, WorkspaceFrame,
-    WorkspaceKind, WorkspaceOption, WorkspaceStateView,
+    ConstellationContextRef, ConstellationMapOption, ExecutionProgress, PackCandidate,
+    ReplCommandV2, ReplStateV2, ResolvedConstellationContext, SessionFeedback, SubjectKind,
+    UserInputV2, WorkspaceFrame, WorkspaceKind, WorkspaceOption, WorkspaceStateView,
 };
 use crate::repl::verb_config_index::VerbConfigIndex;
 use crate::runbook::envelope::ReplayEnvelope;
@@ -1481,6 +1481,9 @@ impl ReplOrchestratorV2 {
                 }
                 ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
                 ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
+                ReplStateV2::PackMismatchConfirm { .. } => {
+                    self.handle_pack_mismatch_confirm(session, input)
+                }
                 ReplStateV2::SentencePlayback { .. } => {
                     self.handle_sentence_playback(session, input)
                 }
@@ -3199,6 +3202,92 @@ impl ReplOrchestratorV2 {
                 command: ReplCommandV2::Cancel,
             } => self.handle_cancel(session),
             _ => self.invalid_input(session, "Please select an option or provide more details."),
+        }
+    }
+
+    /// Handle a reply to the pack-mismatch back-out prompt (see
+    /// `try_pack_mismatch_backout`). Confirm closes the current pack and
+    /// hands control to JourneySelection, pre-staged with the pack that
+    /// owns the out-of-scope verb. Reject/anything else returns to InPack
+    /// with the original pack's slot/proposal state intact.
+    fn handle_pack_mismatch_confirm(
+        &self,
+        session: &mut ReplSessionV2,
+        input: UserInputV2,
+    ) -> ReplResponseV2 {
+        let ReplStateV2::PackMismatchConfirm {
+            current_pack_id,
+            current_required_slots_remaining,
+            current_last_proposal_id,
+            suggested_pack_id,
+            suggested_pack_name,
+            ..
+        } = session.state.clone()
+        else {
+            return self.invalid_input(session, "No pack mismatch pending.");
+        };
+
+        match input {
+            UserInputV2::Confirm => {
+                session.clear_staged_pack();
+                let candidate =
+                    self.pack_router
+                        .get_pack(&suggested_pack_id)
+                        .map(|(manifest, _)| PackCandidate {
+                            pack_id: manifest.id.clone(),
+                            pack_name: manifest.name.clone(),
+                            description: manifest.description.clone(),
+                            score: 1.0,
+                        });
+                session.set_state(ReplStateV2::JourneySelection {
+                    candidates: candidate.map(|c| vec![c]),
+                });
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Question {
+                        field: String::new(),
+                        prompt: format!(
+                            "Closed pack '{}'. Switching to '{}' — say 'yes' to confirm or choose another pack.",
+                            current_pack_id, suggested_pack_name
+                        ),
+                        answer_kind: "string".to_string(),
+                    },
+                    message: format!(
+                        "Closed pack '{}'. Switching to '{}'.",
+                        current_pack_id, suggested_pack_name
+                    ),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                    session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: None,
+                    bpmn_form: None,
+                }
+            }
+            _ => {
+                session.set_state(ReplStateV2::InPack {
+                    pack_id: current_pack_id.clone(),
+                    required_slots_remaining: current_required_slots_remaining,
+                    last_proposal_id: current_last_proposal_id,
+                });
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Question {
+                        field: String::new(),
+                        prompt: format!("Staying in '{}'. What would you like to do?", current_pack_id),
+                        answer_kind: "string".to_string(),
+                    },
+                    message: format!("Staying in '{}'.", current_pack_id),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                    session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: None,
+                    bpmn_form: None,
+                }
+            }
         }
     }
 
@@ -5159,8 +5248,16 @@ impl ReplOrchestratorV2 {
             };
         }
 
-        // No proposals → fall back to no-match response.
+        // No proposals → before giving up, check whether the utterance
+        // actually targets a verb outside the active pack's universe (see
+        // try_pack_mismatch_backout for the architecture this closes).
         if proposal_set.proposals.is_empty() {
+            if let Some(resp) = self
+                .try_pack_mismatch_backout(session, content, match_ctx.allowed_verbs.as_ref())
+                .await
+            {
+                return resp;
+            }
             return self.invalid_input(
                 session,
                 &format!("No matching action found for: {}", content),
@@ -5189,6 +5286,83 @@ impl ReplOrchestratorV2 {
         };
         session.last_proposal_set = Some(proposal_set);
         response
+    }
+
+    /// Utterance parser back-out: pack selection defines the DSL universe
+    /// (`allowed_verbs`). If an in-pack utterance matches nothing inside
+    /// that universe, check whether it actually targets a verb owned by a
+    /// *different* pack — rather than dead-ending with "no match found",
+    /// offer a structured close-this-pack/switch-pack decision.
+    ///
+    /// Only fires from `InPack` (pack-scoped) sessions with a real,
+    /// non-empty `allowed_verbs` constraint and exactly one candidate owning
+    /// pack — an ambiguous owner (0 or 2+ packs) falls through to the
+    /// ordinary no-match response rather than guessing.
+    async fn try_pack_mismatch_backout(
+        &self,
+        session: &mut ReplSessionV2,
+        content: &str,
+        allowed_verbs: Option<&HashSet<String>>,
+    ) -> Option<ReplResponseV2> {
+        let ReplStateV2::InPack {
+            pack_id: current_pack_id,
+            required_slots_remaining: current_required_slots_remaining,
+            last_proposal_id: current_last_proposal_id,
+        } = session.state.clone()
+        else {
+            return None;
+        };
+        let allowed_verbs = allowed_verbs.filter(|av| !av.is_empty())?;
+        let searcher = self.verb_searcher.as_ref()?;
+
+        let hit = searcher
+            .find_out_of_scope_match(content, allowed_verbs)
+            .await
+            .ok()??;
+
+        let owning_packs = self.pack_router.packs_declaring_verb(&hit.verb);
+        let [owning_pack] = owning_packs.as_slice() else {
+            // Zero or ambiguous owners — nothing actionable to offer.
+            return None;
+        };
+        if owning_pack.id == current_pack_id {
+            // Shouldn't happen (the verb would've been in allowed_verbs),
+            // but guard against offering a no-op "switch".
+            return None;
+        }
+
+        session.set_state(ReplStateV2::PackMismatchConfirm {
+            current_pack_id: current_pack_id.clone(),
+            current_required_slots_remaining,
+            current_last_proposal_id,
+            out_of_scope_verb: hit.verb.clone(),
+            suggested_pack_id: owning_pack.id.clone(),
+            suggested_pack_name: owning_pack.name.clone(),
+            original_input: content.to_string(),
+        });
+
+        Some(ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::Question {
+                field: String::new(),
+                prompt: format!(
+                    "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}' and switch to '{}'?",
+                    hit.verb, current_pack_id, owning_pack.name, current_pack_id, owning_pack.name
+                ),
+                answer_kind: "confirm".to_string(),
+            },
+            message: format!(
+                "'{}' isn't available here — it belongs to the '{}' pack. Close this pack and switch? (yes/no)",
+                hit.verb, owning_pack.name
+            ),
+            runbook_summary: None,
+            step_count: session.runbook.entries.len(),
+            session_feedback: Some(session.build_session_feedback(false)),
+            narration: None,
+            trace_id: None,
+            acp_dag_semantic: None,
+            bpmn_form: None,
+        })
     }
 
     /// Handle `SelectProposal` input — look up proposal from last set and
