@@ -881,6 +881,23 @@ impl Runbook {
         }
     }
 
+    /// Count entries that have not reached a terminal executed state
+    /// (`Completed`/`Failed`) and are not intentionally `Disabled`. Used to
+    /// warn before an action that discards the runbook (e.g. a pack
+    /// switch) — the user should see what's about to be dropped, not lose
+    /// staged-but-unrun DSL silently.
+    pub fn pending_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| {
+                !matches!(
+                    e.status,
+                    EntryStatus::Completed | EntryStatus::Failed | EntryStatus::Disabled
+                )
+            })
+            .count()
+    }
+
     /// Clear all entries from the runbook. Returns removed count.
     pub fn clear(&mut self) -> usize {
         let count = self.entries.len();
@@ -2267,5 +2284,41 @@ mod tests {
     fn test_narrate_runbook_summary_empty() {
         let entries: Vec<RunbookEntry> = vec![];
         assert!(narrate_runbook_summary(&entries).is_none());
+    }
+
+    #[test]
+    fn test_pending_count_excludes_terminal_and_disabled() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut proposed = sample_entry("kyc-case.create", "Open case");
+        proposed.status = EntryStatus::Proposed;
+        let proposed_id = rb.add_entry(proposed);
+
+        let mut completed = sample_entry("cbu.list", "List CBUs");
+        completed.status = EntryStatus::Completed;
+        rb.add_entry(completed);
+
+        let mut failed = sample_entry("cbu.list", "List CBUs");
+        failed.status = EntryStatus::Failed;
+        rb.add_entry(failed);
+
+        let mut disabled = sample_entry("cbu.list", "List CBUs");
+        disabled.status = EntryStatus::Disabled;
+        rb.add_entry(disabled);
+
+        // Proposed + a fresh Confirmed entry are both "not yet run".
+        assert_eq!(rb.pending_count(), 1);
+        rb.entries
+            .iter_mut()
+            .find(|e| e.id == proposed_id)
+            .unwrap()
+            .status = EntryStatus::Confirmed;
+        assert_eq!(rb.pending_count(), 1);
+
+        // clear() drops everything (pending AND terminal) and reports the total.
+        let dropped = rb.clear();
+        assert_eq!(dropped, 4);
+        assert_eq!(rb.pending_count(), 0);
+        assert!(rb.entries.is_empty());
     }
 }

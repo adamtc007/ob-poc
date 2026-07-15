@@ -3229,6 +3229,16 @@ impl ReplOrchestratorV2 {
 
         match input {
             UserInputV2::Confirm => {
+                // Closing a pack abandons its runbook — any staged-but-unrun
+                // DSL (Proposed/Confirmed/Resolved/Executing/Parked entries)
+                // belongs to a pack context that's going away, not the one
+                // being switched into. Flush it rather than silently
+                // carrying stale, cross-pack entries forward; already-run
+                // (Completed/Failed) history is cleared too, matching
+                // handle_clear's "close this pack out" semantics, and stays
+                // in the audit trail via RunbookCleared.
+                let pending = session.runbook.pending_count();
+                let dropped = session.runbook.clear();
                 session.clear_staged_pack();
                 let candidate =
                     self.pack_router
@@ -3242,19 +3252,26 @@ impl ReplOrchestratorV2 {
                 session.set_state(ReplStateV2::JourneySelection {
                     candidates: candidate.map(|c| vec![c]),
                 });
+                let drop_note = if pending > 0 {
+                    format!(" ({} unexecuted step(s) dropped)", pending)
+                } else if dropped > 0 {
+                    format!(" ({} completed step(s) cleared)", dropped)
+                } else {
+                    String::new()
+                };
                 ReplResponseV2 {
                     state: session.state.clone(),
                     kind: ReplResponseKindV2::Question {
                         field: String::new(),
                         prompt: format!(
-                            "Closed pack '{}'. Switching to '{}' — say 'yes' to confirm or choose another pack.",
-                            current_pack_id, suggested_pack_name
+                            "Closed pack '{}'{}. Switching to '{}' — say 'yes' to confirm or choose another pack.",
+                            current_pack_id, drop_note, suggested_pack_name
                         ),
                         answer_kind: "string".to_string(),
                     },
                     message: format!(
-                        "Closed pack '{}'. Switching to '{}'.",
-                        current_pack_id, suggested_pack_name
+                        "Closed pack '{}'{}. Switching to '{}'.",
+                        current_pack_id, drop_note, suggested_pack_name
                     ),
                     runbook_summary: None,
                     step_count: session.runbook.entries.len(),
@@ -5341,19 +5358,20 @@ impl ReplOrchestratorV2 {
             original_input: content.to_string(),
         });
 
+        let pending_note = pending_steps_note(session);
         Some(ReplResponseV2 {
             state: session.state.clone(),
             kind: ReplResponseKindV2::Question {
                 field: String::new(),
                 prompt: format!(
-                    "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}' and switch to '{}'?",
-                    hit.verb, current_pack_id, owning_pack.name, current_pack_id, owning_pack.name
+                    "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}'{} and switch to '{}'?",
+                    hit.verb, current_pack_id, owning_pack.name, current_pack_id, pending_note, owning_pack.name
                 ),
                 answer_kind: "confirm".to_string(),
             },
             message: format!(
-                "'{}' isn't available here — it belongs to the '{}' pack. Close this pack and switch? (yes/no)",
-                hit.verb, owning_pack.name
+                "'{}' isn't available here — it belongs to the '{}' pack. Close this pack{} and switch? (yes/no)",
+                hit.verb, owning_pack.name, pending_note
             ),
             runbook_summary: None,
             step_count: session.runbook.entries.len(),
@@ -9323,9 +9341,10 @@ impl ReplOrchestratorV2 {
                         suggested_pack_name: suggested_pack_name.clone(),
                         original_input: entry.sentence.clone(),
                     });
+                    let pending_note = pending_steps_note(session);
                     let message = format!(
-                        "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}' and switch to '{}'?",
-                        verb, current_pack_id, suggested_pack_name, current_pack_id, suggested_pack_name
+                        "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}'{} and switch to '{}'?",
+                        verb, current_pack_id, suggested_pack_name, current_pack_id, pending_note, suggested_pack_name
                     );
                     return Some(ReplResponseV2 {
                         state: session.state.clone(),
@@ -9789,6 +9808,20 @@ fn repl_command_name(command: &ReplCommandV2) -> &'static str {
         ReplCommandV2::Toggle(_) => "toggle",
         ReplCommandV2::Status => "status",
         ReplCommandV2::Resume(_) => "resume",
+    }
+}
+
+/// Parenthetical warning fragment for a pack-switch prompt: how many
+/// staged-but-unrun runbook steps a "close this pack" confirm would drop.
+/// Empty string when there's nothing to warn about.
+fn pending_steps_note(session: &ReplSessionV2) -> String {
+    let pending = session.runbook.pending_count();
+    if pending == 0 {
+        String::new()
+    } else if pending == 1 {
+        " (dropping 1 unexecuted step)".to_string()
+    } else {
+        format!(" (dropping {} unexecuted steps)", pending)
     }
 }
 
