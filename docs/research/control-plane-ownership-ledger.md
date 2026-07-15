@@ -1943,3 +1943,85 @@ Verified throughout: full workspace build clean, `test_plugin_verb_coverage`
 touched crate, `cargo x registry-graph` 766/766/0/0/0 held at every step.
 Out of scope, explicitly deferred: refreshing the pre-existing stale
 `audits/surface/*.txt` baselines (unrelated drift, own follow-up).
+
+## KYC/UBO taxonomy review, valid_values parity fix, M4 ControlProngStrategy (2026-07-15)
+
+Following the `selector_dispatch` work above, operator asked whether the KYC
+domain had an entity-type-based UBO determination taxonomy analogous to
+CBU's entity types (LLP, Ltd co, PLC, person). Research found: the taxonomy
+exists (`StructureClass`, 11 variants, `ob-poc-kyc-substrate/src/fold/
+control.rs`), the DSL verb surface is complete
+(`kyc.subject.classify-structure`, `ubo.determination.{select-strategy,
+compute-fold,freeze}`) — nothing verb-wise was missing. What's missing was
+exactly the already-tracked M4 gap: `DeterminationStrategy` had exactly one
+implementer (`OwnershipProngStrategy`); `freeze` hard-errored on any other
+strategy name.
+
+**Parity fix (commit `30b6aed4`):** auditing `structure-class` and
+`strategy` against the `selector_dispatch` `valid_values` discipline (just
+established) found two real bugs: `structure-class` had no `valid_values`
+at all (the taxonomy was invisible at the config layer, unlike CBU's
+`role-type`); `strategy`'s description said `"ownership_prong or
+smo_fallback"` while the only real match string is
+`"ownership_prong_strategy"` (confirmed via `tests/kyc_m3_remediation.rs`)
+— a caller following the description would fail at freeze. Both fixed with
+exact wire-string `valid_values`. Documented as a standing CLAUDE.md rule:
+selector/strategy args always declare `valid_values` with the exact
+runtime match string, never a paraphrase — since `valid_values` is
+descriptive metadata (Sage arg extraction + SemOS `Enum` projection), not
+a DSL-parse-time hard reject, so widening it costs nothing and leaving it
+absent/wrong is pure risk.
+
+**M4 (commit `573d2405`):** built `ControlProngStrategy` — resolves natural
+persons via a chain of control-kind edges (voting rights, board
+appointment, GP statutory, LLP designated member, dominant influence)
+rather than economic percentage, `Prong::ControlByOtherMeans`, no
+percentage quantum. Generalized `DeterminationStrategy::resolve()` from a
+pre-filtered `&[ReconciledEconomicEdge]` to `&ControlState`, letting each
+strategy pull its own edge set (`reconciled_economic_edges` /
+`reconciled_control_edges`, the latter new, excluding `EdgeKind::Nominee`
+since bare nominee edges need piercing first — K-8, still M2). Updated 6
+call sites across the substrate crate + `kyc_stream_ops.rs` + 5 tests.
+`freeze` now dispatches to `control_prong_strategy` alongside
+`ownership_prong_strategy`; a still-genuinely-unimplemented name
+(`role_based_strategy`) keeps the "fails loudly, not silently" contract
+test alive.
+
+Wiring the live path surfaced a second real, pre-launch bug: `ubo.edge.
+assert-control`'s YAML arg was named `edge_kind`, but the fold reads
+payload key `kind` (`control.rs::edge_kind_from_payload`) — the op passes
+args straight through with no normalization (unlike `classify-structure`/
+`register`, which do), so every real DSL call would have silently
+classified every control edge as `DominantInfluence` (the fold's
+catch-all; the fold is infallible by design — no HashMap/no random/no
+now(), so a mismatch can't surface as a hard error there). Same defect
+class as the R3 `structure_class` payload-key bug EOP-DD-KYCUBO-003 fixed
+on 2026-07-01, caught this time before the verb ever went live (`dsl.kyc`'s
+`kyc_stream` `SourceOfTruth` variant doesn't exist in dsl-core yet — this
+verb has never been reachable via the live DSL pipeline). Renamed the YAML
+arg to `kind`, added `valid_values` with the exact wire strings, and
+deliberately excluded `trust_role` from `valid_values` — it's a real
+`EdgeKind` variant with no wire mapping from the `kind` string yet (needs
+a sub-kind for settlor/trustee/protector/beneficiary), a distinct, smaller,
+still-open M4 follow-up, documented (not silently dropped) in both the
+YAML description and code.
+
+New end-to-end test `m4_control_prong_strategy_resolves_gp_statutory_
+control` (`tests/kyc_m3_remediation.rs`) proves the whole path live: an LP
+fund with a GP-statutory control edge to a natural person, through the
+real verb stream, resolves to the correct candidate with
+`ControlByOtherMeans` basis and a null (not fabricated) percentage.
+
+Verified throughout: substrate lib + `kyc_slice` (19/19),
+`kyc_m3_remediation` (5/5), `kyc_w7_oracle` (1/1),
+`test_plugin_verb_coverage`, full workspace build clean, scoped clippy
+clean (pre-existing `useless_vec`/`expect_fun_call` warnings in these test
+files confirmed unrelated via `git stash`), `cargo x registry-graph`
+766/766/0/0/0 unchanged, `cargo x verbs compile`/`check` clean (1277/0/0/0).
+
+Still open, named rather than silently left: `pierce-nominee` (K-8, M2),
+lexicon-manifest coverage for the 11 obligation verbs (M2), `TrustRole`
+wire mapping (M4 follow-up), true institutional/role-based determination
+strategies (M2), and control-prong v2 (crossing into the economic axis
+when an intermediate controlling entity's own UBOs are ownership-derived,
+not control-derived).
