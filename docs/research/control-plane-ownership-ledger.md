@@ -2244,3 +2244,87 @@ Verified: full workspace build clean, `kyc_m3_remediation` (7/7),
 `kyc_w3_w5_w6` all green, `test_plugin_verb_coverage` green, scoped
 clippy clean, `cargo x verbs compile`/`check` clean (1277/0/0/0), `cargo
 fmt --check` clean on all touched files.
+
+## Three flagged dead-code/unclear-purpose items resolved by owner decision (2026-07-15)
+
+Following the payload-key regression sweep above, operator was given 4
+flagged-but-not-fixed items and made explicit calls on 3 of them (the 4th,
+the `entity-workstream.set-ubo` phrase collision, remains open — it's a
+UX-routing decision about two legitimately different features, not
+dead/broken code, and wasn't part of this decision round).
+
+1. **`"kyc.person.waive"` fold arm — confirmed stale, removed.** No verb
+   ever emitted this event (only `kyc.person.approve`/`kyc.person.reject`
+   exist). Removed the match arm from `apply_one_control_event`
+   (`crates/ob-poc-kyc-substrate/src/fold/control.rs`). Since
+   `TerminalStatus::Waived{by_event, reason}` was constructed *only* in
+   that dead arm — confirmed via a full-workspace grep for
+   `TerminalStatus::Waived`, zero other hits — removed the variant too.
+
+2. **`kyc.person.approve`'s fold arm expecting a `person_id` payload
+   key — confirmed redundant, removed.** Cross-checked `kyc.person.reject`'s
+   YAML description ("Reject a subject...") against `kyc.person.approve`'s:
+   both operate at **subject** level (only `subject-id`, no `person-id` arg
+   on either), despite the `kyc.person.*` name. The arm's `person_id(p,
+   "person_id")` read could never succeed — no verb ever sent that key —
+   and the real K-23 terminal-approval gate already lives correctly in the
+   *obligation* fold (`derive_subject_state`), not here. Removed the arm.
+   With both `kyc.person.approve` and `kyc.person.waive` gone, nothing
+   wrote to `ControlState.terminal_persons` any more; a grep confirmed
+   nothing read it either (write-only, dead end-to-end) — removed the
+   field and the now-empty `TerminalStatus` enum entirely, not just the
+   two arms, since leaving an always-empty `BTreeMap` field around is the
+   same kind of unexplained dead capability as the verb itself.
+
+3. **`ubo.board-controller.override` — purpose unclear to the owner,
+   removed entirely** (verb, not just its fold arm). Fully deleted: the
+   `SemOsVerbOp` impl + registration (`src/domain_ops/kyc_stream_ops.rs`,
+   `src/domain_ops/mod.rs`), the YAML verb definition
+   (`config/verbs/kyc/dsl-kyc.yaml`), its `kyc-case.yaml` pack admission,
+   its `tests/kyc_verb_coverage.rs` coverage test, and its stale
+   `verb_pattern_embeddings`/`verb_centroids` rows (pruned via direct SQL —
+   `populate_embeddings` only adds missing rows, never removes rows for
+   deleted verbs, so this step doesn't happen automatically and is easy to
+   forget). Verb count: 1277→1276 total, 23→22 dsl.kyc verbs, `kyc-case`
+   pack's PACK002 orphan count 23→22 (matching 1:1).
+
+   Found while removing it, worth recording since it complicates any
+   future "let's just re-add it" decision: `docs/todo/EOP-DD-KYCUBO-002_
+   W1-Proper-Durable-Verb-Stream-and-Bypass-Elimination.md`'s D3 decision
+   (§12/§13 changelog, v0.3) shows this verb had a real original design —
+   it was supposed to be folded into a board-control projection
+   ("latest non-superseded override wins", composing derived-controller +
+   override-event) replacing 3 legacy stores (`board_controller_overrides`,
+   `cbu_board_controller`, `board_controller_cache`, all confirmed empty).
+   The verb landed but the fold half was never built, so it had zero
+   effect on `ControlState` from day one — appended to the stream and
+   nothing else. On review the owner didn't have enough context left to
+   judge whether that original design was still wanted, so the call was to
+   delete rather than either complete or leave it as unexplained dead
+   capability. Added a v0.4 changelog row to that doc (not a rewrite of
+   the v0.3 entry — ledger/changelog discipline: append, don't revise
+   history) recording the reversal and pointing back to the original D3
+   design as the starting point if this capability is wanted again. A
+   different tier-decision doc
+   (`docs/governance/tier-decisions-2026-04-26.md`) also matched a
+   `board-controller` grep but is about different, already-deleted legacy
+   `ubo.*` verbs (`set-board-controller` etc., predates dsl.kyc entirely)
+   — false positive, left untouched.
+
+**New bug found and flagged, not fixed:** `cargo x verbs inventory`
+panics — `xtask/src/verbs.rs:1005`, `end byte index 57 is not a char
+boundary; it is inside '—'` — a description string containing an em-dash
+gets byte-sliced (presumably to truncate for a table column) without
+respecting UTF-8 char boundaries. Pre-existing, unrelated to this
+session's changes (reproduced on the current YAML corpus, not specific to
+anything touched here); `docs/verb-inventory.md` could not be regenerated
+as a result and remains at its prior (2026-01-24) generation, now stale
+against the 1276-verb count. Confirmed the panic happens before any file
+write, so `verb-inventory.md` itself isn't corrupted — just out of date.
+
+Verified throughout: full workspace build clean, `kyc_m3_remediation`
+(7/7), `kyc_verb_coverage` (16/16, was 17), `kyc_stream_ops`/
+`kyc_w7_oracle`/`kyc_w3_w5_w6` all green, substrate lib + `kyc_slice`
+(19/19), `test_plugin_verb_coverage` green, scoped clippy clean, `cargo x
+verbs compile`/`check` clean (1276/0/0/0, 1 removed as expected), `cargo x
+registry-graph` 765/765/0/0/0 (was 766, -1 as expected).

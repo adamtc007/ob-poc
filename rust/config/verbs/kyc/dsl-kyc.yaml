@@ -488,59 +488,6 @@ domains:
           consequence:
             baseline: reviewable
 
-      board-controller.override:
-        flavour: attribute_mutating
-        description: Record a board-controller override as a verb event (D3 — supersede-never-delete, K-13/K-15/K-35)
-        effect_class: append_fact
-        invocation_phrases:
-          - "override board controller"
-          - "set board controller override"
-          - "record board controller override"
-          - "override the board controller"
-          - "record manual board controller"
-          - "board controller manual override"
-          - "assign board controller override"
-          - "record controller override"
-          - "set manual controller"
-          - "board control override"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: control_edge
-          tags: [ubo, board-controller, override, d3, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root
-          - name: controller-entity-id
-            type: uuid
-            required: true
-            description: The entity designated as board controller
-          - name: basis
-            type: string
-            required: true
-            description: Authority basis for this override (K-17, K-35 traceability)
-          - name: supersedes-event-id
-            type: uuid
-            required: false
-            description: Prior override event being superseded (K-13)
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-
-
   kyc:
     description: "KYC subject stream operations (dsl.kyc lexicon)"
 

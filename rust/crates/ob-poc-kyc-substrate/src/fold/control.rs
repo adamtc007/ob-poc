@@ -119,19 +119,6 @@ impl EdgeState {
     }
 }
 
-// ── Terminal person status ────────────────────────────────────────────────────
-
-/// Status of a terminal natural person — verb-set (Q5).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TerminalStatus {
-    /// In scope; no decision yet.
-    InScope,
-    /// Approved by a decision verb.
-    Approved { by_event: EventId },
-    /// Waived by an authority decision.
-    Waived { by_event: EventId, reason: String },
-}
-
 // ── Structure class ───────────────────────────────────────────────────────────
 
 /// The subject's structure class, set by `kyc.subject.classify-structure`.
@@ -160,8 +147,6 @@ pub enum StructureClass {
 pub struct ControlState {
     /// All edges, including Superseded ones (K-13: supersede-never-delete).
     pub edges: BTreeMap<EdgeId, EdgeState>,
-    /// Terminal natural persons and their decision status (verb-set, Q5).
-    pub terminal_persons: BTreeMap<PersonId, TerminalStatus>,
     /// Set if `kyc.subject.classify-structure` has fired.
     pub structure_class: Option<StructureClass>,
     /// Event that set the structure class (K-35 traceability).
@@ -384,31 +369,6 @@ pub(crate) fn apply_one_control_event(
         "ubo.determination.apply-smo-fallback" => {
             state.smo_person_id = person_id(p, "smo_person_id");
             state.smo_event_id = Some(event.id);
-        }
-
-        "kyc.person.approve" => {
-            if let Some(pid) = person_id(p, "person_id") {
-                state
-                    .terminal_persons
-                    .insert(pid, TerminalStatus::Approved { by_event: event.id });
-            }
-        }
-
-        "kyc.person.waive" => {
-            if let Some(pid) = person_id(p, "person_id") {
-                let reason = p
-                    .get("reason")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unspecified")
-                    .to_owned();
-                state.terminal_persons.insert(
-                    pid,
-                    TerminalStatus::Waived {
-                        by_event: event.id,
-                        reason,
-                    },
-                );
-            }
         }
 
         _ => {}

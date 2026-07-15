@@ -30,7 +30,7 @@ pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
     check_control_preconditions, fold_control, natural_persons_from_events,
     reconciled_control_edges, reconciled_economic_edges, ControlState, EdgeKind, EdgeState,
-    EdgeStatus, ReconciledControlEdge, StructureClass, TerminalStatus,
+    EdgeStatus, ReconciledControlEdge, StructureClass,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
