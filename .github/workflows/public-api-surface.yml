@@ -17,6 +17,16 @@ name: Public API surface
 #      Stub/Mock/Fake-prefixed type unconditionally.
 #
 # See scripts/check-public-api-surface.sh for the implementation.
+#
+#   4. No-widening guard — additions-only check (see
+#      scripts/check-no-widening.sh) against the same audits/surface/
+#      baselines, plus a workspace-wide #[allow(dead_code)] /
+#      #[allow(unreachable_pub)] suppression-count ratchet. Distinct from
+#      check #1: #1 fails on ANY diff (a reviewed-decision gate for
+#      surface snapshot refreshes); this fails ONLY on growth, and exists
+#      specifically to guard the dead-code/dual-routing sweep — proving a
+#      flagged item was deleted, not hidden behind a widened visibility
+#      or a new lint suppression.
 
 on:
   push:
@@ -54,3 +64,6 @@ jobs:
 
       - name: Public API surface gate
         run: bash scripts/check-public-api-surface.sh
+
+      - name: No-widening guard (dead-code/dual-routing sweep)
+        run: bash scripts/check-no-widening.sh
