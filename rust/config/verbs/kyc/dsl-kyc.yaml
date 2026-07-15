@@ -347,7 +347,8 @@ domains:
           - name: strategy
             type: string
             required: true
-            description: "Strategy name: ownership_prong or smo_fallback"
+            description: "DeterminationStrategy::name() to run at freeze — only ownership_prong_strategy is implemented today (M4 open: control_prong_strategy etc. are stream-recordable but ubo.determination.freeze errors at dispatch, no Rust impl exists yet)"
+            valid_values: [ownership_prong_strategy]
         returns:
           type: record
           fields:
@@ -623,7 +624,8 @@ domains:
           - name: structure-class
             type: string
             required: true
-            description: "Structure class (e.g. simple, complex, fund, trust)"
+            description: "Structure class — drives ubo.determination strategy selection (K-4). Only private_company/multi_tier_holding/listed_entity resolve via the implemented ownership_prong_strategy today; lp_fund/llp/trust/foundation/investment_fund/state_owned/cooperative/nominee classify successfully but ubo.determination.freeze errors at strategy-selection time pending a control-prong strategy (M4, open)."
+            valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
           - name: entity-id
             type: uuid
             required: false
