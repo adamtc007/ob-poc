@@ -170,6 +170,39 @@ fn tokenize_macro_call(tokens: proc_macro2::TokenStream) -> (Option<String>, Vec
     (ident, lits)
 }
 
+/// Extract the top-level string keys of a `json!({ "a": .., "b": .. })`
+/// (or `serde_json::json!`) macro invocation. `tokens` is the macro's
+/// full invocation tokens, which for an object literal is a single brace
+/// `Group` — unwrapped one level so only *that* object's own keys are
+/// collected, not keys of any value nested inside it (a nested object's
+/// keys aren't this call site's own arg names, so including them would
+/// be a false positive, not just noise).
+fn extract_json_object_keys(tokens: proc_macro2::TokenStream) -> BTreeSet<String> {
+    let mut keys = BTreeSet::new();
+    let mut top = tokens.into_iter();
+    let Some(proc_macro2::TokenTree::Group(g)) = top.next() else {
+        return keys;
+    };
+    if g.delimiter() != proc_macro2::Delimiter::Brace {
+        return keys;
+    }
+    let toks: Vec<_> = g.stream().into_iter().collect();
+    for i in 0..toks.len() {
+        let proc_macro2::TokenTree::Literal(lit) = &toks[i] else {
+            continue;
+        };
+        let Some(key) = literal_string(&lit.to_string()) else {
+            continue;
+        };
+        if let Some(proc_macro2::TokenTree::Punct(p)) = toks.get(i + 1) {
+            if p.as_char() == ':' {
+                keys.insert(key);
+            }
+        }
+    }
+    keys
+}
+
 /// Extract `registry.register(Arc::new(<path>))` call arguments from a
 /// named top-level function's body. Returns the type path as written
 /// (e.g. `"changeset::Compose"`, `"nav::Drill"`) plus the line number of
@@ -644,6 +677,13 @@ struct CompositionEdge {
     parent_fqn: String,
     child_fqn: String,
     site: String,
+    /// Top-level JSON keys of the args passed at this call site, if
+    /// statically resolvable (the args expr is `&some_var` where
+    /// `some_var` was bound to a `json!({...})` literal earlier in the
+    /// same function body). `None` means "couldn't determine" — a gap
+    /// to report, not a pass, when cross-checking fold-verb selector
+    /// args below.
+    caller_arg_keys: Option<BTreeSet<String>>,
 }
 
 /// Scan every `.rs` file under `dirs` for free functions whose body
@@ -739,11 +779,46 @@ fn visit_calls(block: &syn::Block, f: &mut impl FnMut(&syn::Expr)) {
 /// {...} }` block, and walk its body for composition calls — either a
 /// direct `.dispatch_child(parent, "literal", ...)` or a call to one of
 /// `relays`.
+/// Walk `block`'s top-level `let NAME = serde_json::json!({...});` (or
+/// bare `json!({...})`) statements and return a var-name -> top-level-key
+/// map. Shallow on purpose — only direct macro-call initializers are
+/// recognized; a `let` built via `.insert()` calls or any other shape is
+/// simply absent from the map, which downstream treats as "unknown," not
+/// "no keys."
+fn collect_json_var_keys(block: &syn::Block) -> BTreeMap<String, BTreeSet<String>> {
+    let mut map = BTreeMap::new();
+    for stmt in &block.stmts {
+        let syn::Stmt::Local(local) = stmt else { continue };
+        let syn::Pat::Ident(pat_ident) = &local.pat else {
+            continue;
+        };
+        let Some(init) = &local.init else { continue };
+        let syn::Expr::Macro(m) = &*init.expr else {
+            continue;
+        };
+        if m.mac.path.segments.last().map(|s| s.ident != "json").unwrap_or(true) {
+            continue;
+        }
+        map.insert(
+            pat_ident.ident.to_string(),
+            extract_json_object_keys(m.mac.tokens.clone()),
+        );
+    }
+    map
+}
+
+/// Extracts, per file: composition edges (verb -> verb calls) AND
+/// fold-verb selector requirements (verbs whose `execute()` calls the
+/// strict `dispatch_selector` — the `resolve_selector`-with-fallback
+/// shape, e.g. `cbu.assign-role`, is deliberately excluded here since an
+/// absent/unrecognized selector there is valid — it just falls through
+/// to the verb's own generic handling, not an error).
 fn extract_composition_edges(
     registered: &[RegisteredOp],
     relays: &BTreeMap<String, RelayKind>,
-) -> Result<Vec<CompositionEdge>> {
+) -> Result<(Vec<CompositionEdge>, BTreeMap<String, String>)> {
     let mut edges = Vec::new();
+    let mut fold_verbs: BTreeMap<String, String> = BTreeMap::new();
     // Group by defining file so each file is parsed once even if it
     // defines multiple registered ops (e.g. cbu.rs defines 8).
     let mut by_file: BTreeMap<PathBuf, Vec<&RegisteredOp>> = BTreeMap::new();
@@ -784,6 +859,8 @@ fn extract_composition_edges(
                 if exec_fn.sig.ident != "execute" {
                     continue;
                 }
+                let json_vars = collect_json_var_keys(&exec_fn.block);
+
                 visit_calls(&exec_fn.block, &mut |call| {
                     let (method_or_fn, args): (String, &syn::punctuated::Punctuated<syn::Expr, syn::Token![,]>) =
                         match call {
@@ -801,6 +878,34 @@ fn extract_composition_edges(
                             _ => return,
                         };
 
+                    // Fold-verb detection: a strict dispatch_selector(args,
+                    // ctx, scope, "arg_name", arms) call inside this op's
+                    // own execute() means THIS op requires "arg_name".
+                    if method_or_fn == "dispatch_selector" {
+                        if let Some(syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Str(s),
+                            ..
+                        })) = args.get(3)
+                        {
+                            fold_verbs.insert(op.fqn.clone(), s.value());
+                        }
+                        return;
+                    }
+
+                    // Resolve the args expression (3rd positional arg for
+                    // dispatch_child, or the relay's own args parameter for
+                    // a relay-function call — both line up at index 2 in
+                    // every call site seen) to a variable name, then to its
+                    // known JSON keys, if any.
+                    let caller_arg_keys = args.get(2).and_then(|a| {
+                        let syn::Expr::Reference(r) = a else { return None };
+                        let syn::Expr::Path(p) = &*r.expr else {
+                            return None;
+                        };
+                        let ident = p.path.get_ident()?.to_string();
+                        json_vars.get(&ident).cloned()
+                    });
+
                     // Direct .dispatch_child(parent, "literal", ...).
                     if method_or_fn == "dispatch_child" {
                         if let Some(syn::Expr::Lit(syn::ExprLit {
@@ -812,6 +917,7 @@ fn extract_composition_edges(
                                 parent_fqn: op.fqn.clone(),
                                 child_fqn: s.value(),
                                 site: format!("{}: direct dispatch_child", file.display()),
+                                caller_arg_keys,
                             });
                         }
                         return;
@@ -840,6 +946,7 @@ fn extract_composition_edges(
                                 parent_fqn: op.fqn.clone(),
                                 child_fqn,
                                 site: format!("{}: via {method_or_fn}()", file.display()),
+                                caller_arg_keys,
                             });
                         }
                     }
@@ -848,14 +955,15 @@ fn extract_composition_edges(
         }
     }
 
-    Ok(edges)
+    Ok((edges, fold_verbs))
 }
 
 fn write_composition_report(
     dir: &Path,
     edges: &[CompositionEdge],
     registered_fqns: &BTreeSet<String>,
-) -> Result<Vec<String>> {
+    fold_verbs: &BTreeMap<String, String>,
+) -> Result<(Vec<String>, Vec<String>)> {
     let mut md = String::new();
     md.push_str("# Verb composition graph — statically-discovered execute()-to-registry calls\n\n");
     md.push_str("Every edge here is a compile-time string literal at the call site —\n");
@@ -864,19 +972,48 @@ fn write_composition_report(
     md.push_str("`SemOsChildDispatcher::dispatch_child`, is called from exactly 2 files,\n");
     md.push_str("15 call sites, all literals). This is therefore a closed, static graph,\n");
     md.push_str("not a sample of runtime behavior.\n\n");
+    md.push_str("Fold-verb detection only scans an op's own `execute()` body, not helper\n");
+    md.push_str("functions it delegates to — a fold verb that calls `dispatch_selector`\n");
+    md.push_str("through an indirection (e.g. `gleif.lookup`, which routes through its own\n");
+    md.push_str("`Self::resolve()`) won't be found. Known gap, not a silent one: if a\n");
+    md.push_str("composition edge targets a fold verb missed this way, it just won't be\n");
+    md.push_str("flagged below — treat an empty \"missing selector arg\" section as\n");
+    md.push_str("\"nothing found among the detected fold verbs,\" not \"verified clean.\"\n\n");
+    md.push_str(&format!(
+        "{} fold verb(s) detected (require a selector arg via the strict\n`dispatch_selector` shape — see selector_dispatch.rs): {}\n\n",
+        fold_verbs.len(),
+        fold_verbs
+            .iter()
+            .map(|(fqn, arg)| format!("`{fqn}` (`{arg}`)"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
 
     let mut dangling = Vec::new();
+    let mut missing_selector = Vec::new();
     if edges.is_empty() {
         md.push_str("None found.\n");
     } else {
         md.push_str("| Parent FQN | Child FQN | Site |\n|---|---|---|\n");
         for e in edges {
-            let flag = if registered_fqns.contains(&e.child_fqn) {
-                ""
-            } else {
+            let mut flag = String::new();
+            if !registered_fqns.contains(&e.child_fqn) {
                 dangling.push(e.child_fqn.clone());
-                " ⚠ NOT REGISTERED"
-            };
+                flag.push_str(" ⚠ NOT REGISTERED");
+            } else if let Some(required_arg) = fold_verbs.get(&e.child_fqn) {
+                match &e.caller_arg_keys {
+                    Some(keys) if !keys.contains(required_arg) => {
+                        missing_selector.push((e.parent_fqn.clone(), e.child_fqn.clone(), required_arg.clone()));
+                        flag.push_str(&format!(" ⚠ MISSING `{required_arg}`"));
+                    }
+                    None => {
+                        flag.push_str(&format!(
+                            " (target requires `{required_arg}` — caller's args not statically resolvable, unverified)"
+                        ));
+                    }
+                    _ => {}
+                }
+            }
             md.push_str(&format!(
                 "| `{}` | `{}`{flag} | {} |\n",
                 e.parent_fqn, e.child_fqn, e.site
@@ -895,6 +1032,17 @@ fn write_composition_report(
         }
     }
 
+    if !missing_selector.is_empty() {
+        md.push_str("\n## Composition edges missing a required selector arg\n\n");
+        md.push_str("The target is a fold verb (dispatches via the strict `dispatch_selector`\n");
+        md.push_str("shape, which hard-errors on an absent/unrecognized selector) and this\n");
+        md.push_str("caller's statically-resolved args don't include the required key — this\n");
+        md.push_str("would fail at dispatch time with \"<arg> required\". Real bug candidates.\n\n");
+        for (parent, child, arg) in &missing_selector {
+            md.push_str(&format!("- `{parent}` -> `{child}`: missing `{arg}`\n"));
+        }
+    }
+
     fs::write(dir.join("composition_graph.md"), &md)?;
 
     let mut dot = String::from("digraph composition {\n  rankdir=LR;\n");
@@ -908,7 +1056,7 @@ fn write_composition_report(
     dot.push_str("}\n");
     fs::write(dir.join("composition_graph.dot"), dot)?;
 
-    Ok(dangling)
+    Ok((dangling, missing_selector.into_iter().map(|(p, c, a)| format!("{p} -> {c}: missing {a}")).collect()))
 }
 
 pub(crate) fn run() -> Result<()> {
@@ -977,18 +1125,25 @@ pub(crate) fn run() -> Result<()> {
     let ops_dir = rust_root.join("crates/sem_os_postgres/src/ops");
     let domain_ops_dir = rust_root.join("src/domain_ops");
     let relays = find_relay_functions(&[ops_dir, domain_ops_dir])?;
-    let composition_edges = extract_composition_edges(&registered, &relays)?;
-    let dangling = write_composition_report(&artifacts_dir, &composition_edges, &registered_fqns)?;
+    let (composition_edges, fold_verbs) = extract_composition_edges(&registered, &relays)?;
+    let (dangling, missing_selector) = write_composition_report(
+        &artifacts_dir,
+        &composition_edges,
+        &registered_fqns,
+        &fold_verbs,
+    )?;
 
     println!();
     println!("dead-code candidates (registered, no live YAML entry): {}", dead_code_candidates.len());
     println!("missing registrations (YAML plugin verb, nothing registered): {}", missing_registrations.len());
     println!("dual-routing candidates (one type serving >1 FQN, excluding StubOp/SimpleStatusOp): {}", dual_routing.len());
     println!(
-        "composition edges (execute() -> registry, via {} relay fn(s)): {} ({} dangling)",
+        "composition edges (execute() -> registry, via {} relay fn(s)): {} ({} dangling, {} missing required selector arg, {} fold verb(s) detected)",
         relays.len(),
         composition_edges.len(),
-        dangling.len()
+        dangling.len(),
+        missing_selector.len(),
+        fold_verbs.len()
     );
     println!();
     println!("reports written to {}", artifacts_dir.display());
