@@ -2328,3 +2328,88 @@ Verified throughout: full workspace build clean, `kyc_m3_remediation`
 (19/19), `test_plugin_verb_coverage` green, scoped clippy clean, `cargo x
 verbs compile`/`check` clean (1276/0/0/0, 1 removed as expected), `cargo x
 registry-graph` 765/765/0/0/0 (was 766, -1 as expected).
+
+## Pack-mismatch back-out (2026-07-15)
+
+Follow-on from the dsl.kyc live-pipeline probe above: proving
+`kyc.subject.register` reachable through a live utterance surfaced two
+distinct bugs, fixed in two commits on `codex/phase-1-5-governance-closure`
+(not yet merged to main).
+
+**Bug 1 — verb_search.rs Tier 6 allowed_verbs leak (fixed, commit
+`6b64b96e`).** `search_global_semantic_with_embedding`'s Strategy 2
+(`search_patterns_directly_scoped`, fully unconstrained) runs whenever
+Strategy 1's `allowed_verbs`-constrained search comes back empty, and its
+results were returned with no re-filter — the fallback tier silently
+dropped the pack constraint. This is how `entity-workstream.set-ubo`
+(admitted by zero packs anywhere) won a live proposal over
+`kyc.subject.register` inside an active `kyc-case` pack session. Fix:
+re-apply `allowed_verbs` to Strategy 2's results before returning. Added
+`HybridVerbSearcher::find_out_of_scope_match(query, allowed_verbs) ->
+Option<VerbSearchResult>` — runs the same unconstrained search but returns
+the top hit only if it's outside `allowed_verbs`, i.e. an explicit
+"what would this have matched in a different pack?" diagnostic, needed by
+Bug 2's fix. Live-DB test
+(`tests/client_group_e2e_test.rs::test_verb_search_respects_allowed_verbs_on_global_fallback`)
+proves both halves against the real corpus: `search()` with a
+`kyc-case`-shaped `allowed_verbs` set never returns
+`entity-workstream.set-ubo` for "register kyc subject as ubo", while
+`find_out_of_scope_match` explicitly does.
+
+**Bug 2 — no structured back-out when a pack-scoped utterance targets a
+verb outside the pack (fixed, commit `9858ccbc`).** Owner's framing,
+verbatim: pack selection defines the DSL universe (`allowed_verbs`); if an
+utterance targets a verb NOT in the active pack, the correct behavior is a
+structured back-out — close this pack, offer the pack that actually owns
+the verb — not a silent dead-end or (worse, Bug 1) a silent cross-pack
+leak. Neither half of this existed: `PackHandoffSuggestion` in
+`context_stack.rs` is `#[cfg(test)]`-only and solves a different problem
+(next pack after the CURRENT pack's template completes); the only real
+pack-switch mechanism, `FastCommand::SwitchJourney`, is reachable only via
+literal typed text ("switch pack" etc.), never auto-triggered.
+
+Built: `PackRouter::packs_declaring_verb(verb_fqn) -> Vec<&PackManifest>`
+(reverse index over the already-loaded pack manifests — 2 unit tests, no
+DB needed). New `ReplStateV2::PackMismatchConfirm` state carries the
+current pack's `InPack` fields (so rejecting returns cleanly to where the
+user was) plus the out-of-scope verb and the suggested owning pack.
+`try_pack_mismatch_backout()` wired into `propose_for_input`'s
+empty-proposal path — fires only from `InPack`, only with a real non-empty
+`allowed_verbs` constraint, and only when `find_out_of_scope_match`
+resolves to exactly one owning pack (zero or 2+ candidate owners falls
+through to the ordinary no-match response rather than guessing).
+`handle_pack_mismatch_confirm()`: Confirm clears the staged pack and stages
+`JourneySelection` pre-populated with the owning pack as the sole
+candidate; anything else restores `InPack` with the original pack's
+required-slots/last-proposal state untouched. Updated the two other
+exhaustive `ReplStateV2` matches (`acp_runtime_context`'s state-code label,
+`response_adapter`'s `SessionStateEnum` mapping) — both are pattern
+matches the compiler catches on a missing arm, not something that could
+silently drift.
+
+**Not yet proven live end-to-end** (unlike Bug 1): exercising the full
+`utterance → PackMismatchConfirm → confirm → JourneySelection` path
+against a real DB needs the full `ReplOrchestratorV2` test harness wired
+with a live `HybridVerbSearcher` + `PackRouter` + `ProposalEngine`, which
+is a materially bigger lift than the existing `client_group_e2e_test.rs`
+pattern (single searcher + resolver). Current test coverage: full
+`repl_v2` integration suite green (141/141, no regressions from the new
+state/match arms), full `ob-poc` lib suite green (2193/2193), 2 new
+`PackRouter` unit tests. The state-machine wiring is proven correct by
+type-checking (every exhaustive match updated, compiler-verified) and by
+the unchanged pass rate of the existing REPL v2 suite; the *decision
+logic* inside `try_pack_mismatch_backout` (single-owner resolution,
+InPack-only guard) is exercised only by inspection, not a live scenario.
+
+**Bug found in passing while testing `ob-poc-agent` in isolation, fixed
+(commit `9858ccbc`):** `ob-poc-agent`'s `database` Cargo feature cascaded
+to `ob-poc-sage/database` but not `ob-poc-boundary/database` — same class
+of masking bug the crate's own 2026-07-13 comment already documents for
+the `ob-poc-sage` edge (building the full `ob-poc` binary unifies the
+feature via its own dependency graph, hiding the gap). Tripped
+`dead_code = "deny"` on `entity_facts.rs`'s `PgEntityFactsSource` support
+items (`KindMapping`, `kind_mapping`) whenever `ob-poc-agent` was built or
+tested standalone. Fixed by adding `"ob-poc-boundary/database"` to the
+cascade; verified `cargo test -p ob-poc-agent --lib --features database`
+now builds clean and `cargo build -p ob-poc --lib` (both with and without
+`--features database`) still pass.
