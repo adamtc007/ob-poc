@@ -2481,3 +2481,37 @@ Verified: full `ob-poc` lib suite 2193/2193, `ob-poc-agent --features
 database` 251/251 (including 2 new `PackRouter::packs_declaring_verb`
 tests and 2 new `EffectiveConstraints` global-verb tests), clippy clean
 across both crates, live browser round-trip as described above.
+
+## Runbook flush on pack switch (2026-07-15, commit `f76c1f14`)
+
+Immediate owner follow-up on the universal back-out above: "we need to
+flush the session repl — which may have un-executed dsl — now i think we
+need to close that out (drop it) then switch — or can we prompt to run it
+before switch — or is this already done." It wasn't. `clear_staged_pack()`
+(called from `handle_pack_mismatch_confirm`'s Confirm branch) only nulls
+`session.staged_pack`/`staged_pack_hash` — `session.runbook.entries` is a
+separate field, untouched. Any staged-but-unrun DSL from the pack being
+closed (`Proposed`/`Confirmed`/`Resolved`/`Executing`/`Parked` entries)
+silently carried forward into the new pack's context. Checked the only
+other pack-switch path (`FastCommand::SwitchJourney`, the manual
+"switch pack" command) — same gap, never fixed either.
+
+Owner's own framing ("close that out — drop it — then switch") set the
+answer: `Runbook::pending_count()` (non-terminal, non-`Disabled` entries)
+now drives an upfront warning in both `PackMismatchConfirm` prompts
+("Close 'kyc-case' (dropping 1 unexecuted step) and switch to 'Deal
+Lifecycle'?"), and `handle_pack_mismatch_confirm`'s Confirm branch calls
+`session.runbook.clear()` before switching — audited via the existing
+`RunbookCleared` event, not a silent drop. Already-completed entries get
+cleared too (matches `handle_clear`'s existing "close this out" semantics
+for the `/clear` command), reported separately in the response if there
+were no pending ones ("N completed step(s) cleared").
+
+Verified live end-to-end: staged an unexecuted `kyc-case.create` entry
+(answered the pack's required questions, did NOT `/run`), triggered the
+same `deal.list` mismatch, confirmed the prompt read "...dropping 1
+unexecuted step...", confirmed the switch actually cleared it — "Closed
+pack 'kyc-case' (1 unexecuted step(s) dropped). Switching to 'Deal
+Lifecycle'." New unit test `test_pending_count_excludes_terminal_and_
+disabled` covers the `pending_count()`/`clear()` interplay directly. Full
+`ob-poc` lib suite 2194/2194, clippy clean.
