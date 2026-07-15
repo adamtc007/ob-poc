@@ -1,0 +1,37 @@
+cases:
+  - name: kyc_register_subject
+    domain: kyc
+    bootstrap:
+      - "Allianz Global Investors"
+    utterance: "register kyc subject 11111111-1111-4111-8111-111111111111"
+    expected_verb: "kyc.subject.register"
+    execute: true
+    verify_kyc_stream: true
+    notes: >
+      First live-pipeline probe for the dsl.kyc stream-backed verbs
+      (EOP-DD-KYCUBO-002/003). kyc.subject.register was newly admitted into
+      the kyc-case pack's allowed_verbs on 2026-07-15 — before that it was
+      registered and op-tested but structurally unreachable through
+      verb_search in any session (no pack's allowed_verbs referenced any
+      dsl.kyc verb).
+      Empirical result as of 2026-07-15, run against a live server with 3
+      phrasings tried ("register kyc subject <uuid>" — a literal
+      invocation_phrase; "open a subject stream for <uuid>" — another
+      literal invocation_phrase; and a UBO-flavoured phrasing): all 3 lost
+      verb_search ranking to a DIFFERENT verb NOT in kyc-case's
+      allowed_verbs (entity-workstream.set-ubo, kyc-case.create,
+      request.create across the 3 runs) — meaning the session's resolved
+      journey/pack context for these utterances wasn't kyc-case at all, or
+      cross-pack ranking isn't being pre-constrained the way
+      SessionVerbSurface's allowed_fqns() is documented to. As a live
+      control, this same run also exercised 2 pre-existing, already-live
+      kyc-case verbs from the bank_domain fixture with the IDENTICAL
+      single-bootstrap pattern (kyc.case-status, kyc.list-missing-items)
+      and both passed — so the general single-bootstrap → pack-constrained
+      search mechanism works today; something specific to the new dsl.kyc
+      verbs or this phrasing family is losing the ranking or the pack
+      resolution. Root cause not yet isolated — left as `execute: true` /
+      `verify_kyc_stream: true` so this case starts passing the moment
+      that gap closes, rather than being watered down to a proposal-only
+      check. See docs/research/control-plane-ownership-ledger.md
+      (2026-07-15 entry) for the full empirical trace.

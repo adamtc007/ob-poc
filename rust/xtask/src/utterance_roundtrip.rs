@@ -29,6 +29,20 @@ struct FixtureCase {
     bootstrap: Vec<String>,
     #[serde(default)]
     notes: Option<String>,
+    /// If true, and the initial utterance's proposal matches expected_verb,
+    /// post a follow-up "confirm" utterance to actually execute it — proves
+    /// the verb runs live through the real pipeline, not just that it's
+    /// discoverable.
+    #[serde(default)]
+    execute: bool,
+    /// If true (requires `execute: true`), verify execution by counting
+    /// `"ob-poc".kyc_intent_events` rows for `expected_verb` before/after the
+    /// confirm call — the durable stream is the authoritative "did this
+    /// really run" signal, since the HTTP response's Executed variant does
+    /// not currently surface per-step success/result (see
+    /// docs/research/control-plane-ownership-ledger.md, 2026-07-15 entry).
+    #[serde(default)]
+    verify_kyc_stream: bool,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -154,6 +168,13 @@ pub(crate) struct Summary {
     pub(crate) discovery_stage: usize,
     pub(crate) no_proposal: usize,
     pub(crate) metadata_gap_failures: usize,
+    /// Cases with `execute: true` that reached the confirm call.
+    pub(crate) execution_attempted: usize,
+    /// Of those, the confirm call itself returned without an error signal.
+    pub(crate) execution_succeeded: usize,
+    /// Cases with `verify_kyc_stream: true` where a new stream row was
+    /// confirmed to appear — the authoritative "actually executed" count.
+    pub(crate) stream_verified: usize,
 }
 
 #[derive(Debug, Serialize, Default)]
@@ -198,6 +219,21 @@ pub(crate) struct Row {
     pub(crate) scope_summary: Option<String>,
     pub(crate) message: Option<String>,
     pub(crate) notes: Option<String>,
+    /// Set only when the case has `execute: true`. `None` = execution not
+    /// attempted (initial proposal didn't match/wasn't ready); `Some(false)`
+    /// = confirm call errored or returned an error-shaped message;
+    /// `Some(true)` = confirm call returned without an error signal (this is
+    /// a weak signal — see `stream_verified` for the authoritative check).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) executed: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) execute_message: Option<String>,
+    /// Set only when the case has `verify_kyc_stream: true`. `Some(true)` =
+    /// a new `"ob-poc".kyc_intent_events` row for `expected_verb` appeared
+    /// after the confirm call — authoritative proof the verb executed and
+    /// wrote to the durable stream, not just that the HTTP call succeeded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stream_verified: Option<bool>,
 }
 
 /// Run the live utterance round-trip harness.
@@ -219,6 +255,22 @@ pub(crate) async fn run(
     let client = Client::new();
     let mut rows = Vec::new();
 
+    let needs_db = fixture.cases.iter().any(|c| c.verify_kyc_stream);
+    let pool: Option<sqlx::PgPool> = if needs_db {
+        let db_url = std::env::var("DATABASE_URL").context(
+            "DATABASE_URL must be set — a fixture case has verify_kyc_stream: true",
+        )?;
+        Some(
+            sqlx::postgres::PgPoolOptions::new()
+                .max_connections(2)
+                .connect(&db_url)
+                .await
+                .context("failed to connect to DATABASE_URL for kyc stream verification")?,
+        )
+    } else {
+        None
+    };
+
     for case in fixture
         .cases
         .into_iter()
@@ -230,6 +282,10 @@ pub(crate) async fn run(
             }
         }
 
+        let execute = case.execute;
+        let verify_kyc_stream = case.verify_kyc_stream;
+        let expected_verb = case.expected_verb.clone();
+
         let session_id = create_session(&client, base_url, &case.name, &case.domain).await?;
         for turn in &case.bootstrap {
             let _ = post_utterance(&client, base_url, &session_id, turn).await?;
@@ -237,7 +293,60 @@ pub(crate) async fn run(
 
         let envelope = post_utterance(&client, base_url, &session_id, &case.utterance).await?;
         let payload = envelope.response.or(envelope.chat).unwrap_or_default();
-        rows.push(build_row(case, payload));
+        let mut row = build_row(case, payload);
+
+        if execute && row.pass && (row.requires_confirmation || row.ready_to_execute) {
+            let before_count = if verify_kyc_stream {
+                match kyc_stream_event_count(pool.as_ref().unwrap(), &expected_verb).await {
+                    Ok(n) => Some(n),
+                    Err(e) => {
+                        row.execute_message = Some(format!("pre-count query failed: {e}"));
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            match post_utterance(&client, base_url, &session_id, "confirm").await {
+                Ok(confirm_envelope) => {
+                    let confirm_payload = confirm_envelope
+                        .response
+                        .or(confirm_envelope.chat)
+                        .unwrap_or_default();
+                    let looks_like_error = confirm_payload
+                        .message
+                        .as_deref()
+                        .map(|m| {
+                            let lower = m.to_ascii_lowercase();
+                            lower.contains("error") || lower.contains("fail")
+                        })
+                        .unwrap_or(false);
+                    row.executed = Some(!looks_like_error);
+                    row.execute_message = confirm_payload.message;
+                }
+                Err(e) => {
+                    row.executed = Some(false);
+                    row.execute_message = Some(format!("confirm request failed: {e}"));
+                }
+            }
+
+            if verify_kyc_stream {
+                if let Some(before) = before_count {
+                    match kyc_stream_event_count(pool.as_ref().unwrap(), &expected_verb).await {
+                        Ok(after) => row.stream_verified = Some(after > before),
+                        Err(e) => {
+                            row.execute_message = Some(format!(
+                                "{} | post-count query failed: {e}",
+                                row.execute_message.unwrap_or_default()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        rows.push(row);
     }
 
     let report = build_report(rows);
@@ -325,6 +434,20 @@ async fn post_utterance(
         .json::<ChatEnvelope>()
         .await
         .context("failed to decode chat envelope")
+}
+
+/// Count `"ob-poc".kyc_intent_events` rows for `verb_fqn` — the durable,
+/// authoritative signal that a `dsl.kyc` verb actually executed and
+/// appended to the stream (K-16 system of record), independent of whether
+/// the HTTP response surfaces a structured success field.
+async fn kyc_stream_event_count(pool: &sqlx::PgPool, verb_fqn: &str) -> Result<i64> {
+    let row: (i64,) =
+        sqlx::query_as(r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE verb_fqn = $1"#)
+            .bind(verb_fqn)
+            .fetch_one(pool)
+            .await
+            .context("kyc_intent_events count query failed")?;
+    Ok(row.0)
 }
 
 fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
@@ -491,6 +614,9 @@ fn build_row(case: FixtureCase, payload: ChatPayload) -> Row {
         scope_summary,
         message: payload.message,
         notes: case.notes,
+        executed: None,
+        execute_message: None,
+        stream_verified: None,
     }
 }
 
@@ -624,6 +750,15 @@ fn build_report(rows: Vec<Row>) -> HarnessReport {
             .iter()
             .filter(|row| !row.pass && row.likely_metadata_gap)
             .count(),
+        execution_attempted: rows.iter().filter(|row| row.executed.is_some()).count(),
+        execution_succeeded: rows
+            .iter()
+            .filter(|row| row.executed == Some(true))
+            .count(),
+        stream_verified: rows
+            .iter()
+            .filter(|row| row.stream_verified == Some(true))
+            .count(),
     };
 
     HarnessReport {
@@ -654,13 +789,16 @@ fn render_markdown(report: &HarnessReport) -> String {
     let mut out = String::new();
     out.push_str("# Utterance Round-Trip Report\n\n");
     out.push_str(&format!(
-        "- Total: {}\n- Passed: {}\n- Failed: {}\n- Executable: {}\n- Discovery-stage misses: {}\n- Metadata-gap failures: {}\n\n",
+        "- Total: {}\n- Passed: {}\n- Failed: {}\n- Executable: {}\n- Discovery-stage misses: {}\n- Metadata-gap failures: {}\n- Execution attempted: {}\n- Execution succeeded (HTTP-level, weak signal): {}\n- Stream-verified (DB-level, authoritative): {}\n\n",
         report.summary.total,
         report.summary.passed,
         report.summary.failed,
         report.summary.executable,
         report.summary.discovery_stage,
         report.summary.metadata_gap_failures,
+        report.summary.execution_attempted,
+        report.summary.execution_succeeded,
+        report.summary.stream_verified,
     ));
 
     out.push_str("## Root Cause Buckets\n\n");

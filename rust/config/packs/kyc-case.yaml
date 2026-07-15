@@ -97,6 +97,33 @@ allowed_verbs:
   - structure.list
   - structure.roles
   - structure.select
+  # dsl.kyc stream-backed determination verbs (EOP-DD-KYCUBO-002/003, W1-W7).
+  # Registered + YAML-declared + op-level tested since 2026-06-30/07-01, but
+  # never admitted into any pack's allowed_verbs until now — verb_search
+  # could never surface them to a live session. First pack-level wiring.
+  - ubo.edge.assert-control
+  - ubo.edge.assert-economic-interest
+  - ubo.edge.attach-evidence
+  - ubo.edge.verify
+  - ubo.edge.supersede
+  - ubo.edge.reconcile-conflict
+  - ubo.determination.select-strategy
+  - ubo.determination.compute-fold
+  - ubo.determination.apply-smo-fallback
+  - ubo.determination.freeze
+  - ubo.board-controller.override
+  - kyc.subject.register
+  - kyc.subject.classify-structure
+  - kyc.role.assign
+  - kyc.role.withdraw
+  - kyc.obligation.create
+  - kyc.obligation.update-identity
+  - kyc.obligation.update-screening
+  - kyc.obligation.update-risk
+  - kyc.obligation.satisfy
+  - kyc.obligation.waive
+  - kyc.person.approve
+  - kyc.person.reject
   - structure.setup
   - tollgate.evaluate
   - tollgate.override

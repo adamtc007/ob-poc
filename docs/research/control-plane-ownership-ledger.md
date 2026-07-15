@@ -2025,3 +2025,116 @@ wire mapping (M4 follow-up), true institutional/role-based determination
 strategies (M2), and control-prong v2 (crossing into the economic axis
 when an intermediate controlling entity's own UBOs are ownership-derived,
 not control-derived).
+
+## dsl.kyc live-pipeline probe: pack admission wired, verb-search ranking gap found (2026-07-15)
+
+Following the KYC/UBO taxonomy review above, operator asked whether the
+existing `cargo x utterance-roundtrip` HTTP harness (real reqwest calls
+against a live `ob-poc-web` server, real production `/api/session` +
+`/api/session/:id/input` ingress) could be extended to prove `dsl.kyc`
+verbs are live and called through the actual pipeline — not just
+op-level-tested (see the previous session entry: every `dsl.kyc` test file,
+including this session's own additions, calls `SemOsVerbOp::execute()`
+directly, bypassing DSL parsing, verb_search, and dispatch).
+
+**Step 1 — structural blocker found before running anything:** grepped
+`allowed_verbs:` across all 12 REPL packs for the 23 `dsl.kyc` verb FQNs.
+Zero hits anywhere, including `kyc-case.yaml` (the pack owning the KYC
+workspace) — its `section_layout.verb_prefixes: ["ubo.", ...]` entry is
+cosmetic UI grouping, not the admission list. Confirmed via
+`SessionVerbSurface::allowed_fqns()` that no macro/scenario/FailClosed
+bypass applies to atomic verbs outside a pack's explicit list. Conclusion:
+none of these verbs were reachable through *any* live session, in *any*
+workspace — running the harness against them would have proven only "not
+found," a pack-wiring gap unrelated to DSL correctness. Fixed: added all
+23 FQNs to `kyc-case.yaml`'s `allowed_verbs` (ubo.edge.* ×6,
+ubo.determination.* ×4, ubo.board-controller.override, kyc.subject.* ×2,
+kyc.role.* ×2, kyc.obligation.* ×6, kyc.person.* ×2). Packs load live from
+disk at server startup — no DB compile step, unlike verbs.
+
+Checked `cargo x verbs lint-macros` (PACK001/PACK002) before and after:
+baseline was already 104 errors / 44 warnings pre-existing across other,
+unrelated packs (`product-service-taxonomy`, `bpmn-ops`, `catalogue`,
+`onboarding-request` all already failing PACK002's "orphaned from
+constellation slot" check). The new admission adds 1 more PACK002 error
+("kyc-case: 23 of 93 allowed_verbs are orphaned") — read PACK002's own
+docstring claim ("can never execute through the constellation pipeline")
+skeptically rather than at face value: traced `ConstellationVerbIndex`
+into `verb_search.rs` and confirmed it's an *additive* Tier -0.5 search
+boost (`Option<&ConstellationVerbIndex>`), not a hard admission gate —
+absence just means the verb doesn't benefit from that one fast-lookup
+tier, it's still findable via the other 8 search tiers as long as it's in
+`allowed_fqns()`. Constellation-slot wiring is real, separate, smaller
+follow-up work (narration/progress-tracking completeness), not a
+blocker — left open, not silently ignored.
+
+**Step 2 — harness extended** (`xtask/src/utterance_roundtrip.rs`): added
+`execute: bool` + `verify_kyc_stream: bool` to `FixtureCase`. When a case's
+initial proposal matches `expected_verb` and is confirmable, the harness
+now posts a follow-up `{"kind":"utterance","message":"confirm"}` (the real
+2-turn execution sequence — confirmed via research that there is no
+dedicated `kind: "execute"` variant; execution is triggered by an
+affirmative-phrase utterance mapping to `UserInputV2::Confirm` in
+`agent_routes.rs`) and, when `verify_kyc_stream` is set, verifies via a
+direct `"ob-poc".kyc_intent_events` row-count check (before/after the
+confirm call) — the durable stream, not the HTTP response, is the
+authoritative "did this really execute" signal, since
+`ReplResponseKindV2::Executed`'s per-step `success`/`result` fields are
+currently dropped by `response_adapter.rs` and never reach the wire (a
+separate, real gap, noted but out of scope to fix here). New `Row` fields
+`executed`/`execute_message`/`stream_verified`, new `Summary` counts
+`execution_attempted`/`execution_succeeded`/`stream_verified`. Verified:
+xtask builds clean, scoped clippy clean.
+
+**Live empirical run** (server started with `AGENT_BACKEND=anthropic`,
+real `ANTHROPIC_API_KEY`, against `postgresql:///data_designer`): wrote
+`fixtures/utterance_roundtrip_kyc_domain.yaml` targeting
+`kyc.subject.register` (single required `subject-id` arg, literal UUID
+given in the utterance so `dsl_generate` only has to copy it). 3 phrasings
+tried, all failed at the *proposal* stage (never reached the
+confirm/verify code path, which correctly never fired — proving the
+harness's own control flow is sound): "register kyc subject for UBO
+determination" → `entity-workstream.set-ubo` (78% confidence, a semantic
+false-friend on "UBO"); "register kyc subject <uuid>" (a literal
+`invocation_phrase`) → `kyc-case.create` (compound-intent macro, which
+outranks plain verb matches by design per the 9-tier search priority);
+"open a subject stream for <uuid>" (another literal invocation_phrase) →
+`request.create`. Of the 3 wrongly-predicted verbs
+(`entity-workstream.set-ubo`, `kyc-case.create`, `request.create`),
+`kyc-case.create` *is* in `kyc-case.yaml`'s `allowed_verbs`, but
+`entity-workstream.set-ubo` and `request.create` are not, in either the
+`kyc-case` pack or any pack — meaning the session's resolved journey/pack
+context for at least 2 of the 3 utterances wasn't `kyc-case` at all, or
+cross-pack verb_search ranking isn't being pre-constrained by
+`SessionVerbSurface::allowed_fqns()` the way `HybridVerbSearcher`'s
+documentation claims ("Pre-constrained verb search threads allowed verbs
+into HybridVerbSearcher").
+
+**Live control, same run:** re-ran the pre-existing `bank_domain` fixture's
+3 already-live `kyc` cases with the *identical* single-bootstrap pattern
+("Allianz Global Investors") — 2/3 passed (`kyc.case-status`,
+`kyc.list-missing-items` correctly resolved; `kyc_open_case` got no
+proposal at all this run, a separate pre-existing flake unrelated to this
+change). This proves the general single-bootstrap → pack-constrained
+verb_search mechanism genuinely works today for pre-existing `kyc-case`
+verbs — the gap is specific to the new `dsl.kyc` verbs and/or the
+phrasings tried, not a wholesale breakage of the pipeline.
+
+**Verdict, honestly stated:** Step 1 (pack admission) is real, necessary,
+and done. Step 2 (harness extension) is real, built, and proven functional
+against a live server — it correctly attempted nothing when the proposal
+didn't match, which is the correct/safe behavior. The `dsl.kyc` domain is
+**still not proven live-and-called end-to-end** — a second, distinct gap
+surfaced empirically (verb-search ranking/journey-routing for these
+specific verbs), not yet root-caused. `fixtures/utterance_roundtrip_
+kyc_domain.yaml` is left with `execute: true` / `verify_kyc_stream: true`
+so it starts passing — with real DB proof — the moment that gap closes,
+rather than being watered down to a proposal-only check that would hide
+the remaining work.
+
+Root-causing the ranking/routing gap (why `entity-workstream.set-ubo` and
+`request.create` outrank an in-pack literal-phrase match, and whether
+those two verbs' packs are somehow also in scope for a "kyc" bootstrap)
+is real, separate follow-up work — not attempted here past 3 reproducible
+data points, to avoid burning further live LLM calls chasing a "magic
+phrase" that would prove nothing structural.
