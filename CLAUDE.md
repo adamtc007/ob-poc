@@ -533,6 +533,8 @@ impl SemOsVerbOp for MyDomainCreate {
 
 **Dispatching-fold pattern** (consolidate N specialist verbs → 1, e.g. `cbu.assign-role`, 2026-06-18): to deduplicate the discoverable surface without losing capability, give the canonical verb a `*-type` selector arg + a dispatching `SemOsVerbOp` that routes to the specialist op structs by type. **Retain the specialist structs but DROP their `register()` calls** — they become unregistered dispatch targets, so every write-path is preserved while only one verb is discoverable. Both coverage invariants stay green (no orphan ops: the registry has exactly the verbs declared `behavior: plugin` in YAML). Re-home the folded verbs' `invocation_phrases` onto the canonical, retarget DAG/constellation refs, then `cargo x verbs compile` + repopulate embeddings + prune the removed verbs' stale rows from `verb_pattern_embeddings`.
 
+**Shared fold-verb dispatch helper** (`sem_os_postgres::ops::selector_dispatch`, 2026-07-15): the selector-arg-below-entity-type pattern (e.g. `cbu.assign-role`'s `role-type`, `client-group.entity-manage`'s `action`, `gleif.lookup`'s `target-type`) previously had 3 independent hand-rolled implementations with no shared contract — exactly the duplication that let `cbu.create`'s internal cascade call target an unregistered FQN (`cbu.assign-fund-role`, orphaned by the 2026-06-18 fold) silently break at runtime for a month. Use `resolve_selector(args, arg_name, arms)` (case-insensitive arm lookup, returns `Matched`/`Absent`/`Unrecognized` — pick this when the fold verb must fall back to non-selector behavior, as `cbu.assign-role` does) or `dispatch_selector(...)` (strict — `Absent`/`Unrecognized` both error listing valid values; pick this for a pure fold with no fallback, as `client-group.entity-manage` and `gleif.lookup` do). If an op dispatches through an indirection (e.g. `gleif.lookup`'s `Self::resolve()`, needed because both `pre_fetch` and `execute` resolve the same arm), `cargo x registry-graph`'s fold-verb detector (below) won't see it — it only scans an op's own `execute()` body.
+
 ```bash
 cargo x verbs check   # YAML matches DB
 cargo x verbs lint    # Tiering rules (reads the canonical SemOS registry manifest)
@@ -771,6 +773,18 @@ asked about). The dividing line is dispatch shape, not question type:
    ops ↔ 766 YAML `plugin` verbs, exact match, 0 dead code / 0 missing
    registrations / 0 dual-routing — cross-validated against the
    independent `test_plugin_verb_coverage` test, which also passes.
+   Extended 2026-07-15 to the one intra-registry composition mechanism
+   that exists (`SemOsChildDispatcher::dispatch_child`, confirmed the sole
+   registry-callback path and confirmed 100% literal-FQN, never a
+   runtime-computed string — see the dead-code-candidates check above for
+   why that distinction matters): `cargo x registry-graph` now also
+   extracts every parent→child composition edge, flags dangling child FQNs
+   (caught the `cbu.create`→`cbu.assign-fund-role` break — see
+   `selector_dispatch` below), and detects fold verbs (ops using the
+   strict `dispatch_selector` shape) to flag any composition edge that
+   omits the required selector arg. Known scope gap, documented in the
+   tool's own report output: fold-verb detection only scans an op's own
+   `execute()` body, not helper functions it delegates through.
 
 3. **Harness / tracing — last resort, for genuine cross-process or
    concurrency questions neither tier above can answer.** Both tiers 1
