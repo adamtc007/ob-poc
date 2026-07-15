@@ -2,8 +2,6 @@
 
 #[cfg(test)]
 use super::types::UtteranceTraceRecord;
-#[cfg(all(test, feature = "database"))]
-use super::UtteranceTraceRepository;
 
 /// Verdict for comparing an original trace resolution to a replayed one.
 #[cfg(test)]
@@ -280,62 +278,6 @@ pub fn compare_trace_sequences(
         .zip(replayed.iter())
         .map(|(left, right)| compare_trace_records(left, right))
         .collect()
-}
-
-/// Load two persisted utterance traces and compare them for replay drift.
-///
-/// # Examples
-/// ```rust,no_run
-/// use ob_poc::traceability::{compare_trace_ids, UtteranceTraceRepository};
-/// use uuid::Uuid;
-///
-/// # async fn demo(repo: UtteranceTraceRepository) -> anyhow::Result<()> {
-/// let _comparison = compare_trace_ids(&repo, Uuid::new_v4(), Uuid::new_v4()).await?;
-/// # Ok(())
-/// # }
-/// ```
-#[cfg(all(test, feature = "database"))]
-pub async fn compare_trace_ids(
-    repository: &UtteranceTraceRepository,
-    original_trace_id: uuid::Uuid,
-    replayed_trace_id: uuid::Uuid,
-) -> anyhow::Result<Option<TraceReplayComparison>> {
-    let Some(original) = repository.get(original_trace_id).await? else {
-        return Ok(None);
-    };
-    let Some(replayed) = repository.get(replayed_trace_id).await? else {
-        return Ok(None);
-    };
-
-    Ok(Some(compare_trace_records(&original, &replayed)))
-}
-
-/// Load two sessions of persisted utterance traces and compare them positionally.
-///
-/// # Examples
-/// ```rust,no_run
-/// use ob_poc::traceability::{compare_session_traces, UtteranceTraceRepository};
-/// use uuid::Uuid;
-///
-/// # async fn demo(repo: UtteranceTraceRepository) -> anyhow::Result<()> {
-/// let _comparisons = compare_session_traces(&repo, Uuid::new_v4(), Uuid::new_v4(), 50).await?;
-/// # Ok(())
-/// # }
-/// ```
-#[cfg(all(test, feature = "database"))]
-pub async fn compare_session_traces(
-    repository: &UtteranceTraceRepository,
-    original_session_id: uuid::Uuid,
-    replayed_session_id: uuid::Uuid,
-    limit: i64,
-) -> anyhow::Result<Vec<TraceReplayComparison>> {
-    let original = repository
-        .list_for_session(original_session_id, limit)
-        .await?;
-    let replayed = repository
-        .list_for_session(replayed_session_id, limit)
-        .await?;
-    Ok(compare_trace_sequences(&original, &replayed))
 }
 
 #[cfg(test)]

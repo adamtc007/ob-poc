@@ -543,23 +543,6 @@ impl Phase2Artifacts {
         Phase2Service::compose(lookup, envelope)
     }
 
-    /// Clone from borrowed lookup and Sem OS inputs.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::traceability::Phase2Artifacts;
-    ///
-    /// let artifacts = Phase2Artifacts::from_refs(None, None);
-    /// assert!(artifacts.is_unavailable());
-    /// ```
-    #[cfg(test)]
-    pub fn from_refs(
-        lookup: Option<&LookupResult>,
-        envelope: Option<&SemOsContextEnvelope>,
-    ) -> Self {
-        Phase2Service::compose_from_refs(lookup, envelope)
-    }
-
     /// Render the persisted Phase 2 payload.
     ///
     /// # Examples
