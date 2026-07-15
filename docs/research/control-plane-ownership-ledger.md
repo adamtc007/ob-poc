@@ -1866,3 +1866,80 @@ Verified: `cargo build --workspace` clean, `cargo x verbs check` /
 `identifier.*` verbs don't appear in the DB hash table at all, consistent
 with the domain having never been compiled/exercised). No Rust changed;
 no test suite touches this domain.
+
+## Static-analysis dead-code / dual-routing sweep + registry-graph tool (2026-07-15)
+
+Operator asked for a static call-tree tool to review the control plane for
+dead code and duplicated dispatch paths. `cargo-modules orphans` gave a
+first pass (5 confirmed orphans deleted — see commits `bdd9c5a7`, `e1d917e5`,
+`f46e4653`). An externally-authored 5-phase follow-on plan assumed
+closed-enum/`match` dispatch for the verb-op surface; that premise is
+false — `SemOsVerbOp` is `Arc<dyn SemOsVerbOp>` in a runtime-string-keyed
+`HashMap` (`SemOsVerbOpRegistry`), so any tier-1 static tool (`dead_code`,
+`cargo public-api`, rust-analyzer call hierarchy) run against it produces a
+"dead code" report that's actually the entire live surface — confirmed by
+direct source inspection before building anything, not assumed.
+
+Correct oracle for this shape: relocate the check from the dispatch site
+(unresolvable across `dyn`) to the registration site (`registry.register(
+Arc::new(ConcreteType))` — a plain, statically-resolvable function call).
+Built `cargo x registry-graph` (`xtask/src/registry_graph.rs`, plain `syn`
+v2 — deliberately not `ra_ap_*`, since the target syntax is always
+plain/static: registration calls, 17 known `macro_rules!` FQN-construction
+shapes, 2 const-table loop-registration special cases) as a completeness
+diff between the registered-op set and the YAML `behavior: plugin` verb
+set. Verified 766 registered ops ↔ 766 YAML plugin verbs, exact match: 0
+dead code, 0 missing registrations, 0 dual-routing — cross-validated
+against the independent `test_plugin_verb_coverage` test.
+
+Extended the same tool to the one intra-registry composition mechanism
+that exists (`SemOsChildDispatcher::dispatch_child`, confirmed via its own
+doc comment and a full-workspace grep to be the sole registry-callback
+path, called from exactly 2 files / 15 call sites, all literal FQNs — no
+verb composes another via a runtime-computed string, checked before
+building rather than assumed). `registry-graph` now extracts every
+parent→child composition edge and flags dangling child FQNs.
+
+This caught a real production bug on the first run: `cbu.create`'s
+fund/ManCo role-assignment cascade (`crates/sem_os_postgres/src/ops/cbu.rs`)
+called `dispatch_child_verb(..., "cbu.assign-fund-role", ...)` — a FQN
+unregistered since the 2026-06-18 dispatching-fold migration folded
+`AssignFundRole` into `cbu.assign-role` (`role-type` selector arg). Neither
+`dead_code=deny` nor the registry/YAML diff could see this (both sides of
+that check are individually "correct" — nothing declares or registers
+`cbu.assign-fund-role`, that's by design; only cross-checking a *caller's*
+own reference against the registered set surfaces it). Every CBU created
+with a fund or ManCo entity attached has been failing at that cascade step
+since 2026-06-18. Fixed: both branches now target `cbu.assign-role` with
+`role-type: FUND` (commit `1c435a0c`).
+
+Root cause of the bug, not just the instance: the dispatching-fold pattern
+(3 known users — `cbu.assign-role`'s `role-type`, `client-group.entity-manage`'s
+`action`, `gleif.lookup`'s `target-type`) had 3 independent hand-rolled
+implementations, no shared contract, no shared arg-name convention. Built
+`sem_os_postgres::ops::selector_dispatch` (`resolve_selector` — case-
+insensitive arm lookup with fallback; `dispatch_selector` — strict, errors
+on absent/unrecognized) and refactored all 3 call sites onto it (commit
+`72c110e1`). Extended `registry-graph` to detect ops using the strict
+`dispatch_selector` shape ("fold verbs") and flag any composition edge
+that omits the required selector arg (commit `81e01e8e`) — closing the
+class of bug, not just the instance. Documented scope gap in the tool's
+own report: fold-verb detection only scans an op's own `execute()` body,
+not delegated helper functions (`gleif.lookup` routes through its own
+`Self::resolve()` and isn't detected this way, though it structurally is
+a fold verb).
+
+Also built `scripts/check-no-widening.sh` (Phase 0 anti-widening CI guard,
+additions-only diff vs `audits/surface/*.txt` + suppression-count ratchet,
+commit `bdd9c5a7`) and enabled `dead_code = "deny"` workspace-wide across
+all ~57 crates (Phase 1, commit `e1d917e5`).
+
+Full 3-tier verification strategy (static analysis / registry-data
+extraction / harness-tracing-last-resort) documented in `CLAUDE.md` under
+"Verification Strategy — Which Tool Answers Which Question (xtask)".
+
+Verified throughout: full workspace build clean, `test_plugin_verb_coverage`
++ `selector_dispatch` unit tests green, scoped clippy clean on every
+touched crate, `cargo x registry-graph` 766/766/0/0/0 held at every step.
+Out of scope, explicitly deferred: refreshing the pre-existing stale
+`audits/surface/*.txt` baselines (unrelated drift, own follow-up).
