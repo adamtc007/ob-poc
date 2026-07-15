@@ -21,3 +21,4 @@ smallvec    = { version = "1.11", features = ["serde"] }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

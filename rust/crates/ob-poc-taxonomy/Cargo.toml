@@ -34,3 +34,4 @@ toml = "0.8"
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

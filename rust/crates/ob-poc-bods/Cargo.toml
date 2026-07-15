@@ -23,3 +23,4 @@ database = ["dep:sqlx", "dep:rust_decimal"]
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

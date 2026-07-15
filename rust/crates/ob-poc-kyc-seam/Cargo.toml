@@ -23,3 +23,4 @@ ob-poc-types = { path = "../ob-poc-types" }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

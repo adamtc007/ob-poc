@@ -18,3 +18,4 @@ dsl-lowering = { path = "../dsl-lowering" }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

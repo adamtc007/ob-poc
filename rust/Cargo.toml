@@ -413,3 +413,6 @@ dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0
 dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+
+[lints.rust]
+dead_code = "deny"

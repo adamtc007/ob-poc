@@ -74,3 +74,4 @@ ob-poc-journey = { path = "../ob-poc-journey" }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

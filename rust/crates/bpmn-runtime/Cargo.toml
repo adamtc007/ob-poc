@@ -27,3 +27,4 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid"
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"
