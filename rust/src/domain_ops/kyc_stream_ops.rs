@@ -24,7 +24,7 @@ use ob_poc_kyc_substrate::determination::DeterminationStrategy;
 use ob_poc_kyc_substrate::fold::control::check_control_preconditions;
 use ob_poc_kyc_substrate::{
     find_subject_entity, fold_control_versioned, fold_obligations_versioned,
-    natural_persons_from_events, phase1_lexicon, reconciled_economic_edges, AuthorityRef, EdgeId,
+    natural_persons_from_events, phase1_lexicon, AuthorityRef, ControlProngStrategy, EdgeId,
     FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult, SubjectId,
     SubjectOverallState, TargetBinding, V1FoldImpl,
 };
@@ -441,11 +441,19 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .ok_or_else(|| anyhow!("freeze: no strategy selected (K-4 precondition)"))?;
         let strategy: &dyn DeterminationStrategy = match strategy_name {
             "ownership_prong_strategy" => &OwnershipProngStrategy,
+            // M4: control-by-other-means (voting rights, board appointment, GP
+            // statutory control, LLP designated member, trust roles, dominant
+            // influence). Scope note lives on ControlProngStrategy itself — v1
+            // walks control-kind edges only, does not cross into the economic
+            // axis for an intermediate controlling entity's own UBOs.
+            "control_prong_strategy" => &ControlProngStrategy,
             other => {
                 return Err(anyhow!(
                     "freeze: strategy '{other}' selected but no DeterminationStrategy is \
-                     registered for it — only ownership_prong_strategy exists today \
-                     (control-prong / role-based strategies are M2 follow-on work)"
+                     registered for it — only ownership_prong_strategy and \
+                     control_prong_strategy exist today (role-based strategies for \
+                     e.g. investor-role-profile-driven determination remain M2 \
+                     follow-on work)"
                 ));
             }
         };
@@ -456,7 +464,6 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             )
         })?;
         let natural_persons = natural_persons_from_events(&refs);
-        let reconciled_edges = reconciled_economic_edges(&control);
         // K-6: threshold should be reference-plane data (per jurisdiction/structure
         // class); until that table exists, a caller-suppliable default is the
         // documented interim (EOP-DD-KYCUBO-003 M1.4).
@@ -466,7 +473,7 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .unwrap_or(25.0);
 
         let mut candidates: Vec<ProngCandidate> = strategy.resolve(
-            &reconciled_edges,
+            &control,
             subject_entity_id,
             &natural_persons,
             threshold_pct,

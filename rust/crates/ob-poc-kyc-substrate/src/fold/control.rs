@@ -525,6 +525,52 @@ pub fn reconciled_economic_edges(state: &ControlState) -> Vec<ReconciledEconomic
         .collect()
 }
 
+// ── Control edge summary (for determination strategy, M4) ─────────────────────
+
+/// A verified, reconciled control edge ready for prong computation.
+/// Consumed by `ControlProngStrategy::resolve()` (§5, M4).
+#[derive(Debug, Clone)]
+pub struct ReconciledControlEdge {
+    pub id: EdgeId,
+    pub from: EntityId,
+    pub to: EntityId,
+    pub kind: EdgeKind,
+    /// The event that verified this edge (K-35 traceability on the candidate).
+    pub verified_by: Option<EventId>,
+    /// The event that originally asserted this edge (deterministic; never random).
+    pub originating_event_id: EventId,
+}
+
+/// Extract the reconciled (active, verified) control edges from the control
+/// state — everything that isn't `EconomicInterest` (that's the ownership
+/// prong's job — `reconciled_economic_edges`). Used by `ControlProngStrategy`
+/// (M4).
+///
+/// Excludes `EdgeKind::Nominee`: nominee arrangements require piercing (K-8,
+/// `ubo.edge.pierce-nominee`, separately-tracked M2/open work) to find the
+/// true controller. Treating a bare nominee edge as direct control here
+/// would attribute control to the nominee itself — exactly the wrong answer
+/// K-8 exists to prevent.
+pub fn reconciled_control_edges(state: &ControlState) -> Vec<ReconciledControlEdge> {
+    state
+        .edges
+        .values()
+        .filter(|e| !e.is_economic() && !matches!(e.kind, EdgeKind::Nominee) && e.is_active())
+        .map(|e| ReconciledControlEdge {
+            id: e.id,
+            from: e.from,
+            to: e.to,
+            kind: e.kind.clone(),
+            verified_by: if e.is_verified() {
+                e.evidence_event_id
+            } else {
+                None
+            },
+            originating_event_id: e.originating_event_id,
+        })
+        .collect()
+}
+
 // ── Entity classification helpers ─────────────────────────────────────────────
 
 /// Returns the set of `PersonId`s that are natural persons in the event stream.

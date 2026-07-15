@@ -56,10 +56,11 @@ domains:
             type: uuid
             required: true
             description: Controlled entity
-          - name: edge_kind
+          - name: kind
             type: string
             required: true
-            description: "One of: voting_rights, board_appointment, gp_statutory, designated_member, trust_role, nominee, dominant_influence, economic_interest"
+            description: "Control basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload). trust_role is a recognized EdgeKind variant but has no wire mapping from this string yet (M4 follow-up: needs a sub-kind for settlor/trustee/protector/beneficiary) — passing it, or any unrecognized/omitted value, silently resolves to dominant_influence (the fold's catch-all; the fold is infallible by design, so this cannot be a hard error today)."
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, nominee, dominant_influence, economic_interest]
           - name: edge-id
             type: uuid
             required: false
@@ -347,8 +348,8 @@ domains:
           - name: strategy
             type: string
             required: true
-            description: "DeterminationStrategy::name() to run at freeze — only ownership_prong_strategy is implemented today (M4 open: control_prong_strategy etc. are stream-recordable but ubo.determination.freeze errors at dispatch, no Rust impl exists yet)"
-            valid_values: [ownership_prong_strategy]
+            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %) and control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4) are implemented. Role-based strategies remain open (M2)."
+            valid_values: [ownership_prong_strategy, control_prong_strategy]
         returns:
           type: record
           fields:
@@ -624,7 +625,7 @@ domains:
           - name: structure-class
             type: string
             required: true
-            description: "Structure class — drives ubo.determination strategy selection (K-4). Only private_company/multi_tier_holding/listed_entity resolve via the implemented ownership_prong_strategy today; lp_fund/llp/trust/foundation/investment_fund/state_owned/cooperative/nominee classify successfully but ubo.determination.freeze errors at strategy-selection time pending a control-prong strategy (M4, open)."
+            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4). trust/foundation/investment_fund/state_owned/cooperative/nominee classify successfully but have no wire mapping from ubo.edge.assert-control's kind arg to a control edge kind for their structure-specific control basis yet (e.g. TrustRole — separate, smaller follow-on gap)."
             valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
           - name: entity-id
             type: uuid

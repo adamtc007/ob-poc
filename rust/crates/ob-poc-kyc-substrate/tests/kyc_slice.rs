@@ -326,11 +326,10 @@ fn ec1_ownership_prong_differential_equality() {
     let events = build_fixture_events(subject);
     let event_refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control(&event_refs);
-    let edges = reconciled_economic_edges(&control);
     let natural_persons = fixture_natural_persons();
 
     let strategy = OwnershipProngStrategy;
-    let mut candidates = strategy.resolve(&edges, entity_subject(), &natural_persons, 25.0);
+    let mut candidates = strategy.resolve(&control, entity_subject(), &natural_persons, 25.0);
     candidates.sort_by(|a, b| a.person_id.0.cmp(&b.person_id.0));
 
     // P1: 60% × 80% = 48.0% — above threshold.
@@ -737,9 +736,8 @@ fn ec4_smo_fallback_when_no_ubos_found() {
     );
 
     // Build determination-in-progress.
-    let edges = reconciled_economic_edges(&control);
     let strategy = OwnershipProngStrategy;
-    let candidates = strategy.resolve(&edges, entity_subject(), &BTreeSet::new(), 25.0);
+    let candidates = strategy.resolve(&control, entity_subject(), &BTreeSet::new(), 25.0);
     assert!(
         candidates.is_empty(),
         "no candidates expected for empty graph"
@@ -1174,11 +1172,10 @@ fn ec6_every_candidate_has_originating_event_id() {
     let events = build_fixture_events(subject);
     let event_refs: Vec<&IntentEvent> = events.iter().collect();
     let control = fold_control(&event_refs);
-    let edges = reconciled_economic_edges(&control);
     let natural_persons = fixture_natural_persons();
 
     let strategy = OwnershipProngStrategy;
-    let candidates = strategy.resolve(&edges, entity_subject(), &natural_persons, 25.0);
+    let candidates = strategy.resolve(&control, entity_subject(), &natural_persons, 25.0);
 
     // Every candidate must have a non-nil originating_event_id (K-35).
     for c in &candidates {
