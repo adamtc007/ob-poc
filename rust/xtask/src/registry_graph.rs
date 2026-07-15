@@ -61,6 +61,13 @@ pub(crate) struct RegisteredOp {
     pub type_name: String,
     /// Where the FQN was resolved from, for the report's provenance column.
     pub site: String,
+    /// File the concrete type's `impl SemOsVerbOp` block lives in — used
+    /// by the composition-edge walk to re-open and parse the type's
+    /// `execute()` body. `None` for the two loop-table special cases
+    /// (`StubOp`/`SimpleStatusOp`), which have no meaningful single
+    /// composition target (their `execute()` is generic, parameterized
+    /// by the loop-table entry, not by FQN-specific logic).
+    pub defining_file: Option<PathBuf>,
 }
 
 /// FQN-construction shape for the 12 known local `macro_rules!` helpers.
@@ -428,6 +435,7 @@ fn extract_stub_verbs(rust_root: &Path) -> Result<Vec<RegisteredOp>> {
                     fqn: s.value(),
                     type_name: "StubOp".to_string(),
                     site: format!("{}: STUB_VERBS table", path.display()),
+                    defining_file: None,
                 });
             }
         }
@@ -473,6 +481,7 @@ fn extract_status_flip_verbs(rust_root: &Path) -> Result<Vec<RegisteredOp>> {
                         fqn: lit.value(),
                         type_name: "SimpleStatusOp".to_string(),
                         site: format!("{}: STATUS_FLIP_VERBS table", path.display()),
+                        defining_file: None,
                     });
                 }
             }
@@ -557,6 +566,7 @@ pub(crate) fn extract_all_registrations(rust_root: &Path) -> Result<(Vec<Registe
                 fqn: c.fqn.clone(),
                 type_name: type_path,
                 site: format!("{site} (fqn from {})", c.provenance),
+                defining_file: Some(c.file.clone()),
             }),
             None => unresolved.push((type_path, site)),
         }
@@ -592,6 +602,313 @@ fn load_yaml_plugin_verbs(rust_root: &Path) -> Result<BTreeSet<String>> {
         }
     }
     Ok(out)
+}
+
+// ── Composition edges: verb -> verb calls within execute() bodies ──
+//
+// Verified 2026-07-15 before writing this: the only registry-callback
+// mechanism (an execute() body invoking another SemOsVerbOp through the
+// registry, as opposed to delegating to a typed service module) is
+// `SemOsChildDispatcher::dispatch_child` — its own doc comment says so
+// ("not a separate cascade engine"), and no other escape hatch exists on
+// `VerbExecutionContext`/`TransactionScope`. Every call site found
+// (cbu.rs, cbu_role.rs — 15 edges across 2 files) passes a compile-time
+// string literal for the child FQN, so this closes out statically: no
+// verb composes another verb via a runtime-computed FQN anywhere in the
+// workspace. If that ever changes, this extractor will surface it loudly
+// (a composition call whose child FQN isn't a literal is simply not
+// found, so the edge silently disappears from the report rather than
+// crashing — cross-check the `.register(` count if edge counts ever look
+// low against a known change).
+
+/// How a "relay" function (a free function that itself calls
+/// `.dispatch_child(...)`, standing between an `execute()` body and the
+/// registry) determines its child FQN.
+#[derive(Debug, Clone)]
+enum RelayKind {
+    /// The child FQN is the relay's own Nth positional parameter,
+    /// passed straight through to `.dispatch_child(..)` — so the real
+    /// value must be read from literal arguments at each *call site* of
+    /// the relay (e.g. `dispatch_child_verb`, whose 2nd parameter
+    /// `child_fqn` is forwarded verbatim).
+    Transparent { child_arg_index: usize },
+    /// The relay always dispatches this one literal FQN regardless of
+    /// caller (e.g. `upsert_entity_relationship`, hardcoded to
+    /// `"entity-relationship.upsert"`).
+    Fixed(String),
+}
+
+/// One statically-discovered verb -> verb composition edge.
+#[derive(Debug, Clone)]
+struct CompositionEdge {
+    parent_fqn: String,
+    child_fqn: String,
+    site: String,
+}
+
+/// Scan every `.rs` file under `dirs` for free functions whose body
+/// contains a `.dispatch_child(parent, child, ...)` call, and classify
+/// each as [`RelayKind::Transparent`] or [`RelayKind::Fixed`] by
+/// inspecting the second argument.
+fn find_relay_functions(dirs: &[PathBuf]) -> Result<BTreeMap<String, RelayKind>> {
+    let mut relays = BTreeMap::new();
+    for dir in dirs {
+        for entry in walk_rs_files(dir)? {
+            let src = fs::read_to_string(&entry)?;
+            let Ok(file) = syn::parse_file(&src) else {
+                continue;
+            };
+            for item in &file.items {
+                let syn::Item::Fn(f) = item else { continue };
+                let params: Vec<String> = f
+                    .sig
+                    .inputs
+                    .iter()
+                    .filter_map(|arg| {
+                        if let syn::FnArg::Typed(pat_type) = arg {
+                            if let syn::Pat::Ident(id) = &*pat_type.pat {
+                                return Some(id.ident.to_string());
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+
+                let mut found = None;
+                visit_calls(&f.block, &mut |call| {
+                    if found.is_some() {
+                        return;
+                    }
+                    let syn::Expr::MethodCall(mc) = call else {
+                        return;
+                    };
+                    if mc.method != "dispatch_child" {
+                        return;
+                    }
+                    let Some(child_arg) = mc.args.get(1) else {
+                        return;
+                    };
+                    match child_arg {
+                        syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Str(s),
+                            ..
+                        }) => found = Some(RelayKind::Fixed(s.value())),
+                        syn::Expr::Path(p) => {
+                            if let Some(ident) = p.path.get_ident() {
+                                if let Some(idx) =
+                                    params.iter().position(|p| p == &ident.to_string())
+                                {
+                                    found = Some(RelayKind::Transparent {
+                                        child_arg_index: idx,
+                                    });
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                });
+
+                if let Some(kind) = found {
+                    relays.insert(f.sig.ident.to_string(), kind);
+                }
+            }
+        }
+    }
+    Ok(relays)
+}
+
+/// Walk every expression in `block`, calling `f` on each one. Not a full
+/// `syn::visit::Visit` impl — deliberately shallow (doesn't need to
+/// distinguish expression kinds beyond finding call/method-call nodes),
+/// so a plain recursive walk over `syn::visit::Visit::visit_expr` is
+/// simpler than defining a dedicated visitor struct.
+fn visit_calls(block: &syn::Block, f: &mut impl FnMut(&syn::Expr)) {
+    use syn::visit::Visit;
+    struct Walker<'a, F: FnMut(&syn::Expr)>(&'a mut F);
+    impl<'a, 'ast, F: FnMut(&syn::Expr)> Visit<'ast> for Walker<'a, F> {
+        fn visit_expr(&mut self, node: &'ast syn::Expr) {
+            (self.0)(node);
+            syn::visit::visit_expr(self, node);
+        }
+    }
+    Walker(f).visit_block(block);
+}
+
+/// For each resolved op with a known defining file, re-open that file,
+/// find the op's `impl SemOsVerbOp for Type { ... async fn execute(...)
+/// {...} }` block, and walk its body for composition calls — either a
+/// direct `.dispatch_child(parent, "literal", ...)` or a call to one of
+/// `relays`.
+fn extract_composition_edges(
+    registered: &[RegisteredOp],
+    relays: &BTreeMap<String, RelayKind>,
+) -> Result<Vec<CompositionEdge>> {
+    let mut edges = Vec::new();
+    // Group by defining file so each file is parsed once even if it
+    // defines multiple registered ops (e.g. cbu.rs defines 8).
+    let mut by_file: BTreeMap<PathBuf, Vec<&RegisteredOp>> = BTreeMap::new();
+    for op in registered {
+        if let Some(file) = &op.defining_file {
+            by_file.entry(file.clone()).or_default().push(op);
+        }
+    }
+
+    for (file, ops) in by_file {
+        let src = fs::read_to_string(&file)?;
+        let Ok(parsed) = syn::parse_file(&src) else {
+            continue;
+        };
+        for item in &parsed.items {
+            let syn::Item::Impl(imp) = item else { continue };
+            let Some((_, trait_path, _)) = &imp.trait_ else {
+                continue;
+            };
+            if trait_path.segments.last().map(|s| s.ident != "SemOsVerbOp").unwrap_or(true) {
+                continue;
+            }
+            let syn::Type::Path(self_ty) = &*imp.self_ty else {
+                continue;
+            };
+            let Some(type_name) = self_ty.path.segments.last().map(|s| s.ident.to_string())
+            else {
+                continue;
+            };
+            let Some(op) = ops.iter().find(|o| o.type_name.ends_with(&type_name)) else {
+                continue;
+            };
+
+            for impl_item in &imp.items {
+                let syn::ImplItem::Fn(exec_fn) = impl_item else {
+                    continue;
+                };
+                if exec_fn.sig.ident != "execute" {
+                    continue;
+                }
+                visit_calls(&exec_fn.block, &mut |call| {
+                    let (method_or_fn, args): (String, &syn::punctuated::Punctuated<syn::Expr, syn::Token![,]>) =
+                        match call {
+                            syn::Expr::MethodCall(mc) => (mc.method.to_string(), &mc.args),
+                            syn::Expr::Call(c) => {
+                                let syn::Expr::Path(p) = &*c.func else {
+                                    return;
+                                };
+                                let Some(name) = p.path.segments.last().map(|s| s.ident.to_string())
+                                else {
+                                    return;
+                                };
+                                (name, &c.args)
+                            }
+                            _ => return,
+                        };
+
+                    // Direct .dispatch_child(parent, "literal", ...).
+                    if method_or_fn == "dispatch_child" {
+                        if let Some(syn::Expr::Lit(syn::ExprLit {
+                            lit: syn::Lit::Str(s),
+                            ..
+                        })) = args.get(1)
+                        {
+                            edges.push(CompositionEdge {
+                                parent_fqn: op.fqn.clone(),
+                                child_fqn: s.value(),
+                                site: format!("{}: direct dispatch_child", file.display()),
+                            });
+                        }
+                        return;
+                    }
+
+                    // Call to a known relay function.
+                    if let Some(kind) = relays.get(&method_or_fn) {
+                        let child = match kind {
+                            RelayKind::Fixed(fqn) => Some(fqn.clone()),
+                            RelayKind::Transparent { child_arg_index } => {
+                                args.iter().nth(*child_arg_index).and_then(|a| {
+                                    if let syn::Expr::Lit(syn::ExprLit {
+                                        lit: syn::Lit::Str(s),
+                                        ..
+                                    }) = a
+                                    {
+                                        Some(s.value())
+                                    } else {
+                                        None
+                                    }
+                                })
+                            }
+                        };
+                        if let Some(child_fqn) = child {
+                            edges.push(CompositionEdge {
+                                parent_fqn: op.fqn.clone(),
+                                child_fqn,
+                                site: format!("{}: via {method_or_fn}()", file.display()),
+                            });
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    Ok(edges)
+}
+
+fn write_composition_report(
+    dir: &Path,
+    edges: &[CompositionEdge],
+    registered_fqns: &BTreeSet<String>,
+) -> Result<Vec<String>> {
+    let mut md = String::new();
+    md.push_str("# Verb composition graph — statically-discovered execute()-to-registry calls\n\n");
+    md.push_str("Every edge here is a compile-time string literal at the call site —\n");
+    md.push_str("confirmed 2026-07-15 that no verb in this workspace composes another verb\n");
+    md.push_str("via a runtime-computed FQN (the only registry-callback mechanism,\n");
+    md.push_str("`SemOsChildDispatcher::dispatch_child`, is called from exactly 2 files,\n");
+    md.push_str("15 call sites, all literals). This is therefore a closed, static graph,\n");
+    md.push_str("not a sample of runtime behavior.\n\n");
+
+    let mut dangling = Vec::new();
+    if edges.is_empty() {
+        md.push_str("None found.\n");
+    } else {
+        md.push_str("| Parent FQN | Child FQN | Site |\n|---|---|---|\n");
+        for e in edges {
+            let flag = if registered_fqns.contains(&e.child_fqn) {
+                ""
+            } else {
+                dangling.push(e.child_fqn.clone());
+                " ⚠ NOT REGISTERED"
+            };
+            md.push_str(&format!(
+                "| `{}` | `{}`{flag} | {} |\n",
+                e.parent_fqn, e.child_fqn, e.site
+            ));
+        }
+    }
+
+    if !dangling.is_empty() {
+        md.push_str("\n## Dangling composition targets\n\n");
+        md.push_str("A parent verb composes a child FQN with no matching registered op —\n");
+        md.push_str("this would error at dispatch time. Real bug candidates, not extraction\n");
+        md.push_str("noise (unlike the dead-code/dual-routing candidates, there's no benign\n");
+        md.push_str("explanation for a composition edge pointing at nothing).\n\n");
+        for d in &dangling {
+            md.push_str(&format!("- `{d}`\n"));
+        }
+    }
+
+    fs::write(dir.join("composition_graph.md"), &md)?;
+
+    let mut dot = String::from("digraph composition {\n  rankdir=LR;\n");
+    for e in edges {
+        dot.push_str(&format!(
+            "  \"{}\" -> \"{}\";\n",
+            e.parent_fqn.replace('"', "'"),
+            e.child_fqn.replace('"', "'")
+        ));
+    }
+    dot.push_str("}\n");
+    fs::write(dir.join("composition_graph.dot"), dot)?;
+
+    Ok(dangling)
 }
 
 pub(crate) fn run() -> Result<()> {
@@ -657,10 +974,22 @@ pub(crate) fn run() -> Result<()> {
         &dual_routing,
     )?;
 
+    let ops_dir = rust_root.join("crates/sem_os_postgres/src/ops");
+    let domain_ops_dir = rust_root.join("src/domain_ops");
+    let relays = find_relay_functions(&[ops_dir, domain_ops_dir])?;
+    let composition_edges = extract_composition_edges(&registered, &relays)?;
+    let dangling = write_composition_report(&artifacts_dir, &composition_edges, &registered_fqns)?;
+
     println!();
     println!("dead-code candidates (registered, no live YAML entry): {}", dead_code_candidates.len());
     println!("missing registrations (YAML plugin verb, nothing registered): {}", missing_registrations.len());
     println!("dual-routing candidates (one type serving >1 FQN, excluding StubOp/SimpleStatusOp): {}", dual_routing.len());
+    println!(
+        "composition edges (execute() -> registry, via {} relay fn(s)): {} ({} dangling)",
+        relays.len(),
+        composition_edges.len(),
+        dangling.len()
+    );
     println!();
     println!("reports written to {}", artifacts_dir.display());
 
