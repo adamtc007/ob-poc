@@ -1764,15 +1764,76 @@ impl HybridVerbSearcher {
             }
         }
 
-        // Strategy 2: Full-space search (fallback)
-        self.search_patterns_directly_scoped(
-            verb_service,
-            query_embedding,
-            limit,
-            None,
-            fallback_threshold,
-        )
-        .await
+        // Strategy 2: Full-space search (fallback). When a real (non-empty)
+        // allowed_verbs constraint was requested but Strategy 1 found nothing
+        // in-scope, this must NOT silently hand back an out-of-scope verb as
+        // if it were a normal, confirmable result — that's exactly how an
+        // unrelated verb (e.g. `entity-workstream.set-ubo`) could win a
+        // pack-scoped session's proposal despite never being admitted by any
+        // pack. Filter Strategy 2's output back down to the allowed set; if
+        // nothing in-scope survives, correctly return empty (the caller can
+        // separately call `find_out_of_scope_match` if it wants to diagnose
+        // *why* — e.g. to offer a pack-switch prompt — but `search()`'s own
+        // contract must never leak an unconstrained result when a real
+        // constraint was in force).
+        let global_results = self
+            .search_patterns_directly_scoped(
+                verb_service,
+                query_embedding,
+                limit,
+                None,
+                fallback_threshold,
+            )
+            .await?;
+
+        Ok(match allowed_verbs {
+            Some(allowed) if !allowed.is_empty() => global_results
+                .into_iter()
+                .filter(|r| allowed.contains(&r.verb))
+                .collect(),
+            _ => global_results,
+        })
+    }
+
+    /// Find the best-scoring verb match for `query` across the FULL corpus,
+    /// ignoring `allowed_verbs` entirely — but only returns a hit that is
+    /// itself OUTSIDE `allowed_verbs`. Used for pack-mismatch diagnosis: when
+    /// a pack-scoped `search()` call returns nothing, callers can use this to
+    /// answer "was there actually a strong match, just in a different pack?"
+    /// so they can offer a pack-switch prompt instead of a dead-end "nothing
+    /// found." Returns `None` if semantic search is unavailable, nothing
+    /// clears `fallback_threshold`, or the best global hit is already inside
+    /// `allowed_verbs` (in which case `search()` itself should have found it —
+    /// this function has nothing new to say).
+    pub async fn find_out_of_scope_match(
+        &self,
+        query: &str,
+        allowed_verbs: &HashSet<String>,
+    ) -> Result<Option<VerbSearchResult>> {
+        let Some(embedder) = self.embedder.as_ref() else {
+            return Ok(None);
+        };
+        let Some(verb_service) = self.verb_service.as_ref() else {
+            return Ok(None);
+        };
+        let query_embedding = match embedder.embed_query(query).await {
+            Ok(emb) => emb,
+            Err(_) => return Ok(None),
+        };
+
+        let global_results = self
+            .search_patterns_directly_scoped(
+                verb_service,
+                &query_embedding,
+                5,
+                None,
+                self.fallback_threshold,
+            )
+            .await?;
+
+        Ok(global_results
+            .into_iter()
+            .find(|r| !allowed_verbs.contains(&r.verb)))
     }
 
     /// Search patterns constrained to a specific set of verb FQNs.

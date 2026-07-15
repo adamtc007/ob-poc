@@ -229,4 +229,80 @@ mod e2e_tests {
         assert!(anchor_name.is_some(), "Anchor entity should have a name");
         Ok(())
     }
+
+    /// Regression test for the Tier 6 (global semantic fallback) allowed_verbs
+    /// leak: `search_global_semantic_with_embedding`'s Strategy 2
+    /// (`search_patterns_directly_scoped`, fully unconstrained) used to run
+    /// whenever Strategy 1's constrained search came back empty, and its
+    /// results were returned with no re-application of `allowed_verbs`. This
+    /// is how `entity-workstream.set-ubo` (admitted by zero packs) won a live
+    /// proposal over `kyc.subject.register` inside an active `kyc-case`
+    /// pack session. Proves both halves of the fix: `search()` now honours
+    /// `allowed_verbs` even on the fallback path, and the new
+    /// `find_out_of_scope_match` diagnostic still surfaces the same
+    /// out-of-pack verb when explicitly asked for it.
+    #[tokio::test]
+    #[ignore]
+    async fn test_verb_search_respects_allowed_verbs_on_global_fallback() -> Result<()> {
+        let pool = get_pool().await.clone();
+        let embedder = get_embedder().await.clone();
+
+        let verb_service = Arc::new(VerbService::new(pool.clone()));
+        let warmup = LearningWarmup::new(pool.clone());
+        let (learned_data, _stats) = warmup.warmup().await?;
+
+        let dyn_embedder: Arc<dyn ob_poc::agent::learning::embedder::Embedder> =
+            embedder.clone() as Arc<dyn ob_poc::agent::learning::embedder::Embedder>;
+        let searcher = HybridVerbSearcher::new(verb_service.clone(), Some(learned_data.clone()))
+            .with_embedder(dyn_embedder);
+
+        // Mirrors config/packs/kyc-case.yaml's allowed_verbs — deliberately
+        // does NOT include entity-workstream.set-ubo, which is admitted by
+        // zero packs anywhere in the system.
+        let allowed_verbs: std::collections::HashSet<String> = [
+            "kyc.subject.register",
+            "kyc.subject.classify-structure",
+            "kyc.role.assign",
+            "kyc.role.withdraw",
+            "ubo.edge.assert-control",
+            "ubo.edge.assert-economic-interest",
+            "ubo.determination.freeze",
+            "kyc-case.create",
+            "kyc-case.update-status",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let query = "register kyc subject as ubo";
+
+        let results = searcher
+            .search(query, None, None, None, 5, Some(&allowed_verbs), None, None)
+            .await?;
+
+        assert!(
+            results
+                .iter()
+                .all(|r| allowed_verbs.contains(&r.verb)),
+            "search() leaked an out-of-pack verb through the global fallback tier: {:?}",
+            results.iter().map(|r| &r.verb).collect::<Vec<_>>()
+        );
+
+        // The out-of-scope diagnostic, called explicitly, should still be
+        // able to find a match outside the allowed set (proves the fallback
+        // tier itself still works and wasn't just disabled).
+        let out_of_scope = searcher
+            .find_out_of_scope_match(query, &allowed_verbs)
+            .await?;
+        assert!(
+            out_of_scope.is_some(),
+            "find_out_of_scope_match should surface a candidate outside the allowed set"
+        );
+        assert!(
+            !allowed_verbs.contains(&out_of_scope.unwrap().verb),
+            "find_out_of_scope_match must return a verb NOT in allowed_verbs"
+        );
+
+        Ok(())
+    }
 }
