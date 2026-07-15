@@ -1809,3 +1809,60 @@ correctness bug, independent of G14, that happened to surface during
 the arming-blocker audit; the derivation-side consistency close-out is
 precautionary, not a response to any live arming decision.
 `invariants-expected.toml` untouched.
+
+## Fixed: `identifier.yaml` pre-existing defects (2026-07-15)
+
+Operator asked to fix the two defects flagged above. Both closed, YAML-only
+change (no code, no migration).
+
+1. **5 mis-indented `set_values:` blocks** — `validate`, `invalidate`,
+   `find-by-lei`, `find-by-isin`, `update-lei-status` all declared
+   `set_values:` as a sibling of `crud:` (verb top level) instead of nested
+   inside it. Moved into `crud:` for all five, matching the shape every
+   other verb in the codebase uses (e.g. `attach-lei`'s already-correct
+   `crud.set_values`).
+
+2. **Column-name mismatch, wider than originally flagged** — the ledger
+   entry above called out only `attach-lei`'s upsert (`scheme`/`id` don't
+   exist on `entity_identifiers`; real columns are `identifier_type`/
+   `identifier_value`, confirmed unchanged since migration 010). Re-auditing
+   the whole file found the same wrong pair used in **every** verb, not
+   just `attach-lei`: `attach`, `attach-clearstream`, `list-by-entity`,
+   `find-by-lei`, `find-by-clearstream`, `find-by-isin`, plus all three
+   `conflict_keys` lists (`attach`/`attach-lei`/`attach-clearstream`).
+   `grep`-confirmed zero Rust call sites reference any `identifier.*` FQN
+   (no plugin, no hardcoded caller, no test) — the whole domain has been
+   dead since authoring, so this was a uniform fix across the file rather
+   than a partial one that would've left eleven sibling verbs still dead
+   while only `attach-lei` worked.
+
+**Found while fixing, NOT fixed — two more pre-existing defects, out of
+this pass's authorized scope, flagged for a future YAML-authoring audit:**
+- `execute_select` in **neither** `dsl-runtime::crud_executor.rs` nor
+  `dsl_v2::generic_executor.rs` reads `crud.set_values` at all — only
+  `Update`/`Upsert` apply it (per the fix two entries above). So
+  `find-by-lei`'s `set_values: {identifier_type: LEI}` and
+  `find-by-isin`'s `{identifier_type: ISIN}` are now correctly *positioned*
+  but still silently ignored as a WHERE filter — both verbs will return
+  every identifier row matching the caller-supplied value regardless of
+  scheme, not just LEI/ISIN rows. Fixing this means adding Select support
+  for `set_values`-as-filter to both executors, a code change beyond what
+  was authorized this pass.
+- The `scheme`/`reference-type` args' `valid_values` enums (`LEI`,
+  `CLEARSTREAM_KV`, `CLEARSTREAM_ACCT`, `ISIN`, `company_register`,
+  `tax_id`, `SWIFT_BIC`, `DUNS`, `VAT`, `national_id`) don't match the real
+  table's `valid_identifier_type` CHECK constraint (`LEI`, `BIC`, `ISIN`,
+  `CIK`, `MIC`, `REG_NUM`, `FIGI`, `CUSIP`, `SEDOL`) — half the YAML's
+  declared schemes would be rejected by the DB at insert time, and the DB
+  allows several (`BIC`, `CIK`, `MIC`, `REG_NUM`, `FIGI`, `CUSIP`, `SEDOL`)
+  the YAML never declares. Reconciling this is a product decision (which
+  schemes are actually supported) plus either an app-code or DB-migration
+  change, not a mechanical fix — left untouched.
+
+Verified: `cargo build --workspace` clean, `cargo x verbs check` /
+`cargo x verbs lint` show no new mismatches or lint failures against
+`identifier.*` (pre-existing `deal.*`/`cbu.*` hash drift and
+`kyc-case.refer` missing-in-DB are unrelated, unchanged by this fix — the
+`identifier.*` verbs don't appear in the DB hash table at all, consistent
+with the domain having never been compiled/exercised). No Rust changed;
+no test suite touches this domain.
