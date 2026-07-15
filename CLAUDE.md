@@ -718,6 +718,76 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 
 ---
 
+## Verification Strategy — Which Tool Answers Which Question (xtask)
+
+Three different mechanisms answer three different classes of "is this code
+dead / does this dispatch twice / does this actually work" question. Picking
+the wrong one either produces false positives (flagging live code as dead)
+or silently misses real findings (a tool that can't see the thing it's being
+asked about). The dividing line is dispatch shape, not question type:
+
+1. **Static analysis — for anything closed-enum/match dispatched.**
+   `dead_code = "deny"` (workspace-wide, every crate's `[lints.rust]`),
+   `cargo +nightly public-api` (per-crate ratchet against committed
+   `audits/surface/<crate>.txt` snapshots — `scripts/check-public-api-surface.sh`
+   for the exact-match gate, `scripts/check-no-widening.sh` for an
+   additions-only guard during a deletion sweep), and rust-analyzer/editor
+   call hierarchy for interactive one-off tracing. This tier works because
+   the compiler (and any tool built on its same AST/type info) can resolve
+   every call site at compile time — `ExecutionResult`, `CrudOperation`,
+   orchestrator `match` arms, anything reached by a named function call.
+   It does **not** work across a `dyn Trait` boundary: a call through
+   `&dyn Trait` has no static edge back to a concrete impl, so this tier
+   run against `dyn`-dispatched code produces a "dead code" report that's
+   actually just the entire live surface (confirmed 2026-07-15 before
+   building anything — see tier 2).
+
+2. **Registry-data extraction — for anything behind `dyn` in a
+   runtime-keyed registry.** `SemOsVerbOp` is `Arc<dyn SemOsVerbOp>` in a
+   `HashMap<String, _>` (`sem_os_postgres::ops::SemOsVerbOpRegistry`),
+   dispatched by an FQN string the DSL compiler emits from YAML — the only
+   static edge is `registry.register(Arc::new(ConcreteType))`, a
+   *construction*, not an *invocation*, so tier 1 tooling is structurally
+   blind here. The fix relocates the analysis from the dispatch site
+   (unresolvable) to the registration site (fully resolvable — a plain
+   function call with a string-bearing concrete type as its argument,
+   visible in the same compiled workspace that erases it to `dyn`
+   everywhere else). `cargo x registry-graph`
+   (`xtask/src/registry_graph.rs`) implements this today as static `syn`
+   extraction of every `build_registry()`/`extend_registry()` call site,
+   resolved to FQNs via each type's `fqn()` impl (direct, or via one of
+   17 local `macro_rules!` helpers, or two `const`-table loop-registration
+   special cases), diffed against the YAML `behavior: plugin` verb set —
+   a completeness diff between two declared corpora, not a call-graph
+   walk. (A live *registry pre-run* — actually calling
+   `build_registry()`/`extend_registry()` and reading `.fqn()` off the
+   real `dyn` objects, optionally capturing `std::any::type_name::<T>()`
+   at a generic call site before erasure — is the lower-maintenance
+   version of the same principle: it can't miss a new macro shape the way
+   the static extractor can, since running the real registration code
+   doesn't require recognizing its syntax. The static extractor was
+   chosen first because it needed no new registry API; revisit if the
+   macro-shape surface keeps growing.) Verified 2026-07-15: 766 registered
+   ops ↔ 766 YAML `plugin` verbs, exact match, 0 dead code / 0 missing
+   registrations / 0 dual-routing — cross-validated against the
+   independent `test_plugin_verb_coverage` test, which also passes.
+
+3. **Harness / tracing — last resort, for genuine cross-process or
+   concurrency questions neither tier above can answer.** Both tiers 1
+   and 2 are static: they describe what the compiled workspace *can*
+   reach, not what actually happens across a real request, a real DB
+   transaction, or concurrent sessions. Reach for this tier only when the
+   question is inherently about runtime behavior across a boundary static
+   analysis can't see through — the Agentic Scenario Harness
+   (`cargo x harness run`, see Quick Start), Chrome DevTools MCP live UI
+   smoke tests, or `session_trace`/`session_replay` — not as a default
+   first move for "is this code used."
+
+Full context: `docs/research/control-plane-ownership-ledger.md`
+("Dead code & dual-routing static sweep").
+
+---
+
 ## Domain Quick Reference
 
 | Domain | Verbs | Purpose |
@@ -887,6 +957,7 @@ When you see these in a task, read the corresponding annex first:
 | "playbook", "LSP", "language server", "Zed extension", "tree-sitter" | `docs/annex-frontend-and-tools.md` |
 | "onboarding pipeline", "RequirementPlanner", "ob-agentic" | `docs/annex-frontend-and-tools.md` |
 | "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
+| "dead code", "unused", "dual routing", "registry-graph", "SemOsVerbOpRegistry", "no-widening", "cargo public-api" | Verification Strategy section above, `docs/research/control-plane-ownership-ledger.md` |
 | "runbook plan", "RunbookPlan", "multi-workspace execution", "plan compiler" | `rust/src/runbook/plan_compiler.rs`, `rust/src/runbook/plan_types.rs` |
 | "session trace", "TraceEntry", "TraceOp", "trace replay", "session_replay" | `rust/src/repl/session_trace.rs`, `rust/src/repl/session_replay.rs` |
 | "plan executor", "advance_plan_step", "forward ref", "EntityBinding" | `rust/src/runbook/plan_executor.rs`, `rust/src/runbook/plan_types.rs` |
