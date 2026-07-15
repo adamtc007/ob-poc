@@ -330,6 +330,25 @@ pub struct EffectiveConstraints {
     pub contributing_packs: Vec<ConstraintSource>,
 }
 
+/// Verb-domain prefixes that are always admitted regardless of which
+/// pack(s) are active — session/viewport control, not pack-domain work.
+///
+/// Before this constant, each pack YAML had to hand-declare its own
+/// `session.*`/`view.*`/`nav.*` subset in `allowed_verbs` to keep those
+/// verbs usable while the pack was active (only 2 of 12 packs did, and
+/// only a partial subset each — `book-setup.yaml` and
+/// `session-bootstrap.yaml`, 2 lines apiece). Every other pack silently
+/// blocked session/navigation verbs the moment it went active. Centralised
+/// here so "is this a global verb" has one answer, not N ad-hoc YAML
+/// lists that drift.
+const GLOBAL_VERB_PREFIXES: &[&str] = &["session.", "view.", "nav."];
+
+fn is_global_verb(verb: &str) -> bool {
+    GLOBAL_VERB_PREFIXES
+        .iter()
+        .any(|prefix| verb.starts_with(prefix))
+}
+
 impl EffectiveConstraints {
     /// Create unconstrained (no active packs).
     pub fn unconstrained() -> Self {
@@ -342,6 +361,10 @@ impl EffectiveConstraints {
 
     /// Check if a verb is allowed under these constraints.
     pub fn is_verb_allowed(&self, verb: &str) -> bool {
+        if is_global_verb(verb) {
+            return true;
+        }
+
         // Forbidden always wins
         if self.forbidden_verbs.contains(verb) {
             return false;
@@ -359,6 +382,9 @@ impl EffectiveConstraints {
         let mut violations = Vec::new();
 
         for verb in verbs {
+            if is_global_verb(verb) {
+                continue;
+            }
             if self.forbidden_verbs.contains(verb) {
                 // Find which pack(s) forbid this verb
                 violations.push(ConstraintViolation {
@@ -730,5 +756,40 @@ mod tests {
         let active = mgr.active_packs();
         assert_eq!(active.len(), 1);
         assert!(active.contains(&"p1"));
+    }
+
+    #[test]
+    fn test_global_verbs_exempt_from_pack_allowed_set() {
+        let mut mgr = PackManager::new();
+        mgr.register_pack(test_manifest("kyc-case", &["kyc-case.create"], &[]));
+        mgr.activate_pack("kyc-case").unwrap();
+        let constraints = mgr.effective_constraints();
+
+        assert!(constraints.is_verb_allowed("session.undo"));
+        assert!(constraints.is_verb_allowed("view.universe"));
+        assert!(constraints.is_verb_allowed("nav.drill"));
+        assert!(!constraints.is_verb_allowed("deal.list"));
+
+        let violations = constraints.check_verbs(&[
+            "session.undo".to_string(),
+            "view.universe".to_string(),
+            "nav.drill".to_string(),
+            "deal.list".to_string(),
+        ]);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].verb, "deal.list");
+    }
+
+    #[test]
+    fn test_global_verbs_exempt_even_from_forbidden_list() {
+        let mut mgr = PackManager::new();
+        mgr.register_pack(test_manifest("p1", &[], &["session.clear"]));
+        mgr.activate_pack("p1").unwrap();
+        let constraints = mgr.effective_constraints();
+
+        // Global-prefix exemption is checked first — a pack explicitly
+        // forbidding a session.*/view.*/nav.* verb is a pack-authoring
+        // mistake, not a case for the constraint to actually block it.
+        assert!(constraints.is_verb_allowed("session.clear"));
     }
 }

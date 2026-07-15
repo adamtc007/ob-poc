@@ -9289,6 +9289,62 @@ impl ReplOrchestratorV2 {
                 bpmn_form: None,
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
+                // Universal pack-switch back-out (the compile-time twin of
+                // try_pack_mismatch_backout): this gate fires on the pack's
+                // own YAML allowed_verbs, which is a different — usually
+                // narrower — set than the SemOS/CCIR allowed_verbs that
+                // feeds verb_search. A verb can be legal under governance
+                // (so verb_search returns it as a real match, auto-confirms,
+                // and reaches compile) yet still be outside the active
+                // pack's own declared universe. Same remediation either way:
+                // if exactly one OTHER loaded pack declares the violating
+                // verb, offer the close-pack/switch-pack decision instead of
+                // a dead-end error.
+                let current_pack_id = pack_ctx.map(|pc| pc.pack_id.clone());
+                let backout = v.violating_verbs.first().and_then(|verb| {
+                    let owners = self.pack_router.packs_declaring_verb(verb);
+                    let [owner] = owners.as_slice() else {
+                        return None;
+                    };
+                    if current_pack_id.as_deref() == Some(owner.id.as_str()) {
+                        return None;
+                    }
+                    Some((verb.clone(), owner.id.clone(), owner.name.clone()))
+                });
+                if let (Some((verb, suggested_pack_id, suggested_pack_name)), Some(current_pack_id)) =
+                    (backout, current_pack_id.clone())
+                {
+                    session.set_state(ReplStateV2::PackMismatchConfirm {
+                        current_pack_id: current_pack_id.clone(),
+                        current_required_slots_remaining: vec![],
+                        current_last_proposal_id: None,
+                        out_of_scope_verb: verb.clone(),
+                        suggested_pack_id,
+                        suggested_pack_name: suggested_pack_name.clone(),
+                        original_input: entry.sentence.clone(),
+                    });
+                    let message = format!(
+                        "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}' and switch to '{}'?",
+                        verb, current_pack_id, suggested_pack_name, current_pack_id, suggested_pack_name
+                    );
+                    return Some(ReplResponseV2 {
+                        state: session.state.clone(),
+                        kind: ReplResponseKindV2::Question {
+                            field: String::new(),
+                            prompt: message.clone(),
+                            answer_kind: "confirm".to_string(),
+                        },
+                        message,
+                        runbook_summary: None,
+                        step_count: session.runbook.entries.len(),
+                        session_feedback: Some(session.build_session_feedback(false)),
+                        narration: None,
+                        trace_id: None,
+                        acp_dag_semantic: None,
+                        bpmn_form: None,
+                    });
+                }
+
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
                 Some(ReplResponseV2 {
                     state: session.state.clone(),
