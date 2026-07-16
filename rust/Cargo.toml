@@ -193,6 +193,14 @@ tonic-build = "0.12"
 
 # Build compute-heavy crates in release mode even during debug builds
 # This dramatically speeds up Candle embeddings (from 20+ min to ~10s)
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.test]
+debug = 1
+incremental = false
+
 [profile.dev.package.candle-core]
 opt-level = 3
 
