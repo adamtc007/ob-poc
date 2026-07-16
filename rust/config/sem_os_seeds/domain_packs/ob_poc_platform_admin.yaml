@@ -1,0 +1,40 @@
+pack_id: ob-poc.platform-admin
+name: ob-poc Platform Admin Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [platform_admin_dag]
+owned_packs: [platform-admin]
+owned_state_machines: []
+owned_constellation_maps: []
+owned_constellation_families: []
+owned_universes: []
+owned_verb_prefixes:
+  - identifier.
+  - admin.
+  - role.
+  - refdata.
+  - team.
+  - user.
+  - access-review.
+owned_entity_kinds:
+  - identifier
+  - role
+  - team
+  - access_review
+business_crates: []
+owned_constellations: []
+allowed_transitions: []
+discovery_probes: []
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

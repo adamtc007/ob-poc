@@ -50,6 +50,51 @@ dsl_verb_reconciliation:
     - onboarding.list-slices
     - service-resource.get-provisioning-status
 
+  billing_surface:
+    - billing.add-account-target
+    - billing.list-account-targets
+    - billing.remove-account-target
+  onboarding_surface:
+    - onboarding.auto-complete
+    - onboarding.cancel-data-request
+    - onboarding.cancel-slice
+    - onboarding.compile-data-request
+    - onboarding.dispatch-ready-slices
+    - onboarding.get-data-request
+    - onboarding.get-slice
+    - onboarding.get-slice-attrs
+    - onboarding.list-data-requests
+    - onboarding.list-slices
+    - onboarding.status
+  provisioning_surface:
+    - provisioning.run
+    - provisioning.status
+  readiness_surface:
+    - readiness.compute
+    - readiness.explain
+  semantic_surface:
+    - semantic.get-state
+    - semantic.list-stages
+    - semantic.missing-entities
+    - semantic.next-actions
+    - semantic.prompt-context
+    - semantic.stages-for-product
+    - semantic.next-actionable
+  sla_surface:
+    - sla.bind
+    - sla.commit
+    - sla.list-commitments
+  cbu_surface:
+    - cbu.read
+  deal_surface:
+    - deal.list-contracts
+    - deal.list-products
+    - deal.read
+    - deal.request-onboarding
+    - deal.request-onboarding-batch
+  service_resource_surface:
+    - service-resource.confirm-provisioning-result
+    - service-resource.get-provisioning-status
 # =============================================================================
 # 1. OVERALL LIFECYCLE — handoff-request journey
 # =============================================================================

@@ -42,8 +42,7 @@ owned_verb_prefixes:
   - struct.
   - party.
   - mandate.
-owned_entity_kinds:
-  - cbu
+owned_entity_kinds: []
 business_crates: []
 owned_constellations:
   - cbu.workspace

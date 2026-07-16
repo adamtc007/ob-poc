@@ -41,6 +41,62 @@ allowed_verbs:
   - cbu.list-subscriptions
   - session.load-galaxy
   - entity.create
+  - bods.discover-ubos
+  - bods.find-by-lei
+  - bods.get-statement
+  - bods.import
+  - bods.link-entity
+  - bods.list-by-entity
+  - bods.list-ownership
+  - bods.list-persons
+  - bods.sync-from-gleif
+  - gleif.enrich
+  - gleif.import-managed-funds
+  - gleif.import-to-client-group
+  - gleif.import-tree
+  - gleif.lookup
+  - gleif.refresh
+  - gleif.resolve-successor
+  - gleif.search
+  - gleif.trace-ownership
+  - research.companies-house.fetch-company
+  - research.companies-house.fetch-officers
+  - research.companies-house.fetch-psc
+  - research.companies-house.import-company
+  - research.companies-house.search
+  - research.generic.normalize
+  - research.import-run.begin
+  - research.import-run.complete
+  - research.import-run.supersede
+  - research.outreach.close-request
+  - research.outreach.create-request
+  - research.outreach.get-request
+  - research.outreach.list-overdue
+  - research.outreach.list-pending
+  - research.outreach.mark-sent
+  - research.outreach.plan-generate
+  - research.outreach.record-response
+  - research.outreach.send-reminder
+  - research.sec-edgar.fetch-beneficial-owners
+  - research.sec-edgar.fetch-company
+  - research.sec-edgar.fetch-filings
+  - research.sec-edgar.import-company
+  - research.sec-edgar.search
+  - research.sources.fetch
+  - research.sources.find-for-jurisdiction
+  - research.sources.info
+  - research.sources.list
+  - research.sources.search
+  - research.workflow.audit-trail
+  - research.workflow.confirm-decision
+  - research.workflow.pending-decisions
+  - research.workflow.record-action
+  - research.workflow.record-anomaly
+  - research.workflow.record-correction
+  - research.workflow.record-decision
+  - research.workflow.reject-decision
+  - research.workflow.resolve-anomaly
+  - research.workflow.supersession-trail
   # Product suite macros
   - structure.product-suite-custody-fa-ta
   - structure.product-suite-full

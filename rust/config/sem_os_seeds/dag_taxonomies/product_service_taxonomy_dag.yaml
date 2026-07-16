@@ -56,12 +56,67 @@ dsl_verb_reconciliation:
     - service-version.compare
     - service-version.draft
     - service-version.update
+    - service-version.publish
+    - service-version.retire
+    - service-version.submit-for-review
   service_catalogue_surface:
     - service.bind-option-source
     - service.constrain-option-values
     - service.list-versions
     - service.show
 
+  attribute_surface:
+    - attribute.define
+    - attribute.define-derived
+    - attribute.define-internal
+    - attribute.list
+    - attribute.read
+  product_service_surface:
+    - product-service.amend
+    - product-service.link
+    - product-service.override-option
+    - product-service.unlink
+  product_surface:
+    - product.amend
+    - product.define
+    - product.list
+    - product.read
+    - product.retire
+  resource_owner_surface:
+    - resource-owner.amend
+    - resource-owner.assign
+    - resource-owner.unassign
+  service_resource_surface:
+    - service-resource.add-capability
+    - service-resource.amend-capability
+    - service-resource.amend-type
+    - service-resource.declare-eligibility
+    - service-resource.declare-fanout-rule
+    - service-resource.define-type
+    - service-resource.list
+    - service-resource.list-attributes
+    - service-resource.list-by-service
+    - service-resource.read
+    - service-resource.remove-capability
+    - service-resource.retire-type
+    - service-resource.sync-definitions
+  service_surface:
+    - service.bind-option-source
+    - service.constrain-option-values
+    - service.declare-option
+    - service.define
+    - service.deprecate
+    - service.deprecate-option
+    - service.list
+    - service.list-by-product
+    - service.list-versions
+    - service.propose-revision
+    - service.read
+    - service.retire
+    - service.show
+  sla_surface:
+    - sla.list-templates
+    - sla.read-template
 # =============================================================================
 # 1. OVERALL LIFECYCLE — catalog-exploration journey
 # =============================================================================

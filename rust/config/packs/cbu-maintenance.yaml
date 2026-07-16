@@ -61,6 +61,57 @@ allowed_verbs:
   - entity.list
   - entity.update
   - trading-profile.read
+  - batch.abort
+  - batch.add-products
+  - batch.continue
+  - batch.pause
+  - batch.resume
+  - batch.skip
+  - batch.status
+  - cbu-group.remove-member
+  - cbu-role.terminate
+  - entity-relationship.upsert
+  - fund.add-investment
+  - fund.add-share-class
+  - fund.add-to-umbrella
+  - fund.create
+  - fund.delete-compartment
+  - fund.delete-vehicle
+  - fund.end-investment
+  - fund.ensure
+  - fund.link-feeder
+  - fund.list-by-manager
+  - fund.list-by-vehicle-type
+  - fund.list-compartments-by-umbrella
+  - fund.list-feeders
+  - fund.list-investments
+  - fund.list-investors
+  - fund.list-share-classes
+  - fund.list-subfunds
+  - fund.read-compartment
+  - fund.read-vehicle
+  - fund.update-investment
+  - fund.upsert-compartment
+  - fund.upsert-vehicle
+  - service-intent.cancel
+  - service-intent.create
+  - service-intent.list
+  - service-intent.resume
+  - service-intent.supersede
+  - service-intent.suspend
+  - sla.escalate-breach
+  - sla.list-measurements
+  - sla.list-open-breaches
+  - sla.record-measurement
+  - sla.report-breach
+  - sla.resolve-breach
+  - sla.suspend-commitment
+  - sla.update-remediation
+  - regulatory.registration.add
+  - regulatory.registration.list
+  - regulatory.registration.remove
+  - regulatory.registration.verify
+  - regulatory.status.check
   # Product suite macros
   - structure.product-suite-custody-fa-ta
   - structure.product-suite-full

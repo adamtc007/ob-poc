@@ -24,8 +24,7 @@ owned_verb_prefixes:
   - trading-profile.
   - settlement-chain.
   - trade-gateway.
-owned_entity_kinds:
-  - cbu
+owned_entity_kinds: []
 business_crates:
   - ob-poc-trading-profile
 owned_constellations:

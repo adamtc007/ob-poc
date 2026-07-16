@@ -23,6 +23,11 @@ dsl_verb_reconciliation:
     - catalogue.list-proposals
     - catalogue.propose-verb-declaration
 
+  catalogue_surface:
+    - catalogue.commit-verb-declaration
+    - catalogue.list-proposals
+    - catalogue.propose-verb-declaration
+    - catalogue.rollback-verb-declaration
 # =============================================================================
 # 1. SLOTS
 # =============================================================================

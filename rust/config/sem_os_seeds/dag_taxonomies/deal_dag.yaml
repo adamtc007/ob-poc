@@ -77,6 +77,29 @@ dsl_verb_reconciliation:
     - deal.list-contracts
     - deal.read
 
+  billing_surface:
+    - billing.activate-profile
+    - billing.approve-period
+    - billing.calculate-period
+    - billing.close-profile
+    - billing.create-period
+    - billing.dispute-period
+    - billing.generate-invoice
+    - billing.get-profile
+    - billing.list-profiles
+    - billing.period-summary
+    - billing.revenue-summary
+    - billing.review-period
+    - billing.suspend-profile
+    - billing.create-profile
+  contract_surface:
+    - contract.create
+  deal_surface:
+    - deal.create
+    - deal.list
+    - deal.list-contracts
+    - deal.read
+    - deal.set-stage
 # =============================================================================
 # 1. OVERALL DEAL LIFECYCLE (per deal, derived)
 # =============================================================================

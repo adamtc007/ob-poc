@@ -48,6 +48,23 @@ allowed_verbs:
   - cbu.read
   - semantic.next-actionable
   - onboarding.status
+  - billing.add-account-target
+  - billing.list-account-targets
+  - billing.remove-account-target
+  - onboarding.auto-complete
+  - provisioning.run
+  - provisioning.status
+  - readiness.compute
+  - readiness.explain
+  - semantic.get-state
+  - semantic.list-stages
+  - semantic.missing-entities
+  - semantic.next-actions
+  - semantic.prompt-context
+  - semantic.stages-for-product
+  - sla.bind
+  - sla.commit
+  - sla.list-commitments
   # Post-handoff service-resource data dictionary lifecycle (Tranche 4 / v0.5)
   # These operate on the deal_onboarding_request created by deal.request-onboarding
   # and walk the compile → dispatch → confirm → status chain.

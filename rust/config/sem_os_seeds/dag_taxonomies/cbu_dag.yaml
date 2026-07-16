@@ -79,6 +79,253 @@ dsl_verb_reconciliation:
     - cbu.validate-option-coverage
     - cbu.compute-resource-fanout
 
+  allegation_surface:
+    - allegation.contradict
+    - allegation.list-by-entity
+    - allegation.list-pending
+    - allegation.mark-partial
+    - allegation.record
+    - allegation.verify
+  batch_surface:
+    - batch.abort
+    - batch.add-products
+    - batch.continue
+    - batch.pause
+    - batch.resume
+    - batch.skip
+    - batch.status
+  cbu_group_surface:
+    - cbu-group.remove-member
+  cbu_role_surface:
+    - cbu-role.terminate
+  discrepancy_surface:
+    - discrepancy.escalate
+    - discrepancy.list-open
+    - discrepancy.record
+    - discrepancy.resolve
+  docs_bundle_surface:
+    - docs-bundle.apply
+    - docs-bundle.list-applied
+    - docs-bundle.list-available
+  document_surface:
+    - document.catalog
+    - document.compute-requirements
+    - document.create
+    - document.create-request
+    - document.extract
+    - document.for-entity
+    - document.get
+    - document.list-requests-by-workstream
+    - document.list-versions
+    - document.mark-received
+    - document.mark-requested
+    - document.missing-for-entity
+    - document.reject
+    - document.reject-request
+    - document.start-qa
+    - document.upload-version
+    - document.verify
+    - document.verify-request
+    - document.waive-request
+    - document.list
+    - document.list-missing
+    - document.solicit
+    - document.solicit-batch
+  economic_exposure_surface:
+    - economic-exposure.compute
+    - economic-exposure.summary
+  entity_relationship_surface:
+    - entity-relationship.upsert
+  evidence_surface:
+    - evidence.attach-document
+    - evidence.create-requirement
+    - evidence.mark-rejected
+    - evidence.mark-verified
+    - evidence.mark-waived
+  fund_surface:
+    - fund.add-investment
+    - fund.add-share-class
+    - fund.add-to-umbrella
+    - fund.create
+    - fund.delete-compartment
+    - fund.delete-vehicle
+    - fund.end-investment
+    - fund.ensure
+    - fund.link-feeder
+    - fund.list-by-manager
+    - fund.list-by-vehicle-type
+    - fund.list-compartments-by-umbrella
+    - fund.list-feeders
+    - fund.list-investments
+    - fund.list-investors
+    - fund.list-share-classes
+    - fund.list-subfunds
+    - fund.read-compartment
+    - fund.read-vehicle
+    - fund.update-investment
+    - fund.upsert-compartment
+    - fund.upsert-vehicle
+  issuer_control_config_surface:
+    - issuer-control-config.read
+    - issuer-control-config.upsert
+  kyc_agreement_surface:
+    - kyc-agreement.create
+    - kyc-agreement.list
+    - kyc-agreement.read
+    - kyc-agreement.update-status
+  observation_surface:
+    - observation.get-current
+    - observation.list-for-attribute
+    - observation.list-for-entity
+    - observation.reconcile
+    - observation.record
+    - observation.record-from-document
+    - observation.supersede
+    - observation.verify-allegations
+  ownership_surface:
+    - ownership.bridge.bods-ownership
+    - ownership.bridge.gleif-fund-managers
+    - ownership.bridge.manco-roles
+    - ownership.control-links.compute
+    - ownership.control-links.list
+    - ownership.refresh
+  request_surface:
+    - request.cancel
+    - request.create
+    - request.escalate
+    - request.extend
+    - request.fulfill
+    - request.list
+    - request.overdue
+    - request.remind
+    - request.waive
+  requirement_surface:
+    - requirement.create
+    - requirement.create-set
+    - requirement.get
+    - requirement.list-for-entity
+    - requirement.list-for-workflow
+    - requirement.list-outstanding
+    - requirement.list-with-status
+    - requirement.mark-expired
+    - requirement.reset
+    - requirement.waive
+  service_intent_surface:
+    - service-intent.cancel
+    - service-intent.create
+    - service-intent.list
+    - service-intent.resume
+    - service-intent.supersede
+    - service-intent.suspend
+  sla_surface:
+    - sla.escalate-breach
+    - sla.list-measurements
+    - sla.list-open-breaches
+    - sla.record-measurement
+    - sla.report-breach
+    - sla.resolve-breach
+    - sla.suspend-commitment
+    - sla.update-remediation
+  verify_surface:
+    - verify.assert
+    - verify.calculate-confidence
+    - verify.challenge
+    - verify.detect-evasion
+    - verify.detect-patterns
+    - verify.escalate
+    - verify.get-status
+    - verify.list-challenges
+    - verify.list-escalations
+    - verify.list-patterns
+    - verify.record-pattern
+    - verify.resolve-challenge
+    - verify.resolve-escalation
+    - verify.resolve-pattern
+    - verify.respond-to-challenge
+    - verify.verify-against-registry
+  cbu_surface:
+    - cbu.add-product
+    - cbu.assign-role
+    - cbu.bind-service-options
+    - cbu.compute-resource-fanout
+    - cbu.create
+    - cbu.create-from-client-group
+    - cbu.dirty-flag-bindings
+    - cbu.ensure
+    - cbu.inspect
+    - cbu.link-structure
+    - cbu.list
+    - cbu.list-subscriptions
+    - cbu.override-option-binding
+    - cbu.parties
+    - cbu.products
+    - cbu.read
+    - cbu.recompute-bindings
+    - cbu.remove-product
+    - cbu.remove-role
+    - cbu.rename
+    - cbu.submit-for-validation
+    - cbu.update
+    - cbu.validate-option-coverage
+  entity_surface:
+    - entity.create
+    - entity.list
+    - entity.read
+    - entity.update
+  kyc_case_surface:
+    - kyc-case.create
+    - kyc-case.list-by-cbu
+    - kyc-case.update-status
+  kyc_surface:
+    - kyc.case-status
+    - kyc.list-missing-items
+    - kyc.obligation.create
+    - kyc.obligation.satisfy
+    - kyc.obligation.update-identity
+    - kyc.obligation.update-risk
+    - kyc.obligation.update-screening
+    - kyc.obligation.waive
+    - kyc.person.approve
+    - kyc.person.reject
+    - kyc.role.assign
+    - kyc.role.withdraw
+    - kyc.subject.classify-structure
+    - kyc.subject.register
+  onboarding_surface:
+    - onboarding.status
+  red_flag_surface:
+    - red-flag.escalate
+    - red-flag.raise
+  screening_surface:
+    - screening.adverse-media
+    - screening.bulk-refresh
+    - screening.pep
+    - screening.review-hit
+    - screening.run
+    - screening.sanctions
+  tollgate_surface:
+    - tollgate.evaluate
+    - tollgate.override
+  trading_profile_surface:
+    - trading-profile.read
+  ubo_surface:
+    - ubo.determination.apply-smo-fallback
+    - ubo.determination.compute-fold
+    - ubo.determination.freeze
+    - ubo.determination.select-strategy
+    - ubo.edge.assert-control
+    - ubo.edge.assert-economic-interest
+    - ubo.edge.attach-evidence
+    - ubo.edge.reconcile-conflict
+    - ubo.edge.supersede
+    - ubo.edge.verify
+  regulatory_registration_surface:
+    - regulatory.registration.add
+    - regulatory.registration.list
+    - regulatory.registration.remove
+    - regulatory.registration.verify
+  regulatory_status_surface:
+    - regulatory.status.check
 # =============================================================================
 # 1. OVERALL CBU LIFECYCLE (per CBU, derived)
 # =============================================================================

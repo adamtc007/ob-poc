@@ -1,0 +1,191 @@
+# Platform Admin Workspace — DAG Taxonomy (scaffold, generated 2026-07-16)
+#
+# STATUS: scaffold. Verbs below are declared node-global to this
+# workspace via dsl_verb_reconciliation only — no real state machines
+# have been authored for the `role`, `team`, `user`, or `access_review`
+# slots yet (e.g. team.create -> active -> archived is plausible from
+# the verb names but was NOT guessed at here; author it explicitly as
+# follow-up work rather than trusting an inferred state machine).
+
+version: "1.0"
+workspace: platform_admin
+dag_id: platform_admin_dag
+
+dsl_verb_reconciliation:
+  reference_data_surface:
+      - admin.regulators.create
+      - admin.regulators.deactivate
+      - admin.regulators.list
+      - admin.regulators.read
+      - admin.regulators.update
+      - admin.role-types.create
+      - admin.role-types.deactivate
+      - admin.role-types.list
+      - admin.role-types.read
+      - admin.role-types.update
+      - identifier.attach
+      - identifier.attach-clearstream
+      - identifier.attach-lei
+      - identifier.find-by-clearstream
+      - identifier.find-by-isin
+      - identifier.find-by-lei
+      - identifier.invalidate
+      - identifier.list-by-entity
+      - identifier.remove
+      - identifier.update-lei-status
+      - identifier.validate
+      - refdata.deactivate
+      - refdata.ensure
+      - refdata.list
+      - refdata.load-all
+      - refdata.load-instrument-classes
+      - refdata.load-markets
+      - refdata.load-sla-templates
+      - refdata.load-subcustodians
+      - refdata.read
+      - role.delete
+      - role.ensure
+      - role.list
+      - role.read
+  access_entitlement_surface:
+      - access-review.attest
+      - access-review.audit-report
+      - access-review.bulk-confirm
+      - access-review.campaign-status
+      - access-review.confirm-access
+      - access-review.confirm-all-clean
+      - access-review.create-campaign
+      - access-review.escalate-item
+      - access-review.extend-access
+      - access-review.launch-campaign
+      - access-review.list-flagged
+      - access-review.list-items
+      - access-review.my-pending
+      - access-review.populate-campaign
+      - access-review.process-deadline
+      - access-review.revoke-access
+      - access-review.send-reminders
+      - team.add-cbu-access
+      - team.add-governance-member
+      - team.add-member
+      - team.archive
+      - team.create
+      - team.grant-service
+      - team.read
+      - team.remove-cbu-access
+      - team.remove-member
+      - team.revoke-service
+      - team.transfer-member
+      - team.update-member
+      - user.create
+      - user.offboard
+      - user.reactivate
+      - user.suspend
+
+  access_review_surface:
+    - access-review.attest
+    - access-review.audit-report
+    - access-review.bulk-confirm
+    - access-review.campaign-status
+    - access-review.confirm-access
+    - access-review.confirm-all-clean
+    - access-review.create-campaign
+    - access-review.escalate-item
+    - access-review.extend-access
+    - access-review.launch-campaign
+    - access-review.list-flagged
+    - access-review.list-items
+    - access-review.my-pending
+    - access-review.populate-campaign
+    - access-review.process-deadline
+    - access-review.revoke-access
+    - access-review.send-reminders
+  admin_regulators_surface:
+    - admin.regulators.create
+    - admin.regulators.deactivate
+    - admin.regulators.list
+    - admin.regulators.read
+    - admin.regulators.update
+  admin_role_types_surface:
+    - admin.role-types.create
+    - admin.role-types.deactivate
+    - admin.role-types.list
+    - admin.role-types.read
+    - admin.role-types.update
+  identifier_surface:
+    - identifier.attach
+    - identifier.attach-clearstream
+    - identifier.attach-lei
+    - identifier.find-by-clearstream
+    - identifier.find-by-isin
+    - identifier.find-by-lei
+    - identifier.invalidate
+    - identifier.list-by-entity
+    - identifier.remove
+    - identifier.update-lei-status
+    - identifier.validate
+  refdata_surface:
+    - refdata.deactivate
+    - refdata.ensure
+    - refdata.list
+    - refdata.load-all
+    - refdata.load-instrument-classes
+    - refdata.load-markets
+    - refdata.load-sla-templates
+    - refdata.load-subcustodians
+    - refdata.read
+  role_surface:
+    - role.delete
+    - role.ensure
+    - role.list
+    - role.read
+  team_surface:
+    - team.add-cbu-access
+    - team.add-governance-member
+    - team.add-member
+    - team.archive
+    - team.create
+    - team.grant-service
+    - team.read
+    - team.remove-cbu-access
+    - team.remove-member
+    - team.revoke-service
+    - team.transfer-member
+    - team.update-member
+  user_surface:
+    - user.create
+    - user.offboard
+    - user.reactivate
+    - user.suspend
+slots:
+  - id: workspace_root
+    stateless: true
+    rationale: "Aggregation root for platform admin domain."
+
+  - id: role
+    stateless: true
+    rationale: "Reference-data vocabulary. State machine not yet authored (scaffold)."
+
+  - id: team
+    stateless: false
+    state_machine: "(scaffold — team.create/archive suggest a real lifecycle; not authored here, follow-up work.)"
+
+  - id: access_review
+    stateless: false
+    state_machine: "(scaffold — campaign create/launch/confirm/revoke/close suggest a real lifecycle; not authored here, follow-up work.)"
+
+cross_slot_constraints: []
+cross_workspace_constraints: []
+derived_cross_workspace_state: []
+product_module_gates:
+  always_on:
+    - workspace_root
+    - role
+    - team
+    - access_review
+  conditionally_on: []
+out_of_scope: []
+prune_cascade_rules: []
+prune_pre_validation:
+  required_verbs: []
+  abort_conditions: []
