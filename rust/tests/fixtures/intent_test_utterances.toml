@@ -1248,27 +1248,12 @@ difficulty = "hard"
 notes = "Fee inquiry maps to rate card lines on the deal"
 
 # ============================================================================
-# BOOKING PRINCIPAL DOMAIN
+# BOOKING PRINCIPAL DOMAIN removed 2026-07-16 — the booking-principal
+# domain was deleted from the product 2026-06-15 (commit `00781591`,
+# "remove booking principals"); these two cases were still grading
+# against verbs that no longer exist in the registry, inflating the
+# harness's "Vocabulary" failure count against dead product surface.
 # ============================================================================
-
-[[test]]
-utterance = "set up a booking principal for this deal"
-expected_verb = "booking-principal.create"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "booking-principal"
-category = "direct"
-difficulty = "medium"
-
-[[test]]
-utterance = "which booking entity handles custody for Ireland?"
-expected_verb = "booking-principal.coverage-matrix"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "booking-principal"
-category = "natural"
-difficulty = "hard"
-notes = "Query about principal coverage by jurisdiction maps to coverage-matrix"
 
 # ============================================================================
 # SCENARIO DOMAIN (Tier -2A: Compound journey-level utterances)
