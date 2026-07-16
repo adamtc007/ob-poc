@@ -2502,8 +2502,25 @@ fn deploy(sh: &Shell, release: bool, port: u16, no_run: bool, skip_frontend: boo
     });
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    // Step 2: Build React frontend (unless skipped)
+    // Step 2: Build observatory-wasm (egui canvas embedded in React) + React frontend (unless skipped)
     if !skip_frontend {
+        println!("\nStep {}: Building observatory-wasm...", step);
+        step += 1;
+        let observatory_wasm_dir = root.join("observatory-wasm");
+        if observatory_wasm_dir.exists() {
+            sh.change_dir(&observatory_wasm_dir);
+            cmd!(sh, "wasm-pack build --target web")
+                .run()
+                .context("Failed to build observatory-wasm")?;
+            println!("  observatory-wasm built successfully");
+        } else {
+            println!(
+                "  Warning: observatory-wasm directory not found at {:?}",
+                observatory_wasm_dir
+            );
+            println!("  Skipping observatory-wasm build...");
+        }
+
         println!("\nStep {}: Building React frontend...", step);
         step += 1;
         let react_dir = root.join("ob-poc-ui-react");

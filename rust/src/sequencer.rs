@@ -2177,9 +2177,33 @@ impl ReplOrchestratorV2 {
                     // Not a selection from the list — fall through to fresh resolution.
                 }
 
-                // If the input text is a complex utterance (> 2 words), the sequencer should
-                // attempt verb matching first in ScopeGate. If a confident match (>= 0.7) is found,
-                // it should transition to RunbookEditing and propose the verb.
+                // Try an exact/alias client-group match first. This must win over the
+                // complex-utterance verb-search branch below: a decision-reply exact answer
+                // (e.g. a ScopeGate button for "Allianz Global Investors") is indistinguishable
+                // on the wire from free-typed chat text, and most client group names are 3+
+                // words — without this, exact button-driven answers were racing into verb
+                // search and getting matched to an unrelated verb (e.g. "deal.list") instead of
+                // resolving scope.
+                #[cfg(feature = "database")]
+                let mut precomputed_outcome: Option<crate::repl::bootstrap::BootstrapOutcome> =
+                    None;
+                #[cfg(feature = "database")]
+                if let Some(pool) = self.pool() {
+                    let outcome =
+                        crate::repl::bootstrap::resolve_client_input(&content, pool).await;
+                    if matches!(
+                        outcome,
+                        crate::repl::bootstrap::BootstrapOutcome::Resolved { .. }
+                    ) {
+                        return self.handle_bootstrap_outcome(session, outcome).await;
+                    }
+                    precomputed_outcome = Some(outcome);
+                }
+
+                // If the input text is a complex utterance (> 2 words) and it didn't resolve
+                // exactly to a client group above, the sequencer should attempt verb matching
+                // next. If a confident match (>= 0.7) is found, it should transition to
+                // RunbookEditing and propose the verb.
                 let is_complex = content.split_whitespace().count() > 2;
                 if is_complex {
                     if let Some(svc) = &self.intent_service {
@@ -2221,12 +2245,13 @@ impl ReplOrchestratorV2 {
                     }
                 }
 
-                // Resolve the input against client groups.
+                // Resolve the input against client groups (reusing the outcome computed above
+                // to avoid a second DB round trip).
                 #[cfg(feature = "database")]
                 {
                     if let Some(pool) = self.pool() {
-                        let mut outcome =
-                            crate::repl::bootstrap::resolve_client_input(&content, pool).await;
+                        let mut outcome = precomputed_outcome
+                            .unwrap_or(crate::repl::bootstrap::BootstrapOutcome::Empty);
                         if session.is_test_session
                             && !matches!(
                                 outcome,
