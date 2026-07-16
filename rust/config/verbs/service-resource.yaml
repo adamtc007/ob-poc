@@ -695,7 +695,7 @@ domains:
             lookup:
               table: markets
               entity_type: market
-              schema: custody
+              schema: ob-poc
               search_key: mic
               primary_key: market_id
           - name: currency

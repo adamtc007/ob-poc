@@ -32,7 +32,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: source

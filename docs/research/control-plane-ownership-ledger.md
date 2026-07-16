@@ -2515,3 +2515,98 @@ pack 'kyc-case' (1 unexecuted step(s) dropped). Switching to 'Deal
 Lifecycle'." New unit test `test_pending_count_excludes_terminal_and_
 disabled` covers the `pending_count()`/`clear()` interplay directly. Full
 `ob-poc` lib suite 2194/2194, clippy clean.
+
+### Verb-YAML schema-name defect sweep (2026-07-16)
+
+Traced during a G14 arming-blocker audit: the ledger's own prior entries
+("G14's table-name-format mismatch fixed" and the follow-up adversarial
+review) had characterized the non-`ob-poc`-schema verb YAML footprint as
+"6" then "9 more than that" — both undercounts. `crud_executor.rs` and
+`dsl_v2::generic_executor.rs` both build raw schema-qualified SQL directly
+from each verb's YAML `crud.schema`/`args[].lookup.schema` field with no
+normalization, so any verb declaring a schema outside the live DB's real
+7 (`_sqlx_test`, `dsl_bus`, `ob-poc`, `public`, `sem_reg`,
+`sem_reg_authoring`, `sem_reg_pub`) would hard-fail at dispatch with
+`schema "X" does not exist` — independent of the control-plane/G14 work
+entirely, plain broken CRUD.
+
+A PyYAML sweep across all 146 `config/verbs/**/*.yaml` files found **283
+mismatches across 35 files** (`kyc`/`teams`/`client_portal`/`ob_ref`/
+`ob_kyc`/`custody` — leftover from an abandoned per-domain-schema naming
+convention; everything actually lives under the single `"ob-poc"` schema).
+Cross-checked the 43 distinct table names named by these mismatches
+against live `information_schema.tables`:
+
+- **32 tables exist verbatim under `"ob-poc"`** — pure schema-string typo.
+  Fixed mechanically: `sed` replace of the 6 bad literal schema values
+  with `ob-poc` across all 283 occurrences (verified the literal string
+  `schema: <badvalue>` never appears outside a `crud:`/`lookup:` block
+  first — one incidental false-positive substring inside a free-text
+  `description:` field, distinct value, did not match).
+- **2 tables exist under a different real name** — renamed in the verb
+  YAML rather than schema-only-fixed: `access-review.audit-report`'s
+  `access_review_attestations` → `access_attestations`; `team.{grant,
+  revoke}-service`'s `team_entitlements` → `team_service_entitlements`.
+  Column-shape-checked both against the real tables before treating as
+  safe (`access_attestations` has the `campaign_id` FK the verb's
+  `list_by_fk` op requires; `team_service_entitlements` has the
+  `UNIQUE(team_id, service_code)` the verb's `conflict_keys` upsert
+  requires). Found a second, independent bug on `grant-service` in the
+  same pass: its `config` arg's `maps_to: entitlement_config` targeted a
+  column that has never existed on either table name — fixed to
+  `maps_to: config` alongside the rename.
+- **9 tables have no match at all** under any name (exact or `ilike`
+  fuzzy) in the live DB — `regulatory_tiers`, `partnership_capital`,
+  `tollgate_overrides`, `trust_provisions`, `investor_lifecycle_audit`,
+  `v_governance_access`, `v_effective_memberships`, `v_team_cbu_access`,
+  `v_user_cbu_access`. These had never been wired to real storage —
+  killed rather than fixed: 19 verbs deleted outright (whole
+  `admin.regulatory-tiers` domain; `partnership.{add-partner,withdraw-
+  partner,list-partners}`; `tollgate.{list-overrides,expire-override}`;
+  `trust.{record-provision,update-provision,end-provision,list-
+  provisions,list-by-holder}`; `investor.get-lifecycle-history`;
+  `team.{verify-governance-access,list-members,list-cbus}`;
+  `user.{list-teams,list-cbus,check-access}`). Each domain's sibling
+  `plugin`-behavior verbs (e.g. `partnership.reconcile`, `trust.classify`,
+  the whole `partnership.record-{contribution,distribution}` pair) were
+  checked against the mismatch list and left untouched — they don't
+  declare a `crud:` block at all, so this YAML-level audit can't speak to
+  whether their Rust handler code is live; a `dyn`-dispatch registry-graph
+  question (tier 2 in the Verification Strategy section), not a schema-
+  string one, and out of this sweep's scope.
+
+Verified: re-ran the audit script post-fix (0 mismatches, 0 files
+affected); confirmed all 146 verb YAML files still parse; `cargo x verbs
+check` — 1257 verbs in YAML (down from 1276), 0 hash mismatches, 0
+missing-in-DB, 19 orphaned-in-DB (expected, stale rows for the killed
+verbs); `cargo x verbs compile` — Removed: 19, 0 errors, 0 warnings.
+`populate_embeddings` does not auto-prune pattern rows for verbs no
+longer in YAML (only centroids-without-patterns) — manually pruned 321
+stale `verb_pattern_embeddings` rows + 19 stale `verb_centroids` rows for
+the 19 killed verb FQNs (confirmed 0 remaining after). Re-ran `cargo x
+verbs check` — 0 orphaned. `test_plugin_verb_coverage` — pass (the 19
+killed verbs were all `crud`-behavior, so the plugin-op registry is
+unaffected). `domain_metadata.yaml` itself had no footprint entries for
+the 19 killed verbs, but a broader grep across `config/` + `src/` +
+`crates/` — done only *after* the initial deletion, not before, an
+after-the-fact correction to what this entry originally (wrongly) claimed
+— found 6 `config/sem_os_seeds/constellation_maps/*.yaml` files with 20
+dangling slot-verb references to the killed FQNs (`cbu_workspace`,
+`semos_workspace`, `fund_administration`, `governance_compliance`,
+`kyc_extended`, `kyc_onboarding`). Removed each dangling line; where a
+line was the slot's sole entry it was dropped entirely, where it was one
+line among several sibling verbs on the same slot only that line was
+removed. Left two slots (`fund_administration`'s and `kyc_extended`'s
+`partnership` slots) with no remaining `when: empty` bootstrap verb now
+that `partnership.add-partner` is gone — did not invent a replacement
+`when` trigger on a sibling verb to compensate, since that would be
+guessing at business semantics rather than mechanical dead-ref removal;
+flagged here as a follow-up if that slot's empty-state activation turns
+out to matter. Re-verified: 0 dangling refs left (repo-wide grep), all
+touched constellation YAML still parses, `cargo x verbs check` still
+1257/0/0/0 clean. `sem-reg domain-pack-check` itself could not be used to
+confirm no seed-loader regression — it fails identically on the untouched
+`git stash`-baseline tree with `domain pack owns unknown entity kind
+product_service` (pre-existing, `ob-poc.product-service-taxonomy`, no
+file this sweep touched), so that check was inconclusive by construction,
+not skipped.

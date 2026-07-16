@@ -29,7 +29,7 @@ domains:
         crud:
           operation: select
           table: role_types
-          schema: ob_ref
+          schema: ob-poc
           multiple: true
         args:
           - name: category
@@ -74,7 +74,7 @@ domains:
         crud:
           operation: select
           table: role_types
-          schema: ob_ref
+          schema: ob-poc
         args:
           - name: code
             type: string
@@ -113,7 +113,7 @@ domains:
         crud:
           operation: upsert
           table: role_types
-          schema: ob_ref
+          schema: ob-poc
           returning: role_type_id
           conflict_keys:
             - code
@@ -196,7 +196,7 @@ domains:
         crud:
           operation: update
           table: role_types
-          schema: ob_ref
+          schema: ob-poc
         args:
           - name: code
             type: string
@@ -254,7 +254,7 @@ domains:
         crud:
           operation: update
           table: role_types
-          schema: ob_ref
+          schema: ob-poc
         args:
           - name: code
             type: string

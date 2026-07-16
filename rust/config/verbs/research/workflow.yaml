@@ -45,7 +45,7 @@ domains:
         crud:
           operation: insert
           table: research_decisions
-          schema: kyc
+          schema: ob-poc
           returning: decision_id
         args:
           - name: target-entity-id
@@ -213,7 +213,7 @@ domains:
         crud:
           operation: insert
           table: research_actions
-          schema: kyc
+          schema: ob-poc
           returning: action_id
         args:
           - name: target-entity-id
@@ -314,7 +314,7 @@ domains:
         crud:
           operation: insert
           table: research_corrections
-          schema: kyc
+          schema: ob-poc
           returning: correction_id
         args:
           - name: original-decision-id
@@ -387,7 +387,7 @@ domains:
         crud:
           operation: insert
           table: research_anomalies
-          schema: kyc
+          schema: ob-poc
           returning: anomaly_id
         args:
           - name: action-id
@@ -452,7 +452,7 @@ domains:
         crud:
           operation: update
           table: research_anomalies
-          schema: kyc
+          schema: ob-poc
         args:
           - name: anomaly-id
             type: uuid
@@ -568,7 +568,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
         returns:
@@ -605,7 +605,7 @@ domains:
         crud:
           operation: select
           table: research_decisions
-          schema: kyc
+          schema: ob-poc
         args:
           - name: source-provider
             type: string

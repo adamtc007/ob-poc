@@ -51,11 +51,6 @@ slots:
     cardinality: optional
     depends_on: [entity]
     verbs:
-      record_provision: { verb: trust.record-provision, when: [empty, filled] }
-      update_provision: { verb: trust.update-provision, when: filled }
-      end_provision: { verb: trust.end-provision, when: filled }
-      list_provisions: trust.list-provisions
-      list_by_holder: trust.list-by-holder
       analyze_control: { verb: trust.analyze-control, when: filled }
       identify_ubos: { verb: trust.identify-ubos, when: filled }
       classify: { verb: trust.classify, when: [empty, filled] }
@@ -69,11 +64,8 @@ slots:
     cardinality: optional
     depends_on: [entity]
     verbs:
-      add_partner: { verb: partnership.add-partner, when: [empty, filled] }
       record_contribution: { verb: partnership.record-contribution, when: filled }
       record_distribution: { verb: partnership.record-distribution, when: filled }
-      withdraw_partner: { verb: partnership.withdraw-partner, when: filled }
-      list_partners: partnership.list-partners
       reconcile: { verb: partnership.reconcile, when: filled }
       analyze_control: { verb: partnership.analyze-control, when: filled }
   # red_flag verbs are annotations/events ON entities, not entities

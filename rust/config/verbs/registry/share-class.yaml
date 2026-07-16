@@ -27,7 +27,7 @@ domains:
         crud:
           operation: upsert
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
             - cbu_id
@@ -180,7 +180,7 @@ domains:
         crud:
           operation: upsert
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           conflict_keys:
             - cbu_id
             - isin
@@ -332,7 +332,7 @@ domains:
         crud:
           operation: update
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
           - name: share-class-id
@@ -342,7 +342,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: nav-per-share
@@ -385,7 +385,7 @@ domains:
         crud:
           operation: select
           table: share_classes
-          schema: kyc
+          schema: ob-poc
         args:
           - name: share-class-id
             type: uuid
@@ -394,7 +394,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
         returns:
@@ -429,7 +429,7 @@ domains:
         crud:
           operation: list_by_fk
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           fk_col: cbu_id
         args:
           - name: cbu-id
@@ -477,7 +477,7 @@ domains:
         crud:
           operation: update
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             status: closed
@@ -489,7 +489,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
         returns:

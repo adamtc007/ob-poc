@@ -34,7 +34,7 @@ domains:
         crud:
           operation: insert
           table: investors
-          schema: kyc
+          schema: ob-poc
           returning: investor_id
         args:
           - name: entity-id
@@ -125,7 +125,7 @@ domains:
         crud:
           operation: upsert
           table: investors
-          schema: kyc
+          schema: ob-poc
           returning: investor_id
           conflict_keys:
             - entity_id
@@ -218,7 +218,7 @@ domains:
         crud:
           operation: select
           table: investors
-          schema: kyc
+          schema: ob-poc
         args:
           - name: investor-id
             type: uuid
@@ -227,7 +227,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
         returns:
@@ -264,7 +264,7 @@ domains:
         crud:
           operation: list_by_fk
           table: investors
-          schema: kyc
+          schema: ob-poc
           fk_col: owning_cbu_id
         args:
           - name: owning-cbu-id
@@ -314,7 +314,7 @@ domains:
         crud:
           operation: list_by_fk
           table: investors
-          schema: kyc
+          schema: ob-poc
           fk_col: entity_id
         args:
           - name: entity-id
@@ -370,7 +370,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: required-documents
@@ -425,7 +425,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: case-id
@@ -435,7 +435,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
             description: Link to existing KYC case (optional - can create new)
@@ -490,7 +490,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: risk-rating
@@ -561,7 +561,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: rejection-reason
@@ -618,7 +618,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: eligible-share-classes
@@ -673,7 +673,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: holding-id
@@ -683,7 +683,7 @@ domains:
             lookup:
               table: holdings
               entity_type: holding
-              schema: kyc
+              schema: ob-poc
               search_key: id
               primary_key: id
             description: Initial holding created for investor
@@ -727,7 +727,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
         returns:
@@ -774,7 +774,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: full-redemption
@@ -822,7 +822,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: remaining-balance
@@ -876,7 +876,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: offboard-reason
@@ -939,7 +939,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: suspension-reason
@@ -999,7 +999,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: reinstate-to-state
@@ -1061,7 +1061,7 @@ domains:
         crud:
           operation: update
           table: investors
-          schema: kyc
+          schema: ob-poc
           key: investor_id
         args:
           - name: investor-id
@@ -1071,7 +1071,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: next-review-date
@@ -1089,53 +1089,6 @@ domains:
       # ============================================
       # Query/reporting verbs
       # ============================================
-      get-lifecycle-history:
-        flavour: attribute_mutating
-        description: Get lifecycle state change history for an investor
-        effect_class: read_snapshot
-        metadata:
-          tier: reference
-          source_of_truth: register
-          scope: cbu
-          noun: investor
-          subject_kinds: [investor]
-          phase_tags: [trading]
-          side_effects: facts_only
-          harm_class: read_only
-        invocation_phrases:
-          - "show investor lifecycle history"
-          - "get state change audit trail"
-          - "investor status change log"
-          - "what transitions has investor had"
-          - "show investor onboarding timeline"
-          - "display investor audit history"
-          - "track investor state changes"
-          - "review investor lifecycle events"
-        behavior: crud
-        crud:
-          operation: list_by_fk
-          table: investor_lifecycle_audit
-          schema: kyc
-          fk_col: investor_id
-          order_by: changed_at DESC
-        args:
-          - name: investor-id
-            type: uuid
-            required: true
-            lookup:
-              table: investors
-              entity_type: investor
-              schema: kyc
-              search_key: investor_name
-              primary_key: investor_id
-        returns:
-          type: record_set
-        three_axis:
-          state_effect: preserving
-          external_effects: [observational]
-          consequence:
-            baseline: benign
-
       count-by-state:
         flavour: attribute_mutating
         description: Count investors by lifecycle state for a CBU

@@ -26,7 +26,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -40,7 +40,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: units
@@ -120,7 +120,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -134,7 +134,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: units
@@ -206,7 +206,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -220,7 +220,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: units
@@ -279,7 +279,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -293,7 +293,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: units
@@ -353,7 +353,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -367,7 +367,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: amount
@@ -434,7 +434,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -448,7 +448,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: amount
@@ -524,7 +524,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -538,7 +538,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: amount
@@ -621,7 +621,7 @@ domains:
         crud:
           operation: upsert
           table: movements
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - holding_id
@@ -635,7 +635,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: amount
@@ -701,7 +701,7 @@ domains:
         crud:
           operation: update
           table: movements
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             status: confirmed
@@ -713,7 +713,7 @@ domains:
           lookup:
             table: movements
             entity_type: movement
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         returns:
@@ -748,7 +748,7 @@ domains:
         crud:
           operation: update
           table: movements
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             status: settled
@@ -760,7 +760,7 @@ domains:
           lookup:
             table: movements
             entity_type: movement
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: settlement-date
@@ -799,7 +799,7 @@ domains:
         crud:
           operation: update
           table: movements
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             status: cancelled
@@ -811,7 +811,7 @@ domains:
           lookup:
             table: movements
             entity_type: movement
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: notes
@@ -850,7 +850,7 @@ domains:
         crud:
           operation: update
           table: movements
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             status: failed
@@ -862,7 +862,7 @@ domains:
           lookup:
             table: movements
             entity_type: movement
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: failure-reason
@@ -905,7 +905,7 @@ domains:
         crud:
           operation: list_by_fk
           table: movements
-          schema: kyc
+          schema: ob-poc
           fk_col: holding_id
         args:
         - name: holding-id
@@ -914,7 +914,7 @@ domains:
           lookup:
             table: holdings
             entity_type: holding
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         - name: movement-type
@@ -957,7 +957,7 @@ domains:
         crud:
           operation: select
           table: movements
-          schema: kyc
+          schema: ob-poc
         args:
         - name: movement-id
           type: uuid
@@ -966,7 +966,7 @@ domains:
           lookup:
             table: movements
             entity_type: movement
-            schema: kyc
+            schema: ob-poc
             search_key: id
             primary_key: id
         returns:

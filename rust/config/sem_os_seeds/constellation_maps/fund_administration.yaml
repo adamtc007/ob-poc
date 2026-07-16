@@ -133,11 +133,6 @@ slots:
     cardinality: optional
     depends_on: [fund]
     verbs:
-      record_provision: { verb: trust.record-provision, when: [empty, filled] }
-      update_provision: { verb: trust.update-provision, when: filled }
-      end_provision: { verb: trust.end-provision, when: filled }
-      list_provisions: { verb: trust.list-provisions, when: filled }
-      list_by_holder: { verb: trust.list-by-holder, when: filled }
       analyze_control: { verb: trust.analyze-control, when: filled }
       classify: { verb: trust.classify, when: filled }
       identify_ubos: { verb: trust.identify-ubos, when: filled }
@@ -148,10 +143,7 @@ slots:
     cardinality: optional
     depends_on: [fund]
     verbs:
-      add_partner: { verb: partnership.add-partner, when: [empty, filled] }
       record_contribution: { verb: partnership.record-contribution, when: filled }
       record_distribution: { verb: partnership.record-distribution, when: filled }
-      withdraw_partner: { verb: partnership.withdraw-partner, when: filled }
-      list_partners: { verb: partnership.list-partners, when: filled }
       reconcile: { verb: partnership.reconcile, when: filled }
       analyze_control: { verb: partnership.analyze-control, when: filled }

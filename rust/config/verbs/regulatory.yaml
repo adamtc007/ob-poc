@@ -29,7 +29,7 @@ domains:
         crud:
           operation: upsert
           table: entity_regulatory_registrations
-          schema: ob_kyc
+          schema: ob-poc
           returning: registration_id
           conflict_keys:
             - entity_id
@@ -53,7 +53,7 @@ domains:
             lookup:
               entity_type: regulator
               table: regulators
-              schema: ob_ref
+              schema: ob-poc
               search_key: regulator_code
               primary_key: regulator_code
           - name: registration-number
@@ -111,7 +111,7 @@ domains:
         crud:
           operation: select
           table: entity_regulatory_registrations
-          schema: ob_kyc
+          schema: ob-poc
           multiple: true
         args:
           - name: entity-id
@@ -214,7 +214,7 @@ domains:
         crud:
           operation: update
           table: entity_regulatory_registrations
-          schema: ob_kyc
+          schema: ob-poc
         args:
           - name: entity-id
             type: uuid

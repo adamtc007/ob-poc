@@ -33,7 +33,7 @@ domains:
         crud:
           operation: insert
           table: teams
-          schema: teams
+          schema: ob-poc
           returning: team_id
         args:
           - name: name
@@ -104,7 +104,7 @@ domains:
         crud:
           operation: select
           table: teams
-          schema: teams
+          schema: ob-poc
           key: team_id
         args:
           - name: team
@@ -114,7 +114,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
 
@@ -150,7 +150,7 @@ domains:
         crud:
           operation: update
           table: teams
-          schema: teams
+          schema: ob-poc
           key: team_id
           set_values:
             is_active: false
@@ -163,7 +163,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: reason
@@ -206,7 +206,7 @@ domains:
         crud:
           operation: upsert
           table: memberships
-          schema: teams
+          schema: ob-poc
           conflict_keys: [team_id, user_id, role_key]
           returning: membership_id
         args:
@@ -217,7 +217,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: user
@@ -227,7 +227,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: role
@@ -278,7 +278,7 @@ domains:
         crud:
           operation: delete
           table: memberships
-          schema: teams
+          schema: ob-poc
         args:
           - name: team
             type: uuid
@@ -287,7 +287,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: user
@@ -297,7 +297,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: role
@@ -337,7 +337,7 @@ domains:
         crud:
           operation: update
           table: memberships
-          schema: teams
+          schema: ob-poc
           key: membership_id
         args:
           - name: membership
@@ -385,7 +385,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: to-team
@@ -394,7 +394,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: user
@@ -403,7 +403,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: new-role
@@ -446,7 +446,7 @@ domains:
         crud:
           operation: upsert
           table: memberships
-          schema: teams
+          schema: ob-poc
           conflict_keys: [team_id, user_id, role_key]
           returning: membership_id
         args:
@@ -457,7 +457,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: user
@@ -467,7 +467,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: role
@@ -494,50 +494,6 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
-      verify-governance-access:
-        flavour: attribute_mutating
-        description: "Audit governance access against legal appointments"
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "verify governance access"
-          - "check governance permissions"
-          - "validate governance role"
-          - "can user govern"
-          - "audit governance team access"
-          - "is this user on the board"
-          - "confirm conducting officer appointment"
-          - "review governance access rights"
-          - "does user have governance authority"
-          - "check legal appointment for member"
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: team
-          phase_tags: [administration]
-          side_effects: facts_only
-        behavior: crud
-        crud:
-          operation: select
-          table: v_governance_access
-          schema: teams
-        args:
-          - name: team
-            type: uuid
-            required: false
-            maps_to: team_id
-            description: "Specific team (optional - all governance teams if omitted)"
-
-      # =========================================================================
-      # CBU ACCESS
-      # =========================================================================
-
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
       add-cbu-access:
         flavour: instance_adding
         description: "Add CBU to team's explicit access list"
@@ -564,7 +520,7 @@ domains:
         crud:
           operation: upsert
           table: team_cbu_access
-          schema: teams
+          schema: ob-poc
           conflict_keys: [team_id, cbu_id]
           returning: access_id
         args:
@@ -614,7 +570,7 @@ domains:
         crud:
           operation: delete
           table: team_cbu_access
-          schema: teams
+          schema: ob-poc
         args:
           - name: team
             type: uuid
@@ -659,8 +615,8 @@ domains:
         behavior: crud
         crud:
           operation: upsert
-          table: team_entitlements
-          schema: teams
+          table: team_service_entitlements
+          schema: ob-poc
           conflict_keys: [team_id, service_code]
           returning: entitlement_id
         args:
@@ -671,7 +627,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: service
@@ -682,7 +638,7 @@ domains:
           - name: config
             type: json
             required: false
-            maps_to: entitlement_config
+            maps_to: config
         produces:
           binding: entitlement
           type: uuid
@@ -720,8 +676,8 @@ domains:
         behavior: crud
         crud:
           operation: delete
-          table: team_entitlements
-          schema: teams
+          table: team_service_entitlements
+          schema: ob-poc
         args:
           - name: team
             type: uuid
@@ -730,7 +686,7 @@ domains:
             lookup:
               table: teams
               entity_type: team
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: team_id
           - name: service
@@ -738,110 +694,10 @@ domains:
             required: true
             maps_to: service_code
 
-      # =========================================================================
-      # QUERIES
-      # =========================================================================
-
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: requires_confirmation
-      list-members:
-        flavour: attribute_mutating
-        description: "List team members"
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "list team members"
-          - "show team members"
-          - "who is on the team"
-          - "get team roster"
-          - "display team members"
-          - "show all analysts on team"
-          - "view team membership roster"
-          - "which users belong to this team"
-          - "enumerate team member assignments"
-          - "fetch team personnel list"
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: team
-          phase_tags: [administration]
-          side_effects: facts_only
-        behavior: crud
-        crud:
-          operation: list_by_fk
-          table: v_effective_memberships
-          schema: teams
-          fk_col: team_id
-        args:
-          - name: team
-            type: uuid
-            required: true
-          - name: role-pattern
-            type: string
-            required: false
-          - name: include-inactive
-            type: boolean
-            default: false
-
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
-      list-cbus:
-        flavour: attribute_mutating
-        description: "List CBUs team can access"
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "list team CBUs"
-          - "show team CBU access"
-          - "which CBUs can team access"
-          - "get team CBU list"
-          - "team CBU assignments"
-          - "what structures does team cover"
-          - "display team fund access scope"
-          - "show all units assigned to team"
-          - "view team CBU permissions"
-          - "list accessible structures for team"
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: team
-          phase_tags: [administration]
-          side_effects: facts_only
-        behavior: crud
-        crud:
-          operation: list_by_fk
-          table: v_team_cbu_access
-          schema: teams
-          fk_col: team_id
-        args:
-          - name: team
-            type: uuid
-            required: true
-            maps_to: team_id
-            lookup:
-              table: teams
-              entity_type: team
-              schema: teams
-              search_key: name
-              primary_key: team_id
-
   # ===========================================================================
   # USER DOMAIN
   # ===========================================================================
 
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
   user:
     description: "User lifecycle management"
 
@@ -872,7 +728,7 @@ domains:
         crud:
           operation: insert
           table: clients
-          schema: client_portal
+          schema: ob-poc
           returning: client_id
         args:
           - name: email
@@ -936,7 +792,7 @@ domains:
         crud:
           operation: update
           table: clients
-          schema: client_portal
+          schema: ob-poc
           key: client_id
           set_values:
             status: SUSPENDED
@@ -977,7 +833,7 @@ domains:
         crud:
           operation: update
           table: clients
-          schema: client_portal
+          schema: ob-poc
           key: client_id
           set_values:
             status: ACTIVE
@@ -1018,7 +874,7 @@ domains:
         crud:
           operation: update
           table: clients
-          schema: client_portal
+          schema: ob-poc
           key: client_id
           set_values:
             status: OFFBOARDED
@@ -1030,7 +886,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: reason
@@ -1048,142 +904,3 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
-      list-teams:
-        flavour: attribute_mutating
-        description: "List user's team memberships"
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "list user teams"
-          - "show user teams"
-          - "which teams is user in"
-          - "get user team membership"
-          - "user team assignments"
-          - "what teams does this analyst belong to"
-          - "show all team memberships for user"
-          - "where is this user assigned"
-          - "display user team roles"
-          - "fetch team affiliations for member"
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: team
-          phase_tags: [administration]
-          side_effects: facts_only
-        behavior: crud
-        crud:
-          operation: list_by_fk
-          table: v_effective_memberships
-          schema: teams
-          fk_col: user_id
-        args:
-          - name: user
-            type: uuid
-            required: true
-
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
-      list-cbus:
-        flavour: attribute_mutating
-        description: "List all CBUs user can access"
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "list user CBUs"
-          - "show user CBU access"
-          - "which CBUs can user access"
-          - "get user CBU list"
-          - "user CBU permissions"
-          - "what structures can this user see"
-          - "show funds accessible by analyst"
-          - "display user access scope"
-          - "which units is user entitled to"
-          - "view user structure permissions"
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: team
-          phase_tags: [administration]
-          side_effects: facts_only
-        behavior: crud
-        crud:
-          operation: list_by_fk
-          table: v_user_cbu_access
-          schema: teams
-          fk_col: user_id
-        args:
-          - name: user
-            type: uuid
-            required: true
-            maps_to: user_id
-            lookup:
-              table: clients
-              entity_type: user
-              schema: client_portal
-              search_key: email
-              primary_key: client_id
-
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
-      check-access:
-        flavour: attribute_mutating
-        description: "Check user access to specific CBU"
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "check user access"
-          - "verify user permissions"
-          - "can user access"
-          - "user access check"
-          - "validate user authorization"
-          - "does analyst have CBU access"
-          - "confirm user entitlement to fund"
-          - "test user access to structure"
-          - "is user authorized for this CBU"
-          - "audit user access control"
-        metadata:
-          tier: diagnostics
-          source_of_truth: operational
-          scope: cbu
-          noun: team
-          phase_tags: [administration]
-          side_effects: facts_only
-        behavior: crud
-        crud:
-          operation: select
-          table: v_user_cbu_access
-          schema: teams
-        args:
-          - name: user
-            type: uuid
-            required: true
-            maps_to: user_id
-            lookup:
-              table: clients
-              entity_type: user
-              schema: client_portal
-              search_key: email
-              primary_key: client_id
-          - name: cbu
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign

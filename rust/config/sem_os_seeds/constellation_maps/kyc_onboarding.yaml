@@ -84,8 +84,6 @@ slots:
           list_thresholds: { verb: tollgate.list-thresholds, when: filled }
           set_threshold: { verb: tollgate.set-threshold, when: filled }
           override: { verb: tollgate.override, when: filled }
-          list_overrides: { verb: tollgate.list-overrides, when: filled }
-          expire_override: { verb: tollgate.expire-override, when: filled }
   entity_workstream:
     type: entity
     entity_kinds: [person, company]

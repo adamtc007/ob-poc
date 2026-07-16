@@ -53,7 +53,7 @@ domains:
         crud:
           operation: update
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
           - name: share-class-id
@@ -63,7 +63,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: instrument-type
@@ -121,7 +121,7 @@ domains:
         crud:
           operation: update
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
           - name: share-class-id
@@ -131,7 +131,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: compartment-id
@@ -141,7 +141,7 @@ domains:
             lookup:
               table: fund_compartments
               entity_type: fund_compartment
-              schema: kyc
+              schema: ob-poc
               search_key: compartment_code
               primary_key: id
         returns:
@@ -174,7 +174,7 @@ domains:
         crud:
           operation: update
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             compartment_id:
@@ -186,7 +186,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
         returns:
@@ -220,7 +220,7 @@ domains:
         crud:
           operation: list_by_fk
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           fk_col: compartment_id
         args:
           - name: compartment-id
@@ -229,7 +229,7 @@ domains:
             lookup:
               table: fund_compartments
               entity_type: fund_compartment
-              schema: kyc
+              schema: ob-poc
               search_key: compartment_code
               primary_key: id
         returns:

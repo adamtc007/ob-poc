@@ -26,7 +26,7 @@ domains:
         crud:
           operation: upsert
           table: holdings
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
             - share_class_id
@@ -39,7 +39,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: investor-entity-id
@@ -99,7 +99,7 @@ domains:
         crud:
           operation: upsert
           table: holdings
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
             - share_class_id
@@ -112,7 +112,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: investor-id
@@ -122,7 +122,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: usage-type
@@ -204,7 +204,7 @@ domains:
         crud:
           operation: upsert
           table: holdings
-          schema: kyc
+          schema: ob-poc
           conflict_keys:
             - share_class_id
             - investor_entity_id
@@ -217,7 +217,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: investor-entity-id
@@ -237,7 +237,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
           - name: usage-type
@@ -315,7 +315,7 @@ domains:
         crud:
           operation: update
           table: holdings
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
           - name: holding-id
@@ -325,7 +325,7 @@ domains:
             lookup:
               table: holdings
               entity_type: holding
-              schema: kyc
+              schema: ob-poc
               search_key: id
               primary_key: id
           - name: units
@@ -368,7 +368,7 @@ domains:
         crud:
           operation: update
           table: holdings
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
           - name: holding-id
@@ -378,7 +378,7 @@ domains:
             lookup:
               table: holdings
               entity_type: holding
-              schema: kyc
+              schema: ob-poc
               search_key: id
               primary_key: id
           - name: holding-status
@@ -430,7 +430,7 @@ domains:
         crud:
           operation: select
           table: holdings
-          schema: kyc
+          schema: ob-poc
         args:
           - name: holding-id
             type: uuid
@@ -439,7 +439,7 @@ domains:
             lookup:
               table: holdings
               entity_type: holding
-              schema: kyc
+              schema: ob-poc
               search_key: id
               primary_key: id
         returns:
@@ -474,7 +474,7 @@ domains:
         crud:
           operation: list_by_fk
           table: holdings
-          schema: kyc
+          schema: ob-poc
           fk_col: share_class_id
         args:
           - name: share-class-id
@@ -483,7 +483,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: status
@@ -526,7 +526,7 @@ domains:
         crud:
           operation: list_by_fk
           table: holdings
-          schema: kyc
+          schema: ob-poc
           fk_col: investor_entity_id
         args:
           - name: investor-entity-id
@@ -570,7 +570,7 @@ domains:
         crud:
           operation: list_by_fk
           table: holdings
-          schema: kyc
+          schema: ob-poc
           fk_col: investor_id
         args:
           - name: investor-id
@@ -579,7 +579,7 @@ domains:
             lookup:
               table: investors
               entity_type: investor
-              schema: kyc
+              schema: ob-poc
               search_key: investor_name
               primary_key: investor_id
         returns:
@@ -617,7 +617,7 @@ domains:
         crud:
           operation: update
           table: holdings
-          schema: kyc
+          schema: ob-poc
           key: id
           set_values:
             status: closed
@@ -630,7 +630,7 @@ domains:
             lookup:
               table: holdings
               entity_type: holding
-              schema: kyc
+              schema: ob-poc
               search_key: id
               primary_key: id
         returns:

@@ -21,7 +21,7 @@ domains:
         crud:
           operation: insert
           table: access_review_campaigns
-          schema: teams
+          schema: ob-poc
           returning: campaign_id
         args:
           - name: name
@@ -100,7 +100,7 @@ domains:
             lookup:
               table: access_review_campaigns
               entity_type: access_review_campaign
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: campaign_id
         effects:
@@ -175,7 +175,7 @@ domains:
         crud:
           operation: update
           table: access_review_items
-          schema: teams
+          schema: ob-poc
           key: item_id
           set_values:
             status: CONFIRMED
@@ -262,7 +262,7 @@ domains:
         crud:
           operation: update
           table: access_review_items
-          schema: teams
+          schema: ob-poc
           key: item_id
           set_values:
             status: EXTENDED
@@ -310,7 +310,7 @@ domains:
         crud:
           operation: update
           table: access_review_items
-          schema: teams
+          schema: ob-poc
           key: item_id
           set_values:
             status: ESCALATED
@@ -327,7 +327,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: reason
@@ -569,7 +569,7 @@ domains:
         crud:
           operation: select
           table: access_review_items
-          schema: teams
+          schema: ob-poc
         args:
           - name: campaign
             type: uuid
@@ -583,7 +583,7 @@ domains:
             lookup:
               table: clients
               entity_type: user
-              schema: client_portal
+              schema: ob-poc
               search_key: email
               primary_key: client_id
           - name: status
@@ -619,7 +619,7 @@ domains:
         crud:
           operation: select
           table: access_review_campaigns
-          schema: teams
+          schema: ob-poc
           key: campaign_id
         args:
           - name: campaign
@@ -629,7 +629,7 @@ domains:
             lookup:
               table: access_review_campaigns
               entity_type: access_review_campaign
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: campaign_id
         invocation_phrases:
@@ -660,7 +660,7 @@ domains:
         crud:
           operation: list_by_fk
           table: access_review_items
-          schema: teams
+          schema: ob-poc
           fk_col: campaign_id
         args:
           - name: campaign
@@ -670,7 +670,7 @@ domains:
             lookup:
               table: access_review_campaigns
               entity_type: access_review_campaign
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: campaign_id
           - name: status
@@ -704,8 +704,8 @@ domains:
         behavior: crud
         crud:
           operation: list_by_fk
-          table: access_review_attestations
-          schema: teams
+          table: access_attestations
+          schema: ob-poc
           fk_col: campaign_id
         args:
           - name: campaign
@@ -715,7 +715,7 @@ domains:
             lookup:
               table: access_review_campaigns
               entity_type: access_review_campaign
-              schema: teams
+              schema: ob-poc
               search_key: name
               primary_key: campaign_id
         invocation_phrases:
@@ -746,7 +746,7 @@ domains:
         crud:
           operation: select
           table: access_review_items
-          schema: teams
+          schema: ob-poc
         args:
           - name: campaign
             type: uuid

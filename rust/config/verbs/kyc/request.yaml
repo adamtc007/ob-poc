@@ -126,7 +126,7 @@ domains:
         crud:
           operation: select
           table: outstanding_requests
-          schema: kyc
+          schema: ob-poc
           multiple: true
         args:
         - name: case-id
@@ -136,7 +136,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: workstream-id
@@ -146,7 +146,7 @@ domains:
           lookup:
             table: entity_workstreams
             entity_type: entity_workstream
-            schema: kyc
+            schema: ob-poc
             search_key: workstream_id
             primary_key: workstream_id
         - name: cbu-id
@@ -203,7 +203,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: cbu-id
@@ -262,7 +262,7 @@ domains:
           lookup:
             table: outstanding_requests
             entity_type: outstanding_request
-            schema: kyc
+            schema: ob-poc
             search_key: request_id
             primary_key: request_id
         - name: fulfillment-type
@@ -324,7 +324,7 @@ domains:
           lookup:
             table: outstanding_requests
             entity_type: outstanding_request
-            schema: kyc
+            schema: ob-poc
             search_key: request_id
             primary_key: request_id
         - name: reason
@@ -370,7 +370,7 @@ domains:
           lookup:
             table: outstanding_requests
             entity_type: outstanding_request
-            schema: kyc
+            schema: ob-poc
             search_key: request_id
             primary_key: request_id
         - name: days
@@ -421,7 +421,7 @@ domains:
           lookup:
             table: outstanding_requests
             entity_type: outstanding_request
-            schema: kyc
+            schema: ob-poc
             search_key: request_id
             primary_key: request_id
         - name: channel
@@ -477,7 +477,7 @@ domains:
           lookup:
             table: outstanding_requests
             entity_type: outstanding_request
-            schema: kyc
+            schema: ob-poc
             search_key: request_id
             primary_key: request_id
         - name: escalate-to
@@ -530,7 +530,7 @@ domains:
           lookup:
             table: outstanding_requests
             entity_type: outstanding_request
-            schema: kyc
+            schema: ob-poc
             search_key: request_id
             primary_key: request_id
         - name: reason

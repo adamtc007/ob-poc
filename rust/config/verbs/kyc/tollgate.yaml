@@ -45,7 +45,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: evaluation-type
@@ -180,7 +180,7 @@ domains:
         crud:
           operation: update
           table: tollgate_thresholds
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
         - name: threshold-name
@@ -331,7 +331,7 @@ domains:
         crud:
           operation: list_by_fk
           table: tollgate_evaluations
-          schema: kyc
+          schema: ob-poc
           fk_col: case_id
         args:
         - name: case-id
@@ -340,7 +340,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: evaluation-type
@@ -386,7 +386,7 @@ domains:
         crud:
           operation: select
           table: tollgate_thresholds
-          schema: kyc
+          schema: ob-poc
         args:
         - name: evaluation-type
           type: string
@@ -439,7 +439,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         returns:
@@ -462,102 +462,6 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
-
-      list-overrides:
-        flavour: attribute_mutating
-        description: List overrides for a case or evaluation
-        effect_class: read_snapshot
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: tollgate
-          tags: [kyc]
-          phase_tags: [kyc]
-          side_effects: facts_only
-        invocation_phrases:
-        - "list tollgate overrides"
-        - "show active gate waivers"
-        - "get overrides for case"
-        - "which tollgates have been waived"
-        - "display management override history"
-        - "list compliance gate exceptions"
-        - "show approved tollgate bypasses"
-        - "review override audit trail"
-        behavior: crud
-        crud:
-          operation: select
-          table: tollgate_overrides
-          schema: kyc
-        args:
-        - name: evaluation-id
-          type: uuid
-          required: false
-          maps_to: evaluation_id
-        - name: case-id
-          type: uuid
-          required: false
-          description: "Filter by case (via evaluation)"
-        returns:
-          type: record_set
-        three_axis:
-          state_effect: preserving
-          external_effects: [observational]
-          consequence:
-            baseline: benign
-
-      expire-override:
-        flavour: discretionary
-        effect_class: read_modify_write
-        role_guard:
-          any_of: [senior_compliance, mlro, executive, board]
-        audit_class: tollgate_expire_override
-        description: Manually expire an override
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-          noun: tollgate
-          tags: [kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        invocation_phrases:
-        - "expire tollgate override"
-        - "revoke gate waiver early"
-        - "manually expire compliance override"
-        - "cancel active tollgate exception"
-        - "terminate override before expiry"
-        - "withdraw tollgate bypass approval"
-        - "force expire gate waiver"
-        - "end tollgate override immediately"
-        behavior: crud
-        crud:
-          operation: update
-          table: tollgate_overrides
-          schema: kyc
-          key: id
-        args:
-        - name: override-id
-          type: uuid
-          required: true
-          maps_to: id
-        - name: expired-by
-          type: string
-          required: true
-          description: "User expiring the override"
-        - name: reason
-          type: string
-          required: false
-          description: "Reason for early expiration"
-        set_values:
-          expiry_date: "now()"
-        returns:
-          type: affected
-        three_axis:
-          state_effect: preserving
-          external_effects: [emitting]
-          consequence:
-            baseline: requires_explicit_authorisation
 
       # =========================================================================
       # GATE-BASED EVALUATION (KYC/UBO Computed Architecture)
@@ -593,7 +497,7 @@ domains:
           lookup:
             table: cases
             entity_type: kyc_case
-            schema: kyc
+            schema: ob-poc
             search_key: case_id
             primary_key: case_id
         - name: gate-name

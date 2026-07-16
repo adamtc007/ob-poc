@@ -77,8 +77,6 @@ slots:
       admin_reg_read: admin.regulators.read
       admin_reg_update: { verb: admin.regulators.update, when: filled }
       admin_reg_deactivate: { verb: admin.regulators.deactivate, when: filled }
-      admin_tiers_list: admin.regulatory-tiers.list
-      admin_tiers_read: admin.regulatory-tiers.read
       admin_roles_create: { verb: admin.role-types.create, when: [empty, filled] }
       admin_roles_list: admin.role-types.list
       admin_roles_read: admin.role-types.read
@@ -88,9 +86,6 @@ slots:
       user_suspend: { verb: user.suspend, when: filled }
       user_reactivate: { verb: user.reactivate, when: filled }
       user_offboard: { verb: user.offboard, when: filled }
-      user_check_access: user.check-access
-      user_list_cbus: user.list-cbus
-      user_list_teams: user.list-teams
       refdata_ensure: { verb: refdata.ensure, when: [empty, filled] }
       refdata_list: refdata.list
       refdata_read: refdata.read
