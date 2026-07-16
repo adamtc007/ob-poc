@@ -13,6 +13,7 @@ mod red {
     use ob_poc::dsl_v2::execution::{DslExecutor, ExecutionContext};
     use ob_poc::dsl_v2::planning::compile;
     use ob_poc::dsl_v2::syntax::parse_program;
+    use ob_poc::dsl_v2::ConfigLoader;
 
     struct TestDb {
         pool: PgPool,
@@ -23,6 +24,16 @@ mod red {
         async fn new() -> Result<Self> {
             let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
             std::env::set_var("DSL_CONFIG_DIR", &config_dir);
+
+            // The requires_states lifecycle gate (dsl_v2::executor) resolves entity
+            // state via dsl_runtime's SlotStateProvider table, which is normally
+            // populated once at server startup (ob-poc-web::main). Test binaries
+            // never boot the server, so without this the gate always sees
+            // NoSlotMapping and fails closed regardless of actual entity state.
+            let config_loader = ConfigLoader::from_env();
+            if let Ok(table) = config_loader.load_slot_state_table() {
+                dsl_runtime::set_slot_state_table(table);
+            }
 
             let url = std::env::var("TEST_DATABASE_URL")
                 .or_else(|_| std::env::var("DATABASE_URL"))

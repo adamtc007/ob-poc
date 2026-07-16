@@ -2401,12 +2401,24 @@ async fn enforce_requires_states_precondition_with_mode(
             &format!("entity_arg '{entity_arg}' did not resolve to a uuid"),
         );
     };
-    // Convention: workspace == slot == verb domain (covers `cbu.cbu`). A verb
-    // whose state lives under a non-self-named slot has no mapping here —
-    // richer slot resolution is deferred (Phase-3 plan).
-    let Ok((table, column, pk)) =
-        dsl_runtime::resolve_slot_table(&runtime_verb.domain, &runtime_verb.domain)
-    else {
+    // Prefer a slot derived from `entity_arg` (strip the trailing "-id", kebab->snake,
+    // prefix with the domain) over the bare `domain.domain` self-slot — this reaches
+    // `SlotStateProvider` entries for domain-prefixed sub-slots (e.g. `deal.deal_sla`,
+    // `deal.deal_rate_card`) that share a domain with a *different*, also-valid
+    // `domain.domain` entry (e.g. `deal.deal`), where trying `domain.domain` first
+    // would silently resolve the gate against the wrong entity's table. Verbs whose
+    // entity_arg names the domain's own id (e.g. `cbu-id` under `cbu`) derive a slot
+    // that was never authored (`cbu_cbu`) and fall through to `domain.domain` as
+    // before (covers `cbu.cbu`).
+    let derived_slot = entity_arg
+        .strip_suffix("-id")
+        .map(|stem| format!("{}_{}", runtime_verb.domain, stem.replace('-', "_")));
+    let slot_lookup = derived_slot
+        .as_deref()
+        .ok_or_else(|| anyhow!("no slot derivable from entity_arg"))
+        .and_then(|slot| dsl_runtime::resolve_slot_table(&runtime_verb.domain, slot))
+        .or_else(|_| dsl_runtime::resolve_slot_table(&runtime_verb.domain, &runtime_verb.domain));
+    let Ok((table, column, pk)) = slot_lookup else {
         return gate_lifecycle_fail_open(
             LifecycleFailOpenClass::NoSlotMapping,
             mode,
