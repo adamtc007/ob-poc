@@ -139,8 +139,8 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".entity_relationships
                      (relationship_id, from_entity_id, to_entity_id,
-                      relationship_type, percentage, source)
-                   VALUES ($1, $2, $3, 'OWNERSHIP', $4, $5)"#,
+                      relationship_type, percentage, source, confidence)
+                   VALUES ($1, $2, $3, 'ownership', $4, $5, 'HIGH')"#,
             )
             .bind(Uuid::new_v4())
             .bind(from_id)
@@ -164,10 +164,10 @@ mod kyc_full_lifecycle {
         ) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO "ob-poc".ubo_registry
+                r#"INSERT INTO "ob-poc".kyc_ubo_registry
                      (ubo_id, case_id, workstream_id, subject_entity_id,
                       ubo_person_id, ubo_type, status, computed_percentage)
-                   VALUES ($1, $2, $3, $4, $5, 'SHAREHOLDER', $6, $7)"#,
+                   VALUES ($1, $2, $3, $4, $5, 'OWNERSHIP', $6, $7)"#,
             )
             .bind(id)
             .bind(case_id)
@@ -186,7 +186,7 @@ mod kyc_full_lifecycle {
         async fn create_evidence(&self, ubo_id: Uuid, evidence_type: &str, status: &str) -> Uuid {
             let id = Uuid::new_v4();
             sqlx::query(
-                r#"INSERT INTO "ob-poc".ubo_evidence
+                r#"INSERT INTO "ob-poc".kyc_ubo_evidence
                      (evidence_id, ubo_id, evidence_type, status)
                    VALUES ($1, $2, $3, $4)"#,
             )
@@ -237,7 +237,7 @@ mod kyc_full_lifecycle {
         /// Read UBO registry status.
         async fn get_ubo_status(&self, ubo_id: Uuid) -> String {
             let row: (String,) =
-                sqlx::query_as(r#"SELECT status FROM "ob-poc".ubo_registry WHERE ubo_id = $1"#)
+                sqlx::query_as(r#"SELECT status FROM "ob-poc".kyc_ubo_registry WHERE ubo_id = $1"#)
                     .bind(ubo_id)
                     .fetch_one(&self.pool)
                     .await
@@ -248,7 +248,7 @@ mod kyc_full_lifecycle {
         /// Read evidence status.
         async fn get_evidence_status(&self, evidence_id: Uuid) -> String {
             let row: (String,) = sqlx::query_as(
-                r#"SELECT COALESCE(status, 'REQUIRED') FROM "ob-poc".ubo_evidence WHERE evidence_id = $1"#,
+                r#"SELECT COALESCE(status, 'REQUIRED') FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
             )
             .bind(evidence_id)
             .fetch_one(&self.pool)
@@ -294,8 +294,8 @@ mod kyc_full_lifecycle {
 
             // Evidence linked to UBO entries for our cases
             sqlx::query(
-                r#"DELETE FROM "ob-poc".ubo_evidence WHERE ubo_id IN
-                   (SELECT ubo_id FROM "ob-poc".ubo_registry WHERE case_id IN
+                r#"DELETE FROM "ob-poc".kyc_ubo_evidence WHERE ubo_id IN
+                   (SELECT ubo_id FROM "ob-poc".kyc_ubo_registry WHERE case_id IN
                      (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
                        (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1)))"#,
             )
@@ -384,7 +384,7 @@ mod kyc_full_lifecycle {
 
             // UBO registry
             sqlx::query(
-                r#"DELETE FROM "ob-poc".ubo_registry WHERE case_id IN
+                r#"DELETE FROM "ob-poc".kyc_ubo_registry WHERE case_id IN
                    (SELECT case_id FROM "ob-poc".cases WHERE cbu_id IN
                      (SELECT cbu_id FROM "ob-poc".cbus WHERE name LIKE $1))"#,
             )
@@ -500,7 +500,7 @@ mod kyc_full_lifecycle {
 
             // Phase 2: Promote UBO candidates to IDENTIFIED
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_registry
+                r#"UPDATE "ob-poc".kyc_ubo_registry
                    SET status = 'IDENTIFIED', identified_at = NOW()
                    WHERE ubo_id = $1"#,
             )
@@ -510,7 +510,7 @@ mod kyc_full_lifecycle {
             .unwrap();
 
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_registry
+                r#"UPDATE "ob-poc".kyc_ubo_registry
                    SET status = 'IDENTIFIED', identified_at = NOW()
                    WHERE ubo_id = $1"#,
             )
@@ -524,17 +524,17 @@ mod kyc_full_lifecycle {
 
             // Require + link + verify evidence for both UBOs
             let ev_a = db
-                .create_evidence(ubo_a, "IDENTITY_DOCUMENT", "REQUIRED")
+                .create_evidence(ubo_a, "IDENTITY_DOC", "REQUIRED")
                 .await;
             let ev_b = db
-                .create_evidence(ubo_b, "IDENTITY_DOCUMENT", "REQUIRED")
+                .create_evidence(ubo_b, "IDENTITY_DOC", "REQUIRED")
                 .await;
 
             // Link documents (simulate)
             let doc_a = Uuid::new_v4();
             let doc_b = Uuid::new_v4();
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET document_id = $2, status = 'RECEIVED'
                    WHERE evidence_id = $1"#,
             )
@@ -545,7 +545,7 @@ mod kyc_full_lifecycle {
             .unwrap();
 
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET document_id = $2, status = 'RECEIVED'
                    WHERE evidence_id = $1"#,
             )
@@ -559,7 +559,7 @@ mod kyc_full_lifecycle {
 
             // Verify evidence
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET status = 'VERIFIED', verified_at = NOW()
                    WHERE evidence_id = $1"#,
             )
@@ -569,7 +569,7 @@ mod kyc_full_lifecycle {
             .unwrap();
 
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET status = 'VERIFIED', verified_at = NOW()
                    WHERE evidence_id = $1"#,
             )
@@ -614,7 +614,7 @@ mod kyc_full_lifecycle {
             for ubo_id in [ubo_a, ubo_b] {
                 for status in ["PROVABLE", "PROVED", "REVIEWED", "APPROVED"] {
                     sqlx::query(
-                        r#"UPDATE "ob-poc".ubo_registry SET status = $2, updated_at = NOW()
+                        r#"UPDATE "ob-poc".kyc_ubo_registry SET status = $2, updated_at = NOW()
                            WHERE ubo_id = $1"#,
                     )
                     .bind(ubo_id)
@@ -625,7 +625,7 @@ mod kyc_full_lifecycle {
                 }
                 // Set approved_at
                 sqlx::query(
-                    r#"UPDATE "ob-poc".ubo_registry SET approved_at = NOW() WHERE ubo_id = $1"#,
+                    r#"UPDATE "ob-poc".kyc_ubo_registry SET approved_at = NOW() WHERE ubo_id = $1"#,
                 )
                 .bind(ubo_id)
                 .execute(&db.pool)
@@ -661,7 +661,7 @@ mod kyc_full_lifecycle {
 
             // All UBOs approved
             let ubo_statuses: Vec<(String,)> =
-                sqlx::query_as(r#"SELECT status FROM "ob-poc".ubo_registry WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT status FROM "ob-poc".kyc_ubo_registry WHERE case_id = $1"#)
                     .bind(case_id)
                     .fetch_all(&db.pool)
                     .await
@@ -672,8 +672,8 @@ mod kyc_full_lifecycle {
 
             // All evidence verified
             let ev_statuses: Vec<(String,)> = sqlx::query_as(
-                r#"SELECT COALESCE(status, 'UNKNOWN') FROM "ob-poc".ubo_evidence
-                   WHERE ubo_id IN (SELECT ubo_id FROM "ob-poc".ubo_registry WHERE case_id = $1)"#,
+                r#"SELECT COALESCE(status, 'UNKNOWN') FROM "ob-poc".kyc_ubo_evidence
+                   WHERE ubo_id IN (SELECT ubo_id FROM "ob-poc".kyc_ubo_registry WHERE case_id = $1)"#,
             )
             .bind(case_id)
             .fetch_all(&db.pool)
@@ -756,7 +756,7 @@ mod kyc_full_lifecycle {
 
             // Valid: CANDIDATE -> IDENTIFIED
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_registry SET status = 'IDENTIFIED', identified_at = NOW()
+                r#"UPDATE "ob-poc".kyc_ubo_registry SET status = 'IDENTIFIED', identified_at = NOW()
                    WHERE ubo_id = $1"#,
             )
             .bind(ubo)
@@ -767,7 +767,7 @@ mod kyc_full_lifecycle {
 
             // Verify identified_at is set
             let identified: (Option<chrono::DateTime<chrono::Utc>>,) = sqlx::query_as(
-                r#"SELECT identified_at FROM "ob-poc".ubo_registry WHERE ubo_id = $1"#,
+                r#"SELECT identified_at FROM "ob-poc".kyc_ubo_registry WHERE ubo_id = $1"#,
             )
             .bind(ubo)
             .fetch_one(&db.pool)
@@ -809,10 +809,10 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".tollgate_evaluations
                      (evaluation_id, case_id, workstream_id, tollgate_id, passed,
-                      evaluation_detail, evaluated_at)
+                      evaluation_detail, evaluated_at, config_version)
                    VALUES ($1, $2, $3, 'SKELETON_READY', false,
                            '{"ownership_coverage_pct": 0, "reason": "no ownership edges"}'::jsonb,
-                           NOW())"#,
+                           NOW(), 'v1.0')"#,
             )
             .bind(eval_1)
             .bind(case_id)
@@ -827,17 +827,17 @@ mod kyc_full_lifecycle {
             let ubo = db
                 .create_ubo_entry(case_id, ws, entity, entity, "IDENTIFIED", 30.0)
                 .await;
-            db.create_evidence(ubo, "IDENTITY_DOCUMENT", "REQUIRED")
+            db.create_evidence(ubo, "IDENTITY_DOC", "REQUIRED")
                 .await;
 
             let eval_2 = Uuid::new_v4();
             sqlx::query(
                 r#"INSERT INTO "ob-poc".tollgate_evaluations
                      (evaluation_id, case_id, workstream_id, tollgate_id, passed,
-                      evaluation_detail, evaluated_at)
+                      evaluation_detail, evaluated_at, config_version)
                    VALUES ($1, $2, $3, 'EVIDENCE_COMPLETE', false,
                            '{"identity_docs_verified_pct": 0, "reason": "unverified evidence"}'::jsonb,
-                           NOW())"#,
+                           NOW(), 'v1.0')"#,
             )
             .bind(eval_2)
             .bind(case_id)
@@ -853,10 +853,10 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".tollgate_evaluations
                      (evaluation_id, case_id, workstream_id, tollgate_id, passed,
-                      evaluation_detail, evaluated_at)
+                      evaluation_detail, evaluated_at, config_version)
                    VALUES ($1, $2, $3, 'REVIEW_COMPLETE', false,
                            '{"all_ubos_approved": false, "reason": "UBO still IDENTIFIED"}'::jsonb,
-                           NOW())"#,
+                           NOW(), 'v1.0')"#,
             )
             .bind(eval_3)
             .bind(case_id)
@@ -900,14 +900,14 @@ mod kyc_full_lifecycle {
 
             // Step 1: Require evidence
             let ev_id = db
-                .create_evidence(ubo, "IDENTITY_DOCUMENT", "REQUIRED")
+                .create_evidence(ubo, "IDENTITY_DOC", "REQUIRED")
                 .await;
             assert_eq!(db.get_evidence_status(ev_id).await, "REQUIRED");
 
             // Step 2: Link initial document (bad quality)
             let bad_doc = Uuid::new_v4();
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence SET document_id = $2, status = 'RECEIVED'
+                r#"UPDATE "ob-poc".kyc_ubo_evidence SET document_id = $2, status = 'RECEIVED'
                    WHERE evidence_id = $1"#,
             )
             .bind(ev_id)
@@ -919,7 +919,7 @@ mod kyc_full_lifecycle {
 
             // Step 3: Reject evidence
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET status = 'REJECTED', document_id = NULL,
                        notes = 'UNREADABLE - image too blurry'
                    WHERE evidence_id = $1"#,
@@ -932,7 +932,7 @@ mod kyc_full_lifecycle {
 
             // Verify document_id cleared
             let doc_cleared: (Option<Uuid>,) = sqlx::query_as(
-                r#"SELECT document_id FROM "ob-poc".ubo_evidence WHERE evidence_id = $1"#,
+                r#"SELECT document_id FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
             )
             .bind(ev_id)
             .fetch_one(&db.pool)
@@ -946,7 +946,7 @@ mod kyc_full_lifecycle {
             // Step 4: Link replacement document
             let good_doc = Uuid::new_v4();
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence SET document_id = $2, status = 'RECEIVED'
+                r#"UPDATE "ob-poc".kyc_ubo_evidence SET document_id = $2, status = 'RECEIVED'
                    WHERE evidence_id = $1"#,
             )
             .bind(ev_id)
@@ -958,7 +958,7 @@ mod kyc_full_lifecycle {
 
             // Step 5: Verify replacement
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET status = 'VERIFIED', verified_at = NOW()
                    WHERE evidence_id = $1"#,
             )
@@ -971,7 +971,7 @@ mod kyc_full_lifecycle {
 
             // Verify the final document is the good one
             let final_doc: (Option<Uuid>,) = sqlx::query_as(
-                r#"SELECT document_id FROM "ob-poc".ubo_evidence WHERE evidence_id = $1"#,
+                r#"SELECT document_id FROM "ob-poc".kyc_ubo_evidence WHERE evidence_id = $1"#,
             )
             .bind(ev_id)
             .fetch_one(&db.pool)
@@ -1009,7 +1009,7 @@ mod kyc_full_lifecycle {
                 .await;
 
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_registry SET status = 'IDENTIFIED', identified_at = NOW()
+                r#"UPDATE "ob-poc".kyc_ubo_registry SET status = 'IDENTIFIED', identified_at = NOW()
                    WHERE ubo_id = $1"#,
             )
             .bind(ubo)
@@ -1023,7 +1023,7 @@ mod kyc_full_lifecycle {
             let waiver_authority = "SENIOR_COMPLIANCE";
 
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_registry
+                r#"UPDATE "ob-poc".kyc_ubo_registry
                    SET status = 'WAIVED',
                        waiver_reason = $2,
                        waiver_authority = $3,
@@ -1042,7 +1042,7 @@ mod kyc_full_lifecycle {
 
             let waiver_data: (Option<String>, Option<String>) = sqlx::query_as(
                 r#"SELECT waiver_reason, waiver_authority
-                   FROM "ob-poc".ubo_registry WHERE ubo_id = $1"#,
+                   FROM "ob-poc".kyc_ubo_registry WHERE ubo_id = $1"#,
             )
             .bind(ubo)
             .fetch_one(&db.pool)
@@ -1089,7 +1089,7 @@ mod kyc_full_lifecycle {
 
             // Waive the evidence requirement
             sqlx::query(
-                r#"UPDATE "ob-poc".ubo_evidence
+                r#"UPDATE "ob-poc".kyc_ubo_evidence
                    SET status = 'WAIVED',
                        notes = 'Entity is publicly listed — filings are public record'
                    WHERE evidence_id = $1"#,
@@ -1103,7 +1103,7 @@ mod kyc_full_lifecycle {
 
             // Waived evidence should not block — verify it's not in REQUIRED/RECEIVED state
             let non_terminal: (i64,) = sqlx::query_as(
-                r#"SELECT COUNT(*) FROM "ob-poc".ubo_evidence
+                r#"SELECT COUNT(*) FROM "ob-poc".kyc_ubo_evidence
                    WHERE ubo_id = $1 AND status IN ('REQUIRED', 'RECEIVED')"#,
             )
             .bind(ubo)
@@ -1224,9 +1224,9 @@ mod kyc_full_lifecycle {
             sqlx::query(
                 r#"INSERT INTO "ob-poc".tollgate_evaluations
                      (evaluation_id, case_id, workstream_id, tollgate_id, passed,
-                      evaluation_detail, evaluated_at)
+                      evaluation_detail, evaluated_at, config_version)
                    VALUES ($1, $2, $3, 'SKELETON_READY', true,
-                           '{"ownership_coverage_pct": 85}'::jsonb, NOW())"#,
+                           '{"ownership_coverage_pct": 85}'::jsonb, NOW(), 'v1.0')"#,
             )
             .bind(eval_a)
             .bind(case_a)
@@ -1273,7 +1273,7 @@ mod kyc_full_lifecycle {
 
             // No UBO registry entries for case B
             let ubo_count_b: (i64,) =
-                sqlx::query_as(r#"SELECT COUNT(*) FROM "ob-poc".ubo_registry WHERE case_id = $1"#)
+                sqlx::query_as(r#"SELECT COUNT(*) FROM "ob-poc".kyc_ubo_registry WHERE case_id = $1"#)
                     .bind(case_b)
                     .fetch_one(&db.pool)
                     .await
