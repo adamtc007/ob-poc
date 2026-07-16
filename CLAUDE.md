@@ -156,8 +156,8 @@ SemOS Maintenance workspace (2026-03-28):
 - 4 governance scenarios (Tier -2A): compound intent resolution for SemOS maintenance utterances
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
 - Verb search: 6 phrasing detection improvements (domain_filter bypass for semantic/macro/scenario/learned tiers, short query threshold scaling, multi-domain pack dominant_domain suppression, noun index for new domains)
-- Utterance test harness: 353 test cases across all 7 workspaces, per-workspace hit rate reporting
-- Hit rates: 78.2% first-attempt, 99.4% two-attempt, 2 wrong verbs (all workspaces above 30%)
+- Utterance test harness: 386 test cases across 8 workspaces (`rust/tests/fixtures/intent_test_utterances.toml`; grown from the original 353/7 as of 2026-03-28), per-workspace hit rate reporting
+- Hit rates (2026-07-16 run): 73.6% first-attempt (target ≥35%), 93.3% two-attempt (target ≥55%); 26 failures, concentrated in ubo/ownership/control-domain phrasing collisions
 - Contextual query detection: 16 patterns intercepted before verb search, routed to NarrationEngine
 - Governed phrase authoring (v1.2): `phrase_bank` table (13,570 entries), `phrase_mapping` SemOS object type, `phrase_authoring_lifecycle` state machine (8 states), 9 phrase.* verbs, AI proposal pipeline with 5-signal confidence scoring + risk-tiered approval routing
 - Onboarding product macros: `structure.product-suite-custody-fa-ta`, `structure.product-suite-full`, `structure.remove-all-products` — compound intent → multi-step runbook → per-entity expansion → DAG-ordered → confirm all → execute atomically
@@ -690,8 +690,11 @@ cargo test -p dsl-runtime --lib
 cargo test -p sem_os_postgres --lib
 cargo test -p ob-semantic-matcher --lib
 
-# Intent hit rate (needs DATABASE_URL)
-DATABASE_URL="postgresql:///data_designer" cargo test --features database --test intent_hit_rate -- --ignored --nocapture
+# Intent hit rate / utterance test harness (needs DATABASE_URL)
+# NOTE: intent_hit_rate lives under src/integration_tests/ (a #[cfg(test)]
+# mod of the ob-poc lib), not a standalone tests/*.rs integration binary —
+# `--test intent_hit_rate` does not resolve; use `--lib` with a name filter.
+DATABASE_URL="postgresql:///data_designer" cargo test --features database --lib intent_hit_rate -- --ignored --nocapture
 ```
 
 **Test fixture macros:** `rust/tests/fixtures/macros/*.yaml` — YAML macro definitions loaded by external harnesses via `load_macro_registry_from_dir`. Avoids constructing internal `MacroSchema` types in external tests.
