@@ -72,6 +72,7 @@ pub mod audit_chain;
 // which now point at `ob_poc_domain::*`.
 // display_nouns moved to ob-poc-authoring (Phase 5.1).
 pub mod dsl_drafter;
+pub mod entity_facts;
 pub mod envelope_builder;
 pub mod kyc_dry_run;
 // language_pack STAYS in boundary (Phase 5.3 evaluated and rejected the

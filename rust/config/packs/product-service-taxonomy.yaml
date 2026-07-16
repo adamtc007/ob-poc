@@ -31,6 +31,8 @@ workspaces:
   - product_maintenance
 
 allowed_verbs:
+  - sla.list-templates
+  - sla.read-template
   # Product catalogue lifecycle
   - product.list
   - product.read

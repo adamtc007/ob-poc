@@ -325,6 +325,9 @@ async fn template_batch_impl(
         pending_deal_name: None,
         cbu_scope_dirty: false,
         allow_durable_direct: ctx.allow_durable_direct,
+        execution_path: ctx.execution_path,
+        already_admitted_for: ctx.already_admitted_for,
+        envelope_handle: ctx.envelope_handle,
     };
 
     let batch_executor =

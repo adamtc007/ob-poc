@@ -6,6 +6,11 @@ description = "The typed boundary between Sage (intent understanding) and the se
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+# T4.3: verify_pins compares SnapshotPins (the control plane's own G13
+# proof type) against live row_versions. ob-poc-control-plane has zero
+# dependencies of its own (§9.1), so this edge is one-directional and
+# introduces no cycle.
+ob-poc-control-plane = { path = "../ob-poc-control-plane" }
 # ob-poc-diagnostics carries the canonical events::* types (DslEvent,
 # EventPayload, ErrorSnapshot) consumed by the feedback inspector.
 ob-poc-diagnostics = { path = "../ob-poc-diagnostics" }
@@ -51,6 +56,10 @@ default = []
 database = ["dep:sqlx", "dep:bigdecimal", "dep:rust_decimal", "ob-poc-diagnostics/database"]
 
 [dev-dependencies]
+# test-support: ob_poc_control_plane::snapshot::tests_support::pins, for
+# verify_pins's own unit tests (SnapshotPins has no public constructor
+# outside its own crate — see ob-poc-control-plane's test-support feature).
+ob-poc-control-plane = { path = "../ob-poc-control-plane", features = ["test-support"] }
 tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
 tempfile = "3"
 rand = "0.8"
@@ -65,3 +74,4 @@ ob-poc-journey = { path = "../ob-poc-journey" }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

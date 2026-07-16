@@ -1,0 +1,28 @@
+# Allowlist of files containing a non-test `VerbExecutionContext::new(`
+# construction site (EOP-PLAN-CONTROLPLANE-001 T6 exit criterion: "no
+# call site constructs VerbExecutionContext outside control-plane-issued
+# paths (allowlist file, CI-checked)"; independent adversarial review,
+# docs/research/control-plane-pir-001.md, PIR-D-005).
+#
+# Format: <file-path-relative-to-rust/>:<category>:<note>
+#
+# Categories:
+#   ADMISSION-WIRED   — the context this constructs is subsequently
+#                        dispatched via VerbExecutionPort::execute_verb_admitting_envelope,
+#                        so it passes through the T4.1 admission checkpoint
+#                        (envelope_id may be None — see the ledger's T6/T4
+#                        entries for what that does and does not prove).
+#   KNOWN-BYPASS       — constructs a context that dispatches WITHOUT ever
+#                        reaching execute_verb_admitting_envelope. Tracked,
+#                        not hidden — see the cited ledger row. Adding a
+#                        NEW file here requires an ownership-ledger entry,
+#                        not just an allowlist line.
+#
+# A file's absence from this list means: if check-verb-execution-context-allowlist.sh
+# finds a non-test construction site there, CI fails. Removing a
+# KNOWN-BYPASS line means that site is now admission-wired — update the
+# category, don't just delete the line silently.
+
+src/runbook/step_executor_bridge.rs:ADMISSION-WIRED:Path A (Sequencer/runbook). Fixed PIR-D-002 — routes through execute_verb_admitting_envelope, envelope_id always None today (mechanism-only, enforce off by default).
+crates/ob-poc-web/src/bus_runtime.rs:ADMISSION-WIRED:Path D (bus). T6.1 — routes through execute_verb_admitting_envelope, envelope_id always None until T6.1a lands EnvelopeHandle threading through bpmn-lite domain_payload.
+src/dsl_v2/executor.rs:ADMISSION-WIRED:dispatch_plugin_via_sem_os_op_in_scope — DslExecutor's own internal plugin dispatch chain, still constructs VerbExecutionContext directly (not via ObPocVerbExecutor/VerbExecutionPort). T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B, ratified boundary-interposition redesign, overriding the T6.3/T8.3 deferrals): rather than instrument this shared internal engine, every production top-level caller that constructs its own DslExecutor now calls agent::control_plane_envelope_store::admit_plan() first — RealDslExecutor (repl/executor_bridge.rs, Path B) and WorkflowDispatcher's direct branch (Path C, transitively via the blanket DslExecutorV2 impl), the MCP dsl_execute tool (mcp/handlers/core.rs), the legacy POST /api/session/:id/execute route (api/agent_routes.rs), and the batch/sheet executors (dsl_v2/batch_executor.rs, sheet_executor.rs). Path A/D's own admission (execute_verb_admitting_envelope) already covered their fallthrough to this helper. Recursive sub-DSL execution from within an already-admitted SemOsVerbOp plugin verb's own implementation (domain_ops/{template_ops,onboarding,gleif_ops}.rs, gleif/repository.rs via gleif/enrichment.rs) is exempt by the same reasoning: the outer verb was admitted before this inner call runs. templates/harness.rs is test tooling; bin/dsl_cli.rs is a separate CLI binary (required-features = ["cli"]), not the running service — both out of this gate's production-ingress scope. See docs/research/control-plane-ownership-ledger.md's "Tranche T9.3" entries for the full investigation, including the broader-ingress-surface finding this closes.

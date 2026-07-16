@@ -15,8 +15,7 @@ owned_universes:
   - universe.group_onboarding
 owned_verb_prefixes:
   - session.
-owned_entity_kinds:
-  - cbu
+owned_entity_kinds: []
 business_crates: []
 owned_constellations:
   - cbu.workspace

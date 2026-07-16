@@ -7,6 +7,7 @@ description = "ob-poc verb compiler — consumer-side VerbHandler for ob-poc DSL
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"
 
 [dependencies]
 dsl-core.workspace = true

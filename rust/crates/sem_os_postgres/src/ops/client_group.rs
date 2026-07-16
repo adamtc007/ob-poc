@@ -32,7 +32,7 @@
 //! - `client-group.list-roles` — List role assignments
 //! - `client-group.list-parties` — List all parties (entities with roles)
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -134,21 +134,13 @@ impl SemOsVerbOp for EntityManage {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let action = args
-            .get("action")
-            .and_then(|value| value.as_str())
-            .ok_or_else(|| anyhow!(":action required (add|remove|confirm|reject)"))?;
-
-        match action {
-            "add" => EntityAdd.execute(args, ctx, scope).await,
-            "remove" => EntityRemove.execute(args, ctx, scope).await,
-            "confirm" => ConfirmEntity.execute(args, ctx, scope).await,
-            "reject" => RejectEntity.execute(args, ctx, scope).await,
-            other => Err(anyhow!(
-                "Unknown entity-manage action '{}'. Valid: add, remove, confirm, reject",
-                other
-            )),
-        }
+        let arms: &[(&[&str], &dyn SemOsVerbOp)] = &[
+            (&["ADD"], &EntityAdd),
+            (&["REMOVE"], &EntityRemove),
+            (&["CONFIRM"], &ConfirmEntity),
+            (&["REJECT"], &RejectEntity),
+        ];
+        super::selector_dispatch::dispatch_selector(args, ctx, scope, "action", arms).await
     }
 }
 

@@ -112,6 +112,9 @@ dsl_verb_reconciliation:
     - settlement-chain.remove-hop
     - settlement-chain.set-cross-border
     - settlement-chain.set-location-preference
+    - settlement-chain.add-hop
+    - settlement-chain.deactivate-chain
+    - settlement-chain.define-location
   trade_gateway_surface:
     - trade-gateway.add-routing-rule
     - trade-gateway.define-gateway
@@ -122,6 +125,9 @@ dsl_verb_reconciliation:
     - trade-gateway.read-gateway
     - trade-gateway.remove-routing-rule
     - trade-gateway.set-fallback
+    - trade-gateway.activate-gateway
+    - trade-gateway.enable-gateway
+    - trade-gateway.suspend-gateway
   trading_profile_surface:
     - trading-profile.activate
     - trading-profile.add-component
@@ -137,6 +143,131 @@ dsl_verb_reconciliation:
     - trading-profile.set-base-currency
     - trading-profile.update-im-scope
 
+    - trading-profile.approve
+    - trading-profile.archive
+    - trading-profile.ca.add-cutoff-rule
+    - trading-profile.ca.disable-event-types
+    - trading-profile.ca.enable-event-types
+    - trading-profile.ca.get-policy
+    - trading-profile.ca.link-proceeds-ssi
+    - trading-profile.ca.remove-cutoff-rule
+    - trading-profile.ca.remove-default-option
+    - trading-profile.ca.remove-proceeds-ssi
+    - trading-profile.ca.set-default-option
+    - trading-profile.ca.set-election-policy
+    - trading-profile.ca.set-notification-policy
+    - trading-profile.create-draft
+    - trading-profile.create-new-version
+    - trading-profile.reject
+    - trading-profile.submit
+    - trading-profile.validate-go-live-ready
+    - trading-profile.validate-universe-coverage
+  cash_sweep_surface:
+    - cash-sweep.change-vehicle
+    - cash-sweep.configure
+    - cash-sweep.link-resource
+    - cash-sweep.list
+    - cash-sweep.reactivate
+    - cash-sweep.remove
+    - cash-sweep.suspend
+    - cash-sweep.update-threshold
+    - cash-sweep.update-timing
+  cbu_custody_surface:
+    - cbu-custody.derive-required-coverage
+    - cbu-custody.list-agent-overrides
+    - cbu-custody.list-booking-rules
+    - cbu-custody.list-ssis
+    - cbu-custody.list-universe
+    - cbu-custody.lookup-ssi
+    - cbu-custody.setup-ssi
+    - cbu-custody.validate-booking-coverage
+  corporate_action_surface:
+    - corporate-action.define-event-type
+    - corporate-action.link-ca-ssi
+    - corporate-action.list-ca-ssi-mappings
+    - corporate-action.list-event-types
+    - corporate-action.list-instruction-windows
+    - corporate-action.list-preferences
+    - corporate-action.remove-preference
+    - corporate-action.set-instruction-window
+    - corporate-action.set-preferences
+  entity_settlement_surface:
+    - entity-settlement.add-ssi
+    - entity-settlement.remove-ssi
+    - entity-settlement.set-identity
+  instruction_profile_surface:
+    - instruction-profile.create-template
+    - instruction-profile.define-message-type
+    - instruction-profile.list-assignments
+    - instruction-profile.list-field-overrides
+    - instruction-profile.list-message-types
+    - instruction-profile.list-templates
+    - instruction-profile.read-template
+  instrument_class_surface:
+    - instrument-class.ensure
+    - instrument-class.list
+    - instrument-class.read
+  investment_manager_surface:
+    - investment-manager.assign
+    - investment-manager.find-for-trade
+    - investment-manager.link-connectivity
+    - investment-manager.list
+    - investment-manager.set-scope
+    - investment-manager.suspend
+    - investment-manager.terminate
+  isda_surface:
+    - isda.add-coverage
+    - isda.add-csa
+    - isda.create
+    - isda.list
+    - isda.remove-coverage
+    - isda.remove-csa
+  mandate_surface:
+    - mandate.instrument-matrix
+  matrix_overlay_surface:
+    - matrix-overlay.activate
+    - matrix-overlay.add
+    - matrix-overlay.compare-products
+    - matrix-overlay.effective-matrix
+    - matrix-overlay.list
+    - matrix-overlay.list-by-subscription
+    - matrix-overlay.remove
+    - matrix-overlay.suspend
+    - matrix-overlay.unified-gaps
+  movement_surface:
+    - movement.cancel
+    - movement.capital-call
+    - movement.confirm
+    - movement.distribute
+    - movement.distribute-recallable
+    - movement.fail
+    - movement.list-by-holding
+    - movement.read
+    - movement.record-commitment
+    - movement.redeem
+    - movement.settle
+    - movement.subscribe
+    - movement.transfer-in
+    - movement.transfer-out
+  security_type_surface:
+    - security-type.ensure
+    - security-type.list
+  subcustodian_surface:
+    - subcustodian.ensure
+    - subcustodian.list-by-market
+    - subcustodian.lookup
+  tax_config_surface:
+    - tax-config.deactivate-reclaim
+    - tax-config.define-jurisdiction
+    - tax-config.list-jurisdictions
+    - tax-config.list-reclaim-configs
+    - tax-config.list-reporting
+    - tax-config.list-tax-status
+    - tax-config.list-treaty-rates
+    - tax-config.set-reclaim-config
+    - tax-config.set-reporting
+    - tax-config.set-tax-status
+    - tax-config.set-treaty-rate
 # =============================================================================
 # 1. OVERALL INSTRUMENT-MATRIX LIFECYCLE (per CBU, derived)
 # =============================================================================

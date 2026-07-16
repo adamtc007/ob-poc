@@ -76,6 +76,10 @@ dsl_verb_reconciliation:
     - attribute.seed-derived
     - attribute.seed-domain
     - attribute.set-evidence-grade
+    - attribute.define
+    - attribute.define-internal
+    - attribute.deprecate
+    - attribute.update-internal
   changeset_surface:
     - changeset.add-item
     - changeset.apply-template
@@ -88,6 +92,9 @@ dsl_verb_reconciliation:
     - changeset.remove-item
     - changeset.resolve-conflict
     - changeset.suggest
+    - changeset.compose
+    - changeset.cross-reference
+    - changeset.validate-edit
   governance_surface:
     - governance.dry-run
     - governance.gate-precheck
@@ -96,6 +103,8 @@ dsl_verb_reconciliation:
     - governance.record-review
     - governance.submit-for-review
     - governance.validate
+    - governance.publish
+    - governance.rollback
   phrase_surface:
     - phrase.approve
     - phrase.batch-propose
@@ -105,6 +114,116 @@ dsl_verb_reconciliation:
     - phrase.reject
     - phrase.review-proposals
 
+    - phrase.defer
+    - phrase.propose
+  constellation_surface:
+    - constellation.hydrate
+    - constellation.summary
+  delegation_surface:
+    - delegation.add
+    - delegation.end
+    - delegation.list-delegates
+    - delegation.list-delegations-received
+  discovery_surface:
+    - discovery.available-actions
+    - discovery.cascade-research
+    - discovery.entity-context
+    - discovery.entity-relationships
+    - discovery.explain
+    - discovery.graph-walk
+    - discovery.inspect-data
+    - discovery.run
+    - discovery.search-data
+    - discovery.search-entities
+    - discovery.valid-transitions
+    - discovery.verb-detail
+  focus_surface:
+    - focus.capture-manifest
+    - focus.diff
+    - focus.get
+    - focus.render
+    - focus.set
+    - focus.viewport
+  graph_surface:
+    - graph.ancestors
+    - graph.compare
+    - graph.descendants
+    - graph.filter
+    - graph.find-connected
+    - graph.focus
+    - graph.group-by
+    - graph.path
+    - graph.validate
+    - graph.view
+  maintenance_surface:
+    - maintenance.bootstrap-seeds
+    - maintenance.cleanup
+    - maintenance.drain-outbox
+    - maintenance.health-pending
+    - maintenance.health-stale-dryruns
+    - maintenance.reindex-embeddings
+    - maintenance.validate-schema-sync
+  schema_surface:
+    - schema.cross-reference
+    - schema.domain.describe
+    - schema.entity.describe
+    - schema.entity.list-fields
+    - schema.entity.list-relationships
+    - schema.entity.list-verbs
+    - schema.extract-attributes
+    - schema.extract-entities
+    - schema.extract-verbs
+    - schema.generate-discovery-map
+    - schema.generate-erd
+    - schema.generate-verb-flow
+    - schema.introspect
+  state_surface:
+    - state.blocked-why
+    - state.check-consistency
+    - state.derive
+    - state.derive-all
+    - state.diagnose
+    - state.list-overrides
+    - state.override
+    - state.revoke-override
+  template_surface:
+    - template.batch
+    - template.invoke
+  derivation_surface:
+    - derivation.recompute-stale
+  registry_surface:
+    - registry.describe-object
+    - registry.search
+  remediation_surface:
+    - remediation.confirm-external-correction
+    - remediation.defer
+    - remediation.list-open
+    - remediation.revoke-deferral
+  service_resource_surface:
+    - service-resource.check-attribute-gaps
+    - service-resource.sync-definitions
+  shared_atom_surface:
+    - shared-atom.acknowledge-shared-update
+    - shared-atom.activate
+    - shared-atom.deprecate
+    - shared-atom.list
+    - shared-atom.list-consumers
+    - shared-atom.register
+    - shared-atom.replay-constellation
+    - shared-atom.retire
+  typed_attribute_surface:
+    - typed-attribute.get
+    - typed-attribute.list-for-entity
+    - typed-attribute.record
+  audit_surface:
+    - audit.add-plan-step
+    - audit.create-plan
+    - audit.execute-plan-step
+    - audit.record-decision
+    - audit.record-disambiguation
+    - audit.record-escalation
+    - audit.record-observation
+    - audit.validate-plan
 # =============================================================================
 # 1. OVERALL REGISTRY-STEWARDSHIP LIFECYCLE (per governance-item, derived)
 # =============================================================================

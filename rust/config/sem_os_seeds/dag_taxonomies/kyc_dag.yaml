@@ -42,6 +42,169 @@ dsl_verb_reconciliation:
     - screening.sanctions
     - screening.sanctions-check
 
+  allegation_surface:
+    - allegation.contradict
+    - allegation.list-by-entity
+    - allegation.list-pending
+    - allegation.mark-partial
+    - allegation.record
+    - allegation.verify
+  cbu_surface:
+    - cbu.assign-role
+    - cbu.create
+    - cbu.list
+    - cbu.parties
+    - cbu.products
+    - cbu.remove-role
+  discrepancy_surface:
+    - discrepancy.escalate
+    - discrepancy.list-open
+    - discrepancy.record
+    - discrepancy.resolve
+  docs_bundle_surface:
+    - docs-bundle.apply
+    - docs-bundle.list-applied
+    - docs-bundle.list-available
+  document_surface:
+    - document.catalog
+    - document.compute-requirements
+    - document.create
+    - document.create-request
+    - document.extract
+    - document.for-entity
+    - document.get
+    - document.list
+    - document.list-missing
+    - document.list-requests-by-workstream
+    - document.list-versions
+    - document.mark-received
+    - document.mark-requested
+    - document.missing-for-entity
+    - document.reject
+    - document.reject-request
+    - document.solicit
+    - document.solicit-batch
+    - document.start-qa
+    - document.upload-version
+    - document.verify
+    - document.verify-request
+    - document.waive-request
+  economic_exposure_surface:
+    - economic-exposure.compute
+    - economic-exposure.summary
+  evidence_surface:
+    - evidence.attach-document
+    - evidence.create-requirement
+    - evidence.mark-rejected
+    - evidence.mark-verified
+    - evidence.mark-waived
+  issuer_control_config_surface:
+    - issuer-control-config.read
+    - issuer-control-config.upsert
+  kyc_agreement_surface:
+    - kyc-agreement.create
+    - kyc-agreement.list
+    - kyc-agreement.read
+    - kyc-agreement.update-status
+  kyc_case_surface:
+    - kyc-case.create
+    - kyc-case.list-by-cbu
+    - kyc-case.update-status
+  kyc_surface:
+    - kyc.case-status
+    - kyc.list-missing-items
+    - kyc.obligation.create
+    - kyc.obligation.satisfy
+    - kyc.obligation.update-identity
+    - kyc.obligation.update-risk
+    - kyc.obligation.update-screening
+    - kyc.obligation.waive
+    - kyc.person.approve
+    - kyc.person.reject
+    - kyc.role.assign
+    - kyc.role.withdraw
+    - kyc.subject.classify-structure
+    - kyc.subject.register
+  observation_surface:
+    - observation.get-current
+    - observation.list-for-attribute
+    - observation.list-for-entity
+    - observation.reconcile
+    - observation.record
+    - observation.record-from-document
+    - observation.supersede
+    - observation.verify-allegations
+  onboarding_surface:
+    - onboarding.status
+  ownership_surface:
+    - ownership.bridge.bods-ownership
+    - ownership.bridge.gleif-fund-managers
+    - ownership.bridge.manco-roles
+    - ownership.control-links.compute
+    - ownership.control-links.list
+    - ownership.refresh
+  red_flag_surface:
+    - red-flag.escalate
+    - red-flag.raise
+  request_surface:
+    - request.cancel
+    - request.create
+    - request.escalate
+    - request.extend
+    - request.fulfill
+    - request.list
+    - request.overdue
+    - request.remind
+    - request.waive
+  requirement_surface:
+    - requirement.create
+    - requirement.create-set
+    - requirement.get
+    - requirement.list-for-entity
+    - requirement.list-for-workflow
+    - requirement.list-outstanding
+    - requirement.list-with-status
+    - requirement.mark-expired
+    - requirement.reset
+    - requirement.waive
+  screening_surface:
+    - screening.adverse-media
+    - screening.bulk-refresh
+    - screening.pep
+    - screening.review-hit
+    - screening.run
+    - screening.sanctions
+  tollgate_surface:
+    - tollgate.evaluate
+    - tollgate.override
+  ubo_surface:
+    - ubo.determination.apply-smo-fallback
+    - ubo.determination.compute-fold
+    - ubo.determination.freeze
+    - ubo.determination.select-strategy
+    - ubo.edge.assert-control
+    - ubo.edge.assert-economic-interest
+    - ubo.edge.attach-evidence
+    - ubo.edge.reconcile-conflict
+    - ubo.edge.supersede
+    - ubo.edge.verify
+  verify_surface:
+    - verify.assert
+    - verify.calculate-confidence
+    - verify.challenge
+    - verify.detect-evasion
+    - verify.detect-patterns
+    - verify.escalate
+    - verify.get-status
+    - verify.list-challenges
+    - verify.list-escalations
+    - verify.list-patterns
+    - verify.record-pattern
+    - verify.resolve-challenge
+    - verify.resolve-escalation
+    - verify.resolve-pattern
+    - verify.respond-to-challenge
+    - verify.verify-against-registry
 stream_governed:
   id: kyc_ubo_determination_stream
   description: >

@@ -32,6 +32,7 @@ mod lexicon;
 mod onboarding_harness;
 mod pub_lint;
 mod reconcile;
+mod registry_graph;
 mod replay_tuner;
 mod runbook_envelope_determinism;
 mod seed_allianz;
@@ -407,6 +408,10 @@ enum Command {
         #[command(subcommand)]
         action: reconcile::ReconcileAction,
     },
+
+    /// SemOsVerbOp registry / YAML completeness diff (dead-code +
+    /// dual-routing static sweep, see xtask/src/registry_graph.rs).
+    RegistryGraph,
 
     /// Catalogue authorship commands (Tranche 3 Phase 3.B —
     /// propose / commit / rollback / list).
@@ -1532,6 +1537,7 @@ fn main() -> Result<()> {
             rt.block_on(reconcile::run(action))?;
             Ok(())
         }
+        Command::RegistryGraph => registry_graph::run(),
         Command::Catalogue { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(catalogue::run(action))?;

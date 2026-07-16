@@ -2311,22 +2311,7 @@ impl SemOsVerbOp for GleifLookup {
         ctx: &mut VerbExecutionContext,
         pool: &sqlx::PgPool,
     ) -> Result<Option<serde_json::Value>> {
-        let target_type = json_extract_string_opt(args, "target-type")
-            .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
-        match target_type.as_str() {
-            "record" => GleifGetRecord.pre_fetch(args, ctx, pool).await,
-            "parent" => GleifGetParent.pre_fetch(args, ctx, pool).await,
-            "children" => GleifGetChildren.pre_fetch(args, ctx, pool).await,
-            "manager" => GleifGetManager.pre_fetch(args, ctx, pool).await,
-            "managed-funds" => GleifGetManagedFunds.pre_fetch(args, ctx, pool).await,
-            "master-fund" => GleifGetMasterFund.pre_fetch(args, ctx, pool).await,
-            "umbrella" => GleifGetUmbrella.pre_fetch(args, ctx, pool).await,
-            "isin" => GleifLookupByIsin.pre_fetch(args, ctx, pool).await,
-            other => Err(anyhow::anyhow!(
-                "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
-                other
-            )),
-        }
+        Self::resolve(args)?.pre_fetch(args, ctx, pool).await
     }
 
     async fn execute(
@@ -2335,22 +2320,35 @@ impl SemOsVerbOp for GleifLookup {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let target_type = json_extract_string_opt(args, "target-type")
-            .ok_or_else(|| anyhow::anyhow!(":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"))?;
+        Self::resolve(args)?.execute(args, ctx, scope).await
+    }
+}
 
-        match target_type.as_str() {
-            "record" => GleifGetRecord.execute(args, ctx, scope).await,
-            "parent" => GleifGetParent.execute(args, ctx, scope).await,
-            "children" => GleifGetChildren.execute(args, ctx, scope).await,
-            "manager" => GleifGetManager.execute(args, ctx, scope).await,
-            "managed-funds" => GleifGetManagedFunds.execute(args, ctx, scope).await,
-            "master-fund" => GleifGetMasterFund.execute(args, ctx, scope).await,
-            "umbrella" => GleifGetUmbrella.execute(args, ctx, scope).await,
-            "isin" => GleifLookupByIsin.execute(args, ctx, scope).await,
-            other => Err(anyhow::anyhow!(
-                "Unknown GLEIF lookup target-type '{}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin",
-                other
+impl GleifLookup {
+    /// Shared `target-type` resolution for both `pre_fetch` and
+    /// `execute`, so the two can't drift out of sync on which values are
+    /// accepted or what the error message says.
+    fn resolve(args: &serde_json::Value) -> Result<&'static dyn SemOsVerbOp> {
+        use sem_os_postgres::ops::selector_dispatch::{resolve_selector, SelectorMatch};
+        static ARMS: &[(&[&str], &dyn SemOsVerbOp)] = &[
+            (&["RECORD"], &GleifGetRecord),
+            (&["PARENT"], &GleifGetParent),
+            (&["CHILDREN"], &GleifGetChildren),
+            (&["MANAGER"], &GleifGetManager),
+            (&["MANAGED-FUNDS"], &GleifGetManagedFunds),
+            (&["MASTER-FUND"], &GleifGetMasterFund),
+            (&["UMBRELLA"], &GleifGetUmbrella),
+            (&["ISIN"], &GleifLookupByIsin),
+        ];
+        match resolve_selector(args, "target-type", ARMS) {
+            SelectorMatch::Matched(op) => Ok(op),
+            SelectorMatch::Absent => Err(anyhow::anyhow!(
+                ":target-type required (record|parent|children|manager|managed-funds|master-fund|umbrella|isin)"
+            )),
+            SelectorMatch::Unrecognized(v) => Err(anyhow::anyhow!(
+                "Unknown GLEIF lookup target-type '{v}'. Valid: record, parent, children, manager, managed-funds, master-fund, umbrella, isin"
             )),
         }
     }
 }
+

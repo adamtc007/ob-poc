@@ -13,7 +13,13 @@ chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-smallvec = "1"
+# serde feature required by snapshot.rs's Serialize/Deserialize derives on
+# HashMap<String, SmallVec<[Uuid; N]>> fields — previously masked by a
+# different dependency's transitive feature unification when this crate's
+# `database` feature (and its sqlx tree) was always on by default
+# (2026-07-13 E5 fix, found once compiler.rs was gated out at
+# --no-default-features and the leak stopped being papered over).
+smallvec = { version = "1", features = ["serde"] }
 thiserror = "1"
 tracing = "0.1"
 unicode-normalization = "0.1"
@@ -29,3 +35,4 @@ tokio = { version = "1", features = ["macros", "rt"] }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

@@ -181,7 +181,7 @@ impl LookupService {
     /// Looks at top verb candidates and extracts entity types
     /// from args that have lookup config.
     fn derive_expected_kinds(&self, verbs: &[VerbSearchResult]) -> Vec<String> {
-        use crate::dsl_v2::verb_registry::registry;
+        use dsl_analysis::verb_registry::registry;
 
         let mut kinds: Vec<String> = Vec::new();
         let reg = registry();
@@ -219,7 +219,7 @@ impl LookupService {
         verbs: &[VerbSearchResult],
         mut entities: Vec<EntityResolution>,
     ) -> Vec<EntityResolution> {
-        use crate::dsl_v2::runtime_registry::runtime_registry;
+        use dsl_analysis::runtime_registry::runtime_registry;
 
         if entities.is_empty() || verbs.is_empty() {
             return entities;

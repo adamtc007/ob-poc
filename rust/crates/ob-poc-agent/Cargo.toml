@@ -22,6 +22,17 @@ description = "Sage ACP runtime — planning loop, GoalFrame, frontier computati
 # ob-poc; the binary integrator wires the impl into the agent at
 # startup. Sage ACP is intended to ship as a standalone productisable
 # artefact (V&S §3, R5), so no application-tier dep.
+#
+# MCA-002 escalation E-5 (2026-07-12): this rule is satisfied (no
+# `ob-poc` path dep below) but is narrower than what EOP-VS-CONTROLPLANE-001
+# v0.4's L1 (dependency-direction lock) now actually requires — this
+# crate has direct `dsl-runtime`/`sem_os_client` deps below with no
+# `ob-poc-control-plane` edge, so its capability calls are not yet CP-
+# mediated. Not a defect against T11 (checkpoint topology does not
+# require mediation) — flagged as owed work against T11.2 (keyed doors)
+# / T12 (mediation cutover), carried in the ownership ledger's series
+# completion invariant (E-T11.A). Do not read "no ob-poc dep" as "L1-
+# compliant" until that lands.
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
@@ -61,6 +72,26 @@ sem_os_core.workspace = true
 # the same protocol shape.
 sem_os_mcp = { path = "../sem_os_mcp" }
 
+# T11.1b (2026-07-12): deps needed by the relocated sage/journey/research/
+# semtaxonomy_v2 engines (see crate doc). dsl-analysis is the real home of
+# runtime_registry/verb_registry (sage::verb_index reaches it directly, not
+# through ob-poc's dsl_v2 compat re-export). ob-poc-semtaxonomy is the
+# governed-registry-authored taxonomy client semtaxonomy_v2 compiles
+# against.
+dsl-analysis = { path = "../dsl-analysis" }
+ob-poc-semtaxonomy = { path = "../ob-poc-semtaxonomy" }
+# T11.2 Part A (2026-07-13): AgentTurnContext's `actor` field is
+# sem_os_policy::abac::ActorContext — ob-poc-boundary already depends on
+# this crate for the same type; adding it directly here avoids a detour
+# through a re-export ob-poc-boundary doesn't itself provide.
+sem_os_policy.workspace = true
+sem_os_types.workspace = true
+handlebars = "6.0"
+regex = "1.12.2"
+rust_decimal = { version = "1.33", features = ["serde"] }
+serde_yaml = "0.9"
+jsonschema = { version = "0.29", default-features = false, features = ["resolve-file"] }
+
 # Async runtime.
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
@@ -87,5 +118,33 @@ lsp-types = "0.95"
 [dev-dependencies]
 tempfile = "3"
 
+[features]
+default = []
+# `ob-poc-sage::session_context` (sqlx::PgPool-backed loaders) is only
+# reachable when this crate's own `database` feature is on, cascading to
+# `ob-poc-sage/database`. Without this, `cargo build -p ob-poc-agent`
+# (any feature combination of THIS crate's own, empty, [features] set)
+# unconditionally failed: `sage/mod.rs`'s `pub use
+# ob_poc_sage::session_context` referenced a module ob-poc-sage only
+# compiles behind its own `database` feature, which nothing in
+# ob-poc-agent's dependency declaration ever requested. Building the full
+# `ob-poc` binary masked this — root's own `database` feature enables
+# `ob-poc-sage/database` directly, and Cargo's feature unification made
+# that available to the copy of ob-poc-sage reached via ob-poc-agent too
+# — but `ob-poc-agent` could never be built, tested, or `cargo doc`'d in
+# isolation. Found via the control-plane graduation G0 E5 slice, 2026-07-13.
+#
+# `ob-poc-boundary/database` cascade added 2026-07-15: the same masking
+# pattern applied to `ob-poc-boundary::entity_facts`'s `PgEntityFactsSource`
+# (sqlx-backed, `#[cfg(feature = "database")]`) — its `dead_code`-denied
+# `KindMapping`/`kind_mapping` support items only have a live caller behind
+# that same cfg gate, so building `ob-poc-agent` in isolation (even with
+# THIS crate's own `database` feature on) failed the same way until the
+# full `ob-poc` binary's feature unification masked it. Found running
+# `cargo test -p ob-poc-agent --lib` in isolation for the pack-mismatch
+# back-out feature's router tests.
+database = ["ob-poc-sage/database", "ob-poc-boundary/database"]
+
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

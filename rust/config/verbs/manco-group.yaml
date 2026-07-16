@@ -896,7 +896,7 @@ domains:
         crud:
           operation: select
           table: holding_control_links
-          schema: kyc
+          schema: ob-poc
         args:
           - name: issuer-entity-id
             type: uuid

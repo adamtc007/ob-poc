@@ -1052,6 +1052,16 @@ impl ToolHandlers {
             .map(|r| r.batch_policy)
             .unwrap_or(BatchPolicy::BestEffort);
 
+        // T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): admit every verb in
+        // the plan before dispatch. This tool constructs `DslExecutor`
+        // directly (`build_dsl_executor()`), bypassing the bus/runbook
+        // admission checkpoints entirely — closes that gap.
+        if let Err(e) = crate::agent::control_plane_envelope_store::admit_plan(&self.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
+            .await
+        {
+            return Err(anyhow!("{e}"));
+        }
+
         // =====================================================================
         // EXECUTE - Route based on batch policy
         // =====================================================================

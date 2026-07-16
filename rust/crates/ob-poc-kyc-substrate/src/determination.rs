@@ -24,7 +24,9 @@ use uuid::Uuid;
 
 use crate::error::KycError;
 use crate::event::IntentEvent;
-use crate::fold::control::{reconciled_economic_edges, ControlState, ReconciledEconomicEdge};
+use crate::fold::control::{
+    reconciled_control_edges, reconciled_economic_edges, ControlState, ReconciledEconomicEdge,
+};
 use crate::types::{EntityId, EventId, Hash, PersonId};
 
 // ── Prong ─────────────────────────────────────────────────────────────────────
@@ -69,7 +71,7 @@ pub trait DeterminationStrategy: Send + Sync {
     fn name(&self) -> &'static str;
     fn resolve(
         &self,
-        edges: &[ReconciledEconomicEdge],
+        state: &ControlState,
         subject_entity_id: EntityId,
         natural_persons: &BTreeSet<PersonId>,
         threshold_pct: f64,
@@ -92,16 +94,18 @@ impl DeterminationStrategy for OwnershipProngStrategy {
 
     fn resolve(
         &self,
-        edges: &[ReconciledEconomicEdge],
+        state: &ControlState,
         subject_entity_id: EntityId,
         natural_persons: &BTreeSet<PersonId>,
         threshold_pct: f64,
     ) -> Vec<ProngCandidate> {
+        let edges = reconciled_economic_edges(state);
+
         // Build adjacency: to_entity → sorted vec of (from_entity, pct, originating_event_id).
         // BTreeMap ensures deterministic iteration order (Q6, K-16/18/33).
         // The edge's assertion event id is used (never random) for K-35.
         let mut adj: BTreeMap<EntityId, Vec<(EntityId, f64, EventId)>> = BTreeMap::new();
-        for e in edges {
+        for e in &edges {
             adj.entry(e.to)
                 .or_default()
                 .push((e.from, e.percentage, e.originating_event_id));
@@ -163,6 +167,98 @@ impl DeterminationStrategy for OwnershipProngStrategy {
                 // INVARIANT: orig is always Some here because the adjacency map
                 // always carries the edge's originating_event_id (never random).
                 originating_event_id: orig.expect("originating_event_id must be deterministic"),
+            })
+            .collect()
+    }
+}
+
+// ── ControlProngStrategy (M4 — control by other means) ───────────────────────
+
+/// Resolves natural persons reachable via a chain of asserted-and-reconciled
+/// **control** edges — voting rights, board appointment, GP statutory
+/// control, LLP designated member, trust roles, dominant influence
+/// (`EdgeKind`, `fold::control`) — the "control by other means" prong
+/// (`Prong::ControlByOtherMeans`), distinct from the ownership-percentage
+/// prong `OwnershipProngStrategy` computes.
+///
+/// Structurally mirrors `OwnershipProngStrategy`'s traversal (same
+/// adjacency-from-edges construction, same cycle guard, same deterministic
+/// `BTreeMap` ordering — Q6/K-16/18/33) but walks `reconciled_control_edges`
+/// instead of `reconciled_economic_edges`, and does not multiply a quantum:
+/// control is attributed as present/absent per chain, not accumulated.
+/// `effective_ownership_pct` is always `None`; `threshold_pct` is accepted
+/// for `DeterminationStrategy` signature parity but unused — raw control
+/// edges carry no percentage to threshold against.
+///
+/// **Scope (M4 v1):** traverses control-kind edges only. Does NOT cross into
+/// the economic axis when a controlling intermediate entity is itself only
+/// reachable via ownership rather than a further control edge — e.g. an LLP
+/// designated member that is a body corporate whose own UBOs are only
+/// resolvable via that entity's ownership %. That mixed control→ownership
+/// chain resolution is real, further-removed v2 work; this v1 closes the "no
+/// control-prong strategy exists at all" gap with real `EdgeKind`-driven
+/// determination logic for the common case — a controlling chain of natural
+/// persons and/or control-linked entities.
+pub struct ControlProngStrategy;
+
+impl DeterminationStrategy for ControlProngStrategy {
+    fn name(&self) -> &'static str {
+        "control_prong_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        _threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        let edges = reconciled_control_edges(state);
+
+        // Adjacency: to_entity → sorted vec of (from_entity, originating_event_id).
+        // Same determinism contract as OwnershipProngStrategy (Q6, K-16/18/33).
+        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        for e in &edges {
+            adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+        }
+        for neighbours in adj.values_mut() {
+            neighbours.sort_by_key(|&(from, orig)| (from, orig));
+        }
+
+        // DFS: no percentage to carry, just the path (for ownership_chain / K-35)
+        // and the earliest originating event.
+        let mut stack: Vec<(EntityId, Vec<EntityId>, Option<EventId>)> =
+            vec![(subject_entity_id, vec![subject_entity_id], None)];
+        let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId)> = BTreeMap::new();
+
+        while let Some((entity, path, first_orig)) = stack.pop() {
+            if path.iter().filter(|&&e| e == entity).count() > 1 {
+                continue; // cycle guard
+            }
+            for &(parent, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
+                let chain_orig = first_orig.unwrap_or(edge_orig);
+                let parent_person_id = PersonId(parent.0);
+                if natural_persons.contains(&parent_person_id) {
+                    // First deterministic path wins (control is binary, not summed).
+                    candidates
+                        .entry(parent_person_id)
+                        .or_insert_with(|| (path.clone(), chain_orig));
+                } else {
+                    let mut new_path = path.clone();
+                    new_path.push(parent);
+                    stack.push((parent, new_path, Some(chain_orig)));
+                }
+            }
+        }
+
+        candidates
+            .into_iter()
+            .map(|(pid, (chain, orig))| ProngCandidate {
+                person_id: pid,
+                prong: Prong::ControlByOtherMeans,
+                effective_ownership_pct: None,
+                ownership_chain: chain,
+                originating_event_id: orig,
             })
             .collect()
     }
@@ -326,12 +422,10 @@ pub fn recover_determination_at(
         return None;
     }
 
-    let edges = reconciled_economic_edges(&control);
-
     // Find the subject entity from the first classify event.
     let subject_entity = find_subject_entity(events)?;
 
-    let candidates = strategy.resolve(&edges, subject_entity, natural_persons, threshold_pct);
+    let candidates = strategy.resolve(&control, subject_entity, natural_persons, threshold_pct);
 
     // Find SMO from control state.
     // smo_event_id is ALWAYS Some when smo_person_id is Some (set together in fold_control).

@@ -38,7 +38,7 @@ domains:
         crud:
           operation: insert
           table: outreach_requests
-          schema: kyc
+          schema: ob-poc
           returning: request_id
         args:
           - name: target-entity-id
@@ -119,7 +119,7 @@ domains:
         crud:
           operation: update
           table: outreach_requests
-          schema: kyc
+          schema: ob-poc
         args:
           - name: request-id
             type: uuid
@@ -163,7 +163,7 @@ domains:
         crud:
           operation: update
           table: outreach_requests
-          schema: kyc
+          schema: ob-poc
         args:
           - name: request-id
             type: uuid
@@ -253,7 +253,7 @@ domains:
         crud:
           operation: update
           table: outreach_requests
-          schema: kyc
+          schema: ob-poc
         args:
           - name: request-id
             type: uuid
@@ -305,7 +305,7 @@ domains:
         crud:
           operation: select
           table: outreach_requests
-          schema: kyc
+          schema: ob-poc
         args:
           - name: target-entity-id
             type: uuid
@@ -386,7 +386,7 @@ domains:
         crud:
           operation: select
           table: outreach_requests
-          schema: kyc
+          schema: ob-poc
         args:
           - name: request-id
             type: uuid
@@ -434,7 +434,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: determination-run-id

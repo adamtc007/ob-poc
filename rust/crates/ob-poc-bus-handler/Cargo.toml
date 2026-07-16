@@ -32,3 +32,6 @@ dsl-bus-client.workspace = true
 dsl-bus-storage.workspace = true
 async-trait = "0.1"
 tonic = "0.12"
+
+[lints.rust]
+dead_code = "deny"

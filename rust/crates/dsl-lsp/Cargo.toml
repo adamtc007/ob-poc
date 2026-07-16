@@ -62,3 +62,4 @@ rust_decimal = "1"
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

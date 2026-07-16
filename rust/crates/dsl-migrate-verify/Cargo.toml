@@ -24,3 +24,6 @@ bpmn-test-harness = { path = "../bpmn-test-harness" }
 anyhow          = "1"
 serde_json      = "1"
 tokio           = { version = "1", features = ["rt", "macros"] }
+
+[lints.rust]
+dead_code = "deny"

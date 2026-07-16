@@ -22,9 +22,7 @@ use sqlx::PgPool;
 
 use crate::agent::sem_os_context_envelope::SemOsContextEnvelope;
 use crate::agent::telemetry;
-use crate::agent::verb_surface::{
-    compute_session_verb_surface, SessionVerbSurface, VerbSurfaceContext, VerbSurfaceFailPolicy,
-};
+use crate::agent::verb_surface::SessionVerbSurface;
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
 use crate::dsl_v2::enrich_program;
 use crate::dsl_v2::execution::runtime_registry_arc;
@@ -41,13 +39,12 @@ use crate::mcp::verb_search::{
     HybridVerbSearcher, JourneyMetadata, JourneyRoute, VerbSearchResult, VerbSearchSource,
 };
 use crate::sage::{
-    drafter::DraftResolution, DraftResult, ObservationPlane, OutcomeStep, PendingMutation,
-    SageConfidence, SageEngine, UtteranceDisposition,
+    DraftResult, ObservationPlane, OutcomeStep, PendingMutation, SageConfidence, SageEngine,
+    UtteranceDisposition,
 };
 use crate::sem_reg::abac::ActorContext;
 use crate::semtaxonomy_v2::{
-    compiler_input_from_outcome_intent, supports_cbu_compiler_slice, CompilerSelection,
-    IntentCompiler,
+    compiler_input_from_outcome_intent, supports_cbu_compiler_slice, IntentCompiler,
 };
 use crate::traceability::{
     build_phase2_unavailable_payload, build_phase5_unavailable_payload, build_phase_trace_payload,
@@ -151,15 +148,9 @@ pub struct OrchestratorOutcome {
     pub trace_id: Option<Uuid>,
 }
 
-struct SageStageOutcome {
-    intent: Option<crate::sage::OutcomeIntent>,
-}
-
-struct DraftStageOutcome {
-    result: Option<DraftResult>,
-    elapsed_ms: Option<u128>,
-    error: Option<String>,
-}
+// SageStageOutcome/DraftStageOutcome moved to `ob_poc_agent::sage::stages`
+// (T11.2 Part A, 2026-07-13) alongside `run_sage_stage`/`run_coder_stage`.
+use ob_poc_agent::sage::stages::{run_coder_stage, run_sage_stage};
 
 struct PreparedTurnContext {
     lookup_result: Option<crate::lookup::LookupResult>,
@@ -382,74 +373,17 @@ async fn prepare_turn_context(
 
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent);
-    let envelope = resolve_sem_reg_verbs(
+
+    let grant = crate::agent::legality_grant::mint_legality_grant(
         ctx,
         utterance,
         sage_intent,
         semreg_entity_kind.as_deref(),
         use_generic_task_subject,
+        lookup_result.as_ref(),
     )
     .await;
-
-    let fail_policy = if ctx.policy_gate.semreg_fail_closed() {
-        VerbSurfaceFailPolicy::FailClosed
-    } else {
-        VerbSurfaceFailPolicy::FailOpen
-    };
-    let has_group_scope = ctx.scope.as_ref().and_then(|s| s.client_group_id).is_some();
-
-    // Load group composite state for state-to-intent bias
-    #[cfg(feature = "database")]
-    let composite_state = if has_group_scope {
-        // Use session CBU IDs to load composite state
-        let cbu_ids: Vec<uuid::Uuid> = ctx.session_cbu_ids.as_deref().unwrap_or(&[]).to_vec();
-        if !cbu_ids.is_empty() {
-            match crate::agent::composite_state_loader::load_group_composite_state(
-                &ctx.pool, &cbu_ids,
-            )
-            .await
-            {
-                Ok(state) => state,
-                Err(e) => {
-                    tracing::warn!("Failed to load composite state: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-    #[cfg(not(feature = "database"))]
-    let composite_state: Option<crate::agent::composite_state::GroupCompositeState> = None;
-
-    // Extract entity state from SemOS grounded action surface.
-    // SemOS is the source of truth for current state — the state machine determines
-    // which verbs are reachable. Every utterance is a delta against current state.
-    let grounded_entity_state: Option<String> = envelope
-        .grounded_action_surface
-        .as_ref()
-        .and_then(|gas| gas.current_state.clone());
-
-    let surface_ctx = VerbSurfaceContext {
-        agent_mode: ctx.agent_mode,
-        stage_focus: ctx.stage_focus.as_deref(),
-        envelope: &envelope,
-        fail_policy,
-        entity_state: grounded_entity_state.as_deref(),
-        has_group_scope,
-        is_infrastructure_scope: ctx
-            .scope
-            .as_ref()
-            .and_then(|s| s.client_group_id)
-            .is_some_and(|id| id == uuid::Uuid::nil()),
-        composite_state: composite_state.as_ref(),
-    };
-    let surface = compute_session_verb_surface(&surface_ctx);
-
-    let phase2 = Phase2Service::evaluate(lookup_result.clone(), Some(envelope.clone()));
-    let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
+    let sem_reg_verb_names = Phase2Service::legal_verb_names(&grant.phase2.artifacts);
 
     PreparedTurnContext {
         lookup_result,
@@ -457,9 +391,9 @@ async fn prepare_turn_context(
         dominant_entity_kind,
         entity_candidates,
         sem_reg_verb_names,
-        envelope,
-        surface,
-        composite_state,
+        envelope: grant.envelope,
+        surface: grant.surface,
+        composite_state: grant.composite_state,
     }
 }
 
@@ -770,138 +704,6 @@ pub struct IntentTrace {
     pub entity_confidence: Option<f32>,
 }
 
-async fn run_sage_stage(
-    ctx: &OrchestratorContext,
-    utterance: &str,
-    enabled: bool,
-) -> SageStageOutcome {
-    if !enabled {
-        return SageStageOutcome { intent: None };
-    }
-
-    let sage_ctx = crate::sage::SageContext {
-        session_id: ctx.session_id,
-        stage_focus: ctx.stage_focus.clone(),
-        goals: ctx.goals.clone(),
-        entity_kind: ctx.pre_sage_entity_kind.clone(),
-        dominant_entity_name: ctx.pre_sage_entity_name.clone(),
-        last_intents: ctx.recent_sage_intents.clone(),
-    };
-    let sage_engine = ctx
-        .sage_engine
-        .clone()
-        .unwrap_or_else(|| Arc::new(crate::sage::DeterministicSage));
-
-    let intent = match sage_engine.classify(utterance, &sage_ctx).await {
-        Ok(intent) => {
-            tracing::info!(
-                sage_plane = ?intent.plane,
-                sage_polarity = ?intent.polarity,
-                sage_domain = %intent.domain_concept,
-                "Stage 1.5: Sage shadow classification"
-            );
-            Some(intent)
-        }
-        Err(e) => {
-            tracing::warn!(error = %e, "Stage 1.5: SageEngine failed (non-fatal)");
-            None
-        }
-    };
-
-    SageStageOutcome { intent }
-}
-
-fn run_coder_stage(
-    ctx: &OrchestratorContext,
-    intent: Option<&crate::sage::OutcomeIntent>,
-) -> DraftStageOutcome {
-    let Some(intent) = intent else {
-        return DraftStageOutcome {
-            result: None,
-            elapsed_ms: None,
-            error: None,
-        };
-    };
-
-    let started_at = std::time::Instant::now();
-    if let Some(compiler) = &ctx.nlci_compiler {
-        let compiler_input = compiler_input_from_outcome_intent(
-            intent,
-            ctx.session_id,
-            ctx.dominant_entity_id,
-            ctx.pre_sage_entity_kind.as_deref(),
-            ctx.pre_sage_entity_name.as_deref(),
-        );
-        if supports_cbu_compiler_slice(&compiler_input) {
-            return match compiler.compile(compiler_input) {
-                Ok(output) => match output.selection {
-                    Some(selection) => DraftStageOutcome {
-                        result: Some(coder_result_from_compiler_selection(selection)),
-                        elapsed_ms: Some(started_at.elapsed().as_millis()),
-                        error: None,
-                    },
-                    None => DraftStageOutcome {
-                        result: None,
-                        elapsed_ms: Some(started_at.elapsed().as_millis()),
-                        error: Some(
-                            output
-                                .failure
-                                .map(|failure| failure.user_message)
-                                .unwrap_or_else(|| {
-                                    "NLCI compiler returned no selection for supported CBU intent"
-                                        .to_string()
-                                }),
-                        ),
-                    },
-                },
-                Err(error) => DraftStageOutcome {
-                    result: None,
-                    elapsed_ms: Some(started_at.elapsed().as_millis()),
-                    error: Some(error.to_string()),
-                },
-            };
-        }
-    }
-
-    match crate::sage::DrafterEngine::load().and_then(|engine| engine.resolve(intent)) {
-        Ok(drafter_result) => DraftStageOutcome {
-            result: Some(drafter_result),
-            elapsed_ms: Some(started_at.elapsed().as_millis()),
-            error: None,
-        },
-        Err(error) => DraftStageOutcome {
-            result: None,
-            elapsed_ms: Some(started_at.elapsed().as_millis()),
-            error: Some(error.to_string()),
-        },
-    }
-}
-
-fn coder_result_from_compiler_selection(selection: CompilerSelection) -> DraftResult {
-    let dsl = render_selection_dsl(&selection);
-    DraftResult {
-        verb_fqn: selection.verb_id,
-        dsl,
-        resolution: DraftResolution::Confident,
-        missing_args: vec![],
-        unresolved_refs: vec![],
-        diagnostics: None,
-    }
-}
-
-fn render_selection_dsl(selection: &CompilerSelection) -> String {
-    let args = selection
-        .arguments
-        .iter()
-        .map(|(name, value)| format!(" :{} {}", name, render_dsl_string(value)))
-        .collect::<String>();
-    format!("({}{})", selection.verb_id, args)
-}
-
-fn render_dsl_string(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
 /// Returns true for pipeline outcomes that are "early exits" -- scope resolution,
 /// scope candidates -- where the orchestrator should NOT re-generate DSL via
 /// forced-verb. These outcomes don't involve verb ranking.
@@ -1112,7 +914,8 @@ pub(crate) async fn handle_utterance(
     utterance: &str,
 ) -> anyhow::Result<OrchestratorOutcome> {
     let trace_scaffold = persist_trace_scaffold(ctx, utterance).await;
-    let sage_stage = run_sage_stage(ctx, utterance, true).await;
+    let agent_turn = ctx.agent_turn_context();
+    let sage_stage = run_sage_stage(&agent_turn, utterance, true).await;
     let Some(intent) = sage_stage.intent else {
         let outcome = legacy_handle_utterance(ctx, utterance).await?;
         return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
@@ -1155,7 +958,7 @@ pub(crate) async fn handle_utterance(
                         .await?;
                 return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
-            let coder_stage = run_coder_stage(ctx, Some(&intent));
+            let coder_stage = run_coder_stage(&agent_turn, Some(&intent));
             let serve_candidate = coder_stage
                 .result
                 .clone()
@@ -1265,7 +1068,7 @@ pub(crate) async fn handle_utterance(
                 return finalize_orchestrator_trace(ctx, trace_scaffold, outcome).await;
             }
 
-            let coder_stage = run_coder_stage(ctx, Some(&delegate.outcome));
+            let coder_stage = run_coder_stage(&agent_turn, Some(&delegate.outcome));
             let drafter_result = coder_stage.result.as_ref();
             let coder_complete = drafter_result
                 .map(|result| result.missing_args.is_empty() && result.unresolved_refs.is_empty())
@@ -1548,9 +1351,10 @@ pub(crate) async fn legacy_handle_utterance(
     let sage_fast_path_enabled = false;
     let sage_enabled = false;
 
-    let sage_stage = run_sage_stage(ctx, utterance, sage_enabled).await;
+    let agent_turn = ctx.agent_turn_context();
+    let sage_stage = run_sage_stage(&agent_turn, utterance, sage_enabled).await;
     let sage_intent = sage_stage.intent;
-    let coder_stage = run_coder_stage(ctx, sage_intent.as_ref());
+    let coder_stage = run_coder_stage(&agent_turn, sage_intent.as_ref());
     let sage_coder_result = coder_stage.result;
     let sage_coder_elapsed_ms = coder_stage.elapsed_ms;
     let sage_coder_error = coder_stage.error;
@@ -1596,40 +1400,30 @@ pub(crate) async fn legacy_handle_utterance(
         .map(|lr| lr.entities.iter().map(|e| e.mention_text.clone()).collect())
         .unwrap_or_default();
 
-    // -- Step 2: Sem OS context resolution -> SemOsContextEnvelope --
+    // -- Step 2/2.5: mint LegalityGrant (SemOS envelope + SessionVerbSurface + Phase 2) --
+    // T11.1b/slice 2: previously this hand-rolled its own copy of the same
+    // sequence `prepare_turn_context` runs, but without `composite_state`/
+    // `entity_state` (marked TODO below) — a real drift between the two
+    // paths. Now both call the single `mint_legality_grant`, so this path
+    // gains grounded-state/composite-state bias it was previously missing.
     let use_generic_task_subject =
         should_use_generic_task_subject_for_sage(ctx.stage_focus.as_deref(), sage_intent.as_ref());
-    let envelope = resolve_sem_reg_verbs(
+    let grant = crate::agent::legality_grant::mint_legality_grant(
         ctx,
         utterance,
         sage_intent.as_ref(),
         semreg_entity_kind.as_deref(),
         use_generic_task_subject,
+        lookup_result.as_ref(),
     )
     .await;
-
-    // -- Step 2.5: Compute SessionVerbSurface (all governance layers) --
-    let fail_policy = if policy.semreg_fail_closed() {
-        VerbSurfaceFailPolicy::FailClosed
-    } else {
-        VerbSurfaceFailPolicy::FailOpen
-    };
-    let has_group_scope_2 = ctx.scope.as_ref().and_then(|s| s.client_group_id).is_some();
-    let surface_ctx = VerbSurfaceContext {
-        agent_mode: ctx.agent_mode,
-        stage_focus: ctx.stage_focus.as_deref(),
-        envelope: &envelope,
-        fail_policy,
-        entity_state: None, // Lifecycle filtering deferred to Phase 3
-        has_group_scope: has_group_scope_2,
-        is_infrastructure_scope: ctx
-            .scope
-            .as_ref()
-            .and_then(|s| s.client_group_id)
-            .is_some_and(|id| id == uuid::Uuid::nil()),
-        composite_state: None, // TODO: load from group composite when available
-    };
-    let surface = compute_session_verb_surface(&surface_ctx);
+    let crate::agent::legality_grant::LegalityGrant {
+        envelope,
+        surface,
+        phase2,
+        composite_state,
+        ..
+    } = grant;
 
     tracing::debug!(
         total = surface.filter_summary.total_registry,
@@ -1642,7 +1436,6 @@ pub(crate) async fn legacy_handle_utterance(
         "SessionVerbSurface computed"
     );
 
-    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
     if !phase2.is_available {
         let prepared = PreparedTurnContext {
             lookup_result,
@@ -1652,7 +1445,7 @@ pub(crate) async fn legacy_handle_utterance(
             sem_reg_verb_names: None,
             envelope,
             surface,
-            composite_state: None,
+            composite_state: composite_state.clone(),
         };
         return build_semos_unavailable_outcome(ctx, utterance, prepared, sage_intent.clone())
             .await;
@@ -1667,7 +1460,7 @@ pub(crate) async fn legacy_handle_utterance(
             sem_reg_verb_names: None,
             envelope,
             surface,
-            composite_state: None,
+            composite_state: composite_state.clone(),
         };
         return build_semos_discovery_outcome(ctx, utterance, prepared, sage_intent.clone()).await;
     }
@@ -2971,9 +2764,14 @@ pub async fn handle_utterance_with_forced_verb(
     // Even though the user selected this verb, we still validate it against
     // the current SemReg allowed set. This closes the TOCTOU gap where the
     // verb was allowed at discovery time but may have been revoked since.
-    let envelope = resolve_sem_reg_verbs(ctx, "", None, semreg_entity_kind.as_deref(), false).await;
-
-    let phase2 = Phase2Service::evaluate_from_envelope(envelope.clone());
+    let (envelope, phase2) = crate::agent::legality_grant::verify_envelope_legality(
+        ctx,
+        "",
+        None,
+        semreg_entity_kind.as_deref(),
+        false,
+    )
+    .await;
     let sem_reg_verb_names = Phase2Service::legal_verb_names(&phase2.artifacts);
 
     let allowed_verbs_fingerprint = phase2.fingerprint();
@@ -4111,7 +3909,7 @@ mod tests {
         let ctx = make_test_context();
         let intent = make_cbu_intent(crate::sage::OutcomeAction::Read, vec![]);
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.read");
@@ -4130,7 +3928,7 @@ mod tests {
             Some("show all cbus"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.list");
@@ -4145,7 +3943,7 @@ mod tests {
             vec![("jurisdiction", "LU"), ("client-type", "FUND")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.list");
@@ -4167,7 +3965,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4191,7 +3989,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4212,7 +4010,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4233,7 +4031,7 @@ mod tests {
             ],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.create");
@@ -4251,7 +4049,7 @@ mod tests {
             vec![("name", "Apex Growth Fund")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.rename");
@@ -4269,7 +4067,7 @@ mod tests {
             vec![("jurisdiction", "LU")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-jurisdiction");
@@ -4287,7 +4085,7 @@ mod tests {
             vec![("client-type", "FUND")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-client-type");
@@ -4308,7 +4106,7 @@ mod tests {
             )],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-commercial-client");
@@ -4326,7 +4124,7 @@ mod tests {
             vec![("category", "FUND_MANDATE")],
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.set-category");
@@ -4345,7 +4143,7 @@ mod tests {
             Some("move lifecycle into validation review"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.submit-for-validation");
@@ -4364,7 +4162,7 @@ mod tests {
             Some("move to update pending proof"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.request-proof-update");
@@ -4383,7 +4181,7 @@ mod tests {
             Some("move failed cbu back to validation"),
         );
 
-        let stage = run_coder_stage(&ctx, Some(&intent));
+        let stage = run_coder_stage(&ctx.agent_turn_context(), Some(&intent));
         let result = stage.result.expect("compiler-backed result should exist");
 
         assert_eq!(result.verb_fqn, "cbu.reopen-validation");

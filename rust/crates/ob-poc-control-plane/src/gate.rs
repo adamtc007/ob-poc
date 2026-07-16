@@ -74,6 +74,31 @@ pub enum GateResult {
     /// never return it directly.
     NotEvaluated { blocked_by: Vec<GateId> },
     NotImplemented,
+    /// G5 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001` §3, `EOP-DESIGN-
+    /// CONTROLPLANE-G5-GATE-APPLICABILITY-MATRIX-001`): this gate does not
+    /// apply, by construction, to the `ExecutionPath` the surrounding
+    /// decision was evaluated for — e.g. `PackResolution` on Path D
+    /// (bus-federated dispatch has no REPL journey-pack concept at all).
+    /// This is a **first-class outcome, not a synonym for `NotEvaluated`**:
+    /// `NotEvaluated` means "would apply here, but a declared predecessor
+    /// didn't succeed"; `NotApplicable` means "the concept this gate
+    /// grades does not exist on this path, full stop." The `String` is the
+    /// ratified justification (matches a cell in the applicability matrix
+    /// doc referenced above) — never fabricated per call site.
+    ///
+    /// **No gate adapter's own `Gate::evaluate` impl constructs this
+    /// variant** (every existing adapter in this crate only ever builds
+    /// `Success`/`Failure`, same as `NotEvaluated`'s "the evaluator
+    /// produces this automatically" doc above) — `NotApplicable` is
+    /// applied by path-aware *callers* of `evaluate_shadow` (in `ob-poc`,
+    /// the execution tier), as a post-processing override for the specific
+    /// `(GateId, ExecutionPath)` cells the ratified matrix marks
+    /// not-applicable, never inside this crate's own evaluation loop. In
+    /// particular, Path A's call site never applies this override —
+    /// window discipline (standing rule 3) holds by construction, not by
+    /// convention; see `g5_path_a_never_produces_not_applicable` in
+    /// `ob-poc`'s test suite for the live proof.
+    NotApplicable(String),
 }
 
 impl GateResult {
@@ -116,6 +141,17 @@ impl<Ctx> Gate<Ctx> for UnimplementedGate {
 /// gain real dependency semantics (if any) when their owning tranche wires
 /// them (T3–T5).
 ///
+/// **`RunbookProof`'s edge below (T9.7) is the one exception** — not
+/// invented from §6.16.1 (which has no entry for it), but derived from a
+/// fact already fixed elsewhere in this crate: `proof::ControlPlaneProof`
+/// (the artefact G9 represents) has a public field for exactly these eight
+/// gates' proof types (`proof.rs`'s own struct definition), so declaring
+/// the edge here documents a structural fact the crate already committed
+/// to, the same standard applied to every other row — contrast with
+/// Authority/Evidence below, deliberately *not* linked because §6.16.1
+/// states that relationship as conditional, not because dependency edges
+/// are avoided on principle.
+///
 /// Authority's evidence dependency is written in §6.16.1 as conditional
 /// ("+ evidence decision where policy requires") rather than an
 /// unconditional predecessor, so it is deliberately **not** encoded as a
@@ -155,7 +191,19 @@ pub const GATE_DEPENDENCIES: &[(GateId, &[GateId])] = &[
             GateId::WriteSet,
         ],
     ),
-    (GateId::RunbookProof, &[]),
+    (
+        GateId::RunbookProof,
+        &[
+            GateId::IntentAdmission,
+            GateId::EntityBinding,
+            GateId::PackResolution,
+            GateId::DagProof,
+            GateId::Authority,
+            GateId::Evidence,
+            GateId::WriteSet,
+            GateId::DecisionSnapshot,
+        ],
+    ),
     (GateId::ExecutionEnvelope, &[]),
     (GateId::AuditReplay, &[]),
     (GateId::VersionPinning, &[]),
@@ -214,7 +262,7 @@ fn topological_order() -> Vec<GateId> {
 
 /// The result of a full collect-where-independent evaluation pass: one
 /// `GateResult` per `GateId`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EvaluationReport {
     pub results: BTreeMap<GateId, GateResult>,
 }

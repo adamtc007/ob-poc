@@ -317,6 +317,7 @@ fn repl_state_code(state: &ReplStateV2) -> &'static str {
         ReplStateV2::JourneySelection { .. } => "journey_selection",
         ReplStateV2::InPack { .. } => "in_pack",
         ReplStateV2::Clarifying { .. } => "clarifying",
+        ReplStateV2::PackMismatchConfirm { .. } => "pack_mismatch_confirm",
         ReplStateV2::SentencePlayback { .. } => "sentence_playback",
         ReplStateV2::RunbookEditing => "runbook_editing",
         ReplStateV2::Executing { .. } => "executing",

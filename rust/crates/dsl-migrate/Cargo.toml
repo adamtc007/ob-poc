@@ -18,3 +18,4 @@ path = "src/bin/migrate.rs"
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 #[derive(Default)]
 struct MockExecutor {
-    calls: Mutex<Vec<(String, String, Vec<ResolvedBinding>)>>,
+    calls: Mutex<Vec<(String, String, Vec<ResolvedBinding>, Option<Uuid>)>>,
 }
 
 #[async_trait]
@@ -20,11 +20,14 @@ impl VerbExecutor for MockExecutor {
         verb: &str,
         catalogue: &str,
         inputs: Vec<ResolvedBinding>,
+        snapshot_pin: Option<Uuid>,
     ) -> Result<VerbOutcome, VerbExecutorError> {
-        self.calls
-            .lock()
-            .unwrap()
-            .push((verb.to_owned(), catalogue.to_owned(), inputs.clone()));
+        self.calls.lock().unwrap().push((
+            verb.to_owned(),
+            catalogue.to_owned(),
+            inputs.clone(),
+            snapshot_pin,
+        ));
         Ok(VerbOutcome {
             execution_id: Uuid::now_v7(),
             kind: ExecutionOutcomeKind::Committed,
@@ -43,6 +46,17 @@ fn ctx(verb: &str) -> InvocationContext {
         result_callback_endpoint: "http://bpmn-lite/result".into(),
         authority: None,
         tenant_id: "test-tenant".into(),
+        snapshot_pin: None,
+    }
+}
+
+/// [`ctx`], but with a `snapshot_pin` set — G6a coverage (§8 of the
+/// design doc): proves `ObPocBusHandler::dispatch` forwards the pin
+/// unchanged into `VerbExecutor::execute`'s new parameter.
+fn ctx_with_pin(verb: &str, pin: Uuid) -> InvocationContext {
+    InvocationContext {
+        snapshot_pin: Some(pin),
+        ..ctx(verb)
     }
 }
 
@@ -58,6 +72,44 @@ async fn dispatch_forwards_local_verb_id_and_catalogue_version() {
     assert!(outcome.outcome.detail.contains("cbu.create"));
 }
 
+/// G6a (EOP-DESIGN-CONTROLPLANE-G6A-SNAPSHOT-PIN-CARRIER-001 §5/§8):
+/// `InvocationContext.snapshot_pin` must reach `VerbExecutor::execute`'s
+/// new parameter unchanged — the wire-level half of G6a, independent of
+/// whatever `ObPocVerbAdapter`'s real implementation does with it. Uses
+/// `from_arc` (rather than `new`) so the test retains its own handle on
+/// `MockExecutor` and can inspect `calls` after dispatch.
+#[tokio::test]
+async fn dispatch_forwards_snapshot_pin_unchanged() {
+    let mock = std::sync::Arc::new(MockExecutor::default());
+    let handler = ObPocBusHandler::from_arc(mock.clone());
+    let pin = Uuid::now_v7();
+
+    handler
+        .dispatch(ctx_with_pin("cbu.create", pin), vec![])
+        .await
+        .unwrap();
+
+    let calls = mock.calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].3, Some(pin));
+}
+
+/// Regression sibling: no `snapshot_pin` on the incoming context must
+/// still forward as `None`, not silently substitute a fresh id.
+#[tokio::test]
+async fn dispatch_forwards_absent_snapshot_pin_as_none() {
+    let mock = std::sync::Arc::new(MockExecutor::default());
+    let handler = ObPocBusHandler::from_arc(mock.clone());
+
+    handler
+        .dispatch(ctx("cbu.create"), vec![])
+        .await
+        .unwrap();
+
+    let calls = mock.calls.lock().unwrap();
+    assert_eq!(calls[0].3, None);
+}
+
 #[tokio::test]
 async fn unknown_verb_executor_error_maps_to_bus_server_unknown_verb() {
     struct RejectingExecutor;
@@ -68,6 +120,7 @@ async fn unknown_verb_executor_error_maps_to_bus_server_unknown_verb() {
             verb: &str,
             _catalogue: &str,
             _inputs: Vec<ResolvedBinding>,
+            _snapshot_pin: Option<Uuid>,
         ) -> Result<VerbOutcome, VerbExecutorError> {
             Err(VerbExecutorError::UnknownVerb(format!(
                 "verb '{verb}' not in catalogue"
@@ -93,6 +146,7 @@ async fn version_incompatible_maps_through() {
             _v: &str,
             cat: &str,
             _i: Vec<ResolvedBinding>,
+            _snapshot_pin: Option<Uuid>,
         ) -> Result<VerbOutcome, VerbExecutorError> {
             Err(VerbExecutorError::VersionIncompatible(format!("got {cat}")))
         }
@@ -115,6 +169,7 @@ async fn malformed_input_maps_through() {
             _v: &str,
             _c: &str,
             _i: Vec<ResolvedBinding>,
+            _snapshot_pin: Option<Uuid>,
         ) -> Result<VerbOutcome, VerbExecutorError> {
             Err(VerbExecutorError::Malformed("missing name".into()))
         }

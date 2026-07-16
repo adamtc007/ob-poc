@@ -1,4 +1,4 @@
-# dsl-analysis | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:09Z
+# dsl-analysis | features=all | HEAD=e029ebd941f9367aede5336d4222be2394a80072 | 2026-07-10T16:49:24Z
 pub mod dsl_analysis
 pub mod dsl_analysis::catalogue_loader
 pub enum dsl_analysis::catalogue_loader::CatalogueSource
@@ -5810,6 +5810,7 @@ impl<V, T> ppv_lite86::types::VZip<V> for dsl_analysis::runtime_registry::Runtim
 pub fn dsl_analysis::runtime_registry::RuntimeVerbRegistry::vzip(self) -> V
 pub fn dsl_analysis::runtime_registry::runtime_registry() -> &'static dsl_analysis::runtime_registry::RuntimeVerbRegistry
 pub fn dsl_analysis::runtime_registry::runtime_registry_arc() -> alloc::sync::Arc<dsl_analysis::runtime_registry::RuntimeVerbRegistry>
+pub fn dsl_analysis::runtime_registry::validate_lifecycle_invariants(&dsl_analysis::runtime_registry::RuntimeVerbRegistry) -> anyhow::Result<()>
 pub mod dsl_analysis::stategraph
 pub use dsl_analysis::stategraph::EdgeType
 pub use dsl_analysis::stategraph::GraphEdge

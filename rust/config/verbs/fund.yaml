@@ -865,7 +865,7 @@ domains:
         crud:
           operation: upsert
           table: fund_vehicles
-          schema: kyc
+          schema: ob-poc
           returning: fund_entity_id
           conflict_keys:
             - fund_entity_id
@@ -968,7 +968,7 @@ domains:
         crud:
           operation: select
           table: fund_vehicles
-          schema: kyc
+          schema: ob-poc
         args:
           - name: fund-entity-id
             type: uuid
@@ -1010,7 +1010,7 @@ domains:
         crud:
           operation: delete
           table: fund_vehicles
-          schema: kyc
+          schema: ob-poc
           key: fund_entity_id
         args:
           - name: fund-entity-id
@@ -1051,7 +1051,7 @@ domains:
         crud:
           operation: list_by_fk
           table: fund_vehicles
-          schema: kyc
+          schema: ob-poc
           fk_col: manager_entity_id
         args:
           - name: manager-entity-id
@@ -1093,7 +1093,7 @@ domains:
         crud:
           operation: list_by_fk
           table: fund_vehicles
-          schema: kyc
+          schema: ob-poc
           fk_col: vehicle_type
         args:
           - name: vehicle-type
@@ -1150,7 +1150,7 @@ domains:
         crud:
           operation: upsert
           table: fund_compartments
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
             - umbrella_fund_entity_id
@@ -1218,7 +1218,7 @@ domains:
         crud:
           operation: select
           table: fund_compartments
-          schema: kyc
+          schema: ob-poc
         args:
           - name: id
             type: uuid
@@ -1254,7 +1254,7 @@ domains:
         crud:
           operation: delete
           table: fund_compartments
-          schema: kyc
+          schema: ob-poc
           key: id
         args:
           - name: id
@@ -1290,7 +1290,7 @@ domains:
         crud:
           operation: list_by_fk
           table: fund_compartments
-          schema: kyc
+          schema: ob-poc
           fk_col: umbrella_fund_entity_id
         args:
           - name: umbrella-fund-entity-id

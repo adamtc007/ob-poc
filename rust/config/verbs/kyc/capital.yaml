@@ -33,7 +33,7 @@ domains:
         crud:
           operation: upsert
           table: holdings
-          schema: kyc
+          schema: ob-poc
           returning: id
           conflict_keys:
           - share_class_id
@@ -46,7 +46,7 @@ domains:
           lookup:
             table: share_classes
             entity_type: share_class
-            schema: kyc
+            schema: ob-poc
             search_key: name
             primary_key: id
         - name: shareholder-entity-id
@@ -114,7 +114,7 @@ domains:
           lookup:
             table: share_classes
             entity_type: share_class
-            schema: kyc
+            schema: ob-poc
             search_key: name
             primary_key: id
         - name: from-entity-id
@@ -295,7 +295,7 @@ domains:
           lookup:
             table: share_classes
             entity_type: share_class
-            schema: kyc
+            schema: ob-poc
             search_key: name
             primary_key: id
         - name: additional-shares
@@ -346,7 +346,7 @@ domains:
           lookup:
             table: share_classes
             entity_type: share_class
-            schema: kyc
+            schema: ob-poc
             search_key: name
             primary_key: id
         - name: shares-to-cancel
@@ -390,7 +390,7 @@ domains:
         crud:
           operation: list_by_fk
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           fk_col: issuer_entity_id
         args:
         - name: issuer-entity-id
@@ -435,7 +435,7 @@ domains:
         crud:
           operation: list_by_fk
           table: holdings
-          schema: kyc
+          schema: ob-poc
           fk_col: share_class_id
         args:
         - name: share-class-id
@@ -444,7 +444,7 @@ domains:
           lookup:
             table: share_classes
             entity_type: share_class
-            schema: kyc
+            schema: ob-poc
             search_key: name
             primary_key: id
         - name: include-inactive

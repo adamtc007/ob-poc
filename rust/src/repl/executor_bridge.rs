@@ -35,6 +35,14 @@ pub struct RealDslExecutor {
     /// dispatch post-Phase-5c-migrate slice #80 — without it, plugin verbs
     /// fail with an actionable "no SemOsVerbOp registered" error.
     sem_os_ops: Option<std::sync::Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>>,
+    /// G3/G4 (`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` §3(d)):
+    /// which RR-2 ingress path this instance was constructed to serve.
+    /// Set once at construction (`.with_execution_path`), not per-dispatch
+    /// — matches every `main.rs` construction site tagging itself once at
+    /// wiring time. Default `DslDirect` — every construction site this
+    /// design's author missed fails safe into the Path-B umbrella tag
+    /// rather than an unset/panicking state.
+    execution_path: ob_poc_types::ExecutionPath,
 }
 
 impl RealDslExecutor {
@@ -44,6 +52,7 @@ impl RealDslExecutor {
             allow_durable_direct: false,
             service_registry: std::sync::Arc::new(dsl_runtime::ServiceRegistry::empty()),
             sem_os_ops: None,
+            execution_path: ob_poc_types::ExecutionPath::DslDirect,
         }
     }
 
@@ -69,9 +78,53 @@ impl RealDslExecutor {
         self.sem_os_ops = Some(ops);
         self
     }
+
+    /// G3/G4: tag this instance with the RR-2 ingress path it serves.
+    /// Called once at construction (see `main.rs`'s per-instance call
+    /// sites) — never per-dispatch.
+    pub fn with_execution_path(mut self, path: ob_poc_types::ExecutionPath) -> Self {
+        self.execution_path = path;
+        self
+    }
 }
 
 impl RealDslExecutor {
+    /// T9.3a (EOP-PLAN-CONTROLPLANE-001 Addendum B): boundary-interposition
+    /// admission check for Path B/C (direct REPL dispatch through this
+    /// bridge). Ratified redesign — overrides the T6.3/T8.3 deferrals,
+    /// which were correct against the old design (touching
+    /// `dsl_v2::executor::DslExecutor`'s internal per-verb dispatch chain
+    /// directly, a high-risk shared hot path) but not against this one:
+    /// admit at the bridge's ingress, before delegating to the
+    /// (unmodified) internal engine, exactly as T6 did for the bus path
+    /// (`ObPocVerbExecutor::execute_verb_admitting_envelope`, whose T9.2
+    /// rewrite now calls the scope-threaded `admit_in_scope` internally —
+    /// same admission decision, atomic with dispatch) and the runbook path
+    /// (`step_executor_bridge.rs`'s `execute_verb_admitting_envelope`
+    /// call) — same admission primitive
+    /// (`agent::control_plane_envelope_store::check_admission`), same
+    /// `EnforcedVerbs::from_env()` fail-open-by-default posture, applied
+    /// per verb in the compiled plan rather than per single-verb call
+    /// (this bridge's DSL string may be a multi-statement plan; each
+    /// verb in it is checked independently, first rejection wins).
+    /// `envelope_handle: None` — this path has no envelope infrastructure
+    /// wired (same posture as Path A/D's `None` before an envelope is
+    /// actually minted), so this only bites while a verb is listed in
+    /// `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` (empty by production default).
+    ///
+    /// Delegates to the shared
+    /// `agent::control_plane_envelope_store::admit_plan` — every T9.3
+    /// ingress point (this bridge, the MCP `dsl_execute` tool, the legacy
+    /// raw-execute route, the batch/sheet executors) calls the same
+    /// function so the check can't drift between call sites.
+    async fn admit_plan(
+        &self,
+        plan: &crate::dsl_v2::execution_plan::ExecutionPlan,
+    ) -> Result<(), String> {
+        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, plan, self.execution_path)
+            .await
+    }
+
     /// Shared parse → compile → build context path used by both the
     /// self-scoped (`execute`) and in-scope (`execute_in_scope`) entry
     /// points.
@@ -82,6 +135,9 @@ impl RealDslExecutor {
             ExecutionContext::new()
         };
         ctx.execution_id = Uuid::new_v4();
+        // G3/G4: tag this dispatch's context with the instance's ingress
+        // path — read at the seam (`dsl_v2::executor::execute_verb_in_scope`).
+        ctx.execution_path = self.execution_path;
 
         let mut executor = crate::dsl_v2::executor::DslExecutor::new(self.pool.clone())
             .with_services(self.service_registry.clone());
@@ -120,6 +176,9 @@ impl DslExecutor for RealDslExecutor {
         // 2. Compile → ExecutionPlan (topological sort, injections).
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
 
+        // 2.5. T9.3a: admit every verb in the plan before dispatch.
+        self.admit_plan(&plan).await?;
+
         // 3. Build executor + context (shared with execute_in_scope).
         let (executor, mut ctx) = self.build_executor_and_ctx();
 
@@ -151,6 +210,9 @@ impl DslExecutor for RealDslExecutor {
     ) -> Result<serde_json::Value, String> {
         let program = parse_program(dsl).map_err(|e| format!("Parse error: {}", e))?;
         let plan = compile(&program).map_err(|e| format!("Compile error: {:?}", e))?;
+
+        // T9.3a: admit every verb in the plan before dispatch.
+        self.admit_plan(&plan).await?;
 
         let (executor, mut ctx) = self.build_executor_and_ctx();
 

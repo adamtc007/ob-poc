@@ -87,6 +87,86 @@ dsl_verb_reconciliation:
     - structure.select
     - structure.setup
 
+  bods_surface:
+    - bods.discover-ubos
+    - bods.find-by-lei
+    - bods.get-statement
+    - bods.import
+    - bods.link-entity
+    - bods.list-by-entity
+    - bods.list-ownership
+    - bods.list-persons
+    - bods.sync-from-gleif
+  gleif_surface:
+    - gleif.enrich
+    - gleif.import-managed-funds
+    - gleif.import-to-client-group
+    - gleif.import-tree
+    - gleif.lookup
+    - gleif.refresh
+    - gleif.resolve-successor
+    - gleif.search
+    - gleif.trace-ownership
+  research_companies_house_surface:
+    - research.companies-house.fetch-company
+    - research.companies-house.fetch-officers
+    - research.companies-house.fetch-psc
+    - research.companies-house.import-company
+    - research.companies-house.search
+  research_generic_surface:
+    - research.generic.normalize
+  research_import_run_surface:
+    - research.import-run.begin
+    - research.import-run.complete
+    - research.import-run.supersede
+  research_outreach_surface:
+    - research.outreach.close-request
+    - research.outreach.create-request
+    - research.outreach.get-request
+    - research.outreach.list-overdue
+    - research.outreach.list-pending
+    - research.outreach.mark-sent
+    - research.outreach.plan-generate
+    - research.outreach.record-response
+    - research.outreach.send-reminder
+  research_sec_edgar_surface:
+    - research.sec-edgar.fetch-beneficial-owners
+    - research.sec-edgar.fetch-company
+    - research.sec-edgar.fetch-filings
+    - research.sec-edgar.import-company
+    - research.sec-edgar.search
+  research_sources_surface:
+    - research.sources.fetch
+    - research.sources.find-for-jurisdiction
+    - research.sources.info
+    - research.sources.list
+    - research.sources.search
+  research_workflow_surface:
+    - research.workflow.audit-trail
+    - research.workflow.confirm-decision
+    - research.workflow.pending-decisions
+    - research.workflow.record-action
+    - research.workflow.record-anomaly
+    - research.workflow.record-correction
+    - research.workflow.record-decision
+    - research.workflow.reject-decision
+    - research.workflow.resolve-anomaly
+    - research.workflow.supersession-trail
+  cbu_surface:
+    - cbu.add-product
+    - cbu.assign-role
+    - cbu.create
+    - cbu.link-structure
+    - cbu.list
+    - cbu.list-subscriptions
+    - cbu.parties
+    - cbu.remove-product
+    - cbu.set-category
+    - cbu.update
+  entity_surface:
+    - entity.create
+  session_surface:
+    - session.load-galaxy
 # =============================================================================
 # 1. OVERALL BOOK-SETUP LIFECYCLE (per book, derived)
 # =============================================================================

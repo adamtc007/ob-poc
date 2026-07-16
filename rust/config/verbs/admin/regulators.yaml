@@ -29,7 +29,7 @@ domains:
         crud:
           operation: select
           table: regulators
-          schema: ob_ref
+          schema: ob-poc
           multiple: true
         args:
           - name: jurisdiction
@@ -78,7 +78,7 @@ domains:
         crud:
           operation: select
           table: regulators
-          schema: ob_ref
+          schema: ob-poc
         args:
           - name: code
             type: string
@@ -117,7 +117,7 @@ domains:
         crud:
           operation: upsert
           table: regulators
-          schema: ob_ref
+          schema: ob-poc
           returning: regulator_code
           conflict_keys:
             - regulator_code
@@ -180,7 +180,7 @@ domains:
         crud:
           operation: update
           table: regulators
-          schema: ob_ref
+          schema: ob-poc
         args:
           - name: code
             type: string
@@ -230,7 +230,7 @@ domains:
         crud:
           operation: update
           table: regulators
-          schema: ob_ref
+          schema: ob-poc
         args:
           - name: code
             type: string
@@ -247,80 +247,3 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
-  admin.regulatory-tiers:
-    description: "Regulatory tiers reference data"
-    verbs:
-      list:
-        flavour: attribute_mutating
-        description: "List regulatory tiers"
-        effect_class: read_snapshot
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: regulators
-          phase_tags: [administration]
-          side_effects: facts_only
-        invocation_phrases:
-          - "list regulatory tiers"
-          - "show regulatory tiers"
-          - "what tiers are defined"
-          - "get all regulatory tiers"
-          - "display tier classifications"
-          - "show tier levels"
-          - "list tier codes"
-          - "regulatory tier options"
-        behavior: crud
-        crud:
-          operation: select
-          table: regulatory_tiers
-          schema: ob_ref
-          multiple: true
-        args: []
-        returns:
-          type: record_set
-
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
-      read:
-        flavour: attribute_mutating
-        description: "Get tier by code"
-        effect_class: read_snapshot
-        metadata:
-          tier: reference
-          source_of_truth: operational
-          scope: cbu
-          noun: regulators
-          phase_tags: [administration]
-          side_effects: facts_only
-        invocation_phrases:
-          - "get regulatory tier"
-          - "look up tier by code"
-          - "show tier details"
-          - "read tier record"
-          - "find regulatory tier"
-          - "what tier is this"
-          - "fetch tier info"
-          - "tier details"
-        behavior: crud
-        crud:
-          operation: select
-          table: regulatory_tiers
-          schema: ob_ref
-        args:
-          - name: code
-            type: string
-            required: true
-            maps_to: tier_code
-        returns:
-          type: record
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign

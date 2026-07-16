@@ -37,6 +37,19 @@ allowed_verbs:
   - deal.list
   - contract.create
   - billing.create-profile
+  - billing.activate-profile
+  - billing.approve-period
+  - billing.calculate-period
+  - billing.close-profile
+  - billing.create-period
+  - billing.dispute-period
+  - billing.generate-invoice
+  - billing.get-profile
+  - billing.list-profiles
+  - billing.period-summary
+  - billing.revenue-summary
+  - billing.review-period
+  - billing.suspend-profile
   # R3.5 (2026-04-26): Booking Principal verbs hoisted to booking-principal pack.
 
 forbidden_verbs: []

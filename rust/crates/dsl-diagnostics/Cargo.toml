@@ -11,3 +11,4 @@ thiserror = "1.0"
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

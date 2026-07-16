@@ -165,6 +165,7 @@ pub struct StateNodeRef {
 /// enumerates the four cases the §8.6 mapping calls out for the
 /// `InPack` tollgate.
 #[derive(Debug, Clone)]
+#[allow(clippy::enum_variant_names)] // shared `SemOs` prefix is meaningful here: every variant names a SemOS-availability x pack-presence case, not an accidental naming collision
 pub enum VerbSurfaceComposition {
     /// SemOS responded; Phase 2 evaluation produced a non-empty legal
     /// verb set. Carries the fingerprint and pruned count for the

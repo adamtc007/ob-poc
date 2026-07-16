@@ -27,7 +27,7 @@ domains:
         crud:
           operation: insert
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           returning: red_flag_id
         emits_event: red-flag.raised
         args:
@@ -38,7 +38,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: workstream-id
@@ -48,7 +48,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: flag-type
@@ -174,7 +174,7 @@ domains:
         crud:
           operation: update
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           where: red_flag_id
         emits_event: red-flag.rating-updated
         args:
@@ -223,7 +223,7 @@ domains:
         crud:
           operation: update
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           key: red_flag_id
           set_values:
             status: MITIGATED
@@ -238,7 +238,7 @@ domains:
             lookup:
               table: red_flags
               entity_type: red_flag
-              schema: kyc
+              schema: ob-poc
               search_key: red_flag_id
               primary_key: red_flag_id
           - name: notes
@@ -284,7 +284,7 @@ domains:
         crud:
           operation: update
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           key: red_flag_id
           set_values:
             status: WAIVED
@@ -299,7 +299,7 @@ domains:
             lookup:
               table: red_flags
               entity_type: red_flag
-              schema: kyc
+              schema: ob-poc
               search_key: red_flag_id
               primary_key: red_flag_id
           - name: justification
@@ -346,7 +346,7 @@ domains:
         crud:
           operation: update
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           key: red_flag_id
           set_values:
             status: CLOSED
@@ -360,7 +360,7 @@ domains:
             lookup:
               table: red_flags
               entity_type: red_flag
-              schema: kyc
+              schema: ob-poc
               search_key: red_flag_id
               primary_key: red_flag_id
           - name: resolution
@@ -408,7 +408,7 @@ domains:
         crud:
           operation: update
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           key: red_flag_id
           set_values:
             status: CLOSED
@@ -423,7 +423,7 @@ domains:
             lookup:
               table: red_flags
               entity_type: red_flag
-              schema: kyc
+              schema: ob-poc
               search_key: red_flag_id
               primary_key: red_flag_id
           - name: notes
@@ -466,7 +466,7 @@ domains:
         crud:
           operation: update
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           key: red_flag_id
           set_values:
             status: BLOCKING
@@ -479,7 +479,7 @@ domains:
             lookup:
               table: red_flags
               entity_type: red_flag
-              schema: kyc
+              schema: ob-poc
               search_key: red_flag_id
               primary_key: red_flag_id
         returns:
@@ -518,7 +518,7 @@ domains:
         crud:
           operation: list_by_fk
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           fk_col: case_id
         args:
           - name: case-id
@@ -527,7 +527,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: status
@@ -570,7 +570,7 @@ domains:
         crud:
           operation: list_by_fk
           table: red_flags
-          schema: kyc
+          schema: ob-poc
           fk_col: workstream_id
         args:
           - name: workstream-id
@@ -579,7 +579,7 @@ domains:
             lookup:
               table: entity_workstreams
               entity_type: entity_workstream
-              schema: kyc
+              schema: ob-poc
               search_key: workstream_id
               primary_key: workstream_id
           - name: status

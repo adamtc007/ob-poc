@@ -393,6 +393,14 @@ impl BatchExecutor {
         // 6. Create CHILD context with parent bindings
         let mut child_ctx = self.parent_context.child_for_iteration(index);
 
+        // 6.5. T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): admit every
+        // verb in the plan before dispatch. This executor constructs
+        // `DslExecutor` directly, bypassing the bus/runbook admission
+        // checkpoints entirely — closes that gap.
+        crate::agent::control_plane_envelope_store::admit_plan(&self.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
+            .await
+            .map_err(|e| anyhow!(e))?;
+
         // 7. EXECUTE plan
         let executor = DslExecutor::new(self.pool.clone());
         executor.execute_plan(&plan, &mut child_ctx).await?;

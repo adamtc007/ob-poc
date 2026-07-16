@@ -196,7 +196,7 @@ domains:
           lookup:
             table: share_classes
             entity_type: share_class
-            schema: kyc
+            schema: ob-poc
             search_key: name
             primary_key: id
           description: "Optional share class scope. If set, this role profile only applies to holdings in this specific share class. NULL means applies to all share classes."
@@ -269,7 +269,7 @@ domains:
         crud:
           operation: select
           table: investor_role_profiles
-          schema: kyc
+          schema: ob-poc
           where_clause: "effective_to IS NULL"
         args:
         - name: issuer
@@ -392,7 +392,7 @@ domains:
         crud:
           operation: list_by_fk
           table: investor_role_profiles
-          schema: kyc
+          schema: ob-poc
           fk_col: issuer_entity_id
           where_clause: "effective_to IS NULL"
         args:
@@ -449,7 +449,7 @@ domains:
         crud:
           operation: list_by_fk
           table: investor_role_profiles
-          schema: kyc
+          schema: ob-poc
           fk_col: holder_entity_id
           where_clause: "effective_to IS NULL"
         args:
@@ -498,7 +498,7 @@ domains:
         crud:
           operation: list_by_fk
           table: investor_role_profiles
-          schema: kyc
+          schema: ob-poc
           fk_col: issuer_entity_id
           order_by: effective_from DESC
         args:

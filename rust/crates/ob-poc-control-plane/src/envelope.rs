@@ -62,31 +62,23 @@ impl ValidityWindow {
     }
 }
 
-/// An opaque, serializable reference to a sealed `ExecutionEnvelope`
-/// (id + content hash). Unlike `ExecutionEnvelope` itself, `EnvelopeHandle`
-/// IS serializable (§9.3: "the runtime accepts only `ExecutionEnvelope`,
-/// not raw agent output" — a handle is how a *reference* to an already-
-/// sealed envelope crosses a persistence or wire boundary; T4.2 persists
-/// handles in `control_plane_envelopes` and rehydrates only through
-/// control-plane re-verification, never by deserializing a raw envelope).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct EnvelopeHandle {
-    id: Uuid,
-    /// SHA-256 of the envelope's sealed content, hex-encoded. Lets a
-    /// consumer detect a handle that no longer matches the envelope it was
-    /// minted from (defence in depth alongside the `id` lookup).
-    content_hash: [u8; 32],
-}
-
-impl EnvelopeHandle {
-    pub fn id(&self) -> Uuid {
-        self.id
-    }
-
-    pub fn content_hash_hex(&self) -> String {
-        hex::encode(self.content_hash)
-    }
-}
+/// `EnvelopeHandle` — an opaque, serializable reference to a sealed
+/// `ExecutionEnvelope` (id + content hash). Unlike `ExecutionEnvelope`
+/// itself, `EnvelopeHandle` IS serializable (§9.3: "the runtime accepts
+/// only `ExecutionEnvelope`, not raw agent output" — a handle is how a
+/// *reference* to an already-sealed envelope crosses a persistence or wire
+/// boundary; T4.2 persists handles in `control_plane_envelopes` and
+/// rehydrates only through control-plane re-verification, never by
+/// deserializing a raw envelope).
+///
+/// T8.1 (EOP-PLAN-CONTROLPLANE-001, closes PIR-D-008/PIR-D-010): the type
+/// itself now lives in `ob-poc-types::envelope_handle` — a values-only
+/// boundary crate `dsl-runtime` can depend on without pulling in this
+/// crate's gate logic — so `VerbExecutionPort::execute_verb_admitting_envelope`
+/// can carry a typed, content-hash-checked handle instead of a bare `Uuid`.
+/// Re-exported here so existing `ob_poc_control_plane::envelope::EnvelopeHandle`
+/// call sites are unaffected.
+pub use ob_poc_types::EnvelopeHandle;
 
 /// `ExecutionEnvelope` — the sealed, runtime-admissible artefact. Private
 /// fields, no public constructor, and deliberately **no `Deserialize`**
@@ -116,9 +108,11 @@ impl ExecutionEnvelope {
     /// adding a gate to the platform means adding a parameter here;
     /// forgetting to run it becomes unrepresentable rather than undetected.
     ///
-    /// Called by the (future) T2's collected-gate orchestration, once every
-    /// gate has a real adapter; the only caller today is the cfg(test)
-    /// positive-path test below.
+    /// Called by the (future) full-orchestration `evaluate()` once every
+    /// gate has a real adapter; today's callers are the cfg(test)
+    /// positive-path test below and, behind the `test-support` feature,
+    /// `envelope::test_support::seal` (for downstream crates' storage-layer
+    /// tests — see that module's doc).
     #[allow(clippy::too_many_arguments, dead_code)]
     pub(crate) fn seal(
         intent: AdmittedIntent,
@@ -197,10 +191,84 @@ impl ExecutionEnvelope {
         let mut hasher = Sha256::new();
         hasher.update(&content);
         let content_hash: [u8; 32] = hasher.finalize().into();
-        EnvelopeHandle {
-            id: self.id,
-            content_hash,
+        EnvelopeHandle::new(self.id, content_hash)
+    }
+
+    /// T10.1 (EOP-PLAN-CONTROLPLANE-001 Addendum C, B2): the single
+    /// sanctioned way for a sealed envelope's content to leave this crate.
+    /// `EnvelopeRecord` is a flattened, primitive-typed **projection**, not
+    /// a serde mirror of `ExecutionEnvelope` — none of the individual proof
+    /// types (`AdmittedIntent`, `BoundEntities`, `Authorised`, ...) gain
+    /// `Deserialize` here or anywhere else; only their already-plain-data
+    /// fields are copied out. This is deliberate: a `EnvelopeRecord` read
+    /// back from storage can be inspected (T10.2's pin comparison, future
+    /// audit) but can never be fed back into a `seal()`-equivalent
+    /// constructor to fabricate a proof — "rehydration of a record into
+    /// anything execution-accepted happens only through control-plane
+    /// verification" (§6.10.4), i.e. a future comparison function taking
+    /// `&EnvelopeRecord` plus freshly-read facts, never a raw deserialize
+    /// into `ExecutionEnvelope`.
+    pub fn to_record(&self) -> EnvelopeRecord {
+        EnvelopeRecord {
+            envelope_id: self.id,
+            verb_fqn: self.intent.verb_fqn().to_string(),
+            bound_entity_ids: self.binding.entity_ids().to_vec(),
+            pack_id: self.pack.pack_id().to_string(),
+            snapshot: self.snapshot.clone(),
+            not_before: self.validity.not_before(),
+            not_after: self.validity.not_after(),
         }
+    }
+}
+
+/// T10.1: the flattened, storable projection of a sealed `ExecutionEnvelope`
+/// — see [`ExecutionEnvelope::to_record`] for why this is a distinct type
+/// rather than a `Deserialize` derive on the envelope or its proof types.
+/// Every field here is already plain data (`Uuid`/`String`/`Vec`/pins),
+/// copied out of proof types whose own constructors stay module-private.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct EnvelopeRecord {
+    pub envelope_id: Uuid,
+    pub verb_fqn: String,
+    pub bound_entity_ids: Vec<Uuid>,
+    pub pack_id: String,
+    pub snapshot: crate::snapshot::SnapshotPins,
+    pub not_before: DateTime<Utc>,
+    pub not_after: DateTime<Utc>,
+}
+
+/// Feature-gated (`test-support`, off by default), NOT `cfg(test)`: a
+/// downstream crate's own `cargo test` run does not compile this crate
+/// with `cfg(test)` active (that only applies to a crate's *own* test
+/// target), so a `cfg(test)` bridge here would be invisible to e.g.
+/// `ob-poc`'s T4.2 envelope-persistence tests. This module exists solely so
+/// those tests can obtain a real, fully-proven `ExecutionEnvelope` to
+/// exercise storage/consume-once/TTL logic against — every parameter is
+/// still each gate's own module-private success proof, unchanged from
+/// `seal` itself.
+#[cfg(feature = "test-support")]
+pub mod test_support {
+    use super::{
+        AdmittedIntent, Authorised, BoundEntities, CompiledRunbookRef, EvidenceSufficient, ExecutionEnvelope,
+        LegalTransition, ResolvedPack, SnapshotPins, ValidityWindow, WriteSetProof,
+    };
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn seal(
+        intent: AdmittedIntent,
+        binding: BoundEntities,
+        pack: ResolvedPack,
+        dag: LegalTransition,
+        authority: Authorised,
+        evidence: EvidenceSufficient,
+        write_set: WriteSetProof,
+        runbook: CompiledRunbookRef,
+        snapshot: SnapshotPins,
+        validity: ValidityWindow,
+    ) -> ExecutionEnvelope {
+        ExecutionEnvelope::seal(
+            intent, binding, pack, dag, authority, evidence, write_set, runbook, snapshot, validity,
+        )
     }
 }
 
@@ -233,7 +301,7 @@ mod tests {
             "VALIDATION_PENDING",
             "VALIDATED",
         );
-        let authority = crate::authority_gate::tests_support::authorised(Uuid::nil(), "compliance_officer");
+        let authority = crate::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
         let evidence = crate::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
         let write_set = crate::write_set::tests_support::proof(
             vec![Uuid::nil()],
@@ -261,6 +329,51 @@ mod tests {
         let handle = envelope.handle();
         assert_eq!(handle.id(), envelope.id());
         assert_eq!(handle.content_hash_hex().len(), 64);
+    }
+
+    /// T10.1: `to_record()` copies out plain data only — the record must
+    /// round-trip through JSON (proving it's genuinely storable) while the
+    /// envelope's own proof fields stay private/non-`Deserialize`.
+    #[test]
+    fn to_record_copies_out_plain_data_and_round_trips_through_json() {
+        let intent = crate::intent_admission::tests_support::admitted(Uuid::nil(), "cbu.confirm");
+        let binding = crate::entity_binding::tests_support::bound(vec![Uuid::nil()]);
+        let pack = crate::pack_resolution::tests_support::resolved("ob-poc.cbu");
+        let dag = crate::dag_proof::tests_support::legal(Uuid::nil(), "VALIDATION_PENDING", "VALIDATED");
+        let authority = crate::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
+        let evidence = crate::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
+        let write_set = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".into()],
+            vec!["ob-poc.cbus".into()],
+            vec!["status".into()],
+            "idem-1",
+        );
+        let runbook = CompiledRunbookRef::new(Uuid::nil());
+        let snapshot = crate::snapshot::tests_support::pins(
+            Some(Uuid::nil()),
+            None,
+            None,
+            vec![(Uuid::nil(), "cbu".to_string(), 3)],
+        );
+
+        let envelope = ExecutionEnvelope::seal(
+            intent, binding, pack, dag, authority, evidence, write_set, runbook, snapshot,
+            now_window(),
+        );
+
+        let record = envelope.to_record();
+        assert_eq!(record.envelope_id, envelope.id());
+        assert_eq!(record.verb_fqn, "cbu.confirm");
+        assert_eq!(record.bound_entity_ids, vec![Uuid::nil()]);
+        assert_eq!(record.pack_id, "ob-poc.cbu");
+        assert_eq!(record.snapshot.entity_row_version(Uuid::nil()), Some(3));
+        assert_eq!(record.not_before, now_window().not_before());
+
+        let json = serde_json::to_string(&record).expect("EnvelopeRecord serializes");
+        let round_tripped: EnvelopeRecord =
+            serde_json::from_str(&json).expect("EnvelopeRecord deserializes");
+        assert_eq!(round_tripped, record);
     }
 
     #[test]

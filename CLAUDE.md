@@ -3,15 +3,15 @@
 > **Last reviewed:** 2026-07-01
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) — Chat UI with scope panel, Inspector, Semantic OS Tab
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) — Serves React + REST API
-> **Crates:** 54 workspace crates (incl. `ob-poc` application root) — 21 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, booking-principal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy · kyc-stack: **ob-poc-kyc-substrate, ob-poc-kyc-store, ob-poc-kyc-seam**) · 11 sem_os_* (core, types, ontology, policy, taxonomy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
-> **Verbs:** 1,282 canonical verbs across 134 domains; 23 are dsl.kyc stream-backed (W1–W5: `ubo.edge.*` (6), `ubo.determination.*` (4), `ubo.board-controller.override`, `kyc.subject.*` (2), `kyc.role.*` (2), `kyc.obligation.*` (6), `kyc.person.*` (2)); 58 legacy determination verbs deleted (ubo/control/ownership/board write verbs replaced)
+> **Crates:** 54 workspace crates (incl. `ob-poc` application root) — 21 ob-poc-* library (web, types, diagnostics, boundary, sage, journey, authoring, agent, macros · split-v1: bods, deal, semtaxonomy, ontology, entity-linking, trading-profile, derived-attributes, taxonomy (booking-principal removed 2026-06-15, commit `00781591`) · kyc-stack: **ob-poc-kyc-substrate, ob-poc-kyc-store, ob-poc-kyc-seam**) · 11 sem_os_* (core, types, ontology, policy, taxonomy, postgres, server, client, obpoc_adapter, harness, mcp) · 4 dsl-* (dsl-core, dsl-lsp, dsl-runtime, dsl-analysis) · 4 ob-* (ob-agentic, ob-templates, ob-workflow, ob-semantic-matcher) · 4 misc (entity-gateway, xtask, playbook-core, inspector-projection) · 9 unified-dsl-v0.1 (dsl-atoms, dsl-diagnostics, dsl-parser, dsl-ast, dsl-bpmn-frontend, dsl-lowering, dsl-resolution, bpmn-runtime, bpmn-test-harness)
+> **Verbs:** 1,281 canonical verbs across 134 domains; 22 are dsl.kyc stream-backed (W1–W5: `ubo.edge.*` (6), `ubo.determination.*` (4), `kyc.subject.*` (2), `kyc.role.*` (2), `kyc.obligation.*` (6), `kyc.person.*` (2)); `ubo.board-controller.override` removed 2026-07-15 (D3's own doc comment said it was meant to replace a `board_controller_overrides` table that never existed; it had zero fold effect — appended to the stream, nothing ever read it back — and its purpose was no longer understood, so it was deleted rather than left as unexplained dead capability); 58 legacy determination verbs deleted (ubo/control/ownership/board write verbs replaced)
 > **Macros:** 103 operator macros (22 YAML files, 18 domains, 3 composite), Tier -2B in intent pipeline
 > **MCP Tools:** ~102 tools (DSL, verbs, learning, session, batch, research, taxonomy, sem_reg, stewardship, db_introspect, session_verb_surface)
 > **DAG Taxonomies:** 12 (CBU + KYC + Deal + Catalogue + InstrumentMatrix + BookingPrincipal + LifecycleResources + ProductServiceTaxonomy + SemOsMaintenance + SessionBootstrap + OnboardingRequest + BookSetup) — see `rust/config/sem_os_seeds/dag_taxonomies/`
 > **Latest schema additions:** `rust/migrations/20260630_kyc_intent_events.sql` (authoritative append-only verb stream + per-subject seq allocator — EOP-DD-KYCUBO-002 §2), `20260630_kyc_committed_at_clock_timestamp.sql` (B1 monotonicity fix: `DEFAULT clock_timestamp()` not `now()`), `20260630_w2_lexicon_manifest.sql` (`dsl_verbs.lexicon_hash` + `kyc_lexicon_manifest` table — Q7 whole-lexicon version), `20260630_kyc_control_edge_projection.sql` + `20260630_kyc_obligation_projection.sql` (disposable stream projections — K-34)
 > **Workspaces:** 12 (8 domain: CBU, KYC, Deal, Catalogue, InstrumentMatrix, BookingPrincipal, LifecycleResources, ProductServiceTaxonomy) + (4 infrastructure: SemOsMaintenance, SessionBootstrap, OnboardingRequest, BookSetup)
 > **Catalogue spec:** `docs/todo/catalogue-platform-refinement-v1_2.md` (consolidated authoritative spec, 2026-04-26 — supersedes v1.0/v1.1/v1.3). Tranche 1 implementation complete: validator (transition_args + EXISTS predicate), Sage/REPL policies, P-G provisional designation, GatePipeline default-on, CI gate. Tranche 2 (estate reconciliation: 487 verbs to declare, 153 preserving-with-transition_args migration warnings to fix) follows.
-> **KYC/UBO dsl.kyc V&S implementation:** `docs/todo/EOP-DD-KYCUBO-001_*.md` + `EOP-DD-KYCUBO-002_*.md` + `EOP-DD-KYCUBO-003_*.md`. W1–W7 stream/lexicon/projection infrastructure complete on branch `codex/phase-1-5-governance-closure`; **EOP-DD-KYCUBO-003 (2026-07-01)** wired the actual determination logic into the write path — `ubo.determination.freeze` had been bypassing `OwnershipProngStrategy` entirely (a naive all-active-edges proxy, no threshold/axis split) and `kyc.person.approve` had no K-23 gate; both fixed, RED→GREEN proven. M2 (lexicon-manifest coverage for the 11 obligation verbs, `pierce-nominee`) and M4 (institutional KYC profile, real control-prong strategy for fund-LP/LLP) remain open — see the remediation doc's execution log. Crate stack: `ob-poc-kyc-substrate` (pure engine, no sqlx) ← `ob-poc-kyc-store` (Postgres membrane, §3 append protocol, projectors, drainers, W2 manifest publish) ← `ob-poc-kyc-seam` (the only KYC crate touching dsl-runtime; `append_in_scope` §3.6 chokepoint). `as_of` is now a field on `VerbExecutionContext` (frozen at dispatch). Dep-gate: `rust/scripts/check_kyc_substrate_deps.sh`.
+> **KYC/UBO dsl.kyc V&S implementation:** `docs/todo/EOP-DD-KYCUBO-001_*.md` + `EOP-DD-KYCUBO-002_*.md` + `EOP-DD-KYCUBO-003_*.md`. W1–W7 stream/lexicon/projection infrastructure complete on branch `codex/phase-1-5-governance-closure`; **EOP-DD-KYCUBO-003 (2026-07-01)** wired the actual determination logic into the write path — `ubo.determination.freeze` had been bypassing `OwnershipProngStrategy` entirely (a naive all-active-edges proxy, no threshold/axis split) and `kyc.person.approve` had no K-23 gate; both fixed, RED→GREEN proven. **M4 (2026-07-15): `ControlProngStrategy` landed** — `DeterminationStrategy::resolve()` generalized to take `&ControlState` (was a pre-filtered economic-edge slice); the new strategy resolves natural persons via a chain of control-kind edges (voting rights, board appointment, GP statutory, LLP designated member, dominant influence — `EdgeKind`), `Prong::ControlByOtherMeans`, no percentage quantum. Selectable via `ubo.determination.select-strategy`'s `strategy: control_prong_strategy`; `freeze` dispatches to it alongside `ownership_prong_strategy`. v1 scope, documented on the type: control-kind edges only, does not cross into the economic axis for an intermediate controlling entity's own UBOs (v2). Found and fixed while wiring the live path: `ubo.edge.assert-control`'s YAML arg was named `edge_kind` but the fold reads payload key `kind` — every real DSL call would have silently misclassified every control edge as `DominantInfluence` (same defect class as the R3 structure-class bug from EOP-DD-KYCUBO-003, caught before this verb ever went live). Still open: `pierce-nominee` (K-8, M2), lexicon-manifest coverage for the 11 obligation verbs (M2), a wire mapping from `assert-control`'s `kind` string to `EdgeKind::TrustRole`'s sub-kind (trust/foundation structure classes — real gap, not silently missed, see `dsl-kyc.yaml`'s `structure-class` description), and true institutional/role-based strategies beyond ownership+control (M2). Crate stack: `ob-poc-kyc-substrate` (pure engine, no sqlx) ← `ob-poc-kyc-store` (Postgres membrane, §3 append protocol, projectors, drainers, W2 manifest publish) ← `ob-poc-kyc-seam` (the only KYC crate touching dsl-runtime; `append_in_scope` §3.6 chokepoint). `as_of` is now a field on `VerbExecutionContext` (frozen at dispatch). Dep-gate: `rust/scripts/check_kyc_substrate_deps.sh`.
 > **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md`
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) — 24,587 patterns vectorized
 
@@ -156,8 +156,8 @@ SemOS Maintenance workspace (2026-03-28):
 - 4 governance scenarios (Tier -2A): compound intent resolution for SemOS maintenance utterances
 - New verbs: `service-resource.check-attribute-gaps`, `service-resource.sync-definitions`, `typed-attribute.record/get/list-for-entity`, `derivation.recompute-stale`, `attribute.bridge-to-semos`
 - Verb search: 6 phrasing detection improvements (domain_filter bypass for semantic/macro/scenario/learned tiers, short query threshold scaling, multi-domain pack dominant_domain suppression, noun index for new domains)
-- Utterance test harness: 353 test cases across all 7 workspaces, per-workspace hit rate reporting
-- Hit rates: 78.2% first-attempt, 99.4% two-attempt, 2 wrong verbs (all workspaces above 30%)
+- Utterance test harness: 386 test cases across 8 workspaces (`rust/tests/fixtures/intent_test_utterances.toml`; grown from the original 353/7 as of 2026-03-28), per-workspace hit rate reporting
+- Hit rates (2026-07-16 run): 73.6% first-attempt (target ≥35%), 93.3% two-attempt (target ≥55%); 26 failures, concentrated in ubo/ownership/control-domain phrasing collisions
 - Contextual query detection: 16 patterns intercepted before verb search, routed to NarrationEngine
 - Governed phrase authoring (v1.2): `phrase_bank` table (13,570 entries), `phrase_mapping` SemOS object type, `phrase_authoring_lifecycle` state machine (8 states), 9 phrase.* verbs, AI proposal pipeline with 5-signal confidence scoring + risk-tiered approval routing
 - Onboarding product macros: `structure.product-suite-custody-fa-ta`, `structure.product-suite-full`, `structure.remove-all-products` — compound intent → multi-step runbook → per-entity expansion → DAG-ordered → confirm all → execute atomically
@@ -533,6 +533,10 @@ impl SemOsVerbOp for MyDomainCreate {
 
 **Dispatching-fold pattern** (consolidate N specialist verbs → 1, e.g. `cbu.assign-role`, 2026-06-18): to deduplicate the discoverable surface without losing capability, give the canonical verb a `*-type` selector arg + a dispatching `SemOsVerbOp` that routes to the specialist op structs by type. **Retain the specialist structs but DROP their `register()` calls** — they become unregistered dispatch targets, so every write-path is preserved while only one verb is discoverable. Both coverage invariants stay green (no orphan ops: the registry has exactly the verbs declared `behavior: plugin` in YAML). Re-home the folded verbs' `invocation_phrases` onto the canonical, retarget DAG/constellation refs, then `cargo x verbs compile` + repopulate embeddings + prune the removed verbs' stale rows from `verb_pattern_embeddings`.
 
+**Shared fold-verb dispatch helper** (`sem_os_postgres::ops::selector_dispatch`, 2026-07-15): the selector-arg-below-entity-type pattern (e.g. `cbu.assign-role`'s `role-type`, `client-group.entity-manage`'s `action`, `gleif.lookup`'s `target-type`) previously had 3 independent hand-rolled implementations with no shared contract — exactly the duplication that let `cbu.create`'s internal cascade call target an unregistered FQN (`cbu.assign-fund-role`, orphaned by the 2026-06-18 fold) silently break at runtime for a month. Use `resolve_selector(args, arg_name, arms)` (case-insensitive arm lookup, returns `Matched`/`Absent`/`Unrecognized` — pick this when the fold verb must fall back to non-selector behavior, as `cbu.assign-role` does) or `dispatch_selector(...)` (strict — `Absent`/`Unrecognized` both error listing valid values; pick this for a pure fold with no fallback, as `client-group.entity-manage` and `gleif.lookup` do). If an op dispatches through an indirection (e.g. `gleif.lookup`'s `Self::resolve()`, needed because both `pre_fetch` and `execute` resolve the same arm), `cargo x registry-graph`'s fold-verb detector (below) won't see it — it only scans an op's own `execute()` body.
+
+**Selector-arg `valid_values` is mandatory, always the wire string, not a description-only enum** (2026-07-15): every selector/strategy arg dispatched via `selector_dispatch` — or matched via a hand-rolled `match` on a string arg, like `ubo.determination.freeze`'s `strategy` dispatch on `select-strategy`'s recorded value — MUST declare `valid_values` in the verb YAML using the *exact* runtime match string, not a prose description of it. Two real bugs found by auditing `kyc.subject.classify-structure`/`ubo.determination.select-strategy` for this after building `selector_dispatch`: (1) `structure-class` had no `valid_values` at all — the 11-variant `StructureClass` taxonomy (`ob-poc-kyc-substrate/src/fold/control.rs`) existed only in Rust, invisible at the config layer the way CBU's `role-type` `valid_values: [ROLE, OWNERSHIP, ...]` is; (2) `strategy`'s description said `"ownership_prong or smo_fallback"` while the only real `DeterminationStrategy::name()` is `"ownership_prong_strategy"` — a caller or an LLM doing arg extraction from the description alone would pass a string that fails at `freeze` time. `valid_values` is descriptive metadata (feeds Sage arg extraction + SemOS `AttributeDataType::Enum` projection, not a DSL-parse-time hard reject — confirmed via `crates/sem_os_obpoc_adapter/src/scanner.rs:977`), so widening it costs nothing; the risk is entirely on the side of leaving it absent or wrong. When a selector's valid range includes not-yet-implemented arms (e.g. `structure-class`'s `llp`/`trust`/fund classes, real per `StructureClass` but with no control-prong `DeterminationStrategy` behind them — M4, open), list them anyway and say so in `description` — the taxonomy is real even when the strategy behind an arm isn't built yet; that's a different, separately-tracked gap (see KYC/UBO section above).
+
 ```bash
 cargo x verbs check   # YAML matches DB
 cargo x verbs lint    # Tiering rules (reads the canonical SemOS registry manifest)
@@ -594,7 +598,7 @@ ob-poc/
 │   │   ├── agent/              # Orchestrator, verb surface, onboarding state, context envelope
 │   │   ├── repl/               # V2 REPL (30 files, always enabled) + session_trace, trace_repository, session_replay
 │   │   ├── journey/            # Pack system (router, manifests, handoff)
-│   │   ├── domain_ops/         # Pattern B SemOsVerbOp ops that bridge to ob-poc internals (9 files, 119 ops: onboarding, bpmn_lite, template, source_loader, request, gleif, booking_principal, trading_profile + rule_evaluator utility). Registered via `extend_registry()`.
+│   │   ├── domain_ops/         # Pattern B SemOsVerbOp ops that bridge to ob-poc internals (9 files, 119 ops: onboarding, bpmn_lite, template, source_loader, request, gleif, trading_profile + rule_evaluator utility). Registered via `extend_registry()`.
 │   │   ├── sem_reg/            # Semantic Registry + stewardship (39 files)
 │   │   ├── mcp/                # MCP tools, handlers, verb search, intent pipeline
 │   │   ├── bpmn_integration/   # ob-poc ↔ bpmn-lite wiring (12 files)
@@ -686,8 +690,11 @@ cargo test -p dsl-runtime --lib
 cargo test -p sem_os_postgres --lib
 cargo test -p ob-semantic-matcher --lib
 
-# Intent hit rate (needs DATABASE_URL)
-DATABASE_URL="postgresql:///data_designer" cargo test --features database --test intent_hit_rate -- --ignored --nocapture
+# Intent hit rate / utterance test harness (needs DATABASE_URL)
+# NOTE: intent_hit_rate lives under src/integration_tests/ (a #[cfg(test)]
+# mod of the ob-poc lib), not a standalone tests/*.rs integration binary —
+# `--test intent_hit_rate` does not resolve; use `--lib` with a name filter.
+DATABASE_URL="postgresql:///data_designer" cargo test --features database --lib intent_hit_rate -- --ignored --nocapture
 ```
 
 **Test fixture macros:** `rust/tests/fixtures/macros/*.yaml` — YAML macro definitions loaded by external harnesses via `load_macro_registry_from_dir`. Avoids constructing internal `MacroSchema` types in external tests.
@@ -715,6 +722,88 @@ Automated browser testing via Chrome DevTools MCP. Claude Code can navigate, typ
 @chrome click the CBU workspace button and verify journey options appear
 @chrome check for console errors
 ```
+
+---
+
+## Verification Strategy — Which Tool Answers Which Question (xtask)
+
+Three different mechanisms answer three different classes of "is this code
+dead / does this dispatch twice / does this actually work" question. Picking
+the wrong one either produces false positives (flagging live code as dead)
+or silently misses real findings (a tool that can't see the thing it's being
+asked about). The dividing line is dispatch shape, not question type:
+
+1. **Static analysis — for anything closed-enum/match dispatched.**
+   `dead_code = "deny"` (workspace-wide, every crate's `[lints.rust]`),
+   `cargo +nightly public-api` (per-crate ratchet against committed
+   `audits/surface/<crate>.txt` snapshots — `scripts/check-public-api-surface.sh`
+   for the exact-match gate, `scripts/check-no-widening.sh` for an
+   additions-only guard during a deletion sweep), and rust-analyzer/editor
+   call hierarchy for interactive one-off tracing. This tier works because
+   the compiler (and any tool built on its same AST/type info) can resolve
+   every call site at compile time — `ExecutionResult`, `CrudOperation`,
+   orchestrator `match` arms, anything reached by a named function call.
+   It does **not** work across a `dyn Trait` boundary: a call through
+   `&dyn Trait` has no static edge back to a concrete impl, so this tier
+   run against `dyn`-dispatched code produces a "dead code" report that's
+   actually just the entire live surface (confirmed 2026-07-15 before
+   building anything — see tier 2).
+
+2. **Registry-data extraction — for anything behind `dyn` in a
+   runtime-keyed registry.** `SemOsVerbOp` is `Arc<dyn SemOsVerbOp>` in a
+   `HashMap<String, _>` (`sem_os_postgres::ops::SemOsVerbOpRegistry`),
+   dispatched by an FQN string the DSL compiler emits from YAML — the only
+   static edge is `registry.register(Arc::new(ConcreteType))`, a
+   *construction*, not an *invocation*, so tier 1 tooling is structurally
+   blind here. The fix relocates the analysis from the dispatch site
+   (unresolvable) to the registration site (fully resolvable — a plain
+   function call with a string-bearing concrete type as its argument,
+   visible in the same compiled workspace that erases it to `dyn`
+   everywhere else). `cargo x registry-graph`
+   (`xtask/src/registry_graph.rs`) implements this today as static `syn`
+   extraction of every `build_registry()`/`extend_registry()` call site,
+   resolved to FQNs via each type's `fqn()` impl (direct, or via one of
+   17 local `macro_rules!` helpers, or two `const`-table loop-registration
+   special cases), diffed against the YAML `behavior: plugin` verb set —
+   a completeness diff between two declared corpora, not a call-graph
+   walk. (A live *registry pre-run* — actually calling
+   `build_registry()`/`extend_registry()` and reading `.fqn()` off the
+   real `dyn` objects, optionally capturing `std::any::type_name::<T>()`
+   at a generic call site before erasure — is the lower-maintenance
+   version of the same principle: it can't miss a new macro shape the way
+   the static extractor can, since running the real registration code
+   doesn't require recognizing its syntax. The static extractor was
+   chosen first because it needed no new registry API; revisit if the
+   macro-shape surface keeps growing.) Verified 2026-07-15: 766 registered
+   ops ↔ 766 YAML `plugin` verbs, exact match, 0 dead code / 0 missing
+   registrations / 0 dual-routing — cross-validated against the
+   independent `test_plugin_verb_coverage` test, which also passes.
+   Extended 2026-07-15 to the one intra-registry composition mechanism
+   that exists (`SemOsChildDispatcher::dispatch_child`, confirmed the sole
+   registry-callback path and confirmed 100% literal-FQN, never a
+   runtime-computed string — see the dead-code-candidates check above for
+   why that distinction matters): `cargo x registry-graph` now also
+   extracts every parent→child composition edge, flags dangling child FQNs
+   (caught the `cbu.create`→`cbu.assign-fund-role` break — see
+   `selector_dispatch` below), and detects fold verbs (ops using the
+   strict `dispatch_selector` shape) to flag any composition edge that
+   omits the required selector arg. Known scope gap, documented in the
+   tool's own report output: fold-verb detection only scans an op's own
+   `execute()` body, not helper functions it delegates through.
+
+3. **Harness / tracing — last resort, for genuine cross-process or
+   concurrency questions neither tier above can answer.** Both tiers 1
+   and 2 are static: they describe what the compiled workspace *can*
+   reach, not what actually happens across a real request, a real DB
+   transaction, or concurrent sessions. Reach for this tier only when the
+   question is inherently about runtime behavior across a boundary static
+   analysis can't see through — the Agentic Scenario Harness
+   (`cargo x harness run`, see Quick Start), Chrome DevTools MCP live UI
+   smoke tests, or `session_trace`/`session_replay` — not as a default
+   first move for "is this code used."
+
+Full context: `docs/research/control-plane-ownership-ledger.md`
+("Dead code & dual-routing static sweep").
 
 ---
 
@@ -887,6 +976,7 @@ When you see these in a task, read the corresponding annex first:
 | "playbook", "LSP", "language server", "Zed extension", "tree-sitter" | `docs/annex-frontend-and-tools.md` |
 | "onboarding pipeline", "RequirementPlanner", "ob-agentic" | `docs/annex-frontend-and-tools.md` |
 | "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
+| "dead code", "unused", "dual routing", "registry-graph", "SemOsVerbOpRegistry", "no-widening", "cargo public-api" | Verification Strategy section above, `docs/research/control-plane-ownership-ledger.md` |
 | "runbook plan", "RunbookPlan", "multi-workspace execution", "plan compiler" | `rust/src/runbook/plan_compiler.rs`, `rust/src/runbook/plan_types.rs` |
 | "session trace", "TraceEntry", "TraceOp", "trace replay", "session_replay" | `rust/src/repl/session_trace.rs`, `rust/src/repl/session_replay.rs` |
 | "plan executor", "advance_plan_step", "forward ref", "EntityBinding" | `rust/src/runbook/plan_executor.rs`, `rust/src/runbook/plan_types.rs` |

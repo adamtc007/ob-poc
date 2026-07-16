@@ -22,6 +22,19 @@
 //!   constellation walk).
 //! - Audit emission (local JSONL + OTLP exporter).
 //!
+//! Also owns (T11.1b, 2026-07-12 — EOP-PLAN-CONTROLPLANE-002 Tranche T11.1,
+//! agent-tier extraction) the production utterance→DSL interpretation
+//! engines formerly living in `ob-poc::{sage,journey,research,semtaxonomy_v2}`:
+//! Sage's deterministic/LLM drafting (`sage::{deterministic,drafter,
+//! llm_sage,verb_index,verb_resolve,arg_assembly}`), journey pack routing
+//! (`journey::{pack_manager,providers,router}`), external-source research
+//! (`research::*`, minus the GLEIF client — see below), and the
+//! three-step semantic taxonomy compiler (`semtaxonomy_v2::*`). These are a
+//! structurally distinct subsystem from the ACP planning-loop modules above
+//! (different entry points, different callers) but the same agent-tier
+//! classification applies: interpretation-shaped, no direct capability-crate
+//! access.
+//!
 //! ## Anti-charter
 //!
 //! - NOT the ACP discovery / projection surface (the read-only pack /
@@ -34,18 +47,30 @@
 //!   agent over the LSP-shaped channel).
 //! - NOT the SemOS substrate or registry mutation authority (lives in
 //!   `sem_os_*`).
+//! - NOT `sage::{constrained_match,valid_verb_set}` (real capability
+//!   coupling — `mcp::verb_search::HybridVerbSearcher`,
+//!   `sem_os_runtime::constellation_runtime` — stay in `ob-poc`, named as
+//!   T11.2's first keyed-door targets per the ownership ledger's T11.1b
+//!   entry), `journey::{playback,template}` (repl::Runbook/SentenceGenerator
+//!   coupling, blocked on the same `repl::session_v2` inversion
+//!   `acp_runtime_context.rs` already documents), `lookup::*`/`navigation::*`
+//!   (own MIXED-module follow-up passes), or `research::sources::gleif::
+//!   {loader,normalize}` (GleifClient capability coupling, same T11.2 target
+//!   class as HybridVerbSearcher).
 //!
 //! ## Dependency discipline
 //!
 //! Depends on `ob-poc-types`, `ob-poc-diagnostics`, `ob-poc-sage`,
-//! `ob-poc-boundary`, `dsl-runtime`, `sem_os_client`, `sem_os_core`, plus
-//! primitives (`tokio`, `serde`, `chrono`, `uuid`, `tracing`, `anyhow`,
-//! `thiserror`). Must NOT depend on `ob-poc` — the Sage ACP capability is
-//! intended to ship as a standalone productisable artefact (V&S §3, R5).
-//! Engines that live in `ob-poc` (`llm_sage`, `valid_verb_set`,
-//! `deterministic`) are reached via trait abstractions defined in
-//! `ob-poc-sage`; concrete impls live in `ob-poc`; the binary integrator
-//! wires the impl into the agent at startup.
+//! `ob-poc-boundary`, `ob-poc-journey`, `ob-poc-semtaxonomy`, `dsl-runtime`,
+//! `dsl-analysis`, `sem_os_client`, `sem_os_core`, plus primitives (`tokio`,
+//! `serde`, `chrono`, `uuid`, `tracing`, `anyhow`, `thiserror`, `handlebars`,
+//! `regex`, `rust_decimal`). Must NOT depend on `ob-poc` — the Sage ACP
+//! capability is intended to ship as a standalone productisable artefact
+//! (V&S §3, R5). `sage::{constrained_match,valid_verb_set}` (capability-
+//! coupled, see Anti-charter above) stay in `ob-poc` and are reached via
+//! trait abstractions defined in `ob-poc-sage` where the boundary genuinely
+//! needs them; concrete impls live in `ob-poc`; the binary integrator wires
+//! the impl into the agent at startup.
 //!
 //! ## Migration status (2026-05-13)
 //!
@@ -164,3 +189,29 @@ pub mod knowledge;
 /// Audit emission — Phase 2.9. JSONL sink for replay-grade prompt
 /// records. Phase 5.3 adds the OTLP companion sink per V&S §6.9.
 pub mod audit;
+
+// ---------------------------------------------------------------------------
+// T11.1b (2026-07-12): production utterance→DSL interpretation engines,
+// relocated from `ob-poc::{sage,journey,research,semtaxonomy_v2}`. See this
+// module's own top doc for scope/exclusions.
+// ---------------------------------------------------------------------------
+
+/// The agent-tier projection of `ob-poc`'s `OrchestratorContext` — T11.2
+/// Part A (2026-07-13). See the module doc for why this crosses the crate
+/// boundary and `OrchestratorContext` itself does not.
+pub mod agent_turn_context;
+
+/// Sage's deterministic/LLM drafting engines. `constrained_match` and
+/// `valid_verb_set` stay in `ob-poc` (capability-coupled — see crate doc).
+pub mod sage;
+
+/// Journey pack routing (`pack_manager`, `providers`, `router`).
+/// `playback`/`template` stay in `ob-poc` (repl-coupled — see crate doc).
+pub mod journey;
+
+/// External-source research (companies_house, sec_edgar; GLEIF client
+/// itself stays in `ob-poc` — see crate doc).
+pub mod research;
+
+/// Three-step semantic taxonomy compiler.
+pub mod semtaxonomy_v2;

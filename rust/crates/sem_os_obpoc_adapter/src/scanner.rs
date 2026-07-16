@@ -171,6 +171,7 @@ pub fn verb_config_to_contract(
         primary_table: c.primary_table.clone(),
         join_table: c.join_table.clone(),
         join_col: c.join_col.clone(),
+        set_values: set_values_yaml_to_json(c.set_values.as_ref()),
     });
 
     VerbContractBody {
@@ -808,6 +809,23 @@ fn dedupe_subject_kinds(mut kinds: Vec<String>) -> Vec<String> {
     kinds.sort();
     kinds.dedup();
     kinds
+}
+
+/// `CrudConfig.set_values` is `HashMap<String, serde_yaml::Value>` (the
+/// YAML-loader's native representation) but `VerbCrudMapping.set_values`
+/// is `HashMap<String, serde_json::Value>` — `serde_yaml::Value`
+/// implements `Serialize`, so a round-trip through `serde_json::to_value`
+/// is exact for the scalar types `set_values` actually carries
+/// (string/bool/integer). A conversion failure drops that one entry
+/// rather than the whole map or panicking — an honest under-report.
+fn set_values_yaml_to_json(
+    set_values: Option<&std::collections::HashMap<String, serde_yaml::Value>>,
+) -> Option<std::collections::HashMap<String, serde_json::Value>> {
+    set_values.map(|sv| {
+        sv.iter()
+            .filter_map(|(k, v)| serde_json::to_value(v).ok().map(|jv| (k.clone(), jv)))
+            .collect()
+    })
 }
 
 fn derive_subject_kinds_from_crud(config: &VerbConfig) -> Vec<String> {

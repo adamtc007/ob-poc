@@ -299,7 +299,7 @@ domains:
         crud:
           operation: upsert
           table: issuer_control_config
-          schema: kyc
+          schema: ob-poc
           returning: config_id
           conflict_keys:
             - issuer_entity_id
@@ -401,7 +401,7 @@ domains:
         crud:
           operation: select
           table: issuer_control_config
-          schema: kyc
+          schema: ob-poc
           where_clause: "effective_to IS NULL"
         args:
           - name: issuer-entity-id

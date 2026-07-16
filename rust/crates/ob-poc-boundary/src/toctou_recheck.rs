@@ -138,6 +138,173 @@ pub async fn verify_toctou(
     }
 }
 
+/// T4.3 (EOP-PLAN-CONTROLPLANE-001): pre-state pinning enforcement against
+/// `ob-poc-control-plane`'s own `SnapshotPins` (G13), as an alternative
+/// comparison surface to `verify_toctou`'s `GatedVerbEnvelope`-shaped one —
+/// same `RowVersionProvider`, different pin source. `SnapshotPins` carries
+/// no entity-kind discriminator (it's a plain `(entity_id, row_version)`
+/// map), so the caller supplies `entity_kinds` alongside it.
+///
+/// Only entities present in `pins.entity_row_version(id)` are compared —
+/// plan A5's unpinned-entity classification (any bound entity lacking a
+/// comparable pin caps the plan at `HumanGated`) is the STP classifier's
+/// job (`ob-poc-control-plane::stp_classifier`), not this function's; an
+/// entity absent from the pin set is silently skipped here rather than
+/// treated as a drift, matching that division of responsibility.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PinDrift {
+    pub entity_id: Uuid,
+    pub expected_row_version: i64,
+    pub actual_row_version: u64,
+}
+
+impl std::fmt::Display for PinDrift {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "pin drift for entity {}: expected row_version {}, actual {}",
+            self.entity_id, self.expected_row_version, self.actual_row_version
+        )
+    }
+}
+
+impl std::error::Error for PinDrift {}
+
+/// Re-reads `row_version` for every entity `pins` has a comparable version
+/// for, and compares. Returns `Ok(())` when every pinned entity's current
+/// row_version still matches what was pinned at gate time. Returns the
+/// *first* drift found — like `verify_toctou`, this is a hard stop (void +
+/// `stale_state` exception per the plan), not a collect-all report; a
+/// caller wanting every drift can call this per-entity instead.
+///
+/// Test-only (T9.2 ownership-ledger closure, EOP-PLAN-CONTROLPLANE-001
+/// Addendum B): this is the shadow-only, plain-read half of the pin-check
+/// pair T9.2's design doc discusses — `verify_pins_in_scope` (below) is
+/// the real, locked, admission-time check every production caller uses.
+/// `grep -rn "verify_pins(" rust/src rust/crates` confirmed zero
+/// production callers (only this function's own tests, both the
+/// `MockProvider`-based unit tests and the live-DB `db_integration_tests`
+/// module) before this gate was added — same "two APIs, one weaker" shape
+/// PIR-D-008 named, closed the same way T8.1 closed it for
+/// `try_consume_by_id`: the weaker variant does not exist at all in a
+/// non-test build, so no production code can reference it regardless of
+/// what a text-based CI check might miss.
+#[cfg(test)]
+pub(crate) async fn verify_pins(
+    pins: &ob_poc_control_plane::snapshot::SnapshotPins,
+    entity_kinds: &[(Uuid, String)],
+    provider: &dyn RowVersionProvider,
+) -> Result<(), anyhow::Error> {
+    for (entity_id, kind) in entity_kinds {
+        let Some(expected) = pins.entity_row_version(*entity_id) else {
+            continue;
+        };
+        let actual = provider
+            .row_version(*entity_id, kind)
+            .await
+            .map_err(|err| anyhow!("row_version lookup failed for {}: {}", entity_id, err))?;
+        if actual as i64 != expected {
+            return Err(anyhow!(PinDrift {
+                entity_id: *entity_id,
+                expected_row_version: expected,
+                actual_row_version: actual,
+            }));
+        }
+    }
+    Ok(())
+}
+
+/// T9.2 (EOP-PLAN-CONTROLPLANE-001 Addendum B, design doc §5/§5a): the
+/// real (non-shadow) admission-time pin re-check, run inside the same
+/// `PgTransactionScope` as the envelope consumption and the verb's own
+/// write. Unlike [`verify_pins`] (shadow-only, `RowVersionProvider`-based,
+/// a plain read), this one takes `entity_kinds`/expected versions
+/// **directly from `pins`** (via [`ob_poc_control_plane::snapshot::SnapshotPins::entity_kinds_and_versions`],
+/// T9.2's own widening of that type — see the ownership ledger) rather
+/// than a separately-supplied list that could drift from what was
+/// actually pinned at gate time, and locks every pinned row with
+/// `SELECT ... FOR UPDATE` — held until the caller's own commit/rollback
+/// — so nothing can move a pinned entity between this check and the
+/// write that follows in the same scope. A plain `SELECT` here would
+/// re-create the exact TOCTOU gap T9.2 exists to close (§5a).
+///
+/// Batched per kind (one locking `SELECT ... WHERE pk = ANY($1) FOR
+/// UPDATE` per kind among the pinned entities, not one query per entity),
+/// reusing `entity_facts.rs`'s table/PK mapping directly — "one mapping,
+/// two consumers" per the design doc: unlocked batched facts at shadow-
+/// evaluation time (T9.1-pre), locked pin re-read here at admission time.
+///
+/// Returns the *first* drift found, same hard-stop posture as
+/// `verify_pins`. An entity present in `pins` but no longer found by the
+/// locked read (deleted between gate time and now) is also a drift-class
+/// failure, not silently skipped — unlike `verify_pins`'s "absent from
+/// the pin set" case (a different, upstream condition: never pinned at
+/// all), this is "was pinned, has now vanished," which the write must not
+/// proceed against either.
+#[cfg(feature = "database")]
+pub async fn verify_pins_in_scope(
+    pins: &ob_poc_control_plane::snapshot::SnapshotPins,
+    conn: &mut sqlx::PgConnection,
+) -> Result<(), anyhow::Error> {
+    use sqlx::Row;
+
+    let entries = pins.entity_kinds_and_versions();
+    if entries.is_empty() {
+        return Ok(());
+    }
+
+    let mut by_kind: std::collections::HashMap<&str, Vec<(Uuid, i64)>> = std::collections::HashMap::new();
+    for (entity_id, kind, expected_version) in entries {
+        by_kind
+            .entry(kind.as_str())
+            .or_default()
+            .push((*entity_id, *expected_version));
+    }
+
+    for (kind, expected) in by_kind {
+        let mapping = crate::entity_facts::kind_mapping(kind)?;
+        let ids: Vec<Uuid> = expected.iter().map(|(id, _)| *id).collect();
+        let sql = format!(
+            r#"SELECT {pk} AS id, row_version FROM "ob-poc".{table} WHERE {pk} = ANY($1) FOR UPDATE"#,
+            pk = mapping.pk,
+            table = mapping.table,
+        );
+
+        let rows = sqlx::query(&sql)
+            .bind(&ids)
+            .fetch_all(&mut *conn)
+            .await
+            .map_err(|e| anyhow!("verify_pins_in_scope: locked read of `{}` failed: {}", mapping.table, e))?;
+
+        let mut actual_by_id: std::collections::HashMap<Uuid, i64> = std::collections::HashMap::new();
+        for row in rows {
+            let id: Uuid = row.try_get("id")?;
+            let row_version: i64 = row.try_get("row_version")?;
+            actual_by_id.insert(id, row_version);
+        }
+
+        for (entity_id, expected_version) in expected {
+            let Some(actual_version) = actual_by_id.get(&entity_id).copied() else {
+                return Err(anyhow!(
+                    "verify_pins_in_scope: pinned entity {} (kind `{}`) not found by the locked read — \
+                     deleted between gate time and admission",
+                    entity_id,
+                    kind
+                ));
+            };
+            if actual_version != expected_version {
+                return Err(anyhow!(PinDrift {
+                    entity_id,
+                    expected_row_version: expected_version,
+                    actual_row_version: actual_version as u64,
+                }));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 // ---------------------------------------------------------------------------
 // Production SQL-backed provider (behind #[cfg(feature = "database")]).
 // Requires the D.2 migration to be applied to the target database.
@@ -407,5 +574,206 @@ mod tests {
         let provider = MockProvider(Mutex::new(map));
         let err = verify_toctou(&envelope, workspace_snapshot_id, &provider).await;
         assert!(err.is_err(), "one entity drifted → drift detected");
+    }
+
+    fn pins_with(entries: Vec<(Uuid, String, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
+        ob_poc_control_plane::snapshot::tests_support::pins(None, None, None, entries)
+    }
+
+    #[tokio::test]
+    async fn verify_pins_matches_when_row_version_unchanged() {
+        let entity_id = Uuid::new_v4();
+        let pins = pins_with(vec![(entity_id, "cbu".to_string(), 42)]);
+        let mut map = HashMap::new();
+        map.insert(entity_id, 42u64);
+        let provider = MockProvider(Mutex::new(map));
+
+        verify_pins(&pins, &[(entity_id, "cbu".to_string())], &provider)
+            .await
+            .expect("same row_version -> no drift");
+    }
+
+    #[tokio::test]
+    async fn verify_pins_detects_drift_when_row_version_bumped() {
+        let entity_id = Uuid::new_v4();
+        let pins = pins_with(vec![(entity_id, "cbu".to_string(), 42)]);
+        let mut map = HashMap::new();
+        map.insert(entity_id, 43u64);
+        let provider = MockProvider(Mutex::new(map));
+
+        let err = verify_pins(&pins, &[(entity_id, "cbu".to_string())], &provider)
+            .await
+            .expect_err("row_version changed -> drift expected");
+        let drift = err.downcast_ref::<PinDrift>().expect("PinDrift");
+        assert_eq!(drift.expected_row_version, 42);
+        assert_eq!(drift.actual_row_version, 43);
+    }
+
+    #[tokio::test]
+    async fn verify_pins_skips_entities_with_no_comparable_pin() {
+        // plan A5: an unpinned entity is the STP classifier's concern, not
+        // a drift here — verify_pins must not error just because an entity
+        // in entity_kinds has no pin recorded.
+        let pinned = Uuid::new_v4();
+        let unpinned = Uuid::new_v4();
+        let pins = pins_with(vec![(pinned, "cbu".to_string(), 1)]);
+        let mut map = HashMap::new();
+        map.insert(pinned, 1u64);
+        // deliberately no row_version for `unpinned` in the provider map —
+        // if verify_pins tried to look it up, this would error.
+        let provider = MockProvider(Mutex::new(map));
+
+        verify_pins(
+            &pins,
+            &[(pinned, "cbu".to_string()), (unpinned, "cbu".to_string())],
+            &provider,
+        )
+        .await
+        .expect("unpinned entity must be skipped, not looked up");
+    }
+}
+
+/// T4.3 "productionise": `verify_pins` exercised against `SqlRowVersionProvider`
+/// and a real `"ob-poc".cbus` row, not just the in-memory `MockProvider` — the
+/// exit criterion is "stale pin voids and routes exception," which only a
+/// live-DB proof can actually demonstrate for the SQL-backed provider path.
+#[cfg(all(test, feature = "database"))]
+mod db_integration_tests {
+    use super::*;
+
+    async fn test_pool() -> sqlx::PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    fn pins_with(entries: Vec<(Uuid, String, i64)>) -> ob_poc_control_plane::snapshot::SnapshotPins {
+        ob_poc_control_plane::snapshot::tests_support::pins(None, None, None, entries)
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn verify_pins_against_real_cbu_row_version() {
+        let pool = test_pool().await;
+        let (cbu_id, current_row_version): (Uuid, i64) =
+            sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let provider = SqlRowVersionProvider { pool: &pool };
+
+        let matching_pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version)]);
+        verify_pins(&matching_pins, &[(cbu_id, "cbu".to_string())], &provider)
+            .await
+            .expect("pin matching the live row_version must not drift");
+
+        let stale_pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version - 1)]);
+        let err = verify_pins(&stale_pins, &[(cbu_id, "cbu".to_string())], &provider)
+            .await
+            .expect_err("a pin one version behind the live row must drift");
+        let drift = err.downcast_ref::<PinDrift>().expect("PinDrift");
+        assert_eq!(drift.expected_row_version, current_row_version - 1);
+        assert_eq!(drift.actual_row_version as i64, current_row_version);
+    }
+
+    // ── T9.2 §5/§5a: verify_pins_in_scope ───────────────────────────────────
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn verify_pins_in_scope_matches_when_row_version_unchanged() {
+        let pool = test_pool().await;
+        let (cbu_id, current_row_version): (Uuid, i64) =
+            sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version)]);
+        let mut tx = pool.begin().await.unwrap();
+        verify_pins_in_scope(&pins, &mut tx)
+            .await
+            .expect("pin matching the live row_version must not drift");
+        tx.commit().await.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn verify_pins_in_scope_detects_drift() {
+        let pool = test_pool().await;
+        let (cbu_id, current_row_version): (Uuid, i64) =
+            sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let stale_pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version - 1)]);
+        let mut tx = pool.begin().await.unwrap();
+        let err = verify_pins_in_scope(&stale_pins, &mut tx)
+            .await
+            .expect_err("a pin one version behind the live row must drift");
+        tx.rollback().await.unwrap();
+        let drift = err.downcast_ref::<PinDrift>().expect("PinDrift");
+        assert_eq!(drift.expected_row_version, current_row_version - 1);
+        assert_eq!(drift.actual_row_version as i64, current_row_version);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn verify_pins_in_scope_empty_pins_is_a_noop() {
+        let pool = test_pool().await;
+        let pins = pins_with(vec![]);
+        let mut tx = pool.begin().await.unwrap();
+        verify_pins_in_scope(&pins, &mut tx).await.expect("empty pins never drift");
+        tx.commit().await.unwrap();
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn verify_pins_in_scope_locks_pinned_row_against_concurrent_writer() {
+        // The actual proof of §5a's atomicity claim (the BLOCKER the
+        // architect review found and this fix resolves): a concurrent
+        // writer attempting to update a pinned entity while this scope
+        // holds its FOR UPDATE lock must BLOCK until this scope resolves
+        // — not silently succeed and let the pin check pass against
+        // state that already moved underneath it.
+        let pool = test_pool().await;
+        let (cbu_id, current_row_version): (Uuid, i64) =
+            sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one cbu row exists in the dev database");
+
+        let pins = pins_with(vec![(cbu_id, "cbu".to_string(), current_row_version)]);
+        let mut tx = pool.begin().await.unwrap();
+        verify_pins_in_scope(&pins, &mut tx)
+            .await
+            .expect("pin matches at lock time");
+
+        // Concurrent writer: bump a harmless column (updated_at) on the
+        // SAME row from a second connection while the first scope's lock
+        // is still held (transaction not yet resolved).
+        let pool2 = pool.clone();
+        let writer = tokio::spawn(async move {
+            sqlx::query(r#"UPDATE "ob-poc".cbus SET updated_at = now() WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .execute(&pool2)
+                .await
+                .unwrap();
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        assert!(
+            !writer.is_finished(),
+            "concurrent writer must still be blocked on the FOR UPDATE lock while this scope is open"
+        );
+
+        // Resolve the admitting scope (rollback — this test doesn't need
+        // to actually commit a write, just prove the lock window).
+        tx.rollback().await.unwrap();
+
+        tokio::time::timeout(std::time::Duration::from_secs(5), writer)
+            .await
+            .expect("writer must unblock once this scope resolves")
+            .unwrap();
     }
 }

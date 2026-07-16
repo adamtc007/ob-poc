@@ -68,6 +68,21 @@ pub enum ReplStateV2 {
         args: HashMap<String, String>,
     },
 
+    /// An utterance inside `InPack` targeted a verb outside the active
+    /// pack's `allowed_verbs` universe, and that verb is owned by exactly
+    /// one other loaded pack. Offers the structured back-out: close the
+    /// current pack and switch to the pack that actually owns the verb, or
+    /// stay put and let the user rephrase within the current pack.
+    PackMismatchConfirm {
+        current_pack_id: String,
+        current_required_slots_remaining: Vec<String>,
+        current_last_proposal_id: Option<Uuid>,
+        out_of_scope_verb: String,
+        suggested_pack_id: String,
+        suggested_pack_name: String,
+        original_input: String,
+    },
+
     /// Runbook exists and user is reviewing / editing it.
     RunbookEditing,
 
@@ -82,14 +97,12 @@ pub enum ReplStateV2 {
 // Supporting types for state variants
 // ---------------------------------------------------------------------------
 
-/// A candidate pack for journey selection.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackCandidate {
-    pub pack_id: String,
-    pub pack_name: String,
-    pub description: String,
-    pub score: f32,
-}
+// T11.1b (2026-07-12): PackCandidate hoisted to ob-poc-types::journey — needed
+// by ob-poc-agent's journey::router (now living outside this crate), which
+// cannot depend on ob-poc (L1). Re-exported here so every existing
+// `crate::repl::types_v2::PackCandidate` caller continues to resolve
+// unchanged.
+pub use ob_poc_types::journey::pack_candidate::PackCandidate;
 
 // Phase 3 slice 2c.2b (2026-05-12): WorkspaceKind / AgentMode / SubjectKind /
 // WorkspaceRegistryEntry moved to ob-poc-boundary::session so the boundary

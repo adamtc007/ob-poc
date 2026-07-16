@@ -22,6 +22,7 @@ entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
 ob-poc-boundary = { path = "crates/ob-poc-boundary" }
+ob-poc-control-plane = { path = "crates/ob-poc-control-plane" }
 # bpmn-controller: pool lifecycle (K8s Deployment + HPA) and instance
 # kick-off via direct writes to bpmn-lite's Postgres schema.
 # Reached from loader.* and bpmn-controller.* DSL verbs via Pattern B ops.
@@ -30,6 +31,13 @@ bpmn-controller = { path = "crates/bpmn-controller" }
 # Empty skeletons populated by Phases 2–5.
 ob-poc-sage = { path = "crates/ob-poc-sage" }           # Sage intent understanding (Phase 2 dest)
 ob-poc-journey = { path = "crates/ob-poc-journey" }     # Pack-guided workflows (Phase 3 dest)
+# T11.1b (2026-07-12): ob-poc-agent now hosts the relocated production
+# sage/journey/research/semtaxonomy_v2 engines (agent-tier extraction,
+# EOP-PLAN-CONTROLPLANE-002). ob-poc depends on it so the ~9 call sites
+# (agent/orchestrator.rs, api/agent_state.rs) that dispatch into these
+# engines keep resolving; ob-poc-agent has no reverse dep on ob-poc
+# (checked — no cycle).
+ob-poc-agent = { path = "crates/ob-poc-agent" }
 # ob-poc-domain split v1 (docs/todo/ob-poc-domain-split-v1.md) — 9
 # per-business-capability crates carved out of ob-poc-domain. The
 # original ob-poc-domain crate was deleted in Slice D (2026-05-14).
@@ -158,6 +166,11 @@ smallvec = { version = "1.11", features = ["serde"] }
 
 # Testing
 [dev-dependencies]
+# test-support: exposes ob-poc-control-plane::envelope::test_support::seal
+# (+ every gate module's tests_support fixture constructors) for T4.2's
+# envelope-persistence tests, which need a real sealed ExecutionEnvelope.
+# Off in a plain `cargo build`; only unified in during `cargo test`.
+ob-poc-control-plane = { path = "crates/ob-poc-control-plane", features = ["test-support"] }
 # bpmn-lite was extracted to github.com/adamtc007/bpmn-lite. Workspace
 # deps below resolve from the git tag; ~/.cargo/config.toml [patch]
 # redirects to the local ~/dev/bpmn-lite/ checkout during development.
@@ -180,6 +193,14 @@ tonic-build = "0.12"
 
 # Build compute-heavy crates in release mode even during debug builds
 # This dramatically speeds up Candle embeddings (from 20+ min to ~10s)
+[profile.dev]
+debug = 1
+incremental = false
+
+[profile.test]
+debug = 1
+incremental = false
+
 [profile.dev.package.candle-core]
 opt-level = 3
 
@@ -260,7 +281,7 @@ path = "src/bin/verb_to_dsl.rs"
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
-database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database", "ob-poc-authoring/database", "ob-poc-bods/database", "ob-poc-semtaxonomy/database", "ob-poc-entity-linking/database", "ob-poc-trading-profile/database", "ob-poc-derived-attributes/database", "ob-poc-taxonomy/database"]  # Only enable database functionality when needed
+database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector", "ob-poc-diagnostics/database", "ob-poc-boundary/database", "ob-poc-sage/database", "ob-poc-agent/database", "ob-poc-authoring/database", "ob-poc-bods/database", "ob-poc-semtaxonomy/database", "ob-poc-entity-linking/database", "ob-poc-trading-profile/database", "ob-poc-derived-attributes/database", "ob-poc-taxonomy/database"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
@@ -400,3 +421,6 @@ dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0
 dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+
+[lints.rust]
+dead_code = "deny"

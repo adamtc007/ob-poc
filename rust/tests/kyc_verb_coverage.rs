@@ -1,4 +1,4 @@
-//! 100% live-DB integration coverage for all 23 dsl.kyc verbs.
+//! 100% live-DB integration coverage for all 22 dsl.kyc verbs.
 //!
 //! Each verb is exercised via its SemOsVerbOp through a real VerbExecutionContext
 //! + TransactionScope, committing to the durable stream and asserting the event
@@ -13,7 +13,7 @@
 //!   kyc.obligation.satisfy           → tests/kyc_w3_w5_w6.rs
 //!   kyc.person.approve               → tests/kyc_w3_w5_w6.rs
 //!
-//! This file covers the remaining 17.
+//! This file covers the remaining 16.
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -23,7 +23,7 @@ use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycObligationUpdateIdentity, KycObligationUpdateRisk,
     KycObligationUpdateScreening, KycObligationWaive, KycPersonReject, KycRoleAssign,
-    KycRoleWithdraw, KycSubjectClassifyStructure, KycSubjectRegister, UboBoardControllerOverride,
+    KycRoleWithdraw, KycSubjectClassifyStructure, KycSubjectRegister,
     UboDeterminationApplySmoFallback, UboDeterminationComputeFold, UboDeterminationFreeze,
     UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
     UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede, UboEdgeVerify,
@@ -394,33 +394,6 @@ async fn coverage_ubo_determination_freeze() {
     )
     .await;
     assert_event(&pool, subject, "ubo.determination.freeze").await;
-    cleanup(&pool, &[subject]).await;
-}
-
-// ── D3: Board-controller override ─────────────────────────────────────────────
-
-#[tokio::test]
-async fn coverage_ubo_board_controller_override() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    let controller = Uuid::new_v4();
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
-        &pool,
-    )
-    .await;
-    run(
-        &UboBoardControllerOverride,
-        serde_json::json!({
-            "subject-id": subject.0,
-            "controller-entity-id": controller,
-            "basis": "senior managing official designation by board resolution 2026-01-15",
-        }),
-        &pool,
-    )
-    .await;
-    assert_event(&pool, subject, "ubo.board-controller.override").await;
     cleanup(&pool, &[subject]).await;
 }
 

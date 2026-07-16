@@ -73,6 +73,25 @@ dsl_verb_reconciliation:
     - application.register
     - application.update
 
+  application_instance_surface:
+    - application-instance.activate
+    - application-instance.bring-online
+    - application-instance.decommission
+    - application-instance.enter-maintenance
+    - application-instance.exit-maintenance
+    - application-instance.provision
+    - application-instance.take-offline
+  application_surface:
+    - application.decommission
+    - application.register
+    - application.update
+  capability_binding_surface:
+    - capability-binding.abort-pilot
+    - capability-binding.deprecate
+    - capability-binding.draft
+    - capability-binding.promote-live
+    - capability-binding.retire
+    - capability-binding.start-pilot
 # =============================================================================
 # 1. OVERALL LIFECYCLE — derived per (application_instance, capability_binding)
 # =============================================================================

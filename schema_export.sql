@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jUdsWB3esBI0ThgEMIrYpgiMl28dF6NqtKe1AtnkZd6p0GrxhJ2W054IwIOUAFX
+\restrict McOG9ABjrrGip5E6lfdlQWWepKIdOZBtArNdmkSl5vJ1GhHhywbzgCP6naeBZq8
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -10450,6 +10450,115 @@ COMMENT ON COLUMN "ob-poc".control_edges.gleif_relationship_type IS 'GLEIF RR ty
 --
 
 COMMENT ON COLUMN "ob-poc".control_edges.psc_category IS 'UK PSC category (auto-set from edge_type + percentage)';
+
+
+--
+-- Name: control_plane_envelopes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_envelopes (
+    envelope_id uuid NOT NULL,
+    content_hash text NOT NULL,
+    session_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    status text DEFAULT 'sealed'::text NOT NULL,
+    not_before timestamp with time zone NOT NULL,
+    not_after timestamp with time zone NOT NULL,
+    consumed_at timestamp with time zone,
+    void_reason text,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    record jsonb,
+    CONSTRAINT control_plane_envelopes_status_check CHECK ((status = ANY (ARRAY['sealed'::text, 'consumed'::text, 'expired'::text, 'voided'::text])))
+);
+
+
+--
+-- Name: TABLE control_plane_envelopes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_envelopes IS 'T4.2 sealed ExecutionEnvelope identity + single-use/TTL bookkeeping (EOP-PLAN-CONTROLPLANE-001). No envelope content is stored, only its handle identity and lifecycle status; rehydration is a status-checked consume, never a raw deserialize.';
+
+
+--
+-- Name: COLUMN control_plane_envelopes.record; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_envelopes.record IS 'T10.1: serialised EnvelopeRecord (flattened, primitive-typed projection of the sealed envelope — pins, bound entities, pack id, validity). NULL for pre-T10.1 rows and any row inserted without a real seal.';
+
+
+--
+-- Name: control_plane_shadow_decisions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_shadow_decisions (
+    id bigint NOT NULL,
+    decided_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    session_id uuid NOT NULL,
+    entry_id uuid NOT NULL,
+    verb_fqn text NOT NULL,
+    gate_results jsonb NOT NULL,
+    legacy_outcome_blocked boolean NOT NULL,
+    shadow_intent_admission_blocked boolean CONSTRAINT control_plane_shadow_decisi_shadow_intent_admission_bl_not_null NOT NULL,
+    diverged boolean NOT NULL
+);
+
+
+--
+-- Name: TABLE control_plane_shadow_decisions; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_shadow_decisions IS 'T2.7 shadow-mode ob-poc-control-plane decisions vs legacy Phase 5 recheck outcome (EOP-PLAN-CONTROLPLANE-001). Never gates dispatch; divergence triage input for per-gate enforce-mode graduation.';
+
+
+--
+-- Name: control_plane_shadow_decisions_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE "ob-poc".control_plane_shadow_decisions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "ob-poc".control_plane_shadow_decisions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: control_plane_write_attestations; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_write_attestations (
+    attestation_id bigint NOT NULL,
+    attested_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    scope_id uuid NOT NULL,
+    session_id uuid,
+    verb_fqn text,
+    bounded boolean NOT NULL,
+    captured_writes jsonb NOT NULL,
+    excess_writes jsonb NOT NULL
+);
+
+
+--
+-- Name: TABLE control_plane_write_attestations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_write_attestations IS 'T5.3 write-set attestation audit trail (EOP-PLAN-CONTROLPLANE-001). Enforcement (rollback on breach) happens at PgTransactionScope::commit_attested before this row is written, not here.';
+
+
+--
+-- Name: control_plane_write_attestations_attestation_id_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE "ob-poc".control_plane_write_attestations ALTER COLUMN attestation_id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "ob-poc".control_plane_write_attestations_attestation_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
@@ -25080,6 +25189,30 @@ ALTER TABLE ONLY "ob-poc".control_edges
 
 
 --
+-- Name: control_plane_envelopes control_plane_envelopes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_envelopes
+    ADD CONSTRAINT control_plane_envelopes_pkey PRIMARY KEY (envelope_id);
+
+
+--
+-- Name: control_plane_shadow_decisions control_plane_shadow_decisions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_shadow_decisions
+    ADD CONSTRAINT control_plane_shadow_decisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: control_plane_write_attestations control_plane_write_attestations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_write_attestations
+    ADD CONSTRAINT control_plane_write_attestations_pkey PRIMARY KEY (attestation_id);
+
+
+--
 -- Name: corporate_action_events corporate_action_events_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -30453,6 +30586,48 @@ CREATE INDEX idx_control_edges_type ON "ob-poc".control_edges USING btree (edge_
 --
 
 CREATE UNIQUE INDEX idx_control_edges_unique_active ON "ob-poc".control_edges USING btree (from_entity_id, to_entity_id, edge_type) WHERE (end_date IS NULL);
+
+
+--
+-- Name: idx_control_plane_envelopes_sealed_not_after; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_envelopes_sealed_not_after ON "ob-poc".control_plane_envelopes USING btree (not_after) WHERE (status = 'sealed'::text);
+
+
+--
+-- Name: idx_control_plane_envelopes_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_envelopes_session ON "ob-poc".control_plane_envelopes USING btree (session_id, created_at DESC);
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_diverged; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_diverged ON "ob-poc".control_plane_shadow_decisions USING btree (diverged, decided_at DESC) WHERE diverged;
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_session ON "ob-poc".control_plane_shadow_decisions USING btree (session_id, decided_at DESC);
+
+
+--
+-- Name: idx_control_plane_write_attestations_breaches; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_write_attestations_breaches ON "ob-poc".control_plane_write_attestations USING btree (attested_at DESC) WHERE (NOT bounded);
+
+
+--
+-- Name: idx_control_plane_write_attestations_scope; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_write_attestations_scope ON "ob-poc".control_plane_write_attestations USING btree (scope_id);
 
 
 --
@@ -41002,5 +41177,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jUdsWB3esBI0ThgEMIrYpgiMl28dF6NqtKe1AtnkZd6p0GrxhJ2W054IwIOUAFX
+\unrestrict McOG9ABjrrGip5E6lfdlQWWepKIdOZBtArNdmkSl5vJ1GhHhywbzgCP6naeBZq8
 

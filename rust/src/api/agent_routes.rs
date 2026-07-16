@@ -122,6 +122,11 @@ pub(crate) fn create_agent_router_with_state(state: AgentState) -> Router {
         // Learning routes removed — verb selection signals through REPL pipeline
         // Semantic OS context
         .route("/api/sem-os/context", get(get_semos_context))
+        // T7.2 (EOP-PLAN-CONTROLPLANE-001): control-plane observability
+        .route(
+            "/api/control-plane/metrics",
+            get(get_control_plane_metrics),
+        )
         // F20 fix (Slice 5.2, 2026-04-22): legacy `/decision/reply` route
         // removed. Previously returned 410 Gone — now 404 from the router.
         // Use `/api/session/:id/input` with `kind=decision_reply`.
@@ -1144,6 +1149,107 @@ struct ChangesetSummary {
 }
 
 /// GET /api/sem-os/context — registry stats, recent changesets, agent mode
+/// GET /api/control-plane/metrics
+///
+/// T7.2 (EOP-PLAN-CONTROLPLANE-001): aggregated read-only metrics over the
+/// three `control_plane_*` tables (T2.7 shadow decisions, T4.2 envelopes,
+/// T5.3 write attestations). Never gates or influences dispatch — this is
+/// observability only, matching V&S §6.14's "per-gate rejection rates,
+/// breach count" asks (exception ageing and replay success are omitted:
+/// no exception-tracking table or replay job exists yet, T7.3/T7.4 not
+/// attempted this tranche).
+#[derive(Debug, serde::Serialize)]
+struct ControlPlaneMetricsResponse {
+    gate_outcomes: Vec<crate::agent::control_plane_metrics::GateOutcomeCount>,
+    shadow_divergence: crate::agent::control_plane_metrics::ShadowDivergenceStats,
+    shadow_divergence_rate: f64,
+    write_attestation_breaches: crate::agent::control_plane_metrics::WriteAttestationBreachStats,
+    write_attestation_breach_rate: f64,
+    envelope_status_counts: Vec<crate::agent::control_plane_metrics::EnvelopeStatusCount>,
+    /// T10.1: per-verb-family sealable rate — the measured answer to "what
+    /// fraction of Path A would enforce cleanly today," derived from the
+    /// same `gate_results` `shadow_divergence`/`gate_outcomes` already read.
+    sealable_rate_by_verb: Vec<crate::agent::control_plane_metrics::SealableRateByVerb>,
+    /// G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 5): the
+    /// per-(gate, path) breakdown `gate_outcomes` above cannot answer
+    /// (path-blind). Real production consumer of
+    /// `gate_outcome_counts_by_path` -- the operator-facing surface for
+    /// "is the ratified applicability matrix holding on real B/C/D
+    /// traffic," not just the E3 test-suite probe.
+    gate_outcomes_by_path: Vec<crate::agent::control_plane_metrics::GateOutcomeCountByPath>,
+    /// T11.0: v0.4.1 §15.3 C2 — `capability_invocations_without_cp_provenance`,
+    /// per instrumented capability entry point. In-process counters, not a
+    /// DB query (see `capability_provenance.rs`'s module doc for why, and
+    /// for this first slice's known coverage gap — pool-based capability
+    /// access that never opens a `PgTransactionScope` is not yet counted).
+    capability_invocations_without_cp_provenance:
+        Vec<crate::agent::capability_provenance::CapabilityProvenanceCount>,
+}
+
+async fn get_control_plane_metrics(
+    State(state): State<AgentState>,
+) -> Result<Json<ControlPlaneMetricsResponse>, StatusCode> {
+    let gate_outcomes = crate::agent::control_plane_metrics::gate_outcome_counts(&state.pool)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "control-plane metrics: gate_outcome_counts query failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    let shadow_divergence =
+        crate::agent::control_plane_metrics::shadow_divergence_stats(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: shadow_divergence_stats query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let write_attestation_breaches =
+        crate::agent::control_plane_metrics::write_attestation_breach_stats(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: write_attestation_breach_stats query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let envelope_status_counts =
+        crate::agent::control_plane_metrics::envelope_status_counts(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: envelope_status_counts query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let sealable_rate_by_verb =
+        crate::agent::control_plane_metrics::sealable_rate_by_verb(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: sealable_rate_by_verb query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let gate_outcomes_by_path =
+        crate::agent::control_plane_metrics::gate_outcome_counts_by_path(&state.pool)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "control-plane metrics: gate_outcome_counts_by_path query failed");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+    let shadow_divergence_rate = shadow_divergence.divergence_rate();
+    let write_attestation_breach_rate = write_attestation_breaches.breach_rate();
+
+    let capability_invocations_without_cp_provenance =
+        crate::agent::capability_provenance::capability_invocations_without_cp_provenance();
+
+    Ok(Json(ControlPlaneMetricsResponse {
+        gate_outcomes,
+        shadow_divergence,
+        shadow_divergence_rate,
+        write_attestation_breaches,
+        write_attestation_breach_rate,
+        envelope_status_counts,
+        sealable_rate_by_verb,
+        gate_outcomes_by_path,
+        capability_invocations_without_cp_provenance,
+    }))
+}
+
 async fn get_semos_context(
     State(state): State<AgentState>,
 ) -> Result<Json<SemOsContextResponse>, StatusCode> {
@@ -2354,6 +2460,22 @@ async fn execute_session_dsl_raw(
         .as_ref()
         .map(|r| r.batch_policy)
         .unwrap_or(BatchPolicy::BestEffort);
+
+    // T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): admit every verb in the
+    // plan before dispatch. This route constructs `state.dsl_v2_executor`
+    // directly (`agent_state.rs`), bypassing the bus/runbook admission
+    // checkpoints entirely — closes that gap.
+    if let Err(e) = crate::agent::control_plane_envelope_store::admit_plan(&state.pool, &plan, ob_poc_types::ExecutionPath::DslDirect)
+        .await
+    {
+        return Ok(Json(ExecuteResponse {
+            success: false,
+            results: Vec::new(),
+            errors: vec![e],
+            new_state: current_state.into(),
+            bindings: None,
+        }));
+    }
 
     // =========================================================================
     // EXECUTE - Route based on batch policy

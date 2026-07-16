@@ -52,3 +52,4 @@ clap = { version = "4", features = ["derive"] }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

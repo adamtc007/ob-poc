@@ -71,11 +71,21 @@ impl From<VerbExecutorError> for BusServerError {
 /// `dsl-runtime::execute_verb_sync` against the ob-poc engine.
 #[async_trait]
 pub trait VerbExecutor: Send + Sync + 'static {
+    /// `snapshot_pin` is G6a's threaded `InvocationRequest.snapshot_pin`
+    /// wire field (`EOP-DESIGN-CONTROLPLANE-G6A-SNAPSHOT-PIN-CARRIER-001`)
+    /// — a bare correlation `Uuid` (bpmn-lite's `callout_id` in
+    /// production), never a security credential the caller trusts for
+    /// identity. The real implementation (`bus_runtime.rs`'s
+    /// `ObPocVerbAdapter`) uses it only as `persist_sealed`'s `entry_id`
+    /// on an envelope it mints and consumes itself — see that design
+    /// doc's §3 for why a caller-supplied id is never trusted for the
+    /// content-hash check T8.1 built.
     async fn execute(
         &self,
         local_verb_id: &str,
         catalogue_version: &str,
         inputs: Vec<ResolvedBinding>,
+        snapshot_pin: Option<Uuid>,
     ) -> Result<VerbOutcome, VerbExecutorError>;
 }
 
@@ -132,7 +142,12 @@ impl InvocationDispatcher for ObPocBusHandler {
         }
         let outcome = self
             .executor
-            .execute(&ctx.local_verb_id, &ctx.catalogue_version, inputs)
+            .execute(
+                &ctx.local_verb_id,
+                &ctx.catalogue_version,
+                inputs,
+                ctx.snapshot_pin,
+            )
             .await?;
         Ok(InvocationOutcome {
             execution_id: outcome.execution_id,

@@ -1,4 +1,4 @@
-# ob-poc-types | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:03Z
+# ob-poc-types | features=all | HEAD=61540c0a5a03b25ed57a3e2a0117612e0f3fde6d | 2026-07-13T14:26:02Z
 pub mod ob_poc_types
 pub mod ob_poc_types::batch_control
 pub struct ob_poc_types::batch_control::BatchControlResult
@@ -5301,6 +5301,58 @@ pub unsafe fn ob_poc_types::entity_query::EntityQueryResult::clone_to_uninit(&se
 impl<T> core::convert::From<T> for ob_poc_types::entity_query::EntityQueryResult
 pub fn ob_poc_types::entity_query::EntityQueryResult::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for ob_poc_types::entity_query::EntityQueryResult where T: for<'de> serde_core::de::Deserialize<'de>
+pub mod ob_poc_types::envelope_handle
+pub struct ob_poc_types::envelope_handle::EnvelopeHandle
+impl ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash(&self) -> [u8; 32]
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash_hex(&self) -> alloc::string::String
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::id(&self) -> uuid::Uuid
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::new(uuid::Uuid, [u8; 32]) -> Self
+impl core::clone::Clone for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone(&self) -> ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::Eq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::PartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::eq(&self, &ob_poc_types::envelope_handle::EnvelopeHandle) -> bool
+impl core::fmt::Debug for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::StructuralPartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl serde_core::ser::Serialize for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Send for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Sync for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Unpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::UnsafeUnpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl<T, U> core::convert::Into<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::From<T>
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::Into<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = core::convert::Infallible
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::TryFrom<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Owned = T
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_into(&self, &mut T)
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::envelope_handle::EnvelopeHandle where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub unsafe fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: for<'de> serde_core::de::Deserialize<'de>
 pub mod ob_poc_types::galaxy
 pub enum ob_poc_types::galaxy::AgentMode
 pub ob_poc_types::galaxy::AgentMode::Autopilot
@@ -10201,6 +10253,147 @@ pub unsafe fn ob_poc_types::graph_scene::SceneNode::clone_to_uninit(&self, *mut 
 impl<T> core::convert::From<T> for ob_poc_types::graph_scene::SceneNode
 pub fn ob_poc_types::graph_scene::SceneNode::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for ob_poc_types::graph_scene::SceneNode where T: for<'de> serde_core::de::Deserialize<'de>
+pub mod ob_poc_types::intent
+pub enum ob_poc_types::intent::IntentArgValue
+pub ob_poc_types::intent::IntentArgValue::Boolean(bool)
+pub ob_poc_types::intent::IntentArgValue::List(alloc::vec::Vec<ob_poc_types::intent::IntentArgValue>)
+pub ob_poc_types::intent::IntentArgValue::Map(alloc::collections::btree::map::BTreeMap<alloc::string::String, ob_poc_types::intent::IntentArgValue>)
+pub ob_poc_types::intent::IntentArgValue::Missing
+pub ob_poc_types::intent::IntentArgValue::Missing::arg_name: alloc::string::String
+pub ob_poc_types::intent::IntentArgValue::Number(f64)
+pub ob_poc_types::intent::IntentArgValue::Reference(alloc::string::String)
+pub ob_poc_types::intent::IntentArgValue::String(alloc::string::String)
+pub ob_poc_types::intent::IntentArgValue::Unresolved
+pub ob_poc_types::intent::IntentArgValue::Unresolved::entity_type: core::option::Option<alloc::string::String>
+pub ob_poc_types::intent::IntentArgValue::Unresolved::value: alloc::string::String
+pub ob_poc_types::intent::IntentArgValue::Uuid(alloc::string::String)
+impl core::clone::Clone for ob_poc_types::intent::IntentArgValue
+pub fn ob_poc_types::intent::IntentArgValue::clone(&self) -> ob_poc_types::intent::IntentArgValue
+impl core::fmt::Debug for ob_poc_types::intent::IntentArgValue
+pub fn ob_poc_types::intent::IntentArgValue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_types::intent::IntentArgValue
+pub fn ob_poc_types::intent::IntentArgValue::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::intent::IntentArgValue
+pub fn ob_poc_types::intent::IntentArgValue::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::intent::IntentArgValue
+impl core::marker::Send for ob_poc_types::intent::IntentArgValue
+impl core::marker::Sync for ob_poc_types::intent::IntentArgValue
+impl core::marker::Unpin for ob_poc_types::intent::IntentArgValue
+impl core::marker::UnsafeUnpin for ob_poc_types::intent::IntentArgValue
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::intent::IntentArgValue
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::intent::IntentArgValue
+impl<T, U> core::convert::Into<U> for ob_poc_types::intent::IntentArgValue where U: core::convert::From<T>
+pub fn ob_poc_types::intent::IntentArgValue::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::intent::IntentArgValue where U: core::convert::Into<T>
+pub type ob_poc_types::intent::IntentArgValue::Error = core::convert::Infallible
+pub fn ob_poc_types::intent::IntentArgValue::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::intent::IntentArgValue where U: core::convert::TryFrom<T>
+pub type ob_poc_types::intent::IntentArgValue::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::intent::IntentArgValue::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::intent::IntentArgValue where T: core::clone::Clone
+pub type ob_poc_types::intent::IntentArgValue::Owned = T
+pub fn ob_poc_types::intent::IntentArgValue::clone_into(&self, &mut T)
+pub fn ob_poc_types::intent::IntentArgValue::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::intent::IntentArgValue where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::intent::IntentArgValue::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::intent::IntentArgValue where T: ?core::marker::Sized
+pub fn ob_poc_types::intent::IntentArgValue::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::intent::IntentArgValue where T: ?core::marker::Sized
+pub fn ob_poc_types::intent::IntentArgValue::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::intent::IntentArgValue where T: core::clone::Clone
+pub unsafe fn ob_poc_types::intent::IntentArgValue::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::intent::IntentArgValue
+pub fn ob_poc_types::intent::IntentArgValue::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::intent::IntentArgValue where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_types::intent::IntentArgument
+pub ob_poc_types::intent::IntentArgument::name: alloc::string::String
+pub ob_poc_types::intent::IntentArgument::resolved: bool
+pub ob_poc_types::intent::IntentArgument::value: ob_poc_types::intent::IntentArgValue
+impl core::clone::Clone for ob_poc_types::intent::IntentArgument
+pub fn ob_poc_types::intent::IntentArgument::clone(&self) -> ob_poc_types::intent::IntentArgument
+impl core::fmt::Debug for ob_poc_types::intent::IntentArgument
+pub fn ob_poc_types::intent::IntentArgument::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_types::intent::IntentArgument
+pub fn ob_poc_types::intent::IntentArgument::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::intent::IntentArgument
+pub fn ob_poc_types::intent::IntentArgument::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::intent::IntentArgument
+impl core::marker::Send for ob_poc_types::intent::IntentArgument
+impl core::marker::Sync for ob_poc_types::intent::IntentArgument
+impl core::marker::Unpin for ob_poc_types::intent::IntentArgument
+impl core::marker::UnsafeUnpin for ob_poc_types::intent::IntentArgument
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::intent::IntentArgument
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::intent::IntentArgument
+impl<T, U> core::convert::Into<U> for ob_poc_types::intent::IntentArgument where U: core::convert::From<T>
+pub fn ob_poc_types::intent::IntentArgument::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::intent::IntentArgument where U: core::convert::Into<T>
+pub type ob_poc_types::intent::IntentArgument::Error = core::convert::Infallible
+pub fn ob_poc_types::intent::IntentArgument::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::intent::IntentArgument where U: core::convert::TryFrom<T>
+pub type ob_poc_types::intent::IntentArgument::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::intent::IntentArgument::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::intent::IntentArgument where T: core::clone::Clone
+pub type ob_poc_types::intent::IntentArgument::Owned = T
+pub fn ob_poc_types::intent::IntentArgument::clone_into(&self, &mut T)
+pub fn ob_poc_types::intent::IntentArgument::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::intent::IntentArgument where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::intent::IntentArgument::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::intent::IntentArgument where T: ?core::marker::Sized
+pub fn ob_poc_types::intent::IntentArgument::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::intent::IntentArgument where T: ?core::marker::Sized
+pub fn ob_poc_types::intent::IntentArgument::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::intent::IntentArgument where T: core::clone::Clone
+pub unsafe fn ob_poc_types::intent::IntentArgument::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::intent::IntentArgument
+pub fn ob_poc_types::intent::IntentArgument::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::intent::IntentArgument where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_types::intent::StructuredIntent
+pub ob_poc_types::intent::StructuredIntent::arguments: alloc::vec::Vec<ob_poc_types::intent::IntentArgument>
+pub ob_poc_types::intent::StructuredIntent::confidence: f32
+pub ob_poc_types::intent::StructuredIntent::notes: alloc::vec::Vec<alloc::string::String>
+pub ob_poc_types::intent::StructuredIntent::verb: alloc::string::String
+impl ob_poc_types::intent::StructuredIntent
+pub fn ob_poc_types::intent::StructuredIntent::empty() -> Self
+impl core::clone::Clone for ob_poc_types::intent::StructuredIntent
+pub fn ob_poc_types::intent::StructuredIntent::clone(&self) -> ob_poc_types::intent::StructuredIntent
+impl core::fmt::Debug for ob_poc_types::intent::StructuredIntent
+pub fn ob_poc_types::intent::StructuredIntent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_types::intent::StructuredIntent
+pub fn ob_poc_types::intent::StructuredIntent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::intent::StructuredIntent
+pub fn ob_poc_types::intent::StructuredIntent::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::intent::StructuredIntent
+impl core::marker::Send for ob_poc_types::intent::StructuredIntent
+impl core::marker::Sync for ob_poc_types::intent::StructuredIntent
+impl core::marker::Unpin for ob_poc_types::intent::StructuredIntent
+impl core::marker::UnsafeUnpin for ob_poc_types::intent::StructuredIntent
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::intent::StructuredIntent
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::intent::StructuredIntent
+impl<T, U> core::convert::Into<U> for ob_poc_types::intent::StructuredIntent where U: core::convert::From<T>
+pub fn ob_poc_types::intent::StructuredIntent::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::intent::StructuredIntent where U: core::convert::Into<T>
+pub type ob_poc_types::intent::StructuredIntent::Error = core::convert::Infallible
+pub fn ob_poc_types::intent::StructuredIntent::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::intent::StructuredIntent where U: core::convert::TryFrom<T>
+pub type ob_poc_types::intent::StructuredIntent::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::intent::StructuredIntent::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::intent::StructuredIntent where T: core::clone::Clone
+pub type ob_poc_types::intent::StructuredIntent::Owned = T
+pub fn ob_poc_types::intent::StructuredIntent::clone_into(&self, &mut T)
+pub fn ob_poc_types::intent::StructuredIntent::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::intent::StructuredIntent where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::intent::StructuredIntent::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::intent::StructuredIntent where T: ?core::marker::Sized
+pub fn ob_poc_types::intent::StructuredIntent::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::intent::StructuredIntent where T: ?core::marker::Sized
+pub fn ob_poc_types::intent::StructuredIntent::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::intent::StructuredIntent where T: core::clone::Clone
+pub unsafe fn ob_poc_types::intent::StructuredIntent::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::intent::StructuredIntent
+pub fn ob_poc_types::intent::StructuredIntent::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::intent::StructuredIntent where T: for<'de> serde_core::de::Deserialize<'de>
+pub fn ob_poc_types::intent::assemble_dsl_string(&ob_poc_types::intent::StructuredIntent) -> anyhow::Result<alloc::string::String>
+pub fn ob_poc_types::intent::format_intent_value_string_only(&ob_poc_types::intent::IntentArgValue) -> alloc::string::String
 pub mod ob_poc_types::investor_register
 pub enum ob_poc_types::investor_register::BreakdownDimension
 pub ob_poc_types::investor_register::BreakdownDimension::InvestorType
@@ -10758,6 +10951,50 @@ impl<T> core::convert::From<T> for ob_poc_types::investor_register::ThresholdCon
 pub fn ob_poc_types::investor_register::ThresholdConfig::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for ob_poc_types::investor_register::ThresholdConfig where T: for<'de> serde_core::de::Deserialize<'de>
 pub mod ob_poc_types::journey
+pub mod ob_poc_types::journey::pack_candidate
+pub struct ob_poc_types::journey::pack_candidate::PackCandidate
+pub ob_poc_types::journey::pack_candidate::PackCandidate::description: alloc::string::String
+pub ob_poc_types::journey::pack_candidate::PackCandidate::pack_id: alloc::string::String
+pub ob_poc_types::journey::pack_candidate::PackCandidate::pack_name: alloc::string::String
+pub ob_poc_types::journey::pack_candidate::PackCandidate::score: f32
+impl core::clone::Clone for ob_poc_types::journey::pack_candidate::PackCandidate
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::clone(&self) -> ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::fmt::Debug for ob_poc_types::journey::pack_candidate::PackCandidate
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for ob_poc_types::journey::pack_candidate::PackCandidate
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::journey::pack_candidate::PackCandidate
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::marker::Send for ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::marker::Sync for ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::marker::Unpin for ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::marker::UnsafeUnpin for ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::journey::pack_candidate::PackCandidate
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::journey::pack_candidate::PackCandidate
+impl<T, U> core::convert::Into<U> for ob_poc_types::journey::pack_candidate::PackCandidate where U: core::convert::From<T>
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::journey::pack_candidate::PackCandidate where U: core::convert::Into<T>
+pub type ob_poc_types::journey::pack_candidate::PackCandidate::Error = core::convert::Infallible
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::journey::pack_candidate::PackCandidate where U: core::convert::TryFrom<T>
+pub type ob_poc_types::journey::pack_candidate::PackCandidate::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::journey::pack_candidate::PackCandidate where T: core::clone::Clone
+pub type ob_poc_types::journey::pack_candidate::PackCandidate::Owned = T
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::clone_into(&self, &mut T)
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::journey::pack_candidate::PackCandidate where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::journey::pack_candidate::PackCandidate where T: ?core::marker::Sized
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::journey::pack_candidate::PackCandidate where T: ?core::marker::Sized
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::journey::pack_candidate::PackCandidate where T: core::clone::Clone
+pub unsafe fn ob_poc_types::journey::pack_candidate::PackCandidate::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::journey::pack_candidate::PackCandidate
+pub fn ob_poc_types::journey::pack_candidate::PackCandidate::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::journey::pack_candidate::PackCandidate where T: for<'de> serde_core::de::Deserialize<'de>
 pub mod ob_poc_types::journey::pack_types
 pub enum ob_poc_types::journey::pack_types::AnswerKind
 pub ob_poc_types::journey::pack_types::AnswerKind::Boolean
@@ -25987,6 +26224,57 @@ pub unsafe fn ob_poc_types::resolution::EnumValue::clone_to_uninit(&self, *mut u
 impl<T> core::convert::From<T> for ob_poc_types::resolution::EnumValue
 pub fn ob_poc_types::resolution::EnumValue::from(T) -> T
 impl<T> serde_core::de::DeserializeOwned for ob_poc_types::resolution::EnumValue where T: for<'de> serde_core::de::Deserialize<'de>
+pub struct ob_poc_types::EnvelopeHandle
+impl ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash(&self) -> [u8; 32]
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::content_hash_hex(&self) -> alloc::string::String
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::id(&self) -> uuid::Uuid
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::new(uuid::Uuid, [u8; 32]) -> Self
+impl core::clone::Clone for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone(&self) -> ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::Eq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::cmp::PartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::eq(&self, &ob_poc_types::envelope_handle::EnvelopeHandle) -> bool
+impl core::fmt::Debug for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::StructuralPartialEq for ob_poc_types::envelope_handle::EnvelopeHandle
+impl serde_core::ser::Serialize for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Send for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Sync for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::Unpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::marker::UnsafeUnpin for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::RefUnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl core::panic::unwind_safe::UnwindSafe for ob_poc_types::envelope_handle::EnvelopeHandle
+impl<T, U> core::convert::Into<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::From<T>
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::Into<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = core::convert::Infallible
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_poc_types::envelope_handle::EnvelopeHandle where U: core::convert::TryFrom<T>
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub type ob_poc_types::envelope_handle::EnvelopeHandle::Owned = T
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_into(&self, &mut T)
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::to_owned(&self) -> T
+impl<T> core::any::Any for ob_poc_types::envelope_handle::EnvelopeHandle where T: 'static + ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_poc_types::envelope_handle::EnvelopeHandle where T: ?core::marker::Sized
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_poc_types::envelope_handle::EnvelopeHandle where T: core::clone::Clone
+pub unsafe fn ob_poc_types::envelope_handle::EnvelopeHandle::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_poc_types::envelope_handle::EnvelopeHandle
+pub fn ob_poc_types::envelope_handle::EnvelopeHandle::from(T) -> T
+impl<T> serde_core::de::DeserializeOwned for ob_poc_types::envelope_handle::EnvelopeHandle where T: for<'de> serde_core::de::Deserialize<'de>
 pub struct ob_poc_types::EnvelopeVersion(pub u16)
 impl ob_poc_types::gated_envelope::EnvelopeVersion
 pub const ob_poc_types::gated_envelope::EnvelopeVersion::CURRENT: ob_poc_types::gated_envelope::EnvelopeVersion

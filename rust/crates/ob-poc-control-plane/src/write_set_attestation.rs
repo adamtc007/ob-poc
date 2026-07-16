@@ -1,0 +1,437 @@
+//! G14 — Write-Set Attestation (V&S §6.7.1, post-execution).
+//!
+//! No production analogue exists today (RR-4; ledger C-032: "CRUD executor
+//! executes metadata-driven insert/update/delete/upsert without comparing
+//! to a WriteSetProof"). T5.1-T5.3 add real write capture and attestation
+//! at the `PgTransactionScope` boundary (`ob-poc::sequencer_tx`) — this
+//! module owns only the *comparison* (`attest`), matching §9.1: this crate
+//! never executes SQL, it only decides whether an already-captured set of
+//! writes stays within an already-derived bound.
+//!
+//! Distinct from G7 (`write_set` — pre-execution derivation of the bound):
+//! G7 answers "what is the command allowed to write?"; G14 answers "did
+//! the runtime actually stay inside that bound?" A command can pass G7 and
+//! still fail G14 if its execution touched more than it declared.
+
+use uuid::Uuid;
+
+use crate::gate::{Gate, GateId, GateResult};
+use crate::write_set::WriteSetProof;
+
+/// One write the runtime actually performed, as reported by the caller
+/// (`PgTransactionScope::record_write` — self-reported, since sqlx offers
+/// no post-hoc introspection of which table/columns a raw `sqlx::query!`
+/// touched; see that method's doc for the honesty note this implies).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CapturedWrite {
+    pub table: String,
+    pub entity_id: Uuid,
+    pub columns: Vec<String>,
+    /// True when this write created `entity_id` in this same transaction
+    /// (Insert / Upsert-that-created / RoleLink / EntityCreate /
+    /// EntityUpsert) — a fresh id can never have been in the
+    /// pre-execution `WriteSetProof.entity_ids()` bound (it didn't exist
+    /// yet to be resolved/bound), so `attest()` treats the entity_id
+    /// membership check as vacuously satisfied for these writes. False
+    /// for writes against a pre-existing, pre-bound entity (Update /
+    /// Delete / Link / Unlink / RoleUnlink), where the real membership
+    /// check still applies — that's the actual property this gate
+    /// protects: a command must not write to some OTHER entity's row it
+    /// was never given.
+    pub created_new_entity: bool,
+}
+
+/// `WriteSetAttestation` — V&S §6.7.1 "Output".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttestationOutcome {
+    /// Every captured write is covered by the declared `WriteSetProof`.
+    Bounded,
+    /// At least one captured write falls outside the declared bound
+    /// (unlisted table, unlisted entity, or unlisted column). Carries
+    /// *every* excess write, not just the first — collect-where-
+    /// independent discipline (§6.16), so a breach report is a complete
+    /// work item for whoever triages it, not a truncated hint.
+    Breach { excess: Vec<CapturedWrite> },
+}
+
+/// Pure comparison: every element of `captured` must be covered by
+/// `expected` — same table, same entity id, and every column a subset of
+/// `expected.allowed_columns()`. No I/O, no re-derivation of the bound.
+pub fn attest(captured: &[CapturedWrite], expected: &WriteSetProof) -> AttestationOutcome {
+    let excess: Vec<CapturedWrite> = captured
+        .iter()
+        .filter(|write| {
+            !expected.tables().contains(&write.table)
+                || (!write.created_new_entity && !expected.entity_ids().contains(&write.entity_id))
+                || !write
+                    .columns
+                    .iter()
+                    .all(|c| expected.allowed_columns().contains(c))
+        })
+        .cloned()
+        .collect();
+
+    if excess.is_empty() {
+        AttestationOutcome::Bounded
+    } else {
+        AttestationOutcome::Breach { excess }
+    }
+}
+
+/// Pre-computed input for the G14 gate. Primitive-typed (mirrors
+/// `WriteSetProof`'s fields rather than requiring one, since the crate's
+/// own gate-evaluation context — `context::EvaluationContext` — carries
+/// only primitives per gate, never proof objects; production
+/// pre-commit enforcement (T5.2) calls `attest` directly against a real
+/// `WriteSetProof` at `PgTransactionScope::commit_attested`, this input
+/// shape exists only so `evaluate_shadow` can report G14 consistently
+/// alongside every other gate).
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct WriteSetAttestationInput {
+    pub captured: Vec<CapturedWrite>,
+    pub expected_tables: Vec<String>,
+    pub expected_entity_ids: Vec<Uuid>,
+    pub expected_allowed_columns: Vec<String>,
+}
+
+fn decide(input: &WriteSetAttestationInput) -> AttestationOutcome {
+    let excess: Vec<CapturedWrite> = input
+        .captured
+        .iter()
+        .filter(|write| {
+            !input.expected_tables.contains(&write.table)
+                || (!write.created_new_entity
+                    && !input.expected_entity_ids.contains(&write.entity_id))
+                || !write
+                    .columns
+                    .iter()
+                    .all(|c| input.expected_allowed_columns.contains(c))
+        })
+        .cloned()
+        .collect();
+    if excess.is_empty() {
+        AttestationOutcome::Bounded
+    } else {
+        AttestationOutcome::Breach { excess }
+    }
+}
+
+/// T5 adapter: `Gate<crate::context::EvaluationContext>` impl for G14.
+pub struct WriteSetAttestationGate;
+
+impl Gate<crate::context::EvaluationContext> for WriteSetAttestationGate {
+    fn id(&self) -> GateId {
+        GateId::WriteSetAttestation
+    }
+
+    fn evaluate(&self, ctx: &crate::context::EvaluationContext) -> GateResult {
+        let Some(input) = &ctx.write_set_attestation else {
+            return GateResult::Failure("no WriteSetAttestationInput supplied".to_string());
+        };
+        match decide(input) {
+            AttestationOutcome::Bounded => GateResult::Success,
+            AttestationOutcome::Breach { excess } => GateResult::Failure(format!(
+                "write-set breach: {} excess write(s)",
+                excess.len()
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn write_within_declared_bound_attests_clean() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::nil(),
+            columns: vec!["status".to_string()],
+            created_new_entity: false,
+        }];
+        assert_eq!(attest(&captured, &proof), AttestationOutcome::Bounded);
+    }
+
+    #[test]
+    fn write_to_undeclared_table_is_a_breach() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.entities".to_string(),
+            entity_id: Uuid::nil(),
+            columns: vec!["name".to_string()],
+            created_new_entity: false,
+        }];
+        let outcome = attest(&captured, &proof);
+        assert!(matches!(&outcome, AttestationOutcome::Breach { excess } if excess.len() == 1));
+    }
+
+    #[test]
+    fn write_to_undeclared_column_is_a_breach() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::nil(),
+            columns: vec!["status".to_string(), "legal_name".to_string()],
+            created_new_entity: false,
+        }];
+        assert!(matches!(
+            attest(&captured, &proof),
+            AttestationOutcome::Breach { .. }
+        ));
+    }
+
+    #[test]
+    fn write_to_undeclared_entity_is_a_breach() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::new_v4(),
+            columns: vec!["status".to_string()],
+            created_new_entity: false,
+        }];
+        assert!(matches!(
+            attest(&captured, &proof),
+            AttestationOutcome::Breach { .. }
+        ));
+    }
+
+    /// A write against a freshly-created entity (Insert / Upsert-that-
+    /// created / RoleLink / EntityCreate / EntityUpsert,
+    /// `created_new_entity: true`) attests `Bounded` even when its
+    /// `entity_id` is NOT a member of the pre-execution `entity_ids()`
+    /// bound — a fresh id can never have been pre-bound (it didn't exist
+    /// yet), so the membership check is vacuously satisfied. Table and
+    /// columns still have to be within bounds.
+    #[test]
+    fn created_new_entity_bypasses_entity_id_membership_check_in_attest() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()], // pre-execution bound entity ids — does NOT include the new id below
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::new_v4(), // freshly generated, never in the pre-execution bound
+            columns: vec!["status".to_string()],
+            created_new_entity: true,
+        }];
+        assert_eq!(
+            attest(&captured, &proof),
+            AttestationOutcome::Bounded,
+            "a write against an entity created by this same verb must not breach on \
+             entity_id membership alone"
+        );
+    }
+
+    /// Regression proof: `created_new_entity: false` still enforces the
+    /// real entity_id membership check — this is the actual security
+    /// property G14 protects (don't let a command write to some OTHER
+    /// entity's row it wasn't given). The bypass above must not gut this.
+    #[test]
+    fn non_created_write_to_unbound_entity_still_breaches_in_attest() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec!["validation_state".to_string()],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),
+            entity_id: Uuid::new_v4(), // not in the pre-execution bound
+            columns: vec!["status".to_string()],
+            created_new_entity: false,
+        }];
+        assert!(
+            matches!(attest(&captured, &proof), AttestationOutcome::Breach { .. }),
+            "a write against a pre-existing, unbound entity must still breach"
+        );
+    }
+
+    /// Same two cases through `decide()`/`WriteSetAttestationInput` (the
+    /// shadow-eval `Gate` adapter's twin comparison), not just `attest()`.
+    #[test]
+    fn created_new_entity_bypasses_entity_id_membership_check_in_decide() {
+        let input = WriteSetAttestationInput {
+            captured: vec![CapturedWrite {
+                table: "ob-poc.cbus".to_string(),
+                entity_id: Uuid::new_v4(), // not in expected_entity_ids below
+                columns: vec!["status".to_string()],
+                created_new_entity: true,
+            }],
+            expected_tables: vec!["ob-poc.cbus".to_string()],
+            expected_entity_ids: vec![Uuid::nil()],
+            expected_allowed_columns: vec!["status".to_string()],
+        };
+        assert_eq!(decide(&input), AttestationOutcome::Bounded);
+    }
+
+    #[test]
+    fn non_created_write_to_unbound_entity_still_breaches_in_decide() {
+        let input = WriteSetAttestationInput {
+            captured: vec![CapturedWrite {
+                table: "ob-poc.cbus".to_string(),
+                entity_id: Uuid::new_v4(), // not in expected_entity_ids below
+                columns: vec!["status".to_string()],
+                created_new_entity: false,
+            }],
+            expected_tables: vec!["ob-poc.cbus".to_string()],
+            expected_entity_ids: vec![Uuid::nil()],
+            expected_allowed_columns: vec!["status".to_string()],
+        };
+        assert!(matches!(decide(&input), AttestationOutcome::Breach { .. }));
+    }
+
+    /// EOP-SESSION-CONTROLPLANE-G1-ITEM2-G2-ITEM2-IMPL-001, G2 item 2
+    /// STOP-condition finding: `ob-poc::agent::control_plane_shadow::
+    /// build_write_set_input` — the only existing production source of a
+    /// `WriteSetInput`/`WriteSetProof` for a verb's *declared* footprint
+    /// (used today for G7's shadow evaluation) — always sets
+    /// `allowed_columns: Vec::new()` (it has no per-column knowledge, only
+    /// `domain_metadata.yaml`'s per-verb `writes: [table, ...]` list). This
+    /// test proves what that means for `attest()`: a write with ANY
+    /// nonempty `columns` is unconditionally a breach against an
+    /// empty-`allowed_columns` proof, even when the table and entity_id
+    /// both match exactly. `crud_executor.rs`'s real `record_write` calls
+    /// (T10.3, the scope-based CRUD dispatch path `execute_verb_admitting_
+    /// envelope` actually uses) always report nonempty columns for a real
+    /// INSERT/UPDATE. Wiring `commit_attested` with a `WriteSetProof`
+    /// built this way would therefore misclassify *every* real, legitimate
+    /// CRUD write as a breach and roll it back — not "catch a real excess
+    /// write," but reject all writes for any verb with a declared write
+    /// footprint. This is the concrete, provable basis for this session's
+    /// STOP-condition finding on G2 item 2: `set_expected_write_set` is not
+    /// wired from `build_write_set_input`'s output.
+    #[test]
+    fn empty_allowed_columns_breaches_every_write_with_any_column_even_on_exact_table_and_entity_match(
+    ) {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec![],
+            vec!["ob-poc.cbus".to_string()],
+            vec![], // build_write_set_input's real, always-empty allowed_columns
+            "idem-1",
+        );
+        let captured = vec![CapturedWrite {
+            table: "ob-poc.cbus".to_string(),    // exact table match
+            entity_id: Uuid::nil(),              // exact entity match
+            columns: vec!["status".to_string()], // any real, nonempty column list
+            created_new_entity: false,
+        }];
+        let outcome = attest(&captured, &proof);
+        assert!(
+            matches!(&outcome, AttestationOutcome::Breach { excess } if excess.len() == 1),
+            "expected a spurious breach on an otherwise-legitimate write: {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn breach_collects_every_excess_write_not_just_the_first() {
+        let proof = crate::write_set::tests_support::proof(
+            vec![Uuid::nil()],
+            vec![],
+            vec!["ob-poc.cbus".to_string()],
+            vec!["status".to_string()],
+            "idem-1",
+        );
+        let captured = vec![
+            CapturedWrite {
+                table: "ob-poc.entities".to_string(),
+                entity_id: Uuid::nil(),
+                columns: vec!["name".to_string()],
+                created_new_entity: false,
+            },
+            CapturedWrite {
+                table: "ob-poc.cases".to_string(),
+                entity_id: Uuid::nil(),
+                columns: vec!["status".to_string()],
+                created_new_entity: false,
+            },
+        ];
+        match attest(&captured, &proof) {
+            AttestationOutcome::Breach { excess } => assert_eq!(excess.len(), 2),
+            AttestationOutcome::Bounded => panic!("expected breach"),
+        }
+    }
+
+    fn base_input() -> WriteSetAttestationInput {
+        WriteSetAttestationInput {
+            captured: vec![CapturedWrite {
+                table: "ob-poc.cbus".to_string(),
+                entity_id: Uuid::nil(),
+                columns: vec!["status".to_string()],
+                created_new_entity: false,
+            }],
+            expected_tables: vec!["ob-poc.cbus".to_string()],
+            expected_entity_ids: vec![Uuid::nil()],
+            expected_allowed_columns: vec!["status".to_string()],
+        }
+    }
+
+    #[test]
+    fn gate_evaluate_reports_success_when_bounded() {
+        let ctx = crate::context::EvaluationContext {
+            write_set_attestation: Some(base_input()),
+            ..Default::default()
+        };
+        assert_eq!(WriteSetAttestationGate.evaluate(&ctx), GateResult::Success);
+        assert_eq!(WriteSetAttestationGate.id(), GateId::WriteSetAttestation);
+    }
+
+    #[test]
+    fn gate_evaluate_reports_failure_on_breach() {
+        let ctx = crate::context::EvaluationContext {
+            write_set_attestation: Some(WriteSetAttestationInput {
+                captured: vec![CapturedWrite {
+                    table: "ob-poc.entities".to_string(),
+                    entity_id: Uuid::nil(),
+                    columns: vec!["name".to_string()],
+                    created_new_entity: false,
+                }],
+                ..base_input()
+            }),
+            ..Default::default()
+        };
+        assert!(matches!(
+            WriteSetAttestationGate.evaluate(&ctx),
+            GateResult::Failure(_)
+        ));
+    }
+
+    #[test]
+    fn gate_evaluate_fails_closed_when_input_missing() {
+        let ctx = crate::context::EvaluationContext::default();
+        assert!(matches!(
+            WriteSetAttestationGate.evaluate(&ctx),
+            GateResult::Failure(_)
+        ));
+    }
+}

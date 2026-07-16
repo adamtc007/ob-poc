@@ -1328,11 +1328,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                                 let config_index = Arc::new(config_index);
 
-                                // Inner executor for direct verb execution
+                                // Inner executor for direct verb execution.
+                                // G3/G4: wrapped exclusively by the
+                                // `WorkflowDispatcher` constructed just
+                                // below — tagged Path C (`WorkflowDispatched`)
+                                // once at construction, per
+                                // EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001
+                                // §3(d).
                                 let inner: Arc<dyn ob_poc::sequencer::DslExecutorV2> = Arc::new(
                                     RealDslExecutor::new(pool.clone())
                                         .with_services(service_registry.clone())
-                                        .with_sem_os_ops(sem_os_ops.clone()),
+                                        .with_sem_os_ops(sem_os_ops.clone())
+                                        .with_execution_path(ob_poc_types::ExecutionPath::WorkflowDispatched),
                                 );
 
                                 // WorkflowDispatcher — routes Direct vs Orchestrated.
@@ -1354,12 +1361,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 // Spawn JobWorker (long-poll job activation loop)
                                 let (job_shutdown_tx, job_shutdown_rx) =
                                     tokio::sync::watch::channel(false);
+                                // G3/G4: JobWorker's durable-resume executor.
+                                // No distinct "durable resume" path is named
+                                // by the runbook/plan — tagged into the
+                                // Path-B (`DslDirect`) umbrella per the G3
+                                // design doc's §6 open question 1 (T9.2's
+                                // OQ4 park/resume re-entry trace is still
+                                // open; this is the least-surprising default
+                                // pending that trace, not a final answer).
                                 let worker_executor: Arc<dyn ob_poc::sequencer::DslExecutorV2> =
                                     Arc::new(
                                         RealDslExecutor::new(pool.clone())
                                             .allow_durable_direct()
                                             .with_services(service_registry.clone())
-                                            .with_sem_os_ops(sem_os_ops.clone()),
+                                            .with_sem_os_ops(sem_os_ops.clone())
+                                            .with_execution_path(ob_poc_types::ExecutionPath::DslDirect),
                                     );
                                 let job_worker = JobWorker::new(
                                     format!("ob-poc-worker-{}", std::process::id()),
@@ -1460,11 +1476,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // `sem_os_ops` was built at module startup above and is in scope here.
         // Legacy DslExecutor for the constructor (fallback path — never parks)
+        // G3/G4: Path B (`DslDirect`) umbrella — same reasoning as
+        // `worker_executor` above.
         use ob_poc::repl::executor_bridge::RealDslExecutor;
         let legacy_executor: Arc<dyn ob_poc::sequencer::DslExecutor> = Arc::new(
             RealDslExecutor::new(pool.clone())
                 .with_services(service_registry.clone())
-                .with_sem_os_ops(sem_os_ops.clone()),
+                .with_sem_os_ops(sem_os_ops.clone())
+                .with_execution_path(ob_poc_types::ExecutionPath::DslDirect),
         );
 
         // Create RunbookStore — shared store for compiled runbook artifacts.
@@ -1568,6 +1587,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        // T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): load the verb→table
+        // write-footprint for G7 shadow evaluation. Best-effort, not
+        // production-fatal — unlike GatePipeline's DAG registry (which
+        // gates real dispatch), this only feeds a shadow-only observation;
+        // a missing/malformed file just leaves G7 shadow-unwired (logged),
+        // exactly like an absent GatePipeline leaves G4 shadow-unwired.
+        {
+            use ob_poc::dsl_v2::ConfigLoader;
+            use sem_os_obpoc_adapter::metadata::DomainMetadata;
+
+            let cfg_loader = ConfigLoader::from_env();
+            let domain_metadata_path = cfg_loader
+                .config_dir()
+                .join("sem_os_seeds/domain_metadata.yaml");
+            match DomainMetadata::from_file(&domain_metadata_path) {
+                Ok(metadata) => {
+                    orchestrator = orchestrator.with_domain_metadata(Arc::new(metadata));
+                    tracing::info!("T9.1e domain metadata loaded (G7 shadow write-footprint)");
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        path = %domain_metadata_path.display(),
+                        "T9.1e domain metadata failed to load — G7 shadow-evaluates as not-attempted"
+                    );
+                }
+            }
+        }
+
         // Wire the VerbExecutionPort — lookup order:
         //   1. SemOsVerbOpRegistry (post-Phase-5c-migrate slice #80: the sole
         //      home for plugin verb implementations).
@@ -1600,10 +1648,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             // No BPMN — wire RealDslExecutor directly (it auto-impls DslExecutorV2
             // via the blanket impl, so execute_v2 maps to Completed/Failed, never Parked)
+            // G3/G4: Path B (`DslDirect`) umbrella — no WorkflowDispatcher
+            // wrapper exists in this branch by construction.
             orchestrator = orchestrator.with_executor_v2(Arc::new(
                 RealDslExecutor::new(pool.clone())
                     .with_services(service_registry.clone())
-                    .with_sem_os_ops(sem_os_ops.clone()),
+                    .with_sem_os_ops(sem_os_ops.clone())
+                    .with_execution_path(ob_poc_types::ExecutionPath::DslDirect),
             ));
             tracing::info!("REPL V2 executor: RealDslExecutor (direct, no BPMN)");
         }

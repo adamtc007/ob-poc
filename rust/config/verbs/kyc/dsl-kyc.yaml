@@ -56,10 +56,11 @@ domains:
             type: uuid
             required: true
             description: Controlled entity
-          - name: edge_kind
+          - name: kind
             type: string
             required: true
-            description: "One of: voting_rights, board_appointment, gp_statutory, designated_member, trust_role, nominee, dominant_influence, economic_interest"
+            description: "Control basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload). trust_role is a recognized EdgeKind variant but has no wire mapping from this string yet (M4 follow-up: needs a sub-kind for settlor/trustee/protector/beneficiary) — passing it, or any unrecognized/omitted value, silently resolves to dominant_influence (the fold's catch-all; the fold is infallible by design, so this cannot be a hard error today)."
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, nominee, dominant_influence, economic_interest]
           - name: edge-id
             type: uuid
             required: false
@@ -200,6 +201,9 @@ domains:
           - "verify economic interest"
           - "confirm and verify edge"
           - "verify the assertion"
+          - "verify the UBO evidence"
+          - "verify the UBO evidence is sufficient"
+          - "is the evidence sufficient to verify this edge"
         behavior: plugin
         metadata:
           tier: intent
@@ -244,6 +248,10 @@ domains:
           - "supersede the assertion"
           - "mark as superseded"
           - "this edge is superseded"
+          - "reject this UBO allegation"
+          - "reject as unsubstantiated"
+          - "expire this UBO entry"
+          - "expire this edge"
         behavior: plugin
         metadata:
           tier: intent
@@ -347,7 +355,8 @@ domains:
           - name: strategy
             type: string
             required: true
-            description: "Strategy name: ownership_prong or smo_fallback"
+            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %) and control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4) are implemented. Role-based strategies remain open (M2)."
+            valid_values: [ownership_prong_strategy, control_prong_strategy]
         returns:
           type: record
           fields:
@@ -453,6 +462,9 @@ domains:
           - "commit determination"
           - "seal the UBO pin"
           - "freeze the result"
+          - "approve the beneficial ownership determination"
+          - "approve the UBO determination"
+          - "approve this ownership determination"
         behavior: plugin
         metadata:
           tier: intent
@@ -485,59 +497,6 @@ domains:
           external_effects: []
           consequence:
             baseline: reviewable
-
-      board-controller.override:
-        flavour: attribute_mutating
-        description: Record a board-controller override as a verb event (D3 — supersede-never-delete, K-13/K-15/K-35)
-        effect_class: append_fact
-        invocation_phrases:
-          - "override board controller"
-          - "set board controller override"
-          - "record board controller override"
-          - "override the board controller"
-          - "record manual board controller"
-          - "board controller manual override"
-          - "assign board controller override"
-          - "record controller override"
-          - "set manual controller"
-          - "board control override"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: workflow
-          scope: global
-          noun: control_edge
-          tags: [ubo, board-controller, override, d3, dsl-kyc]
-          phase_tags: [kyc]
-          side_effects: state_write
-        args:
-          - name: subject-id
-            type: uuid
-            required: true
-            description: Determination root
-          - name: controller-entity-id
-            type: uuid
-            required: true
-            description: The entity designated as board controller
-          - name: basis
-            type: string
-            required: true
-            description: Authority basis for this override (K-17, K-35 traceability)
-          - name: supersedes-event-id
-            type: uuid
-            required: false
-            description: Prior override event being superseded (K-13)
-        returns:
-          type: record
-          fields:
-            - name: seq
-              type: integer
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
-
 
   kyc:
     description: "KYC subject stream operations (dsl.kyc lexicon)"
@@ -623,7 +582,8 @@ domains:
           - name: structure-class
             type: string
             required: true
-            description: "Structure class (e.g. simple, complex, fund, trust)"
+            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4). trust/foundation/investment_fund/state_owned/cooperative/nominee classify successfully but have no wire mapping from ubo.edge.assert-control's kind arg to a control edge kind for their structure-specific control basis yet (e.g. TrustRole — separate, smaller follow-on gap)."
+            valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
           - name: entity-id
             type: uuid
             required: false

@@ -24,7 +24,7 @@ use ob_poc_kyc_substrate::determination::DeterminationStrategy;
 use ob_poc_kyc_substrate::fold::control::check_control_preconditions;
 use ob_poc_kyc_substrate::{
     find_subject_entity, fold_control_versioned, fold_obligations_versioned,
-    natural_persons_from_events, phase1_lexicon, reconciled_economic_edges, AuthorityRef, EdgeId,
+    natural_persons_from_events, phase1_lexicon, AuthorityRef, ControlProngStrategy, EdgeId,
     FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult, SubjectId,
     SubjectOverallState, TargetBinding, V1FoldImpl,
 };
@@ -38,6 +38,7 @@ use ob_poc_kyc_substrate::fold::obligation::ObligationState as _ObligationStateC
 /// `verb_fqn`, `target`, and `payload` are verb-specific; everything else is
 /// threaded from `ctx`. If `validate_entry_fqn` is `Some`, the named lexicon
 /// entry's preconditions are checked under the lock.
+#[allow(clippy::too_many_arguments)] // each parameter is a distinct verb-call scalar/binding, not a bundle candidate shared across the 22 call sites below
 async fn stream_append(
     verb_fqn: &str,
     subject: SubjectId,
@@ -384,11 +385,12 @@ impl SemOsVerbOp for UboDeterminationApplySmoFallback {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let payload = normalize_smo_fallback_payload(args);
         let outcome = stream_append(
             "ubo.determination.apply-smo-fallback",
             subject,
             TargetBinding::for_subject(subject),
-            args.clone(),
+            payload,
             "analyst.smo-fallback",
             None,
             ctx,
@@ -399,6 +401,24 @@ impl SemOsVerbOp for UboDeterminationApplySmoFallback {
             serde_json::json!({ "seq": outcome.seq }),
         ))
     }
+}
+
+/// Normalize `ubo.determination.apply-smo-fallback` payload: the YAML arg is
+/// kebab-case `smo-person-id`, but the fold reads snake_case `smo_person_id`
+/// (`fold::control::apply_one_control_event`, via `person_id(p, "smo_person_id")`)
+/// — without this the fold silently left `ControlState.smo_person_id` at
+/// `None`, meaning the entire SMO-fallback path (K-5's "never silent"
+/// escape hatch, consumed at `freeze` time) never actually populated
+/// anything even after a caller ran this verb. Same bug class as R3
+/// (structure_class) and the `edge.assert-control` kind/edge_kind mismatch.
+fn normalize_smo_fallback_payload(args: &serde_json::Value) -> serde_json::Value {
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        if let Some(v) = obj.remove("smo-person-id") {
+            obj.insert("smo_person_id".to_string(), v);
+        }
+    }
+    p
 }
 
 pub struct UboDeterminationFreeze;
@@ -440,11 +460,19 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .ok_or_else(|| anyhow!("freeze: no strategy selected (K-4 precondition)"))?;
         let strategy: &dyn DeterminationStrategy = match strategy_name {
             "ownership_prong_strategy" => &OwnershipProngStrategy,
+            // M4: control-by-other-means (voting rights, board appointment, GP
+            // statutory control, LLP designated member, trust roles, dominant
+            // influence). Scope note lives on ControlProngStrategy itself — v1
+            // walks control-kind edges only, does not cross into the economic
+            // axis for an intermediate controlling entity's own UBOs.
+            "control_prong_strategy" => &ControlProngStrategy,
             other => {
                 return Err(anyhow!(
                     "freeze: strategy '{other}' selected but no DeterminationStrategy is \
-                     registered for it — only ownership_prong_strategy exists today \
-                     (control-prong / role-based strategies are M2 follow-on work)"
+                     registered for it — only ownership_prong_strategy and \
+                     control_prong_strategy exist today (role-based strategies for \
+                     e.g. investor-role-profile-driven determination remain M2 \
+                     follow-on work)"
                 ));
             }
         };
@@ -455,7 +483,6 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             )
         })?;
         let natural_persons = natural_persons_from_events(&refs);
-        let reconciled_edges = reconciled_economic_edges(&control);
         // K-6: threshold should be reference-plane data (per jurisdiction/structure
         // class); until that table exists, a caller-suppliable default is the
         // documented interim (EOP-DD-KYCUBO-003 M1.4).
@@ -464,12 +491,8 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .and_then(|v| v.as_f64())
             .unwrap_or(25.0);
 
-        let mut candidates: Vec<ProngCandidate> = strategy.resolve(
-            &reconciled_edges,
-            subject_entity_id,
-            &natural_persons,
-            threshold_pct,
-        );
+        let mut candidates: Vec<ProngCandidate> =
+            strategy.resolve(&control, subject_entity_id, &natural_persons, threshold_pct);
         candidates.sort_by_key(|c| c.person_id.0);
 
         let smo_result = match (control.smo_person_id, control.smo_event_id) {
@@ -779,6 +802,15 @@ impl SemOsVerbOp for KycObligationCreate {
         let _role = json_extract_string(args, "role")?;
         let mut payload = args.clone();
         payload["obligation_id"] = serde_json::Value::String(obligation_id.to_string());
+        // The YAML arg is kebab-case `cbu-role`, but the fold reads snake_case
+        // `cbu_role` (fold::obligation::str_field(p, "cbu_role"), K-24 exposure
+        // linkage) — without this the fold silently left ObligationBasis.cbu_role
+        // at None. Same bug class as R3 / the smo-person-id fix above.
+        if let Some(obj) = payload.as_object_mut() {
+            if let Some(v) = obj.remove("cbu-role") {
+                obj.insert("cbu_role".to_string(), v);
+            }
+        }
         let outcome = stream_append(
             "kyc.obligation.create",
             subject,
@@ -1030,45 +1062,6 @@ impl SemOsVerbOp for KycPersonReject {
             TargetBinding::for_subject(subject),
             args.clone(),
             "senior-analyst.reject",
-            None,
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
-
-// ── D3: Board-controller override as verb (K-13/K-15/K-32/K-35) ──────────────
-
-/// `ubo.board-controller.override` — the D3 ratified decision: a board-control
-/// override is a first-class verb event on the stream, not a side-effecting table
-/// write. The human-authored `board_controller_overrides` table (which never
-/// existed in this DB) is replaced by this verb + fold. Supersede-never-delete.
-pub struct UboBoardControllerOverride;
-
-#[async_trait]
-impl SemOsVerbOp for UboBoardControllerOverride {
-    fn fqn(&self) -> &str {
-        "ubo.board-controller.override"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let _controller = json_extract_uuid(args, ctx, "controller-entity-id")?;
-        let _basis = json_extract_string(args, "basis")?;
-        let outcome = stream_append(
-            "ubo.board-controller.override",
-            subject,
-            TargetBinding::for_subject(subject),
-            args.clone(),
-            "senior-analyst.board-controller-override",
             None,
             ctx,
             scope,

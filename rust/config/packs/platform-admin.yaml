@@ -1,0 +1,115 @@
+# Platform Admin Journey Pack (scaffold, generated 2026-07-16)
+#
+# Reference-data vocabulary (roles, regulators, identifiers, general
+# refdata) combined with access/entitlement administration (teams, users,
+# access-review campaigns). Housekeeping-tier pack, not tied to a single
+# business entity's operational lifecycle.
+#
+# NOTE: role.* and admin.role-types.* look like near-duplicate concepts
+# (both are "role reference data with a deactivate transition"). Kept as
+# separate verb families here per the original recon — flagged for a
+# follow-up decision on whether they should collapse into one.
+
+id: platform-admin
+name: Platform Admin
+version: "1.0"
+description: >
+  Reference-data vocabulary (roles, regulators, identifiers) and
+  access/entitlement administration (teams, users, access-review
+  campaigns). Scaffold — review naming and verb split before treating
+  as final.
+
+invocation_phrases:
+  - "manage roles"
+  - "manage team access"
+  - "run access review"
+
+required_context: []
+optional_context: []
+workspaces:
+  - platform_admin
+
+allowed_verbs:
+  - access-review.attest
+  - access-review.audit-report
+  - access-review.bulk-confirm
+  - access-review.campaign-status
+  - access-review.confirm-access
+  - access-review.confirm-all-clean
+  - access-review.create-campaign
+  - access-review.escalate-item
+  - access-review.extend-access
+  - access-review.launch-campaign
+  - access-review.list-flagged
+  - access-review.list-items
+  - access-review.my-pending
+  - access-review.populate-campaign
+  - access-review.process-deadline
+  - access-review.revoke-access
+  - access-review.send-reminders
+  - admin.regulators.create
+  - admin.regulators.deactivate
+  - admin.regulators.list
+  - admin.regulators.read
+  - admin.regulators.update
+  - admin.role-types.create
+  - admin.role-types.deactivate
+  - admin.role-types.list
+  - admin.role-types.read
+  - admin.role-types.update
+  - identifier.attach
+  - identifier.attach-clearstream
+  - identifier.attach-lei
+  - identifier.find-by-clearstream
+  - identifier.find-by-isin
+  - identifier.find-by-lei
+  - identifier.invalidate
+  - identifier.list-by-entity
+  - identifier.remove
+  - identifier.update-lei-status
+  - identifier.validate
+  - refdata.deactivate
+  - refdata.ensure
+  - refdata.list
+  - refdata.load-all
+  - refdata.load-instrument-classes
+  - refdata.load-markets
+  - refdata.load-sla-templates
+  - refdata.load-subcustodians
+  - refdata.read
+  - role.delete
+  - role.ensure
+  - role.list
+  - role.read
+  - team.add-cbu-access
+  - team.add-governance-member
+  - team.add-member
+  - team.archive
+  - team.create
+  - team.grant-service
+  - team.read
+  - team.remove-cbu-access
+  - team.remove-member
+  - team.revoke-service
+  - team.transfer-member
+  - team.update-member
+  - user.create
+  - user.offboard
+  - user.reactivate
+  - user.suspend
+
+forbidden_verbs: []
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+required_questions: []
+optional_questions: []
+stop_rules: []
+templates: []
+section_layout:
+  - title: "Reference Data"
+    verb_prefixes: ["identifier.", "admin.", "role.", "refdata."]
+  - title: "Access & Entitlements"
+    verb_prefixes: ["team.", "user.", "access-review."]
+definition_of_done: []
+progress_signals: []

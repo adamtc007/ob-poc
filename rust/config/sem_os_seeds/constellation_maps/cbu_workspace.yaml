@@ -48,7 +48,6 @@ slots:
       investor_start_redemption: { verb: investor.start-redemption, when: filled }
       investor_complete_redemption: { verb: investor.complete-redemption, when: filled }
       investor_count: investor.count-by-state
-      investor_history: investor.get-lifecycle-history
       # ── Investor roles ──────────────────────────────────────────────
       investor_role_set: { verb: investor-role.set, when: filled }
       investor_role_read: investor-role.read

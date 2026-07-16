@@ -130,7 +130,7 @@ domains:
         crud:
           operation: insert
           table: share_class_identifiers
-          schema: kyc
+          schema: ob-poc
           returning: identifier_id
         args:
           - name: share-class-id
@@ -140,7 +140,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: scheme
@@ -202,7 +202,7 @@ domains:
         crud:
           operation: list_by_fk
           table: share_classes
-          schema: kyc
+          schema: ob-poc
           fk_col: issuer_entity_id
         args:
           - name: issuer-entity-id
@@ -251,7 +251,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: as-of
@@ -298,7 +298,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: units
@@ -356,7 +356,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: units
@@ -410,7 +410,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: ratio-from
@@ -470,7 +470,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: units
@@ -521,7 +521,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: units
@@ -586,7 +586,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: holder-entity-id
@@ -674,7 +674,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: holder-entity-id
@@ -747,7 +747,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: holder-entity-id
@@ -817,7 +817,7 @@ domains:
             lookup:
               table: share_classes
               entity_type: share_class
-              schema: kyc
+              schema: ob-poc
               search_key: name
               primary_key: id
           - name: holder-entity-id
@@ -880,7 +880,7 @@ domains:
             lookup:
               table: dilution_instruments
               entity_type: instrument
-              schema: kyc
+              schema: ob-poc
               search_key: instrument_id
               primary_key: instrument_id
           - name: units
@@ -934,7 +934,7 @@ domains:
             lookup:
               table: dilution_instruments
               entity_type: instrument
-              schema: kyc
+              schema: ob-poc
               search_key: instrument_id
               primary_key: instrument_id
           - name: units
@@ -1079,7 +1079,7 @@ domains:
         crud:
           operation: upsert
           table: issuer_control_config
-          schema: kyc
+          schema: ob-poc
           returning: config_id
           conflict_keys:
             - issuer_entity_id
@@ -1176,7 +1176,7 @@ domains:
         crud:
           operation: select
           table: issuer_control_config
-          schema: kyc
+          schema: ob-poc
           filter:
             effective_to:
         args:

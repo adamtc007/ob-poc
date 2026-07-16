@@ -14,10 +14,14 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycPersonApprove, KycSubjectClassifyStructure, KycSubjectRegister,
-    UboDeterminationComputeFold, UboDeterminationFreeze, UboDeterminationSelectStrategy,
-    UboEdgeAssertEconomicInterest, UboEdgeReconcileConflict,
+    UboDeterminationApplySmoFallback, UboDeterminationComputeFold, UboDeterminationFreeze,
+    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
+    UboEdgeReconcileConflict,
 };
-use ob_poc_kyc_substrate::SubjectId;
+use ob_poc_kyc_store::PgKycEventStore;
+use ob_poc_kyc_substrate::{
+    fold_obligations_versioned, phase1_lexicon, FoldRegistry, SubjectId, V1FoldImpl,
+};
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
 
@@ -364,15 +368,120 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
     cleanup(&pool, &[subject]).await;
 }
 
-// ── M3.4 (gap-documenting) — unimplemented strategies fail loudly, not silently ─
+// ── M4 — control-prong strategy for fund-LP/LLP structure classes ───────────
 //
-// Success Criterion 2 (fund-LP/LLP control-prong attribution) is NOT closed by
-// this remediation slice — only `ownership_prong_strategy` exists. This test
-// documents the interim contract: selecting an unimplemented strategy must
-// cause freeze to fail loudly (K-4 spirit: never silently substitute the wrong
-// determination logic), not silently fall back to the ownership prong. A real
-// `ControlProngStrategy` for LP/LLP/trust/etc. structure classes is separate,
-// larger follow-on work (see EOP-DD-KYCUBO-003 §2 Phase M4).
+// EOP-DD-KYCUBO-003 §2 Phase M4: a real `ControlProngStrategy` closing Success
+// Criterion 2 (fund-LP/LLP control-prong attribution), no longer only
+// `ownership_prong_strategy`. Registered in the same `freeze` dispatch match
+// as `ownership_prong_strategy` (`ob_poc::domain_ops::kyc_stream_ops`).
+//
+// Fixture: an LP fund (subject) whose GP-statutory control edge points to a
+// natural person P1 directly. `ubo.edge.assert-control` with `kind:
+// gp_statutory` — the same verb `ownership_prong_strategy` fixtures use for
+// `assert-economic-interest`, just the control counterpart.
+
+#[tokio::test]
+async fn m4_control_prong_strategy_resolves_gp_statutory_control() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let p1 = Uuid::new_v4();
+
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({
+            "subject-id": subject.0, "is_natural_person": false,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({
+            "subject-id": subject.0, "entity-id": p1, "is_natural_person": true,
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({
+            "subject-id": subject.0, "structure-class": "lp_fund",
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeAssertControl,
+        serde_json::json!({
+            "subject-id": subject.0,
+            "from_entity_id": p1,
+            "to_entity_id": subject.0,
+            "kind": "gp_statutory",
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({
+            "subject-id": subject.0, "strategy": "control_prong_strategy",
+        }),
+        &pool,
+    )
+    .await;
+
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({
+            "subject-id": subject.0, "policy-version": "v1.0",
+        }),
+        &pool,
+    )
+    .await;
+
+    let candidates = outcome
+        .get("candidates")
+        .and_then(|c| c.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        candidates.len(),
+        1,
+        "GP-statutory control edge should resolve exactly P1; got {candidates:?}"
+    );
+    assert_eq!(
+        candidates[0].get("person_id").and_then(|v| v.as_str()),
+        Some(p1.to_string().as_str()),
+    );
+    assert_eq!(
+        candidates[0].get("prong").and_then(|v| v.as_str()),
+        Some("ControlByOtherMeans"),
+        "control-prong candidates must record ControlByOtherMeans, not OwnershipProng (K-1 basis)",
+    );
+    assert!(
+        candidates[0]
+            .get("effective_ownership_pct")
+            .map(|v| v.is_null())
+            .unwrap_or(false),
+        "control has no quantum — effective_ownership_pct must be null, not a fabricated value",
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
+// ── M3.4 (gap-documenting) — unimplemented strategies still fail loudly ─────
+//
+// M4 closed control_prong_strategy (above); this test now documents the
+// residual boundary — a genuinely unimplemented strategy name (e.g. a
+// role-based determination strategy, still not built) must fail loudly at
+// freeze (K-4 spirit: never silently substitute the wrong determination
+// logic), not silently fall back to a registered strategy.
 
 #[tokio::test]
 async fn m3_4_unimplemented_strategy_fails_loudly_not_silently() {
@@ -404,7 +513,7 @@ async fn m3_4_unimplemented_strategy_fails_loudly_not_silently() {
     run(
         &UboDeterminationSelectStrategy,
         serde_json::json!({
-            "subject-id": subject.0, "strategy": "control_prong_strategy",
+            "subject-id": subject.0, "strategy": "role_based_strategy",
         }),
         &pool,
     )
@@ -422,12 +531,119 @@ async fn m3_4_unimplemented_strategy_fails_loudly_not_silently() {
     assert!(
         result.is_err(),
         "freeze must refuse an unimplemented strategy rather than silently defaulting \
-         to ownership_prong_strategy",
+         to a registered one",
     );
     let msg = result.unwrap_err().to_string();
     assert!(
-        msg.contains("control_prong_strategy") && msg.contains("no DeterminationStrategy"),
+        msg.contains("role_based_strategy") && msg.contains("no DeterminationStrategy"),
         "error should name the missing strategy; got: {msg}",
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
+// ── Payload-key regressions found auditing the fold-verb valid_values pattern
+// (2026-07-15) — same bug class as R3 (structure_class): a YAML arg name that
+// doesn't match the payload key the fold actually reads, silently dropped
+// instead of erroring, because these ops pass args straight through with no
+// normalize_*_payload step. ─────────────────────────────────────────────────
+
+#[tokio::test]
+async fn smo_person_id_round_trips_through_the_fold() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let smo_person = Uuid::new_v4();
+
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationApplySmoFallback,
+        serde_json::json!({ "subject-id": subject.0, "smo-person-id": smo_person }),
+        &pool,
+    )
+    .await;
+
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        &pool,
+    )
+    .await;
+
+    let smo_result = outcome.get("smo_result").cloned().unwrap_or_default();
+    assert_eq!(
+        smo_result
+            .get("Person")
+            .and_then(|p| p.get("person_id"))
+            .and_then(|v| v.as_str()),
+        Some(smo_person.to_string().as_str()),
+        "smo-person-id (kebab, YAML arg name) must reach ControlState.smo_person_id \
+         (snake_case, what the fold reads) — got smo_result={smo_result:?}",
+    );
+
+    cleanup(&pool, &[subject]).await;
+}
+
+#[tokio::test]
+async fn cbu_role_round_trips_through_the_obligation_fold() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+
+    run(
+        &KycSubjectRegister,
+        serde_json::json!({ "subject-id": subject.0, "is_natural_person": false }),
+        &pool,
+    )
+    .await;
+    run(
+        &KycObligationCreate,
+        serde_json::json!({
+            "subject-id": subject.0, "role": "shareholder", "cbu-role": "investor",
+        }),
+        &pool,
+    )
+    .await;
+
+    let mut conn = pool.acquire().await.expect("acquire connection");
+    let events = PgKycEventStore::load_events(&mut conn, subject)
+        .await
+        .expect("load events");
+    let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+    let mut registry = FoldRegistry::new();
+    registry.register(phase1_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
+    let state = fold_obligations_versioned(&refs, &registry).expect("fold obligations");
+
+    let cbu_roles: Vec<Option<String>> = state
+        .obligations
+        .values()
+        .map(|t| t.basis.cbu_role.clone())
+        .collect();
+    assert!(
+        cbu_roles.iter().any(|r| r.as_deref() == Some("investor")),
+        "cbu-role (kebab, YAML arg name) must reach ObligationBasis.cbu_role \
+         (snake_case, what the fold reads) — got cbu_roles={cbu_roles:?}",
     );
 
     cleanup(&pool, &[subject]).await;

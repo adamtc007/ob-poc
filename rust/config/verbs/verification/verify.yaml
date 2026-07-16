@@ -41,7 +41,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
         returns:
@@ -82,7 +82,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
         returns:
@@ -142,7 +142,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: entity-id
@@ -452,7 +452,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: challenge-id
@@ -865,7 +865,7 @@ domains:
             lookup:
               table: cases
               entity_type: kyc_case
-              schema: kyc
+              schema: ob-poc
               search_key: case_id
               primary_key: case_id
           - name: pattern-type

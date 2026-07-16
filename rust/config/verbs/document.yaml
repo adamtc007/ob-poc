@@ -878,6 +878,8 @@ domains:
           - upload the latest version
           - add a new copy of this document
           - submit a refreshed document file
+          - upload the passport for
+          - upload a passport document
         metadata:
           tier: diagnostics
           source_of_truth: operational

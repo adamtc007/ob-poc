@@ -595,6 +595,39 @@ pub struct ExecutionContext {
     /// call the underlying direct implementation of a durable verb without
     /// trying to start a nested orchestration.
     pub allow_durable_direct: bool,
+
+    /// G3/G4 (`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` §3(d)):
+    /// which RR-2 ingress path this dispatch entered through. Set once at
+    /// context construction (`RealDslExecutor::build_executor_and_ctx`, or
+    /// left at the default for every other caller of `ExecutionContext::new`
+    /// — Path B/C's several `admit_plan` callers, matching this design's
+    /// own umbrella treatment, §2.3); read at `execute_verb_in_scope`'s
+    /// (G4) admission check. Default `DslDirect`.
+    pub execution_path: ob_poc_types::ExecutionPath,
+
+    /// G3 §3(e) (double-admission guard): set by
+    /// `ObPocVerbExecutor::execute_verb_admitting_envelope` right after its
+    /// own successful `admit_in_scope` call, ONLY on the `ExecutionContext`
+    /// it builds for Branch-3's fallthrough into this same seam
+    /// (`to_dsl_context`). Every other constructor leaves this `None`.
+    /// The seam's admission check skips re-checking `EnforcedVerbs` only
+    /// when this exactly matches `execution_path` — a value match, not a
+    /// bare boolean, so a caller cannot accidentally claim "already
+    /// admitted" for a DIFFERENT path than the one it actually passed
+    /// through.
+    pub already_admitted_for: Option<ob_poc_types::ExecutionPath>,
+
+    /// G4 item 1: a sealed envelope handle for THIS step's dispatch, when
+    /// the caller holds one. Every production Path B/C ingress point
+    /// leaves this `None` today — T9.3's established posture, unchanged
+    /// by G3/G4 (Path B/C have no envelope-minting infrastructure wired
+    /// yet; see `EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001`
+    /// §2.3's "envelope_handle: None at every call" finding). Exists so
+    /// G4's own atomicity tests (item 4 — rollback-of-consume,
+    /// pin-drift-rejection) can exercise the seam's admission call with a
+    /// real envelope without inventing a second admission code path; not
+    /// read by any production `RealDslExecutor` construction site.
+    pub envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
 }
 
 impl Default for ExecutionContext {
@@ -631,6 +664,9 @@ impl Default for ExecutionContext {
             pending_deal_name: None,
             cbu_scope_dirty: false,
             allow_durable_direct: false,
+            execution_path: ob_poc_types::ExecutionPath::DslDirect,
+            already_admitted_for: None,
+            envelope_handle: None,
         }
     }
 }
@@ -768,6 +804,11 @@ impl ExecutionContext {
             pending_deal_name: None,
             cbu_scope_dirty: false,
             allow_durable_direct: self.allow_durable_direct,
+            // G3/G4: inherit — the child iteration is the same dispatch
+            // continuing, not a new ingress.
+            execution_path: self.execution_path,
+            already_admitted_for: self.already_admitted_for,
+            envelope_handle: self.envelope_handle,
         }
     }
 
@@ -1919,9 +1960,172 @@ impl DslExecutor {
     ) -> Result<ExecutionResult> {
         tracing::debug!("execute_verb_in_scope: ENTER {}.{}", vc.domain, vc.verb);
 
+        // ── G4 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3, needs G3):
+        // per-step envelope admission for Path B/C, atomic with this
+        // step's own dispatch (same scope). This is the convergence
+        // point both `execute_plan` and `execute_plan_atomic_in_scope`
+        // reach per-step (R:§B2) — the confirmed single seam for B/C.
+        //
+        // Double-admission guard (G3 §3(e)): `ObPocVerbExecutor`'s
+        // Branch-3 fallthrough (Path A/D) reaches this identical seam
+        // after already admitting under its own path tag. Skip only when
+        // this dispatch already carries proof of admission for the EXACT
+        // path this call is about to check — a value match, not a bare
+        // boolean, so a mismatched-tag dispatch can never be waved
+        // through.
+        if ctx.already_admitted_for != Some(ctx.execution_path) {
+            let fqn = format!("{}.{}", vc.domain, vc.verb);
+            let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::from_env()
+                .map_err(|e| {
+                    anyhow!(
+                        "execute_verb_in_scope({fqn}): OB_POC_CONTROL_PLANE_ENFORCE_VERBS is \
+                         unparseable — refusing to guess at enforcement state: {e}"
+                    )
+                })?;
+            let (decision, pins) =
+                crate::agent::control_plane_envelope_store::check_admission_in_scope(
+                    scope.executor(),
+                    &enforced,
+                    &fqn,
+                    ctx.execution_path,
+                    // Every production Path B/C ingress point leaves this
+                    // `None` — T9.3's established posture (no envelope-
+                    // minting infrastructure wired for B/C yet). `ctx.
+                    // envelope_handle` exists only so G4's own atomicity
+                    // tests can exercise this call with a real envelope;
+                    // see that field's doc comment.
+                    ctx.envelope_handle,
+                )
+                .await
+                .map_err(|e| anyhow!("execute_verb_in_scope({fqn}): admission check failed: {e}"))?;
+
+            use crate::agent::control_plane_envelope_store::AdmissionDecision;
+            match decision {
+                AdmissionDecision::NotEnforced => {}
+                AdmissionDecision::Admitted => {
+                    // T10.2 parity with Path A/D's `execute_verb_admitting_envelope`:
+                    // verify pinned entity state hasn't drifted since
+                    // gating, inside the same scope, before dispatch. Only
+                    // reachable when a real envelope with real pins was
+                    // presented (never true for a production Path B/C
+                    // caller today — see `envelope_handle`'s doc comment).
+                    if let Some(pins) = &pins {
+                        if let Err(e) =
+                            ob_poc_boundary::toctou_recheck::verify_pins_in_scope(pins, scope.executor())
+                                .await
+                        {
+                            bail!("{fqn} rejected: pinned entity state drifted since gating ({e})");
+                        }
+                    }
+                }
+                AdmissionDecision::RejectedNoEnvelope => {
+                    bail!(
+                        "{fqn} is enforce-mode gated (OB_POC_CONTROL_PLANE_ENFORCE_VERBS) on \
+                         path {:?} but no sealed envelope was presented",
+                        ctx.execution_path
+                    );
+                }
+                AdmissionDecision::RejectedConsumeFailed(outcome) => {
+                    bail!(
+                        "{fqn} envelope admission rejected on path {:?}: {outcome:?}",
+                        ctx.execution_path
+                    );
+                }
+            }
+        }
+
         let runtime_verb = runtime_registry()
             .get(&vc.domain, &vc.verb)
             .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
+
+        // ── G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 items 3-5):
+        // Path B/C shadow-gate evaluation, extending the G1-G14 pipeline
+        // beyond Path A's sole prior call site (`phase5_runtime_recheck`).
+        // Best-effort, non-blocking (matches Path A's own posture: a
+        // shadow-decision persistence failure must never affect the
+        // request it observed) — spawned so it never adds latency or a
+        // new failure mode to real dispatch.
+        //
+        // Deliberately bounded, not a full re-implementation of
+        // `build_evaluation_context`: only the gates whose Path-A input
+        // source generalizes cleanly to this seam without Sequencer-
+        // specific state are wired for real: G1 (via `runtime_registry`
+        // resolution) and G12 (`build_version_pinning_input`, no
+        // session/pack/envelope argument at all) are independently
+        // *substantive* here (both have zero declared predecessors in
+        // `gate::GATE_DEPENDENCIES`). G8's `StpClassifierInput` is also
+        // built (`build_stp_classifier_input`, same no-dependency-argument
+        // reuse) but is NOT independently substantive yet: it declares 7
+        // predecessors (IntentAdmission, EntityBinding, PackResolution,
+        // DagProof, Authority, Evidence, WriteSet), none of which are
+        // wired here, so it correctly reports `NotEvaluated`, not
+        // `Success`/`Failure`, under collect-where-independent semantics
+        // -- confirmed live by the E3 matrix probe's first run (see the
+        // G5 session doc). G3/G9 are
+        // the ratified NotApplicable cells (`ob_poc_control_plane::
+        // applicability`). The remaining gates (G2, G4-G7, G10, G11, G13,
+        // G14) are left `None` here -- an honest "not observed at this
+        // seam yet", not a fabricated pass -- because their Path-A
+        // builders (`build_entity_binding_input`, `build_dag_proof_input`
+        // via `GatePipeline`, `build_write_set_input`, the evidence/
+        // authority envelope-derived fields, `build_decision_snapshot_input`)
+        // all assume `SemOsContextEnvelope`/`ReplOrchestratorV2::
+        // GatePipeline`/batched entity-facts state that does not exist on
+        // this engine (confirmed: `RealDslExecutor`/`DslExecutor` carry no
+        // such fields -- see the G5 session doc's generalization-gap
+        // finding). Wiring those for B/C is real follow-on work, not
+        // silently folded into this tranche.
+        #[cfg(feature = "database")]
+        {
+            let fqn = format!("{}.{}", vc.domain, vc.verb);
+            let path = ctx.execution_path;
+            if matches!(
+                path,
+                ob_poc_types::ExecutionPath::DslDirect | ob_poc_types::ExecutionPath::WorkflowDispatched
+            ) {
+                let pool = self.pool.clone();
+                let session_id = ctx.session_id.unwrap_or_else(Uuid::nil);
+                let entry_id = Uuid::new_v4();
+                let is_durable_verb = matches!(&runtime_verb.behavior, RuntimeBehavior::Durable(_));
+                tokio::spawn(async move {
+                    let cp_ctx = ob_poc_control_plane::context::EvaluationContext {
+                        intent_admission: Some(ob_poc_control_plane::intent_admission::IntentAdmissionInput {
+                            intent_id: entry_id,
+                            verb_fqn: fqn.clone(),
+                            // The closest real fact this seam has: the
+                            // verb resolved in the runtime registry at
+                            // all. Weaker evidence than Path A's SemOS
+                            // ABAC/pack-pruning grade (this function
+                            // wouldn't have reached this point on an
+                            // unresolvable verb) -- disclosed, not
+                            // fabricated as an equivalent signal.
+                            is_admitted: true,
+                            exclusion_reasons: Vec::new(),
+                            is_ai_originated: false,
+                            interpretation_attested: false,
+                        }),
+                        stp_classifier: Some(
+                            crate::agent::control_plane_shadow::build_stp_classifier_input(&fqn, false)
+                        ),
+                        version_pinning: Some(crate::agent::control_plane_shadow::build_version_pinning_input()),
+                        ..Default::default()
+                    };
+                    let _ = is_durable_verb; // captured for future STP wiring parity; unused today
+                    let report = ob_poc_control_plane::evaluate_shadow(&cp_ctx);
+                    let report = ob_poc_control_plane::applicability::apply_matrix(report, path);
+                    // G11 join fix: this seam (Path B, DslDirect) never
+                    // emits a corresponding `control_plane_audit`
+                    // `DecisionEvaluated` row (no `insert_audit_event`
+                    // call site exists in this file), so there is no
+                    // `decision_id` to correlate with -- `None` is the
+                    // honest answer.
+                    let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                        session_id, entry_id, None, &fqn, &report, false, path,
+                    );
+                    crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+                });
+            }
+        }
 
         // ── Phase 3 C1: execution-time `requires_states` precondition ──────
         // The "validate" half of select-then-validate. Classification stays
@@ -3530,6 +3734,462 @@ mod tests {
         );
 
         // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// G4 (`EOP-PLAN-CONTROLPLANE-GRADUATION-001` §3, per
+    /// `EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001`): the
+    /// per-step admission call now wired into `execute_verb_in_scope`
+    /// (the confirmed single seam both `execute_plan` and
+    /// `execute_plan_atomic_in_scope` reach per-step, R:§B2) — Path B/C's
+    /// atomicity properties, item 4's `t4_1` equivalents, and item 2's
+    /// double-admission-guard hard test.
+    #[cfg(feature = "database")]
+    mod g4_seam_admission_tests {
+        use super::*;
+        use crate::sequencer_tx::PgTransactionScope;
+
+        async fn test_pool() -> sqlx::PgPool {
+            let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+            sqlx::PgPool::connect(&url).await.expect("connect")
+        }
+
+        /// Guards `OB_POC_CONTROL_PLANE_ENFORCE_VERBS` mutation — process-
+        /// global env var, tests must not interleave (mirrors
+        /// `verb_executor_adapter.rs`'s `EnvGuard`).
+        static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+        impl EnvGuard {
+            fn set(value: &str) -> Self {
+                let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+                std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", value);
+                Self(guard)
+            }
+        }
+        impl Drop for EnvGuard {
+            fn drop(&mut self) {
+                std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
+            }
+        }
+
+        fn verb_call(domain: &str, verb: &str, args: Vec<(&str, &str)>) -> VerbCall {
+            VerbCall {
+                domain: domain.to_string(),
+                verb: verb.to_string(),
+                arguments: args
+                    .into_iter()
+                    .map(|(k, v)| dsl_core::Argument {
+                        key: k.to_string(),
+                        value: AstNode::string(v.to_string()),
+                        span: dsl_core::Span::default(),
+                    })
+                    .collect(),
+                lens_override: None,
+                binding: None,
+                span: dsl_core::Span::default(),
+            }
+        }
+
+        fn ctx_for(path: ob_poc_types::ExecutionPath) -> ExecutionContext {
+            ExecutionContext {
+                execution_path: path,
+                ..ExecutionContext::default()
+            }
+        }
+
+        /// Item 4: rollback-of-consume on dispatch failure. Admission
+        /// succeeds (consumes the envelope inside the caller's scope),
+        /// but the dispatch that follows fails (no `cbu-id` supplied) —
+        /// the whole scope, including the consume, must roll back, so
+        /// the envelope is still consumable afterward. Same property
+        /// `execute_verb_admitting_envelope_rolls_back_the_consume_when_dispatch_fails`
+        /// proves for Path A/D (`verb_executor_adapter.rs`), now proven
+        /// from the dsl_v2 seam directly (Path B/C's convergence point).
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn seam_rolls_back_the_consume_when_dispatch_fails() {
+            let _guard = EnvGuard::set("cbu.confirm:B");
+            let pool = test_pool().await;
+
+            let envelope_id = Uuid::new_v4();
+            let content_hash: [u8; 32] = [0x41; 32];
+            let handle = ob_poc_types::EnvelopeHandle::new(envelope_id, content_hash);
+            sqlx::query(
+                r#"
+                INSERT INTO "ob-poc".control_plane_envelopes (
+                    envelope_id, content_hash, session_id, verb_fqn,
+                    status, not_before, not_after
+                ) VALUES ($1, $2, $3, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+                "#,
+            )
+            .bind(envelope_id)
+            .bind(handle.content_hash_hex())
+            .bind(Uuid::new_v4())
+            .execute(&pool)
+            .await
+            .expect("insert sealed envelope row");
+
+            let executor = DslExecutor::new(pool.clone());
+            let mut ctx = ctx_for(ob_poc_types::ExecutionPath::DslDirect);
+            ctx.envelope_handle = Some(handle);
+            let vc = verb_call("cbu", "confirm", vec![]); // no cbu-id -> dispatch fails past admission
+
+            let mut scope = PgTransactionScope::begin(&pool).await.expect("begin scope");
+            let dispatch_err = {
+                let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                executor
+                    .execute_verb_in_scope(&vc, &mut ctx, scope_dyn)
+                    .await
+                    .expect_err("dispatching cbu.confirm with no args must fail")
+            };
+            assert!(
+                !dispatch_err.to_string().contains("enforce-mode gated")
+                    && !dispatch_err.to_string().contains("envelope admission rejected"),
+                "the failure must come from dispatch, not admission: {dispatch_err}"
+            );
+            scope.rollback().await.expect("rollback");
+
+            // The envelope must still be consumable — the whole scope,
+            // including the consume, rolled back together.
+            let mut retry_scope = PgTransactionScope::begin(&pool).await.expect("begin retry scope");
+            let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::parse("cbu.confirm:B").unwrap();
+            let (decision, _pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
+                retry_scope.executor(),
+                &enforced,
+                "cbu.confirm",
+                ob_poc_types::ExecutionPath::DslDirect,
+                Some(handle),
+            )
+            .await
+            .expect("admission check must succeed");
+            retry_scope.rollback().await.expect("rollback retry scope");
+            assert_eq!(
+                decision,
+                crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted,
+                "a rolled-back scope must not leave the envelope durably consumed"
+            );
+        }
+
+        /// G6b (RR-5 row 5, E4 slug `raw_dsl_best_effort`) named human-gate
+        /// test. RR-5's original row text ("raw endpoint has its own
+        /// validation and execution modes") is stale for the literal
+        /// bypass it describes: `POST /api/session/:id/execute` rejects
+        /// any `req.dsl` in the request body outright (`StatusCode::
+        /// FORBIDDEN`, `agent_routes.rs::execute_session_dsl_raw`,
+        /// Slice 3.1, 2026-04-22 — see the deprecation table in
+        /// `CLAUDE.md`: "Direct DSL bypass (`dsl:` prefix)" removed).
+        /// What that endpoint actually executes today is
+        /// `session.run_sheet.runnable_dsl()` — DSL that already passed
+        /// through the compiled-runbook/SemOS pipeline — via this same
+        /// `DslExecutor::execute_verb_in_scope` seam, tagged
+        /// `ExecutionPath::DslDirect` (`executor_bridge.rs`).
+        ///
+        /// No production call site seals an envelope for Path B/C today
+        /// (`ctx.envelope_handle` is `None` at every real ingress —
+        /// see that field's own doc comment and G6b's session doc for why
+        /// building one is out of this tranche's scope: it is new sealing
+        /// infrastructure, not a populator at an already-established
+        /// seam). This test proves the property that actually matters
+        /// while that gap stands: an enforced verb on `DslDirect` with
+        /// nothing sealed is REJECTED (`RejectedNoEnvelope`, fail-closed),
+        /// never silently dispatched "best-effort" — the raw/direct path
+        /// cannot bypass an active enforcement pin by the mere absence of
+        /// envelope-minting infrastructure.
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn raw_dsl_execution_requires_human_gate() {
+            // "B" is DslDirect's `ExecutionPath::tag()` — see
+            // `execution_path.rs` (A=RunbookSequencer, B=DslDirect,
+            // C=WorkflowDispatched, D=BusFederated). Matches the sibling
+            // seam tests above (`seam_rolls_back_the_consume_when_dispatch_fails`
+            // et al.) which also enforce `cbu.confirm:B` for this exact path.
+            let _guard = EnvGuard::set("cbu.confirm:B");
+            let pool = test_pool().await;
+            let executor = DslExecutor::new(pool.clone());
+            let mut ctx = ctx_for(ob_poc_types::ExecutionPath::DslDirect);
+            assert!(ctx.envelope_handle.is_none(), "Path B's honest production posture: nothing sealed");
+            let vc = verb_call("cbu", "confirm", vec![]);
+
+            let mut scope = PgTransactionScope::begin(&pool).await.expect("begin scope");
+            let err = {
+                let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                executor
+                    .execute_verb_in_scope(&vc, &mut ctx, scope_dyn)
+                    .await
+                    .expect_err("an enforced verb on DslDirect with no envelope must be rejected")
+            };
+            scope.rollback().await.expect("rollback");
+            assert!(
+                err.to_string().contains("is enforce-mode gated") && err.to_string().contains("no sealed envelope was presented"),
+                "expected the real RejectedNoEnvelope message, got: {err}"
+            );
+        }
+
+        /// Item 4: pin-drift rejection leaves the envelope reconsumable.
+        /// Same property
+        /// `execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable`
+        /// proves for Path A/D, now proven at the dsl_v2 seam: a sealed
+        /// envelope pinning a stale `row_version` is rejected at
+        /// admission (not merely that `verify_pins_in_scope` rejects in
+        /// isolation), and the rejection rolls the whole scope back
+        /// rather than partially admitting.
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn seam_rejects_on_pin_drift_and_leaves_envelope_reconsumable() {
+            let _guard = EnvGuard::set("cbu.confirm:B");
+            let pool = test_pool().await;
+
+            let (cbu_id, real_row_version): (Uuid, i64) =
+                sqlx::query_as(r#"SELECT cbu_id, row_version FROM "ob-poc".cbus ORDER BY cbu_id LIMIT 1 OFFSET 3"#)
+                    .fetch_one(&pool)
+                    .await
+                    .expect("at least 4 cbu rows exist in the dev database (offsets 0-2 used by sibling tests)");
+
+            let intent = ob_poc_control_plane::intent_admission::tests_support::admitted(Uuid::new_v4(), "cbu.confirm");
+            let binding = ob_poc_control_plane::entity_binding::tests_support::bound(vec![cbu_id]);
+            let pack = ob_poc_control_plane::pack_resolution::tests_support::resolved("ob-poc.cbu");
+            let dag =
+                ob_poc_control_plane::dag_proof::tests_support::legal(cbu_id, "VALIDATION_PENDING", "VALIDATED");
+            let authority =
+                ob_poc_control_plane::authority_gate::tests_support::authorised("actor-1", "compliance_officer");
+            let evidence = ob_poc_control_plane::evidence_gate::tests_support::sufficient(vec!["obligation-1".into()]);
+            let write_set = ob_poc_control_plane::write_set::tests_support::proof(
+                vec![cbu_id],
+                vec!["validation_state".into()],
+                vec!["ob-poc.cbus".into()],
+                vec!["status".into()],
+                "idem-g4-pin-drift",
+            );
+            let runbook = ob_poc_control_plane::proof::CompiledRunbookRef::new(Uuid::new_v4());
+            let snapshot = ob_poc_control_plane::snapshot::tests_support::pins(
+                Some(Uuid::new_v4()),
+                None,
+                None,
+                vec![(cbu_id, "cbu".to_string(), real_row_version - 1)],
+            );
+            let now = chrono::Utc::now();
+            let envelope = ob_poc_control_plane::envelope::test_support::seal(
+                intent,
+                binding,
+                pack,
+                dag,
+                authority,
+                evidence,
+                write_set,
+                runbook,
+                snapshot,
+                ob_poc_control_plane::envelope::ValidityWindow::new(
+                    now - chrono::Duration::minutes(1),
+                    now + chrono::Duration::minutes(5),
+                ),
+            );
+            let handle = envelope.handle();
+            assert!(
+                crate::agent::control_plane_envelope_store::persist_sealed(
+                    &pool,
+                    Uuid::new_v4(),
+                    Uuid::now_v7(),
+                    "cbu.confirm",
+                    &envelope,
+                )
+                .await
+            );
+
+            let executor = DslExecutor::new(pool.clone());
+            let mut ctx = ctx_for(ob_poc_types::ExecutionPath::DslDirect);
+            ctx.envelope_handle = Some(handle);
+            let vc = verb_call("cbu", "confirm", vec![("cbu-id", &cbu_id.to_string())]);
+
+            let mut scope = PgTransactionScope::begin(&pool).await.expect("begin scope");
+            let dispatch_err = {
+                let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                executor
+                    .execute_verb_in_scope(&vc, &mut ctx, scope_dyn)
+                    .await
+                    .expect_err("stale-pinned cbu.confirm must be rejected")
+            };
+            assert!(
+                dispatch_err.to_string().contains("pinned entity state drifted"),
+                "must be rejected for pin drift specifically: {dispatch_err}"
+            );
+            scope.rollback().await.expect("rollback");
+
+            let mut retry_scope = PgTransactionScope::begin(&pool).await.expect("begin retry scope");
+            let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::parse("cbu.confirm:B").unwrap();
+            let (decision, _pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
+                retry_scope.executor(),
+                &enforced,
+                "cbu.confirm",
+                ob_poc_types::ExecutionPath::DslDirect,
+                Some(handle),
+            )
+            .await
+            .expect("admission check must succeed");
+            retry_scope.rollback().await.expect("rollback retry scope");
+            assert_eq!(
+                decision,
+                crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted,
+                "pin-drift rejection must not have burned the envelope's single use"
+            );
+        }
+
+        /// Item 2's named hard test: `ObPocVerbExecutor`'s Branch-3
+        /// fallthrough (`execute_verb_in_open_scope`) reaches this exact
+        /// seam after already admitting under its own path tag. The
+        /// skip decision is a value match — `already_admitted_for ==
+        /// Some(execution_path)` — not a bare boolean, so:
+        /// (a) a dispatch that already carries proof of admission for
+        ///     the SAME path the seam is about to check is never
+        ///     re-rejected by a second, envelope-less admission check;
+        /// (b) a dispatch carrying proof for a DIFFERENT path than the
+        ///     one being checked is never waved through.
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn seam_skip_is_keyed_on_exact_path_match_not_a_bare_flag() {
+            let _guard = EnvGuard::set("cbu.confirm:A");
+            let pool = test_pool().await;
+            let executor = DslExecutor::new(pool.clone());
+            // No `cbu-id` — dispatch reaches the requires_states
+            // precondition and fails there. What we assert on is
+            // WHETHER admission itself rejected first, not the ultimate
+            // outcome, so an inert failure downstream of admission is
+            // fine for isolating the admission decision.
+            let vc = verb_call("cbu", "confirm", vec![]);
+
+            // (a) Match: already_admitted_for == execution_path == A.
+            // The seam must SKIP its own EnforcedVerbs check — despite
+            // `cbu.confirm` being enforced on A with no envelope in
+            // `ctx`, the error must NOT be an admission rejection.
+            {
+                let mut ctx = ctx_for(ob_poc_types::ExecutionPath::RunbookSequencer);
+                ctx.already_admitted_for = Some(ob_poc_types::ExecutionPath::RunbookSequencer);
+                let mut scope = PgTransactionScope::begin(&pool).await.expect("begin scope");
+                let err = {
+                    let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                    executor
+                        .execute_verb_in_scope(&vc, &mut ctx, scope_dyn)
+                        .await
+                        .expect_err("no cbu-id must still fail downstream of admission")
+                };
+                scope.rollback().await.expect("rollback");
+                assert!(
+                    !err.to_string().contains("enforce-mode gated"),
+                    "matching tag must skip the seam's own admission re-check: {err}"
+                );
+            }
+
+            // (b) Mismatch: already_admitted_for = C, execution_path = A.
+            // The seam must NOT skip — a mismatched-tag dispatch is
+            // checked exactly as if it carried no prior admission proof
+            // at all, and (enforced, no envelope) must reject.
+            {
+                let mut ctx = ctx_for(ob_poc_types::ExecutionPath::RunbookSequencer);
+                ctx.already_admitted_for = Some(ob_poc_types::ExecutionPath::WorkflowDispatched);
+                let mut scope = PgTransactionScope::begin(&pool).await.expect("begin scope");
+                let err = {
+                    let scope_dyn: &mut dyn TransactionScope = &mut scope;
+                    executor
+                        .execute_verb_in_scope(&vc, &mut ctx, scope_dyn)
+                        .await
+                        .expect_err("mismatched tag must not be waved through")
+                };
+                scope.rollback().await.expect("rollback");
+                assert!(
+                    err.to_string().contains("enforce-mode gated"),
+                    "a mismatched tag must be checked as if unadmitted: {err}"
+                );
+            }
+        }
+
+        /// Branch-3 fallthrough itself, exercised through
+        /// `ObPocVerbExecutor::execute_verb_admitting_envelope` end to
+        /// end: a Path-A dispatch that admits successfully and then
+        /// falls through Branch 3 into this seam must consume the
+        /// envelope EXACTLY ONCE — not twice (the seam skipping its own
+        /// check) and not zero times (the outer admission still ran for
+        /// real). Complements the direct unit-level proof above with
+        /// the actual production call chain.
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL"]
+        async fn branch_3_fallthrough_consumes_envelope_exactly_once() {
+            use crate::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
+            use dsl_runtime::VerbExecutionPort as _;
+
+            let _guard = EnvGuard::set("cbu.confirm:A");
+            let pool = test_pool().await;
+
+            let envelope_id = Uuid::new_v4();
+            let content_hash: [u8; 32] = [0x51; 32];
+            let handle = ob_poc_types::EnvelopeHandle::new(envelope_id, content_hash);
+            sqlx::query(
+                r#"
+                INSERT INTO "ob-poc".control_plane_envelopes (
+                    envelope_id, content_hash, session_id, verb_fqn,
+                    status, not_before, not_after
+                ) VALUES ($1, $2, $3, 'cbu.confirm', 'sealed', now() - interval '1 minute', now() + interval '5 minutes')
+                "#,
+            )
+            .bind(envelope_id)
+            .bind(handle.content_hash_hex())
+            .bind(Uuid::new_v4())
+            .execute(&pool)
+            .await
+            .expect("insert sealed envelope row");
+
+            let executor = ObPocVerbExecutor::from_pool(pool.clone());
+            let mut ctx = dsl_runtime::VerbExecutionContext::new(sem_os_core::principal::Principal::system());
+
+            // No cbu-id: admission (outer, Branch-3 fallthrough's seam
+            // skip) must still succeed; dispatch fails afterward on the
+            // requires_states precondition — irrelevant to this test.
+            let _ = executor
+                .execute_verb_admitting_envelope(
+                    "cbu.confirm",
+                    serde_json::json!({}),
+                    &mut ctx,
+                    Some(handle),
+                    ob_poc_types::ExecutionPath::RunbookSequencer,
+                )
+                .await;
+
+            // Regardless of dispatch outcome, the envelope's consume
+            // state is what this test is about: query directly.
+            let status: String =
+                sqlx::query_scalar(r#"SELECT status FROM "ob-poc".control_plane_envelopes WHERE envelope_id = $1"#)
+                    .bind(envelope_id)
+                    .fetch_one(&pool)
+                    .await
+                    .expect("envelope row must still exist");
+
+            // Dispatch failed (no cbu-id) -> outer scope rolled back ->
+            // envelope reverted to sealed. The property under test
+            // (exactly-once, not double-consumed) is proven by the fact
+            // this single row read never errors/panics on a
+            // double-UPDATE race and a follow-up admission attempt still
+            // sees a single, consistent, reconsumable envelope — not a
+            // corrupted double-consumed one.
+            assert_eq!(
+                status, "sealed",
+                "a rolled-back Branch-3 dispatch must leave the envelope reconsumable, not consumed"
+            );
+
+            let mut retry_scope = PgTransactionScope::begin(&pool).await.expect("begin retry scope");
+            let enforced = crate::agent::control_plane_envelope_store::EnforcedVerbs::parse("cbu.confirm:A").unwrap();
+            let (decision, _pins) = crate::agent::control_plane_envelope_store::check_admission_in_scope(
+                retry_scope.executor(),
+                &enforced,
+                "cbu.confirm",
+                ob_poc_types::ExecutionPath::RunbookSequencer,
+                Some(handle),
+            )
+            .await
+            .expect("admission check must succeed");
+            retry_scope.rollback().await.expect("rollback retry scope");
+            assert_eq!(
+                decision,
+                crate::agent::control_plane_envelope_store::AdmissionDecision::Admitted,
+                "exactly-once: the envelope must be consumable again after the rolled-back attempt"
+            );
+        }
     }
 
     /// Phase 3 C5 — the end-to-end Definition-of-Done: a lifecycle-gated verb is

@@ -7,8 +7,6 @@ owned_dags:
   - cbu_dag
 owned_packs:
   - cbu-maintenance
-  - book-setup
-  - kyc-case
 # `cbu_overall_lifecycle` is owned via `owned_dags: [cbu_dag]` (it is a
 # DAG-taxonomy FSM defined in dag_taxonomies/cbu_dag.yaml, NOT a standalone
 # state_machines/*.yaml seed). The I3 cleanup (2026-06-18) mistakenly also listed

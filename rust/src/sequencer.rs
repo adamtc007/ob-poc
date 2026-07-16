@@ -63,9 +63,9 @@ use crate::repl::sentence_gen::SentenceGenerator;
 use crate::repl::session_v2::{MessageRole, ReplSessionV2};
 use crate::repl::types::{MatchContext, MatchOutcome};
 use crate::repl::types_v2::{
-    ConstellationContextRef, ConstellationMapOption, ExecutionProgress, ReplCommandV2, ReplStateV2,
-    ResolvedConstellationContext, SessionFeedback, SubjectKind, UserInputV2, WorkspaceFrame,
-    WorkspaceKind, WorkspaceOption, WorkspaceStateView,
+    ConstellationContextRef, ConstellationMapOption, ExecutionProgress, PackCandidate,
+    ReplCommandV2, ReplStateV2, ResolvedConstellationContext, SessionFeedback, SubjectKind,
+    UserInputV2, WorkspaceFrame, WorkspaceKind, WorkspaceOption, WorkspaceStateView,
 };
 use crate::repl::verb_config_index::VerbConfigIndex;
 use crate::runbook::envelope::ReplayEnvelope;
@@ -272,6 +272,13 @@ pub struct ReplOrchestratorV2 {
     /// loaded DAG taxonomies before execution. See
     /// `docs/backlog/catalogue-platform-refinement-v1_3.md` §3.3.
     gate_pipeline: Option<crate::runbook::step_executor_bridge::GatePipeline>,
+    /// T9.1e (EOP-PLAN-CONTROLPLANE-001 Addendum B): verb→table write
+    /// footprint (`config/sem_os_seeds/domain_metadata.yaml`), loaded once
+    /// at startup — a small, static, in-memory lookup (no I/O per call).
+    /// Feeds G7's `WriteSetInput.tables`. `None` when the file failed to
+    /// load or wasn't configured; shadow-only, so this is best-effort, not
+    /// production-fatal the way `gate_pipeline`'s DAG registry load is.
+    domain_metadata: Option<Arc<sem_os_obpoc_adapter::metadata::DomainMetadata>>,
     /// R8 single-path unification (2026-05-11): ACP session-input draft-mode
     /// selection. Configured once at orchestrator construction (typically
     /// via [`ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::from_env`])
@@ -326,6 +333,7 @@ impl ReplOrchestratorV2 {
             lookup_service: None,
             orchestrated_verbs: HashSet::new(),
             gate_pipeline: None,
+            domain_metadata: None,
             acp_session_input_draft_mode:
                 ob_poc_boundary::acp_session_input_draft_mode::AcpSessionInputDraftMode::Deterministic,
             runbook_step_timeout: std::time::Duration::from_secs(5),
@@ -559,6 +567,18 @@ impl ReplOrchestratorV2 {
         pipeline: crate::runbook::step_executor_bridge::GatePipeline,
     ) -> Self {
         self.gate_pipeline = Some(pipeline);
+        self
+    }
+
+    /// Attach the verb→table write-footprint lookup (T9.1e). Feeds G7's
+    /// `WriteSetInput.tables` in shadow evaluation. Optional — `None`
+    /// leaves G7 shadow-unwired (`build_write_set_input` returns `None`),
+    /// same posture as an absent `gate_pipeline` for G4.
+    pub fn with_domain_metadata(
+        mut self,
+        domain_metadata: Arc<sem_os_obpoc_adapter::metadata::DomainMetadata>,
+    ) -> Self {
+        self.domain_metadata = Some(domain_metadata);
         self
     }
 
@@ -1461,6 +1481,9 @@ impl ReplOrchestratorV2 {
                 }
                 ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
                 ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
+                ReplStateV2::PackMismatchConfirm { .. } => {
+                    self.handle_pack_mismatch_confirm(session, input)
+                }
                 ReplStateV2::SentencePlayback { .. } => {
                     self.handle_sentence_playback(session, input)
                 }
@@ -3182,6 +3205,109 @@ impl ReplOrchestratorV2 {
         }
     }
 
+    /// Handle a reply to the pack-mismatch back-out prompt (see
+    /// `try_pack_mismatch_backout`). Confirm closes the current pack and
+    /// hands control to JourneySelection, pre-staged with the pack that
+    /// owns the out-of-scope verb. Reject/anything else returns to InPack
+    /// with the original pack's slot/proposal state intact.
+    fn handle_pack_mismatch_confirm(
+        &self,
+        session: &mut ReplSessionV2,
+        input: UserInputV2,
+    ) -> ReplResponseV2 {
+        let ReplStateV2::PackMismatchConfirm {
+            current_pack_id,
+            current_required_slots_remaining,
+            current_last_proposal_id,
+            suggested_pack_id,
+            suggested_pack_name,
+            ..
+        } = session.state.clone()
+        else {
+            return self.invalid_input(session, "No pack mismatch pending.");
+        };
+
+        match input {
+            UserInputV2::Confirm => {
+                // Closing a pack abandons its runbook — any staged-but-unrun
+                // DSL (Proposed/Confirmed/Resolved/Executing/Parked entries)
+                // belongs to a pack context that's going away, not the one
+                // being switched into. Flush it rather than silently
+                // carrying stale, cross-pack entries forward; already-run
+                // (Completed/Failed) history is cleared too, matching
+                // handle_clear's "close this pack out" semantics, and stays
+                // in the audit trail via RunbookCleared.
+                let pending = session.runbook.pending_count();
+                let dropped = session.runbook.clear();
+                session.clear_staged_pack();
+                let candidate =
+                    self.pack_router
+                        .get_pack(&suggested_pack_id)
+                        .map(|(manifest, _)| PackCandidate {
+                            pack_id: manifest.id.clone(),
+                            pack_name: manifest.name.clone(),
+                            description: manifest.description.clone(),
+                            score: 1.0,
+                        });
+                session.set_state(ReplStateV2::JourneySelection {
+                    candidates: candidate.map(|c| vec![c]),
+                });
+                let drop_note = if pending > 0 {
+                    format!(" ({} unexecuted step(s) dropped)", pending)
+                } else if dropped > 0 {
+                    format!(" ({} completed step(s) cleared)", dropped)
+                } else {
+                    String::new()
+                };
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Question {
+                        field: String::new(),
+                        prompt: format!(
+                            "Closed pack '{}'{}. Switching to '{}' — say 'yes' to confirm or choose another pack.",
+                            current_pack_id, drop_note, suggested_pack_name
+                        ),
+                        answer_kind: "string".to_string(),
+                    },
+                    message: format!(
+                        "Closed pack '{}'{}. Switching to '{}'.",
+                        current_pack_id, drop_note, suggested_pack_name
+                    ),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                    session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: None,
+                    bpmn_form: None,
+                }
+            }
+            _ => {
+                session.set_state(ReplStateV2::InPack {
+                    pack_id: current_pack_id.clone(),
+                    required_slots_remaining: current_required_slots_remaining,
+                    last_proposal_id: current_last_proposal_id,
+                });
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Question {
+                        field: String::new(),
+                        prompt: format!("Staying in '{}'. What would you like to do?", current_pack_id),
+                        answer_kind: "string".to_string(),
+                    },
+                    message: format!("Staying in '{}'.", current_pack_id),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                    session_feedback: Some(session.build_session_feedback(false)),
+                    narration: None,
+                    trace_id: None,
+                    acp_dag_semantic: None,
+                    bpmn_form: None,
+                }
+            }
+        }
+    }
+
     fn handle_sentence_playback(
         &self,
         session: &mut ReplSessionV2,
@@ -3523,6 +3649,17 @@ impl ReplOrchestratorV2 {
             .map(|inv| inv.correlation_key.clone())
             .unwrap_or_default();
         session.runbook.resume_entry(&correlation_key, None);
+
+        // G1 item 2, §4 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001):
+        // re-seal immediately before dispatch — never extend or reuse
+        // whatever `phase5_runtime_recheck` sealed at park time, which may
+        // be arbitrarily stale by now (a human approval can take minutes
+        // to days, far past the 5-minute validity window). AWAITED
+        // (synchronous), same requirement as the Sync/Durable path, so the
+        // fresh row exists by the time `execute_entry_via_gate` below
+        // reaches the consume site.
+        #[cfg(feature = "database")]
+        self.reseal_for_human_gate_resume(session, entry_id).await;
 
         // Now execute through the gate (INV-3: no raw DSL execution).
         let fallback_version = session.allocate_runbook_version();
@@ -5128,8 +5265,16 @@ impl ReplOrchestratorV2 {
             };
         }
 
-        // No proposals → fall back to no-match response.
+        // No proposals → before giving up, check whether the utterance
+        // actually targets a verb outside the active pack's universe (see
+        // try_pack_mismatch_backout for the architecture this closes).
         if proposal_set.proposals.is_empty() {
+            if let Some(resp) = self
+                .try_pack_mismatch_backout(session, content, match_ctx.allowed_verbs.as_ref())
+                .await
+            {
+                return resp;
+            }
             return self.invalid_input(
                 session,
                 &format!("No matching action found for: {}", content),
@@ -5158,6 +5303,84 @@ impl ReplOrchestratorV2 {
         };
         session.last_proposal_set = Some(proposal_set);
         response
+    }
+
+    /// Utterance parser back-out: pack selection defines the DSL universe
+    /// (`allowed_verbs`). If an in-pack utterance matches nothing inside
+    /// that universe, check whether it actually targets a verb owned by a
+    /// *different* pack — rather than dead-ending with "no match found",
+    /// offer a structured close-this-pack/switch-pack decision.
+    ///
+    /// Only fires from `InPack` (pack-scoped) sessions with a real,
+    /// non-empty `allowed_verbs` constraint and exactly one candidate owning
+    /// pack — an ambiguous owner (0 or 2+ packs) falls through to the
+    /// ordinary no-match response rather than guessing.
+    async fn try_pack_mismatch_backout(
+        &self,
+        session: &mut ReplSessionV2,
+        content: &str,
+        allowed_verbs: Option<&HashSet<String>>,
+    ) -> Option<ReplResponseV2> {
+        let ReplStateV2::InPack {
+            pack_id: current_pack_id,
+            required_slots_remaining: current_required_slots_remaining,
+            last_proposal_id: current_last_proposal_id,
+        } = session.state.clone()
+        else {
+            return None;
+        };
+        let allowed_verbs = allowed_verbs.filter(|av| !av.is_empty())?;
+        let searcher = self.verb_searcher.as_ref()?;
+
+        let hit = searcher
+            .find_out_of_scope_match(content, allowed_verbs)
+            .await
+            .ok()??;
+
+        let owning_packs = self.pack_router.packs_declaring_verb(&hit.verb);
+        let [owning_pack] = owning_packs.as_slice() else {
+            // Zero or ambiguous owners — nothing actionable to offer.
+            return None;
+        };
+        if owning_pack.id == current_pack_id {
+            // Shouldn't happen (the verb would've been in allowed_verbs),
+            // but guard against offering a no-op "switch".
+            return None;
+        }
+
+        session.set_state(ReplStateV2::PackMismatchConfirm {
+            current_pack_id: current_pack_id.clone(),
+            current_required_slots_remaining,
+            current_last_proposal_id,
+            out_of_scope_verb: hit.verb.clone(),
+            suggested_pack_id: owning_pack.id.clone(),
+            suggested_pack_name: owning_pack.name.clone(),
+            original_input: content.to_string(),
+        });
+
+        let pending_note = pending_steps_note(session);
+        Some(ReplResponseV2 {
+            state: session.state.clone(),
+            kind: ReplResponseKindV2::Question {
+                field: String::new(),
+                prompt: format!(
+                    "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}'{} and switch to '{}'?",
+                    hit.verb, current_pack_id, owning_pack.name, current_pack_id, pending_note, owning_pack.name
+                ),
+                answer_kind: "confirm".to_string(),
+            },
+            message: format!(
+                "'{}' isn't available here — it belongs to the '{}' pack. Close this pack{} and switch? (yes/no)",
+                hit.verb, owning_pack.name, pending_note
+            ),
+            runbook_summary: None,
+            step_count: session.runbook.entries.len(),
+            session_feedback: Some(session.build_session_feedback(false)),
+            narration: None,
+            trace_id: None,
+            acp_dag_semantic: None,
+            bpmn_form: None,
+        })
     }
 
     /// Handle `SelectProposal` input — look up proposal from last set and
@@ -7784,7 +8007,614 @@ impl ReplOrchestratorV2 {
             "Stage 6 shadow — GatedVerbEnvelope constructed"
         );
 
-        phase5_recheck_failure(&entry.verb, &envelope)
+        let legacy_outcome = phase5_recheck_failure(&entry.verb, &envelope);
+
+        // T2.7 (EOP-PLAN-CONTROLPLANE-001, C-044): run the control plane in
+        // shadow mode alongside the legacy recheck above. Never gates
+        // dispatch — `legacy_outcome` (computed above) remains the sole
+        // return value; this only observes and records.
+        #[cfg(feature = "database")]
+        if let Some(pool) = self.pool() {
+            // T9.1-pre (Addendum B): resolve G2's EntityBindingInput from
+            // real per-entity DB facts. `Some(entities: vec![])` for a
+            // verb with no entity-typed args (vacuous success, not a
+            // NotEvaluated failure — see build_evaluation_context's doc).
+            // `None` only when the batched lookup itself errors (an
+            // unmapped entity_kind — an actionable gap, logged, never
+            // silently promoted to a wrong-but-passing fact).
+            let entity_requests = crate::agent::control_plane_shadow::entity_binding_requests(
+                &self.verb_config_index,
+                &entry.verb,
+                &entry.args,
+            );
+            // T9.6 (Addendum B): capture the raw facts map (not just G2's
+            // derived EntityBindingInput) so G13's row_version pins can be
+            // read from the exact same rows — no second query. `Some(..)`
+            // for the empty-requests case too (vacuously: nothing to bind,
+            // nothing to pin, not a failed attempt); `None` only on a real
+            // fetch error, same posture entity_binding itself has always had.
+            let entity_facts_map: Option<
+                HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>,
+            > = if entity_requests.is_empty() {
+                Some(HashMap::new())
+            } else {
+                let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool };
+                match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(
+                    &source,
+                    &entity_requests,
+                )
+                .await
+                {
+                    Ok(facts) => Some(facts),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            verb = %entry.verb,
+                            "T9.1-pre: entity_facts lookup failed — G2/G13 shadow-evaluate as not-attempted"
+                        );
+                        None
+                    }
+                }
+            };
+            let entity_binding = entity_facts_map.as_ref().map(|facts| {
+                crate::agent::control_plane_shadow::build_entity_binding_input(
+                    &entity_requests,
+                    facts,
+                )
+            });
+
+            // T9.1a (Addendum B): resolve G3's PackResolutionInput from the
+            // REPL's live single-active-pack session state — see
+            // build_pack_resolution_input's doc for why this is the
+            // correct real source (not the SemOS Domain Pack taxonomy,
+            // which has no live runtime instance).
+            let active_pack_id = session.active_pack_id();
+            let active_pack = active_pack_id
+                .as_deref()
+                .and_then(|id| self.pack_router.get_pack(id))
+                .map(|(manifest, _hash)| manifest.as_ref());
+            let pack_resolution = Some(
+                crate::agent::control_plane_shadow::build_pack_resolution_input(
+                    active_pack_id
+                        .as_deref()
+                        .zip(active_pack),
+                    &entry.verb,
+                    !envelope.is_unavailable(),
+                ),
+            );
+
+            // T9.1b (Addendum B): resolve G4's DagProofInput by reusing
+            // the real v1.3 gate's own resolution mechanism against this
+            // orchestrator's own GatePipeline (already wired at startup,
+            // no new plumbing) — see build_dag_proof_input's doc.
+            let dag_proof = crate::agent::control_plane_shadow::build_dag_proof_input(
+                self.gate_pipeline.as_ref(),
+                &entry.verb,
+                &entry.args,
+            )
+            .await;
+
+            // T11.F.2 slice 3: the definitional floor's G3/G4 check, run
+            // synchronously and unconditionally here (not shadow-only,
+            // not gated by EnforcedVerbs) — the one point on Path A where
+            // both `pack_resolution` and `dag_proof` are already resolved
+            // as real values before `evaluate_with_report` re-derives
+            // them a second time (see that function's own doc for why it
+            // duplicates `decide()` rather than widening `Gate`). A floor
+            // hit here short-circuits with a `Failed` `StepOutcome` before
+            // dispatch — the same shape `legacy_outcome` already produces
+            // for its own failure cases below — and records an audit row
+            // via the same fire-and-forget `tokio::spawn` posture this
+            // function already uses for `insert_shadow_decision`.
+            if let Some(pr) = pack_resolution.as_ref() {
+                if ob_poc_control_plane::floor::g3_input_is_floor_eligible(pr) {
+                    let reason = format!("{}: G3 pack resolution floor (MissingPack/AmbiguousPack)", entry.verb);
+                    let row = crate::agent::control_plane_floor::FloorRejectionRow {
+                        session_id: session.id,
+                        entry_id,
+                        verb_fqn: entry.verb.clone(),
+                        floor_gate: "G3",
+                        floor_reason: reason.clone(),
+                    };
+                    let pool = pool.clone();
+                    tokio::spawn(async move {
+                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+                    });
+                    return Some(StepOutcome::Failed {
+                        error: format!("T11.F floor rejection [G3]: {reason}"),
+                    });
+                }
+            }
+            if let Some(dp) = dag_proof.as_ref() {
+                if ob_poc_control_plane::floor::g4_input_is_floor_eligible(dp) {
+                    let reason = format!("{}: G4 DAG legality floor (blocking_violations or topological)", entry.verb);
+                    let row = crate::agent::control_plane_floor::FloorRejectionRow {
+                        session_id: session.id,
+                        entry_id,
+                        verb_fqn: entry.verb.clone(),
+                        floor_gate: "G4",
+                        floor_reason: reason.clone(),
+                    };
+                    let pool = pool.clone();
+                    tokio::spawn(async move {
+                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+                    });
+                    return Some(StepOutcome::Failed {
+                        error: format!("T11.F floor rejection [G4]: {reason}"),
+                    });
+                }
+            }
+
+            // T9.1e (Addendum B): resolve G7's WriteSetInput from the
+            // verb's declared write footprint (domain_metadata.yaml,
+            // loaded once at startup) — see build_write_set_input's doc.
+            let write_set = crate::agent::control_plane_shadow::build_write_set_input(
+                self.domain_metadata.as_deref(),
+                &entry.verb,
+                entry_id,
+                entity_requests.iter().map(|(id, _)| *id).collect(),
+            );
+
+            // T9.5 (Addendum B) / G6b: resolve G8's StpClassifierInput from
+            // the same RuntimeBehavior lookup the real dispatch router
+            // uses, with `has_unpinned_entities` now the real per-entity
+            // pin fact derived from `entity_facts_map` (the same batched
+            // read G2/G13 already fetched above) instead of the blanket
+            // "any bound entity is unpinned" placeholder — see
+            // build_stp_classifier_input's and has_unpinned_entities' docs.
+            let stp_classifier = Some(
+                crate::agent::control_plane_shadow::build_stp_classifier_input(
+                    &entry.verb,
+                    crate::agent::control_plane_shadow::has_unpinned_entities(
+                        &entity_requests,
+                        entity_facts_map.as_ref(),
+                    ),
+                ),
+            );
+
+            // T9.6 (Addendum B): resolve G13's SnapshotInput from the same
+            // entity_facts_map fetched above for G2 — see
+            // build_decision_snapshot_input's doc.
+            let snapshot = crate::agent::control_plane_shadow::build_decision_snapshot_input(
+                entity_facts_map.as_ref(),
+            );
+
+            // T9.7 (Addendum B): resolve G9's RunbookProofInput from the
+            // entry's own compiled_runbook_id (INV-3), and G12's
+            // VersionPinningInput from this build's own CARGO_PKG_VERSION —
+            // see build_runbook_proof_input's/build_version_pinning_input's
+            // doc.
+            let runbook_proof = Some(
+                crate::agent::control_plane_shadow::build_runbook_proof_input(
+                    entry.compiled_runbook_id.map(|id| id.0),
+                ),
+            );
+            let version_pinning =
+                Some(crate::agent::control_plane_shadow::build_version_pinning_input());
+
+            let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
+                &envelope,
+                &entry.verb,
+                entry_id,
+                &actor,
+                entity_binding,
+                pack_resolution,
+                dag_proof,
+                write_set,
+                stp_classifier,
+                snapshot,
+                runbook_proof,
+                version_pinning,
+            );
+            // T10.1 (EOP-PLAN-CONTROLPLANE-001 Addendum C) → T10.2 owed-
+            // convergence closure: a single `evaluate_with_report` call now
+            // produces both the shadow-decision audit row's `report` and
+            // the sealed-envelope-or-rejection `decision` — previously two
+            // separate calls (`evaluate_shadow` then `evaluate`, which
+            // re-ran the identical dependency-aware gate walk internally)
+            // over the exact same `cp_ctx`. Nothing here consumes, gates,
+            // or blocks dispatch: legacy_outcome (computed earlier) remains
+            // the sole return value. A 5-minute validity window matches
+            // this crate's own test convention (no production TTL policy
+            // exists yet to draw from — see envelope_store.rs).
+            let validity = ob_poc_control_plane::envelope::ValidityWindow::new(
+                chrono::Utc::now(),
+                chrono::Utc::now() + chrono::Duration::minutes(5),
+            );
+            let (report, decision) =
+                ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+            // G11 join fix (EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001):
+            // mint (or read) `decision_id` up front -- before building
+            // `row` -- so the SAME per-attempt-unique value threads into
+            // both the shadow-decisions row and the `control_plane_audit`
+            // rows emitted below. `envelope.id()` for `ApprovedStp` (only
+            // *peeked* via `&decision` here, not moved -- `decision` is
+            // still needed, unmoved, several statements further down);
+            // a fresh `Uuid::new_v4()` otherwise. This is the same value
+            // the `tokio::spawn` block below uses to key its
+            // `insert_audit_event` calls -- see that block's own comment.
+            // Must NOT be `entry_id`: `entry_id` is the `RunbookEntry`'s
+            // own stable id, reused across every retry of the same
+            // runbook step, and using it as this join key was exactly
+            // the bug this session fixed (see `ShadowDecisionRow::
+            // decision_id`'s doc).
+            let decision_id = match &decision {
+                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => envelope.id(),
+                _ => Uuid::new_v4(),
+            };
+            let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+                session.id,
+                entry_id,
+                Some(decision_id),
+                &entry.verb,
+                &report,
+                legacy_outcome.is_some(),
+                ob_poc_types::ExecutionPath::RunbookSequencer,
+            );
+            let sealed = matches!(decision, ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_));
+            let session_id = session.id;
+            let entry_verb = entry.verb.clone();
+            let pool = pool.clone();
+
+            // EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2: emit the
+            // `DecisionEvaluated` audit event (and `EnvelopeSealed` when
+            // ApprovedStp) alongside the existing shadow-row insert, in the
+            // same best-effort tokio::spawn — additive only (W1): nothing
+            // here alters `row`, which is built and passed in unchanged.
+            //
+            // decision_id (computed above, before `row` was built): the
+            // audit stream's correlating key across an envelope-bearing
+            // decision's later events (EnvelopeConsumed, DispatchCommitted)
+            // is the envelope's own id (minted fresh per decision by
+            // ExecutionEnvelope::seal) -- G1 items 2-4 (the
+            // entry_id-correlated seal->consume wire) have not landed yet
+            // (V3/V4 finding), so envelope_id is the only value shared
+            // between the seal site and the not-yet-wired consume site.
+            // For non-ApprovedStp decisions (no envelope minted), a fresh
+            // id is used -- nothing downstream correlates to it, by
+            // construction (no envelope, no later events). This is also
+            // now the SAME value `row.decision_id` carries (G11 join fix)
+            // -- the shadow row and this decision's audit rows correlate
+            // by construction.
+            let outcome_for_audit = match &decision {
+                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_) => {
+                    ob_poc_control_plane::audit::DecisionOutcome::ApprovedStp
+                }
+                ob_poc_control_plane::decision::ControlPlaneDecision::RequiresHumanGate(_) => {
+                    ob_poc_control_plane::audit::DecisionOutcome::HumanGate
+                }
+                ob_poc_control_plane::decision::ControlPlaneDecision::Rejected(_) => {
+                    ob_poc_control_plane::audit::DecisionOutcome::Rejected
+                }
+            };
+            let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
+            // entry_id here is informational (the RunbookEntry this
+            // decision was evaluated for) -- it is NOT the G11 replay
+            // join key. That key is `decision_id` (computed above),
+            // carried on `row.decision_id` and on this decision's
+            // `control_plane_audit` rows via the `insert_audit_event`
+            // calls below, which the G11 replay surface joins on
+            // directly (`replay_grade_for_decision`'s own `decision_id`
+            // parameter) -- see the G11 join fix session doc for why
+            // `entry_id` alone is unsafe to use for that join (it is
+            // reused across every retry of the same runbook step).
+            let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
+                outcome: outcome_for_audit,
+                snapshot_ref,
+                entry_id,
+            };
+
+            // G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2, §4):
+            // the seal must be AWAITED (synchronous with this loop
+            // iteration), not fire-and-forget, so the row genuinely exists
+            // in `control_plane_envelopes` by the time this same iteration
+            // reaches `execute_entry_via_gate_impl` -> ... ->
+            // `VerbExecutionPortStepExecutor::execute_step`'s
+            // `lookup_sealed_handle` call a few function calls later
+            // (§1.2's genuine race, closed). The shadow-row insert and the
+            // DecisionEvaluated/EnvelopeSealed audit events stay best-
+            // effort/fire-and-forget below (unchanged posture, W1 window-
+            // discipline: additive only) — only the seal->consume
+            // correlation itself needs the synchronous guarantee.
+            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) = decision {
+                crate::agent::control_plane_envelope_store::persist_sealed(
+                    &pool,
+                    session_id,
+                    entry_id,
+                    &entry_verb,
+                    envelope,
+                )
+                .await;
+            }
+
+            tokio::spawn(async move {
+                crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+                if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
+                    // `decision_id` here is the SAME value computed above
+                    // (before `row` was built) and already carried on
+                    // `row.decision_id` -- not recomputed independently.
+                    // `envelope.id()` is stable/deterministic per
+                    // envelope, so re-deriving it here would happen to
+                    // produce the same value today, but reusing the
+                    // outer binding is what actually guarantees it (and
+                    // is what the G11 join fix's correctness proof
+                    // depends on, not a coincidence of two identical
+                    // computations staying in sync).
+                    crate::agent::control_plane_audit::insert_audit_event(
+                        &pool,
+                        decision_id,
+                        session_id,
+                        &decision_evaluated,
+                    )
+                    .await;
+                    crate::agent::control_plane_audit::insert_audit_event(
+                        &pool,
+                        decision_id,
+                        session_id,
+                        &ob_poc_control_plane::audit::AuditEvent::EnvelopeSealed {
+                            envelope_id: decision_id,
+                            expires_at: envelope.validity().not_after(),
+                        },
+                    )
+                    .await;
+                } else {
+                    // Same reuse: the non-ApprovedStp fresh id minted
+                    // above (`decision_id`) is what `row.decision_id`
+                    // already carries -- not a second, independent
+                    // `Uuid::new_v4()` that would silently desynchronise
+                    // the two.
+                    crate::agent::control_plane_audit::insert_audit_event(
+                        &pool,
+                        decision_id,
+                        session_id,
+                        &decision_evaluated,
+                    )
+                    .await;
+                }
+            });
+            tracing::debug!(
+                verb = %entry.verb,
+                sealed,
+                "T10.1: shadow evaluate() ran (sealing is shadow-only — never gates dispatch)"
+            );
+        }
+
+        legacy_outcome
+    }
+
+    /// G1 item 2, §4 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001): re-seal
+    /// a `HumanGate` entry at resume time, immediately before dispatch,
+    /// rather than extending or reusing whatever `phase5_runtime_recheck`
+    /// sealed at park time (which may be arbitrarily stale — a human
+    /// approval can take minutes to days). Deliberately a smaller
+    /// re-derivation than `phase5_runtime_recheck` itself: it re-runs only
+    /// the control-plane shadow-evaluate-and-seal step (G2/G3/G4/G7/G8/G13/
+    /// G9/G12 input derivation -> `evaluate_with_report` -> synchronous
+    /// `persist_sealed`, same as §2's pseudocode), and deliberately does
+    /// NOT re-run `phase5_runtime_recheck`'s T11.F.2 definitional-floor
+    /// checks (G1/G3/G4, which can return `Some(StepOutcome::Failed)`) or
+    /// its legacy `shadow_envelope`/`legacy_outcome` machinery — those are
+    /// gating mechanisms with no re-seal-at-resume call site today; adding
+    /// one here would be a second, unreviewed production-behaviour change
+    /// beyond G1's scope (a HumanGate resume that could newly fail for a
+    /// reason it never could before). This function's own seal is
+    /// shadow-only, exactly like `phase5_runtime_recheck`'s: it never
+    /// blocks dispatch, only makes a fresh, non-stale envelope available
+    /// for `execute_step`'s consume-site lookup on `(session_id, entry_id)`
+    /// (§2.1's `ORDER BY created_at DESC LIMIT 1` picks this fresh row over
+    /// the stale pre-park one).
+    #[cfg(feature = "database")]
+    async fn reseal_for_human_gate_resume(&self, session: &ReplSessionV2, entry_id: Uuid) {
+        let Some(client) = self.sem_os_client.as_ref() else {
+            return;
+        };
+        let Some(pool) = self.pool() else {
+            return;
+        };
+        let Some(entry) = session.runbook.entries.iter().find(|e| e.id == entry_id) else {
+            return;
+        };
+
+        let tos = session.workspace_stack.last();
+        let constellation_family = tos.map(|f| f.constellation_family.clone());
+        let constellation_map = tos.map(|f| f.constellation_map.clone());
+        let actor = ob_poc_boundary::policy::ActorResolver::from_env();
+        let envelope = crate::agent::orchestrator::resolve_allowed_verbs(
+            client.as_ref(),
+            &actor,
+            Some(session.id),
+            constellation_family,
+            constellation_map,
+        )
+        .await;
+
+        let entity_requests = crate::agent::control_plane_shadow::entity_binding_requests(
+            &self.verb_config_index,
+            &entry.verb,
+            &entry.args,
+        );
+        let entity_facts_map: Option<HashMap<Uuid, ob_poc_boundary::entity_facts::EntityFactsRow>> =
+            if entity_requests.is_empty() {
+                Some(HashMap::new())
+            } else {
+                let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool };
+                match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &entity_requests)
+                    .await
+                {
+                    Ok(facts) => Some(facts),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            verb = %entry.verb,
+                            "reseal_for_human_gate_resume: entity_facts lookup failed — re-seal skipped"
+                        );
+                        None
+                    }
+                }
+            };
+        let entity_binding = entity_facts_map.as_ref().map(|facts| {
+            crate::agent::control_plane_shadow::build_entity_binding_input(&entity_requests, facts)
+        });
+
+        let active_pack_id = session.active_pack_id();
+        let active_pack = active_pack_id
+            .as_deref()
+            .and_then(|id| self.pack_router.get_pack(id))
+            .map(|(manifest, _hash)| manifest.as_ref());
+        let pack_resolution = Some(crate::agent::control_plane_shadow::build_pack_resolution_input(
+            active_pack_id.as_deref().zip(active_pack),
+            &entry.verb,
+            !envelope.is_unavailable(),
+        ));
+
+        let dag_proof = crate::agent::control_plane_shadow::build_dag_proof_input(
+            self.gate_pipeline.as_ref(),
+            &entry.verb,
+            &entry.args,
+        )
+        .await;
+
+        let write_set = crate::agent::control_plane_shadow::build_write_set_input(
+            self.domain_metadata.as_deref(),
+            &entry.verb,
+            entry_id,
+            entity_requests.iter().map(|(id, _)| *id).collect(),
+        );
+        // G6b: real per-entity pin fact (see the primary call site's
+        // identical comment in `phase5_runtime_recheck`, above).
+        let stp_classifier = Some(crate::agent::control_plane_shadow::build_stp_classifier_input(
+            &entry.verb,
+            crate::agent::control_plane_shadow::has_unpinned_entities(
+                &entity_requests,
+                entity_facts_map.as_ref(),
+            ),
+        ));
+        let snapshot =
+            crate::agent::control_plane_shadow::build_decision_snapshot_input(entity_facts_map.as_ref());
+        let runbook_proof = Some(crate::agent::control_plane_shadow::build_runbook_proof_input(
+            entry.compiled_runbook_id.map(|id| id.0),
+        ));
+        let version_pinning = Some(crate::agent::control_plane_shadow::build_version_pinning_input());
+
+        let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
+            &envelope,
+            &entry.verb,
+            entry_id,
+            &actor,
+            entity_binding,
+            pack_resolution,
+            dag_proof,
+            write_set,
+            stp_classifier,
+            snapshot,
+            runbook_proof,
+            version_pinning,
+        );
+
+        let validity = ob_poc_control_plane::envelope::ValidityWindow::new(
+            chrono::Utc::now(),
+            chrono::Utc::now() + chrono::Duration::minutes(5),
+        );
+        let (report, decision) = ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+        // G11 join fix (EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001): same
+        // reasoning as `phase5_runtime_recheck`'s primary call site --
+        // mint/read `decision_id` before building `row`, then reuse this
+        // SAME binding for the `insert_audit_event` calls below, never
+        // `entry_id` (reused across retries of the same runbook step).
+        let decision_id = match &decision {
+            ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => envelope.id(),
+            _ => Uuid::new_v4(),
+        };
+        let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
+            session.id,
+            entry_id,
+            Some(decision_id),
+            &entry.verb,
+            &report,
+            false,
+            ob_poc_types::ExecutionPath::RunbookSequencer,
+        );
+        let session_id = session.id;
+        let entry_verb = entry.verb.clone();
+        let pool = pool.clone();
+
+        // Synchronous, matching §4's requirement: this must complete
+        // before `handle_human_gate_approval` calls `execute_entry_via_gate`
+        // a few lines later, in the SAME resume, so the fresh row exists
+        // by consume time.
+        if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) = decision {
+            crate::agent::control_plane_envelope_store::persist_sealed(
+                &pool,
+                session_id,
+                entry_id,
+                &entry_verb,
+                envelope,
+            )
+            .await;
+        }
+
+        let outcome_for_audit = match &decision {
+            ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_) => {
+                ob_poc_control_plane::audit::DecisionOutcome::ApprovedStp
+            }
+            ob_poc_control_plane::decision::ControlPlaneDecision::RequiresHumanGate(_) => {
+                ob_poc_control_plane::audit::DecisionOutcome::HumanGate
+            }
+            ob_poc_control_plane::decision::ControlPlaneDecision::Rejected(_) => {
+                ob_poc_control_plane::audit::DecisionOutcome::Rejected
+            }
+        };
+        let snapshot_ref = cp_ctx.snapshot.as_ref().and_then(|s| s.sem_reg_snapshot_id);
+        // entry_id here is informational only (the RunbookEntry this
+        // decision was evaluated for), NOT the G11 replay join key -- see
+        // the primary call site's identical comment above. That key is
+        // `decision_id` (computed above, before `row`), carried on both
+        // `row.decision_id` and the `control_plane_audit` rows below.
+        let decision_evaluated = ob_poc_control_plane::audit::AuditEvent::DecisionEvaluated {
+            outcome: outcome_for_audit,
+            snapshot_ref,
+            entry_id,
+        };
+
+        // Best-effort audit trail, same fire-and-forget posture as
+        // `phase5_runtime_recheck`'s own spawn (W1 window discipline:
+        // additive only).
+        tokio::spawn(async move {
+            crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
+            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
+                // Reuses the outer `decision_id` binding (already carried
+                // on `row.decision_id`) -- not an independent recompute.
+                crate::agent::control_plane_audit::insert_audit_event(
+                    &pool,
+                    decision_id,
+                    session_id,
+                    &decision_evaluated,
+                )
+                .await;
+                crate::agent::control_plane_audit::insert_audit_event(
+                    &pool,
+                    decision_id,
+                    session_id,
+                    &ob_poc_control_plane::audit::AuditEvent::EnvelopeSealed {
+                        envelope_id: decision_id,
+                        expires_at: envelope.validity().not_after(),
+                    },
+                )
+                .await;
+            } else {
+                // Reuses the outer `decision_id` binding (already carried
+                // on `row.decision_id`) -- not an independent
+                // `Uuid::new_v4()` that would silently desynchronise the
+                // two.
+                crate::agent::control_plane_audit::insert_audit_event(
+                    &pool,
+                    decision_id,
+                    session_id,
+                    &decision_evaluated,
+                )
+                .await;
+            }
+        });
     }
 
     /// Compile a runbook entry on-the-fly for entries that lack a `compiled_runbook_id`.
@@ -8074,6 +8904,12 @@ impl ReplOrchestratorV2 {
             );
             if let Some(pipeline) = self.gate_pipeline.clone() {
                 bridge = bridge.with_gate_pipeline(pipeline);
+            }
+            // G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001):
+            // real pool so `execute_step` can look up the sealed envelope
+            // `phase5_runtime_recheck` persisted for this step's entry_id.
+            if let Some(pool) = self.pool() {
+                bridge = bridge.with_pool(pool.clone());
             }
             match run_through_gate(
                 store,
@@ -8471,6 +9307,63 @@ impl ReplOrchestratorV2 {
                 bpmn_form: None,
             }),
             crate::runbook::OrchestratorResponse::ConstraintViolation(v) => {
+                // Universal pack-switch back-out (the compile-time twin of
+                // try_pack_mismatch_backout): this gate fires on the pack's
+                // own YAML allowed_verbs, which is a different — usually
+                // narrower — set than the SemOS/CCIR allowed_verbs that
+                // feeds verb_search. A verb can be legal under governance
+                // (so verb_search returns it as a real match, auto-confirms,
+                // and reaches compile) yet still be outside the active
+                // pack's own declared universe. Same remediation either way:
+                // if exactly one OTHER loaded pack declares the violating
+                // verb, offer the close-pack/switch-pack decision instead of
+                // a dead-end error.
+                let current_pack_id = pack_ctx.map(|pc| pc.pack_id.clone());
+                let backout = v.violating_verbs.first().and_then(|verb| {
+                    let owners = self.pack_router.packs_declaring_verb(verb);
+                    let [owner] = owners.as_slice() else {
+                        return None;
+                    };
+                    if current_pack_id.as_deref() == Some(owner.id.as_str()) {
+                        return None;
+                    }
+                    Some((verb.clone(), owner.id.clone(), owner.name.clone()))
+                });
+                if let (Some((verb, suggested_pack_id, suggested_pack_name)), Some(current_pack_id)) =
+                    (backout, current_pack_id.clone())
+                {
+                    session.set_state(ReplStateV2::PackMismatchConfirm {
+                        current_pack_id: current_pack_id.clone(),
+                        current_required_slots_remaining: vec![],
+                        current_last_proposal_id: None,
+                        out_of_scope_verb: verb.clone(),
+                        suggested_pack_id,
+                        suggested_pack_name: suggested_pack_name.clone(),
+                        original_input: entry.sentence.clone(),
+                    });
+                    let pending_note = pending_steps_note(session);
+                    let message = format!(
+                        "'{}' isn't available in the '{}' pack — it belongs to '{}'. Close '{}'{} and switch to '{}'?",
+                        verb, current_pack_id, suggested_pack_name, current_pack_id, pending_note, suggested_pack_name
+                    );
+                    return Some(ReplResponseV2 {
+                        state: session.state.clone(),
+                        kind: ReplResponseKindV2::Question {
+                            field: String::new(),
+                            prompt: message.clone(),
+                            answer_kind: "confirm".to_string(),
+                        },
+                        message,
+                        runbook_summary: None,
+                        step_count: session.runbook.entries.len(),
+                        session_feedback: Some(session.build_session_feedback(false)),
+                        narration: None,
+                        trace_id: None,
+                        acp_dag_semantic: None,
+                        bpmn_form: None,
+                    });
+                }
+
                 let msg = format!("Pack constraint violation: {}", v.explanation,);
                 Some(ReplResponseV2 {
                     state: session.state.clone(),
@@ -8915,6 +9808,20 @@ fn repl_command_name(command: &ReplCommandV2) -> &'static str {
         ReplCommandV2::Toggle(_) => "toggle",
         ReplCommandV2::Status => "status",
         ReplCommandV2::Resume(_) => "resume",
+    }
+}
+
+/// Parenthetical warning fragment for a pack-switch prompt: how many
+/// staged-but-unrun runbook steps a "close this pack" confirm would drop.
+/// Empty string when there's nothing to warn about.
+fn pending_steps_note(session: &ReplSessionV2) -> String {
+    let pending = session.runbook.pending_count();
+    if pending == 0 {
+        String::new()
+    } else if pending == 1 {
+        " (dropping 1 unexecuted step)".to_string()
+    } else {
+        format!(" (dropping {} unexecuted steps)", pending)
     }
 }
 
@@ -10874,5 +11781,568 @@ definition_of_done:
             payload["resolution_strategy_detail"],
             "repl_sentence_playback"
         );
+    }
+}
+
+/// EOP-SESSION-CONTROLPLANE-G1-HUMANGATE-RESEAL-TEST-001: assertion 4 of
+/// the G1 design doc's test plan (`EOP-DESIGN-CONTROLPLANE-G1-SEAL-
+/// CONSUME-001` §10 item 4) — a live-DB, end-to-end proof that
+/// `reseal_for_human_gate_resume` actually does real work, not just that
+/// it exists. Three prior sessions flagged this as owed without building
+/// it (see the ownership ledger). This module drives the REAL
+/// `ReplOrchestratorV2::execute_runbook` -> park -> `handle_human_gate_
+/// approval` -> resume path (not a hand-rolled simulation of it), and
+/// proves: a `HumanGate` entry gets shadow-sealed *before* park (§4's own
+/// framing — `phase5_runtime_recheck` runs unconditionally ahead of the
+/// `match execution_mode` park branch); that pre-park envelope is
+/// deliberately made stale (its `not_after` pushed into the past, "let
+/// time pass" per the test plan's own suggested technique); on approval,
+/// `reseal_for_human_gate_resume` seals a FRESH envelope (new
+/// `envelope_id`, same `entry_id`); and it is specifically the fresh
+/// envelope — not the stale pre-park one — that transitions to
+/// `consumed` when the step dispatches. The pre-park envelope is
+/// asserted to remain untouched (`status = 'sealed'`, never itself
+/// consumed).
+///
+/// Every proof-bearing gate in the shadow evaluate
+/// (`ob_poc_control_plane::decision::evaluate_with_report`) must reach
+/// real `Success` for `phase5_runtime_recheck` to seal `ApprovedStp` at
+/// park time at all — this module wires minimal-but-real fixtures for
+/// each: a `SemOsClient` stub granting exactly the one verb under test
+/// (G1 intent admission), a real `cbus` row reset to an unblocked
+/// disposition/operational state (G2 entity binding), an unconstrained
+/// test pack registered under the session's own `pack_id` (G3 pack
+/// resolution), a synthetic in-memory `GatePipeline` (G4 DAG proof — same
+/// `FixedSlotState`/`FixedLookup` in-memory pattern already used by
+/// `control_plane_shadow.rs`'s and `step_executor_bridge.rs`'s own G4
+/// tests, decoupled from the real `cbus.status` column and from any real
+/// verb's declared `transition_args`), a synthetic single-verb
+/// `DomainMetadata` write footprint (G7 write-set), and a pre-inserted
+/// `CompiledRunbook`/`CompiledRunbookId` on the entry (G9 runbook proof —
+/// `phase5_runtime_recheck` runs before the dispatch-time on-the-fly
+/// compile path, so without this the shadow evaluate always Rejects on a
+/// missing compiled-runbook reference, regardless of every other gate).
+#[cfg(all(test, feature = "database"))]
+mod g1_humangate_reseal_tests {
+    use super::*;
+    use crate::journey::pack::load_pack_from_bytes;
+    use crate::repl::verb_config_index::{ArgSummary, VerbIndexEntry};
+    use crate::runbook::step_executor_bridge::{GatePipeline, VerbTransitionLookup};
+    use crate::sem_os_runtime::verb_executor_adapter::ObPocVerbExecutor;
+    use async_trait::async_trait;
+    use sem_os_client::SemOsClient;
+    use sem_os_core::error::SemOsError;
+    use sem_os_core::principal::Principal;
+    use sem_os_core::proto::{
+        BootstrapSeedBundleResponse, ChangesetDiffResponse, ChangesetImpactResponse,
+        ChangesetPublishResponse, ExportSnapshotSetResponse, GatePreviewResponse,
+        GetManifestResponse, ListChangesetsQuery, ListChangesetsResponse, ListToolSpecsResponse,
+        ToolCallRequest, ToolCallResponse,
+    };
+    use sem_os_policy::abac::AccessDecision;
+    use sem_os_policy::context_resolution::{
+        ContextResolutionRequest as ResolveContextRequest,
+        ContextResolutionResponse as ResolveContextResponse,
+    };
+    use sem_os_policy::context_resolution::{ContextResolutionResponse, ResolutionStage, VerbCandidate};
+    use sem_os_types::{Changeset, GovernanceTier, TrustClass};
+
+    async fn test_pool() -> sqlx::PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        sqlx::PgPool::connect(&url).await.expect("connect")
+    }
+
+    // Same process-global-env-var guard pattern as
+    // `step_executor_bridge::g1_item2_path_a_tests::EnvGuard` — duplicated
+    // locally (module-private there) rather than widened to cross-module
+    // visibility for one shared test helper.
+    static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+    impl EnvGuard {
+        fn set(verb_fqn: &str) -> Self {
+            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", verb_fqn);
+            Self(guard)
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
+        }
+    }
+
+    /// Minimal `SemOsClient` stub granting exactly one verb (G1 intent
+    /// admission) — same shape as `agent::harness::semos_stub::
+    /// HarnessSemOsClient`, but parameterised on the verb under test
+    /// rather than hardcoded to `"harness.no-op"`.
+    struct SingleVerbSemOsClient {
+        verb_fqn: String,
+    }
+
+    impl SingleVerbSemOsClient {
+        fn unsupported() -> SemOsError {
+            SemOsError::InvalidInput("unsupported test client operation".to_string())
+        }
+    }
+
+    #[async_trait]
+    impl SemOsClient for SingleVerbSemOsClient {
+        async fn resolve_context(
+            &self,
+            _principal: &Principal,
+            _req: ResolveContextRequest,
+        ) -> sem_os_client::Result<ResolveContextResponse> {
+            Ok(ContextResolutionResponse {
+                as_of_time: chrono::Utc::now(),
+                resolved_at: chrono::Utc::now(),
+                applicable_views: vec![],
+                candidate_verbs: vec![VerbCandidate {
+                    verb_snapshot_id: Uuid::nil(),
+                    verb_id: Uuid::nil(),
+                    fqn: self.verb_fqn.clone(),
+                    description: "G1 HumanGate reseal test verb".to_string(),
+                    governance_tier: GovernanceTier::Operational,
+                    trust_class: TrustClass::Convenience,
+                    rank_score: 1.0,
+                    preconditions_met: true,
+                    access_decision: AccessDecision::Allow,
+                    usable_for_proof: false,
+                }],
+                candidate_attributes: vec![],
+                required_preconditions: vec![],
+                disambiguation_questions: vec![],
+                evidence: Default::default(),
+                policy_verdicts: vec![],
+                security_handling: AccessDecision::Allow,
+                governance_signals: vec![],
+                entity_kind_pruned_verbs: vec![],
+                confidence: 1.0,
+                grounded_action_surface: None,
+                resolution_stage: ResolutionStage::Grounded,
+                discovery_surface: None,
+            })
+        }
+
+        async fn get_manifest(&self, _snapshot_set_id: &str) -> sem_os_client::Result<GetManifestResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn export_snapshot_set(
+            &self,
+            _snapshot_set_id: &str,
+        ) -> sem_os_client::Result<ExportSnapshotSetResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn bootstrap_seed_bundle(
+            &self,
+            _principal: &Principal,
+            _bundle: sem_os_core::seeds::SeedBundle,
+        ) -> sem_os_client::Result<BootstrapSeedBundleResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn dispatch_tool(
+            &self,
+            _principal: &Principal,
+            _req: ToolCallRequest,
+        ) -> sem_os_client::Result<ToolCallResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn list_tool_specs(&self) -> sem_os_client::Result<ListToolSpecsResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn list_changesets(
+            &self,
+            _query: ListChangesetsQuery,
+        ) -> sem_os_client::Result<ListChangesetsResponse> {
+            Ok(ListChangesetsResponse {
+                changesets: Vec::<Changeset>::new(),
+            })
+        }
+
+        async fn changeset_diff(&self, _changeset_id: &str) -> sem_os_client::Result<ChangesetDiffResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn changeset_impact(&self, _changeset_id: &str) -> sem_os_client::Result<ChangesetImpactResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn changeset_gate_preview(&self, _changeset_id: &str) -> sem_os_client::Result<GatePreviewResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn publish_changeset(
+            &self,
+            _principal: &Principal,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<ChangesetPublishResponse> {
+            Err(Self::unsupported())
+        }
+
+        async fn get_affinity_graph(&self) -> sem_os_client::Result<Arc<sem_os_policy::affinity::AffinityGraph>> {
+            Err(Self::unsupported())
+        }
+
+        async fn drain_outbox_for_test(&self) -> sem_os_client::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// In-memory `SlotStateProvider` fixture (G4 DAG proof) — same pattern
+    /// as `control_plane_shadow.rs`'s own `FixedSlotState` test helper.
+    /// Duplicated locally (that one is private to a different module's
+    /// `#[cfg(test)]` block) rather than widened to cross-module
+    /// visibility for one shared test fixture.
+    struct FixedSlotState(std::collections::HashMap<(String, String, Uuid), Option<String>>);
+
+    #[async_trait]
+    impl dsl_runtime::cross_workspace::SlotStateProvider for FixedSlotState {
+        async fn read_slot_state(
+            &self,
+            workspace: &str,
+            slot: &str,
+            entity_id: Uuid,
+            _pool: &sqlx::PgPool,
+        ) -> anyhow::Result<Option<String>> {
+            Ok(self
+                .0
+                .get(&(workspace.to_string(), slot.to_string(), entity_id))
+                .cloned()
+                .unwrap_or(None))
+        }
+    }
+
+    /// Verb-transition lookup fixture (G4) — returns the same
+    /// `TransitionArgs` regardless of `verb_fqn`, so it applies to
+    /// whichever verb this module's test drives, decoupled entirely from
+    /// that verb's real production YAML (which may or may not declare
+    /// `transition_args` at all — irrelevant here, this is a synthetic
+    /// DAG for gate-mechanism coverage, not a real state-machine
+    /// assertion about the verb under test).
+    struct FixedLookup(Option<dsl_core::TransitionArgs>);
+    impl VerbTransitionLookup for FixedLookup {
+        fn lookup(&self, _verb_fqn: &str) -> Option<dsl_core::TransitionArgs> {
+            self.0.clone()
+        }
+    }
+
+    const TEST_DAG_YAML: &str = r#"
+workspace: testws
+dag_id: g1_humangate_reseal_test_dag
+slots:
+  - id: testslot
+    stateless: false
+    state_machine:
+      id: sm
+      states: [{ id: FROM, entry: true }, { id: TO }]
+      transitions:
+        - from: FROM
+          to: TO
+          via: cbu.rename
+cross_workspace_constraints: []
+"#;
+
+    /// Builds a synthetic, in-memory `GatePipeline` (G4) that always
+    /// resolves `entity_id` to a legal `FROM -> TO` transition for
+    /// `cbu.rename` — used both by `phase5_runtime_recheck`'s shadow G4
+    /// evaluation (via `ReplOrchestratorV2::gate_pipeline`) and by the
+    /// real dispatch-time `pre_dispatch_gate_check` (same field, same
+    /// pipeline instance) — so shadow-seal and real-dispatch agree by
+    /// construction, decoupled from the real `cbus` table's own state
+    /// columns.
+    fn test_gate_pipeline(cbu_id: Uuid) -> GatePipeline {
+        let dir = std::env::temp_dir().join(format!("g1_humangate_reseal_test_dag_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("test.yaml"), TEST_DAG_YAML).unwrap();
+        let registry = Arc::new(dsl_runtime::cross_workspace::DagRegistry::from_dir(&dir).unwrap());
+        std::fs::remove_dir_all(&dir).ok();
+
+        let mut states = std::collections::HashMap::new();
+        states.insert(
+            ("testws".to_string(), "testslot".to_string(), cbu_id),
+            Some("FROM".to_string()),
+        );
+
+        let gate_checker = Arc::new(dsl_runtime::GateChecker::new(
+            registry.clone(),
+            Arc::new(FixedSlotState(states)),
+            Arc::new(dsl_runtime::cross_workspace::SameEntityResolver),
+        ));
+        let verb_metadata: Arc<dyn VerbTransitionLookup> = Arc::new(FixedLookup(Some(dsl_core::TransitionArgs {
+            entity_id_arg: "cbu-id".into(),
+            target_state_arg: None,
+            target_workspace: Some("testws".into()),
+            target_slot: Some("testslot".into()),
+        })));
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://harness-mock-never-connects")
+            .expect("connect_lazy with a valid-shaped URL never fails");
+
+        GatePipeline {
+            registry,
+            gate_checker,
+            verb_metadata,
+            pool: Arc::new(pool),
+            cascade_planner: None,
+        }
+    }
+
+    fn verb_config_index_for(verb_fqn: &str) -> VerbConfigIndex {
+        let mut idx = VerbConfigIndex::empty();
+        idx.insert_test_entry(VerbIndexEntry {
+            fqn: verb_fqn.to_string(),
+            description: "G1 HumanGate reseal test verb".to_string(),
+            invocation_phrases: vec![],
+            sentence_templates: vec![],
+            sentences: None,
+            args: vec![
+                ArgSummary {
+                    name: "cbu-id".to_string(),
+                    arg_type: "uuid".to_string(),
+                    required: true,
+                    description: None,
+                    maps_to: Some("cbu_id".to_string()),
+                    lookup_entity_type: Some("cbu".to_string()),
+                },
+                ArgSummary {
+                    name: "name".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    description: None,
+                    maps_to: Some("name".to_string()),
+                    lookup_entity_type: None,
+                },
+            ],
+            crud_key: Some("cbu_id".to_string()),
+            confirm_policy: ConfirmPolicy::Always,
+            precondition_checks: vec![],
+        });
+        idx
+    }
+
+    fn domain_metadata_for(verb_fqn: &str) -> sem_os_obpoc_adapter::metadata::DomainMetadata {
+        let yaml = format!(
+            "domains:\n  test:\n    description: test\n    verb_data_footprint:\n      {verb_fqn}:\n        writes: [cbus]\n"
+        );
+        sem_os_obpoc_adapter::metadata::DomainMetadata::from_yaml(&yaml).expect("valid fixture YAML")
+    }
+
+    fn test_pack_yaml() -> &'static str {
+        r#"
+id: g1-humangate-reseal-test-pack
+name: G1 HumanGate Reseal Test Pack
+version: "1.0"
+description: Minimal, unconstrained pack (no allowed_verbs) — G3 pack resolution fixture for the G1 HumanGate reseal test.
+"#
+    }
+
+    /// Assembles the real `ReplOrchestratorV2` with every fixture wired —
+    /// this is a real orchestrator, not a stand-in: `phase5_runtime_
+    /// recheck`, `handle_human_gate_approval`, and `reseal_for_human_gate_
+    /// resume` all run unmodified production code against it.
+    fn build_orchestrator(pool: sqlx::PgPool, verb_fqn: &str, cbu_id: Uuid) -> ReplOrchestratorV2 {
+        let (manifest, hash) = load_pack_from_bytes(test_pack_yaml().as_bytes()).unwrap();
+        let router = PackRouter::new(vec![(Arc::new(manifest), hash)]);
+
+        ReplOrchestratorV2::new(router, Arc::new(NullDslExecutor))
+            .with_pool(pool.clone())
+            .with_verb_execution_port(Arc::new(ObPocVerbExecutor::from_pool(pool.clone())))
+            .with_sem_os_client(Arc::new(SingleVerbSemOsClient {
+                verb_fqn: verb_fqn.to_string(),
+            }))
+            .with_verb_config_index(Arc::new(verb_config_index_for(verb_fqn)))
+            .with_domain_metadata(Arc::new(domain_metadata_for(verb_fqn)))
+            .with_gate_pipeline(test_gate_pipeline(cbu_id))
+    }
+
+    /// G1 item 3, assertion 4 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001
+    /// §10): the actual `reseal_for_human_gate_resume` mechanism, driven
+    /// end to end through the real Sequencer park/approve path, not a
+    /// hand-rolled simulation of it.
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn human_gate_resume_reseals_fresh_envelope_not_the_stale_pre_park_one() {
+        let verb_fqn = "cbu.rename";
+        let _guard = EnvGuard::set(verb_fqn);
+        let pool = test_pool().await;
+
+        // A real, existing `cbus` row — reset to a disposition/operational
+        // state G2 (entity binding) grades as available, so the shadow
+        // evaluate's entity-binding fact is honestly `Bound`, not an
+        // accidental `Unavailable` from whatever a prior test/fixture run
+        // left behind.
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("at least one cbu row exists in the dev database");
+        let original_name: String = sqlx::query_scalar(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .fetch_one(&pool)
+            .await
+            .expect("fetch original name for restore");
+        sqlx::query(
+            r#"UPDATE "ob-poc".cbus SET deleted_at = NULL, disposition_status = 'active',
+               operational_status = 'actively_trading' WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .execute(&pool)
+        .await
+        .expect("reset fixture cbu to an unblocked disposition/operational state");
+
+        let orch = build_orchestrator(pool.clone(), verb_fqn, cbu_id);
+
+        let mut session = ReplSessionV2::new();
+        let pack_id = "g1-humangate-reseal-test-pack";
+        session.runbook.pack_id = Some(pack_id.to_string());
+
+        let mut entry = RunbookEntry::new(
+            verb_fqn.to_string(),
+            "Rename CBU (G1 HumanGate reseal test)".to_string(),
+            format!("({verb_fqn} :cbu-id \"{cbu_id}\" :name \"G1 HumanGate Reseal Test\")"),
+        );
+        entry.execution_mode = ExecutionMode::HumanGate;
+        entry.status = EntryStatus::Confirmed;
+        entry.args.insert("cbu-id".to_string(), cbu_id.to_string());
+        entry
+            .args
+            .insert("name".to_string(), "G1 HumanGate Reseal Test".to_string());
+        let entry_id = entry.id;
+
+        // G9 (runbook proof): `phase5_runtime_recheck` reads `entry.
+        // compiled_runbook_id` directly — it runs BEFORE `execute_entry_
+        // via_gate_impl`'s on-the-fly compile fallback, so without a
+        // pre-populated `CompiledRunbook` the shadow evaluate always
+        // Rejects on "no compiled runbook reference available",
+        // regardless of every other gate.
+        let compiled_step = CompiledStep {
+            step_id: entry_id,
+            sentence: entry.sentence.clone(),
+            verb: entry.verb.clone(),
+            dsl: entry.dsl.clone(),
+            args: entry.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            depends_on: vec![],
+            execution_mode: CompiledExecutionMode::HumanGate,
+            write_set: vec![],
+            verb_contract_snapshot_id: None,
+        };
+        let compiled = CompiledRunbook::new(session.id, 1, vec![compiled_step], ReplayEnvelope::empty());
+        let compiled_id = compiled.id;
+        let store = RunbookStore::new();
+        store.insert_sync(&compiled);
+        entry.compiled_runbook_id = Some(compiled_id);
+
+        session.runbook.add_entry(entry);
+
+        let orch = {
+            // Re-thread the runbook store now that `compiled` is known —
+            // `build_orchestrator` doesn't take it (it's assembled after
+            // `entry_id` exists), so wire it on afterward via the same
+            // builder method production startup uses.
+            orch.with_runbook_store(Arc::new(store))
+        };
+
+        // ---- Park: phase5_runtime_recheck seals BEFORE the HumanGate
+        // park branch runs (§4's own framing) — drive the REAL execute_
+        // runbook loop, not a simulation of park.
+        let _park_response = orch.execute_runbook(&mut session).await;
+        assert_eq!(
+            session.runbook.entries[0].status,
+            EntryStatus::Parked,
+            "HumanGate entry must park before dispatch (DSL not called pre-approval)"
+        );
+
+        let pre_park_rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT envelope_id, status FROM "ob-poc".control_plane_envelopes
+               WHERE session_id = $1 AND entry_id = $2 ORDER BY created_at ASC"#,
+        )
+        .bind(session.id)
+        .bind(entry_id)
+        .fetch_all(&pool)
+        .await
+        .expect("query control_plane_envelopes after park");
+        assert_eq!(
+            pre_park_rows.len(),
+            1,
+            "expected exactly one shadow-sealed envelope at park time (every proof-bearing \
+             gate must have reached Success for phase5_runtime_recheck to have sealed \
+             anything at all): {pre_park_rows:?}"
+        );
+        let (pre_park_envelope_id, pre_park_status) = pre_park_rows[0].clone();
+        assert_eq!(pre_park_status, "sealed");
+
+        // ---- Simulate wall-clock time passing well beyond the 5-minute
+        // validity window (test plan's own suggested technique: "lower
+        // the test's ValidityWindow" / age the row directly) — this is
+        // the pre-park envelope going stale while parked, per §4's
+        // "may be arbitrarily stale by now" framing.
+        sqlx::query(
+            r#"UPDATE "ob-poc".control_plane_envelopes SET not_after = now() - interval '10 minutes'
+               WHERE envelope_id = $1"#,
+        )
+        .bind(pre_park_envelope_id)
+        .execute(&pool)
+        .await
+        .expect("age the pre-park envelope past its validity window");
+
+        // ---- Approve: handle_human_gate_approval resumes the entry,
+        // AWAITS reseal_for_human_gate_resume (fresh evaluate + fresh
+        // persist_sealed), then dispatches through the real Path A
+        // consume site.
+        let _approve_response = orch
+            .handle_human_gate_approval(&mut session, entry_id, Some("g1-test-approver".to_string()))
+            .await;
+
+        assert_eq!(
+            session.runbook.entries[0].status,
+            EntryStatus::Completed,
+            "resumed HumanGate entry must complete via the freshly resealed envelope, not fail \
+             on the (now-expired) pre-park one: {:?}",
+            session.runbook.entries[0].result
+        );
+
+        let post_rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT envelope_id, status FROM "ob-poc".control_plane_envelopes
+               WHERE session_id = $1 AND entry_id = $2 ORDER BY created_at ASC"#,
+        )
+        .bind(session.id)
+        .bind(entry_id)
+        .fetch_all(&pool)
+        .await
+        .expect("query control_plane_envelopes after resume");
+        assert_eq!(
+            post_rows.len(),
+            2,
+            "expected exactly the park-time seal plus the resume-time reseal, no more, no \
+             fewer: {post_rows:?}"
+        );
+        let (id0, status0) = post_rows[0].clone();
+        let (id1, status1) = post_rows[1].clone();
+        assert_eq!(id0, pre_park_envelope_id);
+        assert_eq!(
+            status0, "sealed",
+            "the pre-park envelope must remain untouched — it must never itself be the one \
+             consumed"
+        );
+        assert_ne!(
+            id1, pre_park_envelope_id,
+            "the resume-time reseal must mint a fresh envelope_id, not reuse the stale one"
+        );
+        assert_eq!(
+            status1, "consumed",
+            "the fresh (resume-time) envelope must be the one that actually gets consumed at \
+             dispatch"
+        );
+
+        // Restore the fixture row.
+        sqlx::query(r#"UPDATE "ob-poc".cbus SET name = $1 WHERE cbu_id = $2"#)
+            .bind(original_name)
+            .bind(cbu_id)
+            .execute(&pool)
+            .await
+            .expect("restore fixture cbu name");
     }
 }

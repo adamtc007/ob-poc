@@ -33,6 +33,48 @@ impl PgCrudExecutor {
     }
 }
 
+/// T9.2 (§3 Branch 2): the one executor abstraction shared by the pool-based
+/// `execute_crud` and the scope-based `execute_crud_in_scope` — every
+/// per-operation method below takes `exec: &mut CrudExec<'_>` instead of
+/// reading `self.pool` directly, so the same dispatch logic runs atomically
+/// inside a caller-supplied `PgTransactionScope` when one is provided,
+/// without duplicating the ~14 operation methods.
+///
+/// `Pool(&PgPool)` is `Copy`-cheap to re-borrow every helper call.
+/// `Scope(&mut dyn TransactionScope)` is reborrowed (`.executor()`) per
+/// call, the same pattern established elsewhere in this crate —
+/// sequential statements against the same scope compose without fighting
+/// the borrow checker.
+///
+/// T10.3 (EOP-PLAN-CONTROLPLANE-001 Addendum C): widened from
+/// `Conn(&mut sqlx::PgConnection)` to `Scope(&mut dyn TransactionScope)`
+/// so write-capture (`record_write`) is reachable — SQL dispatch is
+/// otherwise unchanged (`scope.executor()` yields the same
+/// `&mut PgConnection` the old `Conn` variant held directly).
+pub(crate) enum CrudExec<'e> {
+    Pool(&'e PgPool),
+    Scope(&'e mut dyn crate::TransactionScope),
+}
+
+impl CrudExec<'_> {
+    /// T10.3: self-report a write for G14's write-set attestation.
+    /// No-op for `Pool` — the pool-based `execute_crud` fast path never
+    /// runs inside a caller's admitting scope (pre-T9.2 legacy path), so
+    /// there is nothing honest to attest against; only `Scope` dispatches
+    /// (T9.2's atomic-admission branch) participate in capture.
+    fn record_write(
+        &mut self,
+        table: &str,
+        entity_id: Uuid,
+        columns: &[String],
+        created_new_entity: bool,
+    ) {
+        if let CrudExec::Scope(s) = self {
+            s.record_write(table, entity_id, columns, created_new_entity);
+        }
+    }
+}
+
 #[async_trait]
 impl CrudExecutionPort for PgCrudExecutor {
     async fn execute_crud(
@@ -40,6 +82,29 @@ impl CrudExecutionPort for PgCrudExecutor {
         contract: &VerbContractBody,
         args: serde_json::Value,
         _ctx: &VerbExecutionContext,
+    ) -> crate::Result<VerbExecutionOutcome> {
+        let mut exec = CrudExec::Pool(&self.pool);
+        self.dispatch(contract, args, &mut exec).await
+    }
+
+    async fn execute_crud_in_scope(
+        &self,
+        contract: &VerbContractBody,
+        args: serde_json::Value,
+        _ctx: &VerbExecutionContext,
+        scope: &mut dyn crate::TransactionScope,
+    ) -> crate::Result<VerbExecutionOutcome> {
+        let mut exec = CrudExec::Scope(scope);
+        self.dispatch(contract, args, &mut exec).await
+    }
+}
+
+impl PgCrudExecutor {
+    async fn dispatch(
+        &self,
+        contract: &VerbContractBody,
+        args: serde_json::Value,
+        exec: &mut CrudExec<'_>,
     ) -> crate::Result<VerbExecutionOutcome> {
         let crud = contract.crud_mapping.as_ref().ok_or_else(|| {
             SemOsError::InvalidInput(format!("Verb {} has no crud_mapping", contract.fqn))
@@ -52,59 +117,59 @@ impl CrudExecutionPort for PgCrudExecutor {
 
         match crud.operation.as_str() {
             "select" => {
-                self.execute_select(schema, table, &contract.args, &args, &contract.returns)
+                self.execute_select(exec, schema, table, &contract.args, &args, &contract.returns)
                     .await
             }
             "insert" => {
-                self.execute_insert(schema, table, crud, &contract.args, &args)
+                self.execute_insert(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "update" => {
-                self.execute_update(schema, table, crud, &contract.args, &args)
+                self.execute_update(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "delete" => {
-                self.execute_delete(schema, table, crud, &contract.args, &args)
+                self.execute_delete(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "upsert" => {
-                self.execute_upsert(schema, table, crud, &contract.args, &args)
+                self.execute_upsert(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "link" => {
-                self.execute_link(schema, table, crud, &contract.args, &args)
+                self.execute_link(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "unlink" => {
-                self.execute_unlink(schema, table, crud, &contract.args, &args)
+                self.execute_unlink(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "role_link" => {
-                self.execute_role_link(schema, crud, &contract.args, &args)
+                self.execute_role_link(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "role_unlink" => {
-                self.execute_role_unlink(schema, crud, &contract.args, &args)
+                self.execute_role_unlink(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "list_by_fk" => {
-                self.execute_list_by_fk(schema, table, crud, &contract.args, &args)
+                self.execute_list_by_fk(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "list_parties" => {
-                self.execute_list_parties(schema, crud, &contract.args, &args)
+                self.execute_list_parties(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "select_with_join" => {
-                self.execute_select_with_join(schema, crud, &contract.args, &args)
+                self.execute_select_with_join(exec, schema, crud, &contract.args, &args)
                     .await
             }
             "entitycreate" | "entity_create" => {
-                self.execute_entity_create(schema, table, crud, &contract.args, &args)
+                self.execute_entity_create(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             "entityupsert" | "entity_upsert" => {
-                self.execute_entity_upsert(schema, table, crud, &contract.args, &args)
+                self.execute_entity_upsert(exec, schema, table, crud, &contract.args, &args)
                     .await
             }
             op => Err(SemOsError::InvalidInput(format!(
@@ -113,13 +178,12 @@ impl CrudExecutionPort for PgCrudExecutor {
             ))),
         }
     }
-}
 
-impl PgCrudExecutor {
     // ── SELECT ──────────────────────────────────────────────────
 
     async fn execute_select(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         arg_defs: &[VerbArgDef],
@@ -172,7 +236,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort SELECT");
 
-        let rows = execute_query(&self.pool, &sql, &bind_values).await?;
+        let rows = execute_query(exec, &sql, &bind_values).await?;
 
         // Single record vs record set based on return type
         let is_single = returns
@@ -196,6 +260,7 @@ impl PgCrudExecutor {
 
     async fn execute_insert(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -211,6 +276,7 @@ impl PgCrudExecutor {
 
         let new_id = Uuid::new_v4();
         let mut columns = vec![format!("\"{}\"", pk_col)];
+        let mut raw_columns = vec![pk_col.to_string()];
         let mut placeholders = vec!["$1".to_string()];
         let mut bind_values: Vec<SqlValue> = vec![SqlValue::Uuid(new_id)];
         let mut idx = 2;
@@ -222,6 +288,7 @@ impl PgCrudExecutor {
                         continue;
                     }
                     columns.push(format!("\"{}\"", col));
+                    raw_columns.push(col.clone());
                     placeholders.push(format!("${idx}"));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
                     idx += 1;
@@ -261,10 +328,16 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort INSERT");
 
-        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let row = execute_query_one(exec, &sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
+        // T10.3: self-report for G14. Recorded unconditionally on success,
+        // including the idempotent-no-op branch (ON CONFLICT DO NOTHING
+        // fell through to the existing row) — a slight over-report, never
+        // an under-report, and harmless to attestation since it's the
+        // same row/table this operation already declares it targets.
+        exec.record_write(&format!("{schema}.{table}"), uuid, &raw_columns, true);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -272,6 +345,7 @@ impl PgCrudExecutor {
 
     async fn execute_update(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -284,6 +358,7 @@ impl PgCrudExecutor {
         })?;
 
         let mut sets = Vec::new();
+        let mut raw_columns = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
         let mut key_value: Option<SqlValue> = None;
         let mut idx = 1;
@@ -296,6 +371,7 @@ impl PgCrudExecutor {
                             Some(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
                     } else {
                         sets.push(format!("\"{}\" = ${}", col, idx));
+                        raw_columns.push(col.clone());
                         bind_values.push(json_to_sql_value(
                             value,
                             &arg_def.arg_type,
@@ -309,6 +385,49 @@ impl PgCrudExecutor {
 
         let key_val = key_value
             .ok_or_else(|| SemOsError::InvalidInput("Missing key argument for update".into()))?;
+
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`), not derived from any caller-supplied arg —
+        // e.g. status transitions (`status: VALIDATION_PENDING`). Mirrors
+        // `dsl_v2::generic_executor.rs`'s own set_values handling exactly
+        // (same now()/current_timestamp SQL-expression special case, same
+        // string/bool/integer bind types) so a verb using only set_values
+        // (no other mapped column) still has something to SET instead of
+        // failing "No columns to update" — the bug this block fixes.
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`), not derived from any caller-supplied arg —
+        // e.g. status transitions (`status: VALIDATION_PENDING`). Mirrors
+        // `dsl_v2::generic_executor.rs`'s own set_values handling exactly
+        // (same now()/current_timestamp SQL-expression special case, same
+        // string/bool/integer bind types) so a verb using only set_values
+        // (no other mapped column) still has something to SET instead of
+        // failing "No columns to update" — the bug this block fixes.
+        if let Some(set_values) = &crud.set_values {
+            for (col, value) in set_values {
+                if let Some(s) = value.as_str() {
+                    let s_lower = s.to_lowercase();
+                    if s_lower == "now()" || s_lower == "current_timestamp" {
+                        sets.push(format!("\"{col}\" = NOW()"));
+                        raw_columns.push(col.clone());
+                    } else {
+                        sets.push(format!("\"{}\" = ${}", col, idx));
+                        raw_columns.push(col.clone());
+                        bind_values.push(SqlValue::String(s.to_string()));
+                        idx += 1;
+                    }
+                } else if let Some(b) = value.as_bool() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    raw_columns.push(col.clone());
+                    bind_values.push(SqlValue::Boolean(b));
+                    idx += 1;
+                } else if let Some(n) = value.as_i64() {
+                    sets.push(format!("\"{}\" = ${}", col, idx));
+                    raw_columns.push(col.clone());
+                    bind_values.push(SqlValue::Integer(n));
+                    idx += 1;
+                }
+            }
+        }
 
         if sets.is_empty() {
             return Err(SemOsError::InvalidInput("No columns to update".into()));
@@ -324,8 +443,24 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len() + 1, "CrudExecutionPort UPDATE");
 
+        // T10.3: capture requires a real entity id to attest against — only
+        // a UUID key qualifies (matches CapturedWrite's own type). A
+        // non-UUID key (rare; most tables in this schema use UUID PKs per
+        // CLAUDE.md's own PostgreSQL<->Rust type table) means this write
+        // goes unrecorded — an honest coverage gap, not a fabricated one.
+        let key_entity_id = if let SqlValue::Uuid(id) = &key_val {
+            Some(*id)
+        } else {
+            None
+        };
+
         bind_values.push(key_val);
-        let affected = execute_non_query(&self.pool, &sql, &bind_values).await?;
+        let affected = execute_non_query(exec, &sql, &bind_values).await?;
+        if affected > 0 {
+            if let Some(entity_id) = key_entity_id {
+                exec.record_write(&format!("{schema}.{table}"), entity_id, &raw_columns, false);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -333,6 +468,7 @@ impl PgCrudExecutor {
 
     async fn execute_delete(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -345,6 +481,10 @@ impl PgCrudExecutor {
         let mut conditions = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
         let mut idx = 1;
+        // T10.3: only the single-key_column path has an unambiguous entity
+        // id to attest against — the multi-condition else-branch below is
+        // an honest coverage gap (PARTIAL), not a fabricated capture.
+        let mut capture_entity_id: Option<Uuid> = None;
 
         // Use key_column if specified, otherwise all maps_to columns
         if let Some(key_col) = crud.key_column.as_deref() {
@@ -355,8 +495,12 @@ impl PgCrudExecutor {
             let value = args_map.get(&key_arg.name).ok_or_else(|| {
                 SemOsError::InvalidInput(format!("Missing key arg: {}", key_arg.name))
             })?;
+            let key_val = json_to_sql_value(value, &key_arg.arg_type, &key_arg.name)?;
+            if let SqlValue::Uuid(id) = &key_val {
+                capture_entity_id = Some(*id);
+            }
             conditions.push(format!("\"{key_col}\" = $1"));
-            bind_values.push(json_to_sql_value(value, &key_arg.arg_type, &key_arg.name)?);
+            bind_values.push(key_val);
         } else {
             for arg_def in arg_defs {
                 if let Some(col) = &arg_def.maps_to {
@@ -397,7 +541,18 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort DELETE");
 
-        let affected = execute_non_query(&self.pool, &sql, &bind_values).await?;
+        let affected = execute_non_query(exec, &sql, &bind_values).await?;
+        if affected > 0 {
+            if let Some(entity_id) = capture_entity_id {
+                // Soft delete writes `deleted_at`; hard delete removes the
+                // row entirely — an empty column list makes no per-column
+                // claim (vacuously within any declared bound), only the
+                // table+entity assertion applies.
+                let columns: Vec<String> =
+                    if is_soft { vec!["deleted_at".to_string()] } else { vec![] };
+                exec.record_write(&format!("{schema}.{table}"), entity_id, &columns, false);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -405,6 +560,7 @@ impl PgCrudExecutor {
 
     async fn execute_upsert(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -433,6 +589,60 @@ impl PgCrudExecutor {
                     columns.push(format!("\"{}\"", col));
                     placeholders.push(format!("${idx}"));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
+                    insert_cols.push(col.clone());
+                    idx += 1;
+                }
+            }
+        }
+
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`) — mirrors `dsl_v2::generic_executor.rs`'s
+        // own `execute_upsert` set_values handling exactly (skip if an
+        // arg already mapped this column; same now()/current_timestamp
+        // SQL-expression special case; same string/bool/integer bind
+        // types). Real verb: `identifier.yaml`'s LEI upsert
+        // (`set_values: {scheme: LEI, scheme_name: ...}`). Adding to
+        // `insert_cols` (not just `columns`) means the ON CONFLICT DO
+        // UPDATE SET clause below picks these up automatically via its
+        // existing `insert_cols`-filtered `updates` derivation.
+        // Literal column values declared directly in the verb YAML
+        // (`crud.set_values`) — mirrors `dsl_v2::generic_executor.rs`'s
+        // own `execute_upsert` set_values handling exactly (skip if an
+        // arg already mapped this column; same now()/current_timestamp
+        // SQL-expression special case; same string/bool/integer bind
+        // types). Real verb: `identifier.yaml`'s LEI upsert
+        // (`set_values: {scheme: LEI, scheme_name: ...}`). Adding to
+        // `insert_cols` (not just `columns`) means the ON CONFLICT DO
+        // UPDATE SET clause below picks these up automatically via its
+        // existing `insert_cols`-filtered `updates` derivation.
+        if let Some(set_values) = &crud.set_values {
+            for (col, value) in set_values {
+                if insert_cols.contains(col) {
+                    continue;
+                }
+                if let Some(s) = value.as_str() {
+                    let s_lower = s.to_lowercase();
+                    if s_lower == "now()" || s_lower == "current_timestamp" {
+                        columns.push(format!("\"{col}\""));
+                        placeholders.push("NOW()".to_string());
+                        insert_cols.push(col.clone());
+                    } else {
+                        columns.push(format!("\"{col}\""));
+                        placeholders.push(format!("${idx}"));
+                        bind_values.push(SqlValue::String(s.to_string()));
+                        insert_cols.push(col.clone());
+                        idx += 1;
+                    }
+                } else if let Some(b) = value.as_bool() {
+                    columns.push(format!("\"{col}\""));
+                    placeholders.push(format!("${idx}"));
+                    bind_values.push(SqlValue::Boolean(b));
+                    insert_cols.push(col.clone());
+                    idx += 1;
+                } else if let Some(n) = value.as_i64() {
+                    columns.push(format!("\"{col}\""));
+                    placeholders.push(format!("${idx}"));
+                    bind_values.push(SqlValue::Integer(n));
                     insert_cols.push(col.clone());
                     idx += 1;
                 }
@@ -475,10 +685,12 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort UPSERT");
 
-        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let row = execute_query_one(exec, &sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
+        // T10.3: self-report for G14 — same posture as execute_insert.
+        exec.record_write(&format!("{schema}.{table}"), uuid, &insert_cols, true);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -486,6 +698,7 @@ impl PgCrudExecutor {
 
     async fn execute_link(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -528,7 +741,27 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort LINK");
 
-        let affected = execute_non_query(&self.pool, &sql, &[from, to]).await?;
+        // T10.3: capture entity ids before `from`/`to` are moved into the
+        // bind slice below.
+        let from_id = if let SqlValue::Uuid(id) = &from { Some(*id) } else { None };
+        let to_id = if let SqlValue::Uuid(id) = &to { Some(*id) } else { None };
+
+        let affected = execute_non_query(exec, &sql, &[from, to]).await?;
+        if affected > 0 {
+            // T10.3: self-report for G14 — only when a row was actually
+            // inserted (ON CONFLICT DO NOTHING no-ops on a re-link, which
+            // makes no write at all to attest against). Junction rows have
+            // no own PK column here, so both known-Uuid sides are recorded
+            // against the junction table, one call per side.
+            let junction_table = format!("{schema}.{junction}");
+            let columns = vec![from_col.to_string(), to_col.to_string()];
+            if let Some(id) = from_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+            if let Some(id) = to_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -536,6 +769,7 @@ impl PgCrudExecutor {
 
     async fn execute_unlink(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -578,7 +812,26 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort UNLINK");
 
-        let affected = execute_non_query(&self.pool, &sql, &[from, to]).await?;
+        // T10.3: capture entity ids before `from`/`to` are moved into the
+        // bind slice below.
+        let from_id = if let SqlValue::Uuid(id) = &from { Some(*id) } else { None };
+        let to_id = if let SqlValue::Uuid(id) = &to { Some(*id) } else { None };
+
+        let affected = execute_non_query(exec, &sql, &[from, to]).await?;
+        if affected > 0 {
+            // T10.3: self-report for G14 — symmetric to execute_link. Hard
+            // delete of the whole junction row: an empty column list makes
+            // no per-column claim (matches execute_delete's own hard-delete
+            // precedent), only the table+entity assertion applies.
+            let junction_table = format!("{schema}.{junction}");
+            let columns: Vec<String> = vec![];
+            if let Some(id) = from_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+            if let Some(id) = to_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -586,6 +839,7 @@ impl PgCrudExecutor {
 
     async fn execute_role_link(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -612,6 +866,7 @@ impl PgCrudExecutor {
         let mut to_val = None;
         let mut role_val = None;
         let mut extra_cols = Vec::new();
+        let mut extra_raw_cols = Vec::new();
         let mut extra_vals = Vec::new();
 
         for arg_def in arg_defs {
@@ -625,6 +880,7 @@ impl PgCrudExecutor {
                 } else if let Some(col) = &arg_def.maps_to {
                     if col != pk_col {
                         extra_cols.push(format!("\"{}\"", col));
+                        extra_raw_cols.push(col.clone());
                         extra_vals.push(json_to_sql_value(
                             value,
                             &arg_def.arg_type,
@@ -649,6 +905,16 @@ impl PgCrudExecutor {
         ];
         columns.extend(extra_cols);
 
+        // T10.3: unquoted parallel vec for `record_write` — same technique
+        // as `execute_insert`'s `raw_columns`.
+        let mut raw_columns = vec![
+            pk_col.to_string(),
+            from_col.to_string(),
+            to_col.to_string(),
+            role_col.to_string(),
+        ];
+        raw_columns.extend(extra_raw_cols);
+
         let mut bind_values = vec![SqlValue::Uuid(new_id), from, to, role];
         bind_values.extend(extra_vals);
 
@@ -670,10 +936,16 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = bind_values.len(), "CrudExecutionPort ROLE_LINK");
 
-        let row = execute_query_one(&self.pool, &sql, &bind_values).await?;
+        let row = execute_query_one(exec, &sql, &bind_values).await?;
         let uuid: Uuid = row.try_get(returning).map_err(|e| {
             SemOsError::Internal(anyhow::anyhow!("Failed to extract {returning}: {e}"))
         })?;
+        // T10.3: self-report for G14 — same posture as execute_insert (same
+        // idempotent-INSERT-with-fallback-SELECT SQL shape, recorded
+        // unconditionally on success). `uuid` is this junction row's own
+        // generated PK, not `from`/`to` — role_link is the one of the six
+        // ops with its own generated row identity, matching execute_insert.
+        exec.record_write(&format!("{schema}.{junction}"), uuid, &raw_columns, true);
         Ok(VerbExecutionOutcome::Uuid(uuid))
     }
 
@@ -681,6 +953,7 @@ impl PgCrudExecutor {
 
     async fn execute_role_unlink(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -729,7 +1002,29 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort ROLE_UNLINK");
 
-        let affected = execute_non_query(&self.pool, &sql, &[from, to, role]).await?;
+        // T10.3: capture entity ids before `from`/`to`/`role` are moved
+        // into the bind slice below.
+        let from_id = if let SqlValue::Uuid(id) = &from { Some(*id) } else { None };
+        let to_id = if let SqlValue::Uuid(id) = &to { Some(*id) } else { None };
+        let role_id = if let SqlValue::Uuid(id) = &role { Some(*id) } else { None };
+
+        let affected = execute_non_query(exec, &sql, &[from, to, role]).await?;
+        if affected > 0 {
+            // T10.3: self-report for G14 — hard delete of the composite-
+            // keyed junction row, same empty-column-list posture as
+            // execute_unlink; one call per known-Uuid side (from/to/role).
+            let junction_table = format!("{schema}.{junction}");
+            let columns: Vec<String> = vec![];
+            if let Some(id) = from_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+            if let Some(id) = to_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+            if let Some(id) = role_id {
+                exec.record_write(&junction_table, id, &columns, false);
+            }
+        }
         Ok(VerbExecutionOutcome::Affected(affected))
     }
 
@@ -737,6 +1032,7 @@ impl PgCrudExecutor {
 
     async fn execute_list_parties(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -785,7 +1081,7 @@ impl PgCrudExecutor {
         debug!(sql = %sql, "CrudExecutionPort LIST_PARTIES");
 
         let bind_values = vec![SqlValue::Uuid(fk_val), SqlValue::Date(as_of_date)];
-        let rows = execute_query(&self.pool, &sql, &bind_values).await?;
+        let rows = execute_query(exec, &sql, &bind_values).await?;
         let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
         Ok(VerbExecutionOutcome::RecordSet(records?))
     }
@@ -794,6 +1090,7 @@ impl PgCrudExecutor {
 
     async fn execute_select_with_join(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         crud: &VerbCrudMapping,
         arg_defs: &[VerbArgDef],
@@ -836,7 +1133,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, "CrudExecutionPort SELECT_WITH_JOIN");
 
-        let rows = execute_query(&self.pool, &sql, &[sql_val]).await?;
+        let rows = execute_query(exec, &sql, &[sql_val]).await?;
         let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
         Ok(VerbExecutionOutcome::RecordSet(records?))
     }
@@ -845,6 +1142,7 @@ impl PgCrudExecutor {
 
     async fn execute_list_by_fk(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         table: &str,
         crud: &VerbCrudMapping,
@@ -903,7 +1201,7 @@ impl PgCrudExecutor {
 
         debug!(sql = %sql, binds = all_values.len(), "CrudExecutionPort LIST_BY_FK");
 
-        let rows = execute_query(&self.pool, &sql, &all_values).await?;
+        let rows = execute_query(exec, &sql, &all_values).await?;
         let records: Result<Vec<serde_json::Value>, _> = rows.iter().map(row_to_json).collect();
         Ok(VerbExecutionOutcome::RecordSet(records?))
     }
@@ -912,6 +1210,7 @@ impl PgCrudExecutor {
 
     async fn execute_entity_create(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -931,7 +1230,7 @@ impl PgCrudExecutor {
                LIMIT 1"#,
         );
         let type_row = execute_query_one(
-            &self.pool,
+            exec,
             &type_sql,
             &[SqlValue::String(type_code.clone())],
         )
@@ -968,7 +1267,7 @@ impl PgCrudExecutor {
             r#"SELECT entity_id FROM "{schema}".entities WHERE entity_type_id = $1 AND name = $2"#,
         );
         if let Ok(rows) = execute_query(
-            &self.pool,
+            exec,
             &existing_sql,
             &[
                 SqlValue::Uuid(entity_type_id),
@@ -991,7 +1290,7 @@ impl PgCrudExecutor {
             r#"INSERT INTO "{schema}".entities (entity_id, entity_type_id, name) VALUES ($1, $2, $3)"#,
         );
         execute_non_query(
-            &self.pool,
+            exec,
             &base_sql,
             &[
                 SqlValue::Uuid(entity_id),
@@ -1000,6 +1299,15 @@ impl PgCrudExecutor {
             ],
         )
         .await?;
+        // T10.3: self-report for G14 — base-table half of the CTI write.
+        // The idempotent early-return above never reaches here, so this
+        // line only runs when a base `entities` row was genuinely inserted.
+        let base_write_cols = [
+            "entity_id".to_string(),
+            "entity_type_id".to_string(),
+            "name".to_string(),
+        ];
+        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols, true);
 
         // INSERT into extension table
         let ext_pk_col = infer_pk_column(&extension_table);
@@ -1020,6 +1328,14 @@ impl PgCrudExecutor {
                 3,
             )
         };
+        // T10.3: unquoted parallel vec for `record_write`, built in
+        // lockstep with `columns` — same technique as `execute_insert`'s
+        // `raw_columns`.
+        let mut raw_ext_columns: Vec<String> = if uses_shared_pk {
+            vec![ext_pk_col.to_string()]
+        } else {
+            vec![ext_pk_col.to_string(), "entity_id".to_string()]
+        };
 
         let base_cols = ["name", "external_id"];
         for arg_def in arg_defs {
@@ -1033,6 +1349,7 @@ impl PgCrudExecutor {
                         continue;
                     }
                     columns.push(format!("\"{col}\""));
+                    raw_ext_columns.push(col.clone());
                     placeholders.push(format!("${idx}"));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
                     idx += 1;
@@ -1046,6 +1363,7 @@ impl PgCrudExecutor {
             if !columns.contains(&quoted) {
                 if let Some(name) = args_map.get("name").and_then(|v| v.as_str()) {
                     columns.push(quoted);
+                    raw_ext_columns.push(name_col.to_string());
                     placeholders.push(format!("${idx}"));
                     bind_values.push(SqlValue::String(name.to_string()));
                 }
@@ -1058,7 +1376,18 @@ impl PgCrudExecutor {
             placeholders.join(", ")
         );
         debug!(sql = %ext_sql, "CrudExecutionPort ENTITY_CREATE extension");
-        execute_non_query(&self.pool, &ext_sql, &bind_values).await?;
+        execute_non_query(exec, &ext_sql, &bind_values).await?;
+        // T10.3: self-report for G14 — extension-table half of the CTI
+        // write. Keyed by `entity_id` (the semantic FK tying this row to
+        // the entity), not `ext_pk_col`'s own surrogate value even when the
+        // extension table has a separate generated PK — `entity_id` is
+        // what a caller's bound-entity-id list actually contains.
+        exec.record_write(
+            &format!("{schema}.{extension_table}"),
+            entity_id,
+            &raw_ext_columns,
+            true,
+        );
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -1067,6 +1396,7 @@ impl PgCrudExecutor {
 
     async fn execute_entity_upsert(
         &self,
+        exec: &mut CrudExec<'_>,
         schema: &str,
         _table: &str,
         crud: &VerbCrudMapping,
@@ -1084,7 +1414,7 @@ impl PgCrudExecutor {
                LIMIT 1"#,
         );
         let type_row = execute_query_one(
-            &self.pool,
+            exec,
             &type_sql,
             &[SqlValue::String(type_code.clone())],
         )
@@ -1123,7 +1453,7 @@ impl PgCrudExecutor {
                RETURNING entity_id"#,
         );
         let row = execute_query_one(
-            &self.pool,
+            exec,
             &base_sql,
             &[
                 SqlValue::Uuid(entity_type_id),
@@ -1134,6 +1464,15 @@ impl PgCrudExecutor {
         let entity_id: Uuid = row
             .try_get("entity_id")
             .map_err(|e| SemOsError::Internal(anyhow::anyhow!("{e}")))?;
+        // T10.3: self-report for G14 — base-table half of the CTI write,
+        // same posture as execute_entity_create (unconditional on success;
+        // this statement always runs — no idempotent-skip branch here).
+        let base_write_cols = [
+            "entity_id".to_string(),
+            "entity_type_id".to_string(),
+            "name".to_string(),
+        ];
+        exec.record_write(&format!("{schema}.entities"), entity_id, &base_write_cols, true);
 
         // Build extension columns
         let ext_pk_col = infer_pk_column(&extension_table);
@@ -1154,6 +1493,13 @@ impl PgCrudExecutor {
                 3,
             )
         };
+        // T10.3: unquoted parallel vec for `record_write`, built in
+        // lockstep with `columns` — same technique as execute_entity_create.
+        let mut raw_ext_columns: Vec<String> = if uses_shared_pk {
+            vec![ext_pk_col.to_string()]
+        } else {
+            vec![ext_pk_col.to_string(), "entity_id".to_string()]
+        };
 
         let mut update_cols: Vec<String> = Vec::new();
         let base_cols = ["name", "external_id"];
@@ -1168,6 +1514,7 @@ impl PgCrudExecutor {
                         continue;
                     }
                     columns.push(format!("\"{col}\""));
+                    raw_ext_columns.push(col.clone());
                     placeholders.push(format!("${idx}"));
                     update_cols.push(format!("\"{col}\" = EXCLUDED.\"{col}\""));
                     bind_values.push(json_to_sql_value(value, &arg_def.arg_type, &arg_def.name)?);
@@ -1181,6 +1528,7 @@ impl PgCrudExecutor {
             if !columns.contains(&quoted) {
                 if let Some(name) = args_map.get("name").and_then(|v| v.as_str()) {
                     columns.push(quoted.clone());
+                    raw_ext_columns.push(name_col.to_string());
                     placeholders.push(format!("${idx}"));
                     update_cols.push(format!("{quoted} = EXCLUDED.{quoted}"));
                     bind_values.push(SqlValue::String(name.to_string()));
@@ -1210,7 +1558,16 @@ impl PgCrudExecutor {
         };
 
         debug!(sql = %ext_sql, "CrudExecutionPort ENTITY_UPSERT extension");
-        execute_non_query(&self.pool, &ext_sql, &bind_values).await?;
+        execute_non_query(exec, &ext_sql, &bind_values).await?;
+        // T10.3: self-report for G14 — extension-table half of the CTI
+        // write, same posture as execute_entity_create: keyed by
+        // `entity_id`, not `ext_pk_col`'s own surrogate value.
+        exec.record_write(
+            &format!("{schema}.{extension_table}"),
+            entity_id,
+            &raw_ext_columns,
+            true,
+        );
 
         Ok(VerbExecutionOutcome::Uuid(entity_id))
     }
@@ -1285,38 +1642,53 @@ fn bind_sql_value<'q>(
     }
 }
 
-async fn execute_query_one(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<PgRow> {
+async fn execute_query_one(
+    exec: &mut CrudExec<'_>,
+    sql: &str,
+    values: &[SqlValue],
+) -> crate::Result<PgRow> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
     }
-    query
-        .fetch_one(pool)
-        .await
-        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
+    let result = match exec {
+        CrudExec::Pool(p) => query.fetch_one(*p).await,
+        CrudExec::Scope(s) => query.fetch_one(s.executor()).await,
+    };
+    result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
 
-async fn execute_non_query(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<u64> {
+async fn execute_non_query(
+    exec: &mut CrudExec<'_>,
+    sql: &str,
+    values: &[SqlValue],
+) -> crate::Result<u64> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
     }
-    let result = query
-        .execute(pool)
-        .await
-        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))?;
+    let result = match exec {
+        CrudExec::Pool(p) => query.execute(*p).await,
+        CrudExec::Scope(s) => query.execute(s.executor()).await,
+    };
+    let result = result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))?;
     Ok(result.rows_affected())
 }
 
-async fn execute_query(pool: &PgPool, sql: &str, values: &[SqlValue]) -> crate::Result<Vec<PgRow>> {
+async fn execute_query(
+    exec: &mut CrudExec<'_>,
+    sql: &str,
+    values: &[SqlValue],
+) -> crate::Result<Vec<PgRow>> {
     let mut query = sqlx::query(sql);
     for val in values {
         query = bind_sql_value(query, val);
     }
-    query
-        .fetch_all(pool)
-        .await
-        .map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
+    let result = match exec {
+        CrudExec::Pool(p) => query.fetch_all(*p).await,
+        CrudExec::Scope(s) => query.fetch_all(s.executor()).await,
+    };
+    result.map_err(|e| SemOsError::Internal(anyhow::anyhow!("SQL error: {e}")))
 }
 
 /// Infer the primary key column name from the table name.
@@ -1586,5 +1958,601 @@ mod tests {
         );
         assert_eq!(contract.fqn, "cbu.show");
         assert!(contract.crud_mapping.is_some());
+    }
+}
+
+// ── T9.2 §3 Branch 2: execute_crud_in_scope live-DB tests ────────
+
+#[cfg(all(test, feature = "database"))]
+mod db_integration_tests {
+    use super::*;
+    use sem_os_ontology::verb_contract::{VerbArgDef, VerbContractBody, VerbCrudMapping, VerbReturnSpec};
+
+    async fn test_pool() -> PgPool {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        PgPool::connect(&url).await.expect("connect")
+    }
+
+    /// T10.3: minimal test-only `TransactionScope` wrapper. `dsl-runtime`
+    /// has no concrete `TransactionScope` impl of its own (the real one,
+    /// `PgTransactionScope`, lives in `ob-poc` — see `tx.rs`'s module doc
+    /// for why the txn-opener stays out of this crate) — this exists
+    /// purely so these tests can exercise `execute_crud_in_scope`'s
+    /// `&mut dyn TransactionScope` signature without depending on `ob-poc`.
+    struct TestScope {
+        tx: sqlx::Transaction<'static, sqlx::Postgres>,
+        pool: PgPool,
+        id: ob_poc_types::TransactionScopeId,
+        captured: Vec<(String, Uuid, Vec<String>, bool)>,
+    }
+
+    impl TestScope {
+        async fn begin(pool: &PgPool) -> Self {
+            Self {
+                tx: pool.begin().await.expect("begin"),
+                pool: pool.clone(),
+                id: ob_poc_types::TransactionScopeId::new(),
+                captured: Vec::new(),
+            }
+        }
+
+        async fn rollback(self) {
+            self.tx.rollback().await.expect("rollback");
+        }
+
+        async fn commit(self) {
+            self.tx.commit().await.expect("commit");
+        }
+    }
+
+    impl crate::TransactionScope for TestScope {
+        fn scope_id(&self) -> ob_poc_types::TransactionScopeId {
+            self.id
+        }
+
+        fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
+            &mut self.tx
+        }
+
+        fn pool(&self) -> &PgPool {
+            &self.pool
+        }
+
+        fn record_write(
+            &mut self,
+            table: &str,
+            entity_id: Uuid,
+            columns: &[String],
+            created_new_entity: bool,
+        ) {
+            self.captured
+                .push((table.to_string(), entity_id, columns.to_vec(), created_new_entity));
+        }
+    }
+
+    fn default_contract_body() -> VerbContractBody {
+        VerbContractBody {
+            fqn: String::new(),
+            domain: String::new(),
+            action: String::new(),
+            description: String::new(),
+            behavior: String::new(),
+            args: vec![],
+            returns: None,
+            preconditions: vec![],
+            postconditions: vec![],
+            produces: None,
+            consumes: vec![],
+            invocation_phrases: vec![],
+            subject_kinds: vec![],
+            phase_tags: vec![],
+            harm_class: None,
+            action_class: None,
+            precondition_states: vec![],
+            requires_subject: true,
+            produces_focus: false,
+            metadata: None,
+            crud_mapping: None,
+            reads_from: vec![],
+            writes_to: vec![],
+            outputs: vec![],
+            produces_shared_facts: vec![],
+        }
+    }
+
+    fn cbu_id_arg() -> VerbArgDef {
+        VerbArgDef {
+            name: "cbu-id".to_string(),
+            arg_type: "uuid".to_string(),
+            required: true,
+            description: None,
+            lookup: None,
+            valid_values: None,
+            default: None,
+            maps_to: Some("cbu_id".to_string()),
+        }
+    }
+
+    fn select_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "cbu.show".to_string(),
+            domain: "cbu".to_string(),
+            action: "show".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![cbu_id_arg()],
+            returns: Some(VerbReturnSpec {
+                return_type: "record".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "select".to_string(),
+                table: Some("cbus".to_string()),
+                schema: Some("ob-poc".to_string()),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    fn update_description_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "cbu.set-description-test".to_string(),
+            domain: "cbu".to_string(),
+            action: "set-description-test".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![
+                cbu_id_arg(),
+                VerbArgDef {
+                    name: "description".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: Some("description".to_string()),
+                },
+            ],
+            returns: Some(VerbReturnSpec {
+                return_type: "affected".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "update".to_string(),
+                table: Some("cbus".to_string()),
+                schema: Some("ob-poc".to_string()),
+                key_column: Some("cbu_id".to_string()),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    fn fake_ctx() -> VerbExecutionContext {
+        VerbExecutionContext::new(sem_os_core::principal::Principal::system())
+    }
+
+    /// Mirrors `cbu.submit-for-validation`'s REAL crud_mapping exactly
+    /// (`config/verbs/cbu.yaml`, `operation: update`, `key: cbu_id`, one
+    /// arg `cbu-id -> cbu_id`, `set_values: {status: VALIDATION_PENDING}`).
+    /// Before this fix, `VerbCrudMapping` had no field to carry
+    /// `set_values` at all, so `execute_update` saw zero SET columns
+    /// (the only mapped arg IS the key) and errored "No columns to
+    /// update" — confirmed live-broken via this exact reproduction before
+    /// the fix landed.
+    fn submit_for_validation_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "cbu.submit-for-validation".to_string(),
+            domain: "cbu".to_string(),
+            action: "submit-for-validation".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![cbu_id_arg()],
+            returns: Some(VerbReturnSpec {
+                return_type: "affected".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "update".to_string(),
+                table: Some("cbus".to_string()),
+                schema: Some("ob-poc".to_string()),
+                key_column: Some("cbu_id".to_string()),
+                set_values: Some(
+                    [("status".to_string(), serde_json::json!("VALIDATION_PENDING"))]
+                        .into_iter()
+                        .collect(),
+                ),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_update_applies_set_values_for_a_key_only_verb() {
+        let pool = test_pool().await;
+        let (cbu_id,): (Uuid,) = sqlx::query_as(
+            r#"SELECT cbu_id FROM "ob-poc".cbus WHERE status = 'DISCOVERED' LIMIT 1"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("a DISCOVERED cbu must exist");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = submit_for_validation_contract();
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string() });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let outcome = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("set_values-only update must now succeed");
+        assert!(matches!(outcome, VerbExecutionOutcome::Affected(1)));
+        assert_eq!(
+            scope.captured,
+            vec![(
+                "ob-poc.cbus".to_string(),
+                cbu_id,
+                vec!["status".to_string()],
+                false,
+            )],
+            "the set_values column must be self-reported for G14, keyed by the pre-bound cbu_id"
+        );
+        scope.rollback().await;
+    }
+
+    /// Mirrors `screening.start`'s (fqn not confirmed exactly, verb file
+    /// `config/verbs/screening.yaml`) REAL crud_mapping: `operation:
+    /// upsert`, `table: screenings`, `conflict_keys: [workstream_id,
+    /// screening_type]`, `set_values: {screening_type: CONSOLIDATED,
+    /// status: PENDING}` — the second real verb this fix covers (the
+    /// first, `identifier.yaml`'s LEI upsert, targets columns —
+    /// `scheme`/`id` — that don't exist on the real `entity_identifiers`
+    /// table, a separate pre-existing bug unrelated to this fix, so it
+    /// can't be used for a live proof).
+    fn screening_upsert_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "screening.start-test".to_string(),
+            domain: "screening".to_string(),
+            action: "start-test".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![VerbArgDef {
+                name: "workstream-id".to_string(),
+                arg_type: "uuid".to_string(),
+                required: true,
+                description: None,
+                lookup: None,
+                valid_values: None,
+                default: None,
+                maps_to: Some("workstream_id".to_string()),
+            }],
+            returns: Some(VerbReturnSpec {
+                return_type: "uuid".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "upsert".to_string(),
+                table: Some("screenings".to_string()),
+                schema: Some("ob-poc".to_string()),
+                returning: Some("screening_id".to_string()),
+                conflict_keys: vec!["workstream_id".to_string(), "screening_type".to_string()],
+                set_values: Some(
+                    [
+                        ("screening_type".to_string(), serde_json::json!("CONSOLIDATED")),
+                        ("status".to_string(), serde_json::json!("PENDING")),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_upsert_applies_set_values_for_a_conflict_only_verb() {
+        let pool = test_pool().await;
+        let (workstream_id,): (Uuid,) =
+            sqlx::query_as(r#"SELECT workstream_id FROM "ob-poc".entity_workstreams LIMIT 1"#)
+                .fetch_one(&pool)
+                .await
+                .expect("at least one entity_workstream row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = screening_upsert_contract();
+        let args = serde_json::json!({ "workstream-id": workstream_id.to_string() });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let outcome = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("upsert with only conflict_keys mapped + set_values columns must succeed");
+        let VerbExecutionOutcome::Uuid(screening_id) = outcome else {
+            panic!("expected Uuid outcome, got {outcome:?}");
+        };
+        assert_eq!(scope.captured.len(), 1);
+        let (table, entity_id, mut columns, created_new) = scope.captured[0].clone();
+        columns.sort();
+        assert_eq!(table, "ob-poc.screenings");
+        assert_eq!(entity_id, screening_id);
+        assert_eq!(
+            columns,
+            vec![
+                "screening_id".to_string(),
+                "screening_type".to_string(),
+                "status".to_string(),
+                "workstream_id".to_string(),
+            ],
+            "both set_values columns must be self-reported alongside the mapped/pk columns"
+        );
+        assert!(created_new);
+        scope.rollback().await;
+    }
+
+    /// Mirrors the real `entity.create` verb (`config/verbs/entity.yaml`,
+    /// `operation: entity_create`) — same args/maps_to shape.
+    fn entity_create_contract() -> VerbContractBody {
+        VerbContractBody {
+            fqn: "entity.create".to_string(),
+            domain: "entity".to_string(),
+            action: "create".to_string(),
+            behavior: "crud".to_string(),
+            args: vec![
+                VerbArgDef {
+                    name: "entity-type".to_string(),
+                    arg_type: "string".to_string(),
+                    required: true,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: None,
+                },
+                VerbArgDef {
+                    name: "first-name".to_string(),
+                    arg_type: "string".to_string(),
+                    required: false,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: Some("first_name".to_string()),
+                },
+                VerbArgDef {
+                    name: "last-name".to_string(),
+                    arg_type: "string".to_string(),
+                    required: false,
+                    description: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    maps_to: Some("last_name".to_string()),
+                },
+            ],
+            returns: Some(VerbReturnSpec {
+                return_type: "uuid".to_string(),
+                schema: None,
+            }),
+            crud_mapping: Some(VerbCrudMapping {
+                operation: "entity_create".to_string(),
+                table: Some("entities".to_string()),
+                schema: Some("ob-poc".to_string()),
+                returning: Some("entity_id".to_string()),
+                ..Default::default()
+            }),
+            ..default_contract_body()
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_matches_execute_crud_for_select() {
+        let pool = test_pool().await;
+        let (cbu_id,): (Uuid,) = sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(&pool)
+            .await
+            .expect("at least one cbu row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = select_contract();
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string() });
+        let ctx = fake_ctx();
+
+        let pool_result = executor
+            .execute_crud(&contract, args.clone(), &ctx)
+            .await
+            .expect("pool-based select");
+
+        let mut scope = TestScope::begin(&pool).await;
+        let scope_result = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("scope-based select");
+        scope.rollback().await;
+
+        assert_eq!(
+            format!("{:?}", pool_result),
+            format!("{:?}", scope_result),
+            "execute_crud_in_scope must return the same record execute_crud does"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_update_rolled_back_leaves_no_durable_trace() {
+        // The Branch 2 durability-on-failure proof (design doc §6): a write
+        // issued through execute_crud_in_scope must be scoped to the
+        // caller's transaction, not committed independently the way the old
+        // per-statement-autocommit CRUD fast path always was.
+        let pool = test_pool().await;
+        // T10.3: deterministic OFFSET 0 — must be a *different* physical
+        // row than the commit-path counterpart test below (OFFSET 1),
+        // otherwise the two tests race for the same row's lock and one's
+        // commit can leak into the other's "after rollback" read (both run
+        // concurrently by default under `cargo test`). Fixed as a test-
+        // isolation issue, not a product-code one, matching this project's
+        // established PIR-D-004 precedent (shared mutable fixture races).
+        let (cbu_id, original_description): (Uuid, Option<String>) = sqlx::query_as(
+            r#"SELECT cbu_id, description FROM "ob-poc".cbus ORDER BY cbu_id LIMIT 1 OFFSET 0"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("at least one cbu row exists in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = update_description_contract();
+        let marker = format!("t9.2-scope-test-{}", Uuid::new_v4());
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string(), "description": marker });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let outcome = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("scope-based update");
+        assert!(matches!(outcome, VerbExecutionOutcome::Affected(1)));
+        scope.rollback().await;
+
+        let (after,): (Option<String>,) =
+            sqlx::query_as(r#"SELECT description FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            after, original_description,
+            "a rolled-back scope must leave zero durable trace of the write"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_update_committed_is_durable() {
+        // The commit-path counterpart to the rollback proof above: a write
+        // issued through execute_crud_in_scope, once the caller commits the
+        // scope, IS durable — this is the whole point of joining CRUD to
+        // the admitting transaction rather than leaving it autocommitted.
+        let pool = test_pool().await;
+        // T10.3: OFFSET 1 — the deliberately distinct row from the
+        // rollback test's OFFSET 0 (see the isolation note there).
+        let (cbu_id, original_description): (Uuid, Option<String>) = sqlx::query_as(
+            r#"SELECT cbu_id, description FROM "ob-poc".cbus ORDER BY cbu_id LIMIT 1 OFFSET 1"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("at least two cbu rows exist in the dev database");
+
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = update_description_contract();
+        let marker = format!("t9.2-scope-test-{}", Uuid::new_v4());
+        let args = serde_json::json!({ "cbu-id": cbu_id.to_string(), "description": marker.clone() });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await
+            .expect("scope-based update");
+        scope.commit().await;
+
+        let (after,): (Option<String>,) =
+            sqlx::query_as(r#"SELECT description FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(after, Some(marker), "a committed scope's write must be durable");
+
+        // Cleanup — restore the original value so this test leaves no
+        // lasting side effect on the dev database.
+        sqlx::query(r#"UPDATE "ob-poc".cbus SET description = $1 WHERE cbu_id = $2"#)
+            .bind(&original_description)
+            .bind(cbu_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+
+    /// T10.3: proves `execute_entity_create`'s base-`entities`-table
+    /// `record_write` call fires correctly.
+    ///
+    /// NOTE — pre-existing, unrelated bug discovered while writing this
+    /// test: `infer_pk_column` in *this* file (unlike its counterpart in
+    /// `dsl_v2::generic_executor.rs`, the actual live path for
+    /// `entity.create`) has no case for any entity extension table
+    /// (`entity_proper_persons`, `entity_limited_companies`,
+    /// `entity_funds`, ...) — it falls back to a literal `"id"` column,
+    /// which does not exist on any of them. `execute_entity_create`'s
+    /// extension-table INSERT therefore fails for every real entity type
+    /// today, independent of this task's `record_write` change (confirmed:
+    /// same failure with the `record_write` calls commented out). Fixing
+    /// `infer_pk_column` is out of scope for T10.3 (write-set-attestation
+    /// wiring only) — so this test proves the base-table capture (which
+    /// runs, and succeeds, before the broken extension step) and stops
+    /// short of the second capture, which cannot be live-DB-proven until
+    /// that separate bug is fixed. Real verb: `entity.create`
+    /// (`config/verbs/entity.yaml`, `operation: entity_create`).
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL"]
+    async fn execute_crud_in_scope_entity_create_records_base_table_write() {
+        let pool = test_pool().await;
+        let executor = PgCrudExecutor::new(pool.clone());
+        let contract = entity_create_contract();
+        let marker_first = format!("t10.3-{}", Uuid::new_v4());
+        let args = serde_json::json!({
+            "entity-type": "proper-person",
+            "first-name": marker_first,
+            "last-name": "RecordWriteTest",
+        });
+        let ctx = fake_ctx();
+
+        let mut scope = TestScope::begin(&pool).await;
+        let result = executor
+            .execute_crud_in_scope(&contract, args, &ctx, &mut scope)
+            .await;
+
+        // Expected to fail at the (pre-existing, unrelated) broken
+        // extension-table insert — see note above.
+        assert!(
+            result.is_err(),
+            "expected the pre-existing extension-table infer_pk_column bug \
+             to surface (if this now passes, that bug was fixed independently \
+             and this test should be upgraded to assert both captures)"
+        );
+
+        assert_eq!(
+            scope.captured.len(),
+            1,
+            "expected exactly 1 captured write (base entities row, before \
+             the extension insert fails), got {:?}",
+            scope.captured
+        );
+        let (base_table, _base_id, base_cols, base_created_new_entity) =
+            scope.captured[0].clone();
+        assert_eq!(base_table, "ob-poc.entities");
+        assert!(
+            base_created_new_entity,
+            "entity_create's base-table write always creates the entities row it writes to"
+        );
+        assert_eq!(
+            base_cols,
+            vec![
+                "entity_id".to_string(),
+                "entity_type_id".to_string(),
+                "name".to_string()
+            ]
+        );
+
+        // Postgres aborts the whole transaction on the extension-insert
+        // error (25P02: current transaction is aborted), so no further
+        // statement — including a same-tx existence check — can run
+        // against `scope` here. `scope.captured` is populated in-process
+        // by `record_write` independent of the SQL result, which is
+        // exactly what proves the base-table capture itself fired.
+        scope.rollback().await;
     }
 }

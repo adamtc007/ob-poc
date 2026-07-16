@@ -13,7 +13,6 @@ x = "run --package xtask --"
 git-fetch-with-cli = true
 
 [profile.dev]
-incremental = true
 debug = 1
 split-debuginfo = "unpacked"
 

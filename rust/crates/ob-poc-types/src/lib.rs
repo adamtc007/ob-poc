@@ -26,9 +26,12 @@ pub mod control;
 pub mod decision;
 pub mod disambiguation;
 pub mod entity_query;
+pub mod envelope_handle;
+pub mod execution_path;
 pub mod galaxy;
 pub mod gated_envelope;
 pub mod graph_scene;
+pub mod intent;
 pub mod investor_register;
 // Phase 3C-prep of capability-crate restructure (2026-05-13). Pack
 // manifest DTOs hoisted from ob-poc-boundary::journey::pack per plan §6.5.
@@ -58,6 +61,8 @@ pub mod viewport;
 pub use bpmn_controller::{
     InstanceState, InstanceStatus, InstanceSummary, Pool, PoolConfig, PoolStatus, PoolType,
 };
+pub use envelope_handle::EnvelopeHandle;
+pub use execution_path::ExecutionPath;
 pub use state_token_resolver::{resolve_pending_state_advance, resolve_state_token};
 
 // --------------------------------------------------------------------------

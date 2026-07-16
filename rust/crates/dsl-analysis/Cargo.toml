@@ -66,3 +66,4 @@ ob-poc-compiler = { path = "../ob-poc-compiler" }
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

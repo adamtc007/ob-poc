@@ -103,19 +103,23 @@ impl SemOsVerbOp for AssignRole {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let role_type = json_extract_string_opt(args, "role-type")
-            .map(|s| s.to_uppercase())
-            .unwrap_or_else(|| "ROLE".to_string());
-        match role_type.as_str() {
-            "OWNERSHIP" => AssignOwnership.execute(args, ctx, scope).await,
-            "CONTROL" => AssignControl.execute(args, ctx, scope).await,
-            "TRUST" | "TRUST_ROLE" => AssignTrustRole.execute(args, ctx, scope).await,
-            "FUND" | "FUND_ROLE" => AssignFundRole.execute(args, ctx, scope).await,
-            "SERVICE_PROVIDER" | "SP" => AssignServiceProvider.execute(args, ctx, scope).await,
-            "SIGNATORY" => AssignSignatory.execute(args, ctx, scope).await,
-            // Generic role binding — replicates the former `crud` role_link of
+        let arms: &[(&[&str], &dyn SemOsVerbOp)] = &[
+            (&["OWNERSHIP"], &AssignOwnership),
+            (&["CONTROL"], &AssignControl),
+            (&["TRUST", "TRUST_ROLE"], &AssignTrustRole),
+            (&["FUND", "FUND_ROLE"], &AssignFundRole),
+            (&["SERVICE_PROVIDER", "SP"], &AssignServiceProvider),
+            (&["SIGNATORY"], &AssignSignatory),
+        ];
+        match super::selector_dispatch::resolve_selector(args, "role-type", arms) {
+            super::selector_dispatch::SelectorMatch::Matched(op) => {
+                op.execute(args, ctx, scope).await
+            }
+            // Absent or unrecognized role-type both fall through to generic
+            // role binding — replicates the former `crud` role_link of
             // `cbu.assign-role` (cbu_entity_roles junction insert).
-            _ => {
+            super::selector_dispatch::SelectorMatch::Absent
+            | super::selector_dispatch::SelectorMatch::Unrecognized(_) => {
                 let cbu_id = json_extract_uuid(args, ctx, "cbu-id")?;
                 let entity_id = json_extract_uuid(args, ctx, "entity-id")?;
                 let role = json_extract_string_opt(args, "role")

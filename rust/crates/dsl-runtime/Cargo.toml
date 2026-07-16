@@ -98,3 +98,4 @@ required-features = ["harness"]
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

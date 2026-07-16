@@ -1,8 +1,15 @@
 //! G1 — Intent Admission (V&S §6.1).
 //!
-//! T1 defines the outcome/proof shape only; T2.1 wires the adapter over
-//! `SessionVerbSurface` + `SemOsContextEnvelope` (ledger C-007, C-009).
+//! T2.1 wires the adapter over `SessionVerbSurface` + `SemOsContextEnvelope`
+//! (ledger C-002, C-005, C-007, C-009, C-011, C-012, C-013, C-029, C-035,
+//! C-040). This module never recomputes verb-surface membership or SemOS
+//! CCIR/ABAC pruning — it grades an already-computed `IntentAdmissionInput`
+//! (built at the call site from `SessionVerbSurface::allowed_fqns()` /
+//! `contains()` and `SemOsContextEnvelope.pruned_verbs`) and, net-new per
+//! V&S §6.13.1 (no prior analogue — Phase 0 RR-3 found none), requires an
+//! interpretation attestation on AI-originated candidates.
 
+use crate::gate::{Gate, GateId, GateResult};
 use uuid::Uuid;
 
 /// `IntentAdmissionDecision` — V&S §6.1 "Output". Variant names mirror the
@@ -66,13 +73,85 @@ impl AdmittedIntent {
 /// `AdmittedIntent::new` — it exists so crate-internal integration-style
 /// tests elsewhere (e.g. `envelope::tests`) can obtain a fixture without
 /// duplicating this module's construction logic.
-#[cfg(test)]
-pub(crate) mod tests_support {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests_support {
     use super::AdmittedIntent;
     use uuid::Uuid;
 
-    pub(crate) fn admitted(id: Uuid, verb_fqn: &str) -> AdmittedIntent {
+    pub fn admitted(id: Uuid, verb_fqn: &str) -> AdmittedIntent {
         AdmittedIntent::new(id, verb_fqn, true)
+    }
+}
+
+/// Pre-computed input for the intent admission gate. Built at the call site
+/// by translating `SessionVerbSurface` (C-009: AgentMode + scope/workflow +
+/// SemReg CCIR + fail policy + ranking already applied) and
+/// `SemOsContextEnvelope.pruned_verbs` (C-007) — this struct is a plain
+/// snapshot of their outcome, not a re-implementation of the pruning logic
+/// itself.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct IntentAdmissionInput {
+    pub intent_id: Uuid,
+    pub verb_fqn: String,
+    /// `true` iff the verb survived into `SessionVerbSurface::allowed_fqns()`
+    /// (equivalently `.contains(verb_fqn)`), i.e. it was not pruned by
+    /// AgentMode/WorkflowPhase/GroupScope/SemRegCcir/LifecycleState/
+    /// ActorGating/FailPolicy (C-009) nor by `SemOsContextEnvelope`'s ABAC/
+    /// entity-kind/agent-mode/policy prune reasons (C-007).
+    pub is_admitted: bool,
+    /// Human-readable prune reasons when `is_admitted` is `false` — mirrors
+    /// `PruneReason`/`SurfacePrune` variant names, stringified at the call
+    /// site so this crate carries no dependency on `ob-poc`'s types.
+    pub exclusion_reasons: Vec<String>,
+    /// `true` when the candidate intent was produced by an LLM/agent
+    /// pipeline rather than typed verbatim by an operator. AI-originated
+    /// intents require an interpretation attestation (§6.13.1); operator
+    /// intents do not.
+    pub is_ai_originated: bool,
+    /// `true` iff a valid interpretation attestation (Sage pre-classification and intent telemetry) was present for this candidate; ignored unless `is_ai_originated` is `true`.
+    pub interpretation_attested: bool,
+}
+
+/// Grades an already-computed `IntentAdmissionInput`. Pure function — no I/O,
+/// no recomputation of surface membership.
+pub(crate) fn decide(input: &IntentAdmissionInput) -> IntentAdmissionDecision {
+    if !input.is_admitted {
+        return if input.exclusion_reasons.iter().any(|r| r == "unknown_intent") {
+            IntentAdmissionDecision::RejectedUnknownIntent
+        } else if input.exclusion_reasons.iter().any(|r| r == "outside_pack") {
+            IntentAdmissionDecision::RejectedOutsidePack
+        } else if input.exclusion_reasons.iter().any(|r| r == "deprecated") {
+            IntentAdmissionDecision::RejectedDeprecated
+        } else {
+            IntentAdmissionDecision::RejectedUnauthorisedSurface
+        };
+    }
+    if input.is_ai_originated && !input.interpretation_attested {
+        return IntentAdmissionDecision::RejectedAttestationInsufficient;
+    }
+    IntentAdmissionDecision::Admitted(AdmittedIntent::new(
+        input.intent_id,
+        input.verb_fqn.clone(),
+        input.interpretation_attested || !input.is_ai_originated,
+    ))
+}
+
+/// T2.1 adapter: `Gate<crate::context::EvaluationContext>` impl for G1.
+pub struct IntentAdmissionGate;
+
+impl Gate<crate::context::EvaluationContext> for IntentAdmissionGate {
+    fn id(&self) -> GateId {
+        GateId::IntentAdmission
+    }
+
+    fn evaluate(&self, ctx: &crate::context::EvaluationContext) -> GateResult {
+        let Some(input) = &ctx.intent_admission else {
+            return GateResult::Failure("no IntentAdmissionInput supplied".to_string());
+        };
+        match decide(input) {
+            IntentAdmissionDecision::Admitted(_) => GateResult::Success,
+            other => GateResult::Failure(format!("{other:?}")),
+        }
     }
 }
 
@@ -87,5 +166,123 @@ mod tests {
         assert_eq!(admitted.intent_id(), id);
         assert_eq!(admitted.verb_fqn(), "cbu.confirm");
         assert!(admitted.attested());
+    }
+
+    fn base_input() -> IntentAdmissionInput {
+        IntentAdmissionInput {
+            intent_id: Uuid::nil(),
+            verb_fqn: "cbu.confirm".to_string(),
+            is_admitted: true,
+            exclusion_reasons: vec![],
+            is_ai_originated: false,
+            interpretation_attested: false,
+        }
+    }
+
+    #[test]
+    fn operator_typed_intent_admitted_without_attestation() {
+        let input = base_input();
+        assert_eq!(
+            decide(&input),
+            IntentAdmissionDecision::Admitted(AdmittedIntent::new(Uuid::nil(), "cbu.confirm", true))
+        );
+    }
+
+    #[test]
+    fn ai_originated_intent_without_attestation_is_rejected() {
+        let input = IntentAdmissionInput {
+            is_ai_originated: true,
+            interpretation_attested: false,
+            ..base_input()
+        };
+        assert_eq!(decide(&input), IntentAdmissionDecision::RejectedAttestationInsufficient);
+    }
+
+    #[test]
+    fn ai_originated_intent_with_attestation_is_admitted() {
+        let input = IntentAdmissionInput {
+            is_ai_originated: true,
+            interpretation_attested: true,
+            ..base_input()
+        };
+        assert_eq!(
+            decide(&input),
+            IntentAdmissionDecision::Admitted(AdmittedIntent::new(Uuid::nil(), "cbu.confirm", true))
+        );
+    }
+
+    #[test]
+    fn pruned_verb_is_rejected_unauthorised_surface_by_default() {
+        let input = IntentAdmissionInput {
+            is_admitted: false,
+            exclusion_reasons: vec!["AbacDenied".to_string()],
+            ..base_input()
+        };
+        assert_eq!(decide(&input), IntentAdmissionDecision::RejectedUnauthorisedSurface);
+    }
+
+    #[test]
+    fn unknown_verb_is_rejected_unknown_intent() {
+        let input = IntentAdmissionInput {
+            is_admitted: false,
+            exclusion_reasons: vec!["unknown_intent".to_string()],
+            ..base_input()
+        };
+        assert_eq!(decide(&input), IntentAdmissionDecision::RejectedUnknownIntent);
+    }
+
+    /// T11.F.2 §6.2 regression test (ownership ledger, "Defect register —
+    /// G1", 2026-07-12): pins the current, documented-broken behaviour so
+    /// a future edit cannot silently half-heal it (e.g. fix the
+    /// `"deprecated"` match but not `"outside_pack"`) without this test
+    /// failing loudly. `decide()` string-matches `exclusion_reasons`
+    /// against the literals `"unknown_intent"`/`"outside_pack"`/
+    /// `"deprecated"`, but the real production producer
+    /// (`ob-poc`'s `control_plane_shadow.rs`) Debug-formats
+    /// `PruneReason`'s four actual variants
+    /// (`AbacDenied`/`EntityKindMismatch`/`AgentModeBlocked`/
+    /// `PolicyDenied`) — none of which ever equal those literals. This
+    /// test uses the real Debug shape of `AbacDenied` (not the bare
+    /// `"AbacDenied"` token `pruned_verb_is_rejected_unauthorised_surface_by_default`
+    /// above uses) to prove the collapse happens even for a
+    /// well-formed, realistic production string, not just a contrived
+    /// unmatched token. NOT a target to remove when this defect is
+    /// eventually fixed — invert the assertion at that point instead (the
+    /// scoped fix ticket, §6.3, is the tracked precondition).
+    #[test]
+    fn known_defect_g1_cannot_discriminate_real_prune_reasons() {
+        let real_producer_shape =
+            r#"AbacDenied { actor_role: "viewer", required: "cbu_write" }"#.to_string();
+        let input = IntentAdmissionInput {
+            is_admitted: false,
+            exclusion_reasons: vec![real_producer_shape],
+            ..base_input()
+        };
+        assert_eq!(
+            decide(&input),
+            IntentAdmissionDecision::RejectedUnauthorisedSurface,
+            "if this fails, G1's decide() has started discriminating real \
+             PruneReason values — update this test to assert the correct \
+             per-reason outcome and close the ledger's G1 defect entry"
+        );
+    }
+
+    #[test]
+    fn gate_evaluate_reports_success_on_admission() {
+        let ctx = crate::context::EvaluationContext {
+            intent_admission: Some(base_input()),
+            ..Default::default()
+        };
+        assert_eq!(IntentAdmissionGate.evaluate(&ctx), GateResult::Success);
+        assert_eq!(IntentAdmissionGate.id(), GateId::IntentAdmission);
+    }
+
+    #[test]
+    fn gate_evaluate_fails_closed_when_input_missing() {
+        let ctx = crate::context::EvaluationContext::default();
+        assert!(matches!(
+            IntentAdmissionGate.evaluate(&ctx),
+            GateResult::Failure(_)
+        ));
     }
 }

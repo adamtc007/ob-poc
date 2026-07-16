@@ -5,6 +5,11 @@ edition = "2021"
 description = "Shared API types for OB-POC - single source of truth for all boundaries"
 
 [dependencies]
+# T11.1b (2026-07-12): assemble_dsl_string's Result<String> signature
+# (moved from ob-poc::mcp::intent_pipeline alongside StructuredIntent) —
+# never actually returns Err today, but preserved verbatim rather than
+# silently changing the signature during a move.
+anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["serde", "v4", "v7", "js"] }
@@ -13,9 +18,13 @@ rust_decimal = { version = "1", features = ["serde"] }
 # BLAKE3 for StateGateHash canonical encoding (Phase 0b / 0c per
 # three-plane-architecture-v0.3.md §10.5). Pure-Rust default features only.
 blake3 = { version = "1", default-features = false }
+# hex encoding for EnvelopeHandle's content-hash display (T8.1,
+# EOP-PLAN-CONTROLPLANE-001) — matches ob-poc-control-plane's own use.
+hex = "0.4"
 
 [dev-dependencies]
 serde_json = "1"
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

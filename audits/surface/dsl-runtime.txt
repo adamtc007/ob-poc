@@ -1,4 +1,4 @@
-# dsl-runtime | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:48:20Z
+# dsl-runtime | features=all | HEAD=61540c0a5a03b25ed57a3e2a0117612e0f3fde6d | 2026-07-13T14:26:02Z
 pub mod dsl_runtime
 pub use dsl_runtime::ConditionDef
 pub use dsl_runtime::ConsistencyCheckDef
@@ -10737,6 +10737,7 @@ impl dsl_runtime::PgCrudExecutor
 pub fn dsl_runtime::PgCrudExecutor::new(sqlx_postgres::PgPool) -> Self
 impl dsl_runtime::CrudExecutionPort for dsl_runtime::PgCrudExecutor
 pub fn dsl_runtime::PgCrudExecutor::execute_crud<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn dsl_runtime::PgCrudExecutor::execute_crud_in_scope<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext, &'life3 mut dyn dsl_runtime::TransactionScope) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 impl core::marker::Freeze for dsl_runtime::PgCrudExecutor
 impl core::marker::Send for dsl_runtime::PgCrudExecutor
 impl core::marker::Sync for dsl_runtime::PgCrudExecutor
@@ -13330,8 +13331,10 @@ pub fn dsl_runtime::ConstellationRuntime::hydrate<'life0, 'life1, 'async_trait>(
 pub fn dsl_runtime::ConstellationRuntime::summary<'life0, 'life1, 'async_trait>(&'life0 self, uuid::Uuid, core::option::Option<uuid::Uuid>, &'life1 str) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<serde_json::value::Value>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait
 pub trait dsl_runtime::CrudExecutionPort: core::marker::Send + core::marker::Sync
 pub fn dsl_runtime::CrudExecutionPort::execute_crud<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn dsl_runtime::CrudExecutionPort::execute_crud_in_scope<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext, &'life3 mut dyn dsl_runtime::TransactionScope) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 impl dsl_runtime::CrudExecutionPort for dsl_runtime::PgCrudExecutor
 pub fn dsl_runtime::PgCrudExecutor::execute_crud<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn dsl_runtime::PgCrudExecutor::execute_crud_in_scope<'life0, 'life1, 'life2, 'life3, 'async_trait>(&'life0 self, &'life1 sem_os_ontology::verb_contract::VerbContractBody, serde_json::value::Value, &'life2 dsl_runtime::VerbExecutionContext, &'life3 mut dyn dsl_runtime::TransactionScope) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionOutcome>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait
 pub trait dsl_runtime::LifecycleCatalog: core::marker::Send + core::marker::Sync
 pub fn dsl_runtime::LifecycleCatalog::is_terminal_state(&self, &str, &str) -> bool
 pub fn dsl_runtime::LifecycleCatalog::is_valid_transition(&self, &str, &str, &str) -> bool
@@ -13384,10 +13387,12 @@ pub fn dsl_runtime::TradingProfileDocument::save_document<'life0, 'life1, 'async
 pub trait dsl_runtime::TransactionScope: core::marker::Send + core::marker::Sync
 pub fn dsl_runtime::TransactionScope::executor(&mut self) -> &mut sqlx_postgres::connection::PgConnection
 pub fn dsl_runtime::TransactionScope::pool(&self) -> &sqlx_postgres::PgPool
+pub fn dsl_runtime::TransactionScope::record_write(&mut self, &str, uuid::Uuid, &[alloc::string::String])
 pub fn dsl_runtime::TransactionScope::scope_id(&self) -> ob_poc_types::gated_envelope::TransactionScopeId
 pub fn dsl_runtime::TransactionScope::transaction(&mut self) -> &mut sqlx_core::transaction::Transaction<'static, sqlx_postgres::database::Postgres>
 pub trait dsl_runtime::VerbExecutionPort: core::marker::Send + core::marker::Sync
 pub fn dsl_runtime::VerbExecutionPort::execute_verb<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value, &'life2 mut dsl_runtime::VerbExecutionContext) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
+pub fn dsl_runtime::VerbExecutionPort::execute_verb_admitting_envelope<'life0, 'life1, 'life2, 'async_trait>(&'life0 self, &'life1 str, serde_json::value::Value, &'life2 mut dsl_runtime::VerbExecutionContext, core::option::Option<ob_poc_types::envelope_handle::EnvelopeHandle>) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = dsl_runtime::Result<dsl_runtime::VerbExecutionResult>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait
 pub trait dsl_runtime::ViewService: core::marker::Send + core::marker::Sync
 pub fn dsl_runtime::ViewService::dispatch_view_verb<'life0, 'life1, 'life2, 'life3, 'life4, 'async_trait>(&'life0 self, &'life1 sqlx_postgres::PgPool, &'life2 str, &'life3 serde_json::value::Value, &'life4 mut serde_json::value::Value) -> core::pin::Pin<alloc::boxed::Box<(dyn core::future::future::Future<Output = anyhow::Result<serde_json::value::Value>> + core::marker::Send + 'async_trait)>> where Self: 'async_trait, 'life0: 'async_trait, 'life1: 'async_trait, 'life2: 'async_trait, 'life3: 'async_trait, 'life4: 'async_trait
 pub async fn dsl_runtime::advance_to_current(&sqlx_postgres::PgPool, uuid::Uuid, uuid::Uuid, &str, i32) -> anyhow::Result<bool>

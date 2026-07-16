@@ -10,6 +10,12 @@
 # This guard covers what only ob-poc can see:
 #   Rule 1: no ob-poc Cargo.toml uses a hard-coded path dep back to any of
 #            the six extracted crate directories (must use workspace = true)
+#   Rule 2 (T11.2 Part A, 2026-07-13): ob-poc-agent has no dependency edge
+#            back to ob-poc (L1, EOP-VS-CONTROLPLANE-001 dependency-direction
+#            lock). Verified by cargo tree, not by convention — a future
+#            agent-tier function reaching for a capability handle directly
+#            would reintroduce this edge, and this rule fails the build
+#            instead of waiting for someone to notice.
 set -uo pipefail
 
 fail=0
@@ -25,6 +31,13 @@ hits="$(grep -rnE "($EXTRACTED).*path\s*=" \
   | grep -vE 'workspace\.dependencies' || true)"
 [ -n "$hits" ] && note "path dep to extracted crate (should be workspace = true):
 $hits"
+
+# Rule 2: ob-poc-agent must not resolve an edge to ob-poc (L1).
+agent_tree="$(cd rust && cargo tree -p ob-poc-agent --edges normal 2>&1)"
+if echo "$agent_tree" | grep -qE '(^| )ob-poc v[0-9]'; then
+  note "ob-poc-agent has a dependency edge to ob-poc (L1 violation):
+$(echo "$agent_tree" | grep -E '(^| )ob-poc v[0-9]')"
+fi
 
 if [ "$fail" -eq 0 ]; then
   echo "  OK — ob-poc layering rules hold."

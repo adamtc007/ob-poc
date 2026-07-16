@@ -1,0 +1,64 @@
+name: Control plane type-level proofs
+
+# EOP-PLAN-CONTROLPLANE-001 T1.3's exit criterion requires proving, by
+# compile-fail test, that ExecutionEnvelope::seal is unreachable from any
+# rejection form and that ExecutionEnvelope has no Deserialize impl
+# (V&S §9.4 / §6.10.3). Those proofs live in
+# rust/crates/ob-poc-control-plane/tests/compile_fail.rs (trybuild) plus
+# the crate's own unit tests, but until this workflow existed nothing ran
+# them in CI — a future PR could silently widen `seal`/a proof type's
+# constructor from private to pub and merge cleanly with no failing check
+# (independent adversarial review, docs/research/control-plane-pir-001.md,
+# PIR-D-003).
+#
+# `--features test-support` is required: it's the only way to reach the
+# crate's own `tests_support` bridges from outside `#[cfg(test)]` (see the
+# crate's Cargo.toml comment) and several unit tests depend on it; it does
+# NOT weaken the compile-fail proofs themselves, which test the opposite
+# direction (construction attempts that must fail regardless of feature
+# flags).
+#
+# The second job enforces T6's own exit criterion — "no call site
+# constructs VerbExecutionContext outside control-plane-issued paths
+# (allowlist file, CI-checked)" — which was found unmet (PIR-D-005) until
+# scripts/check-verb-execution-context-allowlist.sh existed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  proofs:
+    name: cargo test -p ob-poc-control-plane (incl. trybuild compile-fail)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-control-plane-proofs-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-control-plane-proofs-
+
+      - name: Run ob-poc-control-plane test suite (unit + trybuild compile-fail)
+        working-directory: rust
+        run: cargo test -p ob-poc-control-plane --all-targets --features test-support
+
+  verb-execution-context-allowlist:
+    name: VerbExecutionContext construction-site allowlist gate (T6 exit criterion)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allowlist gate
+        run: bash scripts/check-verb-execution-context-allowlist.sh

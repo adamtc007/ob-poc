@@ -1,0 +1,203 @@
+# Expected status of EOP-PLAN-CONTROLPLANE-001's completion invariants
+# (E1-E5), as of the invariant-promotion session
+# (docs/todo/control-plane/EOP-SESSION-CONTROLPLANE-INVARIANT-PROMOTION-001.md).
+#
+# This is a RATCHET, not a target list: CI fails if the actual status
+# (scripts/check-invariants.sh) diverges from what's recorded here IN
+# EITHER DIRECTION.
+#
+#   - actual=fail, expected=fail  -> CI green (known-incomplete, tracked)
+#   - actual=fail, expected=pass  -> CI red (a regression)
+#   - actual=pass, expected=fail  -> CI red (unexpected green — per the
+#     session's governing principle, a completion invariant going green
+#     before its expectation is flipped is itself a defect signal: either
+#     a real tranche closed it (flip the expectation, in the same diff, as
+#     a reviewed decision) or the gate was weakened/satisfied by
+#     convention (fix the gate). Silence is not an acceptable outcome for
+#     either case.
+#   - actual=pass, expected=pass  -> CI green (verified holding)
+#
+# A tranche that closes an invariant flips its row here AS PART OF that
+# tranche's diff — the flip is the reviewer's signal that a completion
+# claim is being made, not a side effect discovered later.
+#
+# Status as of 2026-07-13 (Phase 1-5 of the invariant-promotion session,
+# empirically run, not assumed):
+
+[e1]
+status = "fail"
+# 4/45 RR-3 rows provably CLOSED (hash + resolving symbol cited):
+# C-001, C-022, C-030, C-037. C-001's commit-hash citation (1a194d40)
+# backfilled 2026-07-13 (EOP-IMPL-CONTROLPLANE-GRADUATION-G0-001 Slice 4,
+# G0 item 4 / GRADPLAN plan v0.3) — no new engineering, citation-only.
+# 41/45 rows remain genuinely open.
+#
+# NOTE 2026-07-13/14 (G2 item 2, 01539938): C-032 ("CRUD executor
+# executes metadata-driven insert/update/delete/upsert without comparing
+# to a WriteSetProof") is partially, not fully, advanced -- the
+# mechanism now has a real, live call site (commit_attested genuinely
+# runs on every Path A/D commit), but the comparison itself never
+# activates (no WriteSetProof attached -- build_write_set_input's
+# allowed_columns gap, a deliberate STOP-condition, not an oversight).
+# Not counted among the 4/45 closed rows above (C-032 doesn't appear in
+# that enumeration; this is a status note, not a row-count change) --
+# recorded here so "transport wired, comparison not yet safe to enable"
+# isn't lost between sessions. Architect to decide whether this
+# warrants a named row or stays folded into the general open count.
+
+[e2]
+status = "fail"
+# UPDATED 2026-07-13/14 (G1 items 2-4, 01539938, live-DB proven; G4,
+# 02816414). Structural: 4/4 RR-2 paths (A, B, C, D) reach an admitting
+# entry point (G4 landed the B/C seam at dsl_v2::executor::
+# execute_verb_in_scope). Path A's seal->consume correlation is real and
+# entry_id-keyed (G1 items 2-4, live-DB proven from the real Path A call
+# site, re-confirmed by EOP-SESSION-CONTROLPLANE-G1-ITEMS-3-4-IMPL-001).
+# Dynamic (live DB): every path's admission mechanism works when
+# enabled, but OB_POC_CONTROL_PLANE_ENFORCE_VERBS is unset by production
+# default (NotEnforced) everywhere -- enforce-capable on all paths, not
+# yet enforced on any. Status stays fail: no verb is enforced by
+# production default on any path -- pure capability, not enforcement.
+
+[e3]
+status = "fail"
+# UPDATED 2026-07-13 (EOP-SESSION-CONTROLPLANE-G2-AUDIT-PROVENANCE-IMPL-001,
+# architect ruling same day). 11/14 gates (G1-G9, G10, G13) now have
+# substantive (Success/Failure) samples with metrics flowing, each at its
+# expected provenance (verified live: IntentAdmission 57, EntityBinding/
+# PackResolution/DagProof/Evidence/WriteSet/StpClassifier/RunbookProof/
+# DecisionSnapshot 24 each, Authority 57, ExecutionEnvelope 7 — all
+# shadow_eval except ExecutionEnvelope's 7 at consume_seam per AD-1(a)).
+# G11 (AuditReplay), G12 (VersionPinning), G14 (WriteSetAttestation)
+# remain at zero.
+#
+# Ruling of record: G10's 7 samples are entirely test-sourced (this
+# session's own live-DB `t4_1`/W1/W3 executions against local Postgres),
+# not production traffic — flagged explicitly as a question for the
+# architect rather than assumed. Ruling: "we have no real samples — so
+# however sourced will have to do." This is the single-operator-deployment
+# posture already established for AD-3(a) (the operator IS the traffic;
+# nothing production-sourced exists until GM's merge+deploy opens the
+# window) applied consistently to E3 — a gate counts as evaluated once it
+# has substantive samples at its correct provenance, regardless of
+# whether the run that produced them was a live-DB test or live traffic.
+# G11/G12/G14 remain genuinely zero under this same bar (no wiring
+# exists yet, test or otherwise) — not a relaxation of the bar, a
+# clarification of what it was already measuring.
+#
+# CAUTION (2026-07-13 review finding #3, still applies): this "fail" is
+# satisfied identically by a verified live result (E3_INVARIANT_FAILURE —
+# what's recorded above, from a real run against local Postgres) AND by
+# an unreachable database (E3_INFRASTRUCTURE_FAILURE — the probe cannot
+# even run). CI today has no live DB, so its e3 leg never runs the live
+# half at all (skip -> fail by design). If a live DB is ever wired into
+# CI for this job, check `scripts/check-invariants.sh e3`'s output for
+# an E3_INFRASTRUCTURE_FAILURE marker before trusting a "fail" as
+# verified — an infra failure must be fixed immediately, not left to
+# masquerade as this expected status indefinitely.
+
+[e4]
+status = "fail"
+# UPDATED 2026-07-14 (G6b, 9614be04). 2/5 Mode-1 register rows (RR-5)
+# satisfied: toctou_entity_tables (both branches -- verify_pins_in_scope
+# is a real call site, and the real per-entity pin populator now
+# reaches it via has_unpinned_entities, RED->GREEN proven) and
+# raw_dsl_best_effort (named test raw_dsl_execution_requires_human_gate
+# proves Path C fails closed with no envelope -- the row's original
+# literal-bypass threat was already closed by Slice 3.1, 2026-04-22).
+# bus_operational_writes and shadow_envelope_entities remain untouched.
+# bpmn_process_instances is confirmed a bpmn-lite-side gap, not an
+# ob-poc one (G6c, ratified 2026-07-14 -- see
+# scripts/check-invariants.sh's gate_e4 row comment and the ownership
+# ledger) -- its remediation path is bpmn-lite's own governance, not a
+# lingering ob-poc investigation.
+
+[e5]
+status = "fail"
+# UPDATED 2026-07-13 (EOP-IMPL-CONTROLPLANE-GRADUATION-G0-001 Slice 1 /
+# GRADPLAN plan v0.3 G0 item 1). 4/5 named-stale baselines refreshed and
+# confirmed noise-only (dsl-runtime, ob-poc-control-plane, ob-poc-boundary,
+# ob-poc-types — each diff traced via `git log -S` to a real, already-
+# landed tranche commit dated 2026-07-11/07-12: T10.3/T9.2/T9.7/T11.1b).
+# ob-poc itself is a STOP (not refreshed): its diff is ~23k lines
+# including a genuinely new blanket `tower_http::follow_redirect::
+# policy::PolicyExt` impl (a dependency-version-driven surface widening,
+# not just already-shipped symbols) mixed with Send/Sync-ordering noise —
+# too large/mixed to safely eyeball in a grind slice per Slice 1's own
+# STOP-condition; needs its own review, not a silent baseline overwrite.
+# Two items RECLASSIFIED from hygiene to bug-fix (both STOP-conditions
+# fired, confirmed by direct build): (1) ob-poc-agent's `cargo public-api`
+# "measurement error" is NOT tooling-only — it fails because
+# `ob-poc-boundary::toctou_recheck::verify_pins_in_scope` (and its sqlx
+# imports) is NOT gated behind `#[cfg(feature = "database")]`, so building
+# ob-poc-boundary at less than its own default features breaks the
+# dependent crate's rustdoc-JSON build; (2) the 4 `--no-default-features`
+# failures (ob-poc-derived-attributes, ob-poc-entity-linking, ob-poc-
+# taxonomy, ob-poc-trading-profile) are the same defect shape — real
+# unconditional `sqlx::` usage in source (e.g. `derived_attributes/
+# repository.rs`), not a Cargo.toml-only feature-declaration gap as
+# previously characterized.
+#
+# UPDATED 2026-07-13 (later same day, follow-up scoped fix): both (1) and
+# (2) are now FIXED. `verify_pins_in_scope` (toctou_recheck.rs) gated
+# `#[cfg(feature = "database")]`; `ob-poc-agent`'s own unconditional
+# re-export of `ob_poc_sage::session_context` (itself database-gated in
+# ob-poc-sage) gated to match, with a new `database` feature added to
+# ob-poc-agent's own (previously feature-less) Cargo.toml, cascaded from
+# root's `database` feature. The 4 crates: each had one or two fully-
+# sqlx-dependent modules (advisory_lock/derived_attributes,
+# compiler.rs, view_config_service.rs, document_ops.rs/resolve.rs) gated
+# at the mod-declaration level, matching the `ast_db` pattern
+# ob-poc-trading-profile already used elsewhere in the same crate;
+# ob-poc-entity-linking also had an independent, unrelated bug uncovered
+# once the sqlx leak stopped masking it (`smallvec`'s `serde` feature was
+# never explicitly requested — fixed). Membrane check §2 (the sqlx/
+# PgPool/PgConnection --no-default-features floor) and §3 (test-double
+# leak) sections are now both clean with zero findings. `ob-poc-agent`'s
+# ratchet baseline refreshed for the first time since 2026-07-01 (was
+# unmeasurable this whole time due to the bug above) — 12146 lines, 0
+# removals, a clean first-successful-capture, not a mixed diff requiring
+# review the way `ob-poc`'s own stale baseline does (still untouched,
+# still a STOP, unrelated to this fix). cargo build/test (workspace,
+# default features, and each touched crate's own default/database/
+# --no-default-features combinations) all green; the two pre-existing
+# ob-poc-boundary test failures (acp_dag_semantic, acp_registry_projection
+# — verb-registry/DAG count drift) were confirmed pre-existing via
+# `git stash`, unrelated to this fix, not touched.
+#
+# Remaining open E5 items (as of 2026-07-13): ob-poc's own stale
+# baseline (still a STOP, needs its own review — tower_http trait-impl
+# surface widening mixed with toolchain Send/Sync-ordering noise across
+# many crates); the broader ratchet-trip sweep across dsl-analysis/
+# dsl-lsp/entity-gateway/ob-agentic/sem_os_postgres/etc. (same
+# Send/Sync-ordering nightly-toolchain noise, pre-existing, out of scope
+# for this fix).
+#
+# UPDATED 2026-07-14 (EOP-SESSION-CONTROLPLANE-OBPOC-BASELINE-REVIEW-001,
+# 2c81e021): ob-poc's own stale baseline (the STOP left above) reviewed
+# and refreshed — the last of the 5 named-stale baselines. Root-caused,
+# not just re-eyeballed: the diff's dominant piece (6109/17365 changed
+# lines) is two blanket-impl trait fanouts (tower_http::follow_redirect::
+# policy::PolicyExt, iri_string::format::ToStringFallible) that surface
+# universally across every public type once resolved — caused by T11.1b
+# (7821ecb7) making ob-poc-agent a real dependency of ob-poc, which
+# transitively activates ob-poc-agent's own reqwest rustls-tls ->
+# tower-http follow-redirect feature; empirically confirmed absent at
+# the pre-T11.1b commit under an identical build environment (git
+# worktree re-run). A further 4018/17365 lines are the already-
+# established-safe Send/Sync nightly-toolchain reorder noise (same
+# pattern as the 4 baselines refreshed 2026-07-13). The residual
+# 7238/17365 lines are real, already-ratified work — >95% of the
+# removed side is the T11.1b agent-tier extraction (semtaxonomy_v2,
+# journey::{pack_manager,router}, research::executor relocated to
+# ob-poc-agent; PackCandidate/IntentArgValue relocated to
+# ob-poc-types), the added side dominated by genuine G2/G4/G6b
+# control-plane symbols (ShadowDecisionRow, ExecutionContext's
+# execution_path/envelope_handle/already_admitted_for,
+# with_execution_path, execute_verb_admitting_envelope's new
+# ExecutionPath param) — every group traced via git log -S to a named,
+# already-landed commit; zero unclassified residual (exact line-count
+# reconciliation: 6021+88+4018+7238 = 17365 = 9036 removed + 8329 added,
+# matching the raw diff exactly). Status stays fail: the ob-poc-agent +
+# 4-crate --no-default-features items above and the broader ratchet-trip
+# sweep remain open, unaffected by and unrelated to this refresh.

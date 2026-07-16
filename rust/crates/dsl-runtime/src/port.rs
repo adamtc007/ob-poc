@@ -45,6 +45,46 @@ pub trait VerbExecutionPort: Send + Sync {
         args: serde_json::Value,
         ctx: &mut VerbExecutionContext,
     ) -> Result<VerbExecutionResult>;
+
+    /// T4.1 (EOP-PLAN-CONTROLPLANE-001): envelope-admitting entry point.
+    ///
+    /// `envelope_handle` is `Some` only when the caller holds a sealed
+    /// control-plane `ExecutionEnvelope` (`ob-poc-control-plane`) for this
+    /// dispatch. T8.1 widened this from a bare `Uuid` to the typed
+    /// `ob_poc_types::EnvelopeHandle` (id + content hash) — `ob-poc-types`
+    /// is a values-only boundary crate this trait (the pure execution-tier
+    /// contract) can depend on without depending on `ob-poc-control-plane`
+    /// itself (see `ob_poc_types::envelope_handle`'s module doc for why the
+    /// handle lives there). The implementor re-resolves the handle against
+    /// its own envelope store to verify/consume it, now checking the
+    /// content hash (`try_consume`) rather than id alone
+    /// (`try_consume_by_id`, retired — a handle minted from a different
+    /// envelope than the one sealed is now rejected here, not just at the
+    /// id-lookup level).
+    ///
+    /// Default implementation ignores the handle and degrades to the
+    /// legacy envelope-less `execute_verb` path — every existing
+    /// implementor (including test doubles) is behaviourally unchanged
+    /// unless it explicitly overrides this method, matching the plan's
+    /// shadow-first posture (§0): a gate/envelope concept landing in the
+    /// trait must not, by itself, change any dispatch outcome.
+    ///
+    /// G3 (`EOP-DESIGN-CONTROLPLANE-G3-ENFORCEMENT-DIMENSION-001` §3(d)):
+    /// `path` names which of the four RR-2 admission ingress points this
+    /// dispatch entered through — `EnforcedVerbs` can express "graduate
+    /// this verb on Path A only" against it. The default impl ignores it
+    /// exactly as it already ignores `envelope_handle` — same
+    /// degrades-safely precedent.
+    async fn execute_verb_admitting_envelope(
+        &self,
+        verb_fqn: &str,
+        args: serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        _envelope_handle: Option<ob_poc_types::EnvelopeHandle>,
+        _path: ob_poc_types::ExecutionPath,
+    ) -> Result<VerbExecutionResult> {
+        self.execute_verb(verb_fqn, args, ctx).await
+    }
 }
 
 /// Port trait for CRUD verb execution — driven by `VerbContractBody.crud_mapping`.
@@ -67,6 +107,35 @@ pub trait CrudExecutionPort: Send + Sync {
         contract: &VerbContractBody,
         args: serde_json::Value,
         ctx: &VerbExecutionContext,
+    ) -> Result<VerbExecutionOutcome>;
+
+    /// T9.2 (§3 Branch 2, EOP-PLAN-CONTROLPLANE-001 Addendum B): the same
+    /// dispatch as [`execute_crud`](Self::execute_crud), but against a
+    /// caller-supplied scope already inside a `PgTransactionScope`
+    /// rather than a fresh pool checkout.
+    ///
+    /// Deliberately has **no default implementation** (OQ2, resolved during
+    /// design): a silent pool-based fallback here would defeat T9.2's whole
+    /// purpose — the caller believes this CRUD verb's writes are joined to
+    /// its admitting scope, and a default degrading to `execute_crud`
+    /// would silently break that belief with no compiler signal, repeating
+    /// the `try_consume_by_id` two-APIs-one-weaker lesson (PIR-D-008) one
+    /// gate later. Every implementor of this trait must decide for itself
+    /// how (or whether) to honor this method.
+    ///
+    /// T10.3 (EOP-PLAN-CONTROLPLANE-001 Addendum C): widened from
+    /// `conn: &mut sqlx::PgConnection` to `scope: &mut dyn TransactionScope`
+    /// — SQL dispatch still goes through `scope.executor()` (unchanged
+    /// behaviour), but implementors now also have `scope.record_write(...)`
+    /// available to self-report writes for G14's write-set attestation.
+    /// Flagged and ratified as a genuine trait-signature change, not added
+    /// silently (see the ownership ledger's T10.3 entry).
+    async fn execute_crud_in_scope(
+        &self,
+        contract: &VerbContractBody,
+        args: serde_json::Value,
+        ctx: &VerbExecutionContext,
+        scope: &mut dyn crate::TransactionScope,
     ) -> Result<VerbExecutionOutcome>;
 }
 

@@ -34,6 +34,13 @@ ob-poc = { path = "../..", features = ["server"] }
 # Shared API types (single source of truth for all boundaries)
 ob-poc-types = { path = "../ob-poc-types" }
 
+# G5 (EOP-PLAN-CONTROLPLANE-GRADUATION-001 §3 item 4): Path D's
+# bus_runtime.rs adapter builds a bounded EvaluationContext and calls
+# evaluate_shadow/apply_matrix directly (ob-poc-control-plane already has
+# zero execution-tier dependents beyond ob-poc/ob-poc-boundary/ob-poc-agent
+# -- adding ob-poc-web is the same "values + evaluator" edge, no cycle).
+ob-poc-control-plane = { path = "../ob-poc-control-plane" }
+
 # Phase 3 slice A (2026-07-01): direct deps for the 3 real hub-re-export
 # consumers migrated off `ob_poc::{entity_linking,lexicon,acp_session_input_draft_mode}`.
 ob-poc-entity-linking = { path = "../ob-poc-entity-linking" }
@@ -63,6 +70,9 @@ sem_os_postgres = { path = "../sem_os_postgres" }
 # means the startup wiring now imports it from this crate.
 dsl-runtime = { path = "../dsl-runtime" }
 
+# T9.1e — verb->table write-footprint loader (G7 shadow evaluation).
+sem_os_obpoc_adapter = { path = "../sem_os_obpoc_adapter" }
+
 # T2B.9 — federated DSL bus (extracted to github.com/adamtc007/bpmn-lite v0.2.0).
 dsl-bus-client.workspace = true
 dsl-bus-server.workspace = true
@@ -85,3 +95,4 @@ default = []
 
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

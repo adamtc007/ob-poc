@@ -24,9 +24,6 @@ pub(crate) mod acp_runtime_context;
 // envelope surface at module top.
 pub(crate) mod acp_state_anchor;
 
-// Domain handlers for business logic
-pub(crate) mod domains;
-
 // Database integration (when enabled)
 #[cfg(feature = "database")]
 pub mod database;
@@ -176,15 +173,16 @@ pub mod sem_reg;
 // `dsl-runtime::state_reducer`; consumer `state_ops` moved alongside it.
 // Constellation graph + resolver was removed/relocated alongside this.
 
-// SemTaxonomy v2 — three-step rip-and-replace pipeline
+// SemTaxonomy v2 — three-step rip-and-replace pipeline.
+// T11.1b (2026-07-12): relocated to ob-poc-agent (agent-tier extraction,
+// zero capability-crate deps of its own). Re-exported here, same
+// `database` feature gate as before, so every existing
+// `crate::semtaxonomy_v2::*` caller continues to resolve unchanged.
 #[cfg(feature = "database")]
-pub mod semtaxonomy_v2;
+pub use ob_poc_agent::semtaxonomy_v2;
 
 // Sage — intent understanding layer (plane, polarity, domain — no verb FQNs)
 pub(crate) mod sage;
-
-// Core domain capabilities
-pub use domains::{DomainHandler, DomainRegistry, DomainResult};
 
 // Essential error types — re-exported from ob-poc-diagnostics so the
 // crate-root API (`ob_poc::DSLError`, `ob_poc::ParseError`) stays stable.

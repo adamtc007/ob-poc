@@ -32,8 +32,23 @@
 //!   Removed once those services adopt scope-aware signatures.
 //!
 //! Dyn-compatibility is preserved — every method is object-safe.
+//!
+//! # T10.3 (EOP-PLAN-CONTROLPLANE-001 Addendum C)
+//!
+//! [`TransactionScope::record_write`] joined the trait (default no-op
+//! body) so the CRUD executor (`dsl-runtime::crud_executor`, which only
+//! ever holds `&mut dyn TransactionScope`) can self-report writes for
+//! G14's write-set attestation without depending on `ob-poc`'s concrete
+//! `PgTransactionScope` type. The capture mechanism itself (T5.1) already
+//! existed as an inherent method there; this promotes it onto the trait
+//! so a dyn-dispatched caller can reach it — a real, bounded, additive
+//! trait change, flagged and ratified rather than added silently (see the
+//! ownership ledger's T10.3 entry for the B1 reasoning). Every other
+//! `TransactionScope` implementor (test mocks, harness executors) is
+//! unaffected by the default no-op.
 
 use ob_poc_types::TransactionScopeId;
+use uuid::Uuid;
 
 /// A transaction-scope handle supplied by the Sequencer to the runtime at
 /// dispatch time.
@@ -74,6 +89,32 @@ pub trait TransactionScope: Send + Sync {
     /// on the scope has no effect on them. Removed once every service
     /// takes `&mut dyn TransactionScope` or `&mut Transaction` directly.
     fn pool(&self) -> &sqlx::PgPool;
+
+    /// T10.3: self-report a write the caller performed via
+    /// `executor()`/`transaction()`, for G14's write-set attestation
+    /// (V&S §6.7.1). sqlx offers no post-hoc introspection of which
+    /// table/columns a raw query touched, so this is honestly
+    /// self-reported, not independently observed — a caller that writes
+    /// without calling this under-reports its own footprint.
+    ///
+    /// `created_new_entity`: true when this write created `entity_id` in
+    /// this same transaction (a fresh id can never have been in the
+    /// pre-execution write-set bound). See
+    /// `ob-poc-control-plane::write_set_attestation::CapturedWrite` for
+    /// the full reasoning this param feeds into.
+    ///
+    /// Default no-op: only `ob-poc`'s concrete `PgTransactionScope`
+    /// overrides this (it owns the `captured_writes` accumulator T5.1-T5.3
+    /// already built); every other implementor (test mocks, harness
+    /// executors) is unaffected.
+    fn record_write(
+        &mut self,
+        _table: &str,
+        _entity_id: Uuid,
+        _columns: &[String],
+        _created_new_entity: bool,
+    ) {
+    }
 }
 
 #[cfg(test)]

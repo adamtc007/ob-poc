@@ -12,9 +12,30 @@ serde_json = "1.0"
 thiserror = "1.0"
 sha2 = "0.10"
 hex = "0.4"
+# T8.1 (EOP-PLAN-CONTROLPLANE-001): EnvelopeHandle moved to this
+# values-only boundary crate so dsl-runtime can carry a typed handle
+# across the VerbExecutionPort trait boundary without depending on
+# ob-poc-control-plane itself. This does not weaken the "no
+# execution-tier crate" constraint in this crate's own description:
+# ob-poc-types has zero execution-tier logic, only value types.
+ob-poc-types = { path = "../ob-poc-types" }
 
 [dev-dependencies]
 trybuild = "1"
 
+[features]
+# Off by default (not enabled by [dependencies] consumers, only by a
+# downstream crate's [dev-dependencies] feature unification during `cargo
+# test`). Exposes `envelope::test_support::seal` — a thin pass-through to
+# the crate-private `ExecutionEnvelope::seal` constructor, for downstream
+# crates (e.g. ob-poc's T4.2 envelope-persistence tests) that need a real
+# sealed envelope to exercise storage/consume-once/TTL logic against. This
+# does not weaken the tollgate itself: every parameter is still every
+# gate's own success-form proof by signature, obtainable only via each
+# gate's own module-private construction path — it only relaxes *where*
+# `seal` may be called from (feature-gated, not crate-boundary-gated).
+test-support = []
+
 [lints.rust]
 unreachable_pub = "deny"
+dead_code = "deny"

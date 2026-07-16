@@ -337,12 +337,20 @@ impl SemOsContextEnvelope {
     /// Create a test envelope with specific allowed verbs (deny_all = false, unavailable = false).
     #[cfg(test)]
     pub fn test_with_verbs(verbs: &[&str]) -> Self {
+        Self::test_with_verbs_and_pruned(verbs, vec![])
+    }
+
+    /// As `test_with_verbs`, but also sets `pruned_verbs` — used by tests
+    /// exercising T2.1 exclusion-reason translation
+    /// (`agent::control_plane_shadow::build_evaluation_context`).
+    #[cfg(test)]
+    pub fn test_with_verbs_and_pruned(verbs: &[&str], pruned_verbs: Vec<PrunedVerb>) -> Self {
         let allowed: HashSet<String> = verbs.iter().map(|v| v.to_string()).collect();
         let fingerprint = AllowedVerbSetFingerprint::compute(&allowed);
         SemOsContextEnvelope {
             allowed_verbs: allowed,
             allowed_verb_contracts: vec![],
-            pruned_verbs: vec![],
+            pruned_verbs,
             fingerprint,
             evidence_gaps: vec![],
             governance_signals: vec![],

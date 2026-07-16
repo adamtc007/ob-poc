@@ -14,8 +14,9 @@
 //! This test is the live-DB attestation of that fact.
 
 use ob_poc_kyc_substrate::determination::{DeterminationStrategy, OwnershipProngStrategy};
-use ob_poc_kyc_substrate::fold::control::ReconciledEconomicEdge;
-use ob_poc_kyc_substrate::{EdgeId, EntityId, EventId, PersonId};
+use ob_poc_kyc_substrate::{
+    ControlState, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, PersonId,
+};
 
 use std::collections::BTreeSet;
 
@@ -31,26 +32,37 @@ fn w7_oracle_ownership_prong_on_private_company_fixture() {
     let p2 = PersonId(uuid::Uuid::new_v4());
 
     let nil_event = EventId(uuid::Uuid::nil());
-    let mk = |from: EntityId, to: EntityId, pct: f64| ReconciledEconomicEdge {
-        id: EdgeId(uuid::Uuid::new_v4()),
-        from,
-        to,
-        percentage: pct,
-        verified_by: None,
-        originating_event_id: nil_event,
+    let mk = |from: EntityId, to: EntityId, pct: f64| {
+        let id = EdgeId(uuid::Uuid::new_v4());
+        (
+            id,
+            EdgeState {
+                id,
+                kind: EdgeKind::EconomicInterest,
+                from,
+                to,
+                percentage: Some(pct),
+                status: EdgeStatus::Verified,
+                evidence_event_id: None,
+                originating_event_id: nil_event,
+            },
+        )
     };
     // Edge percentages are in percentage-point units (60 = 60%), matching the
     // strategy's formula: new_pct = cumulative_pct * edge_pct / 100.
     // Starting at 100pp: E0→AO=60pp → 60pp; P1→E0=30pp → 18pp; P2→E0=80pp → 48pp.
-    let edges = vec![
+    let mut control = ControlState::default();
+    for (id, edge) in [
         mk(EntityId(e0.0), ao, 60.0),
         mk(EntityId(p1.0), e0, 30.0),
         mk(EntityId(p2.0), e0, 80.0),
-    ];
+    ] {
+        control.edges.insert(id, edge);
+    }
 
     let natural_persons: BTreeSet<PersonId> = [p1, p2].into_iter().collect();
     let strategy = OwnershipProngStrategy;
-    let candidates = strategy.resolve(&edges, ao, &natural_persons, 0.25);
+    let candidates = strategy.resolve(&control, ao, &natural_persons, 0.25);
 
     // Strategy computes effective % by chain-multiplication (percentage-point units):
     //   E0→AO: 60pp. P1→E0: 30pp. P2→E0: 80pp.

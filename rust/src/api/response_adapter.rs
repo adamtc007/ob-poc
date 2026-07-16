@@ -251,7 +251,9 @@ fn repl_state_to_session_state(state: &ReplStateV2) -> SessionStateEnum {
         ReplStateV2::ConstellationMapSelection { .. }
         | ReplStateV2::JourneySelection { .. }
         | ReplStateV2::InPack { .. } => SessionStateEnum::Scoped,
-        ReplStateV2::Clarifying { .. } => SessionStateEnum::PendingValidation,
+        ReplStateV2::Clarifying { .. } | ReplStateV2::PackMismatchConfirm { .. } => {
+            SessionStateEnum::PendingValidation
+        }
         ReplStateV2::SentencePlayback { .. } | ReplStateV2::RunbookEditing => {
             SessionStateEnum::ReadyToExecute
         }

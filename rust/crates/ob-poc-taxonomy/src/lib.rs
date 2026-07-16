@@ -11,6 +11,12 @@
 #![deny(unreachable_pub)]
 
 pub mod taxonomy;
+// Unconditionally sqlx-backed (view-mode/node-type/layout loader queries
+// against PgPool) — gated to keep the crate buildable at
+// --no-default-features (2026-07-13 E5 fix, membrane check §6.2).
+// `taxonomy::rules`'s own use of it is already correctly
+// #[cfg(feature = "database")]-gated internally.
+#[cfg(feature = "database")]
 pub mod view_config_service;
 
 #[cfg(test)]

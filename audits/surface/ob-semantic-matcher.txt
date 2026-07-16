@@ -1,4 +1,4 @@
-# ob-semantic-matcher | features=all | HEAD=78c375c6fc27e0303518e58fffc59c0612be379d | 2026-07-01T13:49:06Z
+# ob-semantic-matcher | features=all | HEAD=e029ebd941f9367aede5336d4222be2394a80072 | 2026-07-10T16:49:36Z
 pub mod ob_semantic_matcher
 pub mod ob_semantic_matcher::centroid
 pub fn ob_semantic_matcher::centroid::compute_centroid(&[alloc::vec::Vec<f32>]) -> alloc::vec::Vec<f32>
@@ -1085,216 +1085,216 @@ pub enum ob_semantic_matcher::feedback::InputSource
 pub ob_semantic_matcher::feedback::InputSource::Chat
 pub ob_semantic_matcher::feedback::InputSource::Command
 pub ob_semantic_matcher::feedback::InputSource::Voice
-impl ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::as_str(&self) -> &'static str
-impl core::clone::Clone for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::clone(&self) -> ob_semantic_matcher::feedback::InputSource
-impl core::cmp::Eq for ob_semantic_matcher::feedback::InputSource
-impl core::cmp::PartialEq for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::eq(&self, &ob_semantic_matcher::feedback::InputSource) -> bool
-impl core::fmt::Debug for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for ob_semantic_matcher::feedback::InputSource
-impl core::marker::StructuralPartialEq for ob_semantic_matcher::feedback::InputSource
-impl serde_core::ser::Serialize for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_semantic_matcher::feedback::InputSource
-impl core::marker::Send for ob_semantic_matcher::feedback::InputSource
-impl core::marker::Sync for ob_semantic_matcher::feedback::InputSource
-impl core::marker::Unpin for ob_semantic_matcher::feedback::InputSource
-impl core::marker::UnsafeUnpin for ob_semantic_matcher::feedback::InputSource
-impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::feedback::InputSource
-impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::feedback::InputSource
-impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::feedback::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::feedback::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for ob_semantic_matcher::feedback::InputSource where U: core::convert::From<T>
-pub fn ob_semantic_matcher::feedback::InputSource::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::feedback::InputSource where U: core::convert::Into<T>
-pub type ob_semantic_matcher::feedback::InputSource::Error = core::convert::Infallible
-pub fn ob_semantic_matcher::feedback::InputSource::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::feedback::InputSource where U: core::convert::TryFrom<T>
-pub type ob_semantic_matcher::feedback::InputSource::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_semantic_matcher::feedback::InputSource::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::feedback::InputSource where T: core::clone::Clone
-pub type ob_semantic_matcher::feedback::InputSource::Owned = T
-pub fn ob_semantic_matcher::feedback::InputSource::clone_into(&self, &mut T)
-pub fn ob_semantic_matcher::feedback::InputSource::to_owned(&self) -> T
-impl<T> core::any::Any for ob_semantic_matcher::feedback::InputSource where T: 'static + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::feedback::InputSource where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::feedback::InputSource where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_semantic_matcher::feedback::InputSource where T: core::clone::Clone
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::feedback::InputSource
-pub type ob_semantic_matcher::feedback::InputSource::Init = T
-pub const ob_semantic_matcher::feedback::InputSource::ALIGN: usize
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::deref<'a>(usize) -> &'a T
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::drop(usize)
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for ob_semantic_matcher::feedback::InputSource
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::feedback::InputSource where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> tracing::instrument::Instrument for ob_semantic_matcher::feedback::InputSource
-impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::feedback::InputSource
-impl<T> typenum::type_operators::Same for ob_semantic_matcher::feedback::InputSource
-pub type ob_semantic_matcher::feedback::InputSource::Output = T
-impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::feedback::InputSource where T: 'static
-impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::feedback::InputSource where V: ppv_lite86::types::MultiLane<T>
-pub fn ob_semantic_matcher::feedback::InputSource::vzip(self) -> V
+impl ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::as_str(&self) -> &'static str
+impl core::clone::Clone for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::clone(&self) -> ob_semantic_matcher::InputSource
+impl core::cmp::Eq for ob_semantic_matcher::InputSource
+impl core::cmp::PartialEq for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::eq(&self, &ob_semantic_matcher::InputSource) -> bool
+impl core::fmt::Debug for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_semantic_matcher::InputSource
+impl core::marker::StructuralPartialEq for ob_semantic_matcher::InputSource
+impl serde_core::ser::Serialize for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_semantic_matcher::InputSource
+impl core::marker::Send for ob_semantic_matcher::InputSource
+impl core::marker::Sync for ob_semantic_matcher::InputSource
+impl core::marker::Unpin for ob_semantic_matcher::InputSource
+impl core::marker::UnsafeUnpin for ob_semantic_matcher::InputSource
+impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::InputSource
+impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::InputSource
+impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_semantic_matcher::InputSource where U: core::convert::From<T>
+pub fn ob_semantic_matcher::InputSource::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::InputSource where U: core::convert::Into<T>
+pub type ob_semantic_matcher::InputSource::Error = core::convert::Infallible
+pub fn ob_semantic_matcher::InputSource::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::InputSource where U: core::convert::TryFrom<T>
+pub type ob_semantic_matcher::InputSource::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_semantic_matcher::InputSource::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::InputSource where T: core::clone::Clone
+pub type ob_semantic_matcher::InputSource::Owned = T
+pub fn ob_semantic_matcher::InputSource::clone_into(&self, &mut T)
+pub fn ob_semantic_matcher::InputSource::to_owned(&self) -> T
+impl<T> core::any::Any for ob_semantic_matcher::InputSource where T: 'static + ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::InputSource where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::InputSource where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_semantic_matcher::InputSource where T: core::clone::Clone
+pub unsafe fn ob_semantic_matcher::InputSource::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::InputSource
+pub type ob_semantic_matcher::InputSource::Init = T
+pub const ob_semantic_matcher::InputSource::ALIGN: usize
+pub unsafe fn ob_semantic_matcher::InputSource::deref<'a>(usize) -> &'a T
+pub unsafe fn ob_semantic_matcher::InputSource::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn ob_semantic_matcher::InputSource::drop(usize)
+pub unsafe fn ob_semantic_matcher::InputSource::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for ob_semantic_matcher::InputSource
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::InputSource where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_semantic_matcher::InputSource
+impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::InputSource
+impl<T> typenum::type_operators::Same for ob_semantic_matcher::InputSource
+pub type ob_semantic_matcher::InputSource::Output = T
+impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::InputSource where T: 'static
+impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::InputSource where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_semantic_matcher::InputSource::vzip(self) -> V
 pub enum ob_semantic_matcher::feedback::MatchConfidence
 pub ob_semantic_matcher::feedback::MatchConfidence::High
 pub ob_semantic_matcher::feedback::MatchConfidence::Low
 pub ob_semantic_matcher::feedback::MatchConfidence::Medium
 pub ob_semantic_matcher::feedback::MatchConfidence::None
-impl ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::as_str(&self) -> &'static str
-pub fn ob_semantic_matcher::feedback::MatchConfidence::from_score(f32) -> Self
-impl core::clone::Clone for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::clone(&self) -> ob_semantic_matcher::feedback::MatchConfidence
-impl core::cmp::Eq for ob_semantic_matcher::feedback::MatchConfidence
-impl core::cmp::PartialEq for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::eq(&self, &ob_semantic_matcher::feedback::MatchConfidence) -> bool
-impl core::fmt::Debug for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::StructuralPartialEq for ob_semantic_matcher::feedback::MatchConfidence
-impl serde_core::ser::Serialize for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::Send for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::Sync for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::Unpin for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::UnsafeUnpin for ob_semantic_matcher::feedback::MatchConfidence
-impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::feedback::MatchConfidence
-impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::feedback::MatchConfidence
-impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::feedback::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::feedback::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for ob_semantic_matcher::feedback::MatchConfidence where U: core::convert::From<T>
-pub fn ob_semantic_matcher::feedback::MatchConfidence::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::feedback::MatchConfidence where U: core::convert::Into<T>
-pub type ob_semantic_matcher::feedback::MatchConfidence::Error = core::convert::Infallible
-pub fn ob_semantic_matcher::feedback::MatchConfidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::feedback::MatchConfidence where U: core::convert::TryFrom<T>
-pub type ob_semantic_matcher::feedback::MatchConfidence::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_semantic_matcher::feedback::MatchConfidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::feedback::MatchConfidence where T: core::clone::Clone
-pub type ob_semantic_matcher::feedback::MatchConfidence::Owned = T
-pub fn ob_semantic_matcher::feedback::MatchConfidence::clone_into(&self, &mut T)
-pub fn ob_semantic_matcher::feedback::MatchConfidence::to_owned(&self) -> T
-impl<T> core::any::Any for ob_semantic_matcher::feedback::MatchConfidence where T: 'static + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::feedback::MatchConfidence where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::feedback::MatchConfidence where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_semantic_matcher::feedback::MatchConfidence where T: core::clone::Clone
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::feedback::MatchConfidence
-pub type ob_semantic_matcher::feedback::MatchConfidence::Init = T
-pub const ob_semantic_matcher::feedback::MatchConfidence::ALIGN: usize
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::deref<'a>(usize) -> &'a T
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::drop(usize)
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for ob_semantic_matcher::feedback::MatchConfidence
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::feedback::MatchConfidence where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> tracing::instrument::Instrument for ob_semantic_matcher::feedback::MatchConfidence
-impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::feedback::MatchConfidence
-impl<T> typenum::type_operators::Same for ob_semantic_matcher::feedback::MatchConfidence
-pub type ob_semantic_matcher::feedback::MatchConfidence::Output = T
-impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::feedback::MatchConfidence where T: 'static
-impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::feedback::MatchConfidence where V: ppv_lite86::types::MultiLane<T>
-pub fn ob_semantic_matcher::feedback::MatchConfidence::vzip(self) -> V
+impl ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::as_str(&self) -> &'static str
+pub fn ob_semantic_matcher::MatchConfidence::from_score(f32) -> Self
+impl core::clone::Clone for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::clone(&self) -> ob_semantic_matcher::MatchConfidence
+impl core::cmp::Eq for ob_semantic_matcher::MatchConfidence
+impl core::cmp::PartialEq for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::eq(&self, &ob_semantic_matcher::MatchConfidence) -> bool
+impl core::fmt::Debug for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_semantic_matcher::MatchConfidence
+impl core::marker::StructuralPartialEq for ob_semantic_matcher::MatchConfidence
+impl serde_core::ser::Serialize for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_semantic_matcher::MatchConfidence
+impl core::marker::Send for ob_semantic_matcher::MatchConfidence
+impl core::marker::Sync for ob_semantic_matcher::MatchConfidence
+impl core::marker::Unpin for ob_semantic_matcher::MatchConfidence
+impl core::marker::UnsafeUnpin for ob_semantic_matcher::MatchConfidence
+impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::MatchConfidence
+impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::MatchConfidence
+impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_semantic_matcher::MatchConfidence where U: core::convert::From<T>
+pub fn ob_semantic_matcher::MatchConfidence::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::MatchConfidence where U: core::convert::Into<T>
+pub type ob_semantic_matcher::MatchConfidence::Error = core::convert::Infallible
+pub fn ob_semantic_matcher::MatchConfidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::MatchConfidence where U: core::convert::TryFrom<T>
+pub type ob_semantic_matcher::MatchConfidence::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_semantic_matcher::MatchConfidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::MatchConfidence where T: core::clone::Clone
+pub type ob_semantic_matcher::MatchConfidence::Owned = T
+pub fn ob_semantic_matcher::MatchConfidence::clone_into(&self, &mut T)
+pub fn ob_semantic_matcher::MatchConfidence::to_owned(&self) -> T
+impl<T> core::any::Any for ob_semantic_matcher::MatchConfidence where T: 'static + ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::MatchConfidence where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::MatchConfidence where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_semantic_matcher::MatchConfidence where T: core::clone::Clone
+pub unsafe fn ob_semantic_matcher::MatchConfidence::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::MatchConfidence
+pub type ob_semantic_matcher::MatchConfidence::Init = T
+pub const ob_semantic_matcher::MatchConfidence::ALIGN: usize
+pub unsafe fn ob_semantic_matcher::MatchConfidence::deref<'a>(usize) -> &'a T
+pub unsafe fn ob_semantic_matcher::MatchConfidence::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn ob_semantic_matcher::MatchConfidence::drop(usize)
+pub unsafe fn ob_semantic_matcher::MatchConfidence::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for ob_semantic_matcher::MatchConfidence
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::MatchConfidence where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_semantic_matcher::MatchConfidence
+impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::MatchConfidence
+impl<T> typenum::type_operators::Same for ob_semantic_matcher::MatchConfidence
+pub type ob_semantic_matcher::MatchConfidence::Output = T
+impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::MatchConfidence where T: 'static
+impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::MatchConfidence where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_semantic_matcher::MatchConfidence::vzip(self) -> V
 pub enum ob_semantic_matcher::feedback::Outcome
 pub ob_semantic_matcher::feedback::Outcome::Abandoned
 pub ob_semantic_matcher::feedback::Outcome::Corrected
 pub ob_semantic_matcher::feedback::Outcome::Executed
 pub ob_semantic_matcher::feedback::Outcome::Rephrased
 pub ob_semantic_matcher::feedback::Outcome::SelectedAlt
-impl ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::as_str(&self) -> &'static str
-impl core::clone::Clone for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::clone(&self) -> ob_semantic_matcher::feedback::Outcome
-impl core::cmp::Eq for ob_semantic_matcher::feedback::Outcome
-impl core::cmp::PartialEq for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::eq(&self, &ob_semantic_matcher::feedback::Outcome) -> bool
-impl core::fmt::Debug for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for ob_semantic_matcher::feedback::Outcome
-impl core::marker::StructuralPartialEq for ob_semantic_matcher::feedback::Outcome
-impl serde_core::ser::Serialize for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_semantic_matcher::feedback::Outcome
-impl core::marker::Send for ob_semantic_matcher::feedback::Outcome
-impl core::marker::Sync for ob_semantic_matcher::feedback::Outcome
-impl core::marker::Unpin for ob_semantic_matcher::feedback::Outcome
-impl core::marker::UnsafeUnpin for ob_semantic_matcher::feedback::Outcome
-impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::feedback::Outcome
-impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::feedback::Outcome
-impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::feedback::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::feedback::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for ob_semantic_matcher::feedback::Outcome where U: core::convert::From<T>
-pub fn ob_semantic_matcher::feedback::Outcome::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::feedback::Outcome where U: core::convert::Into<T>
-pub type ob_semantic_matcher::feedback::Outcome::Error = core::convert::Infallible
-pub fn ob_semantic_matcher::feedback::Outcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::feedback::Outcome where U: core::convert::TryFrom<T>
-pub type ob_semantic_matcher::feedback::Outcome::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_semantic_matcher::feedback::Outcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::feedback::Outcome where T: core::clone::Clone
-pub type ob_semantic_matcher::feedback::Outcome::Owned = T
-pub fn ob_semantic_matcher::feedback::Outcome::clone_into(&self, &mut T)
-pub fn ob_semantic_matcher::feedback::Outcome::to_owned(&self) -> T
-impl<T> core::any::Any for ob_semantic_matcher::feedback::Outcome where T: 'static + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::feedback::Outcome where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::feedback::Outcome where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_semantic_matcher::feedback::Outcome where T: core::clone::Clone
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::feedback::Outcome
-pub type ob_semantic_matcher::feedback::Outcome::Init = T
-pub const ob_semantic_matcher::feedback::Outcome::ALIGN: usize
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::deref<'a>(usize) -> &'a T
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::drop(usize)
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for ob_semantic_matcher::feedback::Outcome
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::feedback::Outcome where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> tracing::instrument::Instrument for ob_semantic_matcher::feedback::Outcome
-impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::feedback::Outcome
-impl<T> typenum::type_operators::Same for ob_semantic_matcher::feedback::Outcome
-pub type ob_semantic_matcher::feedback::Outcome::Output = T
-impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::feedback::Outcome where T: 'static
-impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::feedback::Outcome where V: ppv_lite86::types::MultiLane<T>
-pub fn ob_semantic_matcher::feedback::Outcome::vzip(self) -> V
+impl ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::as_str(&self) -> &'static str
+impl core::clone::Clone for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::clone(&self) -> ob_semantic_matcher::Outcome
+impl core::cmp::Eq for ob_semantic_matcher::Outcome
+impl core::cmp::PartialEq for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::eq(&self, &ob_semantic_matcher::Outcome) -> bool
+impl core::fmt::Debug for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_semantic_matcher::Outcome
+impl core::marker::StructuralPartialEq for ob_semantic_matcher::Outcome
+impl serde_core::ser::Serialize for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_semantic_matcher::Outcome
+impl core::marker::Send for ob_semantic_matcher::Outcome
+impl core::marker::Sync for ob_semantic_matcher::Outcome
+impl core::marker::Unpin for ob_semantic_matcher::Outcome
+impl core::marker::UnsafeUnpin for ob_semantic_matcher::Outcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::Outcome
+impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::Outcome
+impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_semantic_matcher::Outcome where U: core::convert::From<T>
+pub fn ob_semantic_matcher::Outcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::Outcome where U: core::convert::Into<T>
+pub type ob_semantic_matcher::Outcome::Error = core::convert::Infallible
+pub fn ob_semantic_matcher::Outcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::Outcome where U: core::convert::TryFrom<T>
+pub type ob_semantic_matcher::Outcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_semantic_matcher::Outcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::Outcome where T: core::clone::Clone
+pub type ob_semantic_matcher::Outcome::Owned = T
+pub fn ob_semantic_matcher::Outcome::clone_into(&self, &mut T)
+pub fn ob_semantic_matcher::Outcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_semantic_matcher::Outcome where T: 'static + ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::Outcome where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::Outcome where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_semantic_matcher::Outcome where T: core::clone::Clone
+pub unsafe fn ob_semantic_matcher::Outcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::Outcome
+pub type ob_semantic_matcher::Outcome::Init = T
+pub const ob_semantic_matcher::Outcome::ALIGN: usize
+pub unsafe fn ob_semantic_matcher::Outcome::deref<'a>(usize) -> &'a T
+pub unsafe fn ob_semantic_matcher::Outcome::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn ob_semantic_matcher::Outcome::drop(usize)
+pub unsafe fn ob_semantic_matcher::Outcome::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for ob_semantic_matcher::Outcome
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::Outcome where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_semantic_matcher::Outcome
+impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::Outcome
+impl<T> typenum::type_operators::Same for ob_semantic_matcher::Outcome
+pub type ob_semantic_matcher::Outcome::Output = T
+impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::Outcome where T: 'static
+impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::Outcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_semantic_matcher::Outcome::vzip(self) -> V
 pub struct ob_semantic_matcher::feedback::Alternative
 pub ob_semantic_matcher::feedback::Alternative::score: f32
 pub ob_semantic_matcher::feedback::Alternative::verb: alloc::string::String
@@ -1499,13 +1499,13 @@ pub struct ob_semantic_matcher::feedback::FeedbackService
 impl ob_semantic_matcher::FeedbackService
 pub async fn ob_semantic_matcher::FeedbackService::analyze(&self, i32) -> anyhow::Result<ob_semantic_matcher::AnalysisReport>
 pub fn ob_semantic_matcher::FeedbackService::analyzer(&self) -> &ob_semantic_matcher::FeedbackAnalyzer
-pub async fn ob_semantic_matcher::FeedbackService::capture_match(&self, uuid::Uuid, &str, ob_semantic_matcher::feedback::InputSource, core::option::Option<&ob_semantic_matcher::types::MatchResult>, &[ob_semantic_matcher::types::MatchResult], core::option::Option<&str>, core::option::Option<&str>) -> anyhow::Result<uuid::Uuid>
+pub async fn ob_semantic_matcher::FeedbackService::capture_match(&self, uuid::Uuid, &str, ob_semantic_matcher::InputSource, core::option::Option<&ob_semantic_matcher::types::MatchResult>, &[ob_semantic_matcher::types::MatchResult], core::option::Option<&str>, core::option::Option<&str>) -> anyhow::Result<uuid::Uuid>
 pub async fn ob_semantic_matcher::FeedbackService::count_pending(&self) -> anyhow::Result<i64>
 pub async fn ob_semantic_matcher::FeedbackService::expire_pending(&self, i32) -> anyhow::Result<u64>
 pub fn ob_semantic_matcher::FeedbackService::new(sqlx_postgres::PgPool) -> Self
 pub async fn ob_semantic_matcher::FeedbackService::record_learning_signal(&self, &str, &str, bool, &str, core::option::Option<&str>) -> anyhow::Result<core::option::Option<i64>>
-pub async fn ob_semantic_matcher::FeedbackService::record_outcome(&self, uuid::Uuid, ob_semantic_matcher::feedback::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>) -> anyhow::Result<bool>
-pub async fn ob_semantic_matcher::FeedbackService::record_outcome_with_dsl(&self, uuid::Uuid, ob_semantic_matcher::feedback::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<serde_json::value::Value>) -> anyhow::Result<bool>
+pub async fn ob_semantic_matcher::FeedbackService::record_outcome(&self, uuid::Uuid, ob_semantic_matcher::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>) -> anyhow::Result<bool>
+pub async fn ob_semantic_matcher::FeedbackService::record_outcome_with_dsl(&self, uuid::Uuid, ob_semantic_matcher::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<serde_json::value::Value>) -> anyhow::Result<bool>
 pub fn ob_semantic_matcher::FeedbackService::repository(&self) -> &ob_semantic_matcher::FeedbackRepository
 pub async fn ob_semantic_matcher::FeedbackService::update_known_entities(&self, alloc::vec::Vec<alloc::string::String>)
 impl !core::marker::Freeze for ob_semantic_matcher::FeedbackService
@@ -1549,9 +1549,9 @@ pub fn ob_semantic_matcher::FeedbackService::vzip(self) -> V
 pub struct ob_semantic_matcher::feedback::IntentFeedback
 pub ob_semantic_matcher::feedback::IntentFeedback::alternatives: alloc::vec::Vec<ob_semantic_matcher::feedback::Alternative>
 pub ob_semantic_matcher::feedback::IntentFeedback::graph_context: core::option::Option<alloc::string::String>
-pub ob_semantic_matcher::feedback::IntentFeedback::input_source: ob_semantic_matcher::feedback::InputSource
+pub ob_semantic_matcher::feedback::IntentFeedback::input_source: ob_semantic_matcher::InputSource
 pub ob_semantic_matcher::feedback::IntentFeedback::interaction_id: uuid::Uuid
-pub ob_semantic_matcher::feedback::IntentFeedback::match_confidence: core::option::Option<ob_semantic_matcher::feedback::MatchConfidence>
+pub ob_semantic_matcher::feedback::IntentFeedback::match_confidence: core::option::Option<ob_semantic_matcher::MatchConfidence>
 pub ob_semantic_matcher::feedback::IntentFeedback::match_score: core::option::Option<f32>
 pub ob_semantic_matcher::feedback::IntentFeedback::matched_verb: core::option::Option<alloc::string::String>
 pub ob_semantic_matcher::feedback::IntentFeedback::phonetic_score: core::option::Option<f32>
@@ -1613,7 +1613,7 @@ pub ob_semantic_matcher::feedback::OutcomeUpdate::correction_input: core::option
 pub ob_semantic_matcher::feedback::OutcomeUpdate::final_dsl: core::option::Option<alloc::string::String>
 pub ob_semantic_matcher::feedback::OutcomeUpdate::generated_dsl: core::option::Option<alloc::string::String>
 pub ob_semantic_matcher::feedback::OutcomeUpdate::interaction_id: uuid::Uuid
-pub ob_semantic_matcher::feedback::OutcomeUpdate::outcome: ob_semantic_matcher::feedback::Outcome
+pub ob_semantic_matcher::feedback::OutcomeUpdate::outcome: ob_semantic_matcher::Outcome
 pub ob_semantic_matcher::feedback::OutcomeUpdate::outcome_verb: core::option::Option<alloc::string::String>
 pub ob_semantic_matcher::feedback::OutcomeUpdate::time_to_outcome_ms: core::option::Option<i32>
 pub ob_semantic_matcher::feedback::OutcomeUpdate::user_edits: core::option::Option<serde_json::value::Value>
@@ -2457,144 +2457,144 @@ pub enum ob_semantic_matcher::InputSource
 pub ob_semantic_matcher::InputSource::Chat
 pub ob_semantic_matcher::InputSource::Command
 pub ob_semantic_matcher::InputSource::Voice
-impl ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::as_str(&self) -> &'static str
-impl core::clone::Clone for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::clone(&self) -> ob_semantic_matcher::feedback::InputSource
-impl core::cmp::Eq for ob_semantic_matcher::feedback::InputSource
-impl core::cmp::PartialEq for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::eq(&self, &ob_semantic_matcher::feedback::InputSource) -> bool
-impl core::fmt::Debug for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for ob_semantic_matcher::feedback::InputSource
-impl core::marker::StructuralPartialEq for ob_semantic_matcher::feedback::InputSource
-impl serde_core::ser::Serialize for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_semantic_matcher::feedback::InputSource
-impl core::marker::Send for ob_semantic_matcher::feedback::InputSource
-impl core::marker::Sync for ob_semantic_matcher::feedback::InputSource
-impl core::marker::Unpin for ob_semantic_matcher::feedback::InputSource
-impl core::marker::UnsafeUnpin for ob_semantic_matcher::feedback::InputSource
-impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::feedback::InputSource
-impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::feedback::InputSource
-impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::feedback::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::feedback::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for ob_semantic_matcher::feedback::InputSource where U: core::convert::From<T>
-pub fn ob_semantic_matcher::feedback::InputSource::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::feedback::InputSource where U: core::convert::Into<T>
-pub type ob_semantic_matcher::feedback::InputSource::Error = core::convert::Infallible
-pub fn ob_semantic_matcher::feedback::InputSource::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::feedback::InputSource where U: core::convert::TryFrom<T>
-pub type ob_semantic_matcher::feedback::InputSource::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_semantic_matcher::feedback::InputSource::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::feedback::InputSource where T: core::clone::Clone
-pub type ob_semantic_matcher::feedback::InputSource::Owned = T
-pub fn ob_semantic_matcher::feedback::InputSource::clone_into(&self, &mut T)
-pub fn ob_semantic_matcher::feedback::InputSource::to_owned(&self) -> T
-impl<T> core::any::Any for ob_semantic_matcher::feedback::InputSource where T: 'static + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::feedback::InputSource where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::feedback::InputSource where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::InputSource::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_semantic_matcher::feedback::InputSource where T: core::clone::Clone
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_semantic_matcher::feedback::InputSource
-pub fn ob_semantic_matcher::feedback::InputSource::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::feedback::InputSource
-pub type ob_semantic_matcher::feedback::InputSource::Init = T
-pub const ob_semantic_matcher::feedback::InputSource::ALIGN: usize
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::deref<'a>(usize) -> &'a T
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::drop(usize)
-pub unsafe fn ob_semantic_matcher::feedback::InputSource::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for ob_semantic_matcher::feedback::InputSource
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::feedback::InputSource where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> tracing::instrument::Instrument for ob_semantic_matcher::feedback::InputSource
-impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::feedback::InputSource
-impl<T> typenum::type_operators::Same for ob_semantic_matcher::feedback::InputSource
-pub type ob_semantic_matcher::feedback::InputSource::Output = T
-impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::feedback::InputSource where T: 'static
-impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::feedback::InputSource where V: ppv_lite86::types::MultiLane<T>
-pub fn ob_semantic_matcher::feedback::InputSource::vzip(self) -> V
+impl ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::as_str(&self) -> &'static str
+impl core::clone::Clone for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::clone(&self) -> ob_semantic_matcher::InputSource
+impl core::cmp::Eq for ob_semantic_matcher::InputSource
+impl core::cmp::PartialEq for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::eq(&self, &ob_semantic_matcher::InputSource) -> bool
+impl core::fmt::Debug for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_semantic_matcher::InputSource
+impl core::marker::StructuralPartialEq for ob_semantic_matcher::InputSource
+impl serde_core::ser::Serialize for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_semantic_matcher::InputSource
+impl core::marker::Send for ob_semantic_matcher::InputSource
+impl core::marker::Sync for ob_semantic_matcher::InputSource
+impl core::marker::Unpin for ob_semantic_matcher::InputSource
+impl core::marker::UnsafeUnpin for ob_semantic_matcher::InputSource
+impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::InputSource
+impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::InputSource
+impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::InputSource where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_semantic_matcher::InputSource where U: core::convert::From<T>
+pub fn ob_semantic_matcher::InputSource::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::InputSource where U: core::convert::Into<T>
+pub type ob_semantic_matcher::InputSource::Error = core::convert::Infallible
+pub fn ob_semantic_matcher::InputSource::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::InputSource where U: core::convert::TryFrom<T>
+pub type ob_semantic_matcher::InputSource::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_semantic_matcher::InputSource::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::InputSource where T: core::clone::Clone
+pub type ob_semantic_matcher::InputSource::Owned = T
+pub fn ob_semantic_matcher::InputSource::clone_into(&self, &mut T)
+pub fn ob_semantic_matcher::InputSource::to_owned(&self) -> T
+impl<T> core::any::Any for ob_semantic_matcher::InputSource where T: 'static + ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::InputSource where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::InputSource where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::InputSource::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_semantic_matcher::InputSource where T: core::clone::Clone
+pub unsafe fn ob_semantic_matcher::InputSource::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_semantic_matcher::InputSource
+pub fn ob_semantic_matcher::InputSource::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::InputSource
+pub type ob_semantic_matcher::InputSource::Init = T
+pub const ob_semantic_matcher::InputSource::ALIGN: usize
+pub unsafe fn ob_semantic_matcher::InputSource::deref<'a>(usize) -> &'a T
+pub unsafe fn ob_semantic_matcher::InputSource::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn ob_semantic_matcher::InputSource::drop(usize)
+pub unsafe fn ob_semantic_matcher::InputSource::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for ob_semantic_matcher::InputSource
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::InputSource where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::InputSource where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_semantic_matcher::InputSource
+impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::InputSource
+impl<T> typenum::type_operators::Same for ob_semantic_matcher::InputSource
+pub type ob_semantic_matcher::InputSource::Output = T
+impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::InputSource where T: 'static
+impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::InputSource where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_semantic_matcher::InputSource::vzip(self) -> V
 pub enum ob_semantic_matcher::MatchConfidence
 pub ob_semantic_matcher::MatchConfidence::High
 pub ob_semantic_matcher::MatchConfidence::Low
 pub ob_semantic_matcher::MatchConfidence::Medium
 pub ob_semantic_matcher::MatchConfidence::None
-impl ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::as_str(&self) -> &'static str
-pub fn ob_semantic_matcher::feedback::MatchConfidence::from_score(f32) -> Self
-impl core::clone::Clone for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::clone(&self) -> ob_semantic_matcher::feedback::MatchConfidence
-impl core::cmp::Eq for ob_semantic_matcher::feedback::MatchConfidence
-impl core::cmp::PartialEq for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::eq(&self, &ob_semantic_matcher::feedback::MatchConfidence) -> bool
-impl core::fmt::Debug for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::StructuralPartialEq for ob_semantic_matcher::feedback::MatchConfidence
-impl serde_core::ser::Serialize for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::Send for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::Sync for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::Unpin for ob_semantic_matcher::feedback::MatchConfidence
-impl core::marker::UnsafeUnpin for ob_semantic_matcher::feedback::MatchConfidence
-impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::feedback::MatchConfidence
-impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::feedback::MatchConfidence
-impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::feedback::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::feedback::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for ob_semantic_matcher::feedback::MatchConfidence where U: core::convert::From<T>
-pub fn ob_semantic_matcher::feedback::MatchConfidence::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::feedback::MatchConfidence where U: core::convert::Into<T>
-pub type ob_semantic_matcher::feedback::MatchConfidence::Error = core::convert::Infallible
-pub fn ob_semantic_matcher::feedback::MatchConfidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::feedback::MatchConfidence where U: core::convert::TryFrom<T>
-pub type ob_semantic_matcher::feedback::MatchConfidence::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_semantic_matcher::feedback::MatchConfidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::feedback::MatchConfidence where T: core::clone::Clone
-pub type ob_semantic_matcher::feedback::MatchConfidence::Owned = T
-pub fn ob_semantic_matcher::feedback::MatchConfidence::clone_into(&self, &mut T)
-pub fn ob_semantic_matcher::feedback::MatchConfidence::to_owned(&self) -> T
-impl<T> core::any::Any for ob_semantic_matcher::feedback::MatchConfidence where T: 'static + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::feedback::MatchConfidence where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::feedback::MatchConfidence where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::MatchConfidence::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_semantic_matcher::feedback::MatchConfidence where T: core::clone::Clone
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_semantic_matcher::feedback::MatchConfidence
-pub fn ob_semantic_matcher::feedback::MatchConfidence::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::feedback::MatchConfidence
-pub type ob_semantic_matcher::feedback::MatchConfidence::Init = T
-pub const ob_semantic_matcher::feedback::MatchConfidence::ALIGN: usize
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::deref<'a>(usize) -> &'a T
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::drop(usize)
-pub unsafe fn ob_semantic_matcher::feedback::MatchConfidence::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for ob_semantic_matcher::feedback::MatchConfidence
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::feedback::MatchConfidence where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> tracing::instrument::Instrument for ob_semantic_matcher::feedback::MatchConfidence
-impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::feedback::MatchConfidence
-impl<T> typenum::type_operators::Same for ob_semantic_matcher::feedback::MatchConfidence
-pub type ob_semantic_matcher::feedback::MatchConfidence::Output = T
-impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::feedback::MatchConfidence where T: 'static
-impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::feedback::MatchConfidence where V: ppv_lite86::types::MultiLane<T>
-pub fn ob_semantic_matcher::feedback::MatchConfidence::vzip(self) -> V
+impl ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::as_str(&self) -> &'static str
+pub fn ob_semantic_matcher::MatchConfidence::from_score(f32) -> Self
+impl core::clone::Clone for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::clone(&self) -> ob_semantic_matcher::MatchConfidence
+impl core::cmp::Eq for ob_semantic_matcher::MatchConfidence
+impl core::cmp::PartialEq for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::eq(&self, &ob_semantic_matcher::MatchConfidence) -> bool
+impl core::fmt::Debug for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_semantic_matcher::MatchConfidence
+impl core::marker::StructuralPartialEq for ob_semantic_matcher::MatchConfidence
+impl serde_core::ser::Serialize for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_semantic_matcher::MatchConfidence
+impl core::marker::Send for ob_semantic_matcher::MatchConfidence
+impl core::marker::Sync for ob_semantic_matcher::MatchConfidence
+impl core::marker::Unpin for ob_semantic_matcher::MatchConfidence
+impl core::marker::UnsafeUnpin for ob_semantic_matcher::MatchConfidence
+impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::MatchConfidence
+impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::MatchConfidence
+impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::MatchConfidence where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_semantic_matcher::MatchConfidence where U: core::convert::From<T>
+pub fn ob_semantic_matcher::MatchConfidence::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::MatchConfidence where U: core::convert::Into<T>
+pub type ob_semantic_matcher::MatchConfidence::Error = core::convert::Infallible
+pub fn ob_semantic_matcher::MatchConfidence::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::MatchConfidence where U: core::convert::TryFrom<T>
+pub type ob_semantic_matcher::MatchConfidence::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_semantic_matcher::MatchConfidence::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::MatchConfidence where T: core::clone::Clone
+pub type ob_semantic_matcher::MatchConfidence::Owned = T
+pub fn ob_semantic_matcher::MatchConfidence::clone_into(&self, &mut T)
+pub fn ob_semantic_matcher::MatchConfidence::to_owned(&self) -> T
+impl<T> core::any::Any for ob_semantic_matcher::MatchConfidence where T: 'static + ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::MatchConfidence where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::MatchConfidence where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::MatchConfidence::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_semantic_matcher::MatchConfidence where T: core::clone::Clone
+pub unsafe fn ob_semantic_matcher::MatchConfidence::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_semantic_matcher::MatchConfidence
+pub fn ob_semantic_matcher::MatchConfidence::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::MatchConfidence
+pub type ob_semantic_matcher::MatchConfidence::Init = T
+pub const ob_semantic_matcher::MatchConfidence::ALIGN: usize
+pub unsafe fn ob_semantic_matcher::MatchConfidence::deref<'a>(usize) -> &'a T
+pub unsafe fn ob_semantic_matcher::MatchConfidence::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn ob_semantic_matcher::MatchConfidence::drop(usize)
+pub unsafe fn ob_semantic_matcher::MatchConfidence::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for ob_semantic_matcher::MatchConfidence
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::MatchConfidence where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::MatchConfidence where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_semantic_matcher::MatchConfidence
+impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::MatchConfidence
+impl<T> typenum::type_operators::Same for ob_semantic_matcher::MatchConfidence
+pub type ob_semantic_matcher::MatchConfidence::Output = T
+impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::MatchConfidence where T: 'static
+impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::MatchConfidence where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_semantic_matcher::MatchConfidence::vzip(self) -> V
 pub enum ob_semantic_matcher::MatchMethod
 pub ob_semantic_matcher::MatchMethod::Cached
 pub ob_semantic_matcher::MatchMethod::DirectDsl
@@ -2729,72 +2729,72 @@ pub ob_semantic_matcher::Outcome::Corrected
 pub ob_semantic_matcher::Outcome::Executed
 pub ob_semantic_matcher::Outcome::Rephrased
 pub ob_semantic_matcher::Outcome::SelectedAlt
-impl ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::as_str(&self) -> &'static str
-impl core::clone::Clone for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::clone(&self) -> ob_semantic_matcher::feedback::Outcome
-impl core::cmp::Eq for ob_semantic_matcher::feedback::Outcome
-impl core::cmp::PartialEq for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::eq(&self, &ob_semantic_matcher::feedback::Outcome) -> bool
-impl core::fmt::Debug for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
-impl core::marker::Copy for ob_semantic_matcher::feedback::Outcome
-impl core::marker::StructuralPartialEq for ob_semantic_matcher::feedback::Outcome
-impl serde_core::ser::Serialize for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
-impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
-impl core::marker::Freeze for ob_semantic_matcher::feedback::Outcome
-impl core::marker::Send for ob_semantic_matcher::feedback::Outcome
-impl core::marker::Sync for ob_semantic_matcher::feedback::Outcome
-impl core::marker::Unpin for ob_semantic_matcher::feedback::Outcome
-impl core::marker::UnsafeUnpin for ob_semantic_matcher::feedback::Outcome
-impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::feedback::Outcome
-impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::feedback::Outcome
-impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::feedback::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::equivalent(&self, &K) -> bool
-impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::feedback::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::equivalent(&self, &K) -> bool
-impl<T, U> core::convert::Into<U> for ob_semantic_matcher::feedback::Outcome where U: core::convert::From<T>
-pub fn ob_semantic_matcher::feedback::Outcome::into(self) -> U
-impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::feedback::Outcome where U: core::convert::Into<T>
-pub type ob_semantic_matcher::feedback::Outcome::Error = core::convert::Infallible
-pub fn ob_semantic_matcher::feedback::Outcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
-impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::feedback::Outcome where U: core::convert::TryFrom<T>
-pub type ob_semantic_matcher::feedback::Outcome::Error = <U as core::convert::TryFrom<T>>::Error
-pub fn ob_semantic_matcher::feedback::Outcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
-impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::feedback::Outcome where T: core::clone::Clone
-pub type ob_semantic_matcher::feedback::Outcome::Owned = T
-pub fn ob_semantic_matcher::feedback::Outcome::clone_into(&self, &mut T)
-pub fn ob_semantic_matcher::feedback::Outcome::to_owned(&self) -> T
-impl<T> core::any::Any for ob_semantic_matcher::feedback::Outcome where T: 'static + ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::type_id(&self) -> core::any::TypeId
-impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::feedback::Outcome where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::borrow(&self) -> &T
-impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::feedback::Outcome where T: ?core::marker::Sized
-pub fn ob_semantic_matcher::feedback::Outcome::borrow_mut(&mut self) -> &mut T
-impl<T> core::clone::CloneToUninit for ob_semantic_matcher::feedback::Outcome where T: core::clone::Clone
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::clone_to_uninit(&self, *mut u8)
-impl<T> core::convert::From<T> for ob_semantic_matcher::feedback::Outcome
-pub fn ob_semantic_matcher::feedback::Outcome::from(T) -> T
-impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::feedback::Outcome
-pub type ob_semantic_matcher::feedback::Outcome::Init = T
-pub const ob_semantic_matcher::feedback::Outcome::ALIGN: usize
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::deref<'a>(usize) -> &'a T
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::deref_mut<'a>(usize) -> &'a mut T
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::drop(usize)
-pub unsafe fn ob_semantic_matcher::feedback::Outcome::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
-impl<T> either::into_either::IntoEither for ob_semantic_matcher::feedback::Outcome
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::feedback::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
-impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::feedback::Outcome where T: for<'de> serde_core::de::Deserialize<'de>
-impl<T> tracing::instrument::Instrument for ob_semantic_matcher::feedback::Outcome
-impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::feedback::Outcome
-impl<T> typenum::type_operators::Same for ob_semantic_matcher::feedback::Outcome
-pub type ob_semantic_matcher::feedback::Outcome::Output = T
-impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::feedback::Outcome where T: 'static
-impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::feedback::Outcome where V: ppv_lite86::types::MultiLane<T>
-pub fn ob_semantic_matcher::feedback::Outcome::vzip(self) -> V
+impl ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::as_str(&self) -> &'static str
+impl core::clone::Clone for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::clone(&self) -> ob_semantic_matcher::Outcome
+impl core::cmp::Eq for ob_semantic_matcher::Outcome
+impl core::cmp::PartialEq for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::eq(&self, &ob_semantic_matcher::Outcome) -> bool
+impl core::fmt::Debug for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for ob_semantic_matcher::Outcome
+impl core::marker::StructuralPartialEq for ob_semantic_matcher::Outcome
+impl serde_core::ser::Serialize for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for ob_semantic_matcher::Outcome
+impl core::marker::Send for ob_semantic_matcher::Outcome
+impl core::marker::Sync for ob_semantic_matcher::Outcome
+impl core::marker::Unpin for ob_semantic_matcher::Outcome
+impl core::marker::UnsafeUnpin for ob_semantic_matcher::Outcome
+impl core::panic::unwind_safe::RefUnwindSafe for ob_semantic_matcher::Outcome
+impl core::panic::unwind_safe::UnwindSafe for ob_semantic_matcher::Outcome
+impl<Q, K> equivalent::Equivalent<K> for ob_semantic_matcher::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::equivalent(&self, &K) -> bool
+impl<Q, K> hashbrown::Equivalent<K> for ob_semantic_matcher::Outcome where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::equivalent(&self, &K) -> bool
+impl<T, U> core::convert::Into<U> for ob_semantic_matcher::Outcome where U: core::convert::From<T>
+pub fn ob_semantic_matcher::Outcome::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for ob_semantic_matcher::Outcome where U: core::convert::Into<T>
+pub type ob_semantic_matcher::Outcome::Error = core::convert::Infallible
+pub fn ob_semantic_matcher::Outcome::try_from(U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for ob_semantic_matcher::Outcome where U: core::convert::TryFrom<T>
+pub type ob_semantic_matcher::Outcome::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn ob_semantic_matcher::Outcome::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T> alloc::borrow::ToOwned for ob_semantic_matcher::Outcome where T: core::clone::Clone
+pub type ob_semantic_matcher::Outcome::Owned = T
+pub fn ob_semantic_matcher::Outcome::clone_into(&self, &mut T)
+pub fn ob_semantic_matcher::Outcome::to_owned(&self) -> T
+impl<T> core::any::Any for ob_semantic_matcher::Outcome where T: 'static + ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for ob_semantic_matcher::Outcome where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for ob_semantic_matcher::Outcome where T: ?core::marker::Sized
+pub fn ob_semantic_matcher::Outcome::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for ob_semantic_matcher::Outcome where T: core::clone::Clone
+pub unsafe fn ob_semantic_matcher::Outcome::clone_to_uninit(&self, *mut u8)
+impl<T> core::convert::From<T> for ob_semantic_matcher::Outcome
+pub fn ob_semantic_matcher::Outcome::from(T) -> T
+impl<T> crossbeam_epoch::atomic::Pointable for ob_semantic_matcher::Outcome
+pub type ob_semantic_matcher::Outcome::Init = T
+pub const ob_semantic_matcher::Outcome::ALIGN: usize
+pub unsafe fn ob_semantic_matcher::Outcome::deref<'a>(usize) -> &'a T
+pub unsafe fn ob_semantic_matcher::Outcome::deref_mut<'a>(usize) -> &'a mut T
+pub unsafe fn ob_semantic_matcher::Outcome::drop(usize)
+pub unsafe fn ob_semantic_matcher::Outcome::init(<T as crossbeam_epoch::atomic::Pointable>::Init) -> usize
+impl<T> either::into_either::IntoEither for ob_semantic_matcher::Outcome
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> gemm_common::simd::Boilerplate for ob_semantic_matcher::Outcome where T: core::marker::Copy + core::marker::Send + core::marker::Sync + core::fmt::Debug + core::cmp::PartialEq + 'static
+impl<T> serde_core::de::DeserializeOwned for ob_semantic_matcher::Outcome where T: for<'de> serde_core::de::Deserialize<'de>
+impl<T> tracing::instrument::Instrument for ob_semantic_matcher::Outcome
+impl<T> tracing::instrument::WithSubscriber for ob_semantic_matcher::Outcome
+impl<T> typenum::type_operators::Same for ob_semantic_matcher::Outcome
+pub type ob_semantic_matcher::Outcome::Output = T
+impl<T> yoke::erased::ErasedDestructor for ob_semantic_matcher::Outcome where T: 'static
+impl<V, T> ppv_lite86::types::VZip<V> for ob_semantic_matcher::Outcome where V: ppv_lite86::types::MultiLane<T>
+pub fn ob_semantic_matcher::Outcome::vzip(self) -> V
 pub struct ob_semantic_matcher::AnalysisReport
 pub ob_semantic_matcher::AnalysisReport::confusion_pairs: alloc::vec::Vec<ob_semantic_matcher::feedback::AnalysisResult>
 pub ob_semantic_matcher::AnalysisReport::gaps: alloc::vec::Vec<ob_semantic_matcher::feedback::AnalysisResult>
@@ -3182,13 +3182,13 @@ pub struct ob_semantic_matcher::FeedbackService
 impl ob_semantic_matcher::FeedbackService
 pub async fn ob_semantic_matcher::FeedbackService::analyze(&self, i32) -> anyhow::Result<ob_semantic_matcher::AnalysisReport>
 pub fn ob_semantic_matcher::FeedbackService::analyzer(&self) -> &ob_semantic_matcher::FeedbackAnalyzer
-pub async fn ob_semantic_matcher::FeedbackService::capture_match(&self, uuid::Uuid, &str, ob_semantic_matcher::feedback::InputSource, core::option::Option<&ob_semantic_matcher::types::MatchResult>, &[ob_semantic_matcher::types::MatchResult], core::option::Option<&str>, core::option::Option<&str>) -> anyhow::Result<uuid::Uuid>
+pub async fn ob_semantic_matcher::FeedbackService::capture_match(&self, uuid::Uuid, &str, ob_semantic_matcher::InputSource, core::option::Option<&ob_semantic_matcher::types::MatchResult>, &[ob_semantic_matcher::types::MatchResult], core::option::Option<&str>, core::option::Option<&str>) -> anyhow::Result<uuid::Uuid>
 pub async fn ob_semantic_matcher::FeedbackService::count_pending(&self) -> anyhow::Result<i64>
 pub async fn ob_semantic_matcher::FeedbackService::expire_pending(&self, i32) -> anyhow::Result<u64>
 pub fn ob_semantic_matcher::FeedbackService::new(sqlx_postgres::PgPool) -> Self
 pub async fn ob_semantic_matcher::FeedbackService::record_learning_signal(&self, &str, &str, bool, &str, core::option::Option<&str>) -> anyhow::Result<core::option::Option<i64>>
-pub async fn ob_semantic_matcher::FeedbackService::record_outcome(&self, uuid::Uuid, ob_semantic_matcher::feedback::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>) -> anyhow::Result<bool>
-pub async fn ob_semantic_matcher::FeedbackService::record_outcome_with_dsl(&self, uuid::Uuid, ob_semantic_matcher::feedback::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<serde_json::value::Value>) -> anyhow::Result<bool>
+pub async fn ob_semantic_matcher::FeedbackService::record_outcome(&self, uuid::Uuid, ob_semantic_matcher::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>) -> anyhow::Result<bool>
+pub async fn ob_semantic_matcher::FeedbackService::record_outcome_with_dsl(&self, uuid::Uuid, ob_semantic_matcher::Outcome, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<i32>, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>, core::option::Option<serde_json::value::Value>) -> anyhow::Result<bool>
 pub fn ob_semantic_matcher::FeedbackService::repository(&self) -> &ob_semantic_matcher::FeedbackRepository
 pub async fn ob_semantic_matcher::FeedbackService::update_known_entities(&self, alloc::vec::Vec<alloc::string::String>)
 impl !core::marker::Freeze for ob_semantic_matcher::FeedbackService

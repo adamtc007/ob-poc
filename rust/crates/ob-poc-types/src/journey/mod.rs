@@ -16,4 +16,5 @@
 //! deps. The YAML loader and `PackLoadError` stay with the integrator
 //! crate that owns the catalogue source.
 
+pub mod pack_candidate;
 pub mod pack_types;
