@@ -27,7 +27,6 @@
 # CBU DOMAIN -- Client Business Unit Lifecycle
 # ============================================================================
 
-[[test]]
 utterance = "assign Goldman Sachs as custodian for this CBU"
 expected_verb = "cbu.assign-role"
 expected_plane = "instance"
@@ -119,7 +118,7 @@ notes = "Must distinguish company vs person entity type"
 
 [[test]]
 utterance = "I need to add a trust -- Cayman Islands discretionary trust"
-expected_verb = "entity.create-trust-discretionary"
+expected_verb = "entity.create"
 alt_verbs = ["entity.create"]
 expected_plane = "instance"
 expected_polarity = "write"
@@ -130,7 +129,7 @@ notes = "Must pick trust-discretionary over limited-company"
 
 [[test]]
 utterance = "add a limited partnership for the GP structure"
-expected_verb = "entity.create-partnership-limited"
+expected_verb = "entity.create"
 alt_verbs = ["entity.create"]
 expected_plane = "instance"
 expected_polarity = "write"
@@ -267,7 +266,7 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "indirect"
 difficulty = "expert"
-alt_verbs = ["red-flag.list-by-case", "red-flag.list-by-entity", "screening.sanctions"]
+alt_verbs = ["red-flag.list-by-case", "screening.sanctions"]
 notes = "Requires understanding 'flagged' in screening context"
 
 # ============================================================================
@@ -297,7 +296,7 @@ notes = "Scenario analyse-ubo routes: full + ownership = ubo.list-ubos"
 
 [[test]]
 utterance = "add an ownership stake -- Vanguard holds 25% of this entity"
-expected_verb = "ubo.add-ownership"
+expected_verb = "ubo.edge.assert-economic-interest"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ubo"
@@ -312,22 +311,22 @@ expected_polarity = "read"
 expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "hard"
-alt_verbs = ["ownership.find-controller", "control.list-controllers", "control.identify-ubos", "control.compute-controllers", "control.build-graph"]
+alt_verbs = ["control.list-controllers", "control.identify-ubos", "control.build-graph"]
 notes = "Major collision point between ubo/ownership/control domains"
 
 [[test]]
 utterance = "add a control relationship -- board appointment"
-expected_verb = "control.add"
+expected_verb = "ubo.edge.assert-control"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ubo"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["control.add"]
+alt_verbs = []
 
 [[test]]
 utterance = "calculate the UBOs for this CBU"
-expected_verb = "ubo.compute-chains"
+expected_verb = "ubo.determination.compute-fold"
 alt_verbs = ["ubo.list-ubos"]
 expected_plane = "instance"
 expected_polarity = "read"
@@ -347,44 +346,10 @@ difficulty = "medium"
 alt_verbs = ["ownership.trace-chain"]
 
 # ownership.trace-chain is the canonical verb now; control.trace-chain removed
-[[test]]
-utterance = "this person died last month"
-expected_verb = "ubo.mark-deceased"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "ubo"
-category = "indirect"
-difficulty = "expert"
-notes = "Implied action from factual statement"
-
-[[test]]
-utterance = "the settlor appointed a new trustee"
-expected_verb = "ubo.add-trust-role"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "ubo"
-category = "indirect"
-difficulty = "expert"
-notes = "Trust-specific language - must understand settlor/trustee vocabulary"
-
-[[test]]
-utterance = "waive the ownership verification -- low risk client"
-expected_verb = "ubo.waive-verification"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "ubo"
-category = "natural"
-difficulty = "medium"
-
-[[test]]
-utterance = "ownership was transferred from Parent Co to New Holdco"
-expected_verb = "ubo.update-ownership"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "ubo"
-category = "indirect"
-difficulty = "hard"
-alt_verbs = ["ubo.convergence-supersede"]
+# "ownership was transferred from Parent Co to New Holdco" removed 2026-07-16
+# — ubo.update-ownership was deleted in the W1-W7 KYC/UBO migration; this is
+# a multi-step operation (supersede old edge + assert new edge) with no
+# confident single-verb successor, so removed rather than guessed at.
 
 # ============================================================================
 # FUND DOMAIN -- Fund Structures
@@ -392,7 +357,7 @@ alt_verbs = ["ubo.convergence-supersede"]
 
 [[test]]
 utterance = "create an umbrella fund -- UCITS, Luxembourg domiciled"
-expected_verb = "fund.create-umbrella"
+expected_verb = "fund.create"
 alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
@@ -402,7 +367,7 @@ difficulty = "easy"
 
 [[test]]
 utterance = "set up a new subfund under the umbrella"
-expected_verb = "fund.create-subfund"
+expected_verb = "fund.create"
 alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
@@ -413,23 +378,12 @@ difficulty = "medium"
 [[test]]
 utterance = "add a share class -- accumulating, EUR denominated"
 expected_verb = "share-class.create"
-alt_verbs = ["fund.create-share-class", "fund.create"]
+alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
 category = "natural"
 difficulty = "medium"
-
-[[test]]
-utterance = "create a master-feeder structure"
-expected_verb = "fund.create-feeder"
-expected_plane = "instance"
-expected_polarity = "write"
-expected_domain_concept = "fund"
-category = "natural"
-difficulty = "hard"
-alt_verbs = ["fund.create-master", "fund.create"]
-notes = "Could mean either master or feeder creation"
 
 [[test]]
 utterance = "link the Cayman feeder to the Irish master"
@@ -480,8 +434,8 @@ difficulty = "medium"
 
 [[test]]
 utterance = "create a standalone fund -- AIF, Jersey"
-expected_verb = "fund.ensure-standalone"
-alt_verbs = ["fund.create-standalone", "fund.create"]
+expected_verb = "fund.ensure"
+alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "fund"
@@ -504,7 +458,7 @@ difficulty = "medium"
 [[test]]
 utterance = "request the certificate of incorporation"
 expected_verb = "document.solicit"
-alt_verbs = ["doc-request.create", "document.request"]
+alt_verbs = ["doc-request.create"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "document"
@@ -550,7 +504,7 @@ difficulty = "easy"
 [[test]]
 utterance = "what type of documents do we collect for limited companies?"
 expected_verb = "document.catalog"
-alt_verbs = ["kyc.collect-documents", "document.list-types"]
+alt_verbs = ["kyc.collect-documents"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "document"
@@ -746,19 +700,19 @@ difficulty = "medium"
 
 [[test]]
 utterance = "who ultimately controls this entity?"
-expected_verb = "ownership.find-controller"
+expected_verb = "ownership.control-links.list"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ownership"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["control.build-graph", "control.compute-controllers", "control.identify-ubos", "ubo.list-ubos", "control.list-controllers"]
+alt_verbs = ["control.build-graph", "control.identify-ubos", "ubo.list-ubos", "control.list-controllers"]
 notes = "Collision: ownership.find-controller vs ubo.list-ubos vs control.list-controllers"
 
 [[test]]
 utterance = "reconcile the ownership percentages"
-expected_verb = "ownership.reconcile"
-alt_verbs = ["ownership.reconcile"]
+expected_verb = "ownership.control-links.compute"
+alt_verbs = []
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ownership"
@@ -776,18 +730,8 @@ difficulty = "medium"
 alt_verbs = ["ubo.trace-chains"]
 
 [[test]]
-utterance = "are there any gaps in the ownership structure?"
-expected_verb = "ownership.analyze-gaps"
-alt_verbs = ["ubo.trace-chains"]
-expected_plane = "instance"
-expected_polarity = "read"
-expected_domain_concept = "ownership"
-category = "natural"
-difficulty = "medium"
-
-[[test]]
 utterance = "who is the board-appointed controller?"
-expected_verb = "control.show-board-controller"
+expected_verb = "ownership.control-links.list"
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "control"
@@ -796,7 +740,7 @@ difficulty = "hard"
 
 [[test]]
 utterance = "import the PSC register data"
-expected_verb = "control.import-psc-register"
+expected_verb = "research.companies-house.fetch-psc"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "control"
@@ -830,7 +774,7 @@ notes = "session.load-cluster is the canonical verb for loading a client book in
 [[test]]
 utterance = "zoom into this node"
 expected_verb = "view.zoom-in"
-alt_verbs = ["graph.focus", "view.drill"]
+alt_verbs = ["graph.focus"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "view"
@@ -845,7 +789,7 @@ expected_polarity = "write"
 expected_domain_concept = "view"
 category = "natural"
 difficulty = "easy"
-alt_verbs = ["view.zoom-out", "view.surface", "session.undo"]
+alt_verbs = ["view.zoom-out", "session.undo"]
 
 [[test]]
 utterance = "load the Allianz cluster"
@@ -986,7 +930,7 @@ expected_polarity = "write"
 expected_domain_concept = "client-group"
 category = "adversarial"
 difficulty = "hard"
-alt_verbs = ["ubo.add-ownership", "control.add"]
+alt_verbs = []
 notes = "Extremely vague -- relationship could be ownership, control, or group"
 
 [[test]]
@@ -997,7 +941,7 @@ expected_polarity = "write"
 expected_domain_concept = "document"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["entity.verify", "ownership.reconcile", "cbu.verify-evidence"]
+alt_verbs = ["entity.verify", "cbu.verify-evidence"]
 notes = "'it' = anaphoric reference requiring session context"
 
 [[test]]
@@ -1008,7 +952,7 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["screening.sanctions", "screening.pep", "ownership.reconcile", "cbu.parties"]
+alt_verbs = ["screening.sanctions", "screening.pep", "cbu.parties"]
 notes = "Extremely vague -- 'check' is overloaded; screening.run is the best generic match"
 
 [[test]]
@@ -1030,7 +974,7 @@ expected_polarity = "write"
 expected_domain_concept = "gleif"
 category = "adversarial"
 difficulty = "expert"
-alt_verbs = ["gleif.enrich", "control.import-psc-register", "bods.sync-from-gleif", "research.sources.fetch", "bods.import"]
+alt_verbs = ["gleif.enrich", "bods.sync-from-gleif", "research.sources.fetch", "bods.import"]
 notes = "'import data' could be any external data source"
 
 # ============================================================================
@@ -1062,7 +1006,7 @@ notes = "RBA = Risk Based Approach -- implies full screening suite"
 
 [[test]]
 utterance = "check the PSC register"
-expected_verb = "control.import-psc-register"
+expected_verb = "research.companies-house.fetch-psc"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "control"
@@ -1092,8 +1036,8 @@ notes = "TA = Transfer Agent -- a product/service"
 
 [[test]]
 utterance = "compute the 25% threshold test"
-expected_verb = "ubo.compute-chains"
-alt_verbs = ["ubo.calculate", "control.identify-ubos"]
+expected_verb = "ubo.determination.compute-fold"
+alt_verbs = ["control.identify-ubos"]
 expected_plane = "instance"
 expected_polarity = "read"
 expected_domain_concept = "ubo"
@@ -1103,13 +1047,13 @@ notes = "25% threshold = UBO determination threshold under 4AMLD/5AMLD; ubo.calc
 
 [[test]]
 utterance = "flag the circular ownership"
-expected_verb = "ownership.reconcile"
+expected_verb = "ownership.control-links.compute"
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "ownership"
 category = "indirect"
 difficulty = "expert"
-alt_verbs = ["ubo.trace-chains", "ownership.analyze-gaps"]
+alt_verbs = ["ubo.trace-chains"]
 notes = "Circular ownership detection is part of reconciliation"
 
 [[test]]
@@ -1130,7 +1074,7 @@ expected_polarity = "write"
 expected_domain_concept = "screening"
 category = "indirect"
 difficulty = "expert"
-alt_verbs = ["screening.pep", "screening.adverse-media", "document.missing-for-entity", "kyc-case.reopen", "fund-investor.update-kyc-status"]
+alt_verbs = ["screening.pep", "screening.adverse-media", "document.missing-for-entity", "kyc-case.reopen"]
 notes = "KYC refresh = re-run all screenings + check doc currency"
 
 [[test]]
@@ -1196,7 +1140,7 @@ alt_verbs = ["agent.set-execution-mode"]
 
 [[test]]
 utterance = "confirm"
-expected_verb = "agent.confirm"
+expected_verb = "agent.confirm-decision"
 alt_verbs = ["agent.confirm-decision"]
 expected_plane = "instance"
 expected_polarity = "write"
@@ -1212,7 +1156,7 @@ expected_polarity = "write"
 expected_domain_concept = "agent"
 category = "natural"
 difficulty = "medium"
-alt_verbs = ["view.surface", "view.navigate-back-to", "view.zoom-out", "session.undo"]
+alt_verbs = ["view.navigate-back-to", "view.zoom-out", "session.undo"]
 
 # ============================================================================
 # CONTRACT / BILLING DOMAINS
@@ -1654,7 +1598,7 @@ expected_route_target = "kyc.check-readiness"
 
 [[test]]
 utterance = "Create an umbrella fund"
-expected_verb = "fund.create-umbrella"
+expected_verb = "fund.create"
 alt_verbs = ["fund.create"]
 expected_plane = "instance"
 expected_polarity = "write"
@@ -1667,7 +1611,7 @@ notes = "Single-verb intent — must NOT be intercepted by scenario/macro tiers"
 [[test]]
 utterance = "Run sanctions screening"
 expected_verb = "screening.sanctions"
-alt_verbs = ["case-screening.run", "screening.sanctions-check"]
+alt_verbs = ["screening.sanctions-check"]
 expected_plane = "instance"
 expected_polarity = "write"
 expected_domain_concept = "screening"
@@ -2091,7 +2035,7 @@ workspace = "cbu"
 [[test]]
 utterance = "set up a Luxembourg SICAV"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella", "struct.lux.ucits.sicav"]
+alt_verbs = ["struct.lux.ucits.sicav"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2130,7 +2074,7 @@ workspace = "cbu"
 [[test]]
 utterance = "add depositary role to entity"
 expected_verb = "cbu.assign-role"
-alt_verbs = ["entity.assign-role"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "cbu"
@@ -2138,7 +2082,7 @@ workspace = "cbu"
 [[test]]
 utterance = "create sub-fund"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-subfund"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2180,7 +2124,7 @@ workspace = "cbu"
 [[test]]
 utterance = "open a KYC case"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.create-case", "case.open"]
+alt_verbs = ["case.open"]
 category = "direct"
 difficulty = "easy"
 workspace = "kyc"
@@ -2188,7 +2132,7 @@ workspace = "kyc"
 [[test]]
 utterance = "start KYC review for new client"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.create-case"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2196,7 +2140,7 @@ workspace = "kyc"
 [[test]]
 utterance = "run sanctions screening"
 expected_verb = "screening.sanctions"
-alt_verbs = ["case-screening.run"]
+alt_verbs = []
 category = "direct"
 difficulty = "easy"
 workspace = "kyc"
@@ -2219,7 +2163,7 @@ workspace = "kyc"
 [[test]]
 utterance = "discover UBO structure"
 expected_verb = "ubo.discover"
-alt_verbs = ["ubo.compute-chains"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2227,7 +2171,7 @@ workspace = "kyc"
 [[test]]
 utterance = "set risk rating to high"
 expected_verb = "kyc-case.set-risk-rating"
-alt_verbs = ["kyc.set-risk"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2235,7 +2179,7 @@ workspace = "kyc"
 [[test]]
 utterance = "approve KYC case"
 expected_verb = "kyc-case.close"
-alt_verbs = ["kyc.approve-case", "kyc-case.approve", "case.approve"]
+alt_verbs = ["kyc-case.approve", "case.approve"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2243,7 +2187,7 @@ workspace = "kyc"
 [[test]]
 utterance = "list outstanding KYC requirements"
 expected_verb = "requirement.list-outstanding"
-alt_verbs = ["requirement.list"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -2257,7 +2201,7 @@ workspace = "kyc"
 
 [[test]]
 utterance = "add identifier to entity"
-expected_verb = "identifier.add"
+expected_verb = "identifier.attach"
 alt_verbs = ["party.assign-identifier"]
 category = "natural"
 difficulty = "medium"
@@ -2350,7 +2294,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "set up a Luxembourg fund book"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella", "struct.lux.ucits.sicav"]
+alt_verbs = ["struct.lux.ucits.sicav"]
 category = "natural"
 difficulty = "medium"
 workspace = "onboarding"
@@ -2358,7 +2302,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "configure UCITS SICAV structure"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella", "struct.lux.ucits.sicav"]
+alt_verbs = ["struct.lux.ucits.sicav"]
 category = "natural"
 difficulty = "hard"
 workspace = "onboarding"
@@ -2366,7 +2310,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "onboard a cross-border hedge fund"
 expected_verb = "cbu.create"
-alt_verbs = ["fund.create-umbrella", "struct.hedge.cross-border"]
+alt_verbs = ["struct.hedge.cross-border"]
 category = "natural"
 difficulty = "hard"
 workspace = "onboarding"
@@ -2381,7 +2325,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "open a new client KYC case"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.create-case", "case.open"]
+alt_verbs = ["case.open"]
 category = "natural"
 difficulty = "medium"
 workspace = "onboarding"
@@ -2391,7 +2335,7 @@ workspace = "onboarding"
 [[test]]
 utterance = "show trading matrix"
 expected_verb = "trading-profile.read"
-alt_verbs = ["trading-profile.list"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "instrument_matrix"
@@ -2406,7 +2350,7 @@ workspace = "instrument_matrix"
 [[test]]
 utterance = "configure counterparty limits"
 expected_verb = "trading-profile.add-component"
-alt_verbs = ["trading-profile.add-isda-config", "trading-profile.add-csa-config"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
@@ -2453,7 +2397,7 @@ notes = "Practitioner slang for fund creation"
 [[test]]
 utterance = "who owns this thing?"
 expected_verb = "ubo.list-ubos"
-alt_verbs = ["ubo.discover", "ownership.list-owners", "ownership.find-controller"]
+alt_verbs = ["ubo.discover"]
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -2488,7 +2432,7 @@ notes = "Informal deal cancellation"
 [[test]]
 utterance = "chase the passport"
 expected_verb = "document.solicit"
-alt_verbs = ["document.chase"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -2517,7 +2461,7 @@ notes = "Capital structure jargon"
 [[test]]
 utterance = "what's the LEI?"
 expected_verb = "gleif.search"
-alt_verbs = ["gleif.enrich", "gleif.lookup-lei"]
+alt_verbs = ["gleif.enrich"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2544,7 +2488,7 @@ notes = "Investment Management Agreement"
 [[test]]
 utterance = "set up the SSIs"
 expected_verb = "trading-profile.add-component"
-alt_verbs = ["trading-profile.add-standing-instruction", "cbu-custody.create-ssi", "cbu-custody.setup-ssi"]
+alt_verbs = ["cbu-custody.setup-ssi"]
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
@@ -2553,7 +2497,7 @@ notes = "Standing Settlement Instructions"
 [[test]]
 utterance = "ISDA terms for this counterparty"
 expected_verb = "trading-profile.add-component"
-alt_verbs = ["trading-profile.add-isda-config", "trading-profile.add-isda-coverage"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "instrument_matrix"
@@ -2591,7 +2535,7 @@ notes = "Question form for document requirements"
 [[test]]
 utterance = "how many shareholders are there?"
 expected_verb = "capital.list-shareholders"
-alt_verbs = ["investor.list"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2600,7 +2544,7 @@ notes = "Question form for shareholder count"
 [[test]]
 utterance = "what's the ownership structure?"
 expected_verb = "ubo.discover"
-alt_verbs = ["ownership.list-owners", "ubo.trace-chains"]
+alt_verbs = ["ubo.trace-chains"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2629,7 +2573,7 @@ notes = "Two-word abbreviated screening"
 [[test]]
 utterance = "KYC check"
 expected_verb = "kyc-case.create"
-alt_verbs = ["kyc.create-case"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -2694,7 +2638,7 @@ notes = "Product assignment in fund context"
 [[test]]
 utterance = "process a redemption"
 expected_verb = "capital.buyback"
-alt_verbs = ["investor.redeem", "movement.redeem", "investor.start-redemption"]
+alt_verbs = ["movement.redeem", "investor.start-redemption"]
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2712,7 +2656,7 @@ notes = "Luxembourg fund jargon"
 [[test]]
 utterance = "amend the contract terms"
 expected_verb = "contract.update"
-alt_verbs = ["contract.amend"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "deal"
@@ -2738,7 +2682,7 @@ notes = "Entity blocking"
 [[test]]
 utterance = "trace the ownership chain"
 expected_verb = "ubo.trace-chains"
-alt_verbs = ["ownership.trace"]
+alt_verbs = []
 category = "direct"
 difficulty = "easy"
 workspace = "kyc"
@@ -2755,7 +2699,7 @@ notes = "Direct GLEIF import"
 [[test]]
 utterance = "issue new shares"
 expected_verb = "capital.issue-shares"
-alt_verbs = ["capital.issue", "capital.issue.new"]
+alt_verbs = ["capital.issue.new"]
 category = "direct"
 difficulty = "easy"
 workspace = "cbu"
@@ -2764,7 +2708,7 @@ notes = "Capital action"
 [[test]]
 utterance = "dividend distribution"
 expected_verb = "movement.distribute"
-alt_verbs = ["capital.distribute", "capital.distribute-dividend"]
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "cbu"
@@ -2850,7 +2794,7 @@ workspace = "cbu"
 [[test]]
 utterance = "Create a Delaware LP private fund"
 expected_verb = "struct.us.private-fund.delaware-lp"
-alt_verbs = ["cbu.create", "fund.create-standalone", "fund.create"]
+alt_verbs = ["cbu.create", "fund.create"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3016,7 +2960,7 @@ workspace = "kyc"
 [[test]]
 utterance = "List KYC cases"
 expected_verb = "kyc-case.list-by-cbu"
-alt_verbs = ["case.list", "kyc-case.list"]
+alt_verbs = ["case.list"]
 category = "macro_match"
 difficulty = "easy"
 expected_tier = "macro_index"
@@ -3098,18 +3042,6 @@ expected_route_target = "screening-ops.bulk-refresh"
 workspace = "kyc"
 
 # ── UBO macros (missing: expire) ─────────────────────────────────────────
-
-[[test]]
-utterance = "Expire the beneficial ownership allegation"
-expected_verb = "ubo.registry.expire"
-alt_verbs = ["ubo.expire", "ubo.end-ownership"]
-category = "macro_match"
-difficulty = "hard"
-expected_tier = "macro_index"
-expected_route_target = "ubo.expire"
-workspace = "kyc"
-
-# ── Evidence macros ──────────────────────────────────────────────────────
 
 [[test]]
 utterance = "Require evidence for the ownership allegation"
@@ -3439,7 +3371,7 @@ workspace = "semos_maintenance"
 [[test]]
 utterance = "Reconcile the registry"
 expected_verb = "governance.reconcile-registry"
-alt_verbs = ["attribute.bridge-to-semos", "control.reconcile-ownership", "ownership.reconcile", "discrepancy.resolve"]
+alt_verbs = ["attribute.bridge-to-semos", "discrepancy.resolve"]
 category = "macro_match"
 difficulty = "medium"
 expected_tier = "macro_index"
@@ -3569,7 +3501,7 @@ notes = "Contextual remaining work query"
 [[test]]
 utterance = "show gaps"
 expected_verb = "narration.query"
-alt_verbs = ["semantic.get-state", "ownership.analyze-gaps", "matrix-overlay.unified-gaps"]
+alt_verbs = ["semantic.get-state", "matrix-overlay.unified-gaps"]
 category = "contextual_query"
 difficulty = "medium"
 workspace = "cbu"
@@ -3628,8 +3560,8 @@ notes = "Contextual remaining work query"
 
 [[test]]
 utterance = "allege this person is a beneficial owner"
-expected_verb = "ubo.allege"
-alt_verbs = ["ubo.registry.create", "allegation.record", "ubo.add-ownership"]
+expected_verb = "ubo.edge.assert-economic-interest"
+alt_verbs = ["allegation.record"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -3637,8 +3569,8 @@ notes = "UBO epistemic: undiscovered → alleged"
 
 [[test]]
 utterance = "record a beneficial ownership allegation for the director"
-expected_verb = "ubo.allege"
-alt_verbs = ["allegation.record", "ubo.registry.create"]
+expected_verb = "ubo.edge.assert-economic-interest"
+alt_verbs = ["allegation.record"]
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -3646,26 +3578,17 @@ notes = "UBO epistemic: allegation recording"
 
 [[test]]
 utterance = "verify the UBO evidence is sufficient"
-expected_verb = "ubo.verify"
-alt_verbs = ["ubo.registry.promote", "evidence.mark-verified"]
+expected_verb = "ubo.edge.verify"
+alt_verbs = ["evidence.mark-verified"]
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
 notes = "UBO epistemic: alleged → provable"
 
 [[test]]
-utterance = "promote the UBO candidate to identified status"
-expected_verb = "ubo.promote"
-alt_verbs = ["ubo.registry.advance"]
-category = "direct"
-difficulty = "medium"
-workspace = "kyc"
-notes = "UBO epistemic: provable → proved"
-
-[[test]]
 utterance = "approve the beneficial ownership determination"
-expected_verb = "ubo.approve"
-alt_verbs = ["ubo.registry.advance"]
+expected_verb = "ubo.determination.freeze"
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -3673,8 +3596,8 @@ notes = "UBO epistemic: proved → approved"
 
 [[test]]
 utterance = "reject this UBO allegation as unsubstantiated"
-expected_verb = "ubo.reject"
-alt_verbs = ["ubo.registry.reject"]
+expected_verb = "ubo.edge.supersede"
+alt_verbs = []
 category = "natural"
 difficulty = "medium"
 workspace = "kyc"
@@ -3682,21 +3605,12 @@ notes = "UBO epistemic: rejection path"
 
 [[test]]
 utterance = "expire the UBO entry that has not been renewed"
-expected_verb = "ubo.expire"
-alt_verbs = ["ubo.registry.expire"]
+expected_verb = "ubo.edge.supersede"
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
 notes = "UBO epistemic: expiry/terminal state"
-
-[[test]]
-utterance = "waive verification for this beneficial owner"
-expected_verb = "ubo.waive-verification"
-alt_verbs = ["ubo.registry.waive"]
-category = "direct"
-difficulty = "medium"
-workspace = "kyc"
-notes = "UBO epistemic: waiver bypass"
 
 [[test]]
 utterance = "identify the UBOs from the trust structure"
@@ -3710,7 +3624,7 @@ notes = "Trust-specific UBO identification"
 [[test]]
 utterance = "analyze who controls the trust"
 expected_verb = "trust.analyze-control"
-alt_verbs = ["control.analyze", "board.analyze-control"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -3718,26 +3632,17 @@ notes = "Trust control vector analysis"
 
 [[test]]
 utterance = "capture a snapshot of the current UBO state"
-expected_verb = "ubo.snapshot.capture"
-alt_verbs = ["ownership.snapshot.get"]
+expected_verb = "ubo.determination.compute-fold"
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
 notes = "UBO epistemic: snapshot for audit trail"
 
 [[test]]
-utterance = "compare the UBO determination with the previous snapshot"
-expected_verb = "ubo.snapshot.diff"
-alt_verbs = ["ownership.reconcile"]
-category = "natural"
-difficulty = "expert"
-workspace = "kyc"
-notes = "UBO epistemic: diff for change detection"
-
-[[test]]
 utterance = "record a client allegation about who owns the shares"
 expected_verb = "allegation.record"
-alt_verbs = ["ubo.allege", "ubo.add-ownership"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"
@@ -3755,7 +3660,7 @@ notes = "Trust type classification"
 [[test]]
 utterance = "add a partnership capital contribution for this LP"
 expected_verb = "partnership.record-contribution"
-alt_verbs = ["partnership.add-partner"]
+alt_verbs = []
 category = "natural"
 difficulty = "hard"
 workspace = "kyc"

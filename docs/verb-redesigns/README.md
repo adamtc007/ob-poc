@@ -51,7 +51,6 @@ The `verb_to_dsl` binary annotates each Pattern D verb in the generated
 | `config/verbs/kyc/evidence.yaml` | Evidence lifecycle |
 | `config/verbs/kyc/kyc-case.yaml` | KYC case lifecycle |
 | `config/verbs/kyc/red-flag.yaml` | Red flag lifecycle |
-| `config/verbs/kyc/ubo-registry.yaml` | UBO registry lifecycle |
 | `config/verbs/manco-group.yaml` | Management company group lifecycle |
 | `config/verbs/onboarding.yaml` | Onboarding request lifecycle |
 | `config/verbs/phrase.yaml` | Phrase authoring lifecycle |

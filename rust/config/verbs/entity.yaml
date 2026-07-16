@@ -32,7 +32,7 @@ domains:
           - "register a new trust"
           - "add a new company"
           - "add a new person"
-          - "register John Smith as a person"
+          - "register a new person by name"
           - "onboard a new counterparty"
           - "add a new legal entity to the system"
           - "register a new organisation"

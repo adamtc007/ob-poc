@@ -63,7 +63,7 @@ governance.define-service-dictionary:
     - "define service dictionary"
     - "define the service resource dictionary"
     - "service resource dictionary"
-    - "build service dictionary"
+    - "audit and repair the service dictionary"
 
   ui:
     label: "Define Service Resource Dictionary"
