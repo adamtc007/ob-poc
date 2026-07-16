@@ -201,6 +201,9 @@ domains:
           - "verify economic interest"
           - "confirm and verify edge"
           - "verify the assertion"
+          - "verify the UBO evidence"
+          - "verify the UBO evidence is sufficient"
+          - "is the evidence sufficient to verify this edge"
         behavior: plugin
         metadata:
           tier: intent
@@ -245,6 +248,10 @@ domains:
           - "supersede the assertion"
           - "mark as superseded"
           - "this edge is superseded"
+          - "reject this UBO allegation"
+          - "reject as unsubstantiated"
+          - "expire this UBO entry"
+          - "expire this edge"
         behavior: plugin
         metadata:
           tier: intent
@@ -455,6 +462,9 @@ domains:
           - "commit determination"
           - "seal the UBO pin"
           - "freeze the result"
+          - "approve the beneficial ownership determination"
+          - "approve the UBO determination"
+          - "approve this ownership determination"
         behavior: plugin
         metadata:
           tier: intent
