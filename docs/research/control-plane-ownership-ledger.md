@@ -2610,3 +2610,55 @@ confirm no seed-loader regression — it fails identically on the untouched
 product_service` (pre-existing, `ob-poc.product-service-taxonomy`, no
 file this sweep touched), so that check was inconclusive by construction,
 not skipped.
+
+## RR-2 bypass-closure verification sweep — no new work needed, one real gate bug found and fixed (2026-07-16)
+
+Prompted by an operator question ("Sage/REPL session traffic can still
+bypass the control plane and go direct to DSL/SemOS — is this G14?").
+Answer: no — G14 (`WriteSetAttestation`) is a *post-execution* write
+comparison, unrelated to routing/admission. The actual concern maps to
+**E2** ("all RR-2 paths execute only via envelope admission") and its
+constituent Path B/C wiring (Sage/REPL → `RealDslExecutor`/
+`WorkflowDispatcher` Direct). Investigated each of the three loose ends
+the ledger's own prior entries had left open, expecting to close real
+work — found all three already closed by prior tranches, and one CI-gate
+bug in the process of verifying the third:
+
+1. **`invariants-expected.toml`'s `[e2]` "2/4 RR-2 paths" comment** —
+   already updated to "4/4 RR-2 paths (A, B, C, D)" by the G4 tranche
+   (`02816414`). The ledger's own T-something note calling it "still not
+   applied" predates that update; no action needed.
+2. **HumanGate re-seal-at-resume live-DB test (design doc §10 assertion
+   4)** — already exists:
+   `sequencer::g1_humangate_reseal_tests::human_gate_resume_reseals_fresh_envelope_not_the_stale_pre_park_one`
+   (commit `29aa8df1`). Re-ran live against `DATABASE_URL` this session
+   — green.
+3. **Path D (`dsl_v2/executor.rs`'s `dispatch_plugin_via_sem_os_op_in_scope`)
+   status** — already `ADMISSION-WIRED` per T9.3
+   (`audits/surface/_verb-execution-context-allowlist.txt`), not a
+   lingering `KNOWN-BYPASS`. Verified by running
+   `scripts/check-verb-execution-context-allowlist.sh` directly, which
+   **failed** — not on Path D, but on two false-positive UNLISTED
+   CONSTRUCTION SITEs: `crates/dsl-runtime/src/crud_executor.rs` and
+   `src/sem_os_runtime/verb_executor_adapter.rs`. Root cause: the
+   script's brace-depth test-classifier recognised `#[cfg(test)]` and
+   `#[cfg(any(test...` as test markers but not `#[cfg(all(test,
+   feature = "database"))]` — the form every live-DB integration test
+   module in this workspace actually uses (`crud_executor.rs`'s
+   `db_integration_tests`, `verb_executor_adapter.rs`'s two
+   feature-gated modules). Their `fake_ctx()`/`VerbExecutionContext::new(`
+   test fixtures were misclassified as production `VerbExecutionContext`
+   construction, tripping the T6 exit-criterion gate on fixtures that
+   were never bypass candidates. Fixed with a one-line `#[cfg(all(test`
+   match added alongside the other two
+   (`scripts/check-verb-execution-context-allowlist.sh`) — gate now
+   passes green with the same 3 `ADMISSION-WIRED` entries as before
+   (`bus_runtime.rs`, `dsl_v2/executor.rs`, `step_executor_bridge.rs`),
+   confirming Path D is genuinely closed, not just undetected.
+
+**Full `check-invariants.sh ratchet` re-run this session**: `0/5
+invariant(s) diverge from invariants-expected.toml` — E1-E5 all still
+`fail`, matching their recorded expected status exactly. Nothing
+regressed, nothing silently went green. No RR-2 path work remained open;
+the only real defect this sweep found and fixed was in the verification
+tooling itself, not in the control-plane wiring it verifies.

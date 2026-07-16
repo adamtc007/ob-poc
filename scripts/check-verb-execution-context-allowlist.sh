@@ -21,16 +21,28 @@
 # Test-only classification: brace-depth tracking, not a line-proximity
 # heuristic — a construction site is test-only iff it falls inside the
 # body of an item (mod or fn) annotated `#[cfg(test)]` / `#[cfg(any(test, ...))]`
-# on the nearest preceding attribute line, tracked by nesting depth so
-# code appended AFTER a `#[cfg(test)] mod tests { ... }` block's closing
-# brace is correctly classified as production, not test (an earlier
-# nearest-preceding-marker-line heuristic got exactly this case wrong —
-# verified by probe during development, see the wiring commit). This is
-# still not a real parser: it counts braces textually, so a `{`/`}`
-# inside a string literal or doc-comment code block could in principle
-# confuse the depth counter. No such case was found in this workspace's
-# actual construction-site files at the time of writing; if one appears,
-# prefer restructuring the code over gaming the heuristic.
+# / `#[cfg(all(test, ...))]` on the nearest preceding attribute line,
+# tracked by nesting depth so code appended AFTER a `#[cfg(test)] mod
+# tests { ... }` block's closing brace is correctly classified as
+# production, not test (an earlier nearest-preceding-marker-line
+# heuristic got exactly this case wrong — verified by probe during
+# development, see the wiring commit). This is still not a real parser:
+# it counts braces textually, so a `{`/`}` inside a string literal or
+# doc-comment code block could in principle confuse the depth counter.
+#
+# Bug found and fixed 2026-07-16 (G14/RR-2 closure sweep): the
+# `#[cfg(all(test, feature = "database"))]` form (used by every
+# db-integration test module gated on a live DATABASE_URL, e.g.
+# `dsl-runtime/src/crud_executor.rs`'s `db_integration_tests`,
+# `sem_os_runtime/verb_executor_adapter.rs`'s two feature-gated test
+# modules) was NOT recognised by either substring check — only bare
+# `#[cfg(test)]` and `#[cfg(any(test` matched — so those modules'
+# `VerbExecutionContext::new(` test fixtures were misclassified as
+# production and flagged as false-positive UNLISTED CONSTRUCTION SITEs.
+# Added an `#[cfg(all(test` match alongside the other two. No such other
+# case was found in this workspace's actual construction-site files at
+# the time of writing; if a new `#[cfg(...)]` spelling appears, prefer
+# restructuring the code over gaming the heuristic.
 
 set -uo pipefail
 
@@ -62,6 +74,7 @@ for file in $hits; do
       line = $0
       if (test_depth == -1 && index(line, "#[cfg(test)") > 0) { pending = 1 }
       if (test_depth == -1 && index(line, "#[cfg(any(test") > 0) { pending = 1 }
+      if (test_depth == -1 && index(line, "#[cfg(all(test") > 0) { pending = 1 }
       if (index(line, "VerbExecutionContext::new(") > 0 && test_depth == -1) {
         prod_hits++
       }
