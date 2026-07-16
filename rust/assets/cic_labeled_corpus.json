@@ -323,7 +323,7 @@
   },
   {
     "utterance": "add an ownership stake -- Vanguard holds 25% of this entity",
-    "expected_verb": "ubo.add-ownership",
+    "expected_verb": "ubo.edge.assert-economic-interest",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -351,7 +351,7 @@
   },
   {
     "utterance": "add a control relationship -- board appointment",
-    "expected_verb": "control.add",
+    "expected_verb": "ubo.edge.assert-control",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -386,52 +386,6 @@
     ],
     "entity_context": null,
     "id": "cic-0031",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "this person died last month",
-    "expected_verb": "ubo.mark-deceased",
-    "domain": "KYC",
-    "category": "indirect",
-    "difficulty": "expert",
-    "alt_verbs": [],
-    "entity_context": null,
-    "id": "cic-0032",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "the settlor appointed a new trustee",
-    "expected_verb": "ubo.add-trust-role",
-    "domain": "KYC",
-    "category": "indirect",
-    "difficulty": "expert",
-    "alt_verbs": [],
-    "entity_context": null,
-    "id": "cic-0033",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "waive the ownership verification -- low risk client",
-    "expected_verb": "ubo.waive-verification",
-    "domain": "KYC",
-    "category": "natural",
-    "difficulty": "medium",
-    "alt_verbs": [],
-    "entity_context": null,
-    "id": "cic-0034",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "ownership was transferred from Parent Co to New Holdco",
-    "expected_verb": "ubo.update-ownership",
-    "domain": "KYC",
-    "category": "indirect",
-    "difficulty": "hard",
-    "alt_verbs": [
-      "ubo.convergence-supersede"
-    ],
-    "entity_context": null,
-    "id": "cic-0035",
     "board_id": "board-kyc-case"
   },
   {
@@ -852,7 +806,7 @@
   },
   {
     "utterance": "compute the ownership waterfall",
-    "expected_verb": "ownership.compute",
+    "expected_verb": "ubo.determination.compute-fold",
     "domain": "CBU",
     "category": "natural",
     "difficulty": "medium",
@@ -863,7 +817,7 @@
   },
   {
     "utterance": "who ultimately controls this entity?",
-    "expected_verb": "ownership.find-controller",
+    "expected_verb": "ownership.control-links.list",
     "domain": "CBU",
     "category": "natural",
     "difficulty": "medium",
@@ -880,7 +834,7 @@
   },
   {
     "utterance": "reconcile the ownership percentages",
-    "expected_verb": "ownership.reconcile",
+    "expected_verb": "ownership.control-links.compute",
     "domain": "CBU",
     "category": "direct",
     "difficulty": "easy",
@@ -892,34 +846,8 @@
     "board_id": "board-cbu-operational"
   },
   {
-    "utterance": "trace the chain from Vanguard down to the subfund",
-    "expected_verb": "ownership.trace-chain",
-    "domain": "CBU",
-    "category": "natural",
-    "difficulty": "medium",
-    "alt_verbs": [
-      "ubo.trace-chains"
-    ],
-    "entity_context": null,
-    "id": "cic-0074",
-    "board_id": "board-cbu-operational"
-  },
-  {
-    "utterance": "are there any gaps in the ownership structure?",
-    "expected_verb": "ownership.analyze-gaps",
-    "domain": "CBU",
-    "category": "natural",
-    "difficulty": "medium",
-    "alt_verbs": [
-      "ubo.trace-chains"
-    ],
-    "entity_context": null,
-    "id": "cic-0075",
-    "board_id": "board-cbu-operational"
-  },
-  {
     "utterance": "who is the board-appointed controller?",
-    "expected_verb": "control.show-board-controller",
+    "expected_verb": "ownership.control-links.list",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
@@ -930,7 +858,7 @@
   },
   {
     "utterance": "import the PSC register data",
-    "expected_verb": "control.import-psc-register",
+    "expected_verb": "research.companies-house.fetch-psc",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -1249,7 +1177,7 @@
   },
   {
     "utterance": "check the PSC register",
-    "expected_verb": "control.import-psc-register",
+    "expected_verb": "research.companies-house.fetch-psc",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "expert",
@@ -1293,20 +1221,6 @@
     "entity_context": null,
     "id": "cic-0105",
     "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "flag the circular ownership",
-    "expected_verb": "ownership.reconcile",
-    "domain": "CBU",
-    "category": "indirect",
-    "difficulty": "expert",
-    "alt_verbs": [
-      "ubo.trace-chains",
-      "ownership.analyze-gaps"
-    ],
-    "entity_context": null,
-    "id": "cic-0106",
-    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "check for OFAC hits",
@@ -1465,28 +1379,6 @@
     "entity_context": null,
     "id": "cic-0119",
     "board_id": "board-custody-deal"
-  },
-  {
-    "utterance": "set up a booking principal for this deal",
-    "expected_verb": "booking-principal.create",
-    "domain": "CBU",
-    "category": "direct",
-    "difficulty": "medium",
-    "alt_verbs": [],
-    "entity_context": null,
-    "id": "cic-0120",
-    "board_id": "board-cbu-operational"
-  },
-  {
-    "utterance": "which booking entity handles custody for Ireland?",
-    "expected_verb": "booking-principal.coverage-matrix",
-    "domain": "CBU",
-    "category": "natural",
-    "difficulty": "hard",
-    "alt_verbs": [],
-    "entity_context": null,
-    "id": "cic-0121",
-    "board_id": "board-cbu-operational"
   },
   {
     "utterance": "Onboard a Luxembourg SICAV",
@@ -2633,7 +2525,7 @@
   },
   {
     "utterance": "discover UBO structure",
-    "expected_verb": "ubo.calculate",
+    "expected_verb": "ubo.determination.compute-fold",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -3208,7 +3100,7 @@
   },
   {
     "utterance": "what's the ownership structure?",
-    "expected_verb": "ubo.calculate",
+    "expected_verb": "ubo.determination.compute-fold",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -3857,21 +3749,6 @@
     ],
     "entity_context": null,
     "id": "cic-0310",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "Expire the beneficial ownership allegation",
-    "expected_verb": "ubo.registry.expire",
-    "domain": "KYC",
-    "category": "macro_match",
-    "difficulty": "hard",
-    "alt_verbs": [
-      "ubo.end-ownership",
-      "ubo.end-ownership",
-      "ubo.waive-verification"
-    ],
-    "entity_context": null,
-    "id": "cic-0311",
     "board_id": "board-kyc-case"
   },
   {
@@ -4572,7 +4449,7 @@
   },
   {
     "utterance": "allege this person is a beneficial owner",
-    "expected_verb": "ubo.add-ownership",
+    "expected_verb": "ubo.edge.assert-economic-interest",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4587,7 +4464,7 @@
   },
   {
     "utterance": "record a beneficial ownership allegation for the director",
-    "expected_verb": "ubo.add-ownership",
+    "expected_verb": "ubo.edge.assert-economic-interest",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
@@ -4601,7 +4478,7 @@
   },
   {
     "utterance": "verify the UBO evidence is sufficient",
-    "expected_verb": "ubo.calculate",
+    "expected_verb": "ubo.edge.verify",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4615,21 +4492,8 @@
     "board_id": "board-kyc-case"
   },
   {
-    "utterance": "promote the UBO candidate to identified status",
-    "expected_verb": "ubo.registry.promote",
-    "domain": "KYC",
-    "category": "direct",
-    "difficulty": "medium",
-    "alt_verbs": [
-      "ubo.registry.advance"
-    ],
-    "entity_context": null,
-    "id": "cic-0365",
-    "board_id": "board-kyc-case"
-  },
-  {
     "utterance": "approve the beneficial ownership determination",
-    "expected_verb": "ubo.registry.promote",
+    "expected_verb": "ubo.determination.freeze",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4643,7 +4507,7 @@
   },
   {
     "utterance": "reject this UBO allegation as unsubstantiated",
-    "expected_verb": "ubo.end-ownership",
+    "expected_verb": "ubo.edge.supersede",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -4656,7 +4520,7 @@
   },
   {
     "utterance": "expire the UBO entry that has not been renewed",
-    "expected_verb": "ubo.end-ownership",
+    "expected_verb": "ubo.edge.supersede",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
@@ -4665,19 +4529,6 @@
     ],
     "entity_context": null,
     "id": "cic-0368",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "waive verification for this beneficial owner",
-    "expected_verb": "ubo.waive-verification",
-    "domain": "KYC",
-    "category": "direct",
-    "difficulty": "medium",
-    "alt_verbs": [
-      "ubo.registry.waive"
-    ],
-    "entity_context": null,
-    "id": "cic-0369",
     "board_id": "board-kyc-case"
   },
   {
@@ -4710,7 +4561,7 @@
   },
   {
     "utterance": "capture a snapshot of the current UBO state",
-    "expected_verb": "ubo.snapshot.capture",
+    "expected_verb": "ubo.determination.compute-fold",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
@@ -4719,19 +4570,6 @@
     ],
     "entity_context": null,
     "id": "cic-0372",
-    "board_id": "board-kyc-case"
-  },
-  {
-    "utterance": "compare the UBO determination with the previous snapshot",
-    "expected_verb": "ubo.snapshot.diff",
-    "domain": "KYC",
-    "category": "natural",
-    "difficulty": "expert",
-    "alt_verbs": [
-      "ownership.reconcile"
-    ],
-    "entity_context": null,
-    "id": "cic-0373",
     "board_id": "board-kyc-case"
   },
   {
@@ -5219,7 +5057,7 @@
   },
   {
     "utterance": "verify the date of birth for the primary beneficiary",
-    "expected_verb": "ubo.calculate",
+    "expected_verb": "kyc.obligation.update-identity",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "medium",
@@ -5287,7 +5125,7 @@
   },
   {
     "utterance": "link this individual to the corporate structure tree",
-    "expected_verb": "ubo.add-ownership",
+    "expected_verb": "kyc.subject.register",
     "domain": "KYC",
     "category": "natural",
     "difficulty": "hard",
