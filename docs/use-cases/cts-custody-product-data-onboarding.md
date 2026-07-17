@@ -38,13 +38,13 @@ Its dimensions:
 
 1. **The full traded universe — not the custodied universe.** Every instrument type in scope, explicitly including types that never appear as safekept positions: OTC derivatives (swaps, CDS, FX forwards) exist as agreements and collateral flows rather than holdings. A custody-only lens misses them entirely.
 2. **Instruction and routing topology.** Per instrument type: who instructs (the investment manager's front office / order management), from which BIC, over which channel and message types. This is the direct input for SWIFT setup (RMA relationships, message flows per instructing BIC) and trade routing configuration.
-3. **Markets, settlement currencies, settlement types, and counterparties** — the classic fan-out drivers (account per market, cash account per currency, SSI per market and currency).
+3. **Execution venues, settlement markets and depositories, settlement currencies, settlement types, and counterparties.** Execution venue (where trades are executed) and settlement market/CSD (where positions settle and are safekept) are distinct dimensions and must not be conflated: the execution venue belongs with the routing dimension above, while the settlement dimensions drive custody fan-out — securities account per settlement market, cash account per settlement currency, SSI per settlement market and currency. The settlement dimensions may be derived from execution venue, instrument type, and settlement rules.
 4. **Legal agreement and collateral scope for OTC instruments.** For each OTC instrument type, the counterparty set and the ISDA master and CSA governing each counterparty, because the CSA drives collateral accounts, eligible-collateral schedules, and margin setup. Recording *which* agreement governs each counterparty is always required. The deeper margin mechanics (initial/variation margin terms, bilateral vs triparty, eligible collateral) are **conditionally required**: they become mandatory matrix content when collateral-management or margin services are part of the selected service composition for this CTS.
 5. **Pricing and valuation preferences.** Per instrument class: pricing source hierarchy, fair-value and stale-price policy, and OTC valuation approach. Fund accounting consumes these to strike a NAV; they are part of the same "for this instrument class, here is how we operate" declaration as the rest of the matrix.
 
-The word "matrix" is literal: it is a cross-product of instrument class × market × currency × counterparty × instructing BIC/channel, and every populated cell drives provisioning fan-out somewhere — a custody account, an SSI, a SWIFT relationship, an ISDA/CSA and collateral account, a pricing-source configuration. That is why the matrix must be frozen and versioned before compilation: the entire downstream resource discovery hangs off it.
+The word "matrix" reflects its dimensional shape: a sparse set of valid operational tuples across instrument class × execution venue × settlement market × currency × counterparty × instructing BIC/channel — only the combinations the CTS actually operates are populated, never the full cross-product. Every populated tuple drives provisioning fan-out somewhere — a custody account, an SSI, a SWIFT relationship, an ISDA/CSA and collateral account, a pricing-source configuration. That is why the matrix must be frozen and versioned before compilation: the entire downstream resource discovery hangs off it.
 
-The matrix is a **living document**: it changes throughout the life of the CTS as it is serviced. Change is governed by versioning, not mutation — each change passes the matrix's own QA/validation gates and is **confirmed** as a new version, and every compilation binds to one specific confirmed version. Confirmation is what makes the matrix definitive: for any data it covers, the confirmed matrix is the single authoritative source, and its confirmation *is* the evidence — no separate evidence collection applies to matrix-sourced values.
+The matrix is a **living document**: it changes throughout the life of the CTS as it is serviced. Change is governed by versioning, not mutation — each change passes the matrix's own QA/validation gates and is **confirmed** as a new version, and every compilation binds to one specific confirmed version. Confirmation is what makes the matrix definitive: for any data it covers, the confirmed matrix is the single authoritative source, and its confirmation *is* the evidence — no separate evidence collection applies to matrix-sourced values. "Confirmed" is a business state, not a platform state: it means the version has passed those gates and is authorised as the operational statement of the trading universe. Any implementing platform must nominate which of its own lifecycle states satisfies this definition, and the confirmation itself must be auditable — who confirmed, when, and under what confirmation identity.
 
 The dependency between the matrix and the service composition runs in **both directions**. Downward, the matrix drives resource fan-out (the examples above). Upward, service selection mandates matrix coverage: selecting OTC, variation-margin, or collateral-management services requires the confirmed matrix to cover the corresponding instrument types, governing agreements, and margin terms. Compilation blocks when a selected service demands a matrix dimension the confirmed matrix does not cover.
 
@@ -95,8 +95,9 @@ The output answers five questions:
 | SRDEF | A service-resource definition describing a required resource type, its provisioning strategy, fan-out rules, dependencies, owner, and attribute requirements. |
 | Resource slice | One CTS-specific occurrence of an SRDEF for a parameter set, such as one securities custody account for a market or one cash account for a currency. |
 | Instrument matrix | The self-contained, versioned single source of truth for the CTS's trading universe and how that trading operates: the full *traded* instrument scope (including non-custodied OTC types), markets, settlement currencies and types, counterparties and their governing agreements, instruction and routing topology, and valuation preferences. It drives resource fan-out. See "The instrument matrix" in section 2. |
-| Market | In this use case, the place of settlement/safekeeping (the market or CSD in which assets are held), which drives per-market account and SSI fan-out. |
-| SSI | Standing settlement instruction — the pre-agreed settlement routing details exchanged with counterparties per market and currency. |
+| Execution venue | The market (identified by MIC, e.g. XETR) on which trades are executed. Part of the instruction/routing dimension of the matrix; it does not by itself determine where assets settle or are safekept. |
+| Settlement market / CSD | The market and central securities depository in which positions settle and are safekept (for example Germany via Clearstream Banking Frankfurt, the UK via CREST, the US via DTC). Custody account and SSI fan-out key off these settlement dimensions, which may be derived from execution venue, instrument type, and settlement rules. |
+| SSI | Standing settlement instruction — the pre-agreed settlement routing details exchanged with counterparties per settlement market and currency. |
 | Attribute definition | The canonical semantic definition of a data item, including type, meaning, constraints, and governance identity. |
 | Attribute requirement | A resource-specific use of an attribute, including requiredness, condition, source policy, evidence policy, and any constraint override. |
 | Product data-dependency taxonomy | The consolidated CTS-and-product-specific view of all applicable resource attribute requirements, with complete product → service → resource → attribute lineage. |
@@ -122,7 +123,7 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 
 1. A specific instrument-matrix version is attached to the CTS.
 2. The matrix version is **confirmed** — it has passed the matrix's own QA/validation gates. Formal data solicitation, production compilation, and provisioning all require a confirmed version; a non-confirmed matrix supports only a clearly labelled preview. The version is immutable for the duration of compilation.
-3. The matrix is materialized sufficiently to expose the applicable instruments (including non-custodied OTC types), markets, currencies, settlement types, counterparties and their governing agreements, instructing BICs and channels, valuation preferences, SSIs, and other discovery inputs.
+3. The matrix is materialized sufficiently to expose the applicable instruments (including non-custodied OTC types), execution venues, settlement markets and depositories, currencies, settlement types, counterparties and their governing agreements, instructing BICs and channels, valuation preferences, SSIs, and other discovery inputs.
 4. Product-to-service mappings are effective-dated, governed, and resolvable for Custody.
 5. Every selected service is published/active and has a stable version.
 6. Every discoverable SRDEF is governed, complete, and free of unresolved attribute-definition gaps or conflicts.
@@ -136,7 +137,7 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 | Input | Required content |
 |---|---|
 | CTS reference | CTS identity, name, jurisdiction, lifecycle state, SICAV/sub-fund context, and relevant entity roles |
-| Instrument-matrix snapshot | Profile identity, version, status, content hash, traded instrument classes (custodied and OTC), markets, currencies, settlement types, counterparties and governing agreements (ISDA/CSA), instructing BICs and channels, and valuation/pricing preferences |
+| Instrument-matrix snapshot | Profile identity, version, status, confirmation record, content hash, traded instrument classes (custodied and OTC), execution venues, settlement markets and depositories, currencies, settlement types, counterparties and governing agreements (ISDA/CSA), instructing BICs and channels, and valuation/pricing preferences |
 | Product snapshot | Product identity, code, version/effective date, status, and product configuration |
 | Product-service catalogue | Service identities/codes, versions, mandatory/default flags, eligibility conditions, option definitions, and product overrides |
 | Resource catalogue | SRDEF identities, versions/hashes, service triggers, owners, provisioning strategies, fan-out rules, dependencies, and capability bindings |
@@ -159,11 +160,11 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 6. Attach Custody to the CTS.
 7. Read the governed product-to-service mappings for Custody.
 8. Evaluate each mapping against the CTS, instrument matrix, product options, effective date, and any eligibility predicate.
-9. Select:
+9. Resolve a *proposed* service composition:
    - every mandatory applicable service;
    - every applicable default service unless explicitly opted out under product policy; and
    - every optional service explicitly agreed in the onboarding scope.
-10. Create or reconcile one active service intent per selected CTS/product/service/options tuple.
+10. Present the proposed composition to the onboarding requestor; on the requestor's confirmation, create or reconcile one active service intent per confirmed CTS/product/service/options tuple.
 11. Preserve an explanation for each inclusion, exclusion, default, override, and eligibility decision.
 
 ### Phase C — Discover the service resources
@@ -171,9 +172,9 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 12. For each selected service intent, locate every SRDEF triggered by that service and its selected options.
 13. Evaluate resource eligibility, service option constraints, and dependencies.
 14. Apply fan-out rules using the frozen instrument matrix. Examples include:
-   - securities custody account per applicable market;
+   - securities custody account per applicable settlement market;
    - cash custody account per applicable settlement currency;
-   - SSI instruction set per applicable market;
+   - SSI instruction set per applicable settlement market and currency;
    - SWIFT relationship per instructing BIC and channel;
    - ISDA/CSA reference and, where collateral or margin services are selected, collateral account setup per OTC counterparty; and
    - pricing-source configuration per instrument class where fund accounting services are selected.
@@ -186,7 +187,7 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 18. Load the governed attribute requirements for every discovered resource slice.
 19. Resolve each requirement to its canonical attribute definition.
 20. Build one product-level dependency taxonomy keyed by canonical attribute identity and scoped to the CTS, product, and frozen matrix version.
-21. Preserve a lineage collection on every consolidated attribute showing every service, SRDEF, and resource slice that requires it.
+21. Preserve a **requirement occurrence** on every consolidated attribute for each service, SRDEF, and resource slice that requires it, carrying the slice key and parameters, the effective constraints and policies for that occurrence, and — once populated — the occurrence's own value and validation result. Consolidation is keyed by canonical attribute identity, but values bind at occurrence grain: one canonical attribute may legitimately carry different values across slices (a settlement currency of EUR, GBP, and USD across three cash accounts is three occurrences, not one value).
 22. Merge requirements according to the following rules:
    - If any applicable source requires an attribute unconditionally, its effective product-level strength is `required`.
    - Otherwise, conditional requirements remain conditional and retain their expressions; they are not flattened into unconditional requirements.
@@ -202,7 +203,7 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 25. Attempt automatic population in the order permitted by each requirement's source policy. Supported sources may include governed derivation, existing CTS data, related entity data, documents, reference data, defaults, and manual/client supply.
 26. Reuse an existing value only when its subject, semantic identity, effective date, freshness, evidence, and permitted-use policy satisfy the current requirement.
 27. Where multiple sources disagree, retain all candidates and route the conflict for resolution; do not apply an unrecorded precedence choice.
-28. Group remaining requests into coherent solicitations by data owner or client contact, avoiding duplicate requests for the same canonical attribute.
+28. Group remaining requests into coherent solicitations by data owner or client contact. Deduplicate a request only when the canonical attribute, the subject, and the parameter scope are all identical; occurrences with different parameters (a different settlement market or currency) are distinct requests even for the same attribute.
 29. For every supplied value, record the source, supplier, observation/effective time, evidence references, and any transformation or derivation used.
 30. Validate the value against its canonical type, merged constraints, applicability condition, evidence policy, and freshness policy.
 31. Re-run dependent conditions and derivations whenever an input value changes.
@@ -215,8 +216,8 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 35. Freeze one owner-addressable resource slice per discovery.
 36. Freeze the resolved attribute requirements, populated values, evidence status, validation results, and blockers for each slice.
 37. Create the consolidated JSON projection described in section 12.
-38. Compute a deterministic content hash and persist the JSON with its schema version and all source snapshot identifiers.
-39. Mark the record set `complete` only when all applicable required values and evidence are valid and all blocking conflicts are resolved. Otherwise save it as `blocked` with machine-readable reasons.
+38. Compute a deterministic content hash over a canonical serialization of the record set (stable key ordering and value formats, with the `content_hash` field itself excluded from the hashed payload) and persist the JSON with its schema version and all source snapshot identifiers.
+39. Mark the record set `complete` only when all applicable required values and evidence are valid and all blocking conflicts are resolved. Otherwise save it as `blocked` with machine-readable reasons. Completeness is a statement about the data only: it makes the record set eligible for provisioning; it is never a claim that provisioning has occurred.
 40. Make the completed record set available to the separate resource-provisioning and onboarding-readiness processes.
 
 ## 9. Business rules and invariants
@@ -225,7 +226,7 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 2. Catalogue definitions are design-time governed objects; CTS discoveries, values, and resource slices are operational onboarding instances.
 3. Stable identifiers and version/hash references—not display names—control identity and reproducibility.
 4. A service may trigger several resources, and a resource may support several services. The resulting graph is many-to-many.
-5. Resource fan-out is part of the data dependency. A market-scoped requirement cannot be satisfied merely by a value recorded for a different market.
+5. Resource fan-out is part of the data dependency. A requirement scoped to one settlement market or currency cannot be satisfied by a value recorded for a different one; values bind at requirement-occurrence grain, not at canonical-attribute grain.
 6. Consolidation must remove duplicate solicitation without removing resource-specific applicability, constraints, or lineage.
 7. "Not applicable" is an evaluated state with a recorded reason; it is not equivalent to a missing value.
 8. Defaulted and derived values retain their origin and are never represented as client-supplied values.
@@ -287,12 +288,14 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 
 The persisted operational model may remain normalized across request, discovery, slice, and attribute records. The JSON below is the portable consolidated projection. All identifiers and hashes are illustrative placeholders.
 
+Two contract rules to note. First, consolidation is keyed by canonical attribute, but values and validation bind at **requirement-occurrence** grain — one attribute may carry different values across resource slices. Second, `taxonomy_status` describes **data completeness only**; provisioning readiness and completion belong to the consuming provisioning process, never to this record set.
+
 ```json
 {
   "schema_version": "1.0",
   "record_type": "cts_product_data_dependency_taxonomy",
   "record_id": "<uuid>",
-  "status": "complete",
+  "taxonomy_status": "complete",
   "compiled_at": "2026-07-17T00:00:00Z",
   "content_hash": "sha256:<digest>",
   "scope": {
@@ -313,6 +316,9 @@ The persisted operational model may remain normalized across request, discovery,
       "profile_id": "<uuid>",
       "version": 1,
       "status": "confirmed",
+      "confirmed_by": "<actor-or-role>",
+      "confirmed_at": "<timestamp>",
+      "confirmation_id": "<uuid>",
       "content_hash": "sha256:<digest>"
     }
   },
@@ -328,7 +334,7 @@ The persisted operational model may remain normalized across request, discovery,
   ],
   "resource_slices": [
     {
-      "slice_key": "SRDEF::CUSTODY::Account::custody_securities|market=XETR",
+      "slice_key": "SRDEF::CUSTODY::Account::custody_securities|settlement_market=DE",
       "srdef_id": "SRDEF::CUSTODY::Account::custody_securities",
       "srdef_snapshot_hash": "<digest>",
       "resource_type": "Account",
@@ -336,7 +342,9 @@ The persisted operational model may remain normalized across request, discovery,
       "owner": "CUSTODY",
       "provisioning_strategy": "request",
       "parameters": {
-        "market": "XETR"
+        "settlement_market": "DE",
+        "csd_or_depository": "Clearstream Banking Frankfurt",
+        "derived_from_execution_venues": ["XETR"]
       },
       "triggered_by_services": [
         "SETTLEMENT"
@@ -361,30 +369,54 @@ The persisted operational model may remain normalized across request, discovery,
         "manual"
       ],
       "evidence_policy": {},
-      "required_by": [
+      "requirement_occurrences": [
         {
           "service_code": "SETTLEMENT",
-          "srdef_id": "SRDEF::CUSTODY::Account::custody_securities",
-          "slice_key": "SRDEF::CUSTODY::Account::custody_securities|market=XETR"
+          "srdef_id": "SRDEF::CUSTODY::Account::custody_cash",
+          "slice_key": "SRDEF::CUSTODY::Account::custody_cash|currency=EUR",
+          "parameters": {
+            "settlement_currency": "EUR"
+          },
+          "effective_constraints": {
+            "pattern": "^[A-Z]{3}$"
+          },
+          "value": {
+            "status": "present",
+            "value": "EUR",
+            "source": "instrument_matrix_derivation",
+            "observed_at": "2026-07-17T00:00:00Z",
+            "evidence_refs": []
+          },
+          "validation": {
+            "constraint_status": "valid",
+            "evidence_status": "not_required",
+            "blocking_reasons": []
+          }
         },
         {
           "service_code": "SETTLEMENT",
           "srdef_id": "SRDEF::CUSTODY::Account::custody_cash",
-          "slice_key": "SRDEF::CUSTODY::Account::custody_cash|currency=EUR"
+          "slice_key": "SRDEF::CUSTODY::Account::custody_cash|currency=GBP",
+          "parameters": {
+            "settlement_currency": "GBP"
+          },
+          "effective_constraints": {
+            "pattern": "^[A-Z]{3}$"
+          },
+          "value": {
+            "status": "present",
+            "value": "GBP",
+            "source": "instrument_matrix_derivation",
+            "observed_at": "2026-07-17T00:00:00Z",
+            "evidence_refs": []
+          },
+          "validation": {
+            "constraint_status": "valid",
+            "evidence_status": "not_required",
+            "blocking_reasons": []
+          }
         }
-      ],
-      "value": {
-        "status": "present",
-        "value": "EUR",
-        "source": "instrument_matrix_derivation",
-        "observed_at": "2026-07-17T00:00:00Z",
-        "evidence_refs": []
-      },
-      "validation": {
-        "constraint_status": "valid",
-        "evidence_status": "not_required",
-        "blocking_reasons": []
-      }
+      ]
     }
   ],
   "blockers": [],
@@ -406,9 +438,9 @@ The persisted operational model may remain normalized across request, discovery,
 
 ### B. Market and currency fan-out
 
-**Given** the matrix includes XETR/EUR, XLON/GBP and EUR, and XNYS/USD  
+**Given** the matrix includes equities executed on XETR settling in Germany (Clearstream Banking Frankfurt) in EUR, on XLON settling in CREST in GBP and EUR, and on XNYS settling at DTC in USD  
 **When** Custody resource discovery runs  
-**Then** market-scoped and currency-scoped resource slices are created only for the applicable distinct parameter sets, and their shared attributes are consolidated without losing slice lineage.
+**Then** settlement-market-scoped and currency-scoped resource slices are created only for the applicable distinct parameter sets — keyed off the settlement dimensions, not the execution venues — and their shared attributes are consolidated at requirement-occurrence grain without losing slice lineage.
 
 ### C. Conflicting attribute requirements
 
@@ -438,11 +470,11 @@ The persisted operational model may remain normalized across request, discovery,
 
 The following policy questions were raised during drafting and have been decided:
 
-1. **Permitted instrument-matrix states.** The matrix must be in **confirmed** state. Formal data solicitation, production compilation, and provisioning all require a confirmed version; anything less supports only a clearly labelled preview.
-2. **Service option selection.** Product and service options are explicitly approved by the **onboarding requestor** — they are not inferred from the contracted scope. Service selection in turn switches matrix obligations: selecting OTC, variation-margin, or collateral-management services mandates that the confirmed matrix covers the corresponding instrument types, ISDA/CSA agreements, and margin terms.
+1. **Permitted instrument-matrix states.** The matrix must be in **confirmed** state. Formal data solicitation, production compilation, and provisioning all require a confirmed version; anything less supports only a clearly labelled preview. "Confirmed" is a business state — the version has passed the matrix's QA/validation gates and is authorised as the operational statement of the trading universe; an implementing platform must nominate which of its own lifecycle states satisfies this definition.
+2. **Service option selection.** Product and service options are explicitly approved by the **onboarding requestor** — they are not inferred from the contracted scope. Catalogue resolution therefore produces a *proposed* composition, which the requestor confirms before any service intent becomes active. Service selection in turn switches matrix obligations: selecting OTC, variation-margin, or collateral-management services mandates that the confirmed matrix covers the corresponding instrument types, ISDA/CSA agreements, and margin terms.
 3. **Source precedence.** There is no general precedence policy, because none is needed: the standalone confirmed matrix is the **definitive** source for every data item it covers — its confirmation is what makes it authoritative. Conflicts can only arise for data outside the matrix's scope, and those are routed for authorised resolution.
-4. **Freshness.** No per-attribute freshness periods apply. The matrix is a **living document** that changes throughout the life of the CTS under BNY servicing; currency is managed by versioned confirmation, not expiry clocks. Each compilation binds to one confirmed matrix version, and a subsequent matrix change triggers impact analysis and, where material, a new request version.
-5. **Evidence.** No separate evidence classes are mandated. The matrix's own QA/validation states — culminating in confirmation — are the evidence for everything the matrix covers.
-6. **Override approval.** The onboarding requestor approves product and service options for the CTS.
+4. **Freshness.** No per-attribute freshness periods apply to matrix-sourced values. The matrix is a **living document** that changes throughout the life of the CTS under servicing; its currency is managed by versioned confirmation, not expiry clocks. Each compilation binds to one confirmed matrix version, and a subsequent matrix change triggers impact analysis and, where material, a new request version. Values obtained outside the matrix retain the freshness policies declared by their governed attribute requirements.
+5. **Evidence.** No separate evidence classes are mandated for anything the matrix covers: the matrix's own QA/validation states, culminating in confirmation, are the evidence, and the confirmation itself is auditable (who confirmed, when, under what confirmation identity). Values obtained outside the matrix retain the evidence policies declared by their governed attribute and resource definitions.
+6. **Override approval.** The onboarding requestor approves product and service options for the CTS. Requirement-definition conflicts and constraint overrides are outside the requestor's authority: they are resolved by the product/catalogue steward or the owning resource-definition owner.
 7. **Material change.** A catalogue or matrix change is material when it would change **any resource configuration** — i.e., it alters the discovery, fan-out, or attribute outcome of a compilation. Material changes require a new frozen request version.
 8. **Storage form of the JSON projection.** Implementation detail, deliberately out of scope. The only requirement this use case imposes is that the result is persisted as a JSON record set conforming to section 12.
