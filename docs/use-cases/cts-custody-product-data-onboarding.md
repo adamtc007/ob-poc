@@ -44,6 +44,10 @@ Its dimensions:
 
 The word "matrix" is literal: it is a cross-product of instrument class × market × currency × counterparty × instructing BIC/channel, and every populated cell drives provisioning fan-out somewhere — a custody account, an SSI, a SWIFT relationship, an ISDA/CSA and collateral account, a pricing-source configuration. That is why the matrix must be frozen and versioned before compilation: the entire downstream resource discovery hangs off it.
 
+The matrix is a **living document**: it changes throughout the life of the CTS as it is serviced. Change is governed by versioning, not mutation — each change passes the matrix's own QA/validation gates and is **confirmed** as a new version, and every compilation binds to one specific confirmed version. Confirmation is what makes the matrix definitive: for any data it covers, the confirmed matrix is the single authoritative source, and its confirmation *is* the evidence — no separate evidence collection applies to matrix-sourced values.
+
+The dependency between the matrix and the service composition runs in **both directions**. Downward, the matrix drives resource fan-out (the examples above). Upward, service selection mandates matrix coverage: selecting OTC, variation-margin, or collateral-management services requires the confirmed matrix to cover the corresponding instrument types, governing agreements, and margin terms. Compilation blocks when a selected service demands a matrix dimension the confirmed matrix does not cover.
+
 ### Process overview
 
 The process starts with the CTS, its instrument matrix, and the commercial product. It traverses the governed catalogue from product to services, from services to service-resource definitions, and from each resource definition to its attribute dictionary. It then consolidates the resource dictionaries into one CTS-specific product dependency taxonomy, populates the applicable attributes, and freezes the result as a reproducible JSON record set.
@@ -117,7 +121,7 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 ### Catalogue and data preconditions
 
 1. A specific instrument-matrix version is attached to the CTS.
-2. The matrix version is immutable for the duration of compilation and has reached the status required by onboarding policy. A production compilation should normally use a validated, approved, or active version; a draft is acceptable only for a labelled preview.
+2. The matrix version is **confirmed** — it has passed the matrix's own QA/validation gates. Formal data solicitation, production compilation, and provisioning all require a confirmed version; a non-confirmed matrix supports only a clearly labelled preview. The version is immutable for the duration of compilation.
 3. The matrix is materialized sufficiently to expose the applicable instruments (including non-custodied OTC types), markets, currencies, settlement types, counterparties and their governing agreements, instructing BICs and channels, valuation preferences, SSIs, and other discovery inputs.
 4. Product-to-service mappings are effective-dated, governed, and resolvable for Custody.
 5. Every selected service is published/active and has a stable version.
@@ -229,6 +233,8 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 10. Definition changes do not mutate an already-frozen request. A material catalogue or matrix change requires impact analysis and a new compilation/version.
 11. Repeating compilation for the same onboarding request is idempotent and returns the existing frozen request unless an explicit recompile/version operation is authorised.
 12. No resource may be dispatched for provisioning while its slice has a missing required value, failed validation, missing required evidence, unresolved owner, or missing required live capability binding.
+13. Service selection mandates matrix coverage. Selecting OTC, variation-margin, or collateral-management services requires the confirmed matrix to cover the corresponding instrument types, ISDA/CSA agreements, and margin terms; compilation blocks when a selected service demands a matrix dimension the confirmed matrix does not cover.
+14. The confirmed instrument matrix is the authoritative source for every data item it covers. Precedence questions between sources can only arise for data outside the matrix's scope; those conflicts are routed for authorised resolution, never resolved by silent precedence.
 
 ## 10. Exceptions and alternate flows
 
@@ -236,8 +242,9 @@ An authorised onboarding actor requests that the Custody product be onboarded to
 |---|---|
 | CTS is absent, ambiguous, or not yet validated | Stop before product attachment and return the CTS gate failure. |
 | SICAV context cannot be established | Stop and request structural correction or explicit scenario override. |
-| Instrument matrix is absent | Attach/bootstrap a matrix, populate it, and resume only after the required policy status is reached. |
-| Matrix is draft, stale, or not materialized | Permit a clearly labelled preview only; block production compilation and provisioning. |
+| Instrument matrix is absent | Attach/bootstrap a matrix, populate it, and resume only after it reaches confirmed state. |
+| Matrix is not confirmed or not materialized | Permit a clearly labelled preview only; block formal solicitation, production compilation, and provisioning until a confirmed version exists. |
+| Selected service requires matrix coverage the confirmed matrix lacks (e.g. collateral management selected but no CSA/margin terms recorded) | Block compilation and route back to matrix authoring for a new confirmed version; do not infer the missing dimensions. |
 | Custody product is inactive or not contracted | Stop; do not infer commercial entitlement from catalogue availability. |
 | Product has no service mappings | Block as a catalogue defect and route to the product catalogue steward. |
 | Selected service is ungoverned, unpublished, deprecated, or retired | Exclude only where policy permits; otherwise block and route to the service steward. Preserve the reason. |
@@ -305,7 +312,7 @@ The persisted operational model may remain normalized across request, discovery,
     "instrument_matrix": {
       "profile_id": "<uuid>",
       "version": 1,
-      "status": "<accepted-status>",
+      "status": "confirmed",
       "content_hash": "sha256:<digest>"
     }
   },
@@ -393,7 +400,7 @@ The persisted operational model may remain normalized across request, discovery,
 
 ### A. Successful compilation
 
-**Given** the sub-fund CTS is validated, its accepted instrument matrix is frozen and materialized, Custody is contracted and active, and all selected services and SRDEFs are governed and complete  
+**Given** the sub-fund CTS is validated, its confirmed instrument matrix is frozen and materialized, Custody is contracted and active, and all selected services and SRDEFs are governed and complete  
 **When** Custody is attached, service/resource discovery runs, all applicable required values are obtained and validated, and the data request is compiled  
 **Then** one complete, hashed JSON dependency taxonomy is saved with full product-to-attribute lineage and no blockers.
 
@@ -427,15 +434,15 @@ The persisted operational model may remain normalized across request, discovery,
 **When** collection continues  
 **Then** the original request remains tied to its frozen sources, an impact assessment identifies affected services/resources/attributes, and material changes require a new request version.
 
-## 14. Open policy decisions
+## 14. Policy decisions (resolved)
 
-The following decisions should be agreed before this use case becomes a binding business specification:
+The following policy questions were raised during drafting and have been decided:
 
-1. Which instrument-matrix states are permitted for preview, formal data solicitation, and production provisioning?
-2. Does the contracted Custody scope automatically include default optional services, or must every non-mandatory service be explicitly selected?
-3. What is the authoritative precedence policy when otherwise valid sources disagree?
-4. What freshness periods apply by attribute class and source?
-5. Which evidence classes are mandatory for client-supplied operational data?
-6. Who may approve product-specific requirement or constraint overrides?
-7. What constitutes a material catalogue or matrix change requiring a new frozen request version?
-8. Is the JSON projection stored as one document, as newline-delimited records, or generated on demand from the normalized frozen tables?
+1. **Permitted instrument-matrix states.** The matrix must be in **confirmed** state. Formal data solicitation, production compilation, and provisioning all require a confirmed version; anything less supports only a clearly labelled preview.
+2. **Service option selection.** Product and service options are explicitly approved by the **onboarding requestor** — they are not inferred from the contracted scope. Service selection in turn switches matrix obligations: selecting OTC, variation-margin, or collateral-management services mandates that the confirmed matrix covers the corresponding instrument types, ISDA/CSA agreements, and margin terms.
+3. **Source precedence.** There is no general precedence policy, because none is needed: the standalone confirmed matrix is the **definitive** source for every data item it covers — its confirmation is what makes it authoritative. Conflicts can only arise for data outside the matrix's scope, and those are routed for authorised resolution.
+4. **Freshness.** No per-attribute freshness periods apply. The matrix is a **living document** that changes throughout the life of the CTS under BNY servicing; currency is managed by versioned confirmation, not expiry clocks. Each compilation binds to one confirmed matrix version, and a subsequent matrix change triggers impact analysis and, where material, a new request version.
+5. **Evidence.** No separate evidence classes are mandated. The matrix's own QA/validation states — culminating in confirmation — are the evidence for everything the matrix covers.
+6. **Override approval.** The onboarding requestor approves product and service options for the CTS.
+7. **Material change.** A catalogue or matrix change is material when it would change **any resource configuration** — i.e., it alters the discovery, fan-out, or attribute outcome of a compilation. Material changes require a new frozen request version.
+8. **Storage form of the JSON projection.** Implementation detail, deliberately out of scope. The only requirement this use case imposes is that the result is persisted as a JSON record set conforming to section 12.
