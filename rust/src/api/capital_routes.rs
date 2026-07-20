@@ -30,7 +30,7 @@ use crate::graph::investor_register::{
 // =============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct CapTableQuery {
+pub(crate) struct CapTableQuery {
     /// ISO date (YYYY-MM-DD), defaults to today
     pub as_of: Option<String>,
     /// Ownership basis: VOTING (default), ECONOMIC, or BOTH
@@ -41,7 +41,7 @@ pub struct CapTableQuery {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ReconciliationQuery {
+pub(crate) struct ReconciliationQuery {
     /// Filter by status: OPEN, RESOLVED, ESCALATED
     pub status: Option<String>,
     /// Limit number of results
@@ -49,7 +49,7 @@ pub struct ReconciliationQuery {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct EconomicExposureQuery {
+pub(crate) struct EconomicExposureQuery {
     /// ISO date (YYYY-MM-DD), defaults to today
     pub as_of: Option<String>,
     /// Maximum traversal depth (default 6)
@@ -75,7 +75,7 @@ fn default_true() -> bool {
 // =============================================================================
 
 #[derive(Debug, Serialize)]
-pub struct EconomicExposureResponse {
+pub(crate) struct EconomicExposureResponse {
     pub root_entity_id: Uuid,
     pub root_name: String,
     pub as_of_date: String,
@@ -84,7 +84,7 @@ pub struct EconomicExposureResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ExposureNode {
+pub(crate) struct ExposureNode {
     pub leaf_entity_id: Uuid,
     pub leaf_name: String,
     pub cumulative_pct: f64,
@@ -95,7 +95,7 @@ pub struct ExposureNode {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ExposureParameters {
+pub(crate) struct ExposureParameters {
     pub max_depth: i32,
     pub min_pct: f64,
     pub max_rows: i32,
@@ -104,7 +104,7 @@ pub struct ExposureParameters {
 }
 
 #[derive(Debug, Serialize)]
-pub struct CapTableResponse {
+pub(crate) struct CapTableResponse {
     pub issuer_entity_id: Uuid,
     pub issuer_name: String,
     pub as_of_date: String,
@@ -115,7 +115,7 @@ pub struct CapTableResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ShareClassSummary {
+pub(crate) struct ShareClassSummary {
     pub share_class_id: Uuid,
     pub name: String,
     pub instrument_kind: String,
@@ -127,13 +127,13 @@ pub struct ShareClassSummary {
 }
 
 #[derive(Debug, Serialize)]
-pub struct IdentifierPair {
+pub(crate) struct IdentifierPair {
     pub scheme: String,
     pub value: String,
 }
 
 #[derive(Debug, Serialize)]
-pub struct HolderPosition {
+pub(crate) struct HolderPosition {
     pub holder_entity_id: Uuid,
     pub holder_name: String,
     pub holder_type: String,
@@ -149,7 +149,7 @@ pub struct HolderPosition {
 }
 
 #[derive(Debug, Serialize)]
-pub struct SupplyResponse {
+pub(crate) struct SupplyResponse {
     pub issuer_entity_id: Uuid,
     pub share_classes: Vec<ShareClassSupply>,
     pub total_authorized: f64,
@@ -158,7 +158,7 @@ pub struct SupplyResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ShareClassSupply {
+pub(crate) struct ShareClassSupply {
     pub share_class_id: Uuid,
     pub name: String,
     pub authorized_units: f64,
@@ -169,7 +169,7 @@ pub struct ShareClassSupply {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ControlPositionsResponse {
+pub(crate) struct ControlPositionsResponse {
     pub issuer_entity_id: Uuid,
     pub as_of_date: String,
     pub basis: String,
@@ -177,7 +177,7 @@ pub struct ControlPositionsResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ControlPosition {
+pub(crate) struct ControlPosition {
     pub holder_entity_id: Uuid,
     pub holder_name: String,
     pub voting_pct: f64,
@@ -188,13 +188,13 @@ pub struct ControlPosition {
 }
 
 #[derive(Debug, Serialize)]
-pub struct SpecialRightsResponse {
+pub(crate) struct SpecialRightsResponse {
     pub issuer_entity_id: Uuid,
     pub rights: Vec<SpecialRight>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct SpecialRight {
+pub(crate) struct SpecialRight {
     pub right_id: Uuid,
     pub right_type: String,
     pub holder_entity_id: Uuid,
@@ -206,13 +206,13 @@ pub struct SpecialRight {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ReconciliationRunsResponse {
+pub(crate) struct ReconciliationRunsResponse {
     pub issuer_entity_id: Uuid,
     pub runs: Vec<ReconciliationRunSummary>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ReconciliationRunSummary {
+pub(crate) struct ReconciliationRunSummary {
     pub run_id: Uuid,
     pub run_ts: String,
     pub snapshot_a_id: Uuid,
@@ -223,13 +223,13 @@ pub struct ReconciliationRunSummary {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ReconciliationFindingsResponse {
+pub(crate) struct ReconciliationFindingsResponse {
     pub run_id: Uuid,
     pub findings: Vec<ReconciliationFinding>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ReconciliationFinding {
+pub(crate) struct ReconciliationFinding {
     pub finding_id: Uuid,
     pub holder_entity_id: Uuid,
     pub holder_name: String,
@@ -243,7 +243,7 @@ pub struct ReconciliationFinding {
 }
 
 #[derive(Debug, Serialize)]
-pub struct OwnershipGraphResponse {
+pub(crate) struct OwnershipGraphResponse {
     pub issuer_entity_id: Uuid,
     pub issuer_name: String,
     pub as_of_date: String,
@@ -1045,7 +1045,7 @@ async fn get_holder_special_rights(
 
 /// Query parameters for investor register view (from URL query string)
 #[derive(Debug, Deserialize)]
-pub struct InvestorRegisterUrlQuery {
+pub(crate) struct InvestorRegisterUrlQuery {
     /// Filter to specific share class
     pub share_class_id: Option<Uuid>,
     /// As-of date (YYYY-MM-DD)
@@ -1059,7 +1059,7 @@ pub struct InvestorRegisterUrlQuery {
 
 /// Query parameters for investor list (paginated drill-down)
 #[derive(Debug, Deserialize)]
-pub struct InvestorListUrlQuery {
+pub(crate) struct InvestorListUrlQuery {
     /// Filter to specific share class
     pub share_class_id: Option<Uuid>,
     /// As-of date
@@ -1785,7 +1785,7 @@ fn build_investor_list_query(
 // =============================================================================
 
 /// Create the capital structure router
-pub fn create_capital_router(pool: PgPool) -> Router {
+pub(crate) fn create_capital_router(pool: PgPool) -> Router {
     Router::new()
         // Cap table endpoints
         .route("/api/capital/:issuer_id/cap-table", get(get_cap_table))

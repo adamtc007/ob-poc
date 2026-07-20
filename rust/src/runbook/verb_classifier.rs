@@ -9,7 +9,7 @@ use crate::repl::verb_config_index::VerbConfigIndex;
 
 /// Classification of a verb name.
 #[derive(Debug, Clone)]
-pub enum VerbClassification<'a> {
+pub(crate) enum VerbClassification<'a> {
     /// A primitive runtime verb (exists in VerbConfigIndex).
     Primitive {
         /// Fully-qualified verb name (e.g. "cbu.create").
@@ -35,7 +35,7 @@ pub enum VerbClassification<'a> {
 /// 1. Macro registry (checked first — macros shadow primitives by design)
 /// 2. Verb config index (primitive verbs from YAML)
 /// 3. Unknown
-pub fn classify_verb<'a>(
+pub(crate) fn classify_verb<'a>(
     verb_name: &str,
     verb_index: &VerbConfigIndex,
     macro_registry: &'a MacroRegistry,

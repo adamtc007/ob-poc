@@ -149,13 +149,13 @@ pub async fn get_cbu(
 }
 
 #[derive(Debug, Deserialize)]
-pub struct LayoutQuery {
+pub(crate) struct LayoutQuery {
     pub view_mode: Option<String>,
     pub user_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct LayoutSaveRequest {
+pub(crate) struct LayoutSaveRequest {
     pub view_mode: Option<String>,
     pub positions: Vec<NodeOffset>,
     pub sizes: Vec<NodeSizeOverride>,
@@ -252,7 +252,7 @@ pub async fn save_cbu_layout(
 
 /// Query parameters for unified graph endpoints
 #[derive(Debug, Deserialize)]
-pub struct UnifiedGraphQuery {
+pub(crate) struct UnifiedGraphQuery {
     /// View mode: TRADING (default), KYC_UBO, UBO_ONLY, BOOK
     pub view_mode: Option<String>,
     /// Layout orientation: VERTICAL (default) or HORIZONTAL
@@ -367,7 +367,7 @@ pub async fn get_jurisdiction_graph(
 /// Returns unified EntityGraph for an entity and its N-hop neighborhood.
 /// Supports temporal queries via as_of parameter (defaults to today).
 #[derive(Debug, Deserialize)]
-pub struct NeighborhoodQuery {
+pub(crate) struct NeighborhoodQuery {
     /// Number of hops to include (default 2)
     pub hops: Option<u32>,
     /// View mode
@@ -412,7 +412,7 @@ pub async fn get_entity_neighborhood_graph(
 
 /// Query parameters for route endpoint
 #[derive(Debug, Deserialize)]
-pub struct RouteQuery {
+pub(crate) struct RouteQuery {
     /// Starting node ID (current location if omitted)
     pub from: Option<String>,
     /// Destination node ID or name
@@ -834,7 +834,7 @@ fn hash_to_position(id: &str) -> (f32, f32) {
 
 /// Query parameters for inspector projection endpoint
 #[derive(Debug, Deserialize)]
-pub struct InspectorQuery {
+pub(crate) struct InspectorQuery {
     /// Level of detail (0-3, default 2)
     pub lod: Option<u8>,
     /// Maximum tree depth (default 10)
@@ -976,7 +976,7 @@ pub fn create_graph_router(pool: PgPool) -> Router {
 
 /// State for session-scoped graph endpoints
 #[derive(Clone)]
-pub struct SessionGraphState {
+pub(crate) struct SessionGraphState {
     pub pool: PgPool,
     pub sessions: SessionStore,
     pub repl_sessions: Option<ReplSessionStore>,
@@ -984,7 +984,7 @@ pub struct SessionGraphState {
 
 /// Response for session graph endpoint
 #[derive(Debug, Serialize)]
-pub struct SessionGraphResponse {
+pub(crate) struct SessionGraphResponse {
     /// The graph data (if active CBU exists)
     pub graph: Option<CbuGraph>,
     /// The active CBU ID from session
@@ -997,7 +997,7 @@ pub struct SessionGraphResponse {
 
 /// Response for multi-CBU session graph endpoint
 #[derive(Debug, Serialize)]
-pub struct MultiCbuGraphResponse {
+pub(crate) struct MultiCbuGraphResponse {
     /// Combined graph containing all CBUs in session scope
     pub graph: Option<CbuGraph>,
     /// All CBU IDs included in the graph

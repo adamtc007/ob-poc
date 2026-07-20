@@ -12,7 +12,7 @@ pub const DEFAULT_SCHEMAS: &[&str] = &["ob-poc", "kyc", "sem_reg"];
 
 /// Extracted table metadata from PostgreSQL.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TableExtract {
+pub(crate) struct TableExtract {
     /// Schema name (e.g. "ob-poc")
     pub schema: String,
     /// Table name
@@ -31,7 +31,7 @@ pub struct TableExtract {
 
 /// Extracted column metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColumnExtract {
+pub(crate) struct ColumnExtract {
     /// Column name
     pub name: String,
     /// SQL data type (e.g. "uuid", "text", "timestamp with time zone")
@@ -46,7 +46,7 @@ pub struct ColumnExtract {
 
 /// Extracted foreign key relationship.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ForeignKeyExtract {
+pub(crate) struct ForeignKeyExtract {
     /// Constraint name
     pub constraint_name: String,
     /// Column in the source table

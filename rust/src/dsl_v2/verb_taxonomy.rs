@@ -15,7 +15,7 @@ use std::sync::OnceLock;
 static TAXONOMY: OnceLock<VerbTaxonomy> = OnceLock::new();
 
 /// Get the global verb taxonomy (loads on first access)
-pub fn verb_taxonomy() -> &'static VerbTaxonomy {
+pub(crate) fn verb_taxonomy() -> &'static VerbTaxonomy {
     TAXONOMY.get_or_init(|| {
         load_taxonomy_from_config().unwrap_or_else(|e| {
             tracing::warn!("Failed to load verb taxonomy: {}, using empty", e);
@@ -42,7 +42,7 @@ fn load_taxonomy_from_config() -> anyhow::Result<VerbTaxonomy> {
 
 /// Root taxonomy structure
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct VerbTaxonomy {
+pub(crate) struct VerbTaxonomy {
     pub version: u32,
     #[serde(default)]
     pub generated: bool,
@@ -66,7 +66,7 @@ struct TaxonomyIndexes {
 
 impl VerbTaxonomy {
     /// Build indexes after loading
-    pub fn build_indexes(&mut self) {
+    pub(crate) fn build_indexes(&mut self) {
         self.indexes = TaxonomyIndexes::default();
 
         for (idx, domain) in self.domains.iter().enumerate() {
@@ -92,7 +92,7 @@ impl VerbTaxonomy {
     }
 
     /// Get domain by ID
-    pub fn get_domain(&self, domain_id: &str) -> Option<&TaxonomyDomain> {
+    pub(crate) fn get_domain(&self, domain_id: &str) -> Option<&TaxonomyDomain> {
         self.indexes
             .by_domain_id
             .get(domain_id)
@@ -100,7 +100,7 @@ impl VerbTaxonomy {
     }
 
     /// Get domain for a verb FQN
-    pub fn domain_for_verb(&self, verb_fqn: &str) -> Option<&TaxonomyDomain> {
+    pub(crate) fn domain_for_verb(&self, verb_fqn: &str) -> Option<&TaxonomyDomain> {
         self.indexes
             .verb_to_domain
             .get(verb_fqn)
@@ -108,7 +108,7 @@ impl VerbTaxonomy {
     }
 
     /// Get domain and category for a verb
-    pub fn location_for_verb(&self, verb_fqn: &str) -> Option<VerbLocation> {
+    pub(crate) fn location_for_verb(&self, verb_fqn: &str) -> Option<VerbLocation> {
         self.indexes
             .verb_to_domain
             .get(verb_fqn)
@@ -128,7 +128,7 @@ impl VerbTaxonomy {
     ///
     /// This is more accurate than the hardcoded `infer_domain_from_phrase`
     /// because it uses the taxonomy's keyword definitions.
-    pub fn infer_domain(&self, phrase: &str) -> Option<String> {
+    pub(crate) fn infer_domain(&self, phrase: &str) -> Option<String> {
         let lower = phrase.to_lowercase();
         let words: Vec<&str> = lower.split_whitespace().collect();
 
@@ -152,14 +152,14 @@ impl VerbTaxonomy {
     }
 
     /// Get domains sorted by priority
-    pub fn domains_by_priority(&self) -> Vec<&TaxonomyDomain> {
+    pub(crate) fn domains_by_priority(&self) -> Vec<&TaxonomyDomain> {
         let mut domains: Vec<_> = self.domains.iter().collect();
         domains.sort_by_key(|d| d.priority);
         domains
     }
 
     /// Get all domains as UI-friendly list
-    pub fn domain_list(&self) -> Vec<DomainSummary> {
+    pub(crate) fn domain_list(&self) -> Vec<DomainSummary> {
         self.domains_by_priority()
             .iter()
             .map(|d| DomainSummary {
@@ -176,7 +176,7 @@ impl VerbTaxonomy {
 
 /// A domain in the taxonomy
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaxonomyDomain {
+pub(crate) struct TaxonomyDomain {
     pub id: String,
     pub label: String,
     #[serde(default)]
@@ -197,7 +197,7 @@ fn default_priority() -> u32 {
 
 /// A category within a domain
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaxonomyCategory {
+pub(crate) struct TaxonomyCategory {
     pub id: String,
     pub label: String,
     #[serde(default)]
@@ -208,7 +208,7 @@ pub struct TaxonomyCategory {
 
 /// Location of a verb in the taxonomy
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbLocation {
+pub(crate) struct VerbLocation {
     pub domain_id: String,
     pub domain_label: String,
     pub category_id: String,
@@ -217,7 +217,7 @@ pub struct VerbLocation {
 
 /// Summary of a domain for UI
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DomainSummary {
+pub(crate) struct DomainSummary {
     pub id: String,
     pub label: String,
     pub description: String,

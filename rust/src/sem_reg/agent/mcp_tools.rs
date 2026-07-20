@@ -40,7 +40,7 @@ use sem_os_postgres::PgStores;
 /// Structured grounding metadata attached to tool responses so the agent can
 /// reference exact snapshot IDs, governance tiers, and confidence in decisions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GroundingContext {
+pub(crate) struct GroundingContext {
     /// Snapshot IDs consulted during this tool invocation — keyed by FQN or
     /// object description for traceability.
     pub snapshot_ids: HashMap<String, Uuid>,
@@ -58,7 +58,7 @@ pub struct GroundingContext {
 }
 
 impl GroundingContext {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             snapshot_ids: HashMap::new(),
             governance_tiers: HashMap::new(),
@@ -72,7 +72,7 @@ impl GroundingContext {
 // ── Tool Context ──────────────────────────────────────────────
 
 /// Context passed to every MCP tool handler.
-pub struct SemRegToolContext<'a> {
+pub(crate) struct SemRegToolContext<'a> {
     pub pool: &'a PgPool,
     pub actor: &'a ActorContext,
     /// Pre-built CoreService from startup. When `Some`, avoids per-request
@@ -84,7 +84,7 @@ pub struct SemRegToolContext<'a> {
 
 /// Result from an MCP tool invocation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemRegToolResult {
+pub(crate) struct SemRegToolResult {
     /// Whether the tool succeeded.
     pub success: bool,
     /// Result payload (tool-specific).
@@ -95,7 +95,7 @@ pub struct SemRegToolResult {
 }
 
 impl SemRegToolResult {
-    pub fn ok(data: serde_json::Value) -> Self {
+    pub(crate) fn ok(data: serde_json::Value) -> Self {
         Self {
             success: true,
             data,
@@ -103,7 +103,7 @@ impl SemRegToolResult {
         }
     }
 
-    pub fn err(msg: impl Into<String>) -> Self {
+    pub(crate) fn err(msg: impl Into<String>) -> Self {
         Self {
             success: false,
             data: serde_json::Value::Null,
@@ -171,7 +171,7 @@ pub struct SemRegToolSpec {
 
 /// A parameter for an MCP tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolParameter {
+pub(crate) struct ToolParameter {
     pub name: String,
     pub description: String,
     pub param_type: String,

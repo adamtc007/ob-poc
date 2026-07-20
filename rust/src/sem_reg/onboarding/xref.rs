@@ -29,7 +29,7 @@ pub enum ColumnClassification {
 
 /// A candidate attribute produced by cross-referencing verbs with schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeCandidate {
+pub(crate) struct AttributeCandidate {
     /// Schema name
     pub schema: String,
     /// Table name
@@ -57,7 +57,7 @@ pub struct AttributeCandidate {
 /// How a verb references a column.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum VerbRefKind {
+pub(crate) enum VerbRefKind {
     /// Verb argument `maps_to` points to this column
     ArgMapping,
     /// Verb lookup config references this table
@@ -72,7 +72,7 @@ pub enum VerbRefKind {
 
 /// Result of cross-referencing verbs with schema.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct XrefResult {
+pub(crate) struct XrefResult {
     /// All attribute candidates
     pub candidates: Vec<AttributeCandidate>,
     /// Summary counts

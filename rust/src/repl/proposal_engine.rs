@@ -37,7 +37,7 @@ use crate::journey::template::instantiate_template;
 /// Source of a proposal.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ProposalSource {
+pub(crate) enum ProposalSource {
     /// From a pack template (fast path).
     Template { template_id: String },
     /// From verb search (fallback).
@@ -48,7 +48,7 @@ pub enum ProposalSource {
 
 /// Evidence explaining why a proposal was generated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProposalEvidence {
+pub(crate) struct ProposalEvidence {
     /// Where this proposal came from.
     pub source: ProposalSource,
     /// Confidence score (0.0 to 1.0).
@@ -65,7 +65,7 @@ pub struct ProposalEvidence {
 
 /// A single proposed step (never executed, only proposed).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StepProposal {
+pub(crate) struct StepProposal {
     /// Unique proposal ID (for selection tracking).
     pub id: Uuid,
     /// Fully-qualified verb name.
@@ -84,7 +84,7 @@ pub struct StepProposal {
 
 /// A ranked set of proposals from the engine.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProposalSet {
+pub(crate) struct ProposalSet {
     /// Original user input that triggered proposals.
     pub original_input: String,
     /// Ranked proposals (best first).
@@ -118,14 +118,14 @@ const MAX_VERB_PROPOSALS: usize = 5;
 /// Deterministic proposal engine composing IntentService + VerbConfigIndex.
 ///
 /// Stateless — pack context and runbook are passed as method arguments.
-pub struct ProposalEngine {
+pub(crate) struct ProposalEngine {
     intent_service: Arc<IntentService>,
     verb_config_index: Arc<VerbConfigIndex>,
     sentence_gen: SentenceGenerator,
 }
 
 impl ProposalEngine {
-    pub fn new(
+    pub(crate) fn new(
         intent_service: Arc<IntentService>,
         verb_config_index: Arc<VerbConfigIndex>,
     ) -> Self {
@@ -141,7 +141,7 @@ impl ProposalEngine {
     /// Never executes — only proposes edits. Deterministic: same inputs
     /// always produce the same `ProposalSet`.
     #[allow(clippy::too_many_arguments)]
-    pub async fn propose(
+    pub(crate) async fn propose(
         &self,
         input: &str,
         pack: Option<&PackManifest>,

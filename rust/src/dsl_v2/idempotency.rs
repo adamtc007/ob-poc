@@ -55,7 +55,7 @@ struct ViewStateRecordRow {
 /// Source of an execution - where did this request originate?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ExecutionSource {
+pub(crate) enum ExecutionSource {
     /// API request (REST/GraphQL)
     Api,
     /// Command-line interface
@@ -76,7 +76,7 @@ pub enum ExecutionSource {
 }
 
 impl ExecutionSource {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Api => "api",
             Self::Cli => "cli",
@@ -93,7 +93,7 @@ impl ExecutionSource {
 /// Actor type - what kind of entity initiated the execution?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ActorType {
+pub(crate) enum ActorType {
     /// Human user
     #[default]
     User,
@@ -106,7 +106,7 @@ pub enum ActorType {
 }
 
 impl ActorType {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::User => "user",
             Self::System => "system",
@@ -118,7 +118,7 @@ impl ActorType {
 
 /// Source attribution for execution audit trail
 #[derive(Debug, Clone, Default)]
-pub struct SourceAttribution {
+pub(crate) struct SourceAttribution {
     /// Where the execution originated
     pub source: ExecutionSource,
     /// Correlation ID for distributed tracing
@@ -130,28 +130,19 @@ pub struct SourceAttribution {
 }
 
 impl SourceAttribution {
-    pub fn new(source: ExecutionSource) -> Self {
+    pub(crate) fn new(source: ExecutionSource) -> Self {
         Self {
             source,
             ..Default::default()
         }
     }
 
-    pub fn with_request_id(mut self, request_id: Uuid) -> Self {
-        self.request_id = Some(request_id);
-        self
-    }
 
-    pub fn with_actor(mut self, actor_id: Uuid, actor_type: ActorType) -> Self {
-        self.actor_id = Some(actor_id);
-        self.actor_type = actor_type;
-        self
-    }
 }
 
 /// Cached result from a previous execution
 #[derive(Debug, Clone)]
-pub struct CachedResult {
+pub(crate) struct CachedResult {
     pub result_type: String,
     pub result_id: Option<Uuid>,
     pub result_json: Option<JsonValue>,
@@ -160,7 +151,7 @@ pub struct CachedResult {
 
 impl CachedResult {
     /// Convert cached result back to ExecutionResult
-    pub fn to_execution_result(&self) -> ExecutionResult {
+    pub(crate) fn to_execution_result(&self) -> ExecutionResult {
         match self.result_type.as_str() {
             "uuid" => {
                 if let Some(id) = self.result_id {
@@ -186,7 +177,7 @@ impl CachedResult {
 }
 
 /// Computes idempotency key from execution context
-pub fn compute_idempotency_key(
+pub(crate) fn compute_idempotency_key(
     execution_id: Uuid,
     statement_index: usize,
     verb: &str,
@@ -207,7 +198,7 @@ pub fn compute_idempotency_key(
 }
 
 /// Compute hash of arguments for storage/debugging
-pub fn compute_args_hash(args: &HashMap<String, JsonValue>) -> String {
+pub(crate) fn compute_args_hash(args: &HashMap<String, JsonValue>) -> String {
     let mut hasher = Sha256::new();
 
     // Sort keys for deterministic hashing
@@ -229,18 +220,18 @@ pub fn compute_args_hash(args: &HashMap<String, JsonValue>) -> String {
 
 /// Idempotency manager for DSL execution
 #[cfg(feature = "database")]
-pub struct IdempotencyManager {
+pub(crate) struct IdempotencyManager {
     pool: PgPool,
 }
 
 #[cfg(feature = "database")]
 impl IdempotencyManager {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Check if a statement has already been executed
-    pub async fn check(
+    pub(crate) async fn check(
         &self,
         execution_id: Uuid,
         statement_index: usize,
@@ -272,7 +263,7 @@ impl IdempotencyManager {
     /// verb configuration version for audit trail purposes.
     ///
     /// Returns the idempotency key for downstream audit linkage (e.g., view state audit).
-    pub async fn record(
+    pub(crate) async fn record(
         &self,
         execution_id: Uuid,
         statement_index: usize,
@@ -373,15 +364,6 @@ impl IdempotencyManager {
         Ok(key)
     }
 
-    /// Clear idempotency records for an execution (for testing/reset)
-    pub async fn clear_execution(&self, execution_id: Uuid) -> Result<u64> {
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".dsl_idempotency WHERE execution_id = $1"#)
-            .bind(execution_id)
-            .execute(&self.pool)
-            .await?;
-
-        Ok(result.rows_affected())
-    }
 
     /// Atomically record execution AND view state change in a single transaction
     ///
@@ -391,7 +373,7 @@ impl IdempotencyManager {
     ///
     /// Returns (idempotency_key, view_state_change_id, was_cached)
     #[allow(clippy::too_many_arguments)]
-    pub async fn record_with_view_state(
+    pub(crate) async fn record_with_view_state(
         &self,
         execution_id: Uuid,
         statement_index: usize,
@@ -470,7 +452,7 @@ impl IdempotencyManager {
     /// writes, preventing the divergence where the verb commits but the
     /// idempotency row does not (or vice-versa).  Used by `execute_plan` (B3).
     #[allow(clippy::too_many_arguments)]
-    pub async fn record_with_view_state_in_tx(
+    pub(crate) async fn record_with_view_state_in_tx(
         &self,
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         execution_id: Uuid,
@@ -609,7 +591,7 @@ impl IdempotencyManager {
 
 /// Result of atomic execution + view state recording
 #[derive(Debug, Clone)]
-pub struct AtomicRecordResult {
+pub(crate) struct AtomicRecordResult {
     /// The idempotency key for this execution
     pub idempotency_key: String,
     /// The view state change ID (if view state was recorded)

@@ -28,7 +28,7 @@ use sem_os_postgres::PgStores;
 // ── Resource listing ──────────────────────────────────────────
 
 /// Static resources (no URI parameter).
-pub fn static_resources() -> Vec<Resource> {
+pub(crate) fn static_resources() -> Vec<Resource> {
     vec![Resource {
         uri: "sem_reg://coverage".into(),
         name: "Registry Coverage Report".into(),
@@ -41,7 +41,7 @@ pub fn static_resources() -> Vec<Resource> {
 }
 
 /// Parameterised resource templates.
-pub fn resource_templates() -> Vec<ResourceTemplate> {
+pub(crate) fn resource_templates() -> Vec<ResourceTemplate> {
     vec![
         ResourceTemplate {
             uri_template: "sem_reg://attributes/{fqn}".into(),

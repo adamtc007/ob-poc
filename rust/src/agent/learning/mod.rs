@@ -41,21 +41,18 @@ pub mod inspector;
 pub mod types;
 pub mod warmup;
 
-pub use decay::ConfidenceDecay;
-pub use drain::{spawn_agent_drain_task, DrainConfig};
-pub use embedder::{
-    CachedEmbedder, CandleEmbedder, Embedder, Embedding, NullEmbedder, SharedEmbedder,
-    EMBEDDING_DIMENSION,
-};
-pub use emitter::{AgentEventEmitter, AgentEventReceiver, SharedAgentEmitter};
-pub use inspector::{AgentLearningInspector, LearningCandidate, LearningStatus, LearningType};
-pub use types::{
+pub(crate) use decay::ConfidenceDecay;
+pub(crate) use drain::{spawn_agent_drain_task, DrainConfig};
+pub use embedder::{CandleEmbedder, Embedder, Embedding};
+pub(crate) use embedder::{CachedEmbedder, NullEmbedder, SharedEmbedder, EMBEDDING_DIMENSION};
+pub(crate) use emitter::{AgentEventEmitter, AgentEventReceiver, SharedAgentEmitter};
+pub(crate) use inspector::{AgentLearningInspector, LearningCandidate, LearningStatus, LearningType};
+pub(crate) use types::{
     AgentEvent, AgentEventPayload, CorrectionType, EntityCandidate, ExtractedIntent,
     ResolutionMethod, ResolvedEntity,
 };
-pub use warmup::{LearnedData, LearningWarmup, SharedLearnedData, WarmupStats};
+pub use warmup::{LearningWarmup};
+pub(crate) use warmup::{LearnedData, SharedLearnedData, WarmupStats};
 
-pub use background::{
-    create_learning_status, spawn_learning_task, trigger_learning_cycle, LearningConfig,
-    LearningCycleResult, LearningStatus as BackgroundLearningStatus, SharedLearningStatus,
-};
+pub use background::{create_learning_status, spawn_learning_task, trigger_learning_cycle, LearningConfig};
+pub(crate) use background::{LearningCycleResult, LearningStatus as BackgroundLearningStatus, SharedLearningStatus};

@@ -60,11 +60,11 @@ use super::verb_contract::{codes, VerbDiagnostics};
 
 /// Compiler version for contract versioning
 /// Update this when making changes to verb compilation logic
-pub const COMPILER_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub(crate) const COMPILER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Compiled verb contract with all metadata
 #[derive(Debug)]
-pub struct CompiledVerbContract {
+pub(crate) struct CompiledVerbContract {
     /// Full RuntimeVerb serialized as JSON
     pub compiled_json: serde_json::Value,
     /// Expanded configuration with defaults applied
@@ -77,7 +77,7 @@ pub struct CompiledVerbContract {
 
 /// Errors from verb sync operations
 #[derive(Debug, Error)]
-pub enum VerbSyncError {
+pub(crate) enum VerbSyncError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -87,7 +87,7 @@ pub enum VerbSyncError {
 
 /// Result of a sync operation
 #[derive(Debug, Clone)]
-pub struct SyncResult {
+pub(crate) struct SyncResult {
     pub verbs_added: i32,
     pub verbs_updated: i32,
     pub verbs_unchanged: i32,

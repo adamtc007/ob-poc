@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// Enhanced validation output with resolution options
 #[derive(Debug, Serialize)]
-pub struct ValidationOutput {
+pub(crate) struct ValidationOutput {
     pub valid: bool,
     pub diagnostics: Vec<AgentDiagnostic>,
     pub plan_summary: Option<String>,
@@ -23,7 +23,7 @@ pub struct ValidationOutput {
 
 /// Agent-friendly diagnostic with resolution options
 #[derive(Debug, Serialize)]
-pub struct AgentDiagnostic {
+pub(crate) struct AgentDiagnostic {
     /// "error", "warning", "hint", "info"
     pub severity: String,
     pub message: String,
@@ -36,7 +36,7 @@ pub struct AgentDiagnostic {
 
 /// Source location
 #[derive(Debug, Clone, Serialize)]
-pub struct Location {
+pub(crate) struct Location {
     pub line: u32,
     pub column: u32,
     pub length: u32,
@@ -44,7 +44,7 @@ pub struct Location {
 
 /// A single resolution option for a diagnostic
 #[derive(Debug, Serialize)]
-pub struct ResolutionOption {
+pub(crate) struct ResolutionOption {
     pub description: String,
     /// "replace", "insert_before", "delete", "search"
     pub action: String,
@@ -53,7 +53,7 @@ pub struct ResolutionOption {
 
 /// A suggested DSL fix (e.g., for implicit creates)
 #[derive(Debug, Serialize)]
-pub struct SuggestedFix {
+pub(crate) struct SuggestedFix {
     pub description: String,
     /// The DSL code to insert/replace
     pub dsl: String,
@@ -65,20 +65,10 @@ pub struct SuggestedFix {
 // dsl_execute enhanced types
 // ============================================================================
 
-/// Enhanced execution output
-#[derive(Debug, Serialize)]
-pub struct ExecutionOutput {
-    pub success: bool,
-    pub results: Vec<StepResultSummary>,
-    /// Bindings created: name → uuid
-    pub bindings: HashMap<String, String>,
-    pub error: Option<String>,
-    pub summary: String,
-}
 
 /// Summary of a single execution step
 #[derive(Debug, Serialize)]
-pub struct StepResultSummary {
+pub(crate) struct StepResultSummary {
     pub verb: String,
     /// "created", "updated", "linked", "deleted", "skipped"
     pub action: String,
@@ -92,19 +82,10 @@ pub struct StepResultSummary {
 // entity_search types
 // ============================================================================
 
-/// Search output with disambiguation support
-#[derive(Debug, Serialize)]
-pub struct SearchOutput {
-    pub matches: Vec<EntityMatch>,
-    pub exact_match: Option<EntityMatch>,
-    pub ambiguous: bool,
-    /// Prompt to show user when disambiguation needed
-    pub disambiguation_prompt: Option<String>,
-}
 
 /// A single entity match from search
 #[derive(Debug, Clone, Serialize)]
-pub struct EntityMatch {
+pub(crate) struct EntityMatch {
     pub id: String,
     pub display: String,
     pub entity_type: String,
@@ -118,7 +99,7 @@ pub struct EntityMatch {
 // ============================================================================
 
 /// Convert Severity to string representation (helper to avoid orphan rule)
-pub fn severity_to_string(s: crate::dsl_v2::diagnostics::Severity) -> String {
+pub(crate) fn severity_to_string(s: crate::dsl_v2::diagnostics::Severity) -> String {
     match s {
         crate::dsl_v2::diagnostics::Severity::Error => "error".to_string(),
         crate::dsl_v2::diagnostics::Severity::Warning => "warning".to_string(),

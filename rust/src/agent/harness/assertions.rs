@@ -12,7 +12,7 @@ use serde::Serialize;
 
 /// A single assertion failure with expected vs actual values.
 #[derive(Debug, Clone, Serialize)]
-pub struct AssertionFailure {
+pub(crate) struct AssertionFailure {
     pub field: String,
     pub expected: String,
     pub actual: String,
@@ -44,7 +44,7 @@ fn outcome_label(outcome: &PipelineOutcome) -> &'static str {
 
 /// Check a step's outcome against partial expectations.
 /// Returns a list of failures (empty = all pass).
-pub fn check_step(
+pub(crate) fn check_step(
     expected: &StepExpectation,
     outcome: &OrchestratorOutcome,
     session: &UnifiedSession,
@@ -281,7 +281,7 @@ fn check_global_invariants(
 }
 
 /// Validate a canonical NLCI structured-intent fixture.
-pub fn check_nlci_plan_fixture(raw: &str) -> Vec<AssertionFailure> {
+pub(crate) fn check_nlci_plan_fixture(raw: &str) -> Vec<AssertionFailure> {
     match parse_structured_intent_plan(raw) {
         Ok(_) => Vec::new(),
         Err(error) => vec![AssertionFailure {
@@ -293,7 +293,7 @@ pub fn check_nlci_plan_fixture(raw: &str) -> Vec<AssertionFailure> {
 }
 
 /// Validate a canonical NLCI compiler-envelope fixture.
-pub fn check_nlci_compiler_input_fixture(raw: &str) -> Vec<AssertionFailure> {
+pub(crate) fn check_nlci_compiler_input_fixture(raw: &str) -> Vec<AssertionFailure> {
     match serde_json::from_str::<CompilerInputEnvelope>(raw) {
         Ok(envelope) => match envelope.validate_invariants() {
             Ok(()) => Vec::new(),

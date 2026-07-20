@@ -161,7 +161,7 @@ impl RequestStatus {
 
 /// Requester-side projection of a BPMN-backed durable request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestStateRecord {
+pub(crate) struct RequestStateRecord {
     /// Canonical logical request key. For now this matches `correlation_key`.
     pub request_key: String,
     /// Original correlation key used by the parked runbook entry.
@@ -321,7 +321,7 @@ impl ParkedTokenStatus {
 /// `PendingDispatchWorker` background task retries periodically until
 /// the service recovers or `max_attempts` is exceeded.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingDispatch {
+pub(crate) struct PendingDispatch {
     /// Primary key.
     pub dispatch_id: Uuid,
     /// SHA-256 of canonical domain payload — idempotency key.
@@ -365,7 +365,7 @@ pub struct PendingDispatch {
 /// Status of a pending dispatch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PendingDispatchStatus {
+pub(crate) enum PendingDispatchStatus {
     /// Awaiting retry.
     Pending,
     /// Successfully dispatched to bpmn-lite.
@@ -375,7 +375,7 @@ pub enum PendingDispatchStatus {
 }
 
 impl PendingDispatchStatus {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
             Self::Dispatched => "dispatched",
@@ -383,7 +383,7 @@ impl PendingDispatchStatus {
         }
     }
 
-    pub fn parse(s: &str) -> Option<Self> {
+    pub(crate) fn parse(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),
             "dispatched" => Some(Self::Dispatched),

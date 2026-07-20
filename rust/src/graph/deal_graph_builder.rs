@@ -21,14 +21,14 @@ use crate::api::deal_types::{
 use crate::database::DealRepository;
 
 /// Builder for constructing deal taxonomy graphs
-pub struct DealGraphBuilder {
+pub(crate) struct DealGraphBuilder {
     deal_id: Uuid,
     view_mode: DealViewMode,
 }
 
 impl DealGraphBuilder {
     /// Create a new builder for the given deal
-    pub fn new(deal_id: Uuid) -> Self {
+    pub(crate) fn new(deal_id: Uuid) -> Self {
         Self {
             deal_id,
             view_mode: DealViewMode::default(),
@@ -36,13 +36,13 @@ impl DealGraphBuilder {
     }
 
     /// Set the view mode (COMMERCIAL, FINANCIAL, STATUS)
-    pub fn with_view_mode(mut self, view_mode: DealViewMode) -> Self {
+    pub(crate) fn with_view_mode(mut self, view_mode: DealViewMode) -> Self {
         self.view_mode = view_mode;
         self
     }
 
     /// Build the full deal graph
-    pub async fn build(self, pool: &PgPool) -> Result<DealGraphResponse> {
+    pub(crate) async fn build(self, pool: &PgPool) -> Result<DealGraphResponse> {
         // Fetch deal summary
         let deal = DealRepository::get_deal_summary(pool, self.deal_id)
             .await?
@@ -96,18 +96,10 @@ impl DealGraphBuilder {
         })
     }
 
-    /// Build a minimal deal summary (for quick loading)
-    pub async fn build_summary(pool: &PgPool, deal_id: Uuid) -> Result<Option<DealSummary>> {
-        DealRepository::get_deal_summary(pool, deal_id).await
-    }
 
-    /// Get products for the deal
-    pub async fn get_products(pool: &PgPool, deal_id: Uuid) -> Result<Vec<DealProductSummary>> {
-        DealRepository::get_deal_products(pool, deal_id).await
-    }
 
     /// Get rate cards for a specific product
-    pub async fn get_product_rate_cards(
+    pub(crate) async fn get_product_rate_cards(
         pool: &PgPool,
         deal_id: Uuid,
         product_id: Uuid,
@@ -116,20 +108,16 @@ impl DealGraphBuilder {
     }
 
     /// Get participants for the deal
-    pub async fn get_participants(
+    pub(crate) async fn get_participants(
         pool: &PgPool,
         deal_id: Uuid,
     ) -> Result<Vec<DealParticipantSummary>> {
         DealRepository::get_deal_participants(pool, deal_id).await
     }
 
-    /// Get contracts for the deal
-    pub async fn get_contracts(pool: &PgPool, deal_id: Uuid) -> Result<Vec<DealContractSummary>> {
-        DealRepository::get_deal_contracts(pool, deal_id).await
-    }
 
     /// Get onboarding requests for the deal
-    pub async fn get_onboarding_requests(
+    pub(crate) async fn get_onboarding_requests(
         pool: &PgPool,
         deal_id: Uuid,
     ) -> Result<Vec<OnboardingRequestSummary>> {

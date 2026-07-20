@@ -57,7 +57,7 @@ use sem_os_client::SemOsClient;
 use sem_os_types::agent_mode::AgentMode;
 
 /// Context needed to run the unified orchestrator.
-pub struct OrchestratorContext {
+pub(crate) struct OrchestratorContext {
     pub actor: ActorContext,
     pub session_id: Option<Uuid>,
     pub case_id: Option<Uuid>,
@@ -116,14 +116,14 @@ pub struct OrchestratorContext {
 /// Where the utterance originated.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum UtteranceSource {
+pub(crate) enum UtteranceSource {
     Chat,
     Mcp,
     Repl,
 }
 
 /// Full outcome of orchestrator processing.
-pub struct OrchestratorOutcome {
+pub(crate) struct OrchestratorOutcome {
     pub pipeline_result: PipelineResult,
     /// Rich context envelope from Sem OS resolution (replaces flat `sem_reg_verbs`).
     /// Contains allowed verbs, pruned verbs with reasons, fingerprint, governance signals.
@@ -608,7 +608,7 @@ async fn build_semos_unavailable_outcome(
 
 /// Structured audit trace for every utterance processed.
 #[derive(Debug, Clone, Serialize)]
-pub struct IntentTrace {
+pub(crate) struct IntentTrace {
     pub utterance: String,
     pub source: UtteranceSource,
     pub entity_candidates: Vec<String>,

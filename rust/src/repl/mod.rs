@@ -22,7 +22,7 @@ pub mod intent_matcher;
 pub mod types;
 
 pub use intent_matcher::IntentMatcher;
-pub use types::{
+pub(crate) use types::{
     ClientGroupOption, EntityCandidate, EntityMention, IntentMatchResult, IntentTierOption,
     MatchContext, MatchDebugInfo, MatchOutcome, ScopeCandidate, ScopeContext, UnresolvedRef,
     VerbCandidate,

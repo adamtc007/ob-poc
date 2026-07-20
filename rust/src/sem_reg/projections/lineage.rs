@@ -22,7 +22,7 @@ use sqlx::PgPool;
 /// Direction for lineage traversal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LineageDirection {
+pub(crate) enum LineageDirection {
     /// Forward impact: "if this changes, what is affected?"
     Forward,
     /// Reverse provenance: "where did this value come from?"
@@ -32,7 +32,7 @@ pub enum LineageDirection {
 /// An immutable record linking input snapshots to an output snapshot through a
 /// verb execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DerivationEdge {
+pub(crate) struct DerivationEdge {
     pub edge_id: Uuid,
     /// Snapshots consumed as inputs.
     pub input_snapshot_ids: Vec<Uuid>,
@@ -48,7 +48,7 @@ pub struct DerivationEdge {
 /// A run record captures execution context for a batch of derivation edges.
 /// Immutable — one record per plan-step execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunRecord {
+pub(crate) struct RunRecord {
     pub run_id: Uuid,
     pub plan_id: Option<Uuid>,
     pub step_id: Option<Uuid>,
@@ -64,7 +64,7 @@ pub struct RunRecord {
 
 /// A node in the lineage graph returned by traversal queries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LineageNode {
+pub(crate) struct LineageNode {
     pub snapshot_id: Uuid,
     pub object_type: String,
     pub object_id: Uuid,
@@ -83,14 +83,14 @@ type EdgeRow = (Uuid, Vec<Uuid>, Uuid, String, Option<Uuid>, DateTime<Utc>);
 
 // ── Store ────────────────────────────────────────────────────────────────────
 
-pub struct LineageStore;
+pub(crate) struct LineageStore;
 
 impl LineageStore {
     // ── Write ────────────────────────────────────────────────────────────
 
     /// Record a derivation edge (append-only).
     #[cfg(feature = "database")]
-    pub async fn record_derivation_edge(
+    pub(crate) async fn record_derivation_edge(
         pool: &PgPool,
         input_snapshot_ids: &[Uuid],
         output_snapshot_id: Uuid,
@@ -118,7 +118,7 @@ impl LineageStore {
     /// Record a run (append-only).
     #[cfg(feature = "database")]
     #[allow(clippy::too_many_arguments)]
-    pub async fn record_run(
+    pub(crate) async fn record_run(
         pool: &PgPool,
         plan_id: Option<Uuid>,
         step_id: Option<Uuid>,
@@ -160,7 +160,7 @@ impl LineageStore {
     /// Query forward impact: "if snapshot_id changes, what is affected?"
     /// BFS traversal following output→input edges up to `max_depth`.
     #[cfg(feature = "database")]
-    pub async fn query_forward_impact(
+    pub(crate) async fn query_forward_impact(
         pool: &PgPool,
         snapshot_id: Uuid,
         max_depth: i32,
@@ -223,7 +223,7 @@ impl LineageStore {
     /// Query reverse provenance: "where did this value come from?"
     /// BFS traversal following input←output edges up to `max_depth`.
     #[cfg(feature = "database")]
-    pub async fn query_reverse_provenance(
+    pub(crate) async fn query_reverse_provenance(
         pool: &PgPool,
         snapshot_id: Uuid,
         max_depth: i32,
@@ -285,7 +285,7 @@ impl LineageStore {
 
     /// Get edges for a specific run.
     #[cfg(feature = "database")]
-    pub async fn edges_for_run(pool: &PgPool, run_id: Uuid) -> Result<Vec<DerivationEdge>> {
+    pub(crate) async fn edges_for_run(pool: &PgPool, run_id: Uuid) -> Result<Vec<DerivationEdge>> {
         let rows: Vec<EdgeRow> = sqlx::query_as(
             r#"
                 SELECT edge_id, input_snapshot_ids, output_snapshot_id, verb_fqn, run_id, created_at

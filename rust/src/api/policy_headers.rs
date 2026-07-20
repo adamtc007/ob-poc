@@ -11,7 +11,7 @@ use sem_os_policy::abac::ActorContext;
 /// Build an `ActorContext` from request headers using the
 /// `x-obpoc-actor-id` / `x-obpoc-roles` / `x-obpoc-department` /
 /// `x-obpoc-clearance` / `x-obpoc-jurisdictions` convention.
-pub fn actor_from_headers(headers: &axum::http::HeaderMap) -> ActorContext {
+pub(crate) fn actor_from_headers(headers: &axum::http::HeaderMap) -> ActorContext {
     let actor_id = headers
         .get("x-obpoc-actor-id")
         .and_then(|v| v.to_str().ok())

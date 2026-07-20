@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// Evidence grade — how reliable is this observation?
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum EvidenceGrade {
+pub(crate) enum EvidenceGrade {
     PrimaryDocument,
     SecondaryDocument,
     SelfDeclaration,
@@ -31,7 +31,7 @@ pub enum EvidenceGrade {
 }
 
 impl EvidenceGrade {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::PrimaryDocument => "primary_document",
             Self::SecondaryDocument => "secondary_document",
@@ -48,7 +48,7 @@ impl EvidenceGrade {
 /// Observations form a linear supersession chain via `supersedes`.
 /// INSERT-only — the DB trigger prevents UPDATE and DELETE.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Observation {
+pub(crate) struct Observation {
     pub observation_id: Uuid,
     /// The registry snapshot this observation is evidence for.
     pub snapshot_id: Uuid,
@@ -76,7 +76,7 @@ pub struct Observation {
 /// Forms a linear supersession chain via `supersedes`.
 /// INSERT-only — the DB trigger prevents UPDATE and DELETE.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttributeObservation {
+pub(crate) struct AttributeObservation {
     pub observation_id: Uuid,
     /// The entity this observation is about.
     pub subject_ref: Uuid,
@@ -104,7 +104,7 @@ pub struct AttributeObservation {
 /// Status of a document instance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DocumentInstanceStatus {
+pub(crate) enum DocumentInstanceStatus {
     Pending,
     Received,
     Verified,
@@ -113,7 +113,7 @@ pub enum DocumentInstanceStatus {
 }
 
 impl DocumentInstanceStatus {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
             Self::Received => "received",
@@ -126,7 +126,7 @@ impl DocumentInstanceStatus {
 
 /// A concrete document submission linked to a document type definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DocumentInstance {
+pub(crate) struct DocumentInstance {
     pub instance_id: Uuid,
     /// Links to a `document_type_def` snapshot in the registry.
     pub document_type_snapshot_id: Uuid,
@@ -146,7 +146,7 @@ pub struct DocumentInstance {
 /// Class of provenance relationship.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ProvenanceEdgeClass {
+pub(crate) enum ProvenanceEdgeClass {
     DerivedFrom,
     VerifiedBy,
     SupersededBy,
@@ -156,7 +156,7 @@ pub enum ProvenanceEdgeClass {
 }
 
 impl ProvenanceEdgeClass {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::DerivedFrom => "derived_from",
             Self::VerifiedBy => "verified_by",
@@ -171,7 +171,7 @@ impl ProvenanceEdgeClass {
 /// A directional provenance edge linking two evidence artifacts.
 /// INSERT-only — the DB trigger prevents UPDATE and DELETE.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProvenanceEdge {
+pub(crate) struct ProvenanceEdge {
     pub edge_id: Uuid,
     pub source_type: String,
     pub source_id: Uuid,
@@ -187,7 +187,7 @@ pub struct ProvenanceEdge {
 /// What to do when the retention period expires.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ArchiveAction {
+pub(crate) enum ArchiveAction {
     Delete,
     Archive,
     Anonymize,
@@ -195,7 +195,7 @@ pub enum ArchiveAction {
 }
 
 impl ArchiveAction {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Delete => "delete",
             Self::Archive => "archive",
@@ -207,7 +207,7 @@ impl ArchiveAction {
 
 /// A retention policy linked to a document type definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RetentionPolicy {
+pub(crate) struct RetentionPolicy {
     pub policy_id: Uuid,
     /// Links to a `document_type_def` snapshot in the registry.
     pub document_type_snapshot_id: Uuid,
@@ -220,12 +220,12 @@ pub struct RetentionPolicy {
 // ── Store methods ─────────────────────────────────────────────
 
 /// Evidence instance store — DB operations for the evidence instance layer.
-pub struct EvidenceInstanceStore;
+pub(crate) struct EvidenceInstanceStore;
 
 #[cfg(feature = "database")]
 impl EvidenceInstanceStore {
     /// Insert a new observation. Returns the observation_id.
-    pub async fn insert_observation(
+    pub(crate) async fn insert_observation(
         pool: &sqlx::PgPool,
         snapshot_id: Uuid,
         observer_id: &str,
@@ -252,7 +252,7 @@ impl EvidenceInstanceStore {
 
     /// Follow the supersession chain for an observation, returning the full chain
     /// from most recent to oldest.
-    pub async fn get_observation_chain(
+    pub(crate) async fn get_observation_chain(
         pool: &sqlx::PgPool,
         observation_id: Uuid,
     ) -> Result<Vec<Observation>, sqlx::Error> {
@@ -277,7 +277,7 @@ impl EvidenceInstanceStore {
 
     /// Insert a new attribute observation (entity-centric). Returns the observation_id.
     #[allow(clippy::too_many_arguments)]
-    pub async fn insert_attribute_observation(
+    pub(crate) async fn insert_attribute_observation(
         pool: &sqlx::PgPool,
         subject_ref: Uuid,
         attribute_fqn: &str,
@@ -311,7 +311,7 @@ impl EvidenceInstanceStore {
 
     /// Find the latest (most recent) attribute observation for a subject + attribute.
     /// Returns `None` if no observation exists.
-    pub async fn find_latest_for_subject(
+    pub(crate) async fn find_latest_for_subject(
         pool: &sqlx::PgPool,
         subject_ref: Uuid,
         attribute_fqn: &str,
@@ -332,7 +332,7 @@ impl EvidenceInstanceStore {
 
     /// Find all attribute observations for a subject, optionally filtered by attribute FQN.
     /// Returns newest-first.
-    pub async fn find_by_subject_and_attribute(
+    pub(crate) async fn find_by_subject_and_attribute(
         pool: &sqlx::PgPool,
         subject_ref: Uuid,
         attribute_fqn: Option<&str>,
@@ -369,7 +369,7 @@ impl EvidenceInstanceStore {
     // ── Snapshot Observation methods ──────────────────────────────
 
     /// Insert a new document instance. Returns the instance_id.
-    pub async fn insert_document_instance(
+    pub(crate) async fn insert_document_instance(
         pool: &sqlx::PgPool,
         document_type_snapshot_id: Uuid,
         entity_id: Uuid,
@@ -395,7 +395,7 @@ impl EvidenceInstanceStore {
     }
 
     /// Insert a provenance edge. Returns the edge_id.
-    pub async fn insert_provenance_edge(
+    pub(crate) async fn insert_provenance_edge(
         pool: &sqlx::PgPool,
         source_type: &str,
         source_id: Uuid,
@@ -421,7 +421,7 @@ impl EvidenceInstanceStore {
     }
 
     /// Get all provenance edges for a given entity (as source or target).
-    pub async fn get_provenance_for_entity(
+    pub(crate) async fn get_provenance_for_entity(
         pool: &sqlx::PgPool,
         entity_type: &str,
         entity_id: Uuid,

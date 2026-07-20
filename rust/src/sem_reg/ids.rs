@@ -45,7 +45,7 @@ pub fn object_id_for(object_type: ObjectType, fqn: &str) -> Uuid {
 ///
 /// Uses canonical JSON serialization (sorted keys) followed by SHA-256.
 /// This detects definition drift even when field order changes.
-pub fn definition_hash(definition: &serde_json::Value) -> String {
+pub(crate) fn definition_hash(definition: &serde_json::Value) -> String {
     // Canonicalize by round-tripping through BTreeMap (sorted keys)
     let canonical = canonicalize_json(definition);
     let bytes = serde_json::to_vec(&canonical).unwrap_or_default();

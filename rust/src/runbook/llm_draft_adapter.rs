@@ -22,11 +22,11 @@ use super::{
     WorkbookDiagnostic, WorkbookRevisionOutcome,
 };
 
-pub const KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION: &str =
+pub(crate) const KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION: &str =
     "kyc_update_status_workbook_draft_v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LlmDraftAdapterRefusal {
+pub(crate) struct LlmDraftAdapterRefusal {
     pub refusal_code: String,
     pub message: String,
     #[serde(default)]
@@ -38,7 +38,7 @@ pub struct LlmDraftAdapterRefusal {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
-pub enum LlmDraftLoopOutcome {
+pub(crate) enum LlmDraftLoopOutcome {
     HarnessCompleted {
         llm_trace: LlmInferenceTrace,
         draft: KycUpdateStatusWorkbookDraft,

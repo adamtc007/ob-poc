@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 ///
 /// This ensures that the same semantic JSON content always produces the same hash,
 /// regardless of how the keys were originally ordered.
-pub fn canonical_json_hash(value: &JsonValue) -> [u8; 32] {
+pub(crate) fn canonical_json_hash(value: &JsonValue) -> [u8; 32] {
     let canonical = canonicalize_json(value);
     let bytes = serde_json::to_vec(&canonical).expect("canonical json->bytes should not fail");
     sha256(&bytes)
@@ -30,7 +30,7 @@ pub fn sha256(bytes: &[u8]) -> [u8; 32] {
 /// - Object keys are sorted alphabetically (recursive)
 /// - Arrays preserve order
 /// - Nulls, bools, numbers, strings unchanged
-pub fn canonicalize_json(v: &JsonValue) -> JsonValue {
+pub(crate) fn canonicalize_json(v: &JsonValue) -> JsonValue {
     match v {
         JsonValue::Object(map) => {
             // Sort keys alphabetically
@@ -56,12 +56,12 @@ pub fn canonicalize_json(v: &JsonValue) -> JsonValue {
 }
 
 /// Convert hash bytes to hex string for display/storage
-pub fn hash_to_hex(hash: &[u8; 32]) -> String {
+pub(crate) fn hash_to_hex(hash: &[u8; 32]) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 /// Parse hex string back to hash bytes
-pub fn hex_to_hash(hex_str: &str) -> Option<[u8; 32]> {
+pub(crate) fn hex_to_hash(hex_str: &str) -> Option<[u8; 32]> {
     if hex_str.len() != 64 {
         return None;
     }
@@ -75,7 +75,7 @@ pub fn hex_to_hash(hex_str: &str) -> Option<[u8; 32]> {
 }
 
 /// Compare two hashes for equality (constant-time for security, though not critical here)
-pub fn hashes_equal(a: &[u8; 32], b: &[u8; 32]) -> bool {
+pub(crate) fn hashes_equal(a: &[u8; 32], b: &[u8; 32]) -> bool {
     a == b
 }
 

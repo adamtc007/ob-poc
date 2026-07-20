@@ -179,7 +179,7 @@ fn collect_unresolved_from_node(node: &AstNode, unresolved: &mut Vec<UnresolvedR
 
 /// Return type specification for verb execution
 #[derive(Debug, Clone)]
-pub enum ReturnType {
+pub(crate) enum ReturnType {
     /// Returns a single UUID (e.g., created entity ID)
     Uuid { name: &'static str, capture: bool },
     /// Returns a single record as JSON
@@ -225,7 +225,7 @@ pub enum ExecutionResult {
 /// and aggregates errors by root cause.
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
-pub struct BestEffortExecutionResult {
+pub(crate) struct BestEffortExecutionResult {
     /// Results for each step (Some if succeeded, None if failed)
     pub verb_results: Vec<Option<ExecutionResult>>,
     /// Aggregated errors grouped by root cause
@@ -238,7 +238,7 @@ pub struct BestEffortExecutionResult {
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum BatchStatus {
+pub(crate) enum BatchStatus {
     /// All operations succeeded
     AllSucceeded,
     /// Some operations succeeded, some failed
@@ -250,27 +250,23 @@ pub enum BatchStatus {
 #[cfg(feature = "database")]
 impl BestEffortExecutionResult {
     /// Check if execution was fully successful
-    pub fn is_success(&self) -> bool {
+    pub(crate) fn is_success(&self) -> bool {
         self.status == BatchStatus::AllSucceeded
     }
 
-    /// Check if any operations succeeded
-    pub fn has_successes(&self) -> bool {
-        self.errors.total_succeeded > 0
-    }
 
     /// Check if any operations failed
-    pub fn has_failures(&self) -> bool {
+    pub(crate) fn has_failures(&self) -> bool {
         self.errors.total_failed > 0
     }
 
     /// Get a summary of the execution
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         self.errors.summary()
     }
 
     /// Get the successful results only
-    pub fn successful_results(&self) -> Vec<&ExecutionResult> {
+    pub(crate) fn successful_results(&self) -> Vec<&ExecutionResult> {
         self.verb_results
             .iter()
             .filter_map(|r| r.as_ref())
@@ -278,12 +274,12 @@ impl BestEffortExecutionResult {
     }
 
     /// Get count of successful operations
-    pub fn success_count(&self) -> usize {
+    pub(crate) fn success_count(&self) -> usize {
         self.errors.total_succeeded
     }
 
     /// Get count of failed operations
-    pub fn failure_count(&self) -> usize {
+    pub(crate) fn failure_count(&self) -> usize {
         self.errors.total_failed
     }
 }
@@ -298,7 +294,7 @@ impl BestEffortExecutionResult {
 /// execution in a single transaction and optionally acquires advisory locks.
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
-pub enum AtomicExecutionResult {
+pub(crate) enum AtomicExecutionResult {
     /// All steps succeeded and transaction committed
     Committed {
         /// Results for each step
@@ -371,32 +367,16 @@ pub enum AtomicExecutionResult {
 #[cfg(feature = "database")]
 impl AtomicExecutionResult {
     /// Check if execution was successful
-    pub fn is_success(&self) -> bool {
+    pub(crate) fn is_success(&self) -> bool {
         matches!(self, AtomicExecutionResult::Committed { .. })
     }
 
-    /// Check if execution was rolled back
-    pub fn is_rolled_back(&self) -> bool {
-        matches!(self, AtomicExecutionResult::RolledBack { .. })
-    }
 
-    /// Check if there was lock contention
-    pub fn is_lock_contention(&self) -> bool {
-        matches!(self, AtomicExecutionResult::LockContention { .. })
-    }
 
-    /// Check if this was an idempotent replay (prior result returned).
-    pub fn is_idempotent_replay(&self) -> bool {
-        matches!(self, AtomicExecutionResult::IdempotentReplayReturned { .. })
-    }
 
-    /// Check if this was an optimistic conflict (lost race; no failure).
-    pub fn is_conflict(&self) -> bool {
-        matches!(self, AtomicExecutionResult::OptimisticConflict { .. })
-    }
 
     /// Get the step results if committed
-    pub fn results(&self) -> Option<&[ExecutionResult]> {
+    pub(crate) fn results(&self) -> Option<&[ExecutionResult]> {
         match self {
             AtomicExecutionResult::Committed { step_results, .. } => Some(step_results),
             _ => None,
@@ -404,7 +384,7 @@ impl AtomicExecutionResult {
     }
 
     /// Get a summary of the execution
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         match self {
             AtomicExecutionResult::Committed {
                 step_results,
@@ -1225,7 +1205,7 @@ impl ExecutionContext {
 /// Result of executing a DslSubmission
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct SubmissionResult {
+pub(crate) struct SubmissionResult {
     /// Results for each iteration
     pub iterations: Vec<IterationResult>,
     /// Whether this was a batch execution (N > 1)
@@ -1237,7 +1217,7 @@ pub struct SubmissionResult {
 /// Result of a single iteration within a submission
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct IterationResult {
+pub(crate) struct IterationResult {
     /// Iteration index (0 for singleton)
     pub index: usize,
     /// Whether iteration succeeded

@@ -27,7 +27,7 @@ use crate::graph::types::ProngFilter;
 
 /// A navigation command to execute against an EntityGraph
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum NavCommand {
+pub(crate) enum NavCommand {
     // =========================================================================
     // SCOPE COMMANDS - Change what data is loaded
     // =========================================================================
@@ -174,7 +174,7 @@ pub enum NavCommand {
 
 /// Direction for sibling navigation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Direction {
+pub(crate) enum Direction {
     /// Previous sibling (left in horizontal layout)
     Left,
     /// Next sibling (right in horizontal layout)
@@ -187,7 +187,7 @@ pub enum Direction {
 
 /// Zoom level for graph display
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
-pub enum ZoomLevel {
+pub(crate) enum ZoomLevel {
     /// Overview - see entire graph structure
     Overview,
     /// Standard - default zoom level
@@ -201,7 +201,7 @@ pub enum ZoomLevel {
 
 impl ZoomLevel {
     /// Get the zoom factor as a multiplier
-    pub fn factor(&self) -> f32 {
+    pub(crate) fn factor(&self) -> f32 {
         match self {
             ZoomLevel::Overview => 0.25,
             ZoomLevel::Standard => 1.0,
@@ -211,13 +211,13 @@ impl ZoomLevel {
     }
 
     /// Zoom in one step
-    pub fn zoom_in(&self) -> ZoomLevel {
+    pub(crate) fn zoom_in(&self) -> ZoomLevel {
         let current = self.factor();
         ZoomLevel::Custom((current * 1.25).min(4.0))
     }
 
     /// Zoom out one step
-    pub fn zoom_out(&self) -> ZoomLevel {
+    pub(crate) fn zoom_out(&self) -> ZoomLevel {
         let current = self.factor();
         ZoomLevel::Custom((current / 1.25).max(0.1))
     }
@@ -229,7 +229,7 @@ impl ZoomLevel {
 
 /// Category of navigation command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommandCategory {
+pub(crate) enum CommandCategory {
     Scope,
     Filter,
     Navigation,
@@ -240,7 +240,7 @@ pub enum CommandCategory {
 
 impl NavCommand {
     /// Get the category of this command
-    pub fn category(&self) -> CommandCategory {
+    pub(crate) fn category(&self) -> CommandCategory {
         match self {
             NavCommand::LoadCbu { .. }
             | NavCommand::LoadBook { .. }
@@ -287,7 +287,7 @@ impl NavCommand {
     }
 
     /// Get a human-readable description of this command
-    pub fn description(&self) -> &'static str {
+    pub(crate) fn description(&self) -> &'static str {
         match self {
             NavCommand::LoadCbu { .. } => "Load a single CBU by name",
             NavCommand::LoadBook { .. } => "Load all CBUs under a commercial client",

@@ -33,7 +33,7 @@ use crate::templates::{ExpansionContext, TemplateExpander};
 // =============================================================================
 
 #[derive(Debug, Clone)]
-pub struct TemplateInvokeResult {
+pub(crate) struct TemplateInvokeResult {
     pub template_id: String,
     pub statements_executed: usize,
     pub outputs: HashMap<String, Uuid>,
@@ -43,7 +43,7 @@ pub struct TemplateInvokeResult {
 use crate::dsl_v2::batch_executor::{BatchExecutor, BatchResultAccumulator, OnErrorMode};
 
 #[derive(Debug, Clone)]
-pub struct TemplateBatchResult {
+pub(crate) struct TemplateBatchResult {
     pub template_id: String,
     pub total_items: usize,
     pub success_count: usize,
@@ -55,7 +55,7 @@ pub struct TemplateBatchResult {
 }
 
 impl TemplateBatchResult {
-    pub fn from_accumulator(
+    pub(crate) fn from_accumulator(
         template_id: String,
         acc: &BatchResultAccumulator,
         total_items: usize,
@@ -73,7 +73,7 @@ impl TemplateBatchResult {
         }
     }
 
-    pub fn cbu_ids(&self) -> &[Uuid] {
+    pub(crate) fn cbu_ids(&self) -> &[Uuid] {
         &self.primary_entity_ids
     }
 }
@@ -82,7 +82,7 @@ impl TemplateBatchResult {
 // template.invoke
 // =============================================================================
 
-pub struct TemplateInvoke;
+pub(crate) struct TemplateInvoke;
 
 #[async_trait]
 impl SemOsVerbOp for TemplateInvoke {

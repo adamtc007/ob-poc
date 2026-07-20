@@ -36,7 +36,7 @@ pub struct VerbConfigIndex {
 
 /// Summary of a single verb's configuration.
 #[derive(Debug, Clone)]
-pub struct VerbIndexEntry {
+pub(crate) struct VerbIndexEntry {
     /// Fully-qualified verb name: "domain.action" (e.g. "cbu.assign-product").
     pub fqn: String,
     /// Human-readable description.
@@ -61,7 +61,7 @@ pub struct VerbIndexEntry {
 
 /// Compact argument summary for display and validation.
 #[derive(Debug, Clone)]
-pub struct ArgSummary {
+pub(crate) struct ArgSummary {
     pub name: String,
     pub arg_type: String,
     pub required: bool,
@@ -273,7 +273,7 @@ impl VerbConfigIndex {
 /// These provide better human-readable sentences than the generic
 /// invocation_phrases fallback. In Phase 2, these move to `sentences.step[]`
 /// on VerbConfig YAML and this function is deleted.
-pub fn pack_verb_sentence_templates() -> HashMap<String, Vec<String>> {
+pub(crate) fn pack_verb_sentence_templates() -> HashMap<String, Vec<String>> {
     let mut m = HashMap::new();
 
     // -- CBU verbs --
@@ -370,7 +370,7 @@ pub fn pack_verb_sentence_templates() -> HashMap<String, Vec<String>> {
 ///
 /// Navigation verbs get QuickConfirm (no confirmation needed).
 /// Data-modifying verbs default to Always.
-pub fn pack_verb_confirm_policies() -> HashMap<String, ConfirmPolicy> {
+pub(crate) fn pack_verb_confirm_policies() -> HashMap<String, ConfirmPolicy> {
     let mut m = HashMap::new();
 
     // Navigation — quick confirm (low risk)

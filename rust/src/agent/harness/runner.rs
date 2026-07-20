@@ -12,7 +12,7 @@ use crate::session::unified::UnifiedSession;
 
 /// Result of running a single scenario.
 #[derive(Debug, Serialize)]
-pub struct ScenarioResult {
+pub(crate) struct ScenarioResult {
     pub scenario_name: String,
     pub suite_name: String,
     pub passed: bool,

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// Extracted verb signature from DSL YAML configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbExtract {
+pub(crate) struct VerbExtract {
     /// Fully qualified name: `{domain}.{action}`
     pub fqn: String,
     /// Domain (e.g. "cbu", "kyc", "entity")
@@ -34,7 +34,7 @@ pub struct VerbExtract {
 /// Simplified behavior classification.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum VerbBehaviorKind {
+pub(crate) enum VerbBehaviorKind {
     Crud,
     Plugin,
     GraphQuery,
@@ -43,7 +43,7 @@ pub enum VerbBehaviorKind {
 
 /// A verb input argument with its mapping metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbInput {
+pub(crate) struct VerbInput {
     /// Argument name
     pub name: String,
     /// Argument type as string (from ArgType)
@@ -69,7 +69,7 @@ pub struct VerbOutput {
 
 /// A side effect on a database table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SideEffect {
+pub(crate) struct SideEffect {
     /// Schema name (e.g. "ob-poc", "kyc")
     pub schema: Option<String>,
     /// Table name
@@ -81,7 +81,7 @@ pub struct SideEffect {
 /// Side effect operation type.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SideEffectOp {
+pub(crate) enum SideEffectOp {
     Read,
     Write,
     Insert,

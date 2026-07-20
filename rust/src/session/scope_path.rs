@@ -18,7 +18,7 @@ use uuid::Uuid;
 /// A segment in the scope path - one level in the hierarchy.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ScopeSegment {
+pub(crate) enum ScopeSegment {
     /// Universe level - all CBUs clustered by dimension
     Universe {
         /// Clustering dimension (jurisdiction, client_type, risk_rating, product)
@@ -56,7 +56,7 @@ pub enum ScopeSegment {
 
 impl ScopeSegment {
     /// Get the primary identifier for this segment
-    pub fn id(&self) -> String {
+    pub(crate) fn id(&self) -> String {
         match self {
             Self::Universe { cluster_by } => format!("universe:{}", cluster_by),
             Self::Book { book_id, .. } => format!("book:{}", book_id),
@@ -68,7 +68,7 @@ impl ScopeSegment {
     }
 
     /// Get the display label for this segment
-    pub fn label(&self) -> &str {
+    pub(crate) fn label(&self) -> &str {
         match self {
             Self::Universe { cluster_by } => cluster_by,
             Self::Book { label, .. } => label,
@@ -80,7 +80,7 @@ impl ScopeSegment {
     }
 
     /// Get the segment type name
-    pub fn segment_type(&self) -> &'static str {
+    pub(crate) fn segment_type(&self) -> &'static str {
         match self {
             Self::Universe { .. } => "universe",
             Self::Book { .. } => "book",
@@ -92,12 +92,12 @@ impl ScopeSegment {
     }
 
     /// Check if this segment represents a CBU
-    pub fn is_cbu(&self) -> bool {
+    pub(crate) fn is_cbu(&self) -> bool {
         matches!(self, Self::Cbu { .. })
     }
 
     /// Get CBU ID if this is a CBU segment
-    pub fn cbu_id(&self) -> Option<Uuid> {
+    pub(crate) fn cbu_id(&self) -> Option<Uuid> {
         match self {
             Self::Cbu { cbu_id, .. } => Some(*cbu_id),
             _ => None,
@@ -105,7 +105,7 @@ impl ScopeSegment {
     }
 
     /// Get entity ID if this is an entity segment
-    pub fn entity_id(&self) -> Option<Uuid> {
+    pub(crate) fn entity_id(&self) -> Option<Uuid> {
         match self {
             Self::Entity { entity_id, .. } => Some(*entity_id),
             _ => None,
@@ -124,21 +124,21 @@ impl fmt::Display for ScopeSegment {
 /// The path always starts with Universe and can extend to deeper levels.
 /// This is analogous to a file system path but for the taxonomy tree.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ScopePath {
+pub(crate) struct ScopePath {
     /// Ordered list of segments from root (Universe) to current position
     segments: Vec<ScopeSegment>,
 }
 
 impl ScopePath {
     /// Create an empty path (no scope set)
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             segments: Vec::new(),
         }
     }
 
     /// Create a path starting at universe level
-    pub fn universe(cluster_by: impl Into<String>) -> Self {
+    pub(crate) fn universe(cluster_by: impl Into<String>) -> Self {
         Self {
             segments: vec![ScopeSegment::Universe {
                 cluster_by: cluster_by.into(),
@@ -147,7 +147,7 @@ impl ScopePath {
     }
 
     /// Create a path to a specific book
-    pub fn book(
+    pub(crate) fn book(
         cluster_by: impl Into<String>,
         book_id: impl Into<String>,
         label: impl Into<String>,
@@ -166,7 +166,7 @@ impl ScopePath {
     }
 
     /// Create a path directly to a CBU (common case)
-    pub fn cbu(cbu_id: Uuid, name: impl Into<String>) -> Self {
+    pub(crate) fn cbu(cbu_id: Uuid, name: impl Into<String>) -> Self {
         Self {
             segments: vec![ScopeSegment::Cbu {
                 cbu_id,
@@ -176,7 +176,7 @@ impl ScopePath {
     }
 
     /// Create a path to an entity within a CBU
-    pub fn entity(
+    pub(crate) fn entity(
         cbu_id: Uuid,
         cbu_name: impl Into<String>,
         entity_id: Uuid,
@@ -199,22 +199,22 @@ impl ScopePath {
     }
 
     /// Push a new segment onto the path
-    pub fn push(&mut self, segment: ScopeSegment) {
+    pub(crate) fn push(&mut self, segment: ScopeSegment) {
         self.segments.push(segment);
     }
 
     /// Pop the last segment from the path (zoom out)
-    pub fn pop(&mut self) -> Option<ScopeSegment> {
+    pub(crate) fn pop(&mut self) -> Option<ScopeSegment> {
         self.segments.pop()
     }
 
     /// Get the current (deepest) segment
-    pub fn current(&self) -> Option<&ScopeSegment> {
+    pub(crate) fn current(&self) -> Option<&ScopeSegment> {
         self.segments.last()
     }
 
     /// Get the parent segment (one level up)
-    pub fn parent(&self) -> Option<&ScopeSegment> {
+    pub(crate) fn parent(&self) -> Option<&ScopeSegment> {
         if self.segments.len() >= 2 {
             self.segments.get(self.segments.len() - 2)
         } else {
@@ -223,77 +223,66 @@ impl ScopePath {
     }
 
     /// Get all segments
-    pub fn segments(&self) -> &[ScopeSegment] {
+    pub(crate) fn segments(&self) -> &[ScopeSegment] {
         &self.segments
     }
 
     /// Get the depth of the path (0 = empty, 1 = universe, etc.)
-    pub fn depth(&self) -> usize {
+    pub(crate) fn depth(&self) -> usize {
         self.segments.len()
     }
 
     /// Check if path is empty
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
 
     /// Check if at universe level
-    pub fn is_universe(&self) -> bool {
+    pub(crate) fn is_universe(&self) -> bool {
         self.depth() == 1 && matches!(self.current(), Some(ScopeSegment::Universe { .. }))
     }
 
-    /// Check if at book level
-    pub fn is_book(&self) -> bool {
-        matches!(self.current(), Some(ScopeSegment::Book { .. }))
-    }
 
     /// Check if at CBU level
-    pub fn is_cbu(&self) -> bool {
+    pub(crate) fn is_cbu(&self) -> bool {
         matches!(self.current(), Some(ScopeSegment::Cbu { .. }))
     }
 
     /// Check if at entity level
-    pub fn is_entity(&self) -> bool {
+    pub(crate) fn is_entity(&self) -> bool {
         matches!(self.current(), Some(ScopeSegment::Entity { .. }))
     }
 
     /// Get the CBU ID from the path (if any segment is a CBU)
-    pub fn cbu_id(&self) -> Option<Uuid> {
+    pub(crate) fn cbu_id(&self) -> Option<Uuid> {
         self.segments.iter().find_map(|s| s.cbu_id())
     }
 
     /// Get the entity ID if at entity level
-    pub fn entity_id(&self) -> Option<Uuid> {
+    pub(crate) fn entity_id(&self) -> Option<Uuid> {
         self.current().and_then(|s| s.entity_id())
     }
 
     /// Get breadcrumb labels for display
-    pub fn breadcrumbs(&self) -> Vec<&str> {
+    pub(crate) fn breadcrumbs(&self) -> Vec<&str> {
         self.segments.iter().map(|s| s.label()).collect()
     }
 
-    /// Get breadcrumb with segment types
-    pub fn breadcrumbs_typed(&self) -> Vec<(&'static str, &str)> {
-        self.segments
-            .iter()
-            .map(|s| (s.segment_type(), s.label()))
-            .collect()
-    }
 
     /// Truncate path to a specific depth (for back_to navigation)
-    pub fn truncate(&mut self, depth: usize) {
+    pub(crate) fn truncate(&mut self, depth: usize) {
         self.segments.truncate(depth);
     }
 
     /// Clone and extend with a new segment
-    pub fn extend(&self, segment: ScopeSegment) -> Self {
+    pub(crate) fn extend(&self, segment: ScopeSegment) -> Self {
         let mut new_path = self.clone();
         new_path.push(segment);
         new_path
     }
 
     /// Convert to a path string (for display/debugging)
-    pub fn to_path_string(&self) -> String {
+    pub(crate) fn to_path_string(&self) -> String {
         if self.is_empty() {
             return "/".to_string();
         }

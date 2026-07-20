@@ -37,13 +37,13 @@ use crate::graph::DealGraphBuilder;
 // ============================================================================
 
 #[derive(Clone)]
-pub struct DealState {
+pub(crate) struct DealState {
     pub pool: PgPool,
     pub sessions: SessionStore,
 }
 
 impl DealState {
-    pub fn new(pool: PgPool, sessions: SessionStore) -> Self {
+    pub(crate) fn new(pool: PgPool, sessions: SessionStore) -> Self {
         Self { pool, sessions }
     }
 }
@@ -54,7 +54,7 @@ impl DealState {
 
 /// Query parameters for deal graph endpoint
 #[derive(Debug, Deserialize)]
-pub struct DealGraphQuery {
+pub(crate) struct DealGraphQuery {
     /// View mode: COMMERCIAL, FINANCIAL, STATUS
     #[serde(default)]
     pub view_mode: Option<String>,
@@ -62,7 +62,7 @@ pub struct DealGraphQuery {
 
 /// Query parameters for deal list endpoint
 #[derive(Debug, Deserialize)]
-pub struct DealListQuery {
+pub(crate) struct DealListQuery {
     pub client_group_id: Option<Uuid>,
     pub deal_status: Option<String>,
     pub sales_owner: Option<String>,
@@ -77,7 +77,7 @@ pub struct DealListQuery {
 
 /// Error response
 #[derive(Debug, Serialize)]
-pub struct ErrorResponse {
+pub(crate) struct ErrorResponse {
     pub error: String,
 }
 
@@ -495,7 +495,7 @@ pub fn create_deal_router(pool: PgPool, sessions: SessionStore) -> Router {
 }
 
 /// Create deal router with just pool (no sessions) for simpler use cases
-pub fn create_deal_router_simple(pool: PgPool) -> Router {
+pub(crate) fn create_deal_router_simple(pool: PgPool) -> Router {
     use std::sync::Arc;
     use tokio::sync::RwLock;
 

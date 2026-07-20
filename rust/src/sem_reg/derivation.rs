@@ -17,7 +17,7 @@ use super::types::SecurityLabel;
 // ── Derivation function trait ─────────────────────────────────
 
 /// Trait for derivation functions that can be registered and dispatched.
-pub trait DerivationFn: Send + Sync {
+pub(crate) trait DerivationFn: Send + Sync {
     /// Evaluate the function with the given inputs.
     fn evaluate(&self, inputs: &serde_json::Value) -> Result<serde_json::Value, DerivationError>;
 }
@@ -36,7 +36,7 @@ where
 
 /// Errors from derivation evaluation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DerivationError {
+pub(crate) enum DerivationError {
     /// Referenced function not found in registry.
     FunctionNotFound { ref_name: String },
     /// Required input is null.
@@ -81,7 +81,7 @@ impl std::error::Error for DerivationError {}
 /// Result of evaluating a derivation spec.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
-pub struct DerivationResult {
+pub(crate) struct DerivationResult {
     /// The computed output value.
     pub value: serde_json::Value,
     /// Snapshot ID of the DerivationSpec used.
@@ -99,25 +99,25 @@ use serde::{Deserialize, Serialize};
 // ── Function registry ─────────────────────────────────────────
 
 /// Registry of named derivation functions.
-pub struct DerivationFunctionRegistry {
+pub(crate) struct DerivationFunctionRegistry {
     functions: HashMap<String, Arc<dyn DerivationFn>>,
 }
 
 impl DerivationFunctionRegistry {
     /// Create an empty registry.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             functions: HashMap::new(),
         }
     }
 
     /// Register a named function.
-    pub fn register(&mut self, name: &str, func: Arc<dyn DerivationFn>) {
+    pub(crate) fn register(&mut self, name: &str, func: Arc<dyn DerivationFn>) {
         self.functions.insert(name.to_string(), func);
     }
 
     /// Look up a function by name.
-    pub fn get(&self, name: &str) -> Option<&Arc<dyn DerivationFn>> {
+    pub(crate) fn get(&self, name: &str) -> Option<&Arc<dyn DerivationFn>> {
         self.functions.get(name)
     }
 
@@ -128,7 +128,7 @@ impl DerivationFunctionRegistry {
     /// 2. Check null inputs against `null_semantics`
     /// 3. Evaluate function
     /// 4. Compute inherited security label from input labels
-    pub fn evaluate(
+    pub(crate) fn evaluate(
         &self,
         spec: &DerivationSpecBody,
         inputs: &serde_json::Value,

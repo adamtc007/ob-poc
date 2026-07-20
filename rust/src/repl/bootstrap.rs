@@ -19,7 +19,7 @@ use sqlx::PgPool;
 
 /// A candidate client group from bootstrap resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BootstrapCandidate {
+pub(crate) struct BootstrapCandidate {
     pub group_id: Uuid,
     pub group_name: String,
     pub match_source: String, // "exact", "substring", "fuzzy", "semantic"

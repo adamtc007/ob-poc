@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 /// Immutable runtime policy binding row.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct PolicyVersionBindingRow {
+pub(crate) struct PolicyVersionBindingRow {
     pub binding_id: Uuid,
     pub subject_kind: String,
     pub subject_id: Uuid,
@@ -32,7 +32,7 @@ pub struct PolicyVersionBindingRow {
 
 /// Payload for creating a new runtime policy binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewPolicyVersionBinding {
+pub(crate) struct NewPolicyVersionBinding {
     pub subject_kind: String,
     pub subject_id: Uuid,
     pub semos_snapshot_set_id: Uuid,
@@ -51,7 +51,7 @@ pub struct NewPolicyVersionBinding {
 
 /// Database service for runtime policy version bindings.
 #[derive(Clone, Debug)]
-pub struct PolicyVersionBindingService {
+pub(crate) struct PolicyVersionBindingService {
     pool: PgPool,
 }
 
@@ -63,7 +63,7 @@ impl PolicyVersionBindingService {
     /// ```ignore
     /// let service = PolicyVersionBindingService::new(pool.clone());
     /// ```
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -74,29 +74,10 @@ impl PolicyVersionBindingService {
     /// ```ignore
     /// let pool = service.pool();
     /// ```
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
-    /// Load the currently published SemOS snapshot set ID.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let snapshot_set_id = service.get_active_snapshot_set_id().await?;
-    /// ```
-    pub async fn get_active_snapshot_set_id(&self) -> Result<Option<Uuid>> {
-        sqlx::query_scalar(
-            r#"
-            SELECT active_snapshot_set_id
-            FROM sem_reg_pub.active_snapshot_set
-            LIMIT 1
-            "#,
-        )
-        .fetch_optional(&self.pool)
-        .await
-        .context("Failed to load active SemOS snapshot set ID")
-    }
 
     /// Insert a new immutable runtime policy binding row.
     ///
@@ -105,7 +86,7 @@ impl PolicyVersionBindingService {
     /// ```ignore
     /// let row = service.insert_binding(&new_binding).await?;
     /// ```
-    pub async fn insert_binding(
+    pub(crate) async fn insert_binding(
         &self,
         binding: &NewPolicyVersionBinding,
     ) -> Result<PolicyVersionBindingRow> {
@@ -168,47 +149,4 @@ impl PolicyVersionBindingService {
         .context("Failed to insert policy version binding")
     }
 
-    /// List immutable policy bindings for one runtime subject, newest first.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// let rows = service.list_bindings_for_subject("document_version", version_id).await?;
-    /// ```
-    pub async fn list_bindings_for_subject(
-        &self,
-        subject_kind: &str,
-        subject_id: Uuid,
-    ) -> Result<Vec<PolicyVersionBindingRow>> {
-        sqlx::query_as::<_, PolicyVersionBindingRow>(
-            r#"
-            SELECT
-                binding_id,
-                subject_kind,
-                subject_id,
-                semos_snapshot_set_id,
-                requirement_profile_fqn,
-                requirement_profile_snapshot_id,
-                verification_rule_fqn,
-                verification_rule_snapshot_id,
-                acceptance_policy_fqn,
-                acceptance_policy_snapshot_id,
-                document_type_registry_version,
-                extraction_model_version,
-                policy_effective_at,
-                computed_at,
-                computed_by,
-                metadata
-            FROM "ob-poc".policy_version_bindings
-            WHERE subject_kind = $1
-              AND subject_id = $2
-            ORDER BY computed_at DESC, binding_id DESC
-            "#,
-        )
-        .bind(subject_kind)
-        .bind(subject_id)
-        .fetch_all(&self.pool)
-        .await
-        .context("Failed to list policy version bindings for subject")
-    }
 }

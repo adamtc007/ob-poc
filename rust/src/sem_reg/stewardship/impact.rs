@@ -12,7 +12,7 @@ use super::types::ChangesetEntryRow;
 
 /// Impact analysis result for a changeset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangesetImpactReport {
+pub(crate) struct ChangesetImpactReport {
     pub changeset_id: Uuid,
     pub total_items: usize,
     pub affected_snapshots: Vec<AffectedSnapshot>,
@@ -22,7 +22,7 @@ pub struct ChangesetImpactReport {
 
 /// A snapshot that would be affected by publishing the changeset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AffectedSnapshot {
+pub(crate) struct AffectedSnapshot {
     pub snapshot_id: Uuid,
     pub object_type: String,
     pub fqn: String,
@@ -33,7 +33,7 @@ pub struct AffectedSnapshot {
 /// Type of impact on an affected snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ImpactType {
+pub(crate) enum ImpactType {
     /// The snapshot will be superseded by a new version
     Superseded,
     /// The snapshot references a changed object (transitive dependency)
@@ -46,7 +46,7 @@ pub enum ImpactType {
 
 /// A consumer (verb, view, policy) affected by the changeset.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AffectedConsumer {
+pub(crate) struct AffectedConsumer {
     pub consumer_fqn: String,
     pub consumer_type: String,
     pub dependency_fqn: String,
@@ -55,7 +55,7 @@ pub struct AffectedConsumer {
 
 /// High-level risk summary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RiskSummary {
+pub(crate) struct RiskSummary {
     pub breaking_changes: usize,
     pub non_breaking_changes: usize,
     pub new_items: usize,
@@ -67,7 +67,7 @@ pub struct RiskSummary {
 /// Risk level derived from the impact analysis.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum RiskLevel {
+pub(crate) enum RiskLevel {
     Low,
     Medium,
     High,

@@ -9997,7 +9997,7 @@ fn extract_args_from_dsl(dsl: &str) -> HashMap<String, String> {
 
 /// Rebuild an s-expression DSL string from verb + args.
 /// Inverse of `extract_args_from_dsl()`.
-pub fn rebuild_dsl(verb: &str, args: &HashMap<String, String>) -> String {
+pub(crate) fn rebuild_dsl(verb: &str, args: &HashMap<String, String>) -> String {
     if args.is_empty() {
         return format!("({})", verb);
     }
@@ -10056,7 +10056,7 @@ fn build_arg_extraction_audit(
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub enum OrchestratorError {
+pub(crate) enum OrchestratorError {
     SessionNotFound(Uuid),
     /// A required persistence operation failed (e.g., parking checkpoint).
     PersistenceFailed(String),

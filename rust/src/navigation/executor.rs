@@ -22,7 +22,7 @@ use crate::graph::types::{
 
 /// Result of executing a navigation command
 #[derive(Debug, Clone)]
-pub enum NavResult {
+pub(crate) enum NavResult {
     /// Successfully navigated from one node to another
     Navigated {
         from: Option<Uuid>,
@@ -91,7 +91,7 @@ pub enum NavResult {
 
 /// Item in a query result
 #[derive(Debug, Clone)]
-pub struct QueryResultItem {
+pub(crate) struct QueryResultItem {
     pub entity_id: Uuid,
     pub name: String,
     pub entity_type: EntityType,
@@ -102,7 +102,7 @@ pub struct QueryResultItem {
 
 /// Node in a path result
 #[derive(Debug, Clone)]
-pub struct PathNode {
+pub(crate) struct PathNode {
     pub entity_id: Uuid,
     pub name: String,
     pub entity_type: EntityType,
@@ -112,7 +112,7 @@ pub struct PathNode {
 
 /// Node in a tree result
 #[derive(Debug, Clone)]
-pub struct TreeNode {
+pub(crate) struct TreeNode {
     pub entity_id: Uuid,
     pub name: String,
     pub entity_type: EntityType,
@@ -128,7 +128,7 @@ pub struct TreeNode {
 ///
 /// This is implemented by EntityGraph for in-memory operations.
 /// Database-backed implementations would load data as needed.
-pub trait NavExecutor {
+pub(crate) trait NavExecutor {
     /// Execute a navigation command and return the result
     fn execute_nav(&mut self, cmd: NavCommand) -> NavResult;
 }

@@ -15,7 +15,7 @@ use super::inspector::AgentLearningInspector;
 
 /// Statistics from warmup process.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct WarmupStats {
+pub(crate) struct WarmupStats {
     /// Entity aliases loaded
     pub entity_aliases_loaded: usize,
     /// Lexicon tokens loaded
@@ -30,7 +30,7 @@ pub struct WarmupStats {
 
 /// In-memory learned data for fast lookup.
 #[derive(Debug, Default)]
-pub struct LearnedData {
+pub(crate) struct LearnedData {
     /// Entity aliases: lowercase alias → (canonical_name, entity_id)
     pub entity_aliases: HashMap<String, (String, Option<Uuid>)>,
     /// Lexicon tokens: lowercase token → (token_type, subtype)
@@ -40,7 +40,7 @@ pub struct LearnedData {
 }
 
 /// Shared learned data for use across requests.
-pub type SharedLearnedData = Arc<RwLock<LearnedData>>;
+pub(crate) type SharedLearnedData = Arc<RwLock<LearnedData>>;
 
 /// Learning warmup handler.
 pub struct LearningWarmup {
@@ -171,35 +171,35 @@ impl LearningWarmup {
 
 impl LearnedData {
     /// Look up entity alias.
-    pub fn resolve_entity_alias(&self, query: &str) -> Option<(&str, Option<Uuid>)> {
+    pub(crate) fn resolve_entity_alias(&self, query: &str) -> Option<(&str, Option<Uuid>)> {
         self.entity_aliases
             .get(&query.to_lowercase())
             .map(|(canonical, entity_id)| (canonical.as_str(), *entity_id))
     }
 
     /// Look up lexicon token.
-    pub fn resolve_token(&self, token: &str) -> Option<(&str, Option<&str>)> {
+    pub(crate) fn resolve_token(&self, token: &str) -> Option<(&str, Option<&str>)> {
         self.lexicon_tokens
             .get(&token.to_lowercase())
             .map(|(token_type, subtype)| (token_type.as_str(), subtype.as_deref()))
     }
 
     /// Look up invocation phrase.
-    pub fn resolve_phrase(&self, phrase: &str) -> Option<&str> {
+    pub(crate) fn resolve_phrase(&self, phrase: &str) -> Option<&str> {
         self.invocation_phrases
             .get(&phrase.to_lowercase())
             .map(|v| v.as_str())
     }
 
     /// Check if we have any learned data.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.entity_aliases.is_empty()
             && self.lexicon_tokens.is_empty()
             && self.invocation_phrases.is_empty()
     }
 
     /// Total learned items.
-    pub fn total_count(&self) -> usize {
+    pub(crate) fn total_count(&self) -> usize {
         self.entity_aliases.len() + self.lexicon_tokens.len() + self.invocation_phrases.len()
     }
 }

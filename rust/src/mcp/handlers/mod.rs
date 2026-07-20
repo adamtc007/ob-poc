@@ -25,4 +25,4 @@ mod navigation_tools;
 mod session_tools;
 
 // Re-export the main ToolHandlers struct
-pub use core::ToolHandlers;
+pub(crate) use core::ToolHandlers;

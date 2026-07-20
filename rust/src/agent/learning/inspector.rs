@@ -13,7 +13,7 @@ use super::types::{AgentEvent, AgentEventPayload};
 
 /// Learning candidate from agent interactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LearningCandidate {
+pub(crate) struct LearningCandidate {
     pub id: i64,
     pub fingerprint: String,
     pub learning_type: LearningType,
@@ -29,7 +29,7 @@ pub struct LearningCandidate {
 /// Type of learning to apply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LearningType {
+pub(crate) enum LearningType {
     /// Entity alias: "Barclays" → "Barclays PLC"
     EntityAlias,
     /// Lexicon token: new vocabulary
@@ -41,7 +41,7 @@ pub enum LearningType {
 }
 
 impl LearningType {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             LearningType::EntityAlias => "entity_alias",
             LearningType::LexiconToken => "lexicon_token",
@@ -50,7 +50,7 @@ impl LearningType {
         }
     }
 
-    pub fn parse(s: &str) -> Option<Self> {
+    pub(crate) fn parse(s: &str) -> Option<Self> {
         match s {
             "entity_alias" => Some(LearningType::EntityAlias),
             "lexicon_token" => Some(LearningType::LexiconToken),
@@ -64,7 +64,7 @@ impl LearningType {
 /// Risk level for auto-apply decisions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum RiskLevel {
+pub(crate) enum RiskLevel {
     /// Safe to auto-apply after threshold
     Low,
     /// Requires review queue
@@ -74,7 +74,7 @@ pub enum RiskLevel {
 }
 
 impl RiskLevel {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             RiskLevel::Low => "low",
             RiskLevel::Medium => "medium",
@@ -86,7 +86,7 @@ impl RiskLevel {
 /// Learning status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LearningStatus {
+pub(crate) enum LearningStatus {
     Pending,
     Approved,
     Rejected,
@@ -94,7 +94,7 @@ pub enum LearningStatus {
 }
 
 impl LearningStatus {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             LearningStatus::Pending => "pending",
             LearningStatus::Approved => "approved",
@@ -106,7 +106,7 @@ impl LearningStatus {
 
 /// Applied learning record for audit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppliedLearning {
+pub(crate) struct AppliedLearning {
     pub learning_type: LearningType,
     pub input_pattern: String,
     pub output: String,
@@ -116,7 +116,7 @@ pub struct AppliedLearning {
 
 /// Statistics from analysis run.
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct AnalysisStats {
+pub(crate) struct AnalysisStats {
     pub events_processed: u32,
     pub candidates_created: u32,
     pub candidates_updated: u32,
@@ -127,7 +127,7 @@ pub struct AnalysisStats {
 /// Agent learning inspector.
 ///
 /// Analyzes agent events, identifies patterns, manages learning lifecycle.
-pub struct AgentLearningInspector {
+pub(crate) struct AgentLearningInspector {
     pool: PgPool,
     /// Threshold for auto-applying low-risk learnings
     auto_apply_threshold: i32,
@@ -135,27 +135,20 @@ pub struct AgentLearningInspector {
 
 impl AgentLearningInspector {
     /// Create new inspector.
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self {
             pool,
             auto_apply_threshold: 3,
         }
     }
 
-    /// Create with custom threshold.
-    pub fn with_threshold(pool: PgPool, threshold: i32) -> Self {
-        Self {
-            pool,
-            auto_apply_threshold: threshold,
-        }
-    }
 
     // =========================================================================
     // EVENT PERSISTENCE
     // =========================================================================
 
     /// Store an agent event for later analysis.
-    pub async fn store_event(&self, event: &AgentEvent) -> Result<i64> {
+    pub(crate) async fn store_event(&self, event: &AgentEvent) -> Result<i64> {
         let event_type = event.payload.event_type_str();
 
         // Extract fields based on payload type
@@ -361,7 +354,7 @@ impl AgentLearningInspector {
     // =========================================================================
 
     /// Analyze recent events and create/update learning candidates.
-    pub async fn analyze(&self, since: Option<DateTime<Utc>>) -> Result<AnalysisStats> {
+    pub(crate) async fn analyze(&self, since: Option<DateTime<Utc>>) -> Result<AnalysisStats> {
         let mut stats = AnalysisStats::default();
 
         // Get events with corrections (primary learning signal)
@@ -508,7 +501,7 @@ impl AgentLearningInspector {
     // =========================================================================
 
     /// Apply learnings that have reached the occurrence threshold.
-    pub async fn apply_threshold_learnings(&self) -> Result<usize> {
+    pub(crate) async fn apply_threshold_learnings(&self) -> Result<usize> {
         let candidates = sqlx::query!(
             r#"
             SELECT id, learning_type, input_pattern, suggested_output
@@ -636,7 +629,7 @@ impl AgentLearningInspector {
     // =========================================================================
 
     /// List learning candidates with filtering.
-    pub async fn list_candidates(
+    pub(crate) async fn list_candidates(
         &self,
         status: Option<LearningStatus>,
         learning_type: Option<LearningType>,
@@ -690,7 +683,7 @@ impl AgentLearningInspector {
     }
 
     /// Manually approve and apply a learning candidate.
-    pub async fn approve_candidate(
+    pub(crate) async fn approve_candidate(
         &self,
         fingerprint: &str,
         actor: &str,
@@ -772,7 +765,7 @@ impl AgentLearningInspector {
     }
 
     /// Reject a learning candidate.
-    pub async fn reject_candidate(&self, fingerprint: &str, actor: &str) -> Result<()> {
+    pub(crate) async fn reject_candidate(&self, fingerprint: &str, actor: &str) -> Result<()> {
         sqlx::query!(
             r#"
             UPDATE "ob-poc".learning_candidates
@@ -793,7 +786,7 @@ impl AgentLearningInspector {
     // =========================================================================
 
     /// Get all applied entity aliases.
-    pub async fn get_entity_aliases(&self) -> Result<Vec<(String, String, Option<Uuid>)>> {
+    pub(crate) async fn get_entity_aliases(&self) -> Result<Vec<(String, String, Option<Uuid>)>> {
         let rows = sqlx::query!(
             r#"
             SELECT alias, canonical_name, entity_id
@@ -811,7 +804,7 @@ impl AgentLearningInspector {
     }
 
     /// Get all learned lexicon tokens.
-    pub async fn get_lexicon_tokens(&self) -> Result<Vec<(String, String, Option<String>)>> {
+    pub(crate) async fn get_lexicon_tokens(&self) -> Result<Vec<(String, String, Option<String>)>> {
         let rows = sqlx::query!(
             r#"
             SELECT token, token_type, token_subtype
@@ -829,7 +822,7 @@ impl AgentLearningInspector {
     }
 
     /// Get all learned invocation phrases.
-    pub async fn get_invocation_phrases(&self) -> Result<Vec<(String, String)>> {
+    pub(crate) async fn get_invocation_phrases(&self) -> Result<Vec<(String, String)>> {
         let rows = sqlx::query!(
             r#"
             SELECT phrase, verb

@@ -158,24 +158,24 @@ fn is_crud_write_operation(op: &CrudOperation) -> bool {
 
 /// Result of linting a single verb
 #[derive(Debug, Clone)]
-pub struct VerbLintResult {
+pub(crate) struct VerbLintResult {
     pub full_name: String,
     pub diagnostics: VerbDiagnostics,
 }
 
 impl VerbLintResult {
-    pub fn has_errors(&self) -> bool {
+    pub(crate) fn has_errors(&self) -> bool {
         self.diagnostics.has_errors()
     }
 
-    pub fn has_warnings(&self) -> bool {
+    pub(crate) fn has_warnings(&self) -> bool {
         self.diagnostics.has_warnings()
     }
 }
 
 /// Result of linting all verbs
 #[derive(Debug, Clone, Default)]
-pub struct LintReport {
+pub(crate) struct LintReport {
     pub results: Vec<VerbLintResult>,
     pub total_verbs: usize,
     pub verbs_with_errors: usize,
@@ -184,16 +184,16 @@ pub struct LintReport {
 }
 
 impl LintReport {
-    pub fn has_errors(&self) -> bool {
+    pub(crate) fn has_errors(&self) -> bool {
         self.verbs_with_errors > 0
     }
 
-    pub fn has_warnings(&self) -> bool {
+    pub(crate) fn has_warnings(&self) -> bool {
         self.verbs_with_warnings > 0
     }
 
     /// Get only verbs with issues
-    pub fn issues_only(&self) -> Vec<&VerbLintResult> {
+    pub(crate) fn issues_only(&self) -> Vec<&VerbLintResult> {
         self.results
             .iter()
             .filter(|r| r.has_errors() || r.has_warnings())
@@ -204,12 +204,12 @@ impl LintReport {
 /// Lint a single verb configuration for tiering rule compliance
 ///
 /// Uses default LintConfig (MINIMAL tier). For tier-specific linting, use `lint_verb_with_config`.
-pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> VerbLintResult {
+pub(crate) fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> VerbLintResult {
     lint_verb_with_config(domain, verb_name, config, &LintConfig::default())
 }
 
 /// Lint a single verb with explicit configuration
-pub fn lint_verb_with_config(
+pub(crate) fn lint_verb_with_config(
     domain: &str,
     verb_name: &str,
     config: &VerbConfig,
@@ -557,7 +557,7 @@ fn check_legacy_rules(
 }
 
 /// Lint all verbs from a domain configuration map (uses default LintConfig)
-pub fn lint_all_verbs(
+pub(crate) fn lint_all_verbs(
     domains: &std::collections::HashMap<String, dsl_core::DomainConfig>,
 ) -> LintReport {
     lint_all_verbs_with_config(domains, &LintConfig::default())

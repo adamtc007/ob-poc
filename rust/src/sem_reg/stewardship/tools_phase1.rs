@@ -19,7 +19,7 @@ use crate::sem_reg::stewardship::show_loop::ShowLoop;
 use crate::sem_reg::stewardship::types::*;
 
 /// Return all Phase 1 tool specs (6 tools).
-pub fn phase1_tool_specs() -> Vec<SemRegToolSpec> {
+pub(crate) fn phase1_tool_specs() -> Vec<SemRegToolSpec> {
     vec![
         SemRegToolSpec {
             name: "stew_get_focus".into(),

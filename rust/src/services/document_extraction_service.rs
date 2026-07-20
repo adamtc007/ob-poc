@@ -15,7 +15,7 @@ use uuid::Uuid;
 
 /// Mapping from document_attribute_mappings table
 #[derive(Debug, Clone)]
-pub struct DocumentAttributeMapping {
+pub(crate) struct DocumentAttributeMapping {
     pub mapping_id: Uuid,
     pub attribute_uuid: Uuid,
     pub extraction_method: String,
@@ -25,7 +25,7 @@ pub struct DocumentAttributeMapping {
 
 /// Document info from document_catalog
 #[derive(Debug, Clone)]
-pub struct DocumentInfo {
+pub(crate) struct DocumentInfo {
     pub doc_id: Uuid,
     pub document_type_id: Uuid,
     pub document_type_code: String,
@@ -34,12 +34,12 @@ pub struct DocumentInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct DocumentExtractionService {
+pub(crate) struct DocumentExtractionService {
     pool: PgPool,
 }
 
 impl DocumentExtractionService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -48,7 +48,7 @@ impl DocumentExtractionService {
     // =========================================================================
 
     /// Get document info including type code
-    pub async fn get_document_info(&self, doc_id: Uuid) -> Result<Option<DocumentInfo>, String> {
+    pub(crate) async fn get_document_info(&self, doc_id: Uuid) -> Result<Option<DocumentInfo>, String> {
         let row = sqlx::query!(
             r#"
             SELECT
@@ -81,7 +81,7 @@ impl DocumentExtractionService {
     // =========================================================================
 
     /// Get attribute mappings for a document type
-    pub async fn get_attribute_mappings_for_doc_type(
+    pub(crate) async fn get_attribute_mappings_for_doc_type(
         &self,
         document_type_id: Uuid,
     ) -> Result<Vec<DocumentAttributeMapping>, String> {
@@ -118,81 +118,6 @@ impl DocumentExtractionService {
     // EXTRACTION
     // =========================================================================
 
-    /// Extract attributes from an uploaded document
-    pub async fn extract_attributes_from_document(
-        &self,
-        doc_id: Uuid,
-        dictionary_service: &dyn DictionaryService,
-    ) -> Result<HashMap<AttributeId, Value>, String> {
-        // Step 1: Get document details
-        let document = self
-            .get_document_info(doc_id)
-            .await?
-            .ok_or_else(|| format!("Document {} not found", doc_id))?;
-
-        // Step 2: Get attribute mappings for this document type
-        let attribute_mappings = self
-            .get_attribute_mappings_for_doc_type(document.document_type_id)
-            .await?;
-
-        if attribute_mappings.is_empty() {
-            return Err(format!(
-                "No attribute mappings found for document type '{}'",
-                document.document_type_code
-            ));
-        }
-
-        let mut extracted_values = HashMap::new();
-
-        // Step 3: Extract each mapped attribute
-        for mapping in &attribute_mappings {
-            let attribute_id = AttributeId::from_uuid(mapping.attribute_uuid);
-
-            if let Some(definition) = dictionary_service.get_attribute(&attribute_id).await? {
-                // Extract value using hints from the mapping
-                if let Some(value) = self.extract_single_attribute(&definition, mapping).await? {
-                    // Step 4: Store in document_metadata
-                    self.store_document_metadata(doc_id, mapping.attribute_uuid, &value)
-                        .await?;
-
-                    extracted_values.insert(attribute_id, value);
-                } else if mapping.is_required {
-                    tracing::warn!(
-                        "Required attribute {} could not be extracted from document {}",
-                        mapping.attribute_uuid,
-                        doc_id
-                    );
-                }
-            }
-        }
-
-        // Step 5: Update document extraction status
-        let confidence = if extracted_values.is_empty() {
-            bigdecimal::BigDecimal::from(0)
-        } else {
-            bigdecimal::BigDecimal::try_from(0.85).unwrap_or_else(|_| {
-                bigdecimal::BigDecimal::from(85) / bigdecimal::BigDecimal::from(100)
-            })
-        };
-
-        sqlx::query!(
-            r#"
-            UPDATE "ob-poc".document_catalog
-            SET extraction_status = 'COMPLETED',
-                extraction_confidence = $2,
-                last_extracted_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE doc_id = $1
-            "#,
-            doc_id,
-            confidence
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to update document status: {}", e))?;
-
-        Ok(extracted_values)
-    }
 
     /// Extract a single attribute value from the document
     async fn extract_single_attribute(
@@ -244,32 +169,5 @@ impl DocumentExtractionService {
     // QUERIES
     // =========================================================================
 
-    /// Get all attributes that can be extracted from a document type
-    pub async fn get_extractable_attributes_for_doc_type(
-        &self,
-        document_type_id: Uuid,
-    ) -> Result<Vec<DocumentAttributeMapping>, String> {
-        self.get_attribute_mappings_for_doc_type(document_type_id)
-            .await
-    }
 
-    /// Find document types that can provide a specific attribute
-    pub async fn get_doc_types_for_attribute(
-        &self,
-        attribute_uuid: Uuid,
-    ) -> Result<Vec<Uuid>, String> {
-        let doc_types = sqlx::query!(
-            r#"
-            SELECT DISTINCT document_type_id
-            FROM "ob-poc".document_attribute_mappings
-            WHERE attribute_uuid = $1
-            "#,
-            attribute_uuid
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to get document types for attribute: {}", e))?;
-
-        Ok(doc_types.into_iter().map(|r| r.document_type_id).collect())
-    }
 }

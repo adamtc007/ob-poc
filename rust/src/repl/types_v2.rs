@@ -113,7 +113,7 @@ pub use ob_poc_boundary::session::{AgentMode, SubjectKind, WorkspaceKind, Worksp
 
 /// A selectable workspace option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceOption {
+pub(crate) struct WorkspaceOption {
     pub workspace: WorkspaceKind,
     pub label: String,
     pub description: String,
@@ -121,7 +121,7 @@ pub struct WorkspaceOption {
 
 /// A selectable CBU structure constellation map.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ConstellationMapOption {
+pub(crate) struct ConstellationMapOption {
     pub constellation_map: String,
     pub constellation_family: String,
     pub label: String,
@@ -131,7 +131,7 @@ pub struct ConstellationMapOption {
 
 /// Session scope anchored on a client group.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct SessionScope {
+pub(crate) struct SessionScope {
     pub client_group_id: Uuid,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_group_name: Option<String>,
@@ -139,17 +139,17 @@ pub struct SessionScope {
 
 impl SessionScope {
     /// Sentinel UUID for infrastructure-only sessions (no client group).
-    pub fn infrastructure_scope_id() -> Uuid {
+    pub(crate) fn infrastructure_scope_id() -> Uuid {
         Uuid::nil()
     }
 
     /// Whether this scope represents an infrastructure session.
-    pub fn is_infrastructure(&self) -> bool {
+    pub(crate) fn is_infrastructure(&self) -> bool {
         self.client_group_id == Uuid::nil()
     }
 
     /// Create an infrastructure scope (no client group).
-    pub fn infrastructure() -> Self {
+    pub(crate) fn infrastructure() -> Self {
         Self {
             client_group_id: Uuid::nil(),
             client_group_name: Some("SemOS Infrastructure".to_string()),
@@ -168,14 +168,14 @@ pub struct SubjectRef {
 
 /// Provisioning dependency attached to a handoff context.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ProvisioningDep {
+pub(crate) struct ProvisioningDep {
     pub kind: String,
     pub reference: String,
 }
 
 /// Cross-workspace handoff payload carried alongside a working context.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct HandoffContext {
+pub(crate) struct HandoffContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_deal_id: Option<Uuid>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -188,14 +188,14 @@ pub struct HandoffContext {
 
 /// A scoped verb reference returned in hydrated workspace views.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct VerbRef {
+pub(crate) struct VerbRef {
     pub verb_fqn: String,
     pub display_name: String,
 }
 
 /// Progress summary for the current constellation context.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ProgressSummary {
+pub(crate) struct ProgressSummary {
     pub total_slots: usize,
     pub completion_pct: u8,
     pub blocking_slots: usize,
@@ -203,7 +203,7 @@ pub struct ProgressSummary {
 
 /// A suggested action derived from the current scoped verb surface.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ActionHint {
+pub(crate) struct ActionHint {
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verb_fqn: Option<String>,
@@ -212,7 +212,7 @@ pub struct ActionHint {
 
 /// A workspace available to the user for navigation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct WorkspaceHint {
+pub(crate) struct WorkspaceHint {
     pub workspace: WorkspaceKind,
     pub label: String,
     pub default_constellation_family: String,
@@ -221,7 +221,7 @@ pub struct WorkspaceHint {
 
 /// Self-contained view of the hydrated working surface for one frame.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceStateView {
+pub(crate) struct WorkspaceStateView {
     pub workspace: WorkspaceKind,
     pub constellation_family: String,
     pub constellation_map: String,
@@ -239,7 +239,7 @@ pub struct WorkspaceStateView {
 
 /// One entry in the workspace stack.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceFrame {
+pub(crate) struct WorkspaceFrame {
     pub workspace: WorkspaceKind,
     pub constellation_family: String,
     pub constellation_map: String,
@@ -338,7 +338,7 @@ fn default_view_level() -> ob_poc_types::galaxy::ViewLevel {
 /// Lightweight viewport snapshot for navigation history (back/forward).
 /// Captures viewport state only — NOT DAG state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ViewportSnapshot {
+pub(crate) struct ViewportSnapshot {
     pub view_level: ob_poc_types::galaxy::ViewLevel,
     pub focus_slot_path: Option<String>,
     pub timestamp: DateTime<Utc>,
@@ -360,7 +360,7 @@ impl WorkspaceFrame {
     /// assert_eq!(frame.writes_since_push, 0);
     /// assert!(!frame.is_peek);
     /// ```
-    pub fn new(workspace: WorkspaceKind, session_scope: SessionScope) -> Self {
+    pub(crate) fn new(workspace: WorkspaceKind, session_scope: SessionScope) -> Self {
         let registry = workspace.registry_entry();
         Self {
             workspace,
@@ -393,7 +393,7 @@ impl WorkspaceFrame {
 
 /// Request envelope for navigation resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstellationContextRef {
+pub(crate) struct ConstellationContextRef {
     pub session_id: Uuid,
     pub client_group_id: Uuid,
     pub workspace: WorkspaceKind,
@@ -411,7 +411,7 @@ pub struct ConstellationContextRef {
 
 /// Resolved context after defaults and subject resolution are applied.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedConstellationContext {
+pub(crate) struct ResolvedConstellationContext {
     pub session_id: Uuid,
     pub client_group_id: Uuid,
     pub workspace: WorkspaceKind,
@@ -429,7 +429,7 @@ pub struct ResolvedConstellationContext {
 
 /// Feedback returned with session-scoped navigation responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionFeedback {
+pub(crate) struct SessionFeedback {
     pub stack_depth: usize,
     pub tos: WorkspaceStateView,
     pub tos_is_peek: bool,
@@ -453,7 +453,7 @@ pub struct SessionFeedback {
 
 /// Entity-resolution evidence visible on Sage session feedback.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SessionEntityResolutionFeedback {
+pub(crate) struct SessionEntityResolutionFeedback {
     pub snapshot_hash: String,
     pub snapshot_version: u32,
     pub entity_count: usize,
@@ -468,7 +468,7 @@ pub struct SessionEntityResolutionFeedback {
 
 /// One mention resolved by the Sage entity-linking service.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SessionEntityMentionFeedback {
+pub(crate) struct SessionEntityMentionFeedback {
     pub span: (usize, usize),
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -480,7 +480,7 @@ pub struct SessionEntityMentionFeedback {
 
 /// One candidate considered during entity resolution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SessionEntityCandidateFeedback {
+pub(crate) struct SessionEntityCandidateFeedback {
     pub entity_id: Uuid,
     pub entity_kind: String,
     pub canonical_name: String,
@@ -553,7 +553,7 @@ impl From<&ob_poc_entity_linking::EntityCandidate> for SessionEntityCandidateFee
 
 /// Semantic IR frame used before deterministic or probabilistic resolution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct UtteranceFrame {
+pub(crate) struct UtteranceFrame {
     pub action_phrase: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_workspace_hint: Option<WorkspaceKind>,
@@ -574,7 +574,7 @@ impl UtteranceFrame {
     /// let frame = UtteranceFrame::from_message("show me the current KYC case");
     /// assert_eq!(frame.conversation_mode, ConversationMode::Inspect);
     /// ```
-    pub fn from_message(message: &str) -> Self {
+    pub(crate) fn from_message(message: &str) -> Self {
         let normalized = message.trim().to_lowercase();
         Self {
             action_phrase: normalized.clone(),
@@ -590,7 +590,7 @@ impl UtteranceFrame {
 /// High-level conversational mode used to select stack operations.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ConversationMode {
+pub(crate) enum ConversationMode {
     #[default]
     Inspect,
     Navigate,
@@ -610,7 +610,7 @@ impl ConversationMode {
     ///
     /// assert_eq!(ConversationMode::classify("compare this cbu with that one"), ConversationMode::Compare);
     /// ```
-    pub fn classify(message: &str) -> Self {
+    pub(crate) fn classify(message: &str) -> Self {
         let msg = message.trim().to_lowercase();
         if matches!(msg.as_str(), "yes" | "confirm" | "approved" | "do it") {
             return Self::Confirm;
@@ -652,7 +652,7 @@ impl ConversationMode {
 /// Scope cue used in utterance decomposition.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ScopeCue {
+pub(crate) enum ScopeCue {
     Here,
     There,
     Across,
@@ -668,7 +668,7 @@ impl ScopeCue {
     ///
     /// assert_eq!(ScopeCue::classify("show me this cbu"), ScopeCue::Here);
     /// ```
-    pub fn classify(message: &str) -> Self {
+    pub(crate) fn classify(message: &str) -> Self {
         let msg = message.to_lowercase();
         if msg.contains("across") || msg.contains("compare") {
             return Self::Across;
@@ -686,7 +686,7 @@ impl ScopeCue {
 /// Temporal cue used in utterance decomposition.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum TemporalCue {
+pub(crate) enum TemporalCue {
     Now,
     Before,
     Back,
@@ -702,7 +702,7 @@ impl TemporalCue {
     ///
     /// assert_eq!(TemporalCue::classify("go back to the deal"), TemporalCue::Back);
     /// ```
-    pub fn classify(message: &str) -> Self {
+    pub(crate) fn classify(message: &str) -> Self {
         let msg = message.to_lowercase();
         if msg.contains("go back") || msg == "back" || msg.contains("return") {
             return Self::Back;
@@ -736,7 +736,7 @@ fn extract_subject_hint(message: &str) -> Option<String> {
 
 /// A candidate verb for clarification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbCandidate {
+pub(crate) struct VerbCandidate {
     pub verb_fqn: String,
     pub description: String,
     pub score: f32,
@@ -744,7 +744,7 @@ pub struct VerbCandidate {
 
 /// Progress of runbook execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionProgress {
+pub(crate) struct ExecutionProgress {
     pub total_steps: usize,
     pub completed_steps: usize,
     pub failed_steps: usize,
@@ -754,7 +754,7 @@ pub struct ExecutionProgress {
 }
 
 impl ExecutionProgress {
-    pub fn new(total_steps: usize) -> Self {
+    pub(crate) fn new(total_steps: usize) -> Self {
         Self {
             total_steps,
             completed_steps: 0,

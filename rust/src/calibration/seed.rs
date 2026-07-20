@@ -121,7 +121,7 @@ pub async fn build_scenario_seed(
 /// let signature = compute_situation_signature("cbu", "ACTIVE", &[("kyc".into(), "OPEN".into())]);
 /// assert_eq!(signature, "cbu:ACTIVE|kyc:OPEN");
 /// ```
-pub fn compute_situation_signature(
+pub(crate) fn compute_situation_signature(
     entity_type: &str,
     entity_state: &str,
     linked: &[(String, String)],
@@ -142,7 +142,7 @@ pub fn compute_situation_signature(
 ///
 /// assert_eq!(derive_operational_phase("cbu:ACTIVE|kyc:OPEN"), "KYCBlocked");
 /// ```
-pub fn derive_operational_phase(signature: &str) -> String {
+pub(crate) fn derive_operational_phase(signature: &str) -> String {
     if signature.contains("cbu:DRAFT") || signature.contains("cbu:DISCOVERED") {
         "EarlyOnboarding".to_string()
     } else if signature.contains("kyc:OPEN") && signature.contains("cbu:ACTIVE") {

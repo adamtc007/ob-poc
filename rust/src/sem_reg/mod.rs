@@ -87,7 +87,8 @@ pub mod projections;
 pub mod stewardship;
 
 // Re-export core types at module boundary
-pub use gates::{check_evidence_proof_rule, evaluate_publish_gates, GateResult, PublishGateResult};
+pub use gates::{evaluate_publish_gates};
+pub(crate) use gates::{check_evidence_proof_rule, GateResult, PublishGateResult};
 pub use sem_os_core::types::EvidenceGrade;
 pub use store::SnapshotStore;
 pub use types::{
@@ -117,34 +118,29 @@ pub use observation_def::ObservationDefBody;
 pub use policy_rule::PolicyRuleBody;
 pub use proof_obligation_def::{ProofObligationDefBody, ProofStrength};
 pub use requirement_profile_def::RequirementProfileDefBody;
-pub use security::{compute_inherited_label, validate_verb_security_compatibility};
+pub(crate) use security::{compute_inherited_label, validate_verb_security_compatibility};
 
 // Re-export Phase 5-6 types
-pub use derivation::{DerivationFunctionRegistry, DerivationResult};
-pub use gates::{
-    evaluate_all_publish_gates, ExtendedGateContext, ExtendedPublishGateResult, GateFailure,
-    GateMode, GateSeverity, UnifiedPublishGateResult,
-};
-pub use registry::PublishOutcome;
+pub(crate) use derivation::{DerivationFunctionRegistry, DerivationResult};
+pub use gates::{GateMode, GateSeverity};
+pub(crate) use gates::{evaluate_all_publish_gates, ExtendedGateContext, ExtendedPublishGateResult, GateFailure, UnifiedPublishGateResult};
+pub(crate) use registry::PublishOutcome;
 
 // Re-export Phase 8 types
-pub use agent::{
-    all_tool_specs, dispatch_tool, AgentPlan, AgentPlanStatus, DecisionRecord, DecisionStore,
-    PlanStep, PlanStepStatus, PlanStore, SemRegToolContext, SemRegToolResult,
-};
+pub use agent::{all_tool_specs, dispatch_tool};
+pub(crate) use agent::{AgentPlan, AgentPlanStatus, DecisionRecord, DecisionStore, PlanStep, PlanStepStatus, PlanStore, SemRegToolContext, SemRegToolResult};
 
 // Re-export onboarding pipeline types
-pub use onboarding::{OnboardingPipeline, OnboardingRequest, OnboardingResult, StepResult};
+pub use onboarding::{StepResult};
+pub(crate) use onboarding::{OnboardingPipeline, OnboardingRequest, OnboardingResult};
 
 // Re-export evidence instance types
-pub use evidence_instances::{
+pub(crate) use evidence_instances::{
     ArchiveAction, DocumentInstance, DocumentInstanceStatus,
     EvidenceGrade as EvidenceInstanceGrade, EvidenceInstanceStore, Observation, ProvenanceEdge,
     ProvenanceEdgeClass, RetentionPolicy,
 };
 
 // Re-export Phase 9 types
-pub use projections::{
-    CoverageReport, DerivationEdge, EmbeddingRecord, EmbeddingStore, LineageDirection,
-    LineageStore, MetricsStore, RunRecord, SemanticText, TierDistribution,
-};
+pub use projections::{CoverageReport, MetricsStore};
+pub(crate) use projections::{DerivationEdge, EmbeddingRecord, EmbeddingStore, LineageDirection, LineageStore, RunRecord, SemanticText, TierDistribution};

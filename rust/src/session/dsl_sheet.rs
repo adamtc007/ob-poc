@@ -60,7 +60,7 @@ use uuid::Uuid;
 
 /// A batch of DSL statements to execute together
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslSheet {
+pub(crate) struct DslSheet {
     /// Unique sheet ID
     pub id: Uuid,
 
@@ -82,7 +82,7 @@ pub struct DslSheet {
 
 impl DslSheet {
     /// Create a new empty sheet
-    pub fn new(session_id: Uuid) -> Self {
+    pub(crate) fn new(session_id: Uuid) -> Self {
         Self {
             id: Uuid::new_v4(),
             session_id,
@@ -94,7 +94,7 @@ impl DslSheet {
     }
 
     /// Create sheet with statements
-    pub fn with_statements(session_id: Uuid, statements: Vec<SessionDslStatement>) -> Self {
+    pub(crate) fn with_statements(session_id: Uuid, statements: Vec<SessionDslStatement>) -> Self {
         Self {
             id: Uuid::new_v4(),
             session_id,
@@ -106,17 +106,17 @@ impl DslSheet {
     }
 
     /// Get statement count
-    pub fn statement_count(&self) -> usize {
+    pub(crate) fn statement_count(&self) -> usize {
         self.statements.len()
     }
 
     /// Get phase count
-    pub fn phase_count(&self) -> usize {
+    pub(crate) fn phase_count(&self) -> usize {
         self.phases.len()
     }
 
     /// Check if all statements are resolved (no unresolved symbols)
-    pub fn is_fully_resolved(&self) -> bool {
+    pub(crate) fn is_fully_resolved(&self) -> bool {
         self.statements.iter().all(|s| {
             matches!(
                 s.status,
@@ -126,7 +126,7 @@ impl DslSheet {
     }
 
     /// Get statements that need resolution
-    pub fn unresolved_statements(&self) -> Vec<(usize, &SessionDslStatement)> {
+    pub(crate) fn unresolved_statements(&self) -> Vec<(usize, &SessionDslStatement)> {
         self.statements
             .iter()
             .enumerate()
@@ -135,7 +135,7 @@ impl DslSheet {
     }
 
     /// Get count of unresolved statements
-    pub fn unresolved_count(&self) -> usize {
+    pub(crate) fn unresolved_count(&self) -> usize {
         self.statements
             .iter()
             .filter(|s| matches!(s.status, StatementStatus::Parsed))
@@ -149,7 +149,7 @@ impl DslSheet {
 
 /// A single DSL statement within a sheet
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionDslStatement {
+pub(crate) struct SessionDslStatement {
     /// Index in the original submission order
     pub index: usize,
 
@@ -177,7 +177,7 @@ pub struct SessionDslStatement {
 
 impl SessionDslStatement {
     /// Create a new pending statement
-    pub fn new(index: usize, source: String) -> Self {
+    pub(crate) fn new(index: usize, source: String) -> Self {
         Self {
             index,
             source,
@@ -191,12 +191,12 @@ impl SessionDslStatement {
     }
 
     /// Check if statement is ready for execution
-    pub fn is_ready(&self) -> bool {
+    pub(crate) fn is_ready(&self) -> bool {
         matches!(self.status, StatementStatus::Resolved)
     }
 
     /// Check if statement has completed (success or failure)
-    pub fn is_complete(&self) -> bool {
+    pub(crate) fn is_complete(&self) -> bool {
         matches!(
             self.status,
             StatementStatus::Success
@@ -206,7 +206,7 @@ impl SessionDslStatement {
     }
 
     /// Get the fully resolved source (symbols replaced with UUIDs)
-    pub fn resolved_source(&self) -> Result<String, String> {
+    pub(crate) fn resolved_source(&self) -> Result<String, String> {
         let mut result = self.source.clone();
         for (symbol, uuid) in &self.resolved_args {
             let pattern = format!("@{}", symbol);
@@ -230,7 +230,7 @@ impl SessionDslStatement {
 
 /// Status of a statement in the execution pipeline
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum StatementStatus {
+pub(crate) enum StatementStatus {
     /// Not yet processed
     Pending,
 
@@ -263,7 +263,7 @@ pub enum StatementStatus {
 
 impl StatementStatus {
     /// Create a failed status
-    pub fn failed(error: impl Into<String>, code: ErrorCode) -> Self {
+    pub(crate) fn failed(error: impl Into<String>, code: ErrorCode) -> Self {
         Self::Failed {
             error: error.into(),
             code,
@@ -271,12 +271,12 @@ impl StatementStatus {
     }
 
     /// Create a skipped status
-    pub fn skipped(blocked_by: usize) -> Self {
+    pub(crate) fn skipped(blocked_by: usize) -> Self {
         Self::Skipped { blocked_by }
     }
 
     /// Check if this is a terminal status (no further transitions)
-    pub fn is_terminal(&self) -> bool {
+    pub(crate) fn is_terminal(&self) -> bool {
         matches!(
             self,
             Self::Success | Self::Failed { .. } | Self::Skipped { .. }
@@ -290,7 +290,7 @@ impl StatementStatus {
 
 /// A group of statements that can be executed in parallel (same DAG depth)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionPhase {
+pub(crate) struct ExecutionPhase {
     /// Phase depth (0 = first phase, no dependencies)
     pub depth: usize,
 
@@ -306,7 +306,7 @@ pub struct ExecutionPhase {
 
 impl ExecutionPhase {
     /// Create a new empty phase
-    pub fn new(depth: usize) -> Self {
+    pub(crate) fn new(depth: usize) -> Self {
         Self {
             depth,
             statement_indices: Vec::new(),
@@ -316,7 +316,7 @@ impl ExecutionPhase {
     }
 
     /// Get count of statements in this phase
-    pub fn statement_count(&self) -> usize {
+    pub(crate) fn statement_count(&self) -> usize {
         self.statement_indices.len()
     }
 }
@@ -327,7 +327,7 @@ impl ExecutionPhase {
 
 /// Result of parsing/validating a sheet
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationResult {
+pub(crate) struct ValidationResult {
     /// Whether validation passed
     pub valid: bool,
 
@@ -346,7 +346,7 @@ pub struct ValidationResult {
 
 impl ValidationResult {
     /// Create a successful validation result
-    pub fn success() -> Self {
+    pub(crate) fn success() -> Self {
         Self {
             valid: true,
             syntax_errors: Vec::new(),
@@ -357,7 +357,7 @@ impl ValidationResult {
     }
 
     /// Create a failed validation result
-    pub fn failed(errors: Vec<ValidationError>) -> Self {
+    pub(crate) fn failed(errors: Vec<ValidationError>) -> Self {
         Self {
             valid: false,
             syntax_errors: errors,
@@ -368,14 +368,14 @@ impl ValidationResult {
     }
 
     /// Check if there are any blocking issues
-    pub fn has_blocking_issues(&self) -> bool {
+    pub(crate) fn has_blocking_issues(&self) -> bool {
         !self.valid || !self.cyclic_dependencies.is_empty()
     }
 }
 
 /// A syntax or semantic error in validation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationError {
+pub(crate) struct ValidationError {
     /// Statement index
     pub statement_index: usize,
 
@@ -391,7 +391,7 @@ pub struct ValidationError {
 
 /// A warning (non-blocking)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationWarning {
+pub(crate) struct ValidationWarning {
     /// Statement index
     pub statement_index: usize,
 
@@ -404,7 +404,7 @@ pub struct ValidationWarning {
 
 /// An unresolved entity reference needing user input
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnresolvedReference {
+pub(crate) struct UnresolvedReference {
     /// Statement index
     pub statement_index: usize,
 
@@ -420,7 +420,7 @@ pub struct UnresolvedReference {
 
 /// A candidate entity match for resolution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityCandidate {
+pub(crate) struct EntityCandidate {
     /// Entity ID
     pub entity_id: Uuid,
 
@@ -436,7 +436,7 @@ pub struct EntityCandidate {
 
 /// Cyclic dependency detected
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CyclicDependency {
+pub(crate) struct CyclicDependency {
     /// Statements involved in the cycle
     pub statement_indices: Vec<usize>,
 
@@ -446,7 +446,7 @@ pub struct CyclicDependency {
 
 /// Source span for error highlighting
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SourceSpan {
+pub(crate) struct SourceSpan {
     /// Line number (1-indexed)
     pub line: usize,
 
@@ -463,7 +463,7 @@ pub struct SourceSpan {
 
 /// Categorized error codes for DSL execution
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum ErrorCode {
+pub(crate) enum ErrorCode {
     // Syntax errors
     SyntaxError,
     InvalidVerb,
@@ -518,7 +518,7 @@ impl std::fmt::Display for ErrorCode {
 
 /// Result of executing a sheet
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SheetExecutionResult {
+pub(crate) struct SheetExecutionResult {
     /// Session ID
     pub session_id: Uuid,
 
@@ -549,7 +549,7 @@ pub struct SheetExecutionResult {
 
 impl SheetExecutionResult {
     /// Get count of successful statements
-    pub fn success_count(&self) -> usize {
+    pub(crate) fn success_count(&self) -> usize {
         self.statements
             .iter()
             .filter(|s| s.status == StatementStatus::Success)
@@ -557,7 +557,7 @@ impl SheetExecutionResult {
     }
 
     /// Get count of failed statements
-    pub fn failed_count(&self) -> usize {
+    pub(crate) fn failed_count(&self) -> usize {
         self.statements
             .iter()
             .filter(|s| matches!(s.status, StatementStatus::Failed { .. }))
@@ -565,7 +565,7 @@ impl SheetExecutionResult {
     }
 
     /// Get count of skipped statements
-    pub fn skipped_count(&self) -> usize {
+    pub(crate) fn skipped_count(&self) -> usize {
         self.statements
             .iter()
             .filter(|s| matches!(s.status, StatementStatus::Skipped { .. }))
@@ -573,14 +573,14 @@ impl SheetExecutionResult {
     }
 
     /// Check if execution was successful
-    pub fn is_success(&self) -> bool {
+    pub(crate) fn is_success(&self) -> bool {
         self.overall_status == SheetStatus::Success
     }
 }
 
 /// Overall sheet execution status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum SheetStatus {
+pub(crate) enum SheetStatus {
     /// All statements executed successfully
     Success,
 
@@ -593,7 +593,7 @@ pub enum SheetStatus {
 
 impl SheetStatus {
     /// Get status as string for database storage
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Success => "success",
             Self::Failed => "failed",
@@ -604,7 +604,7 @@ impl SheetStatus {
 
 /// Per-statement execution result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatementResult {
+pub(crate) struct StatementResult {
     /// Statement index
     pub index: usize,
 
@@ -632,7 +632,7 @@ pub struct StatementResult {
 
 /// Detailed error information
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatementError {
+pub(crate) struct StatementError {
     /// Error code
     pub code: ErrorCode,
 

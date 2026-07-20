@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 /// CBU context row from database
 #[derive(Debug, Clone)]
-pub struct CbuContextRow {
+pub(crate) struct CbuContextRow {
     pub id: Uuid,
     pub name: String,
     pub jurisdiction: Option<String>,
@@ -25,7 +25,7 @@ pub struct CbuContextRow {
 
 /// Linked context row from database
 #[derive(Debug, Clone)]
-pub struct LinkedContextRow {
+pub(crate) struct LinkedContextRow {
     pub id: Uuid,
     pub context_type: String,
     pub label: String,
@@ -39,12 +39,12 @@ pub struct LinkedContextRow {
 // ============================================================================
 
 /// Context discovery service for surfacing linked contexts
-pub struct ContextDiscoveryService {
+pub(crate) struct ContextDiscoveryService {
     pool: PgPool,
 }
 
 impl ContextDiscoveryService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -55,7 +55,7 @@ impl ContextDiscoveryService {
     /// - Trading profiles
     /// - ISDA agreements
     /// - Product subscriptions
-    pub async fn discover_for_cbu(&self, cbu_id: Uuid) -> Result<DiscoveredContext, sqlx::Error> {
+    pub(crate) async fn discover_for_cbu(&self, cbu_id: Uuid) -> Result<DiscoveredContext, sqlx::Error> {
         // Get CBU details with counts
         let cbu = self.get_cbu_context(cbu_id).await?;
 
@@ -283,7 +283,7 @@ impl ContextDiscoveryService {
 /// Intermediate type holding discovered context data
 /// This is converted to ob_poc_types::SessionContext at the API layer
 #[derive(Debug, Clone, Default)]
-pub struct DiscoveredContext {
+pub(crate) struct DiscoveredContext {
     pub cbu: Option<CbuContextRow>,
     pub kyc_cases: Vec<LinkedContextRow>,
     pub trading_profile: Option<LinkedContextRow>,
@@ -292,12 +292,12 @@ pub struct DiscoveredContext {
 }
 
 impl DiscoveredContext {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self::default()
     }
 
     /// Check if any context was discovered
-    pub fn has_context(&self) -> bool {
+    pub(crate) fn has_context(&self) -> bool {
         self.cbu.is_some()
     }
 }

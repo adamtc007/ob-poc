@@ -25,7 +25,7 @@ use crate::sem_os_runtime::constellation_runtime::{
 
 /// Application state for constellation routes.
 #[derive(Clone)]
-pub struct ConstellationAppState {
+pub(crate) struct ConstellationAppState {
     pub pool: PgPool,
 }
 
@@ -38,7 +38,7 @@ struct ConstellationQuery {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct HydrateContextQuery {
+pub(crate) struct HydrateContextQuery {
     pub session_id: Uuid,
     pub client_group_id: Uuid,
     pub workspace: WorkspaceKind,

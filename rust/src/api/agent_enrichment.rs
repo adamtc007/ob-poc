@@ -19,7 +19,7 @@ use crate::repl::response_v2::ReplResponseV2;
 /// Returns `None` if the response doesn't carry session feedback with a
 /// hydrated constellation (e.g., during tollgate states before workspace selection).
 /// In that case the caller should fall back to `compute_onboarding_state_from_db`.
-pub fn try_onboarding_from_repl_response(
+pub(crate) fn try_onboarding_from_repl_response(
     response: &ReplResponseV2,
     group_name: Option<&str>,
 ) -> Option<ob_poc_types::onboarding_state::OnboardingStateView> {
@@ -70,10 +70,3 @@ pub async fn compute_onboarding_state_from_db(
     }
 }
 
-/// Enrichment data to merge into a ChatResponse after REPL processing.
-#[derive(Default)]
-pub struct ResponseEnrichment {
-    pub onboarding_state: Option<ob_poc_types::onboarding_state::OnboardingStateView>,
-    pub available_verbs: Option<Vec<ob_poc_types::chat::VerbProfile>>,
-    pub surface_fingerprint: Option<String>,
-}

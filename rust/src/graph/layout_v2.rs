@@ -35,7 +35,7 @@ type GraphNode = LegacyGraphNode;
 
 /// Configuration for the layout engine, can come from database or defaults
 #[derive(Debug, Clone)]
-pub struct LayoutConfigV2 {
+pub(crate) struct LayoutConfigV2 {
     /// Horizontal spacing between nodes in same tier
     pub node_spacing_x: f32,
     /// Vertical spacing between tiers
@@ -71,7 +71,7 @@ impl Default for LayoutConfigV2 {
 
 /// Edge configuration for layout purposes
 #[derive(Debug, Clone)]
-pub struct EdgeLayoutConfig {
+pub(crate) struct EdgeLayoutConfig {
     /// Type code (e.g., "Owns", "HasRole")
     pub type_code: String,
     /// Whether this edge defines parent-child hierarchy for layout
@@ -149,13 +149,13 @@ struct LayoutEdge {
 
 /// Result of layout computation with back-edge info
 #[derive(Debug, Clone, Default)]
-pub struct LayoutResult {
+pub(crate) struct LayoutResult {
     /// Indices of edges that are back-edges (create cycles)
     pub back_edge_indices: Vec<usize>,
 }
 
 /// Config-driven layout engine
-pub struct LayoutEngineV2 {
+pub(crate) struct LayoutEngineV2 {
     config: LayoutConfigV2,
     /// Edge type configurations keyed by type_code
     edge_configs: HashMap<String, EdgeLayoutConfig>,
@@ -166,7 +166,7 @@ pub struct LayoutEngineV2 {
 
 impl LayoutEngineV2 {
     /// Create a new layout engine with default configuration
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             config: LayoutConfigV2::default(),
             edge_configs: Self::default_edge_configs(),
@@ -175,7 +175,7 @@ impl LayoutEngineV2 {
     }
 
     /// Create with custom layout configuration
-    pub fn with_config(config: LayoutConfigV2) -> Self {
+    pub(crate) fn with_config(config: LayoutConfigV2) -> Self {
         Self {
             config,
             edge_configs: Self::default_edge_configs(),
@@ -185,7 +185,7 @@ impl LayoutEngineV2 {
 
     /// Create from database configuration
     #[cfg(feature = "database")]
-    pub async fn from_database(
+    pub(crate) async fn from_database(
         pool: &sqlx::PgPool,
         view_mode: &str,
         horizontal: bool,
@@ -215,14 +215,9 @@ impl LayoutEngineV2 {
         })
     }
 
-    /// Set edge configurations (for testing or non-database use)
-    pub fn with_edge_configs(mut self, configs: HashMap<String, EdgeLayoutConfig>) -> Self {
-        self.edge_configs = configs;
-        self
-    }
 
     /// Set horizontal layout mode
-    pub fn horizontal(mut self, horizontal: bool) -> Self {
+    pub(crate) fn horizontal(mut self, horizontal: bool) -> Self {
         self.config.horizontal = horizontal;
         self
     }
@@ -306,7 +301,7 @@ impl LayoutEngineV2 {
 
     /// Apply layout to graph, computing x,y positions for all nodes
     /// Returns layout result with back-edge information
-    pub fn layout(&self, graph: &mut CbuGraph) -> LayoutResult {
+    pub(crate) fn layout(&self, graph: &mut CbuGraph) -> LayoutResult {
         let mut result = LayoutResult::default();
 
         if graph.nodes.is_empty() {

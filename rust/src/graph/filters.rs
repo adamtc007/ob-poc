@@ -27,7 +27,7 @@ use super::types::{
 // =============================================================================
 
 /// Extension trait for filter operations on EntityGraph
-pub trait GraphFilterOps {
+pub(crate) trait GraphFilterOps {
     /// Check if an ownership edge passes current filters
     fn edge_visible_ownership(&self, edge: &OwnershipEdge) -> bool;
 
@@ -333,7 +333,7 @@ impl EntityGraph {
 
 /// Builder for constructing GraphFilters
 #[derive(Debug, Clone, Default)]
-pub struct FilterBuilder {
+pub(crate) struct FilterBuilder {
     prong: ProngFilter,
     jurisdictions: Option<Vec<String>>,
     fund_types: Option<Vec<String>>,
@@ -346,73 +346,69 @@ pub struct FilterBuilder {
 }
 
 impl FilterBuilder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
-    pub fn prong(mut self, prong: ProngFilter) -> Self {
+    pub(crate) fn prong(mut self, prong: ProngFilter) -> Self {
         self.prong = prong;
         self
     }
 
-    pub fn ownership_only(mut self) -> Self {
+    pub(crate) fn ownership_only(mut self) -> Self {
         self.prong = ProngFilter::OwnershipOnly;
         self
     }
 
-    pub fn control_only(mut self) -> Self {
-        self.prong = ProngFilter::ControlOnly;
-        self
-    }
 
-    pub fn jurisdictions(mut self, jurisdictions: Vec<String>) -> Self {
+    pub(crate) fn jurisdictions(mut self, jurisdictions: Vec<String>) -> Self {
         self.jurisdictions = Some(jurisdictions);
         self
     }
 
-    pub fn add_jurisdiction(mut self, jurisdiction: String) -> Self {
+    pub(crate) fn add_jurisdiction(mut self, jurisdiction: String) -> Self {
         self.jurisdictions
             .get_or_insert_with(Vec::new)
             .push(jurisdiction);
         self
     }
 
-    pub fn fund_types(mut self, fund_types: Vec<String>) -> Self {
+    pub(crate) fn fund_types(mut self, fund_types: Vec<String>) -> Self {
         self.fund_types = Some(fund_types);
         self
     }
 
-    pub fn entity_types(mut self, entity_types: Vec<EntityType>) -> Self {
+    pub(crate) fn entity_types(mut self, entity_types: Vec<EntityType>) -> Self {
         self.entity_types = Some(entity_types);
         self
     }
 
-    pub fn as_of_date(mut self, date: NaiveDate) -> Self {
+    pub(crate) fn as_of_date(mut self, date: NaiveDate) -> Self {
         self.as_of_date = Some(date);
         self
     }
 
-    pub fn min_ownership_pct(mut self, pct: Decimal) -> Self {
+    pub(crate) fn min_ownership_pct(mut self, pct: Decimal) -> Self {
         self.min_ownership_pct = Some(pct);
         self
     }
 
-    pub fn path_only(mut self, path_only: bool) -> Self {
+    pub(crate) fn path_only(mut self, path_only: bool) -> Self {
         self.path_only = path_only;
         self
     }
 
-    pub fn same_manco(mut self, manco_id: Uuid) -> Self {
+    pub(crate) fn same_manco(mut self, manco_id: Uuid) -> Self {
         self.same_manco_id = Some(manco_id);
         self
     }
 
-    pub fn same_sicav(mut self, sicav_id: Uuid) -> Self {
+    pub(crate) fn same_sicav(mut self, sicav_id: Uuid) -> Self {
         self.same_sicav_id = Some(sicav_id);
         self
     }
 
-    pub fn build(self) -> GraphFilters {
+    pub(crate) fn build(self) -> GraphFilters {
         GraphFilters {
             prong: self.prong,
             jurisdictions: self.jurisdictions,

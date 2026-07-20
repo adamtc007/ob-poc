@@ -21,7 +21,7 @@ use std::sync::LazyLock;
 ///
 /// Returns the operator-facing label for any internal entity kind.
 /// Falls back to titlecasing the input if unknown.
-pub fn display_noun(internal_kind: &str) -> &'static str {
+pub(crate) fn display_noun(internal_kind: &str) -> &'static str {
     DISPLAY_NOUN_MAP.get(internal_kind).copied().unwrap_or(
         // Fallback: return a static "Unknown" for truly unknown types
         // In production, this should log a warning
@@ -33,7 +33,7 @@ pub fn display_noun(internal_kind: &str) -> &'static str {
 ///
 /// Like `display_noun` but returns the input as-is if not found.
 /// Useful when you want to show something rather than "Unknown".
-pub fn display_noun_or_self(internal_kind: &str) -> &str {
+pub(crate) fn display_noun_or_self(internal_kind: &str) -> &str {
     DISPLAY_NOUN_MAP
         .get(internal_kind)
         .copied()
@@ -41,12 +41,12 @@ pub fn display_noun_or_self(internal_kind: &str) -> &str {
 }
 
 /// Check if an internal kind has a display mapping
-pub fn has_display_noun(internal_kind: &str) -> bool {
+pub(crate) fn has_display_noun(internal_kind: &str) -> bool {
     DISPLAY_NOUN_MAP.contains_key(internal_kind)
 }
 
 /// Get all known internal kinds
-pub fn all_internal_kinds() -> impl Iterator<Item = &'static str> {
+pub(crate) fn all_internal_kinds() -> impl Iterator<Item = &'static str> {
     DISPLAY_NOUN_MAP.keys().copied()
 }
 
@@ -137,7 +137,7 @@ static DISPLAY_NOUN_MAP: LazyLock<HashMap<&'static str, &'static str>> = LazyLoc
 /// Forbidden tokens that should NEVER appear in operator-facing UI
 ///
 /// Used by lint rules to ensure implementation details don't leak.
-pub const FORBIDDEN_UI_TOKENS: &[&str] = &[
+pub(crate) const FORBIDDEN_UI_TOKENS: &[&str] = &[
     "cbu",
     "cbu_id",
     "cbu-id",
@@ -154,7 +154,7 @@ pub const FORBIDDEN_UI_TOKENS: &[&str] = &[
 ];
 
 /// Check if a string contains any forbidden UI tokens
-pub fn contains_forbidden_token(text: &str) -> Option<&'static str> {
+pub(crate) fn contains_forbidden_token(text: &str) -> Option<&'static str> {
     let lower = text.to_lowercase();
     FORBIDDEN_UI_TOKENS
         .iter()
@@ -163,7 +163,7 @@ pub fn contains_forbidden_token(text: &str) -> Option<&'static str> {
 }
 
 /// Pluralize a display noun
-pub fn pluralize(noun: &str) -> String {
+pub(crate) fn pluralize(noun: &str) -> String {
     match noun {
         "Person" => "People".to_string(),
         "Company" => "Companies".to_string(),

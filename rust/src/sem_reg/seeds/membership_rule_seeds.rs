@@ -25,7 +25,7 @@ const GOVERNED_VERB_DOMAINS: &[&str] = &["kyc-case", "entity-workstream"];
 
 /// Report from membership rule seeding.
 #[derive(Debug, Default)]
-pub struct MembershipRuleSeedReport {
+pub(crate) struct MembershipRuleSeedReport {
     pub membership_rules_published: usize,
     pub membership_rules_skipped: usize,
     pub membership_rules_updated: usize,

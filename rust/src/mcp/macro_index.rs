@@ -100,7 +100,7 @@ fn tokenize(s: &str) -> Vec<String> {
 
 /// Entry in the macro index, derived from macro metadata at startup.
 #[derive(Debug, Clone)]
-pub struct MacroIndexEntry {
+pub(crate) struct MacroIndexEntry {
     pub fqn: String,
     pub label: String,
     pub description: String,
@@ -117,14 +117,14 @@ pub struct MacroIndexEntry {
 
 /// Curated search overrides loaded from YAML (optional layer).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MacroSearchOverrides {
+pub(crate) struct MacroSearchOverrides {
     #[serde(default)]
     pub aliases: HashMap<String, Vec<String>>,
 }
 
 /// A matched signal contributing to the score.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MatchedSignal {
+pub(crate) struct MatchedSignal {
     pub signal: String,
     pub score: i32,
     pub detail: String,
@@ -132,7 +132,7 @@ pub struct MatchedSignal {
 
 /// Result of a gate evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GateResult {
+pub(crate) struct GateResult {
     pub gate: String,
     pub passed: bool,
     pub reason: Option<String>,
@@ -140,7 +140,7 @@ pub struct GateResult {
 
 /// Explain payload for a macro match.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MacroExplain {
+pub(crate) struct MacroExplain {
     pub matched_signals: Vec<MatchedSignal>,
     pub gates: Vec<GateResult>,
     pub score_total: i32,
@@ -149,7 +149,7 @@ pub struct MacroExplain {
 
 /// A single macro match with score and explain.
 #[derive(Debug, Clone)]
-pub struct MacroMatch {
+pub(crate) struct MacroMatch {
     pub fqn: String,
     pub score: i32,
     pub explain: MacroExplain,
@@ -157,7 +157,7 @@ pub struct MacroMatch {
 
 /// Result of `MacroIndex::resolve()`.
 #[derive(Debug, Clone)]
-pub enum MacroResolveOutcome {
+pub(crate) enum MacroResolveOutcome {
     /// Clear winner (top score passes gates, no disambiguation needed).
     Matched(MacroMatch),
     /// Multiple candidates within disambiguation band.

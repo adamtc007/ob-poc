@@ -25,7 +25,7 @@ use uuid::Uuid;
 
 /// Error type for DSL save operations with optimistic locking support
 #[derive(Debug, Error)]
-pub enum DslSaveError {
+pub(crate) enum DslSaveError {
     /// Version conflict - another session modified the data
     #[error("Version conflict for '{business_reference}': expected version {expected}, found {actual}. Another session has modified this data. Please refresh and retry.")]
     VersionConflict {
@@ -41,7 +41,7 @@ pub enum DslSaveError {
 
 /// Result of saving a DSL instance
 #[derive(Debug, Clone)]
-pub struct DslSaveResult {
+pub(crate) struct DslSaveResult {
     pub instance_id: Uuid,
     pub version: i32,
     pub business_reference: String,
@@ -50,7 +50,7 @@ pub struct DslSaveResult {
 
 /// DSL Instance row - matches canonical DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DslInstanceRow {
+pub(crate) struct DslInstanceRow {
     pub instance_id: Uuid,
     pub domain_name: String,
     pub business_reference: String,
@@ -62,7 +62,7 @@ pub struct DslInstanceRow {
 
 /// DSL Instance Version row - matches canonical DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct DslInstanceVersionRow {
+pub(crate) struct DslInstanceVersionRow {
     pub version_id: Uuid,
     pub instance_id: Uuid,
     pub version_number: i32,
@@ -94,7 +94,7 @@ pub mod compilation_status {
 
 /// Data for DSL visualization - used by DSL Viewer UI
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslDisplayData {
+pub(crate) struct DslDisplayData {
     pub instance_id: Uuid,
     pub business_reference: String,
     pub domain_name: String,
@@ -110,7 +110,7 @@ pub struct DslDisplayData {
 
 /// Summary for listing DSL instances in the viewer UI
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslInstanceSummary {
+pub(crate) struct DslInstanceSummary {
     pub instance_id: Uuid,
     pub business_reference: String,
     pub domain_name: String,
@@ -120,18 +120,18 @@ pub struct DslInstanceSummary {
 }
 
 /// DSL Repository for database operations
-pub struct DslRepository {
+pub(crate) struct DslRepository {
     pool: PgPool,
 }
 
 impl DslRepository {
     /// Create a new DSL repository
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the pool reference
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -144,7 +144,7 @@ impl DslRepository {
     ///
     /// When updating an existing instance with `expected_version`, this performs
     /// a double-check in the UPDATE statement to prevent race conditions.
-    pub async fn save_dsl_instance(
+    pub(crate) async fn save_dsl_instance(
         &self,
         business_reference: &str,
         domain_name: &str,
@@ -253,7 +253,7 @@ impl DslRepository {
 
     /// Save DSL instance without optimistic locking (legacy compatibility)
     /// Use `save_dsl_instance` with `expected_version` for new code
-    pub async fn save_dsl_instance_unchecked(
+    pub(crate) async fn save_dsl_instance_unchecked(
         &self,
         business_reference: &str,
         domain_name: &str,
@@ -275,7 +275,7 @@ impl DslRepository {
     /// Save DSL execution (simplified interface)
     /// Note: This uses unchecked save (no optimistic locking) for backward compatibility
     /// For optimistic locking, use `save_execution_checked` instead
-    pub async fn save_execution(
+    pub(crate) async fn save_execution(
         &self,
         dsl_content: &str,
         domain: &str,
@@ -301,7 +301,7 @@ impl DslRepository {
     /// # Returns
     /// * `Ok(DslSaveResult)` - Success with new version number
     /// * `Err(DslSaveError::VersionConflict)` - Another session modified the data
-    pub async fn save_execution_checked(
+    pub(crate) async fn save_execution_checked(
         &self,
         dsl_content: &str,
         domain: &str,
@@ -322,7 +322,7 @@ impl DslRepository {
     }
 
     /// Get DSL instance by business_reference
-    pub async fn get_instance_by_reference(
+    pub(crate) async fn get_instance_by_reference(
         &self,
         business_reference: &str,
     ) -> Result<Option<DslInstanceRow>, sqlx::Error> {
@@ -338,103 +338,13 @@ impl DslRepository {
         .await
     }
 
-    /// Get DSL instance by instance_id
-    pub async fn get_instance_by_id(
-        &self,
-        instance_id: Uuid,
-    ) -> Result<Option<DslInstanceRow>, sqlx::Error> {
-        sqlx::query_as::<_, DslInstanceRow>(
-            r#"
-            SELECT instance_id, domain_name, business_reference, current_version, status, created_at, updated_at
-            FROM "ob-poc".dsl_instances
-            WHERE instance_id = $1
-            "#,
-        )
-        .bind(instance_id)
-        .fetch_optional(&self.pool)
-        .await
-    }
 
-    /// Get DSL content by instance ID (latest version)
-    pub async fn get_dsl_content(&self, instance_id: Uuid) -> Result<Option<String>, sqlx::Error> {
-        let result = sqlx::query_as::<_, (String,)>(
-            r#"
-            SELECT v.dsl_content
-            FROM "ob-poc".dsl_instance_versions v
-            WHERE v.instance_id = $1
-            ORDER BY v.version_number DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(instance_id)
-        .fetch_optional(&self.pool)
-        .await?;
 
-        Ok(result.map(|(content,)| content))
-    }
 
-    /// Load latest DSL for a business_reference
-    pub async fn load_dsl(
-        &self,
-        business_reference: &str,
-    ) -> Result<Option<(String, i32)>, sqlx::Error> {
-        let result = sqlx::query_as::<_, (String, i32)>(
-            r#"
-            SELECT v.dsl_content, v.version_number
-            FROM "ob-poc".dsl_instance_versions v
-            JOIN "ob-poc".dsl_instances i ON i.instance_id = v.instance_id
-            WHERE i.business_reference = $1
-            ORDER BY v.version_number DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(business_reference)
-        .fetch_optional(&self.pool)
-        .await?;
 
-        Ok(result)
-    }
-
-    /// Load latest AST for a business_reference
-    pub async fn load_ast(
-        &self,
-        business_reference: &str,
-    ) -> Result<Option<serde_json::Value>, sqlx::Error> {
-        let result = sqlx::query_as::<_, (serde_json::Value,)>(
-            r#"
-            SELECT v.ast_json
-            FROM "ob-poc".dsl_instance_versions v
-            JOIN "ob-poc".dsl_instances i ON i.instance_id = v.instance_id
-            WHERE i.business_reference = $1 AND v.ast_json IS NOT NULL
-            ORDER BY v.version_number DESC
-            LIMIT 1
-            "#,
-        )
-        .bind(business_reference)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(result.map(|(ast,)| ast))
-    }
-
-    /// Get version count for a business_reference
-    pub async fn get_version_count(&self, business_reference: &str) -> Result<i32, sqlx::Error> {
-        let result: Option<(i32,)> = sqlx::query_as(
-            r#"
-            SELECT current_version
-            FROM "ob-poc".dsl_instances
-            WHERE business_reference = $1
-            "#,
-        )
-        .bind(business_reference)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(result.map(|(v,)| v).unwrap_or(0))
-    }
 
     /// Get all versions for a business_reference
-    pub async fn get_all_versions(
+    pub(crate) async fn get_all_versions(
         &self,
         business_reference: &str,
     ) -> Result<Vec<DslInstanceVersionRow>, sqlx::Error> {
@@ -454,7 +364,7 @@ impl DslRepository {
     }
 
     /// Update instance status
-    pub async fn update_status(
+    pub(crate) async fn update_status(
         &self,
         instance_id: Uuid,
         status: &str,
@@ -475,7 +385,7 @@ impl DslRepository {
     }
 
     /// List instances by domain
-    pub async fn list_by_domain(
+    pub(crate) async fn list_by_domain(
         &self,
         domain_name: &str,
         limit: Option<i32>,
@@ -497,7 +407,7 @@ impl DslRepository {
 
     /// Get DSL for display/visualization
     /// If version is None, returns latest version
-    pub async fn get_dsl_for_display(
+    pub(crate) async fn get_dsl_for_display(
         &self,
         business_reference: &str,
         version: Option<i32>,
@@ -570,7 +480,7 @@ impl DslRepository {
     }
 
     /// List all DSL instances for the viewer UI
-    pub async fn list_instances_for_display(
+    pub(crate) async fn list_instances_for_display(
         &self,
         limit: Option<i32>,
         domain_filter: Option<&str>,

@@ -13,7 +13,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[async_trait]
-pub trait SinkExecutor: Send + Sync {
+pub(crate) trait SinkExecutor: Send + Sync {
     async fn persist_value(
         &self,
         attribute_id: &AttributeId,
@@ -27,25 +27,13 @@ pub trait SinkExecutor: Send + Sync {
 ///
 /// Direct database writes have been removed. Use `typed-attribute.record`
 /// verb instead.
-pub struct CompositeSinkExecutor {
+pub(crate) struct CompositeSinkExecutor {
     _pool: PgPool,
 }
 
 impl CompositeSinkExecutor {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { _pool: pool }
     }
 
-    pub async fn persist_to_all_sinks(
-        &self,
-        _attribute_id: &AttributeId,
-        _value: &Value,
-        _definition: &DbAttributeDefinition,
-        _entity_id: Uuid,
-    ) -> Result<(), String> {
-        Err(
-            "Direct sink writes are deprecated. Use the typed-attribute.record DSL verb instead."
-                .into(),
-        )
-    }
 }

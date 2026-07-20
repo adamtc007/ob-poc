@@ -3,7 +3,7 @@
 use sha2::{Digest, Sha256};
 
 /// Normalize an utterance for stable hashing: lowercase, trim, collapse whitespace.
-pub fn normalize_utterance(s: &str) -> String {
+pub(crate) fn normalize_utterance(s: &str) -> String {
     s.split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
@@ -11,14 +11,14 @@ pub fn normalize_utterance(s: &str) -> String {
 }
 
 /// SHA-256 hex hash of a normalized utterance.
-pub fn utterance_hash(normalized: &str) -> String {
+pub(crate) fn utterance_hash(normalized: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(normalized.as_bytes());
     hex::encode(hasher.finalize())
 }
 
 /// Produce a redacted preview: max 80 chars, no PII masking beyond truncation.
-pub fn preview_redacted(raw: &str) -> Option<String> {
+pub(crate) fn preview_redacted(raw: &str) -> Option<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return None;

@@ -14,13 +14,13 @@ use crate::dsl_v2::ExpansionReport;
 
 /// Repository for persisting expansion audit trails
 #[derive(Clone)]
-pub struct ExpansionAuditRepository {
+pub(crate) struct ExpansionAuditRepository {
     pool: PgPool,
 }
 
 impl ExpansionAuditRepository {
     /// Create a new repository
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -28,7 +28,7 @@ impl ExpansionAuditRepository {
     ///
     /// This is called after DSL expansion to create an audit trail.
     /// The report contains all information needed to reproduce the expansion.
-    pub async fn save(
+    pub(crate) async fn save(
         &self,
         session_id: Uuid,
         report: &ExpansionReport,
@@ -98,7 +98,7 @@ impl ExpansionAuditRepository {
     }
 
     /// Get an expansion report by ID
-    pub async fn get(&self, expansion_id: Uuid) -> Result<Option<ExpansionReportRow>, sqlx::Error> {
+    pub(crate) async fn get(&self, expansion_id: Uuid) -> Result<Option<ExpansionReportRow>, sqlx::Error> {
         sqlx::query_as::<_, ExpansionReportRow>(
             r#"
             SELECT
@@ -124,7 +124,7 @@ impl ExpansionAuditRepository {
     }
 
     /// List recent expansion reports for a session
-    pub async fn list_for_session(
+    pub(crate) async fn list_for_session(
         &self,
         session_id: Uuid,
         limit: i32,
@@ -159,7 +159,7 @@ impl ExpansionAuditRepository {
 
 /// Row from expansion_reports table
 #[derive(Debug, Clone, sqlx::FromRow)]
-pub struct ExpansionReportRow {
+pub(crate) struct ExpansionReportRow {
     pub expansion_id: Uuid,
     pub session_id: Uuid,
     pub source_digest: String,

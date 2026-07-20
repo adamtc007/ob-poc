@@ -18,7 +18,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "VARCHAR", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
-pub enum SessionStatus {
+pub(crate) enum SessionStatus {
     #[default]
     Active,
     Completed,
@@ -27,21 +27,10 @@ pub enum SessionStatus {
     Error,
 }
 
-/// Primary domain detected from DSL execution
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum PrimaryDomain {
-    Cbu,
-    Kyc,
-    Onboarding,
-    Entity,
-    Document,
-    Custody,
-}
 
 /// Persisted session state
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersistedSession {
+pub(crate) struct PersistedSession {
     pub session_id: Uuid,
     pub status: SessionStatus,
 
@@ -76,7 +65,7 @@ pub struct PersistedSession {
 
 /// DSL snapshot (successful execution)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslSnapshot {
+pub(crate) struct DslSnapshot {
     pub snapshot_id: Uuid,
     pub session_id: Uuid,
     pub version: i32,
@@ -92,7 +81,7 @@ pub struct DslSnapshot {
 
 /// Entity created during execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityCreated {
+pub(crate) struct EntityCreated {
     pub entity_type: String,
     pub entity_id: Uuid,
     pub name: Option<String>,
@@ -101,7 +90,7 @@ pub struct EntityCreated {
 /// Session event types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SessionEventType {
+pub(crate) enum SessionEventType {
     Created,
     ExecuteStarted,
     ExecuteSuccess,
@@ -146,12 +135,12 @@ impl std::fmt::Display for SessionEventType {
 // ============================================================================
 
 /// Session persistence repository
-pub struct SessionRepository {
+pub(crate) struct SessionRepository {
     pool: PgPool,
 }
 
 impl SessionRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -160,7 +149,7 @@ impl SessionRepository {
     // ------------------------------------------------------------------------
 
     /// Create a new session with a specific ID
-    pub async fn create_session_with_id(
+    pub(crate) async fn create_session_with_id(
         &self,
         session_id: Uuid,
         client_type: Option<&str>,
@@ -211,7 +200,7 @@ impl SessionRepository {
     }
 
     /// Get a session by ID
-    pub async fn get_session(
+    pub(crate) async fn get_session(
         &self,
         session_id: Uuid,
     ) -> Result<Option<PersistedSession>, sqlx::Error> {
@@ -264,23 +253,9 @@ impl SessionRepository {
         }))
     }
 
-    /// Update session activity timestamp
-    pub async fn touch_session(&self, session_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"
-            UPDATE "ob-poc".dsl_sessions
-            SET last_activity_at = now()
-            WHERE session_id = $1 AND status = 'active'
-            "#,
-            session_id
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
 
     /// Update session bindings after successful execution
-    pub async fn update_bindings(
+    pub(crate) async fn update_bindings(
         &self,
         session_id: Uuid,
         bindings: &HashMap<String, Uuid>,
@@ -313,7 +288,7 @@ impl SessionRepository {
     }
 
     /// Record an error on the session
-    pub async fn record_error(&self, session_id: Uuid, error: &str) -> Result<(), sqlx::Error> {
+    pub(crate) async fn record_error(&self, session_id: Uuid, error: &str) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"
             UPDATE "ob-poc".dsl_sessions
@@ -332,53 +307,14 @@ impl SessionRepository {
         Ok(())
     }
 
-    /// Mark session as completed
-    pub async fn complete_session(&self, session_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"
-            UPDATE "ob-poc".dsl_sessions
-            SET status = 'completed', completed_at = now(), last_activity_at = now()
-            WHERE session_id = $1 AND status = 'active'
-            "#,
-            session_id
-        )
-        .execute(&self.pool)
-        .await?;
 
-        self.log_event(session_id, SessionEventType::Completed, None, None, None)
-            .await?;
-        Ok(())
-    }
-
-    /// Mark session as aborted
-    pub async fn abort_session(
-        &self,
-        session_id: Uuid,
-        reason: Option<&str>,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"
-            UPDATE "ob-poc".dsl_sessions
-            SET status = 'aborted', last_error = $2, last_activity_at = now()
-            WHERE session_id = $1 AND status = 'active'
-            "#,
-            session_id,
-            reason,
-        )
-        .execute(&self.pool)
-        .await?;
-
-        self.log_event(session_id, SessionEventType::Aborted, None, reason, None)
-            .await?;
-        Ok(())
-    }
 
     // ------------------------------------------------------------------------
     // Snapshots
     // ------------------------------------------------------------------------
 
     /// Save a DSL snapshot after successful execution
-    pub async fn save_snapshot(
+    pub(crate) async fn save_snapshot(
         &self,
         session_id: Uuid,
         dsl_source: &str,
@@ -443,7 +379,7 @@ impl SessionRepository {
     }
 
     /// Get all snapshots for a session
-    pub async fn get_snapshots(&self, session_id: Uuid) -> Result<Vec<DslSnapshot>, sqlx::Error> {
+    pub(crate) async fn get_snapshots(&self, session_id: Uuid) -> Result<Vec<DslSnapshot>, sqlx::Error> {
         let rows = sqlx::query!(
             r#"
             SELECT
@@ -479,7 +415,7 @@ impl SessionRepository {
     }
 
     /// Get latest snapshot for a session
-    pub async fn get_latest_snapshot(
+    pub(crate) async fn get_latest_snapshot(
         &self,
         session_id: Uuid,
     ) -> Result<Option<DslSnapshot>, sqlx::Error> {
@@ -492,7 +428,7 @@ impl SessionRepository {
     // ------------------------------------------------------------------------
 
     /// Log a session event
-    pub async fn log_event(
+    pub(crate) async fn log_event(
         &self,
         session_id: Uuid,
         event_type: SessionEventType,
@@ -526,79 +462,14 @@ impl SessionRepository {
     // Locks (for timeout detection)
     // ------------------------------------------------------------------------
 
-    /// Acquire a lock for an operation
-    pub async fn acquire_lock(
-        &self,
-        session_id: Uuid,
-        operation: &str,
-        timeout_secs: i32,
-    ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query!(
-            r#"
-            INSERT INTO "ob-poc".dsl_session_locks (session_id, operation, locked_at, lock_timeout_at)
-            VALUES ($1, $2, now(), now() + ($3 || ' seconds')::interval)
-            ON CONFLICT (session_id) DO NOTHING
-            "#,
-            session_id,
-            operation,
-            timeout_secs.to_string(),
-        )
-        .execute(&self.pool)
-        .await?;
 
-        Ok(result.rows_affected() > 0)
-    }
 
-    /// Release a lock
-    pub async fn release_lock(&self, session_id: Uuid) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"DELETE FROM "ob-poc".dsl_session_locks WHERE session_id = $1"#,
-            session_id
-        )
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
-    /// Check if session is locked
-    pub async fn is_locked(&self, session_id: Uuid) -> Result<bool, sqlx::Error> {
-        let locked = sqlx::query_scalar!(
-            r#"
-            SELECT EXISTS(
-                SELECT 1 FROM "ob-poc".dsl_session_locks
-                WHERE session_id = $1 AND lock_timeout_at > now()
-            ) as "exists!"
-            "#,
-            session_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(locked)
-    }
 
     // ------------------------------------------------------------------------
     // Cleanup
     // ------------------------------------------------------------------------
 
-    /// Clean up expired sessions
-    pub async fn cleanup_expired(&self) -> Result<i32, sqlx::Error> {
-        let result =
-            sqlx::query_scalar!(r#"SELECT "ob-poc".cleanup_expired_sessions() as "count!""#)
-                .fetch_one(&self.pool)
-                .await?;
 
-        Ok(result)
-    }
-
-    /// Abort hung sessions (locked too long)
-    pub async fn abort_hung_sessions(&self) -> Result<i32, sqlx::Error> {
-        let result = sqlx::query_scalar!(r#"SELECT "ob-poc".abort_hung_sessions() as "count!""#)
-            .fetch_one(&self.pool)
-            .await?;
-
-        Ok(result)
-    }
 
     // ------------------------------------------------------------------------
     // CBU-Specific Methods (for REPL/incremental editing)
@@ -607,7 +478,7 @@ impl SessionRepository {
     /// Get or create an active session for a specific CBU
     ///
     /// Returns the existing active session if one exists, otherwise creates a new one.
-    pub async fn get_or_create_session_for_cbu(
+    pub(crate) async fn get_or_create_session_for_cbu(
         &self,
         cbu_id: Uuid,
     ) -> Result<PersistedSession, sqlx::Error> {
@@ -710,7 +581,7 @@ impl SessionRepository {
     /// Get accumulated DSL source for a CBU from all successful snapshots
     ///
     /// Returns the concatenated DSL source from all snapshots in execution order.
-    pub async fn get_accumulated_dsl_for_cbu(&self, cbu_id: Uuid) -> Result<String, sqlx::Error> {
+    pub(crate) async fn get_accumulated_dsl_for_cbu(&self, cbu_id: Uuid) -> Result<String, sqlx::Error> {
         let rows = sqlx::query!(
             r#"
             SELECT s.dsl_source
@@ -728,36 +599,9 @@ impl SessionRepository {
         Ok(dsl_parts.join("\n\n"))
     }
 
-    /// Get all bindings for a CBU from the active session
-    pub async fn get_bindings_for_cbu(
-        &self,
-        cbu_id: Uuid,
-    ) -> Result<HashMap<String, Uuid>, sqlx::Error> {
-        let row = sqlx::query!(
-            r#"
-            SELECT named_refs
-            FROM "ob-poc".dsl_sessions
-            WHERE cbu_id = $1 AND status = 'active'
-            ORDER BY last_activity_at DESC
-            LIMIT 1
-            "#,
-            cbu_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match row {
-            Some(r) => {
-                let bindings: HashMap<String, Uuid> =
-                    serde_json::from_value(r.named_refs).unwrap_or_default();
-                Ok(bindings)
-            }
-            None => Ok(HashMap::new()),
-        }
-    }
 
     /// Get CBU state summary (for loading into REPL/UI)
-    pub async fn get_cbu_state(&self, cbu_id: Uuid) -> Result<CbuDslState, sqlx::Error> {
+    pub(crate) async fn get_cbu_state(&self, cbu_id: Uuid) -> Result<CbuDslState, sqlx::Error> {
         let session = self.get_or_create_session_for_cbu(cbu_id).await?;
         let accumulated_dsl = self.get_accumulated_dsl_for_cbu(cbu_id).await?;
         let snapshots = self.get_snapshots(session.session_id).await?;
@@ -775,7 +619,7 @@ impl SessionRepository {
 
 /// CBU DSL state summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuDslState {
+pub(crate) struct CbuDslState {
     pub cbu_id: Uuid,
     pub session_id: Uuid,
     pub executed_dsl: String,
@@ -796,7 +640,7 @@ fn compute_checksum(dsl: &str) -> String {
 }
 
 /// Detect primary domain from DSL verbs
-pub fn detect_domain(dsl: &str) -> Option<String> {
+pub(crate) fn detect_domain(dsl: &str) -> Option<String> {
     // Simple heuristic: look at verb prefixes
     if dsl.contains("onboarding.") {
         Some("onboarding".to_string())
@@ -816,7 +660,7 @@ pub fn detect_domain(dsl: &str) -> Option<String> {
 }
 
 /// Extract domains used in DSL
-pub fn extract_domains(dsl: &str) -> Vec<String> {
+pub(crate) fn extract_domains(dsl: &str) -> Vec<String> {
     let mut domains = Vec::new();
 
     let domain_patterns = [

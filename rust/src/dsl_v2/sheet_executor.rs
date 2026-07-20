@@ -62,7 +62,7 @@ use crate::session::unified::{
 use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 
 /// Phased executor for DSL sheets
-pub struct SheetExecutor<'a> {
+pub(crate) struct SheetExecutor<'a> {
     pool: &'a PgPool,
     #[allow(dead_code)] // Reserved for future event emission
     emitter: Option<SharedEmitter>,
@@ -70,7 +70,7 @@ pub struct SheetExecutor<'a> {
 
 impl<'a> SheetExecutor<'a> {
     /// Create a new sheet executor
-    pub fn new(pool: &'a PgPool, emitter: Option<SharedEmitter>) -> Self {
+    pub(crate) fn new(pool: &'a PgPool, emitter: Option<SharedEmitter>) -> Self {
         Self { pool, emitter }
     }
 
@@ -89,7 +89,7 @@ impl<'a> SheetExecutor<'a> {
         since = "0.1.0",
         note = "Use execute_run_sheet with RunSheet and unified ExecutionPhase types instead"
     )]
-    pub async fn execute_phased(
+    pub(crate) async fn execute_phased(
         &self,
         sheet: &mut DslSheet,
         phases: &[ExecutionPhase],
@@ -283,7 +283,7 @@ impl<'a> SheetExecutor<'a> {
     ///
     /// # Returns
     /// * `UnifiedSheetExecutionResult` with per-entry status and overall result
-    pub async fn execute_run_sheet(
+    pub(crate) async fn execute_run_sheet(
         &self,
         session_id: Uuid,
         run_sheet: &mut RunSheet,
@@ -670,7 +670,7 @@ impl<'a> SheetExecutor<'a> {
         since = "0.1.0",
         note = "Use persist_audit_unified with RunSheet and unified SheetExecutionResult types instead"
     )]
-    pub async fn persist_audit(
+    pub(crate) async fn persist_audit(
         &self,
         sheet: &DslSheet,
         result: &SheetExecutionResult,
@@ -756,7 +756,7 @@ impl<'a> SheetExecutor<'a> {
     /// Persist execution audit using unified RunSheet and SheetExecutionResult types
     ///
     /// This is the preferred method for new code. The legacy `persist_audit` is deprecated.
-    pub async fn persist_audit_unified(
+    pub(crate) async fn persist_audit_unified(
         &self,
         run_sheet: &RunSheet,
         result: &UnifiedSheetExecutionResult,

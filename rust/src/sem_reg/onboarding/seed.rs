@@ -37,7 +37,7 @@ const BOOTSTRAP_CREATED_BY: &str = "bootstrap";
 
 /// Report of what the bootstrap seed wrote.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BootstrapReport {
+pub(crate) struct BootstrapReport {
     pub attribute_defs_written: usize,
     pub attribute_defs_skipped: usize,
     pub verb_contracts_written: usize,
@@ -50,7 +50,7 @@ pub struct BootstrapReport {
 
 impl BootstrapReport {
     /// Total snapshots written across all object types.
-    pub fn total_written(&self) -> usize {
+    pub(crate) fn total_written(&self) -> usize {
         self.attribute_defs_written
             + self.verb_contracts_written
             + self.entity_type_defs_written

@@ -14,7 +14,7 @@ use crate::repl::runbook::Runbook;
 
 /// A chapter in a runbook summary — groups related steps for display.
 #[derive(Debug, Clone)]
-pub struct ChapterView {
+pub(crate) struct ChapterView {
     pub chapter: String,
     pub steps: Vec<(i32, String)>, // (sequence, sentence)
 }
@@ -24,11 +24,11 @@ pub struct ChapterView {
 // ---------------------------------------------------------------------------
 
 /// Generates pack-level playback summaries.
-pub struct PackPlayback;
+pub(crate) struct PackPlayback;
 
 impl PackPlayback {
     /// Produce a one-paragraph summary of the runbook within a pack context.
-    pub fn summarize(
+    pub(crate) fn summarize(
         pack: &PackManifest,
         runbook: &Runbook,
         answers: &HashMap<String, serde_json::Value>,
@@ -101,7 +101,7 @@ impl PackPlayback {
     }
 
     /// Group runbook entries into chapters based on pack section layout.
-    pub fn chapter_view(pack: &PackManifest, runbook: &Runbook) -> Vec<ChapterView> {
+    pub(crate) fn chapter_view(pack: &PackManifest, runbook: &Runbook) -> Vec<ChapterView> {
         if pack.section_layout.is_empty() {
             // No section layout — single "Steps" chapter.
             return vec![ChapterView {

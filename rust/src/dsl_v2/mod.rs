@@ -156,50 +156,51 @@ pub use dsl_analysis::verb_registry;
 pub mod verb_taxonomy;
 
 // Re-export local module types
-pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
+pub(crate) use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
 #[cfg(feature = "database")]
-pub use batch_executor::{
+pub(crate) use batch_executor::{
     BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
 };
-pub use csg_linter::{CsgLinter, InferredContext, LintResult};
-pub use display_nouns::{
+pub(crate) use csg_linter::{CsgLinter, InferredContext, LintResult};
+pub(crate) use display_nouns::{
     contains_forbidden_token, display_noun, display_noun_or_self, has_display_noun, pluralize,
     FORBIDDEN_UI_TOKENS,
 };
-pub use domain_context::{ActiveDomain, DomainContext, IterationContext};
-pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
-pub use execution_result::{ExecutionResults, StepResult};
+pub(crate) use domain_context::{ActiveDomain, DomainContext, IterationContext};
+pub(crate) use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
+pub use execution_result::{StepResult};
+pub(crate) use execution_result::{ExecutionResults};
 #[cfg(feature = "database")]
-pub use idempotency::{compute_idempotency_key, IdempotencyManager};
-pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
-pub use operator_types::{OperatorRole, OperatorType};
+pub(crate) use idempotency::{compute_idempotency_key, IdempotencyManager};
+pub(crate) use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
+pub(crate) use operator_types::{OperatorRole, OperatorType};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
-pub use repl_session::{ExecutedBlock, ReplSession};
+pub(crate) use repl_session::{ExecutedBlock, ReplSession};
 #[cfg(feature = "database")]
-pub use sheet_executor::SheetExecutor;
-pub use submission::{
+pub(crate) use sheet_executor::SheetExecutor;
+pub(crate) use submission::{
     DslSubmission, ExpandedSubmission, IterationKey, IterationStatements, SubmissionError,
     SubmissionLimits, SubmissionState, SymbolBinding,
 };
-pub use topo_sort::{
+pub(crate) use topo_sort::{
     emit_dsl, topological_sort, topological_sort_with_lifecycle,
     ExecutionPhase as TopoExecutionPhase, TopoSortError, TopoSortResult,
 };
 
-pub use verb_taxonomy::{
+pub(crate) use verb_taxonomy::{
     verb_taxonomy, DomainSummary, TaxonomyCategory, TaxonomyDomain, VerbLocation, VerbTaxonomy,
 };
 
 // Re-export expansion module types (consumed externally)
 #[allow(unused_imports)]
-pub use expansion::{
+pub(crate) use expansion::{
     expand_templates, expand_templates_simple, BatchPolicy, ExpansionReport, LockAccess, LockKey,
     LockMode,
 };
 
 // Re-export error aggregation types
-pub use errors::{
+pub(crate) use errors::{
     AffectedVerb, CauseDetails, CausedErrors, ErrorCause, ExecutionErrors, FailureTiming,
 };
 
@@ -216,15 +217,12 @@ pub mod syntax {
 
 /// Planning-facing DSL seam: compile, analyse, and inspect dependency/planning output.
 pub mod planning {
-    pub use super::entity_deps::{
+    pub(crate) use super::entity_deps::{
         entity_deps, topological_sort_unified, DependencyKind, EntityDep, EntityDependencyRegistry,
         EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
     };
-    pub use super::execution_plan::{
-        compile, compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError,
-        ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext,
-        PlanningResult, SyntheticStep,
-    };
+    pub use super::execution_plan::{compile};
+pub(crate) use super::execution_plan::{compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError, ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext, PlanningResult, SyntheticStep};
     pub use super::planning_facade::{
         analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,
         PlanningOutput, SyntheticStep as FacadeSyntheticStep,
@@ -234,14 +232,12 @@ pub mod planning {
 /// Execution-facing DSL seam: execute compiled/planned work and access runtime registries.
 pub mod execution {
     #[cfg(feature = "database")]
-    pub use super::executor::{
-        AtomicExecutionResult, BatchStatus, BestEffortExecutionResult, DslExecutor,
-        ExecutionContext, ExecutionResult, IterationResult, SubmissionResult,
-    };
+    pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
+pub(crate) use super::executor::{AtomicExecutionResult, BatchStatus, BestEffortExecutionResult, IterationResult, SubmissionResult};
     #[cfg(not(feature = "database"))]
     pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 
-    pub use super::executor::ReturnType;
+    pub(crate) use super::executor::ReturnType;
     #[cfg(feature = "database")]
     pub use super::gateway_resolver::{gateway_addr, GatewayRefResolver};
     #[cfg(feature = "database")]
@@ -277,7 +273,8 @@ pub mod tooling {
     #[cfg(feature = "database")]
     pub use super::lsp_validator::LspValidator;
     #[cfg(feature = "database")]
-    pub use super::semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
+    pub use super::semantic_validator::{validate_dsl, validate_dsl_with_csg};
+pub(crate) use super::semantic_validator::{SemanticValidator};
     #[cfg(feature = "database")]
     pub use super::validation::{
         BindingInfo as ValidationBindingInfo, Diagnostic as ValidationDiagnostic,

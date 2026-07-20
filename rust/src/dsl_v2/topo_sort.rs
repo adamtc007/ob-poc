@@ -21,7 +21,7 @@ use super::runtime_registry::{RuntimeVerb, RuntimeVerbRegistry};
 
 /// Errors from topological sort
 #[derive(Debug, Clone)]
-pub enum TopoSortError {
+pub(crate) enum TopoSortError {
     /// Circular dependency detected
     CyclicDependency {
         /// Statements involved in the cycle
@@ -43,7 +43,7 @@ impl std::error::Error for TopoSortError {}
 
 /// Result of topological sort
 #[derive(Debug)]
-pub struct TopoSortResult {
+pub(crate) struct TopoSortResult {
     /// The sorted program
     pub program: Program,
     /// Whether any reordering occurred
@@ -59,7 +59,7 @@ pub struct TopoSortResult {
 
 /// An execution phase - group of statements at the same DAG depth
 #[derive(Debug, Clone)]
-pub struct ExecutionPhase {
+pub(crate) struct ExecutionPhase {
     /// Phase depth (0 = no dependencies, 1 = depends on depth 0, etc.)
     pub depth: usize,
     /// Statement indices in this phase (in sorted order)
@@ -75,7 +75,7 @@ impl TopoSortResult {
     /// - Depth N: Depends on statements up to depth N-1
     ///
     /// Statements within a phase can theoretically execute in parallel.
-    pub fn compute_phases(&self) -> Vec<ExecutionPhase> {
+    pub(crate) fn compute_phases(&self) -> Vec<ExecutionPhase> {
         if self.program.statements.is_empty() {
             return vec![];
         }
@@ -109,12 +109,6 @@ impl TopoSortResult {
         phases
     }
 
-    /// Get the DAG depth for a specific statement index
-    pub fn get_depth(&self, stmt_index: usize) -> usize {
-        let mut depths: HashMap<usize, usize> = HashMap::new();
-        compute_depth_recursive(stmt_index, &self.deps, &mut depths);
-        depths.get(&stmt_index).copied().unwrap_or(0)
-    }
 }
 
 /// Recursively compute depth for a statement
@@ -160,7 +154,7 @@ fn compute_depth_recursive(
 /// # Returns
 /// * `Ok(TopoSortResult)` - Sorted program with metadata
 /// * `Err(TopoSortError)` - If cyclic dependency detected
-pub fn topological_sort(
+pub(crate) fn topological_sort(
     pending: &Program,
     executed_context: &BindingContext,
     _registry: &RuntimeVerbRegistry,
@@ -331,7 +325,7 @@ pub fn topological_sort(
 /// # Returns
 /// * `Ok(TopoSortResult)` - Sorted program with lifecycle diagnostics
 /// * `Err(TopoSortError)` - If cyclic dependency detected
-pub fn topological_sort_with_lifecycle(
+pub(crate) fn topological_sort_with_lifecycle(
     pending: &Program,
     executed_context: &BindingContext,
     planning_context: &PlanningContext,
@@ -785,7 +779,7 @@ fn collect_implicit_refs(
 /// Emit DSL source from a sorted program
 ///
 /// Reconstructs the DSL text from the AST, preserving formatting where possible.
-pub fn emit_dsl(program: &Program) -> String {
+pub(crate) fn emit_dsl(program: &Program) -> String {
     let mut lines = vec![];
 
     for stmt in &program.statements {

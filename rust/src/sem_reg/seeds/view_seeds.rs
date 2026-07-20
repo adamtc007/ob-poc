@@ -19,7 +19,7 @@ use crate::sem_reg::{
 
 /// Report from view seeding.
 #[derive(Debug, Default)]
-pub struct ViewSeedReport {
+pub(crate) struct ViewSeedReport {
     pub views_published: usize,
     pub views_skipped: usize,
     pub views_updated: usize,

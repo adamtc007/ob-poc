@@ -17,7 +17,7 @@ use sem_os_core::types::EvidenceGrade;
 ///
 /// - Governed tier with zero memberships → Error
 /// - Operational tier with zero memberships → Warning (informational)
-pub fn check_taxonomy_membership(
+pub(crate) fn check_taxonomy_membership(
     object_fqn: &str,
     tier: GovernanceTier,
     memberships: &[String],
@@ -63,7 +63,7 @@ pub fn check_taxonomy_membership(
 ///
 /// - Governed tier with empty/placeholder steward → Error
 /// - Operational tier → pass (no steward requirement)
-pub fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
+pub(crate) fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
     match tier {
         GovernanceTier::Operational => vec![],
         GovernanceTier::Governed => {
@@ -96,7 +96,7 @@ pub fn check_stewardship(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<Ga
 /// - `EvidenceGrade::None` / `EvidenceGrade::Prohibited` → always passes
 /// - constrained or regulatory evidence grades on governed tier → need tests + policy
 /// - Operational tier → pass (no evidence policy enforcement)
-pub fn check_evidence_grade_policy(
+pub(crate) fn check_evidence_grade_policy(
     derivation: &DerivationSpecBody,
     tier: GovernanceTier,
     has_passing_tests: bool,
@@ -161,7 +161,7 @@ pub fn check_evidence_grade_policy(
 /// If a governed snapshot's definition contains `regulatory_references` or
 /// `regulation_ids`, those references should be non-empty and well-formed.
 /// Operational-tier snapshots skip this check.
-pub fn check_regulatory_linkage(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
+pub(crate) fn check_regulatory_linkage(snapshot: &SnapshotRow, tier: GovernanceTier) -> Vec<GateFailure> {
     match tier {
         GovernanceTier::Operational => vec![],
         GovernanceTier::Governed => {
@@ -212,7 +212,7 @@ pub fn check_regulatory_linkage(snapshot: &SnapshotRow, tier: GovernanceTier) ->
 ///
 /// If a snapshot has an `effective_until` date, it must not be in the past.
 /// Governed snapshots without `effective_until` get a Warning suggesting one be set.
-pub fn check_review_cycle_compliance(
+pub(crate) fn check_review_cycle_compliance(
     snapshot: &SnapshotRow,
     tier: GovernanceTier,
     now: chrono::DateTime<chrono::Utc>,
@@ -268,7 +268,7 @@ pub fn check_review_cycle_compliance(
 /// When a predecessor exists, the new snapshot's version must be strictly greater.
 /// This is a stricter version of the simple `version_monotonicity` gate — it
 /// also checks that the version tuple strictly increases (not just >=).
-pub fn check_version_consistency(
+pub(crate) fn check_version_consistency(
     snapshot: &SnapshotRow,
     predecessor: Option<&SnapshotRow>,
 ) -> Vec<GateFailure> {
@@ -304,7 +304,7 @@ pub fn check_version_consistency(
 ///
 /// When `change_type` is `Breaking`, `change_rationale` must be non-empty and
 /// describe the migration path for consumers of the previous version.
-pub fn check_continuation_completeness(snapshot: &SnapshotRow) -> Vec<GateFailure> {
+pub(crate) fn check_continuation_completeness(snapshot: &SnapshotRow) -> Vec<GateFailure> {
     if snapshot.change_type == super::types::ChangeType::Breaking {
         let rationale = snapshot.change_rationale.as_deref().unwrap_or("").trim();
         if rationale.is_empty() {
@@ -336,7 +336,7 @@ pub fn check_continuation_completeness(snapshot: &SnapshotRow) -> Vec<GateFailur
 /// If a verb contract has `behavior: template` and its definition contains
 /// an `expands_to` field, each referenced verb FQN must exist in the
 /// known verb set.
-pub fn check_macro_expansion_integrity(
+pub(crate) fn check_macro_expansion_integrity(
     verb_definition: &serde_json::Value,
     verb_fqn: &str,
     known_verb_fqns: &std::collections::HashSet<String>,

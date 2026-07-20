@@ -16,7 +16,7 @@ use std::collections::HashMap;
 /// Each field represents a weighted contribution to total mass.
 /// Weights are applied during calculation, not stored here.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct MassBreakdown {
+pub(crate) struct MassBreakdown {
     /// Number of CBUs in scope
     pub cbu_count: u32,
 
@@ -55,22 +55,22 @@ pub struct MassBreakdown {
 
 impl MassBreakdown {
     /// Create an empty breakdown
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self::default()
     }
 
     /// Check if the breakdown represents an empty scope
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.cbu_count == 0 && self.entity_count == 0
     }
 
     /// Get total node count (CBUs + entities)
-    pub fn total_nodes(&self) -> u32 {
+    pub(crate) fn total_nodes(&self) -> u32 {
         self.cbu_count + self.entity_count
     }
 
     /// Add counts from another breakdown (for aggregation)
-    pub fn merge(&mut self, other: &MassBreakdown) {
+    pub(crate) fn merge(&mut self, other: &MassBreakdown) {
         self.cbu_count += other.cbu_count;
         self.entity_count += other.entity_count;
         self.relationship_count += other.relationship_count;
@@ -90,7 +90,7 @@ impl MassBreakdown {
     }
 
     /// Increment entity count for a specific type
-    pub fn add_entity(&mut self, entity_type: &str) {
+    pub(crate) fn add_entity(&mut self, entity_type: &str) {
         self.entity_count += 1;
         *self
             .by_entity_type
@@ -99,7 +99,7 @@ impl MassBreakdown {
     }
 
     /// Increment relationship count for a specific type
-    pub fn add_relationship(&mut self, relationship_type: &str) {
+    pub(crate) fn add_relationship(&mut self, relationship_type: &str) {
         self.relationship_count += 1;
         *self
             .by_relationship_type
@@ -113,7 +113,7 @@ impl MassBreakdown {
 /// These weights determine how different components contribute to total mass.
 /// Higher weights mean that component has more influence on view mode selection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MassWeights {
+pub(crate) struct MassWeights {
     /// Weight per CBU (default: 10.0)
     pub cbu_weight: f32,
 
@@ -163,7 +163,7 @@ impl Default for MassWeights {
 
 impl MassWeights {
     /// Get weight for a specific entity type
-    pub fn entity_weight_for(&self, entity_type: &str) -> f32 {
+    pub(crate) fn entity_weight_for(&self, entity_type: &str) -> f32 {
         self.entity_type_weights
             .get(entity_type)
             .copied()
@@ -171,7 +171,7 @@ impl MassWeights {
     }
 
     /// Get weight for a specific relationship type
-    pub fn relationship_weight_for(&self, rel_type: &str) -> f32 {
+    pub(crate) fn relationship_weight_for(&self, rel_type: &str) -> f32 {
         self.relationship_type_weights
             .get(rel_type)
             .copied()
@@ -181,7 +181,7 @@ impl MassWeights {
 
 /// Computed mass with breakdown and configuration reference.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StructMass {
+pub(crate) struct StructMass {
     /// The computed total mass score
     pub total: f32,
 
@@ -195,7 +195,7 @@ pub struct StructMass {
 
 /// Individual weighted contributions to total mass.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MassContributions {
+pub(crate) struct MassContributions {
     pub from_cbus: f32,
     pub from_entities: f32,
     pub from_relationships: f32,
@@ -207,7 +207,7 @@ pub struct MassContributions {
 
 impl StructMass {
     /// Create a zero mass
-    pub fn zero() -> Self {
+    pub(crate) fn zero() -> Self {
         Self {
             total: 0.0,
             breakdown: MassBreakdown::empty(),
@@ -216,7 +216,7 @@ impl StructMass {
     }
 
     /// Calculate mass from breakdown using provided weights
-    pub fn calculate(breakdown: MassBreakdown, weights: &MassWeights) -> Self {
+    pub(crate) fn calculate(breakdown: MassBreakdown, weights: &MassWeights) -> Self {
         // CBU contribution
         let from_cbus = breakdown.cbu_count as f32 * weights.cbu_weight;
 
@@ -272,28 +272,16 @@ impl StructMass {
         }
     }
 
-    /// Check if mass is zero (empty scope)
-    pub fn is_zero(&self) -> bool {
-        self.total == 0.0
-    }
 
-    /// Check if mass is "light" (suitable for detailed view)
-    pub fn is_light(&self, threshold: f32) -> bool {
-        self.total < threshold
-    }
 
-    /// Check if mass is "heavy" (needs higher-level view)
-    pub fn is_heavy(&self, threshold: f32) -> bool {
-        self.total >= threshold
-    }
 
     /// Suggest a view mode based on mass using default thresholds
-    pub fn suggested_view_mode(&self) -> MassViewMode {
+    pub(crate) fn suggested_view_mode(&self) -> MassViewMode {
         self.suggested_view_mode_with_thresholds(&MassThresholds::default())
     }
 
     /// Suggest a view mode based on mass using custom thresholds
-    pub fn suggested_view_mode_with_thresholds(&self, thresholds: &MassThresholds) -> MassViewMode {
+    pub(crate) fn suggested_view_mode_with_thresholds(&self, thresholds: &MassThresholds) -> MassViewMode {
         if self.total < thresholds.detail_max {
             MassViewMode::Detail
         } else if self.total < thresholds.solar_system_max {
@@ -304,7 +292,7 @@ impl StructMass {
     }
 
     /// Get a human-readable summary
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         format!(
             "Mass: {:.1} ({} CBUs, {} entities, {} relationships, depth {})",
             self.total,
@@ -318,7 +306,7 @@ impl StructMass {
 
 /// Thresholds for automatic view mode selection based on mass.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MassThresholds {
+pub(crate) struct MassThresholds {
     /// Below this: Detail view (full entity graph)
     pub detail_max: f32,
 
@@ -339,7 +327,7 @@ impl Default for MassThresholds {
 /// View modes determined by mass thresholds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum MassViewMode {
+pub(crate) enum MassViewMode {
     /// Low mass: Show full detail (entity-level graph)
     Detail,
     /// Medium mass: Show clustered/aggregated view (solar system)
@@ -350,7 +338,7 @@ pub enum MassViewMode {
 
 impl MassViewMode {
     /// Determine view mode from mass using thresholds
-    pub fn from_mass(mass: &StructMass, thresholds: &MassThresholds) -> Self {
+    pub(crate) fn from_mass(mass: &StructMass, thresholds: &MassThresholds) -> Self {
         if mass.total < thresholds.detail_max {
             Self::Detail
         } else if mass.total < thresholds.solar_system_max {
@@ -361,7 +349,7 @@ impl MassViewMode {
     }
 
     /// Get display name
-    pub fn display_name(&self) -> &'static str {
+    pub(crate) fn display_name(&self) -> &'static str {
         match self {
             Self::Detail => "Detail",
             Self::SolarSystem => "Solar System",
@@ -370,7 +358,7 @@ impl MassViewMode {
     }
 
     /// Get icon name for UI
-    pub fn icon(&self) -> &'static str {
+    pub(crate) fn icon(&self) -> &'static str {
         match self {
             Self::Detail => "🔬",
             Self::SolarSystem => "🌍",
@@ -379,7 +367,7 @@ impl MassViewMode {
     }
 
     /// Get string representation for serialization/API
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Detail => "detail",
             Self::SolarSystem => "solar_system",

@@ -29,14 +29,14 @@ const ENV_GRPC_URL: &str = "BPMN_LITE_GRPC_URL";
 
 /// Result of compiling BPMN XML to bytecode.
 #[derive(Debug, Clone)]
-pub struct CompileResult {
+pub(crate) struct CompileResult {
     pub bytecode_version: Vec<u8>,
     pub diagnostics: Vec<CompileDiagnostic>,
 }
 
 /// Single diagnostic from compilation.
 #[derive(Debug, Clone)]
-pub struct CompileDiagnostic {
+pub(crate) struct CompileDiagnostic {
     pub severity: String,
     pub message: String,
     pub element_id: String,
@@ -58,7 +58,7 @@ pub struct StartProcessRequest {
 
 /// Typed orchestrator flag value (maps to ProtoValue oneof).
 #[derive(Debug, Clone)]
-pub enum OrchestratorFlag {
+pub(crate) enum OrchestratorFlag {
     Bool(bool),
     Int(i64),
     Str(String),
@@ -66,7 +66,7 @@ pub enum OrchestratorFlag {
 
 /// Result of inspecting a process instance.
 #[derive(Debug, Clone)]
-pub struct ProcessInspection {
+pub(crate) struct ProcessInspection {
     pub state: String,
     pub fibers: Vec<FiberSnapshot>,
     pub waits: Vec<WaitSnapshot>,
@@ -76,7 +76,7 @@ pub struct ProcessInspection {
 
 /// Snapshot of a single fiber in the VM.
 #[derive(Debug, Clone)]
-pub struct FiberSnapshot {
+pub(crate) struct FiberSnapshot {
     pub fiber_id: String,
     pub pc: u32,
     pub wait_state: String,
@@ -84,7 +84,7 @@ pub struct FiberSnapshot {
 
 /// Snapshot of a wait condition.
 #[derive(Debug, Clone)]
-pub struct WaitSnapshot {
+pub(crate) struct WaitSnapshot {
     pub fiber_id: String,
     pub wait_type: String,
     pub detail: String,
@@ -92,7 +92,7 @@ pub struct WaitSnapshot {
 
 /// A single activated job from the job worker protocol.
 #[derive(Debug, Clone)]
-pub struct JobActivation {
+pub(crate) struct JobActivation {
     pub job_key: String,
     pub process_instance_id: String,
     pub task_type: String,

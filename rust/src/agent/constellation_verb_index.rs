@@ -22,7 +22,7 @@ use crate::sem_os_runtime::constellation_runtime::{HydratedCardinality, Hydrated
 
 /// Context about where a verb lives in the constellation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlotContext {
+pub(crate) struct SlotContext {
     pub slot_name: String,
     pub slot_path: String,
     pub effective_state: String,
@@ -32,7 +32,7 @@ pub struct SlotContext {
 
 /// A single entry in the forward index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbMatch {
+pub(crate) struct VerbMatch {
     pub verb_fqn: String,
     pub slot_name: String,
     pub effective_state: String,
@@ -45,7 +45,7 @@ pub struct VerbMatch {
 
 /// Summary statistics for diagnostics.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IndexStats {
+pub(crate) struct IndexStats {
     pub total_slots: usize,
     pub total_available_verbs: usize,
     pub distinct_verbs: usize,
@@ -56,7 +56,7 @@ pub struct IndexStats {
 
 /// The two-way index over a hydrated constellation's verb surface.
 #[derive(Debug, Clone)]
-pub struct ConstellationVerbIndex {
+pub(crate) struct ConstellationVerbIndex {
     /// (noun_key, action_stem) → matching verbs with slot context
     forward: HashMap<(String, String), Vec<VerbMatch>>,
     /// verb_fqn → slot contexts where it appears
@@ -71,7 +71,7 @@ pub struct ConstellationVerbIndex {
 
 impl ConstellationVerbIndex {
     /// Build the index from a hydrated constellation's slot tree.
-    pub fn build(slots: &[HydratedSlot]) -> Self {
+    pub(crate) fn build(slots: &[HydratedSlot]) -> Self {
         let mut forward: HashMap<(String, String), Vec<VerbMatch>> = HashMap::new();
         let mut reverse: HashMap<String, Vec<SlotContext>> = HashMap::new();
         let mut by_noun: HashMap<String, Vec<String>> = HashMap::new();
@@ -179,7 +179,7 @@ impl ConstellationVerbIndex {
     /// Look up verbs matching both a noun and action stem.
     /// This is the primary "two-clue" resolution path.
     /// Results are sorted by priority (1 = domain-prefix match first, 2 = slot-name fallback).
-    pub fn lookup(&self, noun: &str, action: &str) -> Vec<&VerbMatch> {
+    pub(crate) fn lookup(&self, noun: &str, action: &str) -> Vec<&VerbMatch> {
         let key = (normalize(noun), normalize_action(action));
         let mut matches: Vec<&VerbMatch> = self
             .forward
@@ -190,48 +190,43 @@ impl ConstellationVerbIndex {
     }
 
     /// Look up verbs matching a noun (any action).
-    pub fn lookup_by_noun(&self, noun: &str) -> &[String] {
+    pub(crate) fn lookup_by_noun(&self, noun: &str) -> &[String] {
         self.by_noun
             .get(&normalize(noun))
             .map_or(&[] as &[String], |v| v.as_slice())
     }
 
     /// Look up verbs matching an action stem (any noun).
-    pub fn lookup_by_action(&self, action: &str) -> &[String] {
+    pub(crate) fn lookup_by_action(&self, action: &str) -> &[String] {
         self.by_action
             .get(&normalize_action(action))
             .map_or(&[] as &[String], |v| v.as_slice())
     }
 
     /// Reverse: given a verb FQN, where does it live in the constellation?
-    pub fn slot_contexts(&self, verb_fqn: &str) -> &[SlotContext] {
+    pub(crate) fn slot_contexts(&self, verb_fqn: &str) -> &[SlotContext] {
         self.reverse
             .get(verb_fqn)
             .map_or(&[] as &[SlotContext], |v| v.as_slice())
     }
 
     /// All verb FQNs currently available in the constellation.
-    pub fn all_verbs(&self) -> Vec<&str> {
+    pub(crate) fn all_verbs(&self) -> Vec<&str> {
         self.reverse.keys().map(|s| s.as_str()).collect()
     }
 
     /// All noun keys present in the index.
-    pub fn all_nouns(&self) -> Vec<&str> {
+    pub(crate) fn all_nouns(&self) -> Vec<&str> {
         self.by_noun.keys().map(|s| s.as_str()).collect()
     }
 
-    /// All action stems present in the index.
-    pub fn all_actions(&self) -> Vec<&str> {
-        self.by_action.keys().map(|s| s.as_str()).collect()
-    }
-
     /// Diagnostic statistics.
-    pub fn stats(&self) -> &IndexStats {
+    pub(crate) fn stats(&self) -> &IndexStats {
         &self.stats
     }
 
     /// Produce a human-readable dump for inspection.
-    pub fn dump(&self) -> String {
+    pub(crate) fn dump(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!(
             "ConstellationVerbIndex: {} slots, {} available verbs, {} distinct verbs\n",

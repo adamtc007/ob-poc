@@ -18,7 +18,7 @@ use std::collections::HashMap;
 /// UBO/ownership/control is a GROUP-level concern — the corporate hierarchy
 /// is determined once for the group and inherited by all CBUs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct GroupCompositeState {
+pub(crate) struct GroupCompositeState {
     /// Number of CBUs in scope for this group.
     pub cbu_count: usize,
 
@@ -52,7 +52,7 @@ pub struct GroupCompositeState {
 /// Street-side state (trading profiles, custody, SSI) is a separate downstream concern
 /// that only matters after KYC approval.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuStateSummary {
+pub(crate) struct CbuStateSummary {
     pub cbu_id: String,
     pub cbu_name: Option<String>,
     /// CBU lifecycle: DISCOVERED → VALIDATED → ACTIVE
@@ -67,7 +67,7 @@ pub struct CbuStateSummary {
 
 /// A verb likely to be the user's next intent, with a reason.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScoredVerbHint {
+pub(crate) struct ScoredVerbHint {
     pub verb_fqn: String,
     /// Score boost to apply when this verb appears in candidates (0.0 to 0.20).
     pub boost: f32,
@@ -77,7 +77,7 @@ pub struct ScoredVerbHint {
 
 /// A verb that is blocked by current entity state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockedVerbHint {
+pub(crate) struct BlockedVerbHint {
     pub verb_fqn: String,
     /// Score penalty to apply (0.0 to -0.20).
     pub penalty: f32,
@@ -95,7 +95,7 @@ impl GroupCompositeState {
     ///   - Slots with `computed_state == "filled"` in "kyc" family → has_kyc_case
     ///   - Slots with `computed_state == "filled"` in "screening" family → has_screening
     ///   - Slot progress aggregated for domain_counts
-    pub fn from_hydrated_constellation(
+    pub(crate) fn from_hydrated_constellation(
         constellation: &crate::sem_os_runtime::constellation_runtime::HydratedConstellation,
     ) -> Self {
         let mut domain_counts = HashMap::new();
@@ -178,7 +178,7 @@ impl GroupCompositeState {
     ///
     /// Returns a value in [-0.15, +0.15] that should be added to the verb's
     /// raw search score before ambiguity resolution.
-    pub fn compute_state_boost(&self, verb_fqn: &str) -> f32 {
+    pub(crate) fn compute_state_boost(&self, verb_fqn: &str) -> f32 {
         let mut boost = 0.0f32;
 
         // Check next-likely verbs (positive boost)
@@ -208,7 +208,7 @@ impl GroupCompositeState {
     ///   3. CBUs identified (the revenue-generating units)
     ///   4. Per-CBU: Case → Screening → Documents → Tollgate → APPROVED
     ///   5. Post-approval: custody, settlement, go-live (street-side)
-    pub fn derive_next_likely_verbs(&mut self) {
+    pub(crate) fn derive_next_likely_verbs(&mut self) {
         self.next_likely_verbs.clear();
         self.blocked_verbs.clear();
 
@@ -360,7 +360,7 @@ impl GroupCompositeState {
     /// Returns true if domain work is impossible given current state.
     ///
     /// Used for wildcard blocking: `domain.*` patterns.
-    pub fn is_domain_blocked(&self, verb_fqn: &str) -> bool {
+    pub(crate) fn is_domain_blocked(&self, verb_fqn: &str) -> bool {
         self.blocked_verbs.iter().any(|b| {
             if b.verb_fqn.ends_with(".*") {
                 let prefix = &b.verb_fqn[..b.verb_fqn.len() - 2];

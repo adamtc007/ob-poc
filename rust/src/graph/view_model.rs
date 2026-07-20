@@ -41,7 +41,7 @@ type GraphNode = LegacyGraphNode;
 /// GraphViewModel (this struct) ──► JSON ──► egui UI
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphViewModel {
+pub(crate) struct GraphViewModel {
     // =========================================================================
     // IDENTITY
     // =========================================================================
@@ -122,7 +122,7 @@ pub struct GraphViewModel {
 
 impl GraphViewModel {
     /// Create a new empty GraphViewModel
-    pub fn new(root_id: String) -> Self {
+    pub(crate) fn new(root_id: String) -> Self {
         Self {
             query_id: Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now(),
@@ -144,7 +144,7 @@ impl GraphViewModel {
     }
 
     /// Add a node to the view model
-    pub fn add_node(&mut self, node: GraphNode) {
+    pub(crate) fn add_node(&mut self, node: GraphNode) {
         // Update groupings
         self.nodes_by_layer
             .entry(node.layer)
@@ -159,12 +159,12 @@ impl GraphViewModel {
     }
 
     /// Add an edge to the view model
-    pub fn add_edge(&mut self, edge: GraphEdge) {
+    pub(crate) fn add_edge(&mut self, edge: GraphEdge) {
         self.edges.push(edge);
     }
 
     /// Compute statistics from current nodes/edges
-    pub fn compute_stats(&mut self) {
+    pub(crate) fn compute_stats(&mut self) {
         self.stats.node_count = self.nodes.len();
         self.stats.edge_count = self.edges.len();
 
@@ -196,33 +196,19 @@ impl GraphViewModel {
     }
 
     /// Get a node by ID
-    pub fn get_node(&self, id: &str) -> Option<&GraphNode> {
+    pub(crate) fn get_node(&self, id: &str) -> Option<&GraphNode> {
         self.nodes.iter().find(|n| n.id == id)
     }
 
-    /// Get all nodes of a specific type
-    pub fn nodes_of_type(&self, node_type: NodeType) -> Vec<&GraphNode> {
-        self.nodes
-            .iter()
-            .filter(|n| n.node_type == node_type)
-            .collect()
-    }
 
-    /// Get all edges of a specific type
-    pub fn edges_of_type(&self, edge_type: EdgeType) -> Vec<&GraphEdge> {
-        self.edges
-            .iter()
-            .filter(|e| e.edge_type == edge_type)
-            .collect()
-    }
 
     /// Check if a node exists
-    pub fn has_node(&self, id: &str) -> bool {
+    pub(crate) fn has_node(&self, id: &str) -> bool {
         self.nodes.iter().any(|n| n.id == id)
     }
 
     /// Get nodes connected to a given node
-    pub fn connected_nodes(&self, node_id: &str) -> Vec<&GraphNode> {
+    pub(crate) fn connected_nodes(&self, node_id: &str) -> Vec<&GraphNode> {
         let connected_ids: std::collections::HashSet<_> = self
             .edges
             .iter()
@@ -250,7 +236,7 @@ impl GraphViewModel {
 
 /// Information about the view mode used for a query
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ViewModeInfo {
+pub(crate) struct ViewModeInfo {
     /// View mode name (KYC_UBO, SERVICE_DELIVERY, CUSTODY, PRODUCTS_ONLY)
     pub name: String,
 
@@ -273,7 +259,7 @@ pub struct ViewModeInfo {
 
 /// Filter criteria for graph queries
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct GraphFilter {
+pub(crate) struct GraphFilter {
     /// Filter by node types
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub node_types: Vec<NodeType>,
@@ -313,7 +299,7 @@ pub struct GraphFilter {
 
 /// A group of nodes (from group-by queries)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeGroup {
+pub(crate) struct NodeGroup {
     /// Group key (e.g., jurisdiction code, role name)
     pub key: String,
 
@@ -334,7 +320,7 @@ pub struct NodeGroup {
 
 /// A path through the graph (from path queries)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphPath {
+pub(crate) struct GraphPath {
     /// Path ID
     pub id: String,
 
@@ -362,7 +348,7 @@ pub struct GraphPath {
 
 impl GraphPath {
     /// Create a new path
-    pub fn new(id: String, node_ids: Vec<String>, edge_ids: Vec<String>) -> Self {
+    pub(crate) fn new(id: String, node_ids: Vec<String>, edge_ids: Vec<String>) -> Self {
         let length = edge_ids.len();
         Self {
             id,
@@ -382,7 +368,7 @@ impl GraphPath {
 
 /// Statistics about the graph view
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GraphViewStats {
+pub(crate) struct GraphViewStats {
     /// Total number of nodes
     pub node_count: usize,
 
@@ -421,7 +407,7 @@ pub struct GraphViewStats {
 /// Layout orientation hint for the UI
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum LayoutOrientation {
+pub(crate) enum LayoutOrientation {
     /// Top-to-bottom (default for ownership/UBO)
     #[default]
     Vertical,
@@ -435,7 +421,7 @@ pub enum LayoutOrientation {
 
 /// Canvas bounds for the graph layout
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CanvasBounds {
+pub(crate) struct CanvasBounds {
     pub min_x: f32,
     pub min_y: f32,
     pub max_x: f32,
@@ -444,17 +430,17 @@ pub struct CanvasBounds {
 
 impl CanvasBounds {
     /// Calculate width of bounds
-    pub fn width(&self) -> f32 {
+    pub(crate) fn width(&self) -> f32 {
         self.max_x - self.min_x
     }
 
     /// Calculate height of bounds
-    pub fn height(&self) -> f32 {
+    pub(crate) fn height(&self) -> f32 {
         self.max_y - self.min_y
     }
 
     /// Get center point
-    pub fn center(&self) -> (f32, f32) {
+    pub(crate) fn center(&self) -> (f32, f32) {
         (
             (self.min_x + self.max_x) / 2.0,
             (self.min_y + self.max_y) / 2.0,
@@ -468,7 +454,7 @@ impl CanvasBounds {
 
 /// Result of comparing two graph states
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphComparison {
+pub(crate) struct GraphComparison {
     /// Query ID
     pub query_id: String,
 
@@ -502,7 +488,7 @@ pub struct GraphComparison {
 
 /// A changed node
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeChange {
+pub(crate) struct NodeChange {
     /// Node ID
     pub node_id: String,
 
@@ -512,7 +498,7 @@ pub struct NodeChange {
 
 /// A changed field
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldChange {
+pub(crate) struct FieldChange {
     /// Field name
     pub field: String,
 
@@ -525,7 +511,7 @@ pub struct FieldChange {
 
 /// Summary of comparison
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct ComparisonSummary {
+pub(crate) struct ComparisonSummary {
     pub nodes_added_count: usize,
     pub nodes_removed_count: usize,
     pub nodes_changed_count: usize,

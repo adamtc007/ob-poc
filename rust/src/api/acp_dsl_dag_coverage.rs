@@ -17,10 +17,10 @@ use crate::acp_state_anchor::{
 };
 use crate::runbook::{transition_language_pack_readiness, TransitionLanguagePackReadiness};
 
-pub const ACP_DSL_DAG_COVERAGE_SCHEMA_VERSION: &str = "acp_dsl_dag_coverage_v1";
+pub(crate) const ACP_DSL_DAG_COVERAGE_SCHEMA_VERSION: &str = "acp_dsl_dag_coverage_v1";
 
 #[derive(Debug, Clone, Serialize)]
-pub struct AcpDslDagCoverageReport {
+pub(crate) struct AcpDslDagCoverageReport {
     pub schema_version: &'static str,
     pub config_root: String,
     pub summary: AcpDslDagCoverageSummary,
@@ -28,7 +28,7 @@ pub struct AcpDslDagCoverageReport {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct AcpDslDagCoverageSummary {
+pub(crate) struct AcpDslDagCoverageSummary {
     pub total_rows: usize,
     pub core_acp_covered_rows: usize,
     pub full_loop_covered_rows: usize,
@@ -50,7 +50,7 @@ pub struct AcpDslDagCoverageSummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct AcpDslDagProviderCoverage {
+pub(crate) struct AcpDslDagProviderCoverage {
     pub provider_id: String,
     pub task: String,
     pub subject_kind: String,
@@ -62,7 +62,7 @@ pub struct AcpDslDagProviderCoverage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AcpDslDagSurfaceKind {
+pub(crate) enum AcpDslDagSurfaceKind {
     PackAllowedVerb,
     VerbConfig,
     DagProgressionVerb,
@@ -86,7 +86,7 @@ impl AcpDslDagSurfaceKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AcpDslDagCoverageStatus {
+pub(crate) enum AcpDslDagCoverageStatus {
     Covered,
     CoreOnly,
     Partial,
@@ -105,7 +105,7 @@ impl AcpDslDagCoverageStatus {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct AcpDslDagCoverageRow {
+pub(crate) struct AcpDslDagCoverageRow {
     pub surface_kind: AcpDslDagSurfaceKind,
     pub source_file: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,7 +166,7 @@ struct InventoryCounts {
     verb_config_count: usize,
 }
 
-pub fn build_acp_dsl_dag_coverage_report(
+pub(crate) fn build_acp_dsl_dag_coverage_report(
     config_root: impl AsRef<Path>,
 ) -> Result<AcpDslDagCoverageReport> {
     let config_root = config_root.as_ref();
@@ -214,7 +214,7 @@ pub fn build_acp_dsl_dag_coverage_report(
     })
 }
 
-pub fn write_acp_dsl_dag_coverage_artifacts(
+pub(crate) fn write_acp_dsl_dag_coverage_artifacts(
     report: &AcpDslDagCoverageReport,
     out_dir: impl AsRef<Path>,
 ) -> Result<(PathBuf, PathBuf)> {

@@ -37,7 +37,7 @@ type GraphNode = LegacyGraphNode;
 ///
 /// This builder queries the configuration tables (node_types, edge_types, view_modes)
 /// to determine what to include in the graph, rather than using hardcoded logic.
-pub struct ConfigDrivenGraphBuilder {
+pub(crate) struct ConfigDrivenGraphBuilder {
     cbu_id: Uuid,
     /// Stored for debugging/logging (derived sets are used for actual logic)
     _view_mode: String,
@@ -69,7 +69,7 @@ impl ConfigDrivenGraphBuilder {
     /// - FUND_STRUCTURE
     /// - PRODUCTS_ONLY
     /// - COMBINED
-    pub async fn new(pool: &sqlx::PgPool, cbu_id: Uuid, view_mode: &str) -> Result<Self> {
+    pub(crate) async fn new(pool: &sqlx::PgPool, cbu_id: Uuid, view_mode: &str) -> Result<Self> {
         // Load all node type configs
         let node_types = ViewConfigService::get_all_node_types(pool).await?;
         let node_type_configs: HashMap<String, NodeTypeConfig> = node_types
@@ -130,17 +130,17 @@ impl ConfigDrivenGraphBuilder {
     }
 
     /// Check if a node type is visible in the current view mode
-    pub fn is_node_type_visible(&self, type_code: &str) -> bool {
+    pub(crate) fn is_node_type_visible(&self, type_code: &str) -> bool {
         self.visible_node_types.contains(type_code)
     }
 
     /// Check if an edge type is visible in the current view mode
-    pub fn is_edge_type_visible(&self, type_code: &str) -> bool {
+    pub(crate) fn is_edge_type_visible(&self, type_code: &str) -> bool {
         self.visible_edge_types.contains(type_code)
     }
 
     /// Get rendering hints for a node type
-    pub fn get_node_rendering_hints(&self, type_code: &str) -> Option<NodeRenderingHints> {
+    pub(crate) fn get_node_rendering_hints(&self, type_code: &str) -> Option<NodeRenderingHints> {
         self.node_type_configs.get(type_code).map(|config| {
             use bigdecimal::ToPrimitive;
             NodeRenderingHints {
@@ -154,34 +154,14 @@ impl ConfigDrivenGraphBuilder {
         })
     }
 
-    /// Get layout hints for an edge type
-    pub fn get_edge_layout_hints(&self, type_code: &str) -> Option<EdgeLayoutHints> {
-        self.edge_type_configs
-            .get(type_code)
-            .map(|config| EdgeLayoutHints {
-                tier_delta: config.tier_delta,
-                is_hierarchical: config.is_hierarchical,
-                layout_direction: config.layout_direction.clone(),
-                bundle_group: config.bundle_group.clone(),
-                routing_priority: config.routing_priority,
-            })
-    }
 
-    /// Check if an edge type is hierarchical (affects layout)
-    pub fn is_hierarchy_edge(&self, type_code: &str) -> bool {
-        self.hierarchy_edge_types.contains(type_code)
-    }
 
-    /// Check if an edge type is an overlay (rendered on top of hierarchy)
-    pub fn is_overlay_edge(&self, type_code: &str) -> bool {
-        self.overlay_edge_types.contains(type_code)
-    }
 
     /// Get the layers to include based on view mode config
     ///
     /// Infers layers from the hierarchy_edge_types and overlay_edge_types in the view mode config.
     /// Falls back to ["core"] if no config is available.
-    pub fn get_included_layers(&self) -> Vec<String> {
+    pub(crate) fn get_included_layers(&self) -> Vec<String> {
         // Since view_modes doesn't have an included_layers column,
         // we infer layers from the edge types configured for this view mode.
         // The default includes "core" and any layers implied by visible edge types.
@@ -246,7 +226,7 @@ impl ConfigDrivenGraphBuilder {
     /// Build the graph from database via VisualizationRepository
     ///
     /// This method loads data and applies config-driven filtering.
-    pub async fn build(self, repo: &VisualizationRepository) -> Result<CbuGraph> {
+    pub(crate) async fn build(self, repo: &VisualizationRepository) -> Result<CbuGraph> {
         // Load CBU base record
         let cbu_record = repo
             .get_cbu_basic(self.cbu_id)
@@ -1556,7 +1536,7 @@ impl ConfigDrivenGraphBuilder {
 
 /// Rendering hints for a node type from config
 #[derive(Debug, Clone)]
-pub struct NodeRenderingHints {
+pub(crate) struct NodeRenderingHints {
     pub icon: Option<String>,
     pub default_color: Option<String>,
     pub default_shape: Option<String>,
@@ -1567,7 +1547,7 @@ pub struct NodeRenderingHints {
 
 /// Layout hints for an edge type from config
 #[derive(Debug, Clone)]
-pub struct EdgeLayoutHints {
+pub(crate) struct EdgeLayoutHints {
     pub tier_delta: Option<i32>,
     pub is_hierarchical: bool,
     pub layout_direction: Option<String>,

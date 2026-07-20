@@ -14,23 +14,23 @@ use super::types::AgentEvent;
 const DEFAULT_BUFFER_SIZE: usize = 256;
 
 /// Receiver end of the agent event channel (re-exported for drain task).
-pub type AgentEventReceiver = mpsc::Receiver<AgentEvent>;
+pub(crate) type AgentEventReceiver = mpsc::Receiver<AgentEvent>;
 
 /// Shared emitter for use across async boundaries.
-pub type SharedAgentEmitter = Arc<AgentEventEmitter>;
+pub(crate) type SharedAgentEmitter = Arc<AgentEventEmitter>;
 
 /// Agent event emitter.
 ///
 /// Fire-and-forget: `emit()` never blocks, never fails, drops on full buffer.
 /// This ensures zero impact on the agent hot path.
-pub struct AgentEventEmitter {
+pub(crate) struct AgentEventEmitter {
     sender: mpsc::Sender<AgentEvent>,
     stats: EmitterStats,
 }
 
 /// Statistics for monitoring emitter health.
 #[derive(Debug, Default)]
-pub struct EmitterStats {
+pub(crate) struct EmitterStats {
     /// Total events emitted
     emitted: AtomicU64,
     /// Events dropped due to full buffer
@@ -39,12 +39,12 @@ pub struct EmitterStats {
 
 impl AgentEventEmitter {
     /// Create a new emitter with default buffer size.
-    pub fn new() -> (Self, AgentEventReceiver) {
+    pub(crate) fn new() -> (Self, AgentEventReceiver) {
         Self::with_buffer_size(DEFAULT_BUFFER_SIZE)
     }
 
     /// Create a new emitter with custom buffer size.
-    pub fn with_buffer_size(size: usize) -> (Self, AgentEventReceiver) {
+    pub(crate) fn with_buffer_size(size: usize) -> (Self, AgentEventReceiver) {
         let (sender, receiver) = mpsc::channel(size);
         let emitter = Self {
             sender,
@@ -60,7 +60,7 @@ impl AgentEventEmitter {
     /// - Never fails (drops on full buffer)
     /// - Takes < 1μs
     #[inline]
-    pub fn emit(&self, event: AgentEvent) {
+    pub(crate) fn emit(&self, event: AgentEvent) {
         self.stats.emitted.fetch_add(1, Ordering::Relaxed);
 
         if self.sender.try_send(event).is_err() {
@@ -70,7 +70,7 @@ impl AgentEventEmitter {
     }
 
     /// Get current stats.
-    pub fn stats(&self) -> (u64, u64) {
+    pub(crate) fn stats(&self) -> (u64, u64) {
         (
             self.stats.emitted.load(Ordering::Relaxed),
             self.stats.dropped.load(Ordering::Relaxed),

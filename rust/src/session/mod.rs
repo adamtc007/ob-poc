@@ -41,12 +41,11 @@ use crate::graph::types::{EntityGraph, GraphFilters};
 use crate::graph::ViewportContext;
 use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
-pub use agent_mode::{
-    ActionRef, AgentState, AgentStatus, AgentTask, Candidate, Checkpoint, CheckpointContext,
-    CheckpointType, DecisionRef, SessionMode,
-};
-pub use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash, sha256};
-pub use constraint_cascade::{
+pub use agent_mode::{AgentState, Candidate};
+pub(crate) use agent_mode::{ActionRef, AgentStatus, AgentTask, Checkpoint, CheckpointContext, CheckpointType, DecisionRef, SessionMode};
+pub use canonical_hash::{sha256};
+pub(crate) use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash};
+pub(crate) use constraint_cascade::{
     derive_extended_scope, derive_search_scope, set_case, set_client, set_structure,
     set_structure_type, update_dag_from_cascade, validate_set_case, validate_set_client,
     validate_set_structure, validate_set_structure_type, verb_available_for_persona, CascadeError,
@@ -74,91 +73,37 @@ pub use constraint_cascade::{
     since = "0.1.0",
     note = "Use unified types from session::unified instead (RunSheet, EntryStatus, etc.)"
 )]
-pub use dsl_sheet::{
+pub(crate) use dsl_sheet::{
     CyclicDependency, DslSheet, EntityCandidate, ErrorCode, ExecutionPhase, SessionDslStatement,
     SheetExecutionResult, SheetStatus, SourceSpan, StatementError, StatementResult,
     StatementStatus, UnresolvedReference, ValidationError, ValidationResult, ValidationWarning,
 };
-pub use research_context::{ResearchContext, ResearchState};
-pub use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
-pub use scope_path::{ScopePath, ScopeSegment};
-pub use struct_mass::{
+pub(crate) use research_context::{ResearchContext, ResearchState};
+pub(crate) use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
+pub(crate) use scope_path::{ScopePath, ScopeSegment};
+pub(crate) use struct_mass::{
     MassBreakdown, MassContributions, MassThresholds, MassViewMode, MassWeights, StructMass,
 };
-pub use unified::{
-    BoundEntity,
-    CaseRef,
-    // CBU undo/redo (migrated from CbuSession)
-    CbuSnapshot,
-    ChatMessage,
-    ClientRef,
-    // Correction sub-session
-    CorrectionSubSession,
-    DagState,
-    DiscriminatorField,
-    EntityMatch,
-    // Entity match info for resolution UI
-    EntityMatchInfo,
-    EntityScope,
-    // Sheet execution types (migrated from dsl_sheet)
-    EntryError,
-    EntryResult,
-    EntryStatus,
-    EnumValue,
-    ErrorCode as UnifiedErrorCode,
-    ExecutionPhase as UnifiedExecutionPhase,
-    FieldType,
-    MessageRole,
-    Persona,
-    PrereqCondition,
-    // REPL state machine (migrated from CbuSession)
-    ReplState,
-    // Research sub-session
-    ResearchSubSession,
-    ResolutionState,
-    // Resolution sub-session (full metadata for disambiguation)
-    ResolutionSubSession,
-    ResolvedRef,
-    // Review status enum
-    ReviewStatus,
-    // Review sub-session
-    ReviewSubSession,
-    RunSheet,
-    RunSheetEntry,
-    SearchKeyField,
-    SearchScope,
-    // Session state machine (migrated from AgentSession)
-    SessionEvent,
-    // Session list item for API responses
-    SessionListItem,
-    // Session lifecycle states
-    SessionState,
-    SheetExecutionResult as UnifiedSheetExecutionResult,
-    SheetStatus as UnifiedSheetStatus,
-    StructureRef,
-    StructureType,
-    // Sub-session types
-    SubSessionType,
-    TargetUniverse,
-    UnifiedSession,
-    UniverseDefinition,
-    UnresolvedRef,
-    // Unresolved ref info (full metadata for resolution UI)
-    UnresolvedRefInfo,
-    ValidationError as UnifiedValidationError,
-    ViewState as UnifiedViewState,
-    ZoomLevel,
+pub use unified::{EntryStatus, UnifiedSession, ViewState as UnifiedViewState};
+pub(crate) use unified::{
+    BoundEntity, CaseRef, CbuSnapshot, ChatMessage, ClientRef, CorrectionSubSession, DagState,
+    DiscriminatorField, EntityMatch, EntityMatchInfo, EntityScope, EntryError, EntryResult,
+    EnumValue, ErrorCode as UnifiedErrorCode, ExecutionPhase as UnifiedExecutionPhase, FieldType,
+    MessageRole, Persona, PrereqCondition, ReplState, ResearchSubSession, ResolutionState,
+    ResolutionSubSession, ResolvedRef, ReviewStatus, ReviewSubSession, RunSheet, RunSheetEntry,
+    SearchKeyField, SearchScope, SessionEvent, SessionListItem, SessionState,
+    SheetExecutionResult as UnifiedSheetExecutionResult, SheetStatus as UnifiedSheetStatus,
+    StructureRef, StructureType, SubSessionType, TargetUniverse, UniverseDefinition,
+    UnresolvedRef, UnresolvedRefInfo, ValidationError as UnifiedValidationError, ZoomLevel,
 };
-pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostic, VerbDiagnostics};
-pub use verb_sync::{SyncResult, VerbSyncError, VerbSyncService};
-pub use verb_tiering_linter::{
-    lint_all_verbs, lint_all_verbs_with_config, lint_verb_tiering, lint_verb_with_config,
-    LintConfig, LintReport, LintTier, VerbLintResult,
-};
-pub use view_state::{
-    BatchOperation, LayoutBounds, LayoutResult, NodePosition, OperationPreview, PendingOperation,
-    Refinement, ViewState,
-};
+pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostics};
+pub(crate) use verb_contract::{VerbDiagnostic};
+pub use verb_sync::{VerbSyncService};
+pub(crate) use verb_sync::{SyncResult, VerbSyncError};
+pub use verb_tiering_linter::{lint_all_verbs_with_config, LintConfig, LintTier};
+pub(crate) use verb_tiering_linter::{lint_all_verbs, lint_verb_tiering, lint_verb_with_config, LintReport, VerbLintResult};
+pub use view_state::{ViewState};
+pub(crate) use view_state::{BatchOperation, LayoutBounds, LayoutResult, NodePosition, OperationPreview, PendingOperation, Refinement};
 
 /// Unified session context - handles Visualization + Navigation
 ///
@@ -182,7 +127,7 @@ pub use view_state::{
 ///
 /// For new DSL/REPL features, prefer `UnifiedSession`.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct UnifiedSessionContext {
+pub(crate) struct UnifiedSessionContext {
     /// Session identity
     pub session_id: Uuid,
     pub user_id: Option<Uuid>,
@@ -246,7 +191,7 @@ impl Clone for UnifiedSessionContext {
 
 /// Executed command with timestamp for history
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutedCommand {
+pub(crate) struct ExecutedCommand {
     pub command: NavCommand,
     pub executed_at: DateTime<Utc>,
     pub result_summary: String,
@@ -254,7 +199,7 @@ pub struct ExecutedCommand {
 
 /// Named position bookmark
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Bookmark {
+pub(crate) struct Bookmark {
     pub name: String,
     pub cursor: Option<Uuid>,
     pub filters: GraphFilters,
@@ -270,7 +215,7 @@ impl Default for UnifiedSessionContext {
 
 impl UnifiedSessionContext {
     /// Create a new session with default values
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             session_id: Uuid::new_v4(),
             user_id: None,
@@ -289,14 +234,14 @@ impl UnifiedSessionContext {
     }
 
     /// Create a session with a specific user
-    pub fn with_user(user_id: Uuid) -> Self {
+    pub(crate) fn with_user(user_id: Uuid) -> Self {
         let mut session = Self::new();
         session.user_id = Some(user_id);
         session
     }
 
     /// Execute a navigation command
-    pub fn execute_nav(&mut self, cmd: NavCommand) -> NavResult {
+    pub(crate) fn execute_nav(&mut self, cmd: NavCommand) -> NavResult {
         // Record in history
         let result = if let Some(graph) = &mut self.graph {
             graph.execute_nav(cmd.clone())
@@ -322,7 +267,7 @@ impl UnifiedSessionContext {
     }
 
     /// Set the graph data and update scope stats
-    pub fn set_graph(&mut self, graph: EntityGraph) {
+    pub(crate) fn set_graph(&mut self, graph: EntityGraph) {
         // Update scope stats from graph
         self.scope = SessionScope::from_graph(&graph, self.scope.definition.clone());
 
@@ -338,7 +283,7 @@ impl UnifiedSessionContext {
     }
 
     /// Clear the current graph
-    pub fn clear_graph(&mut self) {
+    pub(crate) fn clear_graph(&mut self) {
         self.graph = None;
         self.scope = SessionScope::empty();
         self.viewport =
@@ -346,7 +291,7 @@ impl UnifiedSessionContext {
     }
 
     /// Create a bookmark at the current position
-    pub fn create_bookmark(&mut self, name: &str) {
+    pub(crate) fn create_bookmark(&mut self, name: &str) {
         if let Some(graph) = &self.graph {
             let bookmark = Bookmark {
                 name: name.to_string(),
@@ -360,7 +305,7 @@ impl UnifiedSessionContext {
     }
 
     /// Restore a named bookmark
-    pub fn restore_bookmark(&mut self, name: &str) -> bool {
+    pub(crate) fn restore_bookmark(&mut self, name: &str) -> bool {
         if let Some(bookmark) = self.bookmarks.get(name).cloned() {
             if let Some(graph) = &mut self.graph {
                 graph.cursor = bookmark.cursor;
@@ -375,22 +320,22 @@ impl UnifiedSessionContext {
     }
 
     /// Get list of bookmark names
-    pub fn list_bookmarks(&self) -> Vec<&str> {
+    pub(crate) fn list_bookmarks(&self) -> Vec<&str> {
         self.bookmarks.keys().map(|s| s.as_str()).collect()
     }
 
     /// Get command history (most recent first)
-    pub fn recent_commands(&self, limit: usize) -> Vec<&ExecutedCommand> {
+    pub(crate) fn recent_commands(&self, limit: usize) -> Vec<&ExecutedCommand> {
         self.command_history.iter().rev().take(limit).collect()
     }
 
     /// Check if session has a graph loaded
-    pub fn has_graph(&self) -> bool {
+    pub(crate) fn has_graph(&self) -> bool {
         self.graph.is_some()
     }
 
     /// Check if session has a cursor set
-    pub fn has_cursor(&self) -> bool {
+    pub(crate) fn has_cursor(&self) -> bool {
         self.graph
             .as_ref()
             .map(|g| g.cursor.is_some())
@@ -398,12 +343,12 @@ impl UnifiedSessionContext {
     }
 
     /// Get current cursor entity ID
-    pub fn cursor_id(&self) -> Option<Uuid> {
+    pub(crate) fn cursor_id(&self) -> Option<Uuid> {
         self.graph.as_ref().and_then(|g| g.cursor)
     }
 
     /// Get cursor entity name
-    pub fn cursor_name(&self) -> Option<String> {
+    pub(crate) fn cursor_name(&self) -> Option<String> {
         self.graph.as_ref().and_then(|g| {
             g.cursor
                 .and_then(|id| g.nodes.get(&id).map(|n| n.name.clone()))
@@ -415,42 +360,33 @@ impl UnifiedSessionContext {
     // =========================================================================
 
     /// Check if session has a view loaded
-    pub fn has_view(&self) -> bool {
+    pub(crate) fn has_view(&self) -> bool {
         self.view.is_some()
     }
 
     /// Get current view for rendering (immutable)
-    pub fn current_view(&self) -> Option<&ViewState> {
+    pub(crate) fn current_view(&self) -> Option<&ViewState> {
         self.view.as_ref()
     }
 
     /// Get current view for modification
-    pub fn current_view_mut(&mut self) -> Option<&mut ViewState> {
+    pub(crate) fn current_view_mut(&mut self) -> Option<&mut ViewState> {
         self.view.as_mut()
     }
 
     /// Set view from an existing ViewState
-    pub fn set_view(&mut self, view: ViewState) {
+    pub(crate) fn set_view(&mut self, view: ViewState) {
         self.view = Some(view);
     }
 
     /// Clear the current view
-    pub fn clear_view(&mut self) {
+    pub(crate) fn clear_view(&mut self) {
         self.view = None;
     }
 
-    /// Apply refinement to current view
-    pub fn refine_view(&mut self, refinement: Refinement) -> anyhow::Result<()> {
-        if let Some(view) = &mut self.view {
-            view.refine(refinement);
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("No active view"))
-        }
-    }
 
     /// Clear all refinements from current view
-    pub fn clear_view_refinements(&mut self) -> anyhow::Result<()> {
+    pub(crate) fn clear_view_refinements(&mut self) -> anyhow::Result<()> {
         if let Some(view) = &mut self.view {
             view.clear_refinements();
             Ok(())
@@ -460,7 +396,7 @@ impl UnifiedSessionContext {
     }
 
     /// Stage batch operation on current selection
-    pub fn stage_operation(&mut self, operation: BatchOperation) -> anyhow::Result<()> {
+    pub(crate) fn stage_operation(&mut self, operation: BatchOperation) -> anyhow::Result<()> {
         if let Some(view) = &mut self.view {
             view.stage_operation(operation)
         } else {
@@ -469,7 +405,7 @@ impl UnifiedSessionContext {
     }
 
     /// Clear pending operation from current view
-    pub fn clear_pending_operation(&mut self) -> anyhow::Result<()> {
+    pub(crate) fn clear_pending_operation(&mut self) -> anyhow::Result<()> {
         if let Some(view) = &mut self.view {
             view.clear_pending();
             Ok(())
@@ -479,17 +415,17 @@ impl UnifiedSessionContext {
     }
 
     /// Get current selection count
-    pub fn selection_count(&self) -> usize {
+    pub(crate) fn selection_count(&self) -> usize {
         self.view.as_ref().map(|v| v.selection_count()).unwrap_or(0)
     }
 
     /// Check if there's a pending operation
-    pub fn has_pending_operation(&self) -> bool {
+    pub(crate) fn has_pending_operation(&self) -> bool {
         self.view.as_ref().is_some_and(|v| v.has_pending())
     }
 
     /// Get the pending operation's generated DSL (for preview/editing)
-    pub fn pending_dsl(&self) -> Option<&str> {
+    pub(crate) fn pending_dsl(&self) -> Option<&str> {
         self.view
             .as_ref()
             .and_then(|v| v.pending.as_ref())
@@ -497,7 +433,7 @@ impl UnifiedSessionContext {
     }
 
     /// Get selection IDs for external use
-    pub fn selection_ids(&self) -> Vec<Uuid> {
+    pub(crate) fn selection_ids(&self) -> Vec<Uuid> {
         self.view
             .as_ref()
             .map(|v| v.selection.clone())
@@ -511,7 +447,7 @@ impl UnifiedSessionContext {
     /// Zoom into a node, expanding it into its child taxonomy.
     ///
     /// Delegates to ViewState::zoom_in. Returns Ok(true) if zoom succeeded.
-    pub async fn zoom_in(&mut self, node_id: Uuid) -> anyhow::Result<bool> {
+    pub(crate) async fn zoom_in(&mut self, node_id: Uuid) -> anyhow::Result<bool> {
         if let Some(view) = &mut self.view {
             view.zoom_in(node_id).await
         } else {
@@ -522,7 +458,7 @@ impl UnifiedSessionContext {
     /// Zoom out to the parent taxonomy.
     ///
     /// Delegates to ViewState::zoom_out. Returns Ok(true) if zoom out succeeded.
-    pub fn zoom_out(&mut self) -> anyhow::Result<bool> {
+    pub(crate) fn zoom_out(&mut self) -> anyhow::Result<bool> {
         if let Some(view) = &mut self.view {
             view.zoom_out()
         } else {
@@ -533,7 +469,7 @@ impl UnifiedSessionContext {
     /// Jump back to a specific breadcrumb level.
     ///
     /// `depth` is 0-indexed: 0 = root, 1 = first zoom, etc.
-    pub fn back_to(&mut self, depth: usize) -> anyhow::Result<bool> {
+    pub(crate) fn back_to(&mut self, depth: usize) -> anyhow::Result<bool> {
         if let Some(view) = &mut self.view {
             view.back_to(depth)
         } else {
@@ -542,7 +478,7 @@ impl UnifiedSessionContext {
     }
 
     /// Get breadcrumbs for navigation display.
-    pub fn breadcrumbs(&self) -> Vec<String> {
+    pub(crate) fn breadcrumbs(&self) -> Vec<String> {
         self.view
             .as_ref()
             .map(|v| v.breadcrumbs())
@@ -550,7 +486,7 @@ impl UnifiedSessionContext {
     }
 
     /// Get breadcrumbs with frame IDs.
-    pub fn breadcrumbs_with_ids(&self) -> Vec<(String, Uuid)> {
+    pub(crate) fn breadcrumbs_with_ids(&self) -> Vec<(String, Uuid)> {
         self.view
             .as_ref()
             .map(|v| v.breadcrumbs_with_ids())
@@ -558,17 +494,17 @@ impl UnifiedSessionContext {
     }
 
     /// Get current zoom depth (0 = root level).
-    pub fn zoom_depth(&self) -> usize {
+    pub(crate) fn zoom_depth(&self) -> usize {
         self.view.as_ref().map(|v| v.zoom_depth()).unwrap_or(0)
     }
 
     /// Check if we can zoom out (not at root).
-    pub fn can_zoom_out(&self) -> bool {
+    pub(crate) fn can_zoom_out(&self) -> bool {
         self.view.as_ref().is_some_and(|v| v.can_zoom_out())
     }
 
     /// Check if a node can be zoomed into.
-    pub fn can_zoom_in(&self, node_id: Uuid) -> bool {
+    pub(crate) fn can_zoom_in(&self, node_id: Uuid) -> bool {
         self.view.as_ref().is_some_and(|v| v.can_zoom_in(node_id))
     }
 
@@ -577,7 +513,7 @@ impl UnifiedSessionContext {
     // =========================================================================
 
     /// Start agent mode with a task
-    pub fn start_agent(&mut self, task: AgentTask) -> Uuid {
+    pub(crate) fn start_agent(&mut self, task: AgentTask) -> Uuid {
         let state = AgentState::new(task);
         let agent_session_id = state.agent_session_id;
         self.agent = Some(state);
@@ -586,7 +522,7 @@ impl UnifiedSessionContext {
     }
 
     /// Start agent mode for resolving gaps
-    pub fn start_resolve_gaps(&mut self, entity_id: Uuid) -> Uuid {
+    pub(crate) fn start_resolve_gaps(&mut self, entity_id: Uuid) -> Uuid {
         let state = AgentState::resolve_gaps(entity_id);
         let agent_session_id = state.agent_session_id;
         self.agent = Some(state);
@@ -595,7 +531,7 @@ impl UnifiedSessionContext {
     }
 
     /// Start agent mode for chain research
-    pub fn start_chain_research(&mut self, entity_id: Uuid) -> Uuid {
+    pub(crate) fn start_chain_research(&mut self, entity_id: Uuid) -> Uuid {
         let state = AgentState::chain_research(entity_id);
         let agent_session_id = state.agent_session_id;
         self.agent = Some(state);
@@ -604,7 +540,7 @@ impl UnifiedSessionContext {
     }
 
     /// Stop agent mode and return to manual
-    pub fn stop_agent(&mut self) {
+    pub(crate) fn stop_agent(&mut self) {
         if let Some(agent) = &mut self.agent {
             agent.cancel();
         }
@@ -612,48 +548,48 @@ impl UnifiedSessionContext {
     }
 
     /// Pause agent execution
-    pub fn pause_agent(&mut self) {
+    pub(crate) fn pause_agent(&mut self) {
         if let Some(agent) = &mut self.agent {
             agent.pause();
         }
     }
 
     /// Resume agent execution
-    pub fn resume_agent(&mut self) {
+    pub(crate) fn resume_agent(&mut self) {
         if let Some(agent) = &mut self.agent {
             agent.resume();
         }
     }
 
     /// Check if session is in agent mode
-    pub fn is_agent_mode(&self) -> bool {
+    pub(crate) fn is_agent_mode(&self) -> bool {
         matches!(self.mode, SessionMode::Agent | SessionMode::Hybrid)
     }
 
     /// Check if agent is waiting for user input
-    pub fn agent_waiting(&self) -> bool {
+    pub(crate) fn agent_waiting(&self) -> bool {
         self.agent.as_ref().is_some_and(|a| a.is_waiting())
     }
 
     /// Get pending checkpoint if any
-    pub fn pending_checkpoint(&self) -> Option<&Checkpoint> {
+    pub(crate) fn pending_checkpoint(&self) -> Option<&Checkpoint> {
         self.agent
             .as_ref()
             .and_then(|a| a.pending_checkpoint.as_ref())
     }
 
     /// Get agent status
-    pub fn agent_status(&self) -> Option<AgentStatus> {
+    pub(crate) fn agent_status(&self) -> Option<AgentStatus> {
         self.agent.as_ref().map(|a| a.status)
     }
 
     /// Get agent summary for display
-    pub fn agent_summary(&self) -> Option<String> {
+    pub(crate) fn agent_summary(&self) -> Option<String> {
         self.agent.as_ref().map(|a| a.summary())
     }
 
     /// Get mutable reference to agent state
-    pub fn agent_mut(&mut self) -> Option<&mut AgentState> {
+    pub(crate) fn agent_mut(&mut self) -> Option<&mut AgentState> {
         self.agent.as_mut()
     }
 }

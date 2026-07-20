@@ -50,8 +50,9 @@ pub mod narration_emit;
 mod resource_owner;
 
 pub use bpmn_signal::{BpmnCancelConsumer, BpmnSignalConsumer};
-pub use consumer::AsyncOutboxConsumer;
-pub use drainer::{OutboxDrainerConfig, OutboxDrainerHandle, OutboxDrainerImpl};
+pub(crate) use consumer::AsyncOutboxConsumer;
+pub use drainer::{OutboxDrainerConfig, OutboxDrainerImpl};
+pub(crate) use drainer::{OutboxDrainerHandle};
 pub use maintenance_spawn::MaintenanceSpawnConsumer;
 pub use narrate::NarrateConsumer;
 pub use resource_owner::{ResourceOwnerDispatchConsumer, ResourceOwnerStandDownConsumer};

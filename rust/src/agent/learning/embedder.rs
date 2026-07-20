@@ -18,10 +18,10 @@ use tokio::sync::{Mutex, RwLock};
 pub type Embedding = Vec<f32>;
 
 /// Standard embedding dimension (BGE-small-en-v1.5, same as MiniLM)
-pub const EMBEDDING_DIMENSION: usize = 384;
+pub(crate) const EMBEDDING_DIMENSION: usize = 384;
 
 /// Model version for tracking (useful for migrations)
-pub const EMBEDDING_MODEL_VERSION: &str = "bge-small-en-v1.5";
+pub(crate) const EMBEDDING_MODEL_VERSION: &str = "bge-small-en-v1.5";
 
 /// Trait for text embedding services
 #[async_trait]
@@ -52,7 +52,7 @@ pub trait Embedder: Send + Sync {
 }
 
 /// Shared embedder type for use across handlers
-pub type SharedEmbedder = Arc<dyn Embedder>;
+pub(crate) type SharedEmbedder = Arc<dyn Embedder>;
 
 /// Local embedder using Candle + BGE-small-en-v1.5
 ///
@@ -210,7 +210,7 @@ impl Embedder for CandleEmbedder {
 }
 
 /// Cached embedder wrapper for efficiency
-pub struct CachedEmbedder {
+pub(crate) struct CachedEmbedder {
     inner: Arc<dyn Embedder>,
     query_cache: RwLock<HashMap<String, Embedding>>,
     target_cache: RwLock<HashMap<String, Embedding>>,
@@ -219,7 +219,7 @@ pub struct CachedEmbedder {
 
 impl CachedEmbedder {
     /// Create cached wrapper around an embedder
-    pub fn new(inner: Arc<dyn Embedder>) -> Self {
+    pub(crate) fn new(inner: Arc<dyn Embedder>) -> Self {
         Self {
             inner,
             query_cache: RwLock::new(HashMap::new()),
@@ -228,15 +228,6 @@ impl CachedEmbedder {
         }
     }
 
-    /// Create with custom cache size
-    pub fn with_max_cache(inner: Arc<dyn Embedder>, max_size: usize) -> Self {
-        Self {
-            inner,
-            query_cache: RwLock::new(HashMap::new()),
-            target_cache: RwLock::new(HashMap::new()),
-            max_cache_size: max_size,
-        }
-    }
 }
 
 #[async_trait]
@@ -386,20 +377,17 @@ impl Embedder for CachedEmbedder {
 
 /// Null embedder for testing (returns zero vectors)
 #[derive(Default)]
-pub struct NullEmbedder {
+pub(crate) struct NullEmbedder {
     dimension: usize,
 }
 
 impl NullEmbedder {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             dimension: EMBEDDING_DIMENSION,
         }
     }
 
-    pub fn with_dimension(dimension: usize) -> Self {
-        Self { dimension }
-    }
 }
 
 #[async_trait]

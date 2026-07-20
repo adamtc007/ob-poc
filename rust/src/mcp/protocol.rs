@@ -7,7 +7,7 @@ use serde_json::Value;
 
 /// JSON-RPC request
 #[derive(Debug, Deserialize)]
-pub struct JsonRpcRequest {
+pub(crate) struct JsonRpcRequest {
     pub jsonrpc: String,
     pub id: Option<Value>,
     pub method: String,
@@ -17,7 +17,7 @@ pub struct JsonRpcRequest {
 
 /// JSON-RPC response
 #[derive(Debug, Serialize)]
-pub struct JsonRpcResponse {
+pub(crate) struct JsonRpcResponse {
     pub jsonrpc: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<Value>,
@@ -29,13 +29,13 @@ pub struct JsonRpcResponse {
 
 /// JSON-RPC error
 #[derive(Debug, Serialize)]
-pub struct JsonRpcError {
+pub(crate) struct JsonRpcError {
     pub code: i32,
     pub message: String,
 }
 
 impl JsonRpcResponse {
-    pub fn success(id: Option<Value>, result: Value) -> Self {
+    pub(crate) fn success(id: Option<Value>, result: Value) -> Self {
         Self {
             jsonrpc: "2.0".into(),
             id,
@@ -44,7 +44,7 @@ impl JsonRpcResponse {
         }
     }
 
-    pub fn error(id: Option<Value>, code: i32, message: impl Into<String>) -> Self {
+    pub(crate) fn error(id: Option<Value>, code: i32, message: impl Into<String>) -> Self {
         Self {
             jsonrpc: "2.0".into(),
             id,
@@ -58,15 +58,14 @@ impl JsonRpcResponse {
 }
 
 // Standard JSON-RPC error codes
-pub const PARSE_ERROR: i32 = -32700;
-pub const INVALID_REQUEST: i32 = -32600;
-pub const METHOD_NOT_FOUND: i32 = -32601;
-pub const INVALID_PARAMS: i32 = -32602;
-pub const INTERNAL_ERROR: i32 = -32603;
+pub(crate) const PARSE_ERROR: i32 = -32700;
+pub(crate) const METHOD_NOT_FOUND: i32 = -32601;
+pub(crate) const INVALID_PARAMS: i32 = -32602;
+pub(crate) const INTERNAL_ERROR: i32 = -32603;
 
 /// MCP initialize result
 #[derive(Debug, Serialize)]
-pub struct InitializeResult {
+pub(crate) struct InitializeResult {
     #[serde(rename = "protocolVersion")]
     pub protocol_version: String,
     pub capabilities: ServerCapabilities,
@@ -76,7 +75,7 @@ pub struct InitializeResult {
 
 /// Server capabilities
 #[derive(Debug, Serialize)]
-pub struct ServerCapabilities {
+pub(crate) struct ServerCapabilities {
     pub tools: ToolsCapability,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resources: Option<ResourcesCapability>,
@@ -84,21 +83,21 @@ pub struct ServerCapabilities {
 
 /// Tools capability
 #[derive(Debug, Serialize)]
-pub struct ToolsCapability {
+pub(crate) struct ToolsCapability {
     #[serde(rename = "listChanged")]
     pub list_changed: bool,
 }
 
 /// Server info
 #[derive(Debug, Serialize)]
-pub struct ServerInfo {
+pub(crate) struct ServerInfo {
     pub name: String,
     pub version: String,
 }
 
 /// Tool definition
 #[derive(Debug, Serialize)]
-pub struct Tool {
+pub(crate) struct Tool {
     pub name: String,
     pub description: String,
     #[serde(rename = "inputSchema")]
@@ -107,13 +106,13 @@ pub struct Tool {
 
 /// Tools list result
 #[derive(Debug, Serialize)]
-pub struct ToolsListResult {
+pub(crate) struct ToolsListResult {
     pub tools: Vec<Tool>,
 }
 
 /// Tool call parameters
 #[derive(Debug, Deserialize)]
-pub struct ToolCallParams {
+pub(crate) struct ToolCallParams {
     pub name: String,
     #[serde(default)]
     pub arguments: Value,
@@ -129,7 +128,7 @@ pub struct ToolCallResult {
 
 /// Tool content block
 #[derive(Debug, Serialize)]
-pub struct ToolContent {
+pub(crate) struct ToolContent {
     #[serde(rename = "type")]
     pub content_type: String,
     pub text: String,
@@ -139,7 +138,7 @@ pub struct ToolContent {
 
 /// Resource template definition (advertised via `resources/list`)
 #[derive(Debug, Serialize)]
-pub struct ResourceTemplate {
+pub(crate) struct ResourceTemplate {
     /// URI template with placeholders, e.g. `sem_reg://attributes/{fqn}`
     #[serde(rename = "uriTemplate")]
     pub uri_template: String,
@@ -163,7 +162,7 @@ pub struct Resource {
 
 /// Result for `resources/list`
 #[derive(Debug, Serialize)]
-pub struct ResourcesListResult {
+pub(crate) struct ResourcesListResult {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub resources: Vec<Resource>,
     #[serde(rename = "resourceTemplates", skip_serializing_if = "Vec::is_empty")]
@@ -172,13 +171,13 @@ pub struct ResourcesListResult {
 
 /// Parameters for `resources/read`
 #[derive(Debug, Deserialize)]
-pub struct ResourceReadParams {
+pub(crate) struct ResourceReadParams {
     pub uri: String,
 }
 
 /// A single content block returned by `resources/read`
 #[derive(Debug, Serialize)]
-pub struct ResourceContent {
+pub(crate) struct ResourceContent {
     pub uri: String,
     #[serde(rename = "mimeType", skip_serializing_if = "Option::is_none")]
     pub mime_type: Option<String>,
@@ -188,12 +187,12 @@ pub struct ResourceContent {
 
 /// Result for `resources/read`
 #[derive(Debug, Serialize)]
-pub struct ResourceReadResult {
+pub(crate) struct ResourceReadResult {
     pub contents: Vec<ResourceContent>,
 }
 
 impl ResourceReadResult {
-    pub fn json_content(uri: &str, value: &serde_json::Value) -> Self {
+    pub(crate) fn json_content(uri: &str, value: &serde_json::Value) -> Self {
         Self {
             contents: vec![ResourceContent {
                 uri: uri.to_string(),
@@ -203,7 +202,7 @@ impl ResourceReadResult {
         }
     }
 
-    pub fn not_found(uri: &str) -> Self {
+    pub(crate) fn not_found(uri: &str) -> Self {
         Self {
             contents: vec![ResourceContent {
                 uri: uri.to_string(),
@@ -216,7 +215,7 @@ impl ResourceReadResult {
 
 /// Resources capability
 #[derive(Debug, Serialize)]
-pub struct ResourcesCapability {
+pub(crate) struct ResourcesCapability {
     #[serde(rename = "listChanged")]
     pub list_changed: bool,
 }

@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 /// A single DSL action intent - what the user wants to do
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslIntent {
+pub(crate) struct DslIntent {
     /// The verb to execute (e.g., "cbu.assign-role", "entity.create")
     /// AI picks from known verbs, or we infer from action type
     pub verb: Option<String>,
@@ -40,7 +40,7 @@ pub struct DslIntent {
 /// An argument value that needs resolution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum ArgIntent {
+pub(crate) enum ArgIntent {
     /// A literal value (string, number, boolean)
     Literal { value: serde_json::Value },
 
@@ -67,7 +67,7 @@ pub enum ArgIntent {
 
 /// Multiple actions to perform in sequence
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslIntentBatch {
+pub(crate) struct DslIntentBatch {
     /// The individual actions in order
     pub actions: Vec<DslIntent>,
 
@@ -80,7 +80,7 @@ pub struct DslIntentBatch {
 
 /// Result of resolving an ArgIntent via EntityGateway
 #[derive(Debug, Clone)]
-pub struct ResolvedArg {
+pub(crate) struct ResolvedArg {
     /// The DSL value to insert (UUID, code, or literal)
     pub value: String,
 
@@ -96,7 +96,7 @@ pub struct ResolvedArg {
 
 impl DslIntent {
     /// Create a simple literal arg
-    pub fn literal(key: &str, value: impl Into<serde_json::Value>) -> (String, ArgIntent) {
+    pub(crate) fn literal(key: &str, value: impl Into<serde_json::Value>) -> (String, ArgIntent) {
         (
             key.to_string(),
             ArgIntent::Literal {
@@ -106,7 +106,7 @@ impl DslIntent {
     }
 
     /// Create a symbol reference arg
-    pub fn symbol_ref(key: &str, symbol: &str) -> (String, ArgIntent) {
+    pub(crate) fn symbol_ref(key: &str, symbol: &str) -> (String, ArgIntent) {
         (
             key.to_string(),
             ArgIntent::SymbolRef {
@@ -116,7 +116,7 @@ impl DslIntent {
     }
 
     /// Create an entity lookup arg
-    pub fn entity_lookup(
+    pub(crate) fn entity_lookup(
         key: &str,
         search_text: &str,
         entity_type: Option<&str>,
@@ -131,7 +131,7 @@ impl DslIntent {
     }
 
     /// Create a ref data lookup arg
-    pub fn ref_lookup(key: &str, search_text: &str, ref_type: &str) -> (String, ArgIntent) {
+    pub(crate) fn ref_lookup(key: &str, search_text: &str, ref_type: &str) -> (String, ArgIntent) {
         (
             key.to_string(),
             ArgIntent::RefDataLookup {
@@ -143,7 +143,7 @@ impl DslIntent {
 }
 
 impl DslIntentBatch {
-    pub fn new(original_request: impl Into<String>) -> Self {
+    pub(crate) fn new(original_request: impl Into<String>) -> Self {
         Self {
             actions: Vec::new(),
             context: None,
@@ -151,12 +151,12 @@ impl DslIntentBatch {
         }
     }
 
-    pub fn with_context(mut self, context: impl Into<String>) -> Self {
+    pub(crate) fn with_context(mut self, context: impl Into<String>) -> Self {
         self.context = Some(context.into());
         self
     }
 
-    pub fn add_action(mut self, action: DslIntent) -> Self {
+    pub(crate) fn add_action(mut self, action: DslIntent) -> Self {
         self.actions.push(action);
         self
     }

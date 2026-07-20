@@ -34,9 +34,5 @@ pub mod telemetry;
 pub mod verb_surface;
 pub mod workspace_mode_tags;
 
-pub use learning::{
-    spawn_agent_drain_task, AgentEvent, AgentEventEmitter, AgentEventPayload,
-    AgentLearningInspector, CorrectionType, DrainConfig, LearnedData, LearningCandidate,
-    LearningStatus, LearningType, LearningWarmup, SharedAgentEmitter, SharedLearnedData,
-    WarmupStats,
-};
+pub use learning::{LearningWarmup};
+pub(crate) use learning::{spawn_agent_drain_task, AgentEvent, AgentEventEmitter, AgentEventPayload, AgentLearningInspector, CorrectionType, DrainConfig, LearnedData, LearningCandidate, LearningStatus, LearningType, SharedAgentEmitter, SharedLearnedData, WarmupStats};

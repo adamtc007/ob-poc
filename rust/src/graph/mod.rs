@@ -29,32 +29,25 @@ pub mod view_model;
 pub mod viewport;
 
 #[cfg(feature = "database")]
-pub use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
+pub(crate) use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
 #[cfg(feature = "database")]
-pub use deal_graph_builder::DealGraphBuilder;
-pub use filters::{FilterBuilder, GraphFilterOps};
-pub use investor_register::{
+pub(crate) use deal_graph_builder::DealGraphBuilder;
+pub(crate) use filters::{FilterBuilder, GraphFilterOps};
+pub(crate) use investor_register::{
     AggregateBreakdown, AggregateInvestorsNode, ControlHolderNode, InvestorFilters,
     InvestorListItem, InvestorListQuery, InvestorListResponse, InvestorRegisterQuery,
     InvestorRegisterView, IssuerSummary, PaginationInfo, ThresholdConfig,
 };
-pub use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
+pub(crate) use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 #[cfg(feature = "database")]
-pub use query_engine::GraphQueryEngine;
-pub use types::{
-    CbuGraph, CbuNode, CbuStatus, CbuSummary, ControlEdge, ControlType, EdgeType, EntityGraph,
-    EntityType, FundEdge, FundRelationshipType, GraphEdge, GraphFilters, GraphNode, GraphScope,
-    GraphStats, LayerInfo, LayerType, LayoutBehavior, LayoutOverride, LegacyCbuGraph,
-    LegacyGraphEdge, LegacyGraphNode, LegacyGraphStats, NavigationHistory, NodeOffset,
-    NodeSizeOverride, NodeStatus, NodeType, Orientation, OwnershipEdge, OwnershipType, PersonState,
-    ProngFilter, RoleAssignment, RoleCategory, ServiceEdge, ServiceRelationshipType, UboTreatment,
-    VerificationStatus, ViewMode,
-};
-pub use view_model::{
+pub(crate) use query_engine::GraphQueryEngine;
+pub use types::{CbuSummary, EdgeType, GraphEdge, GraphNode, NodeType};
+pub(crate) use types::{CbuGraph, CbuNode, CbuStatus, ControlEdge, ControlType, EntityGraph, EntityType, FundEdge, FundRelationshipType, GraphFilters, GraphScope, GraphStats, LayerInfo, LayerType, LayoutBehavior, LayoutOverride, LegacyCbuGraph, LegacyGraphEdge, LegacyGraphNode, LegacyGraphStats, NavigationHistory, NodeOffset, NodeSizeOverride, NodeStatus, Orientation, OwnershipEdge, OwnershipType, PersonState, ProngFilter, RoleAssignment, RoleCategory, ServiceEdge, ServiceRelationshipType, UboTreatment, VerificationStatus, ViewMode};
+pub(crate) use view_model::{
     CanvasBounds, ComparisonSummary, FieldChange, GraphComparison, GraphFilter, GraphPath,
     GraphViewModel, GraphViewStats, LayoutOrientation, NodeChange, NodeGroup, ViewModeInfo,
 };
-pub use viewport::{
+pub(crate) use viewport::{
     Breakpoint, DisplayConfig, LayoutHint, OffScreenSummary, PanDirection, ViewportContext,
     ZoomName,
 };

@@ -11,7 +11,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[async_trait]
-pub trait SourceExecutor: Send + Sync {
+pub(crate) trait SourceExecutor: Send + Sync {
     async fn fetch_value(
         &self,
         attribute_id: &AttributeId,
@@ -20,42 +20,19 @@ pub trait SourceExecutor: Send + Sync {
     ) -> Result<Option<Value>, String>;
 }
 
-pub struct CompositeSourceExecutor {
+pub(crate) struct CompositeSourceExecutor {
     document_source: Box<dyn SourceExecutor>,
     database_source: Box<dyn SourceExecutor>,
 }
 
 impl CompositeSourceExecutor {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self {
             document_source: Box::new(DocumentSource),
             database_source: Box::new(DatabaseSource::new(pool)),
         }
     }
 
-    pub async fn fetch_from_best_source(
-        &self,
-        attribute_id: &AttributeId,
-        definition: &DbAttributeDefinition,
-        entity_id: Uuid,
-    ) -> Result<Option<Value>, String> {
-        if let Some(source_config) = &definition.source_config {
-            // Try sources in priority order
-            let executor: &dyn SourceExecutor = match source_config.source_type.as_str() {
-                "document" => self.document_source.as_ref(),
-                _ => self.database_source.as_ref(),
-            };
-
-            executor
-                .fetch_value(attribute_id, definition, entity_id)
-                .await
-        } else {
-            // Default to database source
-            self.database_source
-                .fetch_value(attribute_id, definition, entity_id)
-                .await
-        }
-    }
 }
 
 // Document source implementation (placeholder - will query document_catalog when implemented)

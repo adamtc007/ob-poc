@@ -39,7 +39,7 @@ use thiserror::Error;
 // were lifted to ob-poc-boundary in Phase 3 slice 2p so the boundary
 // tier can call them directly without re-entering src/.
 #[allow(unused_imports)]
-pub use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
+pub(crate) use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
 pub use ob_poc_derived_attributes::advisory_lock::{
     advisory_xact_lock, lock_key, try_advisory_xact_lock,
 };
@@ -49,7 +49,7 @@ pub use ob_poc_derived_attributes::advisory_lock::{
 // =============================================================================
 
 /// Derive lock key from a LockKey struct
-pub fn lock_key_from_struct(lock: &LockKey) -> i64 {
+pub(crate) fn lock_key_from_struct(lock: &LockKey) -> i64 {
     lock_key(&lock.entity_type, &lock.entity_id)
 }
 
@@ -59,7 +59,7 @@ pub fn lock_key_from_struct(lock: &LockKey) -> i64 {
 
 /// Result of acquiring multiple locks
 #[derive(Debug, Clone)]
-pub struct LockAcquisitionResult {
+pub(crate) struct LockAcquisitionResult {
     /// Locks successfully acquired
     pub acquired: Vec<LockKey>,
     /// Time spent waiting for locks (in milliseconds)
@@ -68,7 +68,7 @@ pub struct LockAcquisitionResult {
 
 /// Error during lock acquisition
 #[derive(Debug, Error)]
-pub enum LockError {
+pub(crate) enum LockError {
     /// Lock contention - another session holds the lock
     #[error("Lock contention on {entity_type}:{entity_id}")]
     Contention {

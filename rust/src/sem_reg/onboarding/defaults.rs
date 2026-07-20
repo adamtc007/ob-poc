@@ -22,7 +22,7 @@ use crate::sem_reg::EvidenceGrade;
 /// Each FQN is turned into a minimal attribute definition with `String` data
 /// type. Callers who need richer types should provide explicit attributes in
 /// the `OnboardingRequest`.
-pub fn default_attributes_for_entity_type(
+pub(crate) fn default_attributes_for_entity_type(
     entity_type: &EntityTypeDefBody,
 ) -> Vec<AttributeDefBody> {
     let mut attrs = Vec::new();
@@ -97,7 +97,7 @@ fn attribute_from_fqn(fqn: &str, domain: &str, required: bool) -> AttributeDefBo
 ///
 /// Produces: `{domain}.create`, `{domain}.get`, `{domain}.list`,
 /// `{domain}.update`, `{domain}.delete`.
-pub fn default_verb_contracts_for_entity_type(
+pub(crate) fn default_verb_contracts_for_entity_type(
     entity_type: &EntityTypeDefBody,
 ) -> Vec<VerbContractBody> {
     let domain = &entity_type.domain;
@@ -261,7 +261,7 @@ fn crud_contract(
 ///
 /// Maps known domains to their canonical taxonomy FQNs. Unknown domains
 /// get an empty list (no taxonomy placement).
-pub fn default_taxonomy_fqns_for_entity_type(entity_type: &EntityTypeDefBody) -> Vec<String> {
+pub(crate) fn default_taxonomy_fqns_for_entity_type(entity_type: &EntityTypeDefBody) -> Vec<String> {
     let domain = entity_type.domain.as_str();
     let mut fqns = Vec::new();
 
@@ -285,7 +285,7 @@ pub fn default_taxonomy_fqns_for_entity_type(entity_type: &EntityTypeDefBody) ->
 }
 
 /// Create a membership rule linking an entity type to a taxonomy node.
-pub fn membership_rule_for_entity_in_taxonomy(
+pub(crate) fn membership_rule_for_entity_in_taxonomy(
     entity_type_fqn: &str,
     taxonomy_fqn: &str,
 ) -> MembershipRuleBody {
@@ -318,7 +318,7 @@ pub fn membership_rule_for_entity_in_taxonomy(
 // ── Step 5: Default view FQNs + columns ─────────────────────────────────────
 
 /// Derive default view FQNs to update for this entity type.
-pub fn default_view_fqns_for_entity_type(entity_type: &EntityTypeDefBody) -> Vec<String> {
+pub(crate) fn default_view_fqns_for_entity_type(entity_type: &EntityTypeDefBody) -> Vec<String> {
     match entity_type.domain.as_str() {
         "cbu" => vec!["view.trading-overview".to_string()],
         "kyc" | "screening" => vec!["view.kyc-case".to_string()],
@@ -328,7 +328,7 @@ pub fn default_view_fqns_for_entity_type(entity_type: &EntityTypeDefBody) -> Vec
 }
 
 /// Generate view columns for the entity type's required attributes in a given view.
-pub fn columns_for_entity_in_view(
+pub(crate) fn columns_for_entity_in_view(
     entity_type: &EntityTypeDefBody,
     _view_fqn: &str,
 ) -> Vec<ViewColumn> {

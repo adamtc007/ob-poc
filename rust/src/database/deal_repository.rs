@@ -15,7 +15,7 @@ use crate::api::deal_types::{
 };
 
 /// Repository for deal-related database operations
-pub struct DealRepository;
+pub(crate) struct DealRepository;
 
 impl DealRepository {
     // ========================================================================
@@ -23,7 +23,7 @@ impl DealRepository {
     // ========================================================================
 
     /// Get a deal summary by ID with computed counts
-    pub async fn get_deal_summary(pool: &PgPool, deal_id: Uuid) -> Result<Option<DealSummary>> {
+    pub(crate) async fn get_deal_summary(pool: &PgPool, deal_id: Uuid) -> Result<Option<DealSummary>> {
         let row = sqlx::query_as::<_, DealSummaryRow>(
             r#"
             SELECT
@@ -60,58 +60,9 @@ impl DealRepository {
         Ok(row.map(Into::into))
     }
 
-    /// Search for deals by name (fuzzy match)
-    pub async fn search_deals_by_name(
-        pool: &PgPool,
-        name_query: &str,
-        limit: i32,
-    ) -> Result<Vec<DealSummary>> {
-        let rows = sqlx::query_as::<_, DealSummaryRow>(
-            r#"
-            SELECT
-                d.deal_id,
-                d.deal_name,
-                d.deal_reference,
-                d.deal_status,
-                d.primary_client_group_id,
-                cg.canonical_name as client_group_name,
-                d.sales_owner,
-                d.sales_team,
-                d.estimated_revenue,
-                d.currency_code,
-                d.opened_at,
-                d.qualified_at,
-                d.contracted_at,
-                d.active_at,
-                d.closed_at,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_products WHERE deal_id = d.deal_id), 0)::int as product_count,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_rate_cards WHERE deal_id = d.deal_id), 0)::int as rate_card_count,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_participants WHERE deal_id = d.deal_id), 0)::int as participant_count,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_contracts WHERE deal_id = d.deal_id), 0)::int as contract_count,
-                0::int as onboarding_request_count
-            FROM "ob-poc".deals d
-            LEFT JOIN "ob-poc".client_group cg ON cg.id = d.primary_client_group_id
-            WHERE d.deal_name ILIKE '%' || $1 || '%'
-               OR d.deal_reference ILIKE '%' || $1 || '%'
-            ORDER BY
-                CASE WHEN d.deal_name ILIKE $1 THEN 0
-                     WHEN d.deal_name ILIKE $1 || '%' THEN 1
-                     ELSE 2 END,
-                d.deal_name
-            LIMIT $2
-            "#,
-        )
-        .bind(name_query)
-        .bind(limit)
-        .fetch_all(pool)
-        .await
-        .context("Failed to search deals by name")?;
-
-        Ok(rows.into_iter().map(Into::into).collect())
-    }
 
     /// List deals with filters
-    pub async fn list_deals(pool: &PgPool, filters: &DealFilters) -> Result<Vec<DealSummary>> {
+    pub(crate) async fn list_deals(pool: &PgPool, filters: &DealFilters) -> Result<Vec<DealSummary>> {
         let limit = filters.limit.unwrap_or(50);
         let offset = filters.offset.unwrap_or(0);
 
@@ -166,7 +117,7 @@ impl DealRepository {
     }
 
     /// Count deals matching filters
-    pub async fn count_deals(pool: &PgPool, filters: &DealFilters) -> Result<i64> {
+    pub(crate) async fn count_deals(pool: &PgPool, filters: &DealFilters) -> Result<i64> {
         let count: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*)
@@ -192,57 +143,13 @@ impl DealRepository {
         Ok(count.0)
     }
 
-    /// Get deals for a client group (convenience method for session context)
-    /// Returns active deals (excludes CANCELLED, OFFBOARDED)
-    pub async fn get_deals_for_client_group(
-        pool: &PgPool,
-        client_group_id: Uuid,
-    ) -> Result<Vec<DealSummary>> {
-        let rows = sqlx::query_as::<_, DealSummaryRow>(
-            r#"
-            SELECT
-                d.deal_id,
-                d.deal_name,
-                d.deal_reference,
-                d.deal_status,
-                d.primary_client_group_id,
-                cg.canonical_name as client_group_name,
-                d.sales_owner,
-                d.sales_team,
-                d.estimated_revenue,
-                d.currency_code,
-                d.opened_at,
-                d.qualified_at,
-                d.contracted_at,
-                d.active_at,
-                d.closed_at,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_products WHERE deal_id = d.deal_id), 0)::int as product_count,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_rate_cards WHERE deal_id = d.deal_id), 0)::int as rate_card_count,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_participants WHERE deal_id = d.deal_id), 0)::int as participant_count,
-                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_contracts WHERE deal_id = d.deal_id), 0)::int as contract_count,
-                0::int as onboarding_request_count
-            FROM "ob-poc".deals d
-            LEFT JOIN "ob-poc".client_group cg ON cg.id = d.primary_client_group_id
-            WHERE d.primary_client_group_id = $1
-              AND d.deal_status NOT IN ('CANCELLED', 'OFFBOARDED')
-            ORDER BY d.opened_at DESC
-            LIMIT 20
-            "#,
-        )
-        .bind(client_group_id)
-        .fetch_all(pool)
-        .await
-        .context("Failed to fetch deals for client group")?;
-
-        Ok(rows.into_iter().map(Into::into).collect())
-    }
 
     // ========================================================================
     // Deal Products Queries
     // ========================================================================
 
     /// Get products for a deal
-    pub async fn get_deal_products(
+    pub(crate) async fn get_deal_products(
         pool: &PgPool,
         deal_id: Uuid,
     ) -> Result<Vec<DealProductSummary>> {
@@ -281,7 +188,7 @@ impl DealRepository {
     // ========================================================================
 
     /// Get rate cards for a deal
-    pub async fn get_deal_rate_cards(pool: &PgPool, deal_id: Uuid) -> Result<Vec<RateCardSummary>> {
+    pub(crate) async fn get_deal_rate_cards(pool: &PgPool, deal_id: Uuid) -> Result<Vec<RateCardSummary>> {
         let rows = sqlx::query_as::<_, RateCardRow>(
             r#"
             SELECT
@@ -315,7 +222,7 @@ impl DealRepository {
     }
 
     /// Get rate cards for a specific product
-    pub async fn get_product_rate_cards(
+    pub(crate) async fn get_product_rate_cards(
         pool: &PgPool,
         deal_id: Uuid,
         product_id: Uuid,
@@ -354,7 +261,7 @@ impl DealRepository {
     }
 
     /// Get rate card lines for a rate card
-    pub async fn get_rate_card_lines(
+    pub(crate) async fn get_rate_card_lines(
         pool: &PgPool,
         rate_card_id: Uuid,
     ) -> Result<Vec<RateCardLineSummary>> {
@@ -388,7 +295,7 @@ impl DealRepository {
     }
 
     /// Get rate card supersession history (follow superseded_by chain)
-    pub async fn get_rate_card_history(
+    pub(crate) async fn get_rate_card_history(
         pool: &PgPool,
         rate_card_id: Uuid,
     ) -> Result<Vec<RateCardSummary>> {
@@ -465,7 +372,7 @@ impl DealRepository {
     // ========================================================================
 
     /// Get participants for a deal
-    pub async fn get_deal_participants(
+    pub(crate) async fn get_deal_participants(
         pool: &PgPool,
         deal_id: Uuid,
     ) -> Result<Vec<DealParticipantSummary>> {
@@ -500,7 +407,7 @@ impl DealRepository {
     // ========================================================================
 
     /// Get contracts linked to a deal
-    pub async fn get_deal_contracts(
+    pub(crate) async fn get_deal_contracts(
         pool: &PgPool,
         deal_id: Uuid,
     ) -> Result<Vec<DealContractSummary>> {
@@ -535,7 +442,7 @@ impl DealRepository {
     // ========================================================================
 
     /// Get onboarding requests linked to a deal (via CBUs tied to deal products)
-    pub async fn get_deal_onboarding_requests(
+    pub(crate) async fn get_deal_onboarding_requests(
         pool: &PgPool,
         deal_id: Uuid,
     ) -> Result<Vec<OnboardingRequestSummary>> {
@@ -834,7 +741,7 @@ impl From<OnboardingRequestRow> for OnboardingRequestSummary {
 
 /// Summary of a client group for selection UI
 #[derive(Debug, Clone)]
-pub struct ClientGroupSummary {
+pub(crate) struct ClientGroupSummary {
     pub id: Uuid,
     pub canonical_name: String,
     pub deal_count: i32,
@@ -849,7 +756,7 @@ struct ClientGroupRow {
 
 impl DealRepository {
     /// Get all client groups with their deal counts
-    pub async fn get_all_client_groups(pool: &PgPool) -> Result<Vec<ClientGroupSummary>> {
+    pub(crate) async fn get_all_client_groups(pool: &PgPool) -> Result<Vec<ClientGroupSummary>> {
         let rows = sqlx::query_as::<_, ClientGroupRow>(
             r#"
             SELECT

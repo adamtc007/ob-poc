@@ -18,7 +18,7 @@ use uuid::Uuid;
 /// Lifecycle status for an agent plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum AgentPlanStatus {
+pub(crate) enum AgentPlanStatus {
     Draft,
     Active,
     Completed,
@@ -44,7 +44,7 @@ impl std::fmt::Display for AgentPlanStatus {
 /// Lifecycle status for a plan step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum PlanStepStatus {
+pub(crate) enum PlanStepStatus {
     Pending,
     Running,
     Completed,
@@ -72,7 +72,7 @@ impl std::fmt::Display for PlanStepStatus {
 /// Plans are created as `Draft`, activated when confirmed, and
 /// transition to `Completed`/`Failed`/`Cancelled` as execution proceeds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentPlan {
+pub(crate) struct AgentPlan {
     /// Unique plan identifier.
     pub plan_id: Uuid,
     /// Case or subject this plan relates to.
@@ -112,7 +112,7 @@ pub struct AgentPlan {
 /// Each step pins a `verb_snapshot_id` for provenance — the exact version
 /// of the verb contract that was planned against.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanStep {
+pub(crate) struct PlanStep {
     /// Unique step identifier.
     pub step_id: Uuid,
     /// Plan this step belongs to.
@@ -150,11 +150,11 @@ pub struct PlanStep {
 // ── Plan Store ────────────────────────────────────────────────
 
 /// Database operations for agent plans and steps.
-pub struct PlanStore;
+pub(crate) struct PlanStore;
 
 impl PlanStore {
     /// Insert a new agent plan (immutable INSERT).
-    pub async fn insert_plan(pool: &PgPool, plan: &AgentPlan) -> Result<Uuid> {
+    pub(crate) async fn insert_plan(pool: &PgPool, plan: &AgentPlan) -> Result<Uuid> {
         let steps_json = serde_json::to_value(&plan.steps)?;
         let assumptions_json = serde_json::to_value(&plan.assumptions)?;
         let risk_flags_json = serde_json::to_value(&plan.risk_flags)?;
@@ -190,7 +190,7 @@ impl PlanStore {
     }
 
     /// Insert a plan step.
-    pub async fn insert_step(pool: &PgPool, step: &PlanStep) -> Result<Uuid> {
+    pub(crate) async fn insert_step(pool: &PgPool, step: &PlanStep) -> Result<Uuid> {
         let params_json = &step.params;
         let postconditions_json = serde_json::to_value(&step.expected_postconditions)?;
         let fallback_json = serde_json::to_value(&step.fallback_steps)?;
@@ -228,7 +228,7 @@ impl PlanStore {
     }
 
     /// Update plan status.
-    pub async fn update_plan_status(
+    pub(crate) async fn update_plan_status(
         pool: &PgPool,
         plan_id: Uuid,
         status: AgentPlanStatus,
@@ -248,7 +248,7 @@ impl PlanStore {
     }
 
     /// Update step status and optionally set result or error.
-    pub async fn update_step_status(
+    pub(crate) async fn update_step_status(
         pool: &PgPool,
         step_id: Uuid,
         status: PlanStepStatus,
@@ -272,7 +272,7 @@ impl PlanStore {
     }
 
     /// Load a plan by ID with its steps.
-    pub async fn load_plan(pool: &PgPool, plan_id: Uuid) -> Result<Option<AgentPlan>> {
+    pub(crate) async fn load_plan(pool: &PgPool, plan_id: Uuid) -> Result<Option<AgentPlan>> {
         let row = sqlx::query_as::<_, PlanRow>(
             r#"
             SELECT plan_id, case_id, goal, context_resolution_ref,
@@ -293,7 +293,7 @@ impl PlanStore {
     }
 
     /// List plans for a case, newest first.
-    pub async fn list_plans_for_case(
+    pub(crate) async fn list_plans_for_case(
         pool: &PgPool,
         case_id: Uuid,
         limit: i64,
@@ -318,7 +318,7 @@ impl PlanStore {
     }
 
     /// Load steps for a plan, ordered by sequence.
-    pub async fn load_steps(pool: &PgPool, plan_id: Uuid) -> Result<Vec<PlanStep>> {
+    pub(crate) async fn load_steps(pool: &PgPool, plan_id: Uuid) -> Result<Vec<PlanStep>> {
         let rows = sqlx::query_as::<_, StepRow>(
             r#"
             SELECT step_id, plan_id, seq, verb_id, verb_snapshot_id,

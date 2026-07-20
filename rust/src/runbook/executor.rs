@@ -24,7 +24,7 @@ use super::types::{
 
 /// Result of executing a compiled runbook through the gate.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RunbookExecutionResult {
+pub(crate) struct RunbookExecutionResult {
     /// The runbook that was executed.
     pub runbook_id: CompiledRunbookId,
 
@@ -43,7 +43,7 @@ pub struct RunbookExecutionResult {
 
 /// Result of executing a single step.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct StepExecutionResult {
+pub(crate) struct StepExecutionResult {
     pub step_id: Uuid,
     pub verb: String,
     pub outcome: StepOutcome,
@@ -68,7 +68,7 @@ pub enum StepOutcome {
 
 /// Lock acquisition statistics.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct LockStats {
+pub(crate) struct LockStats {
     /// Number of locks acquired.
     pub locks_acquired: usize,
     /// Time spent waiting for locks (milliseconds).
@@ -81,7 +81,7 @@ pub struct LockStats {
 
 /// Errors that prevent execution from starting.
 #[derive(Debug, thiserror::Error)]
-pub enum ExecutionError {
+pub(crate) enum ExecutionError {
     #[error("Runbook {0} not found")]
     NotFound(CompiledRunbookId),
 
@@ -148,14 +148,14 @@ pub enum ExecutionError {
 /// for silently skipping locks in production; only a test that explicitly
 /// asks for unlocked execution can get it.
 #[derive(Debug, Clone, Copy)]
-pub struct UnlockedExecutionToken(());
+pub(crate) struct UnlockedExecutionToken(());
 
 #[cfg(test)]
 impl UnlockedExecutionToken {
     /// TEST-ONLY: explicitly opt into skipping advisory-lock acquisition
     /// even though the write_set is non-empty. See
     /// `execute_runbook_unlocked_for_tests`.
-    pub fn allow_unlocked_execution_for_tests() -> Self {
+    pub(crate) fn allow_unlocked_execution_for_tests() -> Self {
         UnlockedExecutionToken(())
     }
 }
@@ -297,7 +297,7 @@ impl RunbookStoreBackend for RunbookStore {
 ///
 /// Events are INSERT-only — status is derived from the latest status_change event.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RunbookEvent {
+pub(crate) struct RunbookEvent {
     pub compiled_runbook_id: CompiledRunbookId,
     pub event_type: String,
     pub old_status: Option<String>,
@@ -318,13 +318,13 @@ pub struct RunbookEvent {
 /// - Content-addressed dedup: `ON CONFLICT (compiled_runbook_id) DO NOTHING`
 /// - Hash verification on read: `canonical_hash` is checked against recomputed hash
 #[cfg(feature = "database")]
-pub struct PostgresRunbookStore {
+pub(crate) struct PostgresRunbookStore {
     pool: sqlx::PgPool,
 }
 
 #[cfg(feature = "database")]
 impl PostgresRunbookStore {
-    pub fn new(pool: sqlx::PgPool) -> Self {
+    pub(crate) fn new(pool: sqlx::PgPool) -> Self {
         Self { pool }
     }
 
@@ -332,7 +332,7 @@ impl PostgresRunbookStore {
     ///
     /// Uses `ON CONFLICT DO NOTHING` since content-addressed IDs are idempotent:
     /// same content → same ID → safe to skip.
-    pub async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError> {
+    pub(crate) async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError> {
         let steps_json = serde_json::to_value(&runbook.steps)
             .map_err(|e| ExecutionError::Database(format!("serialize steps: {e}")))?;
         let envelope_json = serde_json::to_value(&runbook.envelope)
@@ -374,7 +374,7 @@ impl PostgresRunbookStore {
     ///
     /// Returns `None` if not found. Returns an error if the stored hash
     /// doesn't match the recomputed hash (tampered artefact).
-    pub async fn get(
+    pub(crate) async fn get(
         &self,
         id: &CompiledRunbookId,
     ) -> Result<Option<CompiledRunbook>, ExecutionError> {
@@ -425,7 +425,7 @@ impl PostgresRunbookStore {
     }
 
     /// Append an event to the compiled_runbook_events table (INV-9: INSERT-only).
-    pub async fn append_event(&self, event: RunbookEvent) -> Result<(), ExecutionError> {
+    pub(crate) async fn append_event(&self, event: RunbookEvent) -> Result<(), ExecutionError> {
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".compiled_runbook_events
@@ -448,7 +448,7 @@ impl PostgresRunbookStore {
     /// Derive current status from the latest status_change event (INV-9).
     ///
     /// No `update_status()` method — status is NEVER mutated on the runbook row.
-    pub async fn current_status(
+    pub(crate) async fn current_status(
         &self,
         id: &CompiledRunbookId,
     ) -> Result<CompiledRunbookStatus, ExecutionError> {
@@ -484,7 +484,7 @@ impl PostgresRunbookStore {
     ///
     /// Returns `None` on any error or if no holder is found (advisory locks are
     /// anonymous in PostgreSQL — this is a heuristic).
-    pub async fn lookup_lock_holder(&self, entity_type: &str, entity_id: &str) -> Option<Uuid> {
+    pub(crate) async fn lookup_lock_holder(&self, entity_type: &str, entity_id: &str) -> Option<Uuid> {
         // Suppress unused-variable warnings when feature is enabled but
         // the query references them via bind parameters.
         let _ = entity_type;
@@ -704,7 +704,7 @@ pub(crate) fn status_detail(status: &CompiledRunbookStatus) -> Option<serde_json
 /// entity UUIDs declared in each step's `write_set` field.
 ///
 /// The returned set is sorted (BTreeSet) for deadlock-free lock acquisition.
-pub fn compute_write_set(steps: &[CompiledStep], cursor: Option<&StepCursor>) -> BTreeSet<Uuid> {
+pub(crate) fn compute_write_set(steps: &[CompiledStep], cursor: Option<&StepCursor>) -> BTreeSet<Uuid> {
     let start_idx = cursor.map(|c| c.index).unwrap_or(0);
     steps
         .iter()
@@ -1499,7 +1499,7 @@ pub async fn execute_runbook_in_scope(
 /// on the full `DslExecutor` infrastructure. In production, this delegates
 /// to `DslExecutorV2`. In tests, a stub implementation can be used.
 #[async_trait::async_trait]
-pub trait StepExecutor: Send + Sync {
+pub(crate) trait StepExecutor: Send + Sync {
     /// Scope-aware step execution (Phase B.2b-δ, 2026-04-22).
     ///
     /// Routes dispatch through a caller-owned `TransactionScope` —

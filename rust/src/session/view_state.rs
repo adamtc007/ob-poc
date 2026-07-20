@@ -79,7 +79,7 @@ pub struct ViewState {
 
 /// Refinement operations that modify the selection
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Refinement {
+pub(crate) enum Refinement {
     /// Add filter: "only the Luxembourg ones"
     Include { filter: Filter },
 
@@ -99,7 +99,7 @@ pub enum Refinement {
 
 /// A staged operation awaiting user confirmation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingOperation {
+pub(crate) struct PendingOperation {
     /// What operation
     pub operation: BatchOperation,
 
@@ -118,7 +118,7 @@ pub struct PendingOperation {
 
 /// Batch operations that can be applied to selection
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BatchOperation {
+pub(crate) enum BatchOperation {
     /// Subscribe selection to a product
     Subscribe { product: String },
 
@@ -146,7 +146,7 @@ pub enum BatchOperation {
 
 /// Preview of what an operation will do
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperationPreview {
+pub(crate) struct OperationPreview {
     /// Summary text: "Add CUSTODY to 12 CBUs"
     pub summary: String,
 
@@ -173,7 +173,7 @@ pub struct OperationPreview {
 
 /// Layout result from positioning algorithm
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayoutResult {
+pub(crate) struct LayoutResult {
     /// Node positions keyed by node ID
     pub positions: HashMap<Uuid, NodePosition>,
 
@@ -189,7 +189,7 @@ pub struct LayoutResult {
 
 /// Position of a single node
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct NodePosition {
+pub(crate) struct NodePosition {
     pub x: f32,
     pub y: f32,
     pub z: f32, // For 3D/layered views
@@ -198,7 +198,7 @@ pub struct NodePosition {
 
 /// Bounding box of layout
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct LayoutBounds {
+pub(crate) struct LayoutBounds {
     pub min_x: f32,
     pub max_x: f32,
     pub min_y: f32,
@@ -599,30 +599,19 @@ impl ViewState {
 }
 
 impl LayoutBounds {
-    /// Create default bounds
-    pub fn default_bounds() -> Self {
-        Self {
-            min_x: -1000.0,
-            max_x: 1000.0,
-            min_y: -1000.0,
-            max_y: 1000.0,
-            min_z: 0.0,
-            max_z: 100.0,
-        }
-    }
 
     /// Width of bounds
-    pub fn width(&self) -> f32 {
+    pub(crate) fn width(&self) -> f32 {
         self.max_x - self.min_x
     }
 
     /// Height of bounds
-    pub fn height(&self) -> f32 {
+    pub(crate) fn height(&self) -> f32 {
         self.max_y - self.min_y
     }
 
     /// Depth of bounds
-    pub fn depth(&self) -> f32 {
+    pub(crate) fn depth(&self) -> f32 {
         self.max_z - self.min_z
     }
 }

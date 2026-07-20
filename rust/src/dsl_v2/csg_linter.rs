@@ -30,7 +30,7 @@ use sqlx::PgPool;
 
 /// Result of CSG linting
 #[derive(Debug)]
-pub struct LintResult {
+pub(crate) struct LintResult {
     /// The original AST (passed through)
     pub ast: Program,
     /// Diagnostics generated during linting
@@ -41,30 +41,23 @@ pub struct LintResult {
 
 impl LintResult {
     /// Returns true if there are any errors (invalid or incomplete DSL)
-    pub fn has_errors(&self) -> bool {
+    pub(crate) fn has_errors(&self) -> bool {
         self.diagnostics
             .iter()
             .any(|d| d.severity == Severity::Error)
     }
 
     /// Returns true if there are any warnings
-    pub fn has_warnings(&self) -> bool {
+    pub(crate) fn has_warnings(&self) -> bool {
         self.diagnostics
             .iter()
             .any(|d| d.severity == Severity::Warning)
     }
 
-    /// Returns true if DSL has unresolved symbol errors (incomplete but fixable)
-    /// UI can use this to show "incomplete" state vs other errors
-    pub fn has_unresolved_symbols(&self) -> bool {
-        self.diagnostics
-            .iter()
-            .any(|d| d.code == DiagnosticCode::UnresolvedSymbol)
-    }
 
     /// Returns true if DSL is incomplete (only has unresolved symbol errors)
     /// This means the user just needs to add definitions, not fix invalid syntax
-    pub fn is_incomplete(&self) -> bool {
+    pub(crate) fn is_incomplete(&self) -> bool {
         self.has_errors()
             && self
                 .diagnostics
@@ -75,19 +68,15 @@ impl LintResult {
 
     /// Returns true if DSL is valid and complete (no errors)
     /// This means the DSL is ready to execute
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         !self.has_errors()
     }
 
-    /// Returns true if DSL is invalid (has errors other than unresolved symbols)
-    pub fn is_invalid(&self) -> bool {
-        self.has_errors() && !self.is_incomplete()
-    }
 }
 
 /// Context inferred from AST analysis
 #[derive(Debug, Default)]
-pub struct InferredContext {
+pub(crate) struct InferredContext {
     /// Symbol bindings: name → type info
     pub symbols: HashMap<String, SymbolInfo>,
     /// Operations that create CBUs
@@ -101,7 +90,7 @@ pub struct InferredContext {
 }
 
 #[derive(Debug, Clone)]
-pub struct SymbolInfo {
+pub(crate) struct SymbolInfo {
     pub name: String,
     pub domain: String,              // "cbu", "entity", "document"
     pub entity_type: Option<String>, // e.g., "LIMITED_COMPANY_PRIVATE", "PROPER_PERSON_NATURAL"
@@ -109,7 +98,7 @@ pub struct SymbolInfo {
 }
 
 #[derive(Debug)]
-pub struct CbuCreate {
+pub(crate) struct CbuCreate {
     pub symbol: Option<String>,
     pub name: Option<String>,
     pub client_type: Option<String>,
@@ -118,7 +107,7 @@ pub struct CbuCreate {
 }
 
 #[derive(Debug)]
-pub struct EntityCreate {
+pub(crate) struct EntityCreate {
     pub symbol: Option<String>,
     pub name: Option<String>,
     pub entity_type: String, // Inferred or explicit type code
@@ -134,7 +123,7 @@ pub struct EntityRef {
 }
 
 #[derive(Debug)]
-pub struct DocumentCatalog {
+pub(crate) struct DocumentCatalog {
     pub symbol: Option<String>,
     pub document_type: String, // type_code from document_types
     pub cbu_ref: Option<String>,
@@ -146,7 +135,7 @@ pub struct DocumentCatalog {
 // CSG LINTER
 // =============================================================================
 
-pub struct CsgLinter {
+pub(crate) struct CsgLinter {
     #[cfg(feature = "database")]
     pool: PgPool,
     rules: ApplicabilityRules,
@@ -155,7 +144,7 @@ pub struct CsgLinter {
 
 impl CsgLinter {
     #[cfg(feature = "database")]
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self {
             pool,
             rules: ApplicabilityRules::default(),
@@ -175,7 +164,7 @@ impl CsgLinter {
     /// Uses default/empty rules - no CSG database lookups will be performed
     /// Note: Already initialized - no need to call initialize()
     #[cfg(feature = "database")]
-    pub fn new_without_db() -> Self {
+    pub(crate) fn new_without_db() -> Self {
         // Use a valid URL format that won't panic on parse.
         // This pool should never actually be used - it's a placeholder for offline mode.
         let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/nonexistent")
@@ -189,7 +178,7 @@ impl CsgLinter {
 
     /// Initialize linter by loading rules from database
     #[cfg(feature = "database")]
-    pub async fn initialize(&mut self) -> Result<(), String> {
+    pub(crate) async fn initialize(&mut self) -> Result<(), String> {
         // Skip if already initialized (e.g., from new_without_db)
         if self.initialized {
             return Ok(());
@@ -206,7 +195,7 @@ impl CsgLinter {
     }
 
     /// Main entry point: Lint a parsed AST
-    pub async fn lint(
+    pub(crate) async fn lint(
         &self,
         ast: Program,
         context: &ValidationContext,
@@ -824,14 +813,10 @@ impl CsgLinter {
     }
 
     /// Get a reference to the loaded rules (for testing/inspection)
-    pub fn rules(&self) -> &ApplicabilityRules {
+    pub(crate) fn rules(&self) -> &ApplicabilityRules {
         &self.rules
     }
 
-    /// Check if linter is initialized
-    pub fn is_initialized(&self) -> bool {
-        self.initialized
-    }
 }
 
 #[cfg(not(feature = "database"))]

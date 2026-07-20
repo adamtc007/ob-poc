@@ -31,7 +31,7 @@ use dsl_core::VerbSentences;
 
 /// Outcome of verb matching (simplified view for orchestrator).
 #[derive(Debug, Clone)]
-pub enum VerbMatchOutcome {
+pub(crate) enum VerbMatchOutcome {
     /// Clear winner found.
     Matched {
         verb: String,
@@ -57,7 +57,7 @@ pub enum VerbMatchOutcome {
 
 /// A verb candidate for disambiguation.
 #[derive(Debug, Clone)]
-pub struct VerbMatchCandidate {
+pub(crate) struct VerbMatchCandidate {
     pub verb_fqn: String,
     pub description: String,
     pub score: f32,
@@ -65,7 +65,7 @@ pub struct VerbMatchCandidate {
 
 /// Outcome of arg clarification check.
 #[derive(Debug, Clone)]
-pub enum ClarificationOutcome {
+pub(crate) enum ClarificationOutcome {
     /// All required args are present.
     Complete,
     /// Missing args — return conversational prompts.

@@ -9,7 +9,7 @@ use crate::sem_reg::types::SnapshotMeta;
 
 /// Evaluate all applicable guardrails for the current changeset state.
 /// Each guardrail is a pure function returning `Vec<GuardrailResult>`.
-pub fn evaluate_all_guardrails(
+pub(crate) fn evaluate_all_guardrails(
     changeset: &ChangesetRow,
     entries: &[ChangesetEntryRow],
     conflicts: &[ConflictRecord],
@@ -68,14 +68,14 @@ pub fn evaluate_all_guardrails(
 }
 
 /// Returns true if any guardrail result has Block severity.
-pub fn has_blocking_guardrails(results: &[GuardrailResult]) -> bool {
+pub(crate) fn has_blocking_guardrails(results: &[GuardrailResult]) -> bool {
     results
         .iter()
         .any(|r| r.severity == GuardrailSeverity::Block)
 }
 
 /// Returns true if any guardrail result has Warning severity (needs acknowledgement).
-pub fn has_warning_guardrails(results: &[GuardrailResult]) -> bool {
+pub(crate) fn has_warning_guardrails(results: &[GuardrailResult]) -> bool {
     results
         .iter()
         .any(|r| r.severity == GuardrailSeverity::Warning)

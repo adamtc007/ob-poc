@@ -61,6 +61,6 @@ pub mod commands;
 pub mod executor;
 pub mod parser;
 
-pub use commands::{CommandCategory, Direction, NavCommand, ZoomLevel};
-pub use executor::{NavExecutor, NavResult, QueryResultItem};
-pub use parser::parse_nav_command;
+pub(crate) use commands::{CommandCategory, Direction, NavCommand, ZoomLevel};
+pub(crate) use executor::{NavExecutor, NavResult, QueryResultItem};
+pub(crate) use parser::parse_nav_command;

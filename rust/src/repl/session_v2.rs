@@ -27,7 +27,7 @@ use crate::lookup::LookupResult;
 
 /// A v2 REPL session — the single source of truth for a user's work.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReplSessionV2 {
+pub(crate) struct ReplSessionV2 {
     pub id: Uuid,
     pub state: ReplStateV2,
     /// Deprecated — retained as opaque JSON for deserialization of legacy sessions.
@@ -135,7 +135,7 @@ impl ReplSessionV2 {
     /// let session = ReplSessionV2::new();
     /// assert!(matches!(session.state, ReplStateV2::ScopeGate { .. }));
     /// ```
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let id = Uuid::new_v4();
         let now = Utc::now();
         Self {
@@ -192,7 +192,7 @@ impl ReplSessionV2 {
     /// assert_eq!(session.allocate_runbook_version(), 1);
     /// assert_eq!(session.allocate_runbook_version(), 2);
     /// ```
-    pub fn allocate_runbook_version(&mut self) -> u64 {
+    pub(crate) fn allocate_runbook_version(&mut self) -> u64 {
         self.runbook.next_version_counter += 1;
         self.next_runbook_version = self.runbook.next_version_counter;
         self.runbook.next_version_counter
@@ -209,7 +209,7 @@ impl ReplSessionV2 {
     /// session.set_agent_mode(AgentMode::Repl);
     /// assert_eq!(session.agent_mode, AgentMode::Repl);
     /// ```
-    pub fn set_agent_mode(&mut self, mode: AgentMode) {
+    pub(crate) fn set_agent_mode(&mut self, mode: AgentMode) {
         self.agent_mode = mode;
         self.last_active_at = Utc::now();
     }
@@ -225,7 +225,7 @@ impl ReplSessionV2 {
     /// session.enter_sage_mode();
     /// assert_eq!(session.agent_mode, AgentMode::Sage);
     /// ```
-    pub fn enter_sage_mode(&mut self) {
+    pub(crate) fn enter_sage_mode(&mut self) {
         self.set_agent_mode(AgentMode::Sage);
     }
 
@@ -240,7 +240,7 @@ impl ReplSessionV2 {
     /// session.enter_repl_mode();
     /// assert_eq!(session.agent_mode, AgentMode::Repl);
     /// ```
-    pub fn enter_repl_mode(&mut self) {
+    pub(crate) fn enter_repl_mode(&mut self) {
         self.set_agent_mode(AgentMode::Repl);
     }
 
@@ -254,7 +254,7 @@ impl ReplSessionV2 {
     /// session.push_message(MessageRole::User, "hello".to_string());
     /// assert_eq!(session.messages.len(), 1);
     /// ```
-    pub fn push_message(&mut self, role: MessageRole, content: String) {
+    pub(crate) fn push_message(&mut self, role: MessageRole, content: String) {
         self.messages.push(ChatMessage {
             id: Uuid::new_v4(),
             role,
@@ -275,7 +275,7 @@ impl ReplSessionV2 {
     /// session.set_state(ReplStateV2::RunbookEditing);
     /// assert!(matches!(session.state, ReplStateV2::RunbookEditing));
     /// ```
-    pub fn set_state(&mut self, new_state: ReplStateV2) {
+    pub(crate) fn set_state(&mut self, new_state: ReplStateV2) {
         let from = format!("{:?}", self.state);
         let to = format!("{:?}", new_state);
         self.state = new_state;
@@ -294,7 +294,7 @@ impl ReplSessionV2 {
     /// session.set_client_scope(Uuid::nil());
     /// assert_eq!(session.runbook.client_group_id, Some(Uuid::nil()));
     /// ```
-    pub fn set_client_scope(&mut self, client_group_id: Uuid) {
+    pub(crate) fn set_client_scope(&mut self, client_group_id: Uuid) {
         self.runbook.client_group_id = Some(client_group_id);
         self.last_active_at = Utc::now();
     }
@@ -312,7 +312,7 @@ impl ReplSessionV2 {
     /// session.set_workspace(WorkspaceKind::Deal);
     /// assert_eq!(session.workspace_stack.len(), 1);
     /// ```
-    pub fn set_workspace(&mut self, workspace: WorkspaceKind) {
+    pub(crate) fn set_workspace(&mut self, workspace: WorkspaceKind) {
         self.active_workspace = Some(workspace.clone());
         self.workspace_stack.clear();
         if let Some(scope) = self.session_scope() {
@@ -335,7 +335,7 @@ impl ReplSessionV2 {
     /// session.set_workspace_root(WorkspaceKind::Kyc);
     /// assert_eq!(session.active_workspace, Some(WorkspaceKind::Kyc));
     /// ```
-    pub fn set_workspace_root(&mut self, workspace: WorkspaceKind) {
+    pub(crate) fn set_workspace_root(&mut self, workspace: WorkspaceKind) {
         self.set_workspace(workspace);
     }
 
@@ -439,7 +439,7 @@ impl ReplSessionV2 {
     /// session.set_client_scope(Uuid::nil());
     /// assert!(session.session_scope().is_some());
     /// ```
-    pub fn session_scope(&self) -> Option<SessionScope> {
+    pub(crate) fn session_scope(&self) -> Option<SessionScope> {
         self.runbook
             .client_group_id
             .map(|client_group_id| SessionScope {
@@ -455,7 +455,7 @@ impl ReplSessionV2 {
     /// use ob_poc::repl::session_v2::ReplSessionV2;
     /// assert!(ReplSessionV2::new().tos_frame().is_none());
     /// ```
-    pub fn tos_frame(&self) -> Option<&WorkspaceFrame> {
+    pub(crate) fn tos_frame(&self) -> Option<&WorkspaceFrame> {
         self.workspace_stack.last()
     }
 
@@ -466,7 +466,7 @@ impl ReplSessionV2 {
     /// use ob_poc::repl::session_v2::ReplSessionV2;
     /// assert!(ReplSessionV2::new().tos_frame_mut().is_none());
     /// ```
-    pub fn tos_frame_mut(&mut self) -> Option<&mut WorkspaceFrame> {
+    pub(crate) fn tos_frame_mut(&mut self) -> Option<&mut WorkspaceFrame> {
         self.workspace_stack.last_mut()
     }
 
@@ -487,7 +487,7 @@ impl ReplSessionV2 {
     /// session.increment_tos_writes();
     /// assert_eq!(session.tos_frame().unwrap().writes_since_push, 1);
     /// ```
-    pub fn increment_tos_writes(&mut self) {
+    pub(crate) fn increment_tos_writes(&mut self) {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.writes_since_push += 1;
         }
@@ -531,7 +531,7 @@ impl ReplSessionV2 {
     }
 
     /// Append a trace entry for the given operation.
-    pub fn append_trace(&mut self, op: super::session_trace::TraceOp) {
+    pub(crate) fn append_trace(&mut self, op: super::session_trace::TraceOp) {
         if self.tracing_suppressed {
             return;
         }
@@ -557,7 +557,7 @@ impl ReplSessionV2 {
     }
 
     /// Append an enriched trace entry with verb resolution and execution result.
-    pub fn append_trace_enriched(
+    pub(crate) fn append_trace_enriched(
         &mut self,
         op: super::session_trace::TraceOp,
         verb_fqn: Option<String>,
@@ -606,7 +606,7 @@ impl ReplSessionV2 {
     /// ));
     /// assert!(ok.is_ok());
     /// ```
-    pub fn push_workspace_frame(&mut self, frame: WorkspaceFrame) -> Result<()> {
+    pub(crate) fn push_workspace_frame(&mut self, frame: WorkspaceFrame) -> Result<()> {
         anyhow::ensure!(
             self.workspace_stack.len() < 3,
             "workspace stack depth exceeds max depth 3"
@@ -625,7 +625,7 @@ impl ReplSessionV2 {
     /// ```rust,ignore
     /// session.hydrate_tos(view);
     /// ```
-    pub fn hydrate_tos(&mut self, state_view: WorkspaceStateView) {
+    pub(crate) fn hydrate_tos(&mut self, state_view: WorkspaceStateView) {
         if let Some(tos) = self.workspace_stack.last_mut() {
             // Build constellation verb index from hydrated slots (Tier -0.5 in verb search)
             tos.constellation_verb_index = state_view.hydrated_constellation.as_ref().map(|c| {
@@ -643,7 +643,7 @@ impl ReplSessionV2 {
     // ── Viewport state accessors (observation frame, NOT resource truth) ──
 
     /// Current Observatory view level from TOS.
-    pub fn tos_view_level(&self) -> ob_poc_types::galaxy::ViewLevel {
+    pub(crate) fn tos_view_level(&self) -> ob_poc_types::galaxy::ViewLevel {
         self.workspace_stack
             .last()
             .map(|f| f.view_level)
@@ -651,21 +651,21 @@ impl ReplSessionV2 {
     }
 
     /// Set the Observatory view level on TOS.
-    pub fn set_tos_view_level(&mut self, level: ob_poc_types::galaxy::ViewLevel) {
+    pub(crate) fn set_tos_view_level(&mut self, level: ob_poc_types::galaxy::ViewLevel) {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.view_level = level;
         }
     }
 
     /// Current focus slot path from TOS.
-    pub fn tos_focus_slot_path(&self) -> Option<&str> {
+    pub(crate) fn tos_focus_slot_path(&self) -> Option<&str> {
         self.workspace_stack
             .last()
             .and_then(|f| f.focus_slot_path.as_deref())
     }
 
     /// Set the focus slot path on TOS.
-    pub fn set_tos_focus_slot(&mut self, path: Option<String>) {
+    pub(crate) fn set_tos_focus_slot(&mut self, path: Option<String>) {
         if let Some(tos) = self.workspace_stack.last_mut() {
             tos.focus_slot_path = path;
         }
@@ -673,7 +673,7 @@ impl ReplSessionV2 {
 
     /// Push a viewport snapshot to TOS navigation history (for back/forward).
     /// Truncates any forward history beyond the current cursor.
-    pub fn push_nav_snapshot(&mut self) {
+    pub(crate) fn push_nav_snapshot(&mut self) {
         if let Some(tos) = self.workspace_stack.last_mut() {
             let snapshot = super::types_v2::ViewportSnapshot {
                 view_level: tos.view_level,
@@ -690,7 +690,7 @@ impl ReplSessionV2 {
     }
 
     /// Navigate back in viewport history. Returns true if cursor moved.
-    pub fn nav_back(&mut self) -> bool {
+    pub(crate) fn nav_back(&mut self) -> bool {
         if let Some(tos) = self.workspace_stack.last_mut() {
             if tos.nav_cursor > 0 {
                 tos.nav_cursor -= 1;
@@ -704,7 +704,7 @@ impl ReplSessionV2 {
     }
 
     /// Navigate forward in viewport history. Returns true if cursor moved.
-    pub fn nav_forward(&mut self) -> bool {
+    pub(crate) fn nav_forward(&mut self) -> bool {
         if let Some(tos) = self.workspace_stack.last_mut() {
             if tos.nav_cursor + 1 < tos.nav_snapshots.len() {
                 tos.nav_cursor += 1;
@@ -731,7 +731,7 @@ impl ReplSessionV2 {
     /// session.push_workspace_frame(WorkspaceFrame::new(WorkspaceKind::Kyc, scope)).unwrap();
     /// assert!(session.pop_workspace_frame().is_some());
     /// ```
-    pub fn pop_workspace_frame(&mut self) -> Option<WorkspaceFrame> {
+    pub(crate) fn pop_workspace_frame(&mut self) -> Option<WorkspaceFrame> {
         if self.workspace_stack.len() <= 1 {
             return None;
         }
@@ -766,7 +766,7 @@ impl ReplSessionV2 {
     /// session.commit_workspace_stack();
     /// assert_eq!(session.workspace_stack.len(), 1);
     /// ```
-    pub fn commit_workspace_stack(&mut self) {
+    pub(crate) fn commit_workspace_stack(&mut self) {
         if let Some(tos) = self.workspace_stack.last().cloned() {
             self.workspace_stack.clear();
             self.active_workspace = Some(tos.workspace.clone());
@@ -788,7 +788,7 @@ impl ReplSessionV2 {
     /// let feedback = ReplSessionV2::new().build_session_feedback(false);
     /// assert_eq!(feedback.stack_depth, 0);
     /// ```
-    pub fn build_session_feedback(&self, tos_is_peek_override: bool) -> SessionFeedback {
+    pub(crate) fn build_session_feedback(&self, tos_is_peek_override: bool) -> SessionFeedback {
         let fallback_workspace = self.active_workspace.clone().unwrap_or(WorkspaceKind::Cbu);
         let _fallback_registry = fallback_workspace.registry_entry();
         let (hydrated, stale_warning) = if let Some(tos) = self.workspace_stack.last() {
@@ -865,7 +865,7 @@ impl ReplSessionV2 {
     /// ```rust,ignore
     /// session.activate_pack(pack, hash, None);
     /// ```
-    pub fn activate_pack(
+    pub(crate) fn activate_pack(
         &mut self,
         pack: Arc<PackManifest>,
         manifest_hash: String,
@@ -885,7 +885,7 @@ impl ReplSessionV2 {
     /// ```rust,ignore
     /// session.record_answer("field".into(), serde_json::json!("value"));
     /// ```
-    pub fn record_answer(&mut self, _field: String, _value: serde_json::Value) {
+    pub(crate) fn record_answer(&mut self, _field: String, _value: serde_json::Value) {
         self.last_active_at = Utc::now();
     }
 
@@ -899,7 +899,7 @@ impl ReplSessionV2 {
     /// session.clear_staged_pack();
     /// assert!(session.staged_pack.is_none());
     /// ```
-    pub fn clear_staged_pack(&mut self) {
+    pub(crate) fn clear_staged_pack(&mut self) {
         self.staged_pack = None;
         self.staged_pack_hash = None;
         self.last_active_at = Utc::now();
@@ -911,7 +911,7 @@ impl ReplSessionV2 {
     /// ```rust,ignore
     /// let stack = session.build_context_stack(None);
     /// ```
-    pub fn build_context_stack(
+    pub(crate) fn build_context_stack(
         &self,
         pack_router: Option<&crate::journey::router::PackRouter>,
     ) -> super::context_stack::ContextStack {
@@ -934,7 +934,7 @@ impl ReplSessionV2 {
     ///
     /// assert!(!ReplSessionV2::new().has_active_pack());
     /// ```
-    pub fn has_active_pack(&self) -> bool {
+    pub(crate) fn has_active_pack(&self) -> bool {
         self.active_pack_id().is_some()
     }
 
@@ -946,7 +946,7 @@ impl ReplSessionV2 {
     ///
     /// assert!(ReplSessionV2::new().active_pack_id().is_none());
     /// ```
-    pub fn active_pack_id(&self) -> Option<String> {
+    pub(crate) fn active_pack_id(&self) -> Option<String> {
         self.staged_pack
             .as_ref()
             .map(|p| p.id.clone())
@@ -959,7 +959,7 @@ impl ReplSessionV2 {
     /// ```rust,ignore
     /// session.rehydrate(&pack_router);
     /// ```
-    pub fn rehydrate(&mut self, pack_router: &crate::journey::router::PackRouter) {
+    pub(crate) fn rehydrate(&mut self, pack_router: &crate::journey::router::PackRouter) {
         let hash = self
             .staged_pack_hash
             .as_deref()
@@ -974,7 +974,7 @@ impl ReplSessionV2 {
     }
 
     /// Build the canonical stack/context value shared with BPMN-lite.
-    pub fn build_session_stack_state(&self) -> ob_poc_types::session_stack::SessionStackState {
+    pub(crate) fn build_session_stack_state(&self) -> ob_poc_types::session_stack::SessionStackState {
         use ob_poc_types::session_stack::{
             ConstraintCascadeState, SessionScopeState, SessionStackFrame, SessionStackState,
         };
@@ -1175,7 +1175,7 @@ fn binding_key_fragment(value: &str) -> String {
 
 /// A single message in the session conversation history.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatMessage {
+pub(crate) struct ChatMessage {
     pub id: Uuid,
     pub role: MessageRole,
     pub content: String,
@@ -1185,7 +1185,7 @@ pub struct ChatMessage {
 /// Who sent the message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum MessageRole {
+pub(crate) enum MessageRole {
     User,
     Assistant,
     System,

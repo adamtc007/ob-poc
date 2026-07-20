@@ -16,7 +16,7 @@ use crate::repl::response_v2::{ReplResponseKindV2, ReplResponseV2};
 use crate::repl::types_v2::ReplStateV2;
 
 /// Convert a REPL V2 response to a ChatResponse for the frontend.
-pub fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResponse {
+pub(crate) fn repl_to_chat_response(resp: ReplResponseV2, session_id: Uuid) -> ChatResponse {
     let session_state = repl_state_to_session_state(&resp.state);
     let session_feedback = resp
         .session_feedback

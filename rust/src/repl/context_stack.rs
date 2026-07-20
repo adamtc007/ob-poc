@@ -42,7 +42,7 @@ use crate::journey::router::PackRouter;
 
 /// Unified context for a REPL turn — built from runbook fold.
 #[derive(Debug, Clone)]
-pub struct ContextStack {
+pub(crate) struct ContextStack {
     /// Session scope derived from executed runbook entries.
     pub derived_scope: DerivedScope,
 
@@ -92,7 +92,7 @@ impl ContextStack {
     /// `PackManifest` from `pack.select` entries' `manifest-hash` arg,
     /// giving a rich `PackContext` with allowed_verbs, forbidden_verbs, etc.
     /// Without it, a minimal context is derived from used verbs.
-    pub fn from_runbook(
+    pub(crate) fn from_runbook(
         runbook: &Runbook,
         staged_pack: Option<Arc<PackManifest>>,
         turn: u32,
@@ -101,7 +101,7 @@ impl ContextStack {
     }
 
     /// Build a ContextStack with access to the PackRouter for manifest lookup.
-    pub fn from_runbook_with_router(
+    pub(crate) fn from_runbook_with_router(
         runbook: &Runbook,
         staged_pack: Option<Arc<PackManifest>>,
         turn: u32,
@@ -140,13 +140,13 @@ impl ContextStack {
     }
 
     /// The active pack context — staged preferred over executed.
-    pub fn active_pack(&self) -> Option<&PackContext> {
+    pub(crate) fn active_pack(&self) -> Option<&PackContext> {
         self.pack_staged.as_ref().or(self.pack_executed.as_ref())
     }
 
     /// Whether a verb is allowed by the active pack.
     /// If no pack is active, all verbs are allowed.
-    pub fn is_verb_allowed(&self, verb: &str) -> bool {
+    pub(crate) fn is_verb_allowed(&self, verb: &str) -> bool {
         match self.active_pack() {
             Some(pack) => !pack.forbidden_verbs.contains(verb),
             None => true,
@@ -155,7 +155,7 @@ impl ContextStack {
 
     /// Whether a verb is in the active pack's allowed set.
     /// If no pack is active, returns false (no boost).
-    pub fn is_verb_in_pack(&self, verb: &str) -> bool {
+    pub(crate) fn is_verb_in_pack(&self, verb: &str) -> bool {
         match self.active_pack() {
             Some(pack) => pack.allowed_verbs.contains(verb),
             None => false,
@@ -163,7 +163,7 @@ impl ContextStack {
     }
 
     /// Whether a verb is the next expected template step.
-    pub fn is_template_step(&self, verb: &str) -> bool {
+    pub(crate) fn is_template_step(&self, verb: &str) -> bool {
         match &self.template_hint {
             Some(hint) => hint.expected_verb == verb,
             None => false,
@@ -178,7 +178,7 @@ impl ContextStack {
 /// Session scope derived from executed runbook entries.
 /// Replaces the mutable `ClientContext` struct.
 #[derive(Debug, Clone, Default)]
-pub struct DerivedScope {
+pub(crate) struct DerivedScope {
     pub client_group_id: Option<Uuid>,
     pub client_group_name: Option<String>,
     pub default_cbu: Option<Uuid>,
@@ -276,7 +276,7 @@ fn derive_session_state(runbook: &Runbook) -> DerivedScope {
 
 /// Pack context derived from the active pack manifest.
 #[derive(Debug, Clone)]
-pub struct PackContext {
+pub(crate) struct PackContext {
     pub pack_id: String,
     pub pack_version: String,
     pub allowed_verbs: HashSet<String>,
@@ -288,7 +288,7 @@ pub struct PackContext {
 
 impl PackContext {
     /// Build pack context from a manifest.
-    pub fn from_manifest(manifest: &PackManifest) -> Self {
+    pub(crate) fn from_manifest(manifest: &PackManifest) -> Self {
         let allowed: HashSet<String> = manifest.allowed_verbs.iter().cloned().collect();
         let forbidden: HashSet<String> = manifest.forbidden_verbs.iter().cloned().collect();
 
@@ -427,7 +427,7 @@ fn derive_pack_context(runbook: &Runbook, pack_router: Option<&PackRouter>) -> O
 /// args from completed entries so the scoring layer can boost the expected
 /// verb and the arg extractor can pre-fill known values.
 #[derive(Debug, Clone)]
-pub struct TemplateStepHint {
+pub(crate) struct TemplateStepHint {
     /// Template identifier (matches `runbook.template_id`).
     pub template_id: String,
     /// 0-based index of the next step to execute.
@@ -448,7 +448,7 @@ pub struct TemplateStepHint {
 
 impl TemplateStepHint {
     /// Human-readable progress string, e.g. "Step 3 of 8" or "Step 3 of 8 (entities: 2/4)".
-    pub fn progress_label(&self) -> String {
+    pub(crate) fn progress_label(&self) -> String {
         let base = format!("Step {} of {}", self.step_index + 1, self.total_steps);
         match (&self.section, self.section_progress) {
             (Some(sec), Some((done, total))) => format!("{} ({}: {}/{})", base, sec, done, total),
@@ -564,7 +564,7 @@ fn result_value_object(
 ///
 /// "it", "that", "the manco", "the case" all resolve via this context.
 #[derive(Debug, Clone, Default)]
-pub struct FocusContext {
+pub(crate) struct FocusContext {
     /// The most recently mentioned entity.
     pub entity: Option<FocusRef>,
     /// The most recently mentioned CBU.
@@ -575,7 +575,7 @@ pub struct FocusContext {
 
 /// A concrete reference that a pronoun resolves to.
 #[derive(Debug, Clone)]
-pub struct FocusRef {
+pub(crate) struct FocusRef {
     pub id: Uuid,
     pub display_name: String,
     pub entity_type: String,
@@ -626,7 +626,7 @@ pub(crate) enum FocusTarget {
 
 impl FocusContext {
     /// Try to resolve a pronoun or shorthand to a concrete reference.
-    pub fn resolve_pronoun(&self, input: &str) -> Option<&FocusRef> {
+    pub(crate) fn resolve_pronoun(&self, input: &str) -> Option<&FocusRef> {
         let lower = input.to_lowercase();
         let trimmed = lower.trim();
 
@@ -644,7 +644,7 @@ impl FocusContext {
     }
 
     /// Resolve a role synonym to its canonical form.
-    pub fn resolve_role(input: &str) -> Option<&'static str> {
+    pub(crate) fn resolve_role(input: &str) -> Option<&'static str> {
         let lower = input.to_lowercase();
         let trimmed = lower.trim();
         for (short, canonical) in ROLE_SYNONYMS {
@@ -656,7 +656,7 @@ impl FocusContext {
     }
 
     /// Update entity focus.
-    pub fn set_entity(&mut self, id: Uuid, name: String, entity_type: String, turn: u32) {
+    pub(crate) fn set_entity(&mut self, id: Uuid, name: String, entity_type: String, turn: u32) {
         self.entity = Some(FocusRef {
             id,
             display_name: name,
@@ -666,7 +666,7 @@ impl FocusContext {
     }
 
     /// Update CBU focus.
-    pub fn set_cbu(&mut self, id: Uuid, name: String, turn: u32) {
+    pub(crate) fn set_cbu(&mut self, id: Uuid, name: String, turn: u32) {
         self.cbu = Some(FocusRef {
             id,
             display_name: name,
@@ -676,7 +676,7 @@ impl FocusContext {
     }
 
     /// Update case focus.
-    pub fn set_case(&mut self, id: Uuid, name: String, turn: u32) {
+    pub(crate) fn set_case(&mut self, id: Uuid, name: String, turn: u32) {
         self.case = Some(FocusRef {
             id,
             display_name: name,
@@ -849,14 +849,14 @@ pub(crate) fn derive_focus_mode(context: &ContextStack) -> FocusMode {
 
 /// Recent entity mentions for carry-forward and context.
 #[derive(Debug, Clone, Default)]
-pub struct RecentContext {
+pub(crate) struct RecentContext {
     /// Last N entity mentions (most recent first).
     pub mentions: Vec<RecentMention>,
 }
 
 /// A recent entity mention.
 #[derive(Debug, Clone)]
-pub struct RecentMention {
+pub(crate) struct RecentMention {
     pub entity_id: Uuid,
     pub display_name: String,
     pub entity_type: String,
@@ -867,7 +867,7 @@ const MAX_RECENT_MENTIONS: usize = 10;
 
 impl RecentContext {
     /// Add a mention, maintaining the max size.
-    pub fn add(&mut self, mention: RecentMention) {
+    pub(crate) fn add(&mut self, mention: RecentMention) {
         // Remove duplicate if present.
         self.mentions.retain(|m| m.entity_id != mention.entity_id);
         self.mentions.insert(0, mention);
@@ -915,13 +915,13 @@ fn derive_recent(runbook: &Runbook) -> RecentContext {
 /// Tracks rejected candidates so they are not re-proposed.
 /// Entries decay after 3 turns.
 #[derive(Debug, Clone, Default)]
-pub struct ExclusionSet {
+pub(crate) struct ExclusionSet {
     pub exclusions: Vec<Exclusion>,
 }
 
 /// A single exclusion.
 #[derive(Debug, Clone)]
-pub struct Exclusion {
+pub(crate) struct Exclusion {
     /// The rejected entity or value.
     pub value: String,
     /// Optional entity ID.
@@ -966,7 +966,7 @@ fn derive_exclusions(runbook: &Runbook, _current_turn: u32) -> ExclusionSet {
 
 impl ExclusionSet {
     /// Add an exclusion from a user rejection.
-    pub fn add_from_rejection(
+    pub(crate) fn add_from_rejection(
         &mut self,
         value: String,
         entity_id: Option<Uuid>,
@@ -990,32 +990,32 @@ impl ExclusionSet {
     }
 
     /// Prune expired exclusions.
-    pub fn prune(&mut self, current_turn: u32) {
+    pub(crate) fn prune(&mut self, current_turn: u32) {
         self.exclusions
             .retain(|e| current_turn.saturating_sub(e.rejected_at_turn) < EXCLUSION_DECAY_TURNS);
     }
 
     /// Check if a value or entity is excluded.
-    pub fn is_excluded(&self, value: &str, entity_id: Option<Uuid>) -> bool {
+    pub(crate) fn is_excluded(&self, value: &str, entity_id: Option<Uuid>) -> bool {
         self.exclusions
             .iter()
             .any(|e| e.value == value || (entity_id.is_some() && e.entity_id == entity_id))
     }
 
     /// Check if an entity ID is excluded.
-    pub fn is_entity_excluded(&self, entity_id: Uuid) -> bool {
+    pub(crate) fn is_entity_excluded(&self, entity_id: Uuid) -> bool {
         self.exclusions
             .iter()
             .any(|e| e.entity_id == Some(entity_id))
     }
 
     /// Whether the set has no exclusions.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.exclusions.is_empty()
     }
 
     /// Return all active (non-pruned) exclusions.
-    pub fn active(&self) -> &[Exclusion] {
+    pub(crate) fn active(&self) -> &[Exclusion] {
         &self.exclusions
     }
 }
@@ -1026,13 +1026,13 @@ impl ExclusionSet {
 
 /// Registry of execution results for @N back-references.
 #[derive(Debug, Clone, Default)]
-pub struct OutcomeRegistry {
+pub(crate) struct OutcomeRegistry {
     pub outcomes: HashMap<Uuid, serde_json::Value>,
 }
 
 impl OutcomeRegistry {
     /// Get an outcome by entry ID.
-    pub fn get(&self, entry_id: Uuid) -> Option<&serde_json::Value> {
+    pub(crate) fn get(&self, entry_id: Uuid) -> Option<&serde_json::Value> {
         self.outcomes.get(&entry_id)
     }
 }
@@ -1118,7 +1118,7 @@ fn derive_staged_verbs(runbook: &Runbook) -> HashSet<String> {
 #[cfg(test)]
 /// A suggestion to hand off to a different pack after the current one completes.
 #[derive(Debug, Clone)]
-pub struct PackHandoffSuggestion {
+pub(crate) struct PackHandoffSuggestion {
     /// The pack that completed.
     pub completed_pack_id: String,
     /// The suggested next pack (from `handoff_target`).
@@ -1149,7 +1149,7 @@ impl ContextStack {
     ///
     /// Returns a handoff suggestion with outcome refs from the completed pack.
     #[cfg(test)]
-    pub fn check_pack_handoff(&self, runbook: &Runbook) -> Option<PackHandoffSuggestion> {
+    pub(crate) fn check_pack_handoff(&self, runbook: &Runbook) -> Option<PackHandoffSuggestion> {
         let pack = self.active_pack()?;
 
         // Must have a template and it must be fully completed.

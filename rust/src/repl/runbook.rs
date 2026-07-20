@@ -209,7 +209,7 @@ pub enum GateType {
 /// Lifecycle of an invocation record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum InvocationStatus {
+pub(crate) enum InvocationStatus {
     /// Waiting for signal.
     Active,
     /// Signal received, entry resumed.
@@ -264,7 +264,7 @@ pub struct SlotProvenance {
 /// Origin of a single argument value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SlotSource {
+pub(crate) enum SlotSource {
     /// User typed it in conversation.
     UserProvided,
     /// Came from the pack template default.
@@ -281,7 +281,7 @@ pub enum SlotSource {
 
 /// Audit record for an LLM-based argument extraction call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ArgExtractionAudit {
+pub(crate) struct ArgExtractionAudit {
     pub model_id: String,
     pub prompt_hash: String,
     pub user_input: String,
@@ -296,7 +296,7 @@ pub struct ArgExtractionAudit {
 
 /// An entity reference that has not yet been resolved to a UUID.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnresolvedRef {
+pub(crate) struct UnresolvedRef {
     pub ref_id: String,
     pub display_text: String,
     pub entity_type: Option<String>,
@@ -310,7 +310,7 @@ pub struct UnresolvedRef {
 /// Event-sourced audit trail for all runbook mutations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum RunbookEvent {
+pub(crate) enum RunbookEvent {
     Created {
         timestamp: DateTime<Utc>,
     },
@@ -421,7 +421,7 @@ pub enum RunbookEvent {
 
 /// Report on whether a runbook is ready for execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadinessReport {
+pub(crate) struct ReadinessReport {
     pub ready: bool,
     pub total_entries: usize,
     pub enabled_entries: usize,
@@ -431,7 +431,7 @@ pub struct ReadinessReport {
 
 /// A single issue blocking execution readiness.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReadinessIssue {
+pub(crate) struct ReadinessIssue {
     pub entry_id: Uuid,
     pub sequence: i32,
     pub issue: String,
@@ -446,7 +446,7 @@ pub struct ReadinessIssue {
 /// Derived on-demand via `Runbook::derive_pending_questions()`. NOT stored
 /// separately — the runbook entries are the single source of truth.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingQuestion {
+pub(crate) struct PendingQuestion {
     pub entry_id: Uuid,
     pub sequence: i32,
     pub verb: String,
@@ -461,7 +461,7 @@ pub struct PendingQuestion {
 
 /// Snapshot of runbook progress for narration and UI display.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ProgressMetrics {
+pub(crate) struct ProgressMetrics {
     pub total: usize,
     pub completed: usize,
     pub confirmed: usize,
@@ -480,7 +480,7 @@ pub struct ProgressMetrics {
 /// These are zero-cost: parsed from the raw input string with no ML involved.
 /// If a fast command is detected, the orchestrator skips verb search entirely.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FastCommand {
+pub(crate) enum FastCommand {
     /// "undo" — remove last entry from runbook.
     Undo,
     /// "redo" — restore last undone entry.
@@ -512,7 +512,7 @@ impl FastCommand {
     ///
     /// Returns `None` if the input doesn't match any known command pattern.
     /// Commands are case-insensitive and support common aliases.
-    pub fn parse(input: &str) -> Option<Self> {
+    pub(crate) fn parse(input: &str) -> Option<Self> {
         let trimmed = input.trim().to_lowercase();
 
         // Exact matches first.
@@ -575,7 +575,7 @@ pub mod provenance {
 /// Stamp journey provenance labels on a RunbookEntry.
 ///
 /// Call this when creating entries from Tier -2 journey matches.
-pub fn stamp_journey_provenance(
+pub(crate) fn stamp_journey_provenance(
     entry: &mut RunbookEntry,
     macro_fqn: &str,
     scenario_id: Option<&str>,
@@ -609,7 +609,7 @@ pub fn stamp_journey_provenance(
 ///
 /// Returns e.g. "Step 3 of 13: Lux UCITS SICAV Setup" when the entry
 /// has an `origin_title` label, or `None` for regular entries.
-pub fn narrate_progress(entry: &RunbookEntry, total_entries: usize) -> Option<String> {
+pub(crate) fn narrate_progress(entry: &RunbookEntry, total_entries: usize) -> Option<String> {
     let title = entry.labels.get(provenance::ORIGIN_TITLE)?;
     Some(format!(
         "Step {} of {}: {}",
@@ -621,7 +621,7 @@ pub fn narrate_progress(entry: &RunbookEntry, total_entries: usize) -> Option<St
 ///
 /// Returns e.g. "Lux UCITS SICAV Setup — 13 steps" when at least one
 /// entry carries an `origin_title` label, or `None` otherwise.
-pub fn narrate_runbook_summary(entries: &[RunbookEntry]) -> Option<String> {
+pub(crate) fn narrate_runbook_summary(entries: &[RunbookEntry]) -> Option<String> {
     // Find the first entry with a title label
     let title = entries
         .iter()

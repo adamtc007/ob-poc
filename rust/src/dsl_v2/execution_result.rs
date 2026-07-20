@@ -100,7 +100,7 @@ impl StepResult {
 
 /// Accumulated results from executing a plan
 #[derive(Clone, Debug, Default)]
-pub struct ExecutionResults {
+pub(crate) struct ExecutionResults {
     /// Results indexed by step index
     pub step_results: Vec<(usize, StepResult)>,
     /// Bindings created during execution: symbol name → UUID
@@ -112,12 +112,12 @@ pub struct ExecutionResults {
 }
 
 impl ExecutionResults {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Record a successful step result
-    pub fn record_step(&mut self, step_index: usize, result: StepResult, binding: Option<&str>) {
+    pub(crate) fn record_step(&mut self, step_index: usize, result: StepResult, binding: Option<&str>) {
         // Record binding if provided and result produced a PK
         if let Some(bind_name) = binding {
             if let Some(pk) = result.produced_pk() {
@@ -132,42 +132,42 @@ impl ExecutionResults {
     }
 
     /// Record an error for a step
-    pub fn record_error(&mut self, step_index: usize, error: impl Into<String>) {
+    pub(crate) fn record_error(&mut self, step_index: usize, error: impl Into<String>) {
         self.errors.push((step_index, error.into()));
     }
 
     /// Check if execution was successful (no errors)
-    pub fn is_success(&self) -> bool {
+    pub(crate) fn is_success(&self) -> bool {
         self.errors.is_empty()
     }
 
     /// Get the number of successful steps
-    pub fn success_count(&self) -> usize {
+    pub(crate) fn success_count(&self) -> usize {
         self.step_results.len()
     }
 
     /// Get the number of errors
-    pub fn error_count(&self) -> usize {
+    pub(crate) fn error_count(&self) -> usize {
         self.errors.len()
     }
 
     /// Get binding by name
-    pub fn get_binding(&self, name: &str) -> Option<Uuid> {
+    pub(crate) fn get_binding(&self, name: &str) -> Option<Uuid> {
         self.bindings_created.get(name).copied()
     }
 
     /// Check if a binding exists
-    pub fn has_binding(&self, name: &str) -> bool {
+    pub(crate) fn has_binding(&self, name: &str) -> bool {
         self.bindings_created.contains_key(name)
     }
 
     /// Get entity type for a binding
-    pub fn binding_type(&self, name: &str) -> Option<&str> {
+    pub(crate) fn binding_type(&self, name: &str) -> Option<&str> {
         self.binding_types.get(name).map(|s| s.as_str())
     }
 
     /// Merge results from another execution
-    pub fn merge(&mut self, other: ExecutionResults) {
+    pub(crate) fn merge(&mut self, other: ExecutionResults) {
         self.step_results.extend(other.step_results);
         self.bindings_created.extend(other.bindings_created);
         self.binding_types.extend(other.binding_types);
@@ -175,7 +175,7 @@ impl ExecutionResults {
     }
 
     /// Create a summary string for logging
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         let creates = self
             .step_results
             .iter()

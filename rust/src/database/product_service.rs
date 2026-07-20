@@ -9,7 +9,7 @@ use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ProductRow {
+pub(crate) struct ProductRow {
     pub product_id: Uuid,
     pub name: String,
     pub description: Option<String>,
@@ -40,15 +40,15 @@ pub(crate) struct NewProductFields {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProductService {
+pub(crate) struct ProductService {
     pool: PgPool,
 }
 
 impl ProductService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -64,24 +64,8 @@ impl ProductService {
         Ok(product_id)
     }
 
-    pub async fn get_product_by_id(&self, product_id: Uuid) -> Result<Option<ProductRow>> {
-        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, product_family, effective_from, effective_to, created_at, updated_at FROM "ob-poc".products WHERE product_id = $1"#)
-            .bind(product_id).fetch_optional(&self.pool).await.context("Failed to get Product by ID")
-    }
 
-    pub async fn get_product_by_name(&self, name: &str) -> Result<Option<ProductRow>> {
-        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, product_family, effective_from, effective_to, created_at, updated_at FROM "ob-poc".products WHERE name = $1"#)
-            .bind(name).fetch_optional(&self.pool).await.context("Failed to get Product by name")
-    }
 
-    pub async fn list_products(
-        &self,
-        limit: Option<i32>,
-        offset: Option<i32>,
-    ) -> Result<Vec<ProductRow>> {
-        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, product_family, effective_from, effective_to, created_at, updated_at FROM "ob-poc".products ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
-            .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Products")
-    }
 
     #[allow(dead_code)]
     pub(crate) async fn update_product(

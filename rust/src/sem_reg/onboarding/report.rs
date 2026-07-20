@@ -7,7 +7,7 @@ use super::seed::BootstrapReport;
 use super::xref::ColumnClassification;
 
 /// Format a BootstrapReport as a multi-line string for terminal output.
-pub fn format_bootstrap_report(report: &BootstrapReport) -> String {
+pub(crate) fn format_bootstrap_report(report: &BootstrapReport) -> String {
     let mut lines = Vec::new();
 
     lines.push("── Bootstrap Report ────────────────────────────────".into());
@@ -52,7 +52,7 @@ pub fn format_bootstrap_report(report: &BootstrapReport) -> String {
 }
 
 /// Format a manifest summary showing what WOULD be seeded.
-pub fn format_seed_preview(manifest: &OnboardingManifest) -> String {
+pub(crate) fn format_seed_preview(manifest: &OnboardingManifest) -> String {
     let mut lines = Vec::new();
 
     let seedable_attrs = manifest

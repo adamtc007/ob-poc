@@ -16,7 +16,7 @@ use crate::graph::types::{EntityGraph, GraphScope};
 
 /// Session scope with stats and windowing info
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionScope {
+pub(crate) struct SessionScope {
     /// How scope was defined
     pub definition: GraphScope,
 
@@ -29,7 +29,7 @@ pub struct SessionScope {
 
 /// Summary statistics for a loaded scope
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScopeSummary {
+pub(crate) struct ScopeSummary {
     /// Total number of entities in scope
     pub total_entities: usize,
 
@@ -54,7 +54,7 @@ pub struct ScopeSummary {
 
 /// Load status indicating how much data is in memory
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub enum LoadStatus {
+pub(crate) enum LoadStatus {
     /// All data loaded in memory
     #[default]
     Full,
@@ -78,7 +78,7 @@ pub enum LoadStatus {
 
 /// A node that can be expanded to load more data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpandableNode {
+pub(crate) struct ExpandableNode {
     /// Entity ID that can be expanded
     pub entity_id: Uuid,
 
@@ -94,7 +94,7 @@ pub struct ExpandableNode {
 
 impl SessionScope {
     /// Create an empty scope
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             definition: GraphScope::Empty,
             stats: ScopeSummary::default(),
@@ -107,7 +107,7 @@ impl SessionScope {
     /// This is used when session.* verbs change the scope definition but
     /// graph data hasn't been loaded yet. Stats will be populated later
     /// when the graph is loaded.
-    pub fn from_graph_scope(definition: GraphScope) -> Self {
+    pub(crate) fn from_graph_scope(definition: GraphScope) -> Self {
         Self {
             definition,
             stats: ScopeSummary::default(),
@@ -118,7 +118,7 @@ impl SessionScope {
     }
 
     /// Create scope from a loaded graph
-    pub fn from_graph(graph: &EntityGraph, definition: GraphScope) -> Self {
+    pub(crate) fn from_graph(graph: &EntityGraph, definition: GraphScope) -> Self {
         let max_depth = graph
             .nodes
             .values()
@@ -144,7 +144,7 @@ impl SessionScope {
     }
 
     /// Create a windowed scope centered on an entity
-    pub fn windowed(
+    pub(crate) fn windowed(
         definition: GraphScope,
         center_entity_id: Uuid,
         loaded_hops: u32,
@@ -163,7 +163,7 @@ impl SessionScope {
     }
 
     /// Create a summary-only scope with expandable nodes
-    pub fn summary_only(
+    pub(crate) fn summary_only(
         definition: GraphScope,
         stats: ScopeSummary,
         expandable_nodes: Vec<ExpandableNode>,
@@ -197,22 +197,22 @@ impl SessionScope {
     }
 
     /// Check if scope is empty
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         matches!(self.definition, GraphScope::Empty)
     }
 
     /// Check if scope is fully loaded
-    pub fn is_fully_loaded(&self) -> bool {
+    pub(crate) fn is_fully_loaded(&self) -> bool {
         matches!(self.load_status, LoadStatus::Full)
     }
 
     /// Check if scope is windowed
-    pub fn is_windowed(&self) -> bool {
+    pub(crate) fn is_windowed(&self) -> bool {
         matches!(self.load_status, LoadStatus::Windowed { .. })
     }
 
     /// Get expandable nodes if in summary-only mode
-    pub fn expandable_nodes(&self) -> Option<&[ExpandableNode]> {
+    pub(crate) fn expandable_nodes(&self) -> Option<&[ExpandableNode]> {
         match &self.load_status {
             LoadStatus::SummaryOnly { expandable_nodes } => Some(expandable_nodes),
             _ => None,
@@ -220,7 +220,7 @@ impl SessionScope {
     }
 
     /// Get window center if in windowed mode
-    pub fn window_center(&self) -> Option<Uuid> {
+    pub(crate) fn window_center(&self) -> Option<Uuid> {
         match &self.load_status {
             LoadStatus::Windowed {
                 center_entity_id, ..
@@ -230,7 +230,7 @@ impl SessionScope {
     }
 
     /// Get top jurisdictions by entity count
-    pub fn top_jurisdictions(&self, limit: usize) -> Vec<(&str, usize)> {
+    pub(crate) fn top_jurisdictions(&self, limit: usize) -> Vec<(&str, usize)> {
         let mut sorted: Vec<_> = self
             .stats
             .by_jurisdiction
@@ -242,21 +242,9 @@ impl SessionScope {
         sorted
     }
 
-    /// Get top entity types by count
-    pub fn top_entity_types(&self, limit: usize) -> Vec<(&str, usize)> {
-        let mut sorted: Vec<_> = self
-            .stats
-            .by_entity_type
-            .iter()
-            .map(|(k, v)| (k.as_str(), *v))
-            .collect();
-        sorted.sort_by_key(|item| std::cmp::Reverse(item.1));
-        sorted.truncate(limit);
-        sorted
-    }
 
     /// Format scope for display
-    pub fn display_summary(&self) -> String {
+    pub(crate) fn display_summary(&self) -> String {
         let scope_type = match &self.definition {
             GraphScope::SingleCbu { cbu_name, .. } => format!("CBU: {}", cbu_name),
             GraphScope::Book { apex_name, .. } => format!("Book: {}", apex_name),

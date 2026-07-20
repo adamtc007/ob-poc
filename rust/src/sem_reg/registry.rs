@@ -33,7 +33,7 @@ use super::{
 
 /// Outcome of a gated publish operation.
 #[derive(Debug)]
-pub enum PublishOutcome {
+pub(crate) enum PublishOutcome {
     /// Snapshot published successfully (no gate failures).
     Published(Uuid),
     /// Publish blocked by gate failures (Enforce mode).

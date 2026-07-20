@@ -20,11 +20,11 @@ pub struct ExecutionContext {
 use super::document_catalog_source::{AttributeSource, SourceError};
 
 /// Result type for executor operations
-pub type ExecutorResult<T> = Result<T, ExecutorError>;
+pub(crate) type ExecutorResult<T> = Result<T, ExecutorError>;
 
 /// Executor-specific errors
 #[derive(Debug, thiserror::Error)]
-pub enum ExecutorError {
+pub(crate) enum ExecutorError {
     #[error("No value found for attribute {0}")]
     NoValueFound(Uuid),
 
@@ -43,7 +43,7 @@ pub enum ExecutorError {
 
 /// Trait for attribute sinks - persist attribute values
 #[async_trait]
-pub trait AttributeSink: Send + Sync {
+pub(crate) trait AttributeSink: Send + Sync {
     /// Write attribute value to this sink
     async fn write_value(
         &self,
@@ -57,17 +57,17 @@ pub trait AttributeSink: Send + Sync {
 }
 
 /// Dictionary for attribute definitions and validation
-pub struct AttributeDictionary {
+pub(crate) struct AttributeDictionary {
     pool: PgPool,
 }
 
 impl AttributeDictionary {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get attribute definition
-    pub async fn get_attribute(&self, attribute_id: &Uuid) -> ExecutorResult<AttributeDef> {
+    pub(crate) async fn get_attribute(&self, attribute_id: &Uuid) -> ExecutorResult<AttributeDef> {
         let resolved = AttributeIdentityService::new(self.pool.clone())
             .resolve_reference(&attribute_id.to_string())
             .await
@@ -87,7 +87,7 @@ impl AttributeDictionary {
     }
 
     /// Validate attribute value against its definition
-    pub async fn validate_attribute_value(
+    pub(crate) async fn validate_attribute_value(
         &self,
         attribute_id: &Uuid,
         value: &serde_json::Value,
@@ -125,12 +125,12 @@ pub struct AttributeDef {
 }
 
 /// Database sink - writes to attribute_values table
-pub struct DatabaseSink {
+pub(crate) struct DatabaseSink {
     pool: PgPool,
 }
 
 impl DatabaseSink {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
@@ -173,7 +173,7 @@ impl AttributeSink for DatabaseSink {
 }
 
 /// Attribute executor - coordinates sources and sinks
-pub struct AttributeExecutor {
+pub(crate) struct AttributeExecutor {
     sources: Vec<Arc<dyn AttributeSource>>,
     sinks: Vec<Arc<dyn AttributeSink>>,
     dictionary: AttributeDictionary,
@@ -181,7 +181,7 @@ pub struct AttributeExecutor {
 
 impl AttributeExecutor {
     /// Create new executor with sources and sinks
-    pub fn new(
+    pub(crate) fn new(
         sources: Vec<Arc<dyn AttributeSource>>,
         sinks: Vec<Arc<dyn AttributeSink>>,
         dictionary: AttributeDictionary,
@@ -198,7 +198,7 @@ impl AttributeExecutor {
     }
 
     /// Resolve attribute with fallback chain
-    pub async fn resolve_attribute(
+    pub(crate) async fn resolve_attribute(
         &self,
         attribute_id: &Uuid,
         context: &ExecutionContext,
@@ -275,7 +275,7 @@ impl AttributeExecutor {
     }
 
     /// Batch resolve multiple attributes
-    pub async fn batch_resolve(
+    pub(crate) async fn batch_resolve(
         &self,
         attribute_ids: &[Uuid],
         context: &ExecutionContext,

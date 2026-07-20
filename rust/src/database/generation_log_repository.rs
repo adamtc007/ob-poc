@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 /// A single generation attempt within an iteration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenerationAttempt {
+pub(crate) struct GenerationAttempt {
     pub attempt: i32,
     pub timestamp: DateTime<Utc>,
     pub prompt_template: Option<String>,
@@ -43,14 +43,14 @@ pub struct GenerationAttempt {
 
 /// Result of parsing DSL
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParseResult {
+pub(crate) struct ParseResult {
     pub success: bool,
     pub error: Option<String>,
 }
 
 /// Result of linting DSL
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LintResult {
+pub(crate) struct LintResult {
     pub valid: bool,
     pub errors: Vec<String>,
     pub warnings: Vec<String>,
@@ -58,7 +58,7 @@ pub struct LintResult {
 
 /// Result of compiling DSL to execution plan
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompileResult {
+pub(crate) struct CompileResult {
     pub success: bool,
     pub error: Option<String>,
     pub step_count: i32,
@@ -67,7 +67,7 @@ pub struct CompileResult {
 /// Execution status for DSL (matches DB enum)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "\"ob-poc\".execution_status", rename_all = "lowercase")]
-pub enum ExecutionStatus {
+pub(crate) enum ExecutionStatus {
     Pending,
     Executed,
     Failed,
@@ -77,14 +77,14 @@ pub enum ExecutionStatus {
 
 /// Training pair: user intent → valid DSL
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct TrainingPair {
+pub(crate) struct TrainingPair {
     pub user_intent: String,
     pub valid_dsl: Option<String>,
 }
 
 /// Correction pair: bad DSL + error → fixed DSL
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CorrectionPair {
+pub(crate) struct CorrectionPair {
     pub user_intent: String,
     pub bad_dsl: Option<String>,
     pub error_message: Option<String>,
@@ -93,7 +93,7 @@ pub struct CorrectionPair {
 
 /// Prompt template effectiveness statistics
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct PromptStats {
+pub(crate) struct PromptStats {
     pub template_name: Option<String>,
     pub total_uses: i64,
     pub first_try_success: i64,
@@ -103,7 +103,7 @@ pub struct PromptStats {
 
 /// Full generation log row
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct GenerationLogRow {
+pub(crate) struct GenerationLogRow {
     pub log_id: Uuid,
     pub instance_id: Option<Uuid>,
     pub user_intent: String,
@@ -129,18 +129,18 @@ pub struct GenerationLogRow {
 }
 
 /// Repository for generation log operations
-pub struct GenerationLogRepository {
+pub(crate) struct GenerationLogRepository {
     pool: PgPool,
 }
 
 impl GenerationLogRepository {
     /// Create a new repository
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get the pool reference
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -149,7 +149,7 @@ impl GenerationLogRepository {
     ///
     /// # Arguments
     /// * `intent_feedback_id` - Links to intent_feedback for learning loop (optional)
-    pub async fn start_log(
+    pub(crate) async fn start_log(
         &self,
         user_intent: &str,
         domain_name: &str,
@@ -181,7 +181,7 @@ impl GenerationLogRepository {
     }
 
     /// Add an iteration attempt to existing log
-    pub async fn add_attempt(
+    pub(crate) async fn add_attempt(
         &self,
         log_id: Uuid,
         attempt: &GenerationAttempt,
@@ -213,7 +213,7 @@ impl GenerationLogRepository {
     }
 
     /// Mark generation as successful and store final DSL
-    pub async fn mark_success(
+    pub(crate) async fn mark_success(
         &self,
         log_id: Uuid,
         final_dsl: &str,
@@ -240,7 +240,7 @@ impl GenerationLogRepository {
     }
 
     /// Mark generation as failed
-    pub async fn mark_failed(&self, log_id: Uuid) -> Result<(), sqlx::Error> {
+    pub(crate) async fn mark_failed(&self, log_id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
             UPDATE "ob-poc".dsl_generation_log
@@ -258,7 +258,7 @@ impl GenerationLogRepository {
     /// Record execution outcome for learning loop
     ///
     /// Called after DSL execution completes (success or failure)
-    pub async fn record_execution_outcome(
+    pub(crate) async fn record_execution_outcome(
         &self,
         log_id: Uuid,
         status: ExecutionStatus,
@@ -286,29 +286,9 @@ impl GenerationLogRepository {
         Ok(())
     }
 
-    /// Link an existing log entry to intent_feedback (if not set at creation)
-    pub async fn link_to_feedback(
-        &self,
-        log_id: Uuid,
-        intent_feedback_id: i64,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            UPDATE "ob-poc".dsl_generation_log
-            SET intent_feedback_id = $2
-            WHERE log_id = $1 AND intent_feedback_id IS NULL
-            "#,
-        )
-        .bind(log_id)
-        .bind(intent_feedback_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(())
-    }
 
     /// Get a generation log by ID
-    pub async fn get_by_id(&self, log_id: Uuid) -> Result<Option<GenerationLogRow>, sqlx::Error> {
+    pub(crate) async fn get_by_id(&self, log_id: Uuid) -> Result<Option<GenerationLogRow>, sqlx::Error> {
         sqlx::query_as::<_, GenerationLogRow>(
             r#"
             SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
@@ -326,7 +306,7 @@ impl GenerationLogRepository {
     }
 
     /// List recent generation logs
-    pub async fn list_recent(&self, limit: i32) -> Result<Vec<GenerationLogRow>, sqlx::Error> {
+    pub(crate) async fn list_recent(&self, limit: i32) -> Result<Vec<GenerationLogRow>, sqlx::Error> {
         sqlx::query_as::<_, GenerationLogRow>(
             r#"
             SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
@@ -344,115 +324,12 @@ impl GenerationLogRepository {
         .await
     }
 
-    /// Export successful intent → DSL pairs for fine-tuning
-    pub async fn export_training_pairs(
-        &self,
-        domain: Option<&str>,
-        limit: Option<i32>,
-    ) -> Result<Vec<TrainingPair>, sqlx::Error> {
-        sqlx::query_as::<_, TrainingPair>(
-            r#"
-            SELECT user_intent, final_valid_dsl as valid_dsl
-            FROM "ob-poc".dsl_generation_log
-            WHERE success = true
-              AND final_valid_dsl IS NOT NULL
-              AND ($1::text IS NULL OR domain_name = $1)
-            ORDER BY created_at DESC
-            LIMIT $2
-            "#,
-        )
-        .bind(domain)
-        .bind(limit.unwrap_or(1000))
-        .fetch_all(&self.pool)
-        .await
-    }
 
-    /// Export error correction pairs (bad DSL + error → fixed DSL)
-    /// Returns pairs where first attempt failed but later succeeded
-    pub async fn export_correction_pairs(
-        &self,
-        limit: Option<i32>,
-    ) -> Result<Vec<CorrectionPair>, sqlx::Error> {
-        sqlx::query_as::<_, CorrectionPair>(
-            r#"
-            WITH corrections AS (
-                SELECT
-                    log_id,
-                    user_intent,
-                    iterations,
-                    final_valid_dsl,
-                    total_attempts
-                FROM "ob-poc".dsl_generation_log
-                WHERE success = true AND total_attempts > 1
-            )
-            SELECT
-                user_intent,
-                iterations->0->>'extracted_dsl' as bad_dsl,
-                COALESCE(
-                    iterations->0->'lint_result'->'errors'->>0,
-                    iterations->0->'parse_result'->>'error',
-                    iterations->0->'compile_result'->>'error'
-                ) as error_message,
-                final_valid_dsl as fixed_dsl
-            FROM corrections
-            WHERE final_valid_dsl IS NOT NULL
-            LIMIT $1
-            "#,
-        )
-        .bind(limit.unwrap_or(500))
-        .fetch_all(&self.pool)
-        .await
-    }
 
-    /// Find similar successful generations for few-shot RAG
-    /// Requires pg_trgm extension for similarity search
-    pub async fn find_similar_examples(
-        &self,
-        intent: &str,
-        domain: &str,
-        limit: i32,
-    ) -> Result<Vec<TrainingPair>, sqlx::Error> {
-        sqlx::query_as::<_, TrainingPair>(
-            r#"
-            SELECT user_intent, final_valid_dsl as valid_dsl
-            FROM "ob-poc".dsl_generation_log
-            WHERE success = true
-              AND final_valid_dsl IS NOT NULL
-              AND domain_name = $2
-              AND user_intent % $1
-            ORDER BY similarity(user_intent, $1) DESC
-            LIMIT $3
-            "#,
-        )
-        .bind(intent)
-        .bind(domain)
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await
-    }
 
-    /// Get prompt template effectiveness stats
-    pub async fn prompt_effectiveness_stats(&self) -> Result<Vec<PromptStats>, sqlx::Error> {
-        sqlx::query_as::<_, PromptStats>(
-            r#"
-            SELECT
-                iterations->0->>'prompt_template' as template_name,
-                COUNT(*)::bigint as total_uses,
-                SUM(CASE WHEN total_attempts = 1 AND success THEN 1 ELSE 0 END)::bigint as first_try_success,
-                AVG(total_attempts)::float8 as avg_attempts,
-                AVG(total_latency_ms)::float8 as avg_latency_ms
-            FROM "ob-poc".dsl_generation_log
-            WHERE iterations->0->>'prompt_template' IS NOT NULL
-            GROUP BY iterations->0->>'prompt_template'
-            ORDER BY total_uses DESC
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await
-    }
 
     /// Get logs for a specific session
-    pub async fn get_by_session(
+    pub(crate) async fn get_by_session(
         &self,
         session_id: Uuid,
     ) -> Result<Vec<GenerationLogRow>, sqlx::Error> {
@@ -473,30 +350,11 @@ impl GenerationLogRepository {
         .await
     }
 
-    /// Get generation stats summary
-    pub async fn get_stats_summary(&self) -> Result<Option<GenerationStatsSummary>, sqlx::Error> {
-        sqlx::query_as::<_, GenerationStatsSummary>(
-            r#"
-            SELECT
-                COUNT(*)::bigint as total_generations,
-                SUM(CASE WHEN success THEN 1 ELSE 0 END)::bigint as successful,
-                SUM(CASE WHEN NOT success THEN 1 ELSE 0 END)::bigint as failed,
-                AVG(total_attempts)::float8 as avg_attempts,
-                AVG(CASE WHEN success THEN total_latency_ms END)::float8 as avg_success_latency_ms,
-                SUM(total_input_tokens)::bigint as total_input_tokens,
-                SUM(total_output_tokens)::bigint as total_output_tokens
-            FROM "ob-poc".dsl_generation_log
-            WHERE completed_at IS NOT NULL
-            "#,
-        )
-        .fetch_optional(&self.pool)
-        .await
-    }
 }
 
 /// Summary statistics for generation logs
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct GenerationStatsSummary {
+pub(crate) struct GenerationStatsSummary {
     pub total_generations: i64,
     pub successful: i64,
     pub failed: i64,

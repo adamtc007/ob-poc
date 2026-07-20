@@ -20,7 +20,7 @@ use sqlx::PgPool;
 /// The canonical text representation of a registry object, used as embedding
 /// input.  Built deterministically from snapshot fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemanticText {
+pub(crate) struct SemanticText {
     pub snapshot_id: Uuid,
     pub object_type: String,
     /// Concatenated searchable text: FQN + name + description + aliases +
@@ -32,7 +32,7 @@ pub struct SemanticText {
 
 /// A stored embedding record with staleness tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmbeddingRecord {
+pub(crate) struct EmbeddingRecord {
     pub embedding_id: Uuid,
     pub snapshot_id: Uuid,
     pub object_type: String,
@@ -49,7 +49,7 @@ pub struct EmbeddingRecord {
 
 /// Result from a similarity search.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimilarityResult {
+pub(crate) struct SimilarityResult {
     pub snapshot_id: Uuid,
     pub object_type: String,
     pub object_id: Uuid,
@@ -80,7 +80,7 @@ impl SemanticText {
     ///
     /// Concatenates: object_type, FQN (if present), name, description, aliases,
     /// and taxonomy paths into a single searchable string.
-    pub fn from_definition(
+    pub(crate) fn from_definition(
         snapshot_id: Uuid,
         object_type: &str,
         definition: &serde_json::Value,
@@ -152,12 +152,12 @@ fn md5_hash(input: &str) -> u128 {
 
 // ── Store ────────────────────────────────────────────────────────────────────
 
-pub struct EmbeddingStore;
+pub(crate) struct EmbeddingStore;
 
 impl EmbeddingStore {
     /// Insert or update an embedding record (versioned by snapshot_id).
     #[cfg(feature = "database")]
-    pub async fn upsert_embedding(
+    pub(crate) async fn upsert_embedding(
         pool: &PgPool,
         snapshot_id: Uuid,
         object_type: &str,
@@ -196,7 +196,7 @@ impl EmbeddingStore {
 
     /// Check if an embedding is stale (version_hash differs from current snapshot).
     #[cfg(feature = "database")]
-    pub async fn check_staleness(
+    pub(crate) async fn check_staleness(
         pool: &PgPool,
         snapshot_id: Uuid,
         current_hash: &str,
@@ -224,7 +224,7 @@ impl EmbeddingStore {
     /// candidate embeddings and compute cosine similarity in Rust.  Results
     /// are returned sorted by descending similarity score.
     #[cfg(feature = "database")]
-    pub async fn similarity_search(
+    pub(crate) async fn similarity_search(
         pool: &PgPool,
         query_embedding: &[f32],
         object_type_filter: Option<&str>,
@@ -292,7 +292,7 @@ impl EmbeddingStore {
 
     /// Return snapshot IDs of stale embeddings (version_hash mismatch).
     #[cfg(feature = "database")]
-    pub async fn stale_snapshot_ids(pool: &PgPool) -> Result<Vec<Uuid>> {
+    pub(crate) async fn stale_snapshot_ids(pool: &PgPool) -> Result<Vec<Uuid>> {
         let rows: Vec<(Uuid,)> = sqlx::query_as(
             r#"
             SELECT e.snapshot_id
@@ -308,7 +308,7 @@ impl EmbeddingStore {
 
     /// Count total embeddings and stale embeddings for stats.
     #[cfg(feature = "database")]
-    pub async fn stats(pool: &PgPool) -> Result<(i64, i64)> {
+    pub(crate) async fn stats(pool: &PgPool) -> Result<(i64, i64)> {
         let row: (i64, i64) = sqlx::query_as(
             r#"
             SELECT
@@ -331,7 +331,7 @@ impl EmbeddingStore {
 
 /// Compute cosine similarity between two embedding vectors.
 /// Returns 0.0 if either vector has zero magnitude.
-pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+pub(crate) fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     if a.len() != b.len() || a.is_empty() {
         return 0.0;
     }

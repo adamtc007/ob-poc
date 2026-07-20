@@ -31,4 +31,5 @@
 
 pub mod service;
 
-pub use service::{EntitySnapshotMetadata, LookupResult, LookupService};
+pub use service::{LookupService};
+pub(crate) use service::{EntitySnapshotMetadata, LookupResult};

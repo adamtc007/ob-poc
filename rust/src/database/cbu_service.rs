@@ -38,7 +38,7 @@ pub struct CbuRow {
 
 /// Fields for creating a new CBU
 #[derive(Debug, Clone)]
-pub struct NewCbuFields {
+pub(crate) struct NewCbuFields {
     pub name: String,
     pub description: Option<String>,
     pub nature_purpose: Option<String>,

@@ -22,7 +22,7 @@ use crate::graph::types::EntityGraph;
 
 /// Responsive breakpoint based on viewport width
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum Breakpoint {
+pub(crate) enum Breakpoint {
     /// < 600px - Mobile phones
     Phone,
     /// 600-1024px - Tablets
@@ -36,7 +36,7 @@ pub enum Breakpoint {
 
 impl Breakpoint {
     /// Determine breakpoint from viewport width (in logical pixels)
-    pub fn from_width(width: f32) -> Self {
+    pub(crate) fn from_width(width: f32) -> Self {
         match width {
             w if w < 600.0 => Breakpoint::Phone,
             w if w < 1024.0 => Breakpoint::Tablet,
@@ -46,7 +46,7 @@ impl Breakpoint {
     }
 
     /// Get recommended node size multiplier for this breakpoint
-    pub fn node_scale(&self) -> f32 {
+    pub(crate) fn node_scale(&self) -> f32 {
         match self {
             Breakpoint::Phone => 0.6,
             Breakpoint::Tablet => 0.8,
@@ -56,7 +56,7 @@ impl Breakpoint {
     }
 
     /// Get recommended font size multiplier for this breakpoint
-    pub fn font_scale(&self) -> f32 {
+    pub(crate) fn font_scale(&self) -> f32 {
         match self {
             Breakpoint::Phone => 0.75,
             Breakpoint::Tablet => 0.9,
@@ -66,7 +66,7 @@ impl Breakpoint {
     }
 
     /// Get recommended label visibility threshold (zoom level below which labels hide)
-    pub fn label_hide_threshold(&self) -> f32 {
+    pub(crate) fn label_hide_threshold(&self) -> f32 {
         match self {
             Breakpoint::Phone => 0.6, // Hide labels earlier on small screens
             Breakpoint::Tablet => 0.5,
@@ -76,7 +76,7 @@ impl Breakpoint {
     }
 
     /// Get recommended max visible nodes before LOD reduction
-    pub fn lod_threshold(&self) -> usize {
+    pub(crate) fn lod_threshold(&self) -> usize {
         match self {
             Breakpoint::Phone => 30,
             Breakpoint::Tablet => 60,
@@ -85,13 +85,9 @@ impl Breakpoint {
         }
     }
 
-    /// Check if this is a "compact" layout (phone/tablet)
-    pub fn is_compact(&self) -> bool {
-        matches!(self, Breakpoint::Phone | Breakpoint::Tablet)
-    }
 
     /// Get as human-readable string
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Breakpoint::Phone => "Phone",
             Breakpoint::Tablet => "Tablet",
@@ -107,7 +103,7 @@ impl Breakpoint {
 
 /// Display configuration for responsive layout
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisplayConfig {
+pub(crate) struct DisplayConfig {
     /// Device pixel ratio (1.0 for standard, 2.0 for Retina/HiDPI)
     pub scale_factor: f32,
 
@@ -142,7 +138,7 @@ impl Default for DisplayConfig {
 
 impl DisplayConfig {
     /// Create display config from viewport dimensions and scale factor
-    pub fn from_viewport(width: f32, height: f32, scale_factor: f32) -> Self {
+    pub(crate) fn from_viewport(width: f32, height: f32, scale_factor: f32) -> Self {
         let breakpoint = Breakpoint::from_width(width);
         let is_undersized = width < 320.0 || height < 480.0;
 
@@ -163,40 +159,16 @@ impl DisplayConfig {
         }
     }
 
-    /// Convert logical pixels to physical pixels
-    pub fn to_physical(&self, logical: f32) -> f32 {
-        logical * self.scale_factor
-    }
 
-    /// Convert physical pixels to logical pixels
-    pub fn to_logical(&self, physical: f32) -> f32 {
-        physical / self.scale_factor
-    }
 
-    /// Get effective node radius accounting for breakpoint and scale
-    pub fn effective_node_radius(&self, base_radius: f32) -> f32 {
-        base_radius * self.breakpoint.node_scale()
-    }
 
-    /// Get effective font size accounting for breakpoint and scale
-    pub fn effective_font_size(&self, base_size: f32) -> f32 {
-        base_size * self.breakpoint.font_scale()
-    }
 
-    /// Check if labels should be visible at current zoom
-    pub fn should_show_labels(&self, zoom: f32) -> bool {
-        zoom >= self.breakpoint.label_hide_threshold()
-    }
 
-    /// Check if we should use reduced LOD (level of detail)
-    pub fn should_reduce_lod(&self, visible_count: usize) -> bool {
-        visible_count > self.breakpoint.lod_threshold()
-    }
 }
 
 /// Layout hint based on viewport size
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum LayoutHint {
+pub(crate) enum LayoutHint {
     /// Single panel - graph only (phone)
     SinglePanel,
     /// Two panels - graph + one side panel (tablet)
@@ -207,7 +179,7 @@ pub enum LayoutHint {
 }
 
 impl LayoutHint {
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             LayoutHint::SinglePanel => "SinglePanel",
             LayoutHint::TwoPanel => "TwoPanel",
@@ -218,7 +190,7 @@ impl LayoutHint {
 
 /// Viewport state for graph visualization
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ViewportContext {
+pub(crate) struct ViewportContext {
     /// Zoom level (0.1 = zoomed out, 2.0 = zoomed in)
     pub zoom: f32,
 
@@ -246,7 +218,7 @@ pub struct ViewportContext {
 
 /// Named zoom levels for agent context
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub enum ZoomName {
+pub(crate) enum ZoomName {
     /// 0.1 - 0.3: See entire structure
     Overview,
     /// 0.3 - 0.7: Normal working view
@@ -257,7 +229,7 @@ pub enum ZoomName {
 }
 
 impl ZoomName {
-    pub fn from_zoom(zoom: f32) -> Self {
+    pub(crate) fn from_zoom(zoom: f32) -> Self {
         match zoom {
             z if z < 0.3 => ZoomName::Overview,
             z if z > 0.7 => ZoomName::Detail,
@@ -265,7 +237,7 @@ impl ZoomName {
         }
     }
 
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             ZoomName::Overview => "Overview",
             ZoomName::Standard => "Standard",
@@ -276,7 +248,7 @@ impl ZoomName {
 
 /// Summary of entities off-screen by direction
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct OffScreenSummary {
+pub(crate) struct OffScreenSummary {
     /// Entities above viewport (owners/parents)
     pub above: usize,
     /// Entities below viewport (owned/children)
@@ -294,17 +266,17 @@ pub struct OffScreenSummary {
 
 impl OffScreenSummary {
     /// Total entities off-screen
-    pub fn total(&self) -> usize {
+    pub(crate) fn total(&self) -> usize {
         self.above + self.below + self.left + self.right
     }
 
     /// Check if anything is off-screen
-    pub fn has_any(&self) -> bool {
+    pub(crate) fn has_any(&self) -> bool {
         self.total() > 0
     }
 
     /// Generate a natural language hint
-    pub fn to_hint(&self) -> Option<String> {
+    pub(crate) fn to_hint(&self) -> Option<String> {
         let mut parts = Vec::new();
 
         if self.above > 0 {
@@ -334,7 +306,7 @@ impl OffScreenSummary {
 
 /// Pan direction for viewport commands
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PanDirection {
+pub(crate) enum PanDirection {
     Up,
     Down,
     Left,
@@ -349,12 +321,12 @@ impl Default for ViewportContext {
 
 impl ViewportContext {
     /// Create a new viewport with given canvas dimensions
-    pub fn new(canvas_width: f32, canvas_height: f32) -> Self {
+    pub(crate) fn new(canvas_width: f32, canvas_height: f32) -> Self {
         Self::with_scale_factor(canvas_width, canvas_height, 1.0)
     }
 
     /// Create a new viewport with given canvas dimensions and scale factor
-    pub fn with_scale_factor(canvas_width: f32, canvas_height: f32, scale_factor: f32) -> Self {
+    pub(crate) fn with_scale_factor(canvas_width: f32, canvas_height: f32, scale_factor: f32) -> Self {
         Self {
             zoom: 0.5,
             zoom_name: ZoomName::Standard,
@@ -367,14 +339,9 @@ impl ViewportContext {
         }
     }
 
-    /// Update display config when viewport resizes
-    pub fn update_display(&mut self, canvas_width: f32, canvas_height: f32, scale_factor: f32) {
-        self.canvas_size = (canvas_width, canvas_height);
-        self.display = DisplayConfig::from_viewport(canvas_width, canvas_height, scale_factor);
-    }
 
     /// Compute what's visible given current zoom/pan and node positions
-    pub fn compute_visibility(&mut self, graph: &EntityGraph) {
+    pub(crate) fn compute_visibility(&mut self, graph: &EntityGraph) {
         self.visible_entities.clear();
         self.off_screen = OffScreenSummary::default();
 
@@ -421,7 +388,7 @@ impl ViewportContext {
     }
 
     /// Update the zoom name based on current zoom level
-    pub fn update_zoom_name(&mut self) {
+    pub(crate) fn update_zoom_name(&mut self) {
         self.zoom_name = ZoomName::from_zoom(self.zoom);
     }
 
@@ -480,7 +447,7 @@ impl ViewportContext {
     // =========================================================================
 
     /// Pan the viewport in a direction
-    pub fn pan(&mut self, direction: PanDirection, amount: f32) {
+    pub(crate) fn pan(&mut self, direction: PanDirection, amount: f32) {
         match direction {
             PanDirection::Up => self.pan_offset.1 -= amount,
             PanDirection::Down => self.pan_offset.1 += amount,
@@ -490,34 +457,24 @@ impl ViewportContext {
         self.is_default = false;
     }
 
-    /// Pan by a default amount (100 pixels)
-    pub fn pan_default(&mut self, direction: PanDirection) {
-        self.pan(direction, 100.0);
-    }
 
     /// Zoom in by a factor
-    pub fn zoom_in(&mut self) {
+    pub(crate) fn zoom_in(&mut self) {
         self.zoom = (self.zoom * 1.25).min(2.0);
         self.update_zoom_name();
         self.is_default = false;
     }
 
     /// Zoom out by a factor
-    pub fn zoom_out(&mut self) {
+    pub(crate) fn zoom_out(&mut self) {
         self.zoom = (self.zoom / 1.25).max(0.1);
         self.update_zoom_name();
         self.is_default = false;
     }
 
-    /// Set zoom to a specific level
-    pub fn set_zoom(&mut self, level: f32) {
-        self.zoom = level.clamp(0.1, 2.0);
-        self.update_zoom_name();
-        self.is_default = false;
-    }
 
     /// Fit all entities in view (reset to overview)
-    pub fn fit_all(&mut self) {
+    pub(crate) fn fit_all(&mut self) {
         self.zoom = 0.25;
         self.pan_offset = (0.0, 0.0);
         self.update_zoom_name();
@@ -525,39 +482,25 @@ impl ViewportContext {
     }
 
     /// Center on a specific point
-    pub fn center_on(&mut self, x: f32, y: f32) {
+    pub(crate) fn center_on(&mut self, x: f32, y: f32) {
         let center_x = self.canvas_size.0 / 2.0;
         let center_y = self.canvas_size.1 / 2.0;
         self.pan_offset = (center_x - x, center_y - y);
         self.is_default = false;
     }
 
-    /// Center on an entity by ID
-    pub fn center_on_entity(&mut self, entity_id: Uuid, graph: &EntityGraph) -> bool {
-        if let Some(node) = graph.nodes.get(&entity_id) {
-            if let (Some(x), Some(y)) = (node.x, node.y) {
-                self.center_on(x, y);
-                return true;
-            }
-        }
-        false
-    }
 
     /// Reset viewport to default
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.zoom = 0.5;
         self.zoom_name = ZoomName::Standard;
         self.pan_offset = (0.0, 0.0);
         self.is_default = true;
     }
 
-    /// Check if an entity is visible
-    pub fn is_visible(&self, entity_id: &Uuid) -> bool {
-        self.visible_entities.contains(entity_id)
-    }
 
     /// Get count of visible entities
-    pub fn visible_count(&self) -> usize {
+    pub(crate) fn visible_count(&self) -> usize {
         self.visible_entities.len()
     }
 }

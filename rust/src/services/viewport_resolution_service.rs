@@ -35,20 +35,20 @@ use uuid::Uuid;
 use crate::database::visualization_repository::{GraphEntityView, VisualizationRepository};
 
 /// Service for resolving viewport references to concrete data
-pub struct ViewportResolutionService {
+pub(crate) struct ViewportResolutionService {
     pool: PgPool,
 }
 
 impl ViewportResolutionService {
     /// Create a new resolution service with database pool
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Resolve a CBU reference to full CBU data
     ///
     /// Returns basic CBU information needed for viewport headers and context.
-    pub async fn resolve_cbu(&self, cbu_ref: &CbuRef) -> Result<ResolvedCbu, ResolutionError> {
+    pub(crate) async fn resolve_cbu(&self, cbu_ref: &CbuRef) -> Result<ResolvedCbu, ResolutionError> {
         let repo = VisualizationRepository::new(self.pool.clone());
         let cbu_id = cbu_ref.0;
 
@@ -68,81 +68,12 @@ impl ViewportResolutionService {
         })
     }
 
-    /// Resolve all entity members of a CBU with role information
-    ///
-    /// Returns entities with their roles, categories, and confidence scores.
-    /// Use `confidence_threshold` to filter to a specific zone (e.g., 0.70 for Shell+).
-    pub async fn resolve_cbu_members(
-        &self,
-        cbu_id: Uuid,
-        confidence_threshold: Option<f32>,
-    ) -> Result<Vec<CbuEntityMember>, ResolutionError> {
-        let repo = VisualizationRepository::new(self.pool.clone());
-
-        let entities =
-            repo.get_graph_entities(cbu_id)
-                .await
-                .map_err(|e| ResolutionError::DatabaseError {
-                    message: e.to_string(),
-                })?;
-
-        // Group by entity_id to deduplicate (same entity may have multiple roles)
-        let mut entity_map: HashMap<Uuid, CbuEntityMember> = HashMap::new();
-
-        for entity in entities {
-            // Calculate confidence score based on available data
-            // This is a heuristic - in production would use observation model
-            let confidence_score = calculate_entity_confidence(&entity);
-
-            if let Some(threshold) = confidence_threshold {
-                if confidence_score < threshold {
-                    continue;
-                }
-            }
-
-            let confidence_zone = ConfidenceZone::from_score(confidence_score);
-
-            entity_map
-                .entry(entity.entity_id)
-                .and_modify(|existing| {
-                    // Merge roles from multiple role assignments
-                    for role in &entity.roles {
-                        if !existing.roles.contains(role) {
-                            existing.roles.push(role.clone());
-                        }
-                    }
-                })
-                .or_insert_with(|| CbuEntityMember {
-                    entity_id: entity.entity_id,
-                    name: entity.entity_name.clone(),
-                    entity_type: entity.entity_type.clone(),
-                    entity_category: entity.entity_category.clone(),
-                    jurisdiction: entity.jurisdiction.clone(),
-                    roles: entity.roles.clone(),
-                    primary_role: entity.primary_role.clone(),
-                    role_category: entity.primary_role_category.clone(),
-                    confidence_score,
-                    confidence_zone,
-                });
-        }
-
-        let mut members: Vec<_> = entity_map.into_values().collect();
-        // Sort by confidence (highest first), then by name
-        members.sort_by(|a, b| {
-            b.confidence_score
-                .partial_cmp(&a.confidence_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.name.cmp(&b.name))
-        });
-
-        Ok(members)
-    }
 
     /// Resolve the instrument matrix (trading profile) for a CBU
     ///
     /// Returns the active trading profile with instrument types, markets, and currencies.
     /// Returns None if no trading profile exists for this CBU.
-    pub async fn resolve_instrument_matrix(
+    pub(crate) async fn resolve_instrument_matrix(
         &self,
         cbu_id: Uuid,
     ) -> Result<Option<ResolvedInstrumentMatrix>, ResolutionError> {
@@ -217,147 +148,9 @@ impl ViewportResolutionService {
         }))
     }
 
-    /// Resolve SSIs for a CBU
-    ///
-    /// Returns all Standing Settlement Instructions for the CBU.
-    pub async fn resolve_ssis(&self, cbu_id: Uuid) -> Result<Vec<ResolvedSsi>, ResolutionError> {
-        let repo = VisualizationRepository::new(self.pool.clone());
 
-        let ssis = repo
-            .get_ssis(cbu_id)
-            .await
-            .map_err(|e| ResolutionError::DatabaseError {
-                message: e.to_string(),
-            })?;
 
-        Ok(ssis
-            .into_iter()
-            .map(|ssi| ResolvedSsi {
-                ssi_id: ssi.ssi_id,
-                name: ssi.ssi_name,
-                ssi_type: ssi.ssi_type,
-                status: ssi.status,
-                mic: ssi.mic,
-                currency: ssi.cash_currency,
-                safekeeping_account: ssi.safekeeping_account,
-                safekeeping_bic: ssi.safekeeping_bic,
-            })
-            .collect())
-    }
 
-    /// Resolve ISDA agreements for a CBU
-    ///
-    /// Returns all ISDA master agreements with CSA information.
-    pub async fn resolve_isdas(&self, cbu_id: Uuid) -> Result<Vec<ResolvedIsda>, ResolutionError> {
-        let repo = VisualizationRepository::new(self.pool.clone());
-
-        let isdas = repo
-            .get_isdas(cbu_id)
-            .await
-            .map_err(|e| ResolutionError::DatabaseError {
-                message: e.to_string(),
-            })?;
-
-        let mut resolved = Vec::with_capacity(isdas.len());
-
-        for isda in isdas {
-            // Look up CSA for this ISDA
-            let csa =
-                repo.get_csas(isda.isda_id)
-                    .await
-                    .map_err(|e| ResolutionError::DatabaseError {
-                        message: e.to_string(),
-                    })?;
-
-            let (has_csa, csa_type) = if let Some(first_csa) = csa.first() {
-                (true, Some(first_csa.csa_type.clone()))
-            } else {
-                (false, None)
-            };
-
-            resolved.push(ResolvedIsda {
-                isda_id: isda.isda_id,
-                counterparty_id: isda.counterparty_entity_id,
-                counterparty_name: isda.counterparty_name,
-                governing_law: isda.governing_law,
-                has_csa,
-                csa_type,
-            });
-        }
-
-        Ok(resolved)
-    }
-
-    /// Resolve a specific entity by ID
-    ///
-    /// Returns entity details including roles within a specific CBU context.
-    /// For full entity data with roles, prefer resolving via CBU members.
-    pub async fn resolve_entity(
-        &self,
-        entity_id: Uuid,
-        cbu_id: Option<Uuid>,
-    ) -> Result<CbuEntityMember, ResolutionError> {
-        let repo = VisualizationRepository::new(self.pool.clone());
-
-        // Get basic entity info
-        let entity = repo
-            .get_entity_basic(entity_id)
-            .await
-            .map_err(|e| ResolutionError::DatabaseError {
-                message: e.to_string(),
-            })?
-            .ok_or(ResolutionError::EntityNotFound { entity_id })?;
-
-        // Get roles if CBU context provided
-        let roles = if let Some(cbu) = cbu_id {
-            let cbu_roles =
-                repo.get_cbu_roles(cbu)
-                    .await
-                    .map_err(|e| ResolutionError::DatabaseError {
-                        message: e.to_string(),
-                    })?;
-
-            cbu_roles
-                .into_iter()
-                .filter(|r| r.entity_id == entity_id)
-                .map(|r| r.role_name)
-                .collect()
-        } else {
-            Vec::new()
-        };
-
-        // Base confidence for entities without full graph context
-        let confidence_score: f32 = 0.60;
-
-        Ok(CbuEntityMember {
-            entity_id: entity.entity_id,
-            name: entity.name,
-            entity_type: entity.type_code.unwrap_or_else(|| "unknown".to_string()),
-            entity_category: None, // EntityBasicView doesn't include category
-            jurisdiction: None,    // EntityBasicView doesn't include jurisdiction
-            roles,
-            primary_role: None,
-            role_category: None,
-            confidence_score,
-            confidence_zone: ConfidenceZone::from_score(confidence_score),
-        })
-    }
-
-    /// Resolve instrument matrix from a reference
-    ///
-    /// The InstrumentMatrixRef contains a profile_id. We need to look up the
-    /// CBU from the profile to get the full matrix data.
-    pub async fn resolve_instrument_matrix_ref(
-        &self,
-        _matrix_ref: &InstrumentMatrixRef,
-    ) -> Result<Option<ResolvedInstrumentMatrix>, ResolutionError> {
-        // InstrumentMatrixRef(Uuid) is a profile_id, not a cbu_id
-        // For now, this requires the caller to provide CBU context
-        // Future: add a query to look up CBU from profile_id
-        Err(ResolutionError::DatabaseError {
-            message: "InstrumentMatrixRef resolution requires CBU context. Use resolve_instrument_matrix(cbu_id) instead.".to_string(),
-        })
-    }
 }
 
 /// Calculate entity confidence score based on available data

@@ -60,7 +60,7 @@ pub type SharedLexicon = Arc<dyn LexiconService>;
 
 /// A unified verb search result
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct VerbSearchResult {
+pub(crate) struct VerbSearchResult {
     pub verb: String,
     pub score: f32,
     pub source: VerbSearchSource,
@@ -77,7 +77,7 @@ pub struct VerbSearchResult {
 /// Enables the orchestrator to expand macros deterministically instead of
 /// falling through to LLM-based arg extraction.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct JourneyMetadata {
+pub(crate) struct JourneyMetadata {
     /// Scenario ID if matched via ScenarioIndex (Tier -2A).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<String>,
@@ -91,7 +91,7 @@ pub struct JourneyMetadata {
 /// Serializable resolved route for journey-level matches.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum JourneyRoute {
+pub(crate) enum JourneyRoute {
     /// Expand a single macro.
     Macro { macro_fqn: String },
     /// Expand a sequence of macros in order.
@@ -153,7 +153,7 @@ impl From<&ResolvedRoute> for JourneyRoute {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(PartialEq)]
-pub enum VerbSearchSource {
+pub(crate) enum VerbSearchSource {
     /// User-specific exact match (highest priority)
     UserLearnedExact,
     /// User-specific semantic match
@@ -209,7 +209,7 @@ impl VerbSearchResult {
     /// };
     /// assert_eq!(r.tier(), Tier::Scenario);
     /// ```
-    pub fn tier(&self) -> Tier {
+    pub(crate) fn tier(&self) -> Tier {
         match self.source {
             VerbSearchSource::ScenarioIndex => Tier::Scenario,
             VerbSearchSource::MacroIndex | VerbSearchSource::Macro => Tier::Macro,
@@ -241,7 +241,7 @@ impl VerbSearchResult {
 /// and ordinal `Tier`. Does not touch ranking — it is computed from the output
 /// of `search()`, never from inside it. This is how Intent Trace records the
 /// soft-stage flow without instrumenting (and risking) the search body.
-pub fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
+pub(crate) fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
     let mut by_source: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     let mut by_tier: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
@@ -296,11 +296,11 @@ fn apply_logit_boost(p: f32, boost: f32) -> f32 {
 
 /// Margin threshold for ambiguity detection
 /// If top two candidates are within this margin, flag as ambiguous
-pub const AMBIGUITY_MARGIN: f32 = 0.05;
+pub(crate) const AMBIGUITY_MARGIN: f32 = 0.05;
 
 /// Outcome of verb search with ambiguity detection (Issue D/J)
 #[derive(Debug, Clone)]
-pub enum VerbSearchOutcome {
+pub(crate) enum VerbSearchOutcome {
     /// Clear winner - proceed with LLM extraction
     Matched(VerbSearchResult),
     /// Top candidates too close - need user clarification
@@ -327,7 +327,7 @@ pub enum VerbSearchOutcome {
 ///
 /// IMPORTANT: Run this AFTER union+dedupe+sort (Issue I), so margin
 /// reflects true best alternatives across all semantic sources.
-pub fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbSearchOutcome {
+pub(crate) fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbSearchOutcome {
     // Use default fallback threshold if not specified
     check_ambiguity_with_fallback(candidates, threshold, DEFAULT_FALLBACK_THRESHOLD)
 }
@@ -345,7 +345,7 @@ const DEFAULT_FALLBACK_THRESHOLD: f32 = 0.45;
 ///
 /// The Suggest path is CRITICAL for learning: vague queries like "show me the deals"
 /// get a menu instead of "no match", allowing user selection to create training data.
-pub fn check_ambiguity_with_fallback(
+pub(crate) fn check_ambiguity_with_fallback(
     candidates: &[VerbSearchResult],
     threshold: f32,
     fallback_threshold: f32,
@@ -406,7 +406,7 @@ pub fn check_ambiguity_with_fallback(
 /// INVARIANT: When same verb appears from multiple sources (trie, semantic, phonetic),
 /// we keep the BEST score, not first-seen. This ensures the final ranking reflects
 /// true match quality across all discovery methods.
-pub fn normalize_candidates(
+pub(crate) fn normalize_candidates(
     mut results: Vec<VerbSearchResult>,
     limit: usize,
     query: Option<&str>,
@@ -489,39 +489,6 @@ pub fn normalize_candidates(
     combined_results
 }
 
-/// Apply narration boost to search results.
-///
-/// Verbs that were suggested by the NarrationEngine in the previous turn
-/// get a small score bump (+0.05), biasing disambiguation toward the
-/// contextually expected action. The boost is small enough that a strong
-/// unrelated match (0.10+ gap) still wins.
-///
-/// Design: ADR 044 (ai-thoughts/044-narration-boost-signal.md)
-pub fn apply_narration_boost(results: &mut [VerbSearchResult], hot_verbs: &[String]) {
-    const NARRATION_BOOST: f32 = 0.05;
-    if hot_verbs.is_empty() {
-        return;
-    }
-    for result in results.iter_mut() {
-        if hot_verbs.iter().any(|hv| hv == &result.verb) {
-            result.score = apply_logit_boost(result.score, NARRATION_BOOST);
-            tracing::debug!(
-                verb = %result.verb,
-                new_score = result.score,
-                "NarrationBoost: +{} applied",
-                NARRATION_BOOST,
-            );
-        }
-    }
-    // Re-sort after boost to maintain lexicographical order
-    results.sort_by(|a, b| match b.tier().cmp(&a.tier()) {
-        std::cmp::Ordering::Equal => b
-            .score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal),
-        ord => ord,
-    });
-}
 
 /// Hybrid verb searcher combining all discovery strategies
 ///

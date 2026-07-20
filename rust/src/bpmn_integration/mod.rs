@@ -36,12 +36,10 @@ pub(crate) mod signal_relay;
 pub(crate) mod types;
 pub(crate) mod worker;
 
-pub use canonical::{blake3_bytes, canonical_json_with_hash, validate_payload_hash};
-pub use client::{
-    BpmnLifecycleEvent, BpmnLiteConnection, CompileDiagnostic, CompileResult, CompleteJobRequest,
-    FiberSnapshot, JobActivation, OrchestratorFlag, ProcessInspection, StartProcessRequest,
-    WaitSnapshot,
-};
+pub use canonical::{canonical_json_with_hash, validate_payload_hash};
+pub(crate) use canonical::{blake3_bytes};
+pub use client::{BpmnLifecycleEvent, BpmnLiteConnection, CompleteJobRequest, StartProcessRequest};
+pub(crate) use client::{CompileDiagnostic, CompileResult, FiberSnapshot, JobActivation, OrchestratorFlag, ProcessInspection, WaitSnapshot};
 pub use config::{WorkflowConfig, WorkflowConfigIndex};
 pub use correlation::CorrelationStore;
 pub use dispatcher::WorkflowDispatcher;
@@ -52,9 +50,6 @@ pub use pending_dispatch_worker::PendingDispatchWorker;
 pub use pending_dispatches::PendingDispatchStore;
 pub use request_state::RequestStateStore;
 pub use signal_relay::SignalRelay;
-pub use types::{
-    CorrelationRecord, CorrelationStatus, ExecutionRoute, JobFrame, JobFrameStatus, OutcomeEvent,
-    ParkedToken, ParkedTokenStatus, PendingDispatch, PendingDispatchStatus, RequestStateRecord,
-    RequestStatus, TaskBinding, WorkflowBinding,
-};
+pub use types::{CorrelationRecord, CorrelationStatus, ExecutionRoute, JobFrame, JobFrameStatus, OutcomeEvent, ParkedToken, ParkedTokenStatus, RequestStatus, TaskBinding, WorkflowBinding};
+pub(crate) use types::{PendingDispatch, PendingDispatchStatus, RequestStateRecord};
 pub use worker::JobWorker;

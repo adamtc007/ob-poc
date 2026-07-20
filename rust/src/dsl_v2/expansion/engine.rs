@@ -23,7 +23,7 @@ use crate::templates::{TemplateDefinition, TemplateRegistry};
 
 /// Output from template expansion
 #[derive(Debug)]
-pub struct ExpansionOutput {
+pub(crate) struct ExpansionOutput {
     /// The expanded DSL source (all templates replaced with verb calls)
     pub expanded_dsl: String,
     /// Audit report with full expansion details
@@ -32,7 +32,7 @@ pub struct ExpansionOutput {
 
 /// Errors that can occur during expansion
 #[derive(Debug, thiserror::Error)]
-pub enum ExpansionError {
+pub(crate) enum ExpansionError {
     #[error("Template not found: {0}")]
     TemplateNotFound(String),
 
@@ -69,7 +69,7 @@ pub enum ExpansionError {
 /// # Returns
 ///
 /// `ExpansionOutput` containing expanded DSL and audit report
-pub fn expand_templates(
+pub(crate) fn expand_templates(
     source_dsl: &str,
     template_registry: &TemplateRegistry,
     template_args: &std::collections::HashMap<String, serde_json::Value>,
@@ -204,7 +204,7 @@ pub fn expand_templates(
 ///
 /// Convenience function for DSL that doesn't use templates or has templates
 /// with all defaults/session-derived params.
-pub fn expand_templates_simple(
+pub(crate) fn expand_templates_simple(
     source_dsl: &str,
     template_registry: &TemplateRegistry,
 ) -> Result<ExpansionOutput, ExpansionError> {

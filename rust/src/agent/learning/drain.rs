@@ -15,7 +15,7 @@ use super::types::AgentEvent;
 ///
 /// Runs in background, batches events, persists to database.
 /// Gracefully handles database unavailability (drops events).
-pub fn spawn_agent_drain_task(
+pub(crate) fn spawn_agent_drain_task(
     mut receiver: AgentEventReceiver,
     pool: PgPool,
     batch_size: usize,
@@ -88,7 +88,7 @@ async fn flush_batch(inspector: &AgentLearningInspector, batch: &mut Vec<AgentEv
 
 /// Configuration for drain task.
 #[derive(Debug, Clone)]
-pub struct DrainConfig {
+pub(crate) struct DrainConfig {
     /// Number of events to batch before flushing
     pub batch_size: usize,
     /// Max time between flushes in milliseconds

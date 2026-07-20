@@ -9,7 +9,7 @@ use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ServiceRow {
+pub(crate) struct ServiceRow {
     pub service_id: Uuid,
     pub name: String,
     pub description: Option<String>,
@@ -34,15 +34,15 @@ pub(crate) struct NewServiceFields {
 }
 
 #[derive(Clone, Debug)]
-pub struct ServiceService {
+pub(crate) struct ServiceService {
     pool: PgPool,
 }
 
 impl ServiceService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -57,24 +57,8 @@ impl ServiceService {
         Ok(service_id)
     }
 
-    pub async fn get_service_by_id(&self, service_id: Uuid) -> Result<Option<ServiceRow>> {
-        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, lifecycle_tags, created_at, updated_at FROM "ob-poc".services WHERE service_id = $1"#)
-            .bind(service_id).fetch_optional(&self.pool).await.context("Failed to get Service by ID")
-    }
 
-    pub async fn get_service_by_name(&self, name: &str) -> Result<Option<ServiceRow>> {
-        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, lifecycle_tags, created_at, updated_at FROM "ob-poc".services WHERE name = $1"#)
-            .bind(name).fetch_optional(&self.pool).await.context("Failed to get Service by name")
-    }
 
-    pub async fn list_services(
-        &self,
-        limit: Option<i32>,
-        offset: Option<i32>,
-    ) -> Result<Vec<ServiceRow>> {
-        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, lifecycle_tags, created_at, updated_at FROM "ob-poc".services ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
-            .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Services")
-    }
 
     #[allow(dead_code)]
     pub(crate) async fn update_service(

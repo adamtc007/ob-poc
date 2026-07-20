@@ -44,7 +44,7 @@ pub struct Scenario {
 
 /// One step in a multi-turn scenario.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ScenarioStep {
+pub(crate) struct ScenarioStep {
     pub user: String,
     #[serde(default)]
     pub expect: StepExpectation,
@@ -54,7 +54,7 @@ pub struct ScenarioStep {
 
 /// Partial assertions on a step's outcome. Only specified fields are checked.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct StepExpectation {
+pub(crate) struct StepExpectation {
     pub outcome: Option<String>,
     pub chosen_verb: Option<String>,
     pub forced_verb: Option<String>,
@@ -74,7 +74,7 @@ pub struct StepExpectation {
 
 /// Expected trace field values (partial).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct TraceExpectation {
+pub(crate) struct TraceExpectation {
     pub macro_semreg_checked: Option<bool>,
     #[serde(default)]
     pub macro_denied_verbs_non_empty: Option<bool>,
@@ -86,7 +86,7 @@ pub struct TraceExpectation {
 /// Action to take when an interactive outcome occurs.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
-pub enum OnOutcomeAction {
+pub(crate) enum OnOutcomeAction {
     ChooseIndex { choose_index: usize },
     ChooseVerbFqn { choose_verb_fqn: String },
     Reply { reply: String },
@@ -94,7 +94,7 @@ pub enum OnOutcomeAction {
 
 /// Policy expectations for the suite.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ModeExpectations {
+pub(crate) struct ModeExpectations {
     #[serde(default = "default_true")]
     pub strict_semreg: bool,
     #[serde(default = "default_true")]
@@ -119,7 +119,7 @@ fn default_true() -> bool {
 
 /// Session seed for scenario initialization.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct SessionSeed {
+pub(crate) struct SessionSeed {
     #[serde(default)]
     pub scope: Option<String>,
     #[serde(default)]
@@ -130,7 +130,7 @@ pub struct SessionSeed {
 
 /// Actor configuration for scenario.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ActorSeed {
+pub(crate) struct ActorSeed {
     #[serde(default = "default_actor_id")]
     pub actor_id: String,
     #[serde(default = "default_roles")]

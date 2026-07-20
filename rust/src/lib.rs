@@ -189,9 +189,8 @@ pub(crate) mod sage;
 pub use ob_poc_diagnostics::error::{DSLError, ParseError};
 
 // DSL v2 types - unified S-expression DSL
-pub use dsl_v2::execution::{
-    DslExecutor, ExecutionContext, ExecutionResult as DslV2ExecutionResult, ReturnType,
-};
+pub use dsl_v2::execution::{DslExecutor, ExecutionContext, ExecutionResult as DslV2ExecutionResult};
+pub(crate) use dsl_v2::execution::{ReturnType};
 pub use dsl_v2::{
     parse_program, parse_single_verb, Argument, AstNode, Literal, Program, Span, Statement,
     VerbCall,

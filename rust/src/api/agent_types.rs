@@ -15,18 +15,18 @@ use crate::session::{
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct ValidateDslRequest {
+pub(crate) struct ValidateDslRequest {
     pub dsl: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct GenerateDslRequest {
+pub(crate) struct GenerateDslRequest {
     pub instruction: String,
     pub domain: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct GenerateDslResponse {
+pub(crate) struct GenerateDslResponse {
     pub dsl: Option<String>,
     pub explanation: Option<String>,
     pub error: Option<String>,
@@ -38,7 +38,7 @@ pub struct GenerateDslResponse {
 
 /// Request to add products to multiple CBUs (server-side DSL generation)
 #[derive(Debug, Deserialize)]
-pub struct BatchAddProductsRequest {
+pub(crate) struct BatchAddProductsRequest {
     /// CBU IDs to add products to
     pub cbu_ids: Vec<Uuid>,
     /// Product codes to add (e.g., ["CUSTODY", "FUND_ACCOUNTING"])
@@ -47,7 +47,7 @@ pub struct BatchAddProductsRequest {
 
 /// Result of adding a product to a single CBU
 #[derive(Debug, Serialize)]
-pub struct BatchProductResult {
+pub(crate) struct BatchProductResult {
     pub cbu_id: Uuid,
     pub product: String,
     pub success: bool,
@@ -59,7 +59,7 @@ pub struct BatchProductResult {
 
 /// Response from batch add products
 #[derive(Debug, Serialize)]
-pub struct BatchAddProductsResponse {
+pub(crate) struct BatchAddProductsResponse {
     pub total_operations: usize,
     pub success_count: usize,
     pub failure_count: usize,
@@ -72,14 +72,14 @@ pub struct BatchAddProductsResponse {
 // ============================================================================
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ValidationResult {
+pub(crate) struct ValidationResult {
     pub valid: bool,
     pub errors: Vec<ValidationError>,
     pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ValidationError {
+pub(crate) struct ValidationError {
     pub line: Option<usize>,
     pub column: Option<usize>,
     pub message: String,
@@ -91,25 +91,25 @@ pub struct ValidationError {
 // ============================================================================
 
 #[derive(Debug, Serialize)]
-pub struct DomainsResponse {
+pub(crate) struct DomainsResponse {
     pub domains: Vec<DomainInfo>,
     pub total_verbs: usize,
 }
 
 #[derive(Debug, Serialize)]
-pub struct DomainInfo {
+pub(crate) struct DomainInfo {
     pub name: String,
     pub description: String,
     pub verb_count: usize,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct VocabQuery {
+pub(crate) struct VocabQuery {
     pub domain: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct VocabResponse {
+pub(crate) struct VocabResponse {
     pub verbs: Vec<VerbInfo>,
 }
 
@@ -128,7 +128,7 @@ pub struct VerbInfo {
 // ============================================================================
 
 #[derive(Debug, Serialize)]
-pub struct HealthResponse {
+pub(crate) struct HealthResponse {
     pub status: String,
     pub version: String,
     pub verb_count: usize,
@@ -141,7 +141,7 @@ pub struct HealthResponse {
 
 /// Request for entity completion
 #[derive(Debug, Deserialize)]
-pub struct CompleteRequest {
+pub(crate) struct CompleteRequest {
     /// The type of entity to complete: "cbu", "entity", "product", "role", "jurisdiction", etc.
     pub entity_type: String,
     /// The search query (partial text to match)
@@ -151,13 +151,13 @@ pub struct CompleteRequest {
     pub limit: i32,
 }
 
-pub fn default_limit() -> i32 {
+pub(crate) fn default_limit() -> i32 {
     10
 }
 
 /// A single completion item
 #[derive(Debug, Serialize)]
-pub struct CompletionItem {
+pub(crate) struct CompletionItem {
     /// The value to insert (UUID or code)
     pub value: String,
     /// Display label for the completion
@@ -170,7 +170,7 @@ pub struct CompletionItem {
 
 /// Response with completion items
 #[derive(Debug, Serialize)]
-pub struct CompleteResponse {
+pub(crate) struct CompleteResponse {
     pub items: Vec<CompletionItem>,
     pub total: usize,
 }
@@ -181,19 +181,19 @@ pub struct CompleteResponse {
 
 /// Query parameters for session watch endpoint
 #[derive(Debug, Deserialize)]
-pub struct WatchQuery {
+pub(crate) struct WatchQuery {
     /// Timeout in milliseconds (default 30000, max 60000)
     #[serde(default = "default_watch_timeout")]
     pub timeout_ms: u64,
 }
 
-pub fn default_watch_timeout() -> u64 {
+pub(crate) fn default_watch_timeout() -> u64 {
     30000
 }
 
 /// Query parameters for verb surface endpoint
 #[derive(Debug, Deserialize)]
-pub struct VerbSurfaceQuery {
+pub(crate) struct VerbSurfaceQuery {
     /// Filter to specific domain (e.g., "kyc", "cbu")
     #[serde(default)]
     pub domain: Option<String>,
@@ -204,7 +204,7 @@ pub struct VerbSurfaceQuery {
 
 /// Response from session watch endpoint
 #[derive(Debug, Serialize)]
-pub struct WatchResponse {
+pub(crate) struct WatchResponse {
     /// Session ID
     pub session_id: Uuid,
     /// Version number (incremented on each update)
@@ -228,7 +228,7 @@ pub struct WatchResponse {
 }
 
 impl WatchResponse {
-    pub fn from_snapshot(
+    pub(crate) fn from_snapshot(
         snapshot: &crate::api::session_manager::SessionSnapshot,
         is_initial: bool,
     ) -> Self {
@@ -263,7 +263,7 @@ impl WatchResponse {
 
 /// Identifies a specific EntityRef in the AST
 #[derive(Debug, Deserialize)]
-pub struct RefId {
+pub(crate) struct RefId {
     /// Index of statement in AST (0-based)
     pub statement_index: usize,
     /// Argument key containing the EntityRef (e.g., "entity-id")
@@ -272,7 +272,7 @@ pub struct RefId {
 
 /// Request to resolve an EntityRef in the session AST
 #[derive(Debug, Deserialize)]
-pub struct ResolveRefRequest {
+pub(crate) struct ResolveRefRequest {
     /// Session containing the AST
     pub session_id: Uuid,
     /// Location of the EntityRef to resolve
@@ -283,7 +283,7 @@ pub struct ResolveRefRequest {
 
 /// Statistics about EntityRef resolution in the AST
 #[derive(Debug, Serialize)]
-pub struct ResolutionStats {
+pub(crate) struct ResolutionStats {
     /// Total EntityRef nodes in AST
     pub total_refs: i32,
     /// Remaining unresolved refs
@@ -299,7 +299,7 @@ pub struct ResolutionStats {
 /// Uses span-based ref_id format ("stmt_idx:start-end") for precise targeting
 /// of refs in lists and maps. Includes dsl_hash to prevent stale commits.
 #[derive(Debug, Deserialize)]
-pub struct ResolveByRefIdRequest {
+pub(crate) struct ResolveByRefIdRequest {
     /// Session containing the AST
     pub session_id: Uuid,
     /// Span-based ref_id (e.g., "0:15-30")
@@ -312,7 +312,7 @@ pub struct ResolveByRefIdRequest {
 
 /// Response from resolving by ref_id (Issue K)
 #[derive(Debug, Serialize)]
-pub struct ResolveByRefIdResponse {
+pub(crate) struct ResolveByRefIdResponse {
     /// Whether the update succeeded
     pub success: bool,
     /// Updated DSL with resolved ref
@@ -330,7 +330,7 @@ pub struct ResolveByRefIdResponse {
 
 /// Info about an unresolved ref (for ResolveByRefIdResponse)
 #[derive(Debug, Clone, Serialize)]
-pub struct RemainingUnresolvedRef {
+pub(crate) struct RemainingUnresolvedRef {
     /// Argument key (e.g., "entity-id")
     pub param_name: String,
     /// Search text (e.g., "John Smith")
@@ -346,7 +346,7 @@ pub struct RemainingUnresolvedRef {
 
 /// Response from resolving an EntityRef
 #[derive(Debug, Serialize)]
-pub struct ResolveRefResponse {
+pub(crate) struct ResolveRefResponse {
     /// Whether the update succeeded
     pub success: bool,
     /// DSL source re-rendered from updated AST (DSL + AST are a tuple pair)
@@ -369,7 +369,7 @@ pub struct ResolveRefResponse {
 
 /// Request to generate onboarding DSL from natural language
 #[derive(Debug, Deserialize)]
-pub struct OnboardingRequest {
+pub(crate) struct OnboardingRequest {
     /// Natural language description of the onboarding request
     pub description: String,
     /// Whether to execute the DSL after generation
@@ -379,7 +379,7 @@ pub struct OnboardingRequest {
 
 /// Response from onboarding DSL generation
 #[derive(Debug, Serialize)]
-pub struct OnboardingResponse {
+pub(crate) struct OnboardingResponse {
     /// Generated DSL code
     pub dsl: Option<String>,
     /// Explanation of what was generated
@@ -394,7 +394,7 @@ pub struct OnboardingResponse {
 
 /// Result of executing onboarding DSL
 #[derive(Debug, Serialize)]
-pub struct OnboardingExecutionResult {
+pub(crate) struct OnboardingExecutionResult {
     pub success: bool,
     pub cbu_id: Option<Uuid>,
     pub resource_count: usize,
@@ -420,7 +420,7 @@ pub(crate) enum ExecutionOutcome {
 
 /// Request to create a sub-session
 #[derive(Debug, Deserialize)]
-pub struct CreateSubSessionRequest {
+pub(crate) struct CreateSubSessionRequest {
     /// Type of sub-session to create
     pub session_type: CreateSubSessionType,
 }
@@ -428,7 +428,7 @@ pub struct CreateSubSessionRequest {
 /// Sub-session type for API (simplified for JSON)
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum CreateSubSessionType {
+pub(crate) enum CreateSubSessionType {
     /// Resolution sub-session with unresolved refs
     Resolution {
         /// Unresolved refs to resolve
@@ -452,7 +452,7 @@ pub enum CreateSubSessionType {
 
 /// Response from creating a sub-session
 #[derive(Debug, Serialize)]
-pub struct CreateSubSessionResponse {
+pub(crate) struct CreateSubSessionResponse {
     /// New sub-session ID
     pub session_id: Uuid,
     /// Parent session ID
@@ -465,7 +465,7 @@ pub struct CreateSubSessionResponse {
 
 /// Response for sub-session state
 #[derive(Debug, Serialize)]
-pub struct SubSessionStateResponse {
+pub(crate) struct SubSessionStateResponse {
     pub session_id: Uuid,
     pub parent_id: Option<Uuid>,
     pub session_type: String,
@@ -477,14 +477,14 @@ pub struct SubSessionStateResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct SubSessionMessage {
+pub(crate) struct SubSessionMessage {
     pub role: String,
     pub content: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ResolutionState {
+pub(crate) struct ResolutionState {
     pub total_refs: usize,
     pub current_index: usize,
     pub resolved_count: usize,
@@ -493,7 +493,7 @@ pub struct ResolutionState {
 }
 
 impl SubSessionStateResponse {
-    pub fn from_session(session: &UnifiedSession) -> Self {
+    pub(crate) fn from_session(session: &UnifiedSession) -> Self {
         let session_type = match &session.sub_session_type {
             SubSessionType::Root => "root",
             SubSessionType::Resolution(_) => "resolution",
@@ -559,25 +559,25 @@ impl SubSessionStateResponse {
 
 /// Request for sub-session chat
 #[derive(Debug, Deserialize)]
-pub struct SubSessionChatRequest {
+pub(crate) struct SubSessionChatRequest {
     pub message: String,
 }
 
 /// Request to complete a resolution sub-session
 #[derive(Debug, Deserialize)]
-pub struct CompleteSubSessionRequest {
+pub(crate) struct CompleteSubSessionRequest {
     /// Whether to apply resolutions to parent
     #[serde(default = "default_true")]
     pub apply: bool,
 }
 
-pub fn default_true() -> bool {
+pub(crate) fn default_true() -> bool {
     true
 }
 
 /// Response from completing a sub-session
 #[derive(Debug, Serialize)]
-pub struct CompleteSubSessionResponse {
+pub(crate) struct CompleteSubSessionResponse {
     pub success: bool,
     pub resolutions_applied: usize,
     pub message: String,
@@ -589,7 +589,7 @@ pub struct CompleteSubSessionResponse {
 
 /// Request to set a binding in a session
 #[derive(Debug, Deserialize)]
-pub struct SetBindingRequest {
+pub(crate) struct SetBindingRequest {
     /// The binding name (without @)
     pub name: String,
     /// The UUID to bind (accepts string for TypeScript compat)
@@ -602,7 +602,7 @@ pub struct SetBindingRequest {
 }
 
 /// Deserialize UUID from string
-pub fn deserialize_uuid_string<'de, D>(deserializer: D) -> Result<Uuid, D::Error>
+pub(crate) fn deserialize_uuid_string<'de, D>(deserializer: D) -> Result<Uuid, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -612,7 +612,7 @@ where
 
 /// Response from setting a binding
 #[derive(Debug, Serialize)]
-pub struct SetBindingResponse {
+pub(crate) struct SetBindingResponse {
     pub success: bool,
     pub binding_name: String,
     pub bindings: std::collections::HashMap<String, Uuid>,
@@ -620,7 +620,7 @@ pub struct SetBindingResponse {
 
 /// Request to set stage focus in a session
 #[derive(Debug, Deserialize)]
-pub struct SetFocusRequest {
+pub(crate) struct SetFocusRequest {
     /// The stage code to focus on (e.g., "KYC_REVIEW")
     /// Pass None or empty string to clear focus
     #[serde(default)]
@@ -629,7 +629,7 @@ pub struct SetFocusRequest {
 
 /// Response from setting stage focus
 #[derive(Debug, Serialize)]
-pub struct SetFocusResponse {
+pub(crate) struct SetFocusResponse {
     pub success: bool,
     /// The stage that is now focused (None if cleared)
     pub stage_code: Option<String>,
@@ -645,7 +645,7 @@ pub struct SetFocusResponse {
 
 /// Request to parse DSL source into AST
 #[derive(Debug, Deserialize)]
-pub struct ParseDslRequest {
+pub(crate) struct ParseDslRequest {
     /// DSL source text to parse
     pub dsl: String,
     /// Optional session ID to store the parsed AST
@@ -654,7 +654,7 @@ pub struct ParseDslRequest {
 
 /// A missing required argument
 #[derive(Debug, Clone, Serialize)]
-pub struct MissingArg {
+pub(crate) struct MissingArg {
     /// Statement index (0-based)
     pub statement_index: usize,
     /// Argument name (e.g., "name", "jurisdiction")
@@ -664,7 +664,7 @@ pub struct MissingArg {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ParseDslResponse {
+pub(crate) struct ParseDslResponse {
     /// Whether parsing succeeded
     pub success: bool,
     /// Pipeline stage reached
@@ -689,7 +689,7 @@ pub struct ParseDslResponse {
 
 /// Request to parse natural language into discriminators
 #[derive(Debug, Deserialize)]
-pub struct ParseDiscriminatorsRequest {
+pub(crate) struct ParseDiscriminatorsRequest {
     /// The natural language input to parse
     pub input: String,
     /// Optional entity type context
@@ -698,7 +698,7 @@ pub struct ParseDiscriminatorsRequest {
 
 /// Parsed discriminators for entity resolution
 #[derive(Debug, Serialize, Default)]
-pub struct ParsedDiscriminators {
+pub(crate) struct ParsedDiscriminators {
     /// Nationality code (e.g., "GB", "US")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nationality: Option<String>,
@@ -724,7 +724,7 @@ pub struct ParsedDiscriminators {
 
 /// Response from discriminator parsing
 #[derive(Debug, Serialize)]
-pub struct ParseDiscriminatorsResponse {
+pub(crate) struct ParseDiscriminatorsResponse {
     pub success: bool,
     pub discriminators: ParsedDiscriminators,
     /// Whether input appears to be a selection (number or ordinal)
@@ -741,7 +741,7 @@ pub struct ParseDiscriminatorsResponse {
 
 /// Request for entity mention extraction
 #[derive(Debug, Deserialize)]
-pub struct ExtractEntitiesRequest {
+pub(crate) struct ExtractEntitiesRequest {
     /// The utterance to extract entity mentions from
     pub utterance: String,
     /// Optional: limit entity kinds to these values (e.g., ["company", "fund"])
@@ -755,13 +755,13 @@ pub struct ExtractEntitiesRequest {
     pub limit: usize,
 }
 
-pub fn default_mention_limit() -> usize {
+pub(crate) fn default_mention_limit() -> usize {
     5
 }
 
 /// A candidate entity match
 #[derive(Debug, Serialize)]
-pub struct EntityCandidateResponse {
+pub(crate) struct EntityCandidateResponse {
     pub entity_id: String,
     pub entity_kind: String,
     pub canonical_name: String,
@@ -771,14 +771,14 @@ pub struct EntityCandidateResponse {
 
 /// Evidence for a match (stable wire format)
 #[derive(Debug, Serialize)]
-pub struct EvidenceResponse {
+pub(crate) struct EvidenceResponse {
     pub kind: String,
     pub details: serde_json::Value,
 }
 
 /// A single entity mention extracted from the utterance
 #[derive(Debug, Serialize)]
-pub struct EntityMentionResponse {
+pub(crate) struct EntityMentionResponse {
     /// Character span in original utterance (start, end)
     pub span: (usize, usize),
     /// The text that was matched
@@ -793,7 +793,7 @@ pub struct EntityMentionResponse {
 
 /// Response from entity mention extraction
 #[derive(Debug, Serialize)]
-pub struct ExtractEntitiesResponse {
+pub(crate) struct ExtractEntitiesResponse {
     /// Snapshot metadata for cache invalidation
     pub snapshot_hash: String,
     pub snapshot_version: u32,
@@ -811,7 +811,7 @@ pub struct ExtractEntitiesResponse {
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct ExecuteDslRequest {
+pub(crate) struct ExecuteDslRequest {
     /// DSL source to execute. If None/missing, uses the session's run-sheet draft entries.
     #[serde(default)]
     pub dsl: Option<String>,
@@ -823,7 +823,7 @@ pub struct ExecuteDslRequest {
 /// Pipeline stage indicating where processing stopped
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum PipelineStage {
+pub(crate) enum PipelineStage {
     /// DSL source received but parse failed
     Draft,
     /// Parse succeeded - AST exists, tokens valid
@@ -844,7 +844,7 @@ pub enum PipelineStage {
 
 /// An unresolved EntityRef that needs user/agent resolution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnresolvedRef {
+pub(crate) struct UnresolvedRef {
     /// Statement index in AST (0-based)
     pub statement_index: usize,
     /// Argument key containing the EntityRef
@@ -861,7 +861,7 @@ pub struct UnresolvedRef {
 
 /// Request to report a user correction (for learning loop)
 #[derive(Debug, Deserialize)]
-pub struct ReportCorrectionRequest {
+pub(crate) struct ReportCorrectionRequest {
     /// Session ID where correction occurred
     pub session_id: Uuid,
     /// Original user message that triggered DSL generation
@@ -875,7 +875,7 @@ pub struct ReportCorrectionRequest {
 
 /// Response from reporting a correction
 #[derive(Debug, Serialize)]
-pub struct ReportCorrectionResponse {
+pub(crate) struct ReportCorrectionResponse {
     /// Whether the correction was recorded
     pub recorded: bool,
     /// Event ID for tracking

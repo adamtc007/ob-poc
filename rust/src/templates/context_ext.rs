@@ -9,7 +9,7 @@ use crate::api::session::SessionContext;
 use crate::dsl_v2::repl_session::ReplSession;
 
 /// Extension trait for creating ExpansionContext from main crate session types
-pub trait ExpansionContextExt {
+pub(crate) trait ExpansionContextExt {
     /// Create context from a ReplSession
     ///
     /// Automatically populates:

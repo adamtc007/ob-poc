@@ -29,4 +29,5 @@ pub mod validators;
 pub mod verb_extract;
 pub mod xref;
 
-pub use pipeline::{OnboardingPipeline, OnboardingRequest, OnboardingResult, StepResult};
+pub use pipeline::{StepResult};
+pub(crate) use pipeline::{OnboardingPipeline, OnboardingRequest, OnboardingResult};

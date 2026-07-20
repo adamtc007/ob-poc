@@ -19,7 +19,7 @@ use ob_poc_types::{ClaimedOutboxRow, OutboxEffectKind, OutboxProcessOutcome};
 /// recoveries. A consumer that has already produced the effect for an
 /// idempotency key should return [`OutboxProcessOutcome::Deduped`].
 #[async_trait]
-pub trait AsyncOutboxConsumer: Send + Sync {
+pub(crate) trait AsyncOutboxConsumer: Send + Sync {
     /// The effect kind this consumer handles. Must be unique per
     /// drainer instance — registration enforces.
     fn effect_kind(&self) -> OutboxEffectKind;

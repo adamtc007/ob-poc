@@ -37,7 +37,7 @@ use super::runtime_registry::{RuntimeArg, RuntimeVerbRegistry};
 
 /// Errors that can occur during enrichment
 #[derive(Debug, Clone)]
-pub struct EnrichmentError {
+pub(crate) struct EnrichmentError {
     pub message: String,
     pub span: Span,
 }
@@ -50,7 +50,7 @@ impl std::fmt::Display for EnrichmentError {
 
 /// Result of enrichment - enriched AST plus any errors/warnings
 #[derive(Debug)]
-pub struct EnrichmentResult {
+pub(crate) struct EnrichmentResult {
     pub program: Program,
     pub errors: Vec<EnrichmentError>,
 }
@@ -59,7 +59,7 @@ pub struct EnrichmentResult {
 ///
 /// This transforms `Literal::String` nodes into `EntityRef` nodes
 /// for arguments that have lookup configuration in their verb definition.
-pub fn enrich_program(program: Program, registry: &RuntimeVerbRegistry) -> EnrichmentResult {
+pub(crate) fn enrich_program(program: Program, registry: &RuntimeVerbRegistry) -> EnrichmentResult {
     let mut enricher = Enricher {
         registry,
         errors: Vec::new(),

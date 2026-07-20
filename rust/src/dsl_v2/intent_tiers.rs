@@ -26,15 +26,6 @@ use uuid::Uuid;
 /// Global intent tier taxonomy (lazy-loaded)
 static INTENT_TIERS: OnceLock<IntentTierTaxonomy> = OnceLock::new();
 
-/// Get the global intent tier taxonomy
-pub fn intent_tier_taxonomy() -> &'static IntentTierTaxonomy {
-    INTENT_TIERS.get_or_init(|| {
-        load_intent_tiers_from_config().unwrap_or_else(|e| {
-            tracing::warn!("Failed to load intent tiers: {}, using defaults", e);
-            IntentTierTaxonomy::default()
-        })
-    })
-}
 
 /// Load intent tier taxonomy from config file
 fn load_intent_tiers_from_config() -> anyhow::Result<IntentTierTaxonomy> {
@@ -61,7 +52,7 @@ fn load_intent_tiers_from_config() -> anyhow::Result<IntentTierTaxonomy> {
 
 /// Root intent tier taxonomy structure
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct IntentTierTaxonomy {
+pub(crate) struct IntentTierTaxonomy {
     /// Tier 1: Primary action intent (navigate, create, modify, analyze, workflow)
     pub tier_1: Tier1Config,
 
@@ -84,7 +75,7 @@ pub struct IntentTierTaxonomy {
 
 /// Tier 1 configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Tier1Config {
+pub(crate) struct Tier1Config {
     pub id: String,
     pub prompt: String,
     #[serde(default)]
@@ -93,7 +84,7 @@ pub struct Tier1Config {
 
 /// A tier 1 option (action intent)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tier1Option {
+pub(crate) struct Tier1Option {
     pub id: String,
     pub label: String,
     pub description: String,
@@ -105,7 +96,7 @@ pub struct Tier1Option {
 
 /// Tier 2 configuration for a specific tier 1 intent
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Tier2Config {
+pub(crate) struct Tier2Config {
     pub id: String,
     pub prompt: String,
     #[serde(default)]
@@ -114,7 +105,7 @@ pub struct Tier2Config {
 
 /// A tier 2 option (scope/domain)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Tier2Option {
+pub(crate) struct Tier2Option {
     pub id: String,
     pub label: String,
     pub description: String,
@@ -124,7 +115,7 @@ pub struct Tier2Option {
 
 /// Thresholds for tier disambiguation behavior
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TierThresholds {
+pub(crate) struct TierThresholds {
     /// If candidates span more than this many tier 1 intents, show tier 1 first
     #[serde(default = "default_multi_intent_threshold")]
     pub multi_intent_threshold: usize,
@@ -173,7 +164,7 @@ struct TierIndexes {
 
 impl IntentTierTaxonomy {
     /// Build indexes after loading
-    pub fn build_indexes(&mut self) {
+    pub(crate) fn build_indexes(&mut self) {
         let mut indexes = TierIndexes::default();
 
         // Index tier 1 keywords
@@ -213,7 +204,7 @@ impl IntentTierTaxonomy {
     }
 
     /// Get the tier mapping for a verb
-    pub fn get_verb_tiers(&self, verb: &str) -> Option<(&str, &str)> {
+    pub(crate) fn get_verb_tiers(&self, verb: &str) -> Option<(&str, &str)> {
         self.indexes
             .verb_to_tiers
             .get(verb)
@@ -221,7 +212,7 @@ impl IntentTierTaxonomy {
     }
 
     /// Analyze which tiers are represented in a set of candidate verbs
-    pub fn analyze_candidates(&self, verbs: &[&str]) -> TierAnalysis {
+    pub(crate) fn analyze_candidates(&self, verbs: &[&str]) -> TierAnalysis {
         let mut tier1_intents: HashMap<String, Vec<String>> = HashMap::new();
         let mut tier2_scopes: HashMap<(String, String), Vec<String>> = HashMap::new();
         let mut unmapped_verbs: Vec<String> = Vec::new();
@@ -259,104 +250,10 @@ impl IntentTierTaxonomy {
         }
     }
 
-    /// Build a tier 1 request for the given candidates
-    pub fn build_tier1_request(
-        &self,
-        original_input: &str,
-        analysis: &TierAnalysis,
-    ) -> IntentTierRequest {
-        let options: Vec<IntentTierOption> = self
-            .tier_1
-            .options
-            .iter()
-            .filter(|opt| analysis.tier1_intents.contains_key(&opt.id))
-            .map(|opt| {
-                let verb_count = analysis
-                    .tier1_intents
-                    .get(&opt.id)
-                    .map(|v| v.len())
-                    .unwrap_or(0);
-                IntentTierOption {
-                    id: opt.id.clone(),
-                    label: opt.label.clone(),
-                    description: opt.description.clone(),
-                    hint: opt.hint.clone(),
-                    verb_count,
-                }
-            })
-            .collect();
 
-        IntentTierRequest {
-            request_id: Uuid::new_v4().to_string(),
-            tier_number: 1,
-            original_input: original_input.to_string(),
-            options,
-            prompt: self.tier_1.prompt.clone(),
-            selected_path: vec![],
-        }
-    }
-
-    /// Build a tier 2 request after tier 1 selection
-    pub fn build_tier2_request(
-        &self,
-        original_input: &str,
-        tier1_selection: &str,
-        analysis: &TierAnalysis,
-    ) -> Option<IntentTierRequest> {
-        let tier2_config = self.tier_2.get(tier1_selection)?;
-
-        // Find which tier 2 options have matching verbs
-        let options: Vec<IntentTierOption> = tier2_config
-            .options
-            .iter()
-            .filter(|opt| {
-                analysis
-                    .tier2_scopes
-                    .contains_key(&(tier1_selection.to_string(), opt.id.clone()))
-            })
-            .map(|opt| {
-                let verb_count = analysis
-                    .tier2_scopes
-                    .get(&(tier1_selection.to_string(), opt.id.clone()))
-                    .map(|v| v.len())
-                    .unwrap_or(0);
-                IntentTierOption {
-                    id: opt.id.clone(),
-                    label: opt.label.clone(),
-                    description: opt.description.clone(),
-                    hint: None,
-                    verb_count,
-                }
-            })
-            .collect();
-
-        // If only one tier 2 option, skip tier 2
-        if options.len() <= 1 {
-            return None;
-        }
-
-        let tier1_opt = self
-            .tier_1
-            .options
-            .iter()
-            .find(|o| o.id == tier1_selection)?;
-
-        Some(IntentTierRequest {
-            request_id: Uuid::new_v4().to_string(),
-            tier_number: 2,
-            original_input: original_input.to_string(),
-            options,
-            prompt: tier2_config.prompt.clone(),
-            selected_path: vec![IntentTierSelection {
-                tier: 1,
-                option_id: tier1_selection.to_string(),
-                option_label: tier1_opt.label.clone(),
-            }],
-        })
-    }
 
     /// Get verbs matching a tier selection path
-    pub fn get_matching_verbs(
+    pub(crate) fn get_matching_verbs(
         &self,
         tier1_selection: &str,
         tier2_selection: Option<&str>,
@@ -382,21 +279,11 @@ impl IntentTierTaxonomy {
         }
     }
 
-    /// Check if tier-based disambiguation should be used
-    pub fn should_use_tiers(&self, analysis: &TierAnalysis, top_score: f32) -> bool {
-        // Skip if very confident match
-        if top_score >= self.thresholds.skip_tiers_confidence {
-            return false;
-        }
-
-        // Use tiers if spans multiple intents OR needs scope clarification
-        analysis.spans_multiple_intents || analysis.needs_scope_clarification
-    }
 }
 
 /// Analysis of which tiers are represented in candidate verbs
 #[derive(Debug, Clone)]
-pub struct TierAnalysis {
+pub(crate) struct TierAnalysis {
     /// Whether candidates span multiple tier 1 intents
     pub spans_multiple_intents: bool,
     /// Whether scope clarification (tier 2) is needed within a single intent

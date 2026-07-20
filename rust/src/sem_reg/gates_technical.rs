@@ -22,7 +22,7 @@ use super::verb_contract::VerbContractBody;
 /// 1. `produces.entity_type` — must resolve to a known entity type FQN
 /// 2. `consumes` — each consumed FQN must exist in the attribute dictionary
 /// 3. `args[].lookup.entity_type` — entity type references should resolve
-pub fn check_type_correctness(
+pub(crate) fn check_type_correctness(
     verb: &VerbContractBody,
     known_attribute_fqns: &HashSet<String>,
     known_entity_type_fqns: &HashSet<String>,
@@ -102,7 +102,7 @@ pub fn check_type_correctness(
 ///
 /// Delegates to `check_derivation_cycle` and `check_derivation_type_compatibility`
 /// from `gates.rs`. This is a convenience re-export for the technical gate suite.
-pub fn check_dependency_correctness(
+pub(crate) fn check_dependency_correctness(
     derivation_specs: &[super::derivation_spec::DerivationSpecBody],
     known_attribute_fqns: &HashSet<String>,
 ) -> Vec<GateFailure> {
@@ -157,7 +157,7 @@ pub fn check_security_label_presence(snapshot: &SnapshotRow) -> Vec<GateFailure>
 ///
 /// Also checks that attributes with `AttributeSource.producing_verb` pointing to
 /// this verb are reflected in its `produces` spec.
-pub fn check_verb_surface_disclosure(
+pub(crate) fn check_verb_surface_disclosure(
     verb: &VerbContractBody,
     _known_attribute_fqns: &HashSet<String>,
     attribute_sinks_for_verb: &[String],
@@ -250,7 +250,7 @@ pub fn check_verb_surface_disclosure(
 // ── Gate 5: Snapshot integrity ────────────────────────────────
 
 /// Check that a new snapshot correctly references its predecessor.
-pub fn check_snapshot_integrity(
+pub(crate) fn check_snapshot_integrity(
     snapshot: &SnapshotRow,
     predecessor: Option<&SnapshotRow>,
 ) -> Vec<GateFailure> {
@@ -317,7 +317,7 @@ pub fn check_snapshot_integrity(
 ///
 /// - Governed orphans → Error (every governed attribute should be traceable)
 /// - Operational orphans → Warning (informational)
-pub fn check_orphan_attributes(
+pub(crate) fn check_orphan_attributes(
     attribute_fqn: &str,
     tier: GovernanceTier,
     consuming_verbs: &[String],

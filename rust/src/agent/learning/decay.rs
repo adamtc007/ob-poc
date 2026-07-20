@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 /// Confidence decay manager
-pub struct ConfidenceDecay {
+pub(crate) struct ConfidenceDecay {
     pool: PgPool,
     /// Multiplier for decay on wrong selection (e.g., 0.7 = 30% reduction)
     decay_factor: f32,
@@ -24,7 +24,7 @@ pub struct ConfidenceDecay {
 
 impl ConfidenceDecay {
     /// Create with default parameters
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self {
             pool,
             decay_factor: 0.7,
@@ -34,28 +34,12 @@ impl ConfidenceDecay {
         }
     }
 
-    /// Create with custom parameters
-    pub fn with_params(
-        pool: PgPool,
-        decay_factor: f32,
-        boost_amount: f32,
-        min_confidence: f32,
-        max_confidence: f32,
-    ) -> Self {
-        Self {
-            pool,
-            decay_factor,
-            boost_amount,
-            min_confidence,
-            max_confidence,
-        }
-    }
 
     /// Apply decay when a learned phrase led to wrong verb selection
     ///
     /// For user-specific phrases: reduces confidence score
     /// For global phrases: reduces occurrence_count
-    pub async fn decay_wrong(
+    pub(crate) async fn decay_wrong(
         &self,
         phrase: &str,
         wrong_verb: &str,
@@ -131,7 +115,7 @@ impl ConfidenceDecay {
     /// Boost confidence when correct verb is confirmed
     ///
     /// Creates or updates the phrase→verb mapping with increased confidence
-    pub async fn boost_correct(
+    pub(crate) async fn boost_correct(
         &self,
         phrase: &str,
         correct_verb: &str,
@@ -197,42 +181,11 @@ impl ConfidenceDecay {
         })
     }
 
-    /// Handle a verb correction event
-    ///
-    /// Decays the wrong verb's confidence and boosts the correct verb's confidence
-    pub async fn handle_correction(
-        &self,
-        phrase: &str,
-        wrong_verb: &str,
-        correct_verb: &str,
-        user_id: Option<Uuid>,
-    ) -> Result<CorrectionResult> {
-        let decay_result = self.decay_wrong(phrase, wrong_verb, user_id).await?;
-        let boost_result = self.boost_correct(phrase, correct_verb, user_id).await?;
-
-        tracing::info!(
-            phrase = %phrase,
-            wrong_verb = %wrong_verb,
-            correct_verb = %correct_verb,
-            decay_conf = decay_result.new_confidence,
-            boost_conf = boost_result.new_confidence,
-            "Applied confidence correction"
-        );
-
-        Ok(CorrectionResult {
-            phrase: phrase.to_string(),
-            wrong_verb: wrong_verb.to_string(),
-            wrong_new_confidence: decay_result.new_confidence,
-            correct_verb: correct_verb.to_string(),
-            correct_new_confidence: boost_result.new_confidence,
-            scope: boost_result.scope,
-        })
-    }
 }
 
 /// Result of a decay/boost operation
 #[derive(Debug, Clone)]
-pub struct DecayResult {
+pub(crate) struct DecayResult {
     pub phrase: String,
     pub verb: String,
     pub new_confidence: f32,
@@ -242,7 +195,7 @@ pub struct DecayResult {
 
 /// What action was taken
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DecayAction {
+pub(crate) enum DecayAction {
     Decayed,
     Boosted,
     NotFound,
@@ -250,14 +203,14 @@ pub enum DecayAction {
 
 /// Scope of the decay/boost
 #[derive(Debug, Clone, Copy)]
-pub enum DecayScope {
+pub(crate) enum DecayScope {
     Global,
     UserSpecific(Uuid),
 }
 
 /// Result of handling a full correction
 #[derive(Debug)]
-pub struct CorrectionResult {
+pub(crate) struct CorrectionResult {
     pub phrase: String,
     pub wrong_verb: String,
     pub wrong_new_confidence: f32,

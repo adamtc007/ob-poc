@@ -43,7 +43,7 @@ use uuid::Uuid;
 
 /// Shared state for workflow routes
 #[derive(Clone)]
-pub struct WorkflowState {
+pub(crate) struct WorkflowState {
     pub pool: PgPool,
 }
 
@@ -53,7 +53,7 @@ pub struct WorkflowState {
 
 /// Request for task completion webhook
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TaskCompleteRequest {
+pub(crate) struct TaskCompleteRequest {
     pub task_id: Uuid,
     pub status: String,
     pub idempotency_key: String,
@@ -61,7 +61,7 @@ pub struct TaskCompleteRequest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TaskCompleteItem {
+pub(crate) struct TaskCompleteItem {
     pub cargo_ref: String,
     pub status: Option<String>,
     pub error: Option<String>,
@@ -165,7 +165,7 @@ async fn handle_task_complete(
 
 /// Request to create a new document
 #[derive(Debug, Deserialize)]
-pub struct CreateDocumentRequest {
+pub(crate) struct CreateDocumentRequest {
     pub document_type: String,
     pub subject_entity_id: Option<Uuid>,
     pub subject_cbu_id: Option<Uuid>,
@@ -177,7 +177,7 @@ pub struct CreateDocumentRequest {
 
 /// Response after creating a document
 #[derive(Debug, Serialize)]
-pub struct CreateDocumentResponse {
+pub(crate) struct CreateDocumentResponse {
     pub requirement_id: Option<Uuid>,
     pub document_id: Uuid,
     pub document_type_id: Option<Uuid>,
@@ -253,7 +253,7 @@ async fn create_document(
 
 /// Request to upload a new document version
 #[derive(Debug, Deserialize)]
-pub struct CreateVersionRequest {
+pub(crate) struct CreateVersionRequest {
     pub content_type: String,
     pub structured_data: Option<serde_json::Value>,
     pub blob_ref: Option<String>,
@@ -266,7 +266,7 @@ pub struct CreateVersionRequest {
 
 /// Response after creating a version
 #[derive(Debug, Serialize)]
-pub struct CreateVersionResponse {
+pub(crate) struct CreateVersionResponse {
     pub version_id: Uuid,
     pub document_id: Uuid,
     pub document_type_id: Option<Uuid>,
@@ -372,7 +372,7 @@ async fn create_version(
 
 /// Document with status (from view)
 #[derive(Debug, Serialize, FromRow)]
-pub struct DocumentWithStatusRow {
+pub(crate) struct DocumentWithStatusRow {
     pub document_id: Uuid,
     pub document_type: String,
     pub subject_entity_id: Option<Uuid>,
@@ -427,7 +427,7 @@ async fn get_document(
 
 /// Document version row
 #[derive(Debug, Serialize, FromRow)]
-pub struct DocumentVersionRow {
+pub(crate) struct DocumentVersionRow {
     pub version_id: Uuid,
     pub document_id: Uuid,
     pub version_no: i32,
@@ -496,7 +496,7 @@ async fn list_versions(
 
 /// Query params for listing requirements
 #[derive(Debug, Deserialize)]
-pub struct RequirementQuery {
+pub(crate) struct RequirementQuery {
     pub workflow_instance_id: Option<Uuid>,
     pub subject_entity_id: Option<Uuid>,
     pub status: Option<String>,
@@ -510,7 +510,7 @@ fn default_limit() -> i32 {
 
 /// Document requirement row
 #[derive(Debug, Serialize, FromRow)]
-pub struct DocumentRequirementRow {
+pub(crate) struct DocumentRequirementRow {
     pub requirement_id: Uuid,
     pub workflow_instance_id: Option<Uuid>,
     pub subject_entity_id: Option<Uuid>,
@@ -625,13 +625,13 @@ async fn get_requirement(
 
 /// Request to verify a document version
 #[derive(Debug, Deserialize)]
-pub struct VerifyVersionRequest {
+pub(crate) struct VerifyVersionRequest {
     pub verified_by: String,
 }
 
 /// Request to reject a document version
 #[derive(Debug, Deserialize)]
-pub struct RejectVersionRequest {
+pub(crate) struct RejectVersionRequest {
     pub rejection_code: String,
     pub rejection_reason: Option<String>,
     pub verified_by: String,
@@ -728,7 +728,7 @@ async fn reject_version(
 // ============================================================================
 
 #[derive(Debug)]
-pub enum WorkflowApiError {
+pub(crate) enum WorkflowApiError {
     Database(sqlx::Error),
     NotFound(String),
     BadRequest(String),
@@ -763,7 +763,7 @@ impl axum::response::IntoResponse for WorkflowApiError {
 // ============================================================================
 
 /// Create the workflow router with all endpoints
-pub fn create_workflow_router(pool: PgPool) -> Router {
+pub(crate) fn create_workflow_router(pool: PgPool) -> Router {
     let state = WorkflowState { pool };
 
     Router::new()
@@ -789,7 +789,7 @@ pub fn create_workflow_router(pool: PgPool) -> Router {
 }
 
 /// Create workflow router with shared state (for integration with main app)
-pub fn workflow_routes(_state: WorkflowState) -> Router<WorkflowState> {
+pub(crate) fn workflow_routes(_state: WorkflowState) -> Router<WorkflowState> {
     Router::new()
         // Task completion webhook
         .route("/workflow/task-complete", post(handle_task_complete))

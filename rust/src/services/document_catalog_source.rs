@@ -14,11 +14,11 @@ use crate::services::attribute_executor::ExecutionContext;
 use super::extraction_service::ExtractionService;
 
 /// Result type for source operations
-pub type SourceResult<T> = Result<T, SourceError>;
+pub(crate) type SourceResult<T> = Result<T, SourceError>;
 
 /// Source-specific errors
 #[derive(Debug, thiserror::Error)]
-pub enum SourceError {
+pub(crate) enum SourceError {
     #[error("No document found for CBU {0} with attribute {1}")]
     NoDocumentFound(Uuid, Uuid),
 
@@ -34,7 +34,7 @@ pub enum SourceError {
 
 /// Trait for attribute sources - provides attribute values from various sources
 #[async_trait]
-pub trait AttributeSource: Send + Sync {
+pub(crate) trait AttributeSource: Send + Sync {
     /// Get attribute value from this source
     async fn get_value(
         &self,
@@ -50,13 +50,13 @@ pub trait AttributeSource: Send + Sync {
 }
 
 /// Document-based attribute source
-pub struct DocumentCatalogSource {
+pub(crate) struct DocumentCatalogSource {
     pool: PgPool,
     extraction_service: Arc<dyn ExtractionService>,
 }
 
 impl DocumentCatalogSource {
-    pub fn new(pool: PgPool, extraction_service: Arc<dyn ExtractionService>) -> Self {
+    pub(crate) fn new(pool: PgPool, extraction_service: Arc<dyn ExtractionService>) -> Self {
         Self {
             pool,
             extraction_service,
@@ -294,13 +294,13 @@ impl AttributeSource for DocumentCatalogSource {
 }
 
 /// Form data source (placeholder for future implementation)
-pub struct FormDataSource {
+pub(crate) struct FormDataSource {
     #[allow(dead_code)]
     pool: PgPool,
 }
 
 impl FormDataSource {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
@@ -326,10 +326,10 @@ impl AttributeSource for FormDataSource {
 }
 
 /// API data source (placeholder for future implementation)
-pub struct ApiDataSource;
+pub(crate) struct ApiDataSource;
 
 impl ApiDataSource {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self
     }
 }

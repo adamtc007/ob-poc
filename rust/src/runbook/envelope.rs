@@ -33,7 +33,7 @@ use crate::dsl_v2::macros::ExpansionLimits;
 /// Excludes all volatile fields (timestamps) so that two compilations
 /// of the same input at different times produce the same ID.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct EnvelopeCore {
+pub(crate) struct EnvelopeCore {
     /// Session cursor at compilation time (monotonic sequence number).
     pub session_cursor: u64,
 
@@ -147,7 +147,7 @@ impl ReplayEnvelope {
 
 /// Audit record for a scoped runbook binding finalised at compile time.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BindingResolutionAudit {
+pub(crate) struct BindingResolutionAudit {
     /// Authoring symbol, including the `@` prefix.
     pub symbol: String,
 
@@ -170,7 +170,7 @@ pub struct BindingResolutionAudit {
 
 /// Record of an external lookup performed during compilation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExternalLookup {
+pub(crate) struct ExternalLookup {
     /// Source system (e.g., `"gleif"`, `"screening"`, `"client_group"`).
     pub source: String,
 
@@ -198,7 +198,7 @@ pub struct ExternalLookup {
 /// `expansion_limits` captures the limits snapshot used during expansion
 /// so that replay can verify the limits haven't changed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MacroExpansionAudit {
+pub(crate) struct MacroExpansionAudit {
     /// Unique expansion ID.
     pub expansion_id: Uuid,
 

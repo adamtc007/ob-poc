@@ -23,7 +23,7 @@ use uuid::Uuid;
 /// object_id to snapshot_id that captures every registry snapshot version
 /// that informed this decision. This enables exact replay and audit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecisionRecord {
+pub(crate) struct DecisionRecord {
     /// Unique decision identifier.
     pub decision_id: Uuid,
     /// Plan that this decision was made under (if any).
@@ -75,7 +75,7 @@ pub struct DecisionRecord {
 
 /// An alternative action that was considered but not chosen.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlternativeAction {
+pub(crate) struct AlternativeAction {
     /// Action identifier (e.g. verb FQN).
     pub action: String,
     /// Why this alternative was not chosen.
@@ -87,7 +87,7 @@ pub struct AlternativeAction {
 
 /// A piece of evidence that informed a decision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvidenceItem {
+pub(crate) struct EvidenceItem {
     /// What kind of evidence (observation, document, attribute, etc.).
     pub kind: String,
     /// Reference (FQN or description).
@@ -103,11 +103,11 @@ pub struct EvidenceItem {
 // ── Decision Store ────────────────────────────────────────────
 
 /// Database operations for decision records.
-pub struct DecisionStore;
+pub(crate) struct DecisionStore;
 
 impl DecisionStore {
     /// Insert a new decision record (immutable INSERT).
-    pub async fn insert(pool: &PgPool, record: &DecisionRecord) -> Result<Uuid> {
+    pub(crate) async fn insert(pool: &PgPool, record: &DecisionRecord) -> Result<Uuid> {
         let alternatives_json = serde_json::to_value(&record.alternatives_considered)?;
         let evidence_for_json = serde_json::to_value(&record.evidence_for)?;
         let evidence_against_json = serde_json::to_value(&record.evidence_against)?;
@@ -159,7 +159,7 @@ impl DecisionStore {
     }
 
     /// Load a decision record by ID.
-    pub async fn load(pool: &PgPool, decision_id: Uuid) -> Result<Option<DecisionRecord>> {
+    pub(crate) async fn load(pool: &PgPool, decision_id: Uuid) -> Result<Option<DecisionRecord>> {
         let row = sqlx::query_as::<_, DecisionRow>(
             r#"
             SELECT decision_id, plan_id, step_id, context_ref,
@@ -183,7 +183,7 @@ impl DecisionStore {
     }
 
     /// List decisions for a plan, ordered by time.
-    pub async fn list_for_plan(
+    pub(crate) async fn list_for_plan(
         pool: &PgPool,
         plan_id: Uuid,
         limit: i64,
@@ -211,7 +211,7 @@ impl DecisionStore {
     }
 
     /// List decisions flagged for escalation.
-    pub async fn list_escalated(pool: &PgPool, limit: i64) -> Result<Vec<DecisionRecord>> {
+    pub(crate) async fn list_escalated(pool: &PgPool, limit: i64) -> Result<Vec<DecisionRecord>> {
         let rows = sqlx::query_as::<_, DecisionRow>(
             r#"
             SELECT decision_id, plan_id, step_id, context_ref,

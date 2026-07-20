@@ -54,7 +54,7 @@ fn spec_to_mcp_tool(spec: &SemRegToolSpec) -> Tool {
 }
 
 /// Returns all Semantic Registry tools as MCP `Tool` definitions.
-pub fn sem_reg_tools() -> Vec<Tool> {
+pub(crate) fn sem_reg_tools() -> Vec<Tool> {
     all_tool_specs().iter().map(spec_to_mcp_tool).collect()
 }
 

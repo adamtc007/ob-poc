@@ -25,7 +25,7 @@ pub fn extract_uuid(verb_call: &VerbCall, ctx: &ExecutionContext, arg_name: &str
 
 /// Simple UUID extraction without context - for ops that don't use symbol resolution.
 /// Handles literal UUIDs and string UUIDs directly from verb arguments.
-pub fn get_required_uuid(verb_call: &VerbCall, arg_name: &str) -> Result<Uuid> {
+pub(crate) fn get_required_uuid(verb_call: &VerbCall, arg_name: &str) -> Result<Uuid> {
     verb_call
         .arguments
         .iter()
@@ -46,7 +46,7 @@ pub fn get_required_uuid(verb_call: &VerbCall, arg_name: &str) -> Result<Uuid> {
 
 /// Extract an optional UUID argument from a verb call.
 /// Handles @symbol references and literal UUIDs.
-pub fn extract_uuid_opt(
+pub(crate) fn extract_uuid_opt(
     verb_call: &VerbCall,
     ctx: &ExecutionContext,
     arg_name: &str,
@@ -77,12 +77,12 @@ pub fn extract_uuid_opt(
 // ============================================================================
 
 /// Extract a required string argument from a verb call.
-pub fn extract_string(verb_call: &VerbCall, arg_name: &str) -> Result<String> {
+pub(crate) fn extract_string(verb_call: &VerbCall, arg_name: &str) -> Result<String> {
     extract_string_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional string argument from a verb call.
-pub fn extract_string_opt(verb_call: &VerbCall, arg_name: &str) -> Option<String> {
+pub(crate) fn extract_string_opt(verb_call: &VerbCall, arg_name: &str) -> Option<String> {
     verb_call
         .arguments
         .iter()
@@ -91,7 +91,7 @@ pub fn extract_string_opt(verb_call: &VerbCall, arg_name: &str) -> Option<String
 }
 
 /// Extract a list of strings from a verb argument.
-pub fn extract_string_list(verb_call: &VerbCall, arg_name: &str) -> Result<Vec<String>> {
+pub(crate) fn extract_string_list(verb_call: &VerbCall, arg_name: &str) -> Result<Vec<String>> {
     verb_call
         .arguments
         .iter()
@@ -108,7 +108,7 @@ pub fn extract_string_list(verb_call: &VerbCall, arg_name: &str) -> Result<Vec<S
 }
 
 /// Extract an optional list of strings from a verb argument.
-pub fn extract_string_list_opt(verb_call: &VerbCall, arg_name: &str) -> Option<Vec<String>> {
+pub(crate) fn extract_string_list_opt(verb_call: &VerbCall, arg_name: &str) -> Option<Vec<String>> {
     verb_call
         .arguments
         .iter()
@@ -128,7 +128,7 @@ pub fn extract_string_list_opt(verb_call: &VerbCall, arg_name: &str) -> Option<V
 // ============================================================================
 
 /// Extract an optional boolean argument from a verb call.
-pub fn extract_bool_opt(verb_call: &VerbCall, arg_name: &str) -> Option<bool> {
+pub(crate) fn extract_bool_opt(verb_call: &VerbCall, arg_name: &str) -> Option<bool> {
     verb_call
         .arguments
         .iter()
@@ -137,7 +137,7 @@ pub fn extract_bool_opt(verb_call: &VerbCall, arg_name: &str) -> Option<bool> {
 }
 
 /// Extract a required boolean argument from a verb call.
-pub fn extract_bool(verb_call: &VerbCall, arg_name: &str) -> Result<bool> {
+pub(crate) fn extract_bool(verb_call: &VerbCall, arg_name: &str) -> Result<bool> {
     extract_bool_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
@@ -146,7 +146,7 @@ pub fn extract_bool(verb_call: &VerbCall, arg_name: &str) -> Result<bool> {
 // ============================================================================
 
 /// Extract an optional integer argument from a verb call.
-pub fn extract_int_opt(verb_call: &VerbCall, arg_name: &str) -> Option<i64> {
+pub(crate) fn extract_int_opt(verb_call: &VerbCall, arg_name: &str) -> Option<i64> {
     verb_call
         .arguments
         .iter()
@@ -155,7 +155,7 @@ pub fn extract_int_opt(verb_call: &VerbCall, arg_name: &str) -> Option<i64> {
 }
 
 /// Extract a required integer argument from a verb call.
-pub fn extract_int(verb_call: &VerbCall, arg_name: &str) -> Result<i64> {
+pub(crate) fn extract_int(verb_call: &VerbCall, arg_name: &str) -> Result<i64> {
     extract_int_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
@@ -163,30 +163,6 @@ pub fn extract_int(verb_call: &VerbCall, arg_name: &str) -> Result<i64> {
 // CBU ID Extraction (sync, no DB) - handles "cbu" or "cbu-id" aliases
 // ============================================================================
 
-/// Extract CBU ID from a verb call, accepting either "cbu" or "cbu-id" as the argument name.
-/// This is the common pattern used ~12 times in ubo_graph_ops.rs.
-pub fn extract_cbu_id(verb_call: &VerbCall, ctx: &ExecutionContext) -> Result<Uuid> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == "cbu" || a.key == "cbu-id")
-        .and_then(|a| {
-            // Try symbol reference first
-            if let Some(sym) = a.value.as_symbol() {
-                return ctx.resolve(sym);
-            }
-            // Try literal UUID
-            if let Some(uuid) = a.value.as_uuid() {
-                return Some(uuid);
-            }
-            // Try parsing string as UUID
-            if let Some(s) = a.value.as_string() {
-                return Uuid::parse_str(s).ok();
-            }
-            None
-        })
-        .ok_or_else(|| anyhow!("Missing cbu or cbu-id argument"))
-}
 
 // ============================================================================
 // CBU Resolution (async, requires DB)
@@ -232,19 +208,19 @@ pub async fn resolve_cbu_id(
 // serde_json::Value args and sem_os_core::VerbExecutionContext.
 
 /// Extract a required string from JSON args.
-pub fn json_extract_string(args: &serde_json::Value, arg_name: &str) -> Result<String> {
+pub(crate) fn json_extract_string(args: &serde_json::Value, arg_name: &str) -> Result<String> {
     json_extract_string_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional string from JSON args.
-pub fn json_extract_string_opt(args: &serde_json::Value, arg_name: &str) -> Option<String> {
+pub(crate) fn json_extract_string_opt(args: &serde_json::Value, arg_name: &str) -> Option<String> {
     args.get(arg_name)
         .and_then(|v| v.as_str())
         .map(|s| s.to_string())
 }
 
 /// Extract a required UUID from JSON args + context symbols.
-pub fn json_extract_uuid(
+pub(crate) fn json_extract_uuid(
     args: &serde_json::Value,
     ctx: &dsl_runtime::VerbExecutionContext,
     arg_name: &str,
@@ -254,7 +230,7 @@ pub fn json_extract_uuid(
 }
 
 /// Extract an optional UUID from JSON args + context symbols.
-pub fn json_extract_uuid_opt(
+pub(crate) fn json_extract_uuid_opt(
     args: &serde_json::Value,
     ctx: &dsl_runtime::VerbExecutionContext,
     arg_name: &str,
@@ -273,7 +249,7 @@ pub fn json_extract_uuid_opt(
 }
 
 /// Simple UUID extraction from JSON args without context.
-pub fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -> Result<Uuid> {
+pub(crate) fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -> Result<Uuid> {
     args.get(arg_name)
         .and_then(|v| v.as_str())
         .and_then(|s| Uuid::parse_str(s).ok())
@@ -281,27 +257,27 @@ pub fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -> Resul
 }
 
 /// Extract an optional boolean from JSON args.
-pub fn json_extract_bool_opt(args: &serde_json::Value, arg_name: &str) -> Option<bool> {
+pub(crate) fn json_extract_bool_opt(args: &serde_json::Value, arg_name: &str) -> Option<bool> {
     args.get(arg_name).and_then(|v| v.as_bool())
 }
 
 /// Extract a required boolean from JSON args.
-pub fn json_extract_bool(args: &serde_json::Value, arg_name: &str) -> Result<bool> {
+pub(crate) fn json_extract_bool(args: &serde_json::Value, arg_name: &str) -> Result<bool> {
     json_extract_bool_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional integer from JSON args.
-pub fn json_extract_int_opt(args: &serde_json::Value, arg_name: &str) -> Option<i64> {
+pub(crate) fn json_extract_int_opt(args: &serde_json::Value, arg_name: &str) -> Option<i64> {
     args.get(arg_name).and_then(|v| v.as_i64())
 }
 
 /// Extract a required integer from JSON args.
-pub fn json_extract_int(args: &serde_json::Value, arg_name: &str) -> Result<i64> {
+pub(crate) fn json_extract_int(args: &serde_json::Value, arg_name: &str) -> Result<i64> {
     json_extract_int_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional string list from JSON args.
-pub fn json_extract_string_list_opt(
+pub(crate) fn json_extract_string_list_opt(
     args: &serde_json::Value,
     arg_name: &str,
 ) -> Option<Vec<String>> {
@@ -313,7 +289,7 @@ pub fn json_extract_string_list_opt(
 }
 
 /// Extract a required string list from JSON args.
-pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Result<Vec<String>> {
+pub(crate) fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Result<Vec<String>> {
     json_extract_string_list_opt(args, arg_name)
         .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
@@ -323,7 +299,7 @@ pub fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Res
 /// Common pattern where the canonical form is e.g. `"cbu-id"` but the legacy
 /// short form `"cbu"` is also accepted. Generic across domains. The longer
 /// key is tried first; the shorter is the fallback.
-pub fn json_extract_uuid_aliased(
+pub(crate) fn json_extract_uuid_aliased(
     args: &serde_json::Value,
     ctx: &dsl_runtime::VerbExecutionContext,
     short_key: &str,
@@ -493,11 +469,11 @@ use crate::session::{UnifiedSession, ViewState};
 
 /// JSON key used to carry the pending `UnifiedSession` across the
 /// dispatch boundary.
-pub const EXT_KEY_PENDING_SESSION: &str = "pending_session";
+pub(crate) const EXT_KEY_PENDING_SESSION: &str = "pending_session";
 
 /// JSON key used to carry the pending `ViewState` across the dispatch
 /// boundary.
-pub const EXT_KEY_PENDING_VIEW_STATE: &str = "pending_view_state";
+pub(crate) const EXT_KEY_PENDING_VIEW_STATE: &str = "pending_view_state";
 
 fn ext_obj_mut(
     ctx: &mut dsl_runtime::VerbExecutionContext,
@@ -509,7 +485,7 @@ fn ext_obj_mut(
 }
 
 /// Consume the pending `UnifiedSession` from `sem_ctx.extensions` if any.
-pub fn ext_take_pending_session(
+pub(crate) fn ext_take_pending_session(
     ctx: &mut dsl_runtime::VerbExecutionContext,
 ) -> Option<UnifiedSession> {
     let obj = ctx.extensions.as_object_mut()?;
@@ -518,7 +494,7 @@ pub fn ext_take_pending_session(
 }
 
 /// Write a `UnifiedSession` to `sem_ctx.extensions` under the pending-session key.
-pub fn ext_set_pending_session(
+pub(crate) fn ext_set_pending_session(
     ctx: &mut dsl_runtime::VerbExecutionContext,
     session: UnifiedSession,
 ) {
@@ -527,31 +503,8 @@ pub fn ext_set_pending_session(
     }
 }
 
-/// Get-or-create the pending `UnifiedSession` in `sem_ctx.extensions`.
-/// Mirrors `ExecutionContext::get_or_create_session_mut` but over JSON
-/// transport — caller mutates the owned value, then writes back via
-/// `ext_set_pending_session`.
-pub fn ext_take_or_create_pending_session(
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-) -> UnifiedSession {
-    ext_take_pending_session(ctx).unwrap_or_default()
-}
 
-/// Write a `ViewState` to `sem_ctx.extensions` under the pending-view-state key.
-pub fn ext_set_pending_view_state(ctx: &mut dsl_runtime::VerbExecutionContext, view: ViewState) {
-    if let Ok(v) = serde_json::to_value(&view) {
-        ext_obj_mut(ctx).insert(EXT_KEY_PENDING_VIEW_STATE.to_string(), v);
-    }
-}
 
-/// Read a string-valued key from `sem_ctx.extensions`.
-pub fn ext_get_string(ctx: &dsl_runtime::VerbExecutionContext, key: &str) -> Option<String> {
-    ctx.extensions
-        .as_object()?
-        .get(key)?
-        .as_str()
-        .map(|s| s.to_string())
-}
 
 // ============================================================================
 // Tests

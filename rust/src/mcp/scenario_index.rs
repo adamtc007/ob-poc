@@ -62,13 +62,13 @@ const PENALTY_SINGLE_VERB_CUE: i32 = -6;
 
 /// Top-level YAML structure for scenario_index.yaml.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioIndexConfig {
+pub(crate) struct ScenarioIndexConfig {
     pub scenarios: Vec<ScenarioDefYaml>,
 }
 
 /// A single scenario definition as loaded from YAML.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioDefYaml {
+pub(crate) struct ScenarioDefYaml {
     pub id: String,
     pub title: String,
     #[serde(default)]
@@ -82,7 +82,7 @@ pub struct ScenarioDefYaml {
 
 /// Gate G1: what compound signals must be present.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequiresGate {
+pub(crate) struct RequiresGate {
     /// At least one of these signal types must be present.
     #[serde(default)]
     pub any_of: Vec<String>,
@@ -93,7 +93,7 @@ pub struct RequiresGate {
 
 /// Signal matchers for the scoring ledger.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SignalConfig {
+pub(crate) struct SignalConfig {
     /// Compound action verbs that trigger this scenario (matched against CompoundSignals).
     #[serde(default)]
     pub actions: Vec<String>,
@@ -111,7 +111,7 @@ pub struct SignalConfig {
 /// How a matched scenario routes to macro(s).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind")]
-pub enum ScenarioRouteYaml {
+pub(crate) enum ScenarioRouteYaml {
     /// Route to a single macro.
     #[serde(rename = "macro")]
     Macro { macro_fqn: String },
@@ -145,7 +145,7 @@ pub enum ScenarioRouteYaml {
 
 /// A single option in a macro_selector route.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SelectorOption {
+pub(crate) struct SelectorOption {
     /// The value to match (e.g., "LU", "IE").
     pub value: String,
     /// The macro FQN to route to (leaf option). Optional when `sub_select` is used.
@@ -158,7 +158,7 @@ pub struct SelectorOption {
 
 /// Nested second-axis selector within a macro_selector option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubSelector {
+pub(crate) struct SubSelector {
     /// Field from CompoundSignals to select on (e.g., "vehicle_type").
     pub select_on: String,
     /// Fallback macro FQN when the second axis is undetected.
@@ -169,14 +169,14 @@ pub struct SubSelector {
 
 /// Leaf option in a two-axis selector.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubSelectorOption {
+pub(crate) struct SubSelectorOption {
     pub value: String,
     pub macro_fqn: String,
 }
 
 /// A single option in a verb_selector route.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbSelectorOption {
+pub(crate) struct VerbSelectorOption {
     /// The value to match (e.g., "ownership", "upward").
     pub value: String,
     /// The verb FQN to route to (leaf option). Optional when `sub_select` is used.
@@ -189,7 +189,7 @@ pub struct VerbSelectorOption {
 
 /// Nested second-axis selector for verb_selector routes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbSubSelector {
+pub(crate) struct VerbSubSelector {
     /// Field from CompoundSignals to select on (e.g., "query_direction").
     pub select_on: String,
     /// Fallback verb FQN when the second axis is undetected.
@@ -200,14 +200,14 @@ pub struct VerbSubSelector {
 
 /// Leaf option in a two-axis verb selector.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbSubSelectorLeaf {
+pub(crate) struct VerbSubSelectorLeaf {
     pub value: String,
     pub verb_fqn: String,
 }
 
 /// Explain configuration (display metadata).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ExplainConfig {
+pub(crate) struct ExplainConfig {
     #[serde(default)]
     pub summary: Option<String>,
     #[serde(default)]
@@ -218,7 +218,7 @@ pub struct ExplainConfig {
 
 /// A matched signal contributing to the scenario score.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioMatchedSignal {
+pub(crate) struct ScenarioMatchedSignal {
     pub signal: String,
     pub score: i32,
     pub detail: String,
@@ -226,7 +226,7 @@ pub struct ScenarioMatchedSignal {
 
 /// Result of a gate evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioGateResult {
+pub(crate) struct ScenarioGateResult {
     pub gate: String,
     pub passed: bool,
     pub reason: Option<String>,
@@ -234,7 +234,7 @@ pub struct ScenarioGateResult {
 
 /// Explain payload for a scenario match.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioExplain {
+pub(crate) struct ScenarioExplain {
     pub matched_signals: Vec<ScenarioMatchedSignal>,
     pub gates: Vec<ScenarioGateResult>,
     pub score_total: i32,
@@ -243,7 +243,7 @@ pub struct ScenarioExplain {
 
 /// Resolved route from a scenario match.
 #[derive(Debug, Clone)]
-pub enum ResolvedRoute {
+pub(crate) enum ResolvedRoute {
     /// Single macro to expand.
     Macro { macro_fqn: String },
     /// Sequence of macros to expand in order.
@@ -265,7 +265,7 @@ pub enum ResolvedRoute {
 
 /// A single scenario match with score, route, and explain.
 #[derive(Debug, Clone)]
-pub struct ScenarioMatch {
+pub(crate) struct ScenarioMatch {
     pub scenario_id: String,
     pub title: String,
     pub score: i32,
@@ -275,7 +275,7 @@ pub struct ScenarioMatch {
 
 /// Result of `ScenarioIndex::resolve()`.
 #[derive(Debug, Clone)]
-pub enum ScenarioResolveOutcome {
+pub(crate) enum ScenarioResolveOutcome {
     /// Clear winner (top score passes all gates, no disambiguation needed).
     Matched(ScenarioMatch),
     /// Multiple candidates within disambiguation band.

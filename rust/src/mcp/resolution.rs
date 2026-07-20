@@ -11,7 +11,7 @@ use super::enrichment::EntityContext;
 /// Confidence level for entity resolution
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ResolutionConfidence {
+pub(crate) enum ResolutionConfidence {
     /// Single exact match or very high score - auto-resolve
     High,
     /// Good match but may want to confirm
@@ -25,7 +25,7 @@ pub enum ResolutionConfidence {
 /// Suggested action based on analysis
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
-pub enum SuggestedAction {
+pub(crate) enum SuggestedAction {
     /// Use this match automatically
     AutoResolve { match_id: String },
     /// Ask user to choose between matches
@@ -38,7 +38,7 @@ pub enum SuggestedAction {
 
 /// Result of resolution analysis
 #[derive(Debug, Clone, Serialize)]
-pub struct ResolutionResult {
+pub(crate) struct ResolutionResult {
     pub confidence: ResolutionConfidence,
     pub action: SuggestedAction,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -47,7 +47,7 @@ pub struct ResolutionResult {
 
 /// An enriched match with context for resolution
 #[derive(Debug, Clone, Serialize)]
-pub struct EnrichedMatch {
+pub(crate) struct EnrichedMatch {
     pub id: String,
     pub display: String,
     pub score: f32,
@@ -58,7 +58,7 @@ pub struct EnrichedMatch {
 
 /// Context from the conversation that can help resolution
 #[derive(Debug, Default, Clone, Deserialize)]
-pub struct ConversationContext {
+pub(crate) struct ConversationContext {
     /// Roles mentioned in conversation (e.g., ["DIRECTOR", "UBO"])
     #[serde(default)]
     pub mentioned_roles: Vec<String>,
@@ -77,7 +77,7 @@ pub struct ConversationContext {
 }
 
 /// Resolution strategy analyzer
-pub struct ResolutionStrategy;
+pub(crate) struct ResolutionStrategy;
 
 impl ResolutionStrategy {
     /// Analyze matches and determine resolution strategy
@@ -89,7 +89,7 @@ impl ResolutionStrategy {
     /// 4. Context-based resolution (role/nationality match) → auto-resolve with medium confidence
     /// 5. Multiple close matches → ask user
     /// 6. Low scores (<0.50) → suggest create
-    pub fn analyze(
+    pub(crate) fn analyze(
         matches: &[EnrichedMatch],
         conversation_context: Option<&ConversationContext>,
     ) -> ResolutionResult {

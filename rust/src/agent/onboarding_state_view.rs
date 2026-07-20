@@ -26,7 +26,7 @@ use super::composite_state::{
 ///
 /// This is the bridge between the scoring engine and the UI.
 /// Called once per chat response when a group is in scope.
-pub fn project_onboarding_state(
+pub(crate) fn project_onboarding_state(
     composite: &GroupCompositeState,
     group_name: Option<&str>,
 ) -> OnboardingStateView {

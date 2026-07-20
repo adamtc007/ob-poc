@@ -26,7 +26,7 @@ use crate::graph::types::{
 
 /// A "book" is a collection of CBUs that share an ownership apex
 #[derive(Debug, Clone)]
-pub struct DerivedBook {
+pub(crate) struct DerivedBook {
     /// The ultimate owner entity (terminus of ownership chain)
     pub apex_entity_id: Uuid,
     pub apex_name: String,
@@ -41,7 +41,7 @@ pub struct DerivedBook {
 // =============================================================================
 
 #[async_trait]
-pub trait GraphRepository: Send + Sync {
+pub(crate) trait GraphRepository: Send + Sync {
     /// Load graph for a single CBU (existing functionality)
     async fn load_cbu_graph(&self, cbu_id: Uuid, as_of: NaiveDate) -> Result<EntityGraph>;
 
@@ -176,12 +176,12 @@ struct GraphDataRows {
 // POSTGRES IMPLEMENTATION
 // =============================================================================
 
-pub struct PgGraphRepository {
+pub(crate) struct PgGraphRepository {
     pool: PgPool,
 }
 
 impl PgGraphRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 

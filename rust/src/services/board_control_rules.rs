@@ -44,7 +44,7 @@ struct BoardControllerRow {
 
 /// Configuration for the rules engine
 #[derive(Debug, Clone)]
-pub struct RulesEngineConfig {
+pub(crate) struct RulesEngineConfig {
     /// Threshold for board appointment majority (default 50%)
     pub board_appointment_threshold: f32,
     /// Threshold for voting rights majority (default 50%)
@@ -68,7 +68,7 @@ impl Default for RulesEngineConfig {
 
 /// Result of a board control computation
 #[derive(Debug, Clone)]
-pub struct BoardControlResult {
+pub(crate) struct BoardControlResult {
     pub controller_entity_id: Option<Uuid>,
     pub controller_name: Option<String>,
     pub method: BoardControlMethod,
@@ -96,14 +96,14 @@ struct RawControlEdge {
 }
 
 /// The board control rules engine
-pub struct BoardControlRulesEngine {
+pub(crate) struct BoardControlRulesEngine {
     pool: PgPool,
     config: RulesEngineConfig,
 }
 
 impl BoardControlRulesEngine {
     /// Create a new rules engine
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self {
             pool,
             config: RulesEngineConfig::default(),
@@ -111,7 +111,7 @@ impl BoardControlRulesEngine {
     }
 
     /// Create with custom configuration
-    pub fn with_config(pool: PgPool, config: RulesEngineConfig) -> Self {
+    pub(crate) fn with_config(pool: PgPool, config: RulesEngineConfig) -> Self {
         Self { pool, config }
     }
 
@@ -122,7 +122,7 @@ impl BoardControlRulesEngine {
     /// 2. Walks the control graph upward
     /// 3. Applies rules A → B → C → D in priority order
     /// 4. Returns the computed controller with full explanation
-    pub async fn compute_for_cbu(&self, cbu_id: Uuid) -> Result<BoardControlResult, String> {
+    pub(crate) async fn compute_for_cbu(&self, cbu_id: Uuid) -> Result<BoardControlResult, String> {
         let as_of = Utc::now().date_naive();
 
         // 1. Get the CBU's issuer entity (anchor with role 'issuer')
@@ -497,7 +497,7 @@ impl BoardControlRulesEngine {
     }
 
     /// Store the computed board controller in the database
-    pub async fn store_result(
+    pub(crate) async fn store_result(
         &self,
         cbu_id: Uuid,
         result: &BoardControlResult,
@@ -555,40 +555,6 @@ impl BoardControlRulesEngine {
         Ok(id)
     }
 
-    /// Load existing board controller for a CBU
-    pub async fn load_for_cbu(&self, cbu_id: Uuid) -> Result<Option<BoardControllerEdge>, String> {
-        let row: Option<BoardControllerRow> = sqlx::query_as(
-            r#"SELECT id, cbu_id, controller_entity_id, controller_name, method, confidence, score, as_of, explanation
-               FROM "ob-poc".cbu_board_controller
-               WHERE cbu_id = $1"#,
-        )
-        .bind(cbu_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| format!("Failed to load board controller: {}", e))?;
-
-        match row {
-            Some(r) => {
-                let explanation: BoardControlExplanation =
-                    serde_json::from_value(r.explanation).unwrap_or_default();
-
-                Ok(Some(BoardControllerEdge {
-                    id: r.id,
-                    cbu_id: r.cbu_id,
-                    controller_entity_id: r.controller_entity_id,
-                    controller_name: r.controller_name,
-                    method: BoardControlMethod::from_db_str(&r.method)
-                        .unwrap_or(BoardControlMethod::NoSingleController),
-                    confidence: ControlConfidence::from_db_str(&r.confidence)
-                        .unwrap_or(ControlConfidence::Low),
-                    score: r.score.to_string().parse().unwrap_or(0.0),
-                    as_of: r.as_of,
-                    explanation,
-                }))
-            }
-            None => Ok(None),
-        }
-    }
 }
 
 /// Builder for accumulating candidate scores

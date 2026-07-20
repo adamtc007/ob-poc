@@ -17,7 +17,7 @@ use uuid::Uuid;
 /// - Used to replay "what did this template expand into?"
 /// - Analyzed for debugging batch execution issues
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpansionReport {
+pub(crate) struct ExpansionReport {
     /// Unique identifier for this expansion
     pub expansion_id: Uuid,
 
@@ -68,7 +68,7 @@ impl Default for ExpansionReport {
 
 /// Hash of a template definition for audit
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateDigest {
+pub(crate) struct TemplateDigest {
     /// Template name (e.g., "onboarding.research-group")
     pub name: String,
     /// Template version
@@ -79,7 +79,7 @@ pub struct TemplateDigest {
 
 /// Details of a single template invocation within an expansion
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateInvocationReport {
+pub(crate) struct TemplateInvocationReport {
     /// Template name
     pub name: String,
     /// Arguments passed to the template (as JSON)
@@ -96,7 +96,7 @@ pub struct TemplateInvocationReport {
 
 /// Reference to a span in source code
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpanRef {
+pub(crate) struct SpanRef {
     /// Source file (if known)
     pub file: Option<String>,
     /// Start byte offset
@@ -107,7 +107,7 @@ pub struct SpanRef {
 
 /// Range of expanded statements
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpandedRange {
+pub(crate) struct ExpandedRange {
     /// Start index (inclusive)
     pub start_index: usize,
     /// End index (exclusive)
@@ -116,7 +116,7 @@ pub struct ExpandedRange {
 
 /// Maps an expanded statement back to its template origin
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerItemOrigin {
+pub(crate) struct PerItemOrigin {
     /// Index in the expanded statement list
     pub expanded_statement_index: usize,
     /// Index in the template's item list
@@ -134,7 +134,7 @@ pub struct PerItemOrigin {
 /// - `BestEffort`: Partial success allowed. Failed items are skipped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum BatchPolicy {
+pub(crate) enum BatchPolicy {
     /// All statements succeed or all are rolled back
     Atomic,
     /// Continue on failure, aggregate errors at the end
@@ -148,7 +148,7 @@ pub enum BatchPolicy {
 
 /// Policy for a template invocation
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TemplatePolicy {
+pub(crate) struct TemplatePolicy {
     /// Batch execution policy
     #[serde(default)]
     pub batch_policy: BatchPolicy,
@@ -167,7 +167,7 @@ pub struct TemplatePolicy {
 /// Without locking, a concurrent session could delete an entity mid-batch,
 /// causing partial failures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LockingPolicy {
+pub(crate) struct LockingPolicy {
     /// Lock acquisition mode (not serialized — `Duration` is not serde-friendly;
     /// use `timeout_ms` to configure timeout from YAML/JSON).
     #[serde(skip, default)]
@@ -181,7 +181,7 @@ pub struct LockingPolicy {
 
 /// Lock acquisition mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum LockMode {
+pub(crate) enum LockMode {
     /// Non-blocking: fail immediately if lock unavailable
     #[default]
     Try,
@@ -200,7 +200,7 @@ pub enum LockMode {
 
 /// Specifies which argument to lock and how
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LockTarget {
+pub(crate) struct LockTarget {
     /// Argument name in verb call (e.g., "entity-id", "person-id")
     pub arg: String,
     /// Entity type for lock key (e.g., "person", "entity", "cbu")
@@ -215,7 +215,7 @@ pub struct LockTarget {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
 )]
 #[serde(rename_all = "snake_case")]
-pub enum LockAccess {
+pub(crate) enum LockAccess {
     /// Read lock - allows concurrent readers, blocks writers
     Read,
     /// Write lock - exclusive access
@@ -232,7 +232,7 @@ pub enum LockAccess {
 /// Lock keys are sorted before acquisition to prevent deadlocks.
 /// The sort order is: (entity_type, entity_id, access).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct LockKey {
+pub(crate) struct LockKey {
     /// Entity type (e.g., "person", "entity", "cbu")
     pub entity_type: String,
     /// Entity UUID as string
@@ -243,7 +243,7 @@ pub struct LockKey {
 
 impl LockKey {
     /// Create a new lock key
-    pub fn new(
+    pub(crate) fn new(
         entity_type: impl Into<String>,
         entity_id: impl Into<String>,
         access: LockAccess,
@@ -256,12 +256,12 @@ impl LockKey {
     }
 
     /// Create a write lock key
-    pub fn write(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
+    pub(crate) fn write(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
         Self::new(entity_type, entity_id, LockAccess::Write)
     }
 
     /// Create a read lock key
-    pub fn read(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
+    pub(crate) fn read(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
         Self::new(entity_type, entity_id, LockAccess::Read)
     }
 }
@@ -288,7 +288,7 @@ impl Ord for LockKey {
 
 /// Diagnostic message from expansion
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExpansionDiagnostic {
+pub(crate) struct ExpansionDiagnostic {
     /// Severity level
     pub level: DiagnosticLevel,
     /// Human-readable message
@@ -300,7 +300,7 @@ pub struct ExpansionDiagnostic {
 /// Diagnostic severity level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum DiagnosticLevel {
+pub(crate) enum DiagnosticLevel {
     /// Expansion failed
     Error,
     /// Expansion succeeded but with warnings

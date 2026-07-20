@@ -30,7 +30,7 @@ use crate::traceability::Phase2Service;
 /// Computed once via `compute_session_verb_surface()` and threaded through
 /// the entire pipeline (orchestrator, MCP, chat response, UI).
 #[derive(Debug, Clone, Serialize)]
-pub struct SessionVerbSurface {
+pub(crate) struct SessionVerbSurface {
     /// Verbs visible to the user after all governance layers.
     pub verbs: Vec<SurfaceVerb>,
     /// Macro/scenario FQNs owned by the composed workspace (by mode-tag
@@ -56,7 +56,7 @@ pub struct SessionVerbSurface {
 
 /// A verb that survived all governance layers and is visible to the user.
 #[derive(Debug, Clone, Serialize)]
-pub struct SurfaceVerb {
+pub(crate) struct SurfaceVerb {
     pub fqn: String,
     pub domain: String,
     pub action: String,
@@ -69,7 +69,7 @@ pub struct SurfaceVerb {
 
 /// A verb that was excluded, with all reasons it was pruned.
 #[derive(Debug, Clone, Serialize)]
-pub struct ExcludedVerb {
+pub(crate) struct ExcludedVerb {
     pub fqn: String,
     /// One or more reasons (SI-3: additive, not first-hit).
     pub reasons: Vec<SurfacePrune>,
@@ -77,7 +77,7 @@ pub struct ExcludedVerb {
 
 /// A single prune reason tagged with the governance layer that applied it.
 #[derive(Debug, Clone, Serialize)]
-pub struct SurfacePrune {
+pub(crate) struct SurfacePrune {
     pub layer: PruneLayer,
     pub reason: String,
 }
@@ -85,7 +85,7 @@ pub struct SurfacePrune {
 /// Which governance layer excluded the verb.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PruneLayer {
+pub(crate) enum PruneLayer {
     AgentMode,
     WorkflowPhase,
     GroupScope,
@@ -98,7 +98,7 @@ pub enum PruneLayer {
 /// Fail policy when SemReg is unavailable.
 #[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum VerbSurfaceFailPolicy {
+pub(crate) enum VerbSurfaceFailPolicy {
     /// Default: reduce to ~30 always-safe verbs.
     #[default]
     FailClosed,
@@ -110,7 +110,7 @@ pub enum VerbSurfaceFailPolicy {
 ///
 /// Format: `"vs1:<hex>"` (versioned, distinct from CCIR `"v1:<hex>"`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SurfaceFingerprint(pub String);
+pub(crate) struct SurfaceFingerprint(pub String);
 
 impl std::fmt::Display for SurfaceFingerprint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -120,7 +120,7 @@ impl std::fmt::Display for SurfaceFingerprint {
 
 /// Progressive narrowing counts at each filter stage.
 #[derive(Debug, Clone, Serialize)]
-pub struct FilterSummary {
+pub(crate) struct FilterSummary {
     pub total_registry: usize,
     pub after_agent_mode: usize,
     pub after_workflow: usize,
@@ -137,7 +137,7 @@ const SAFE_HARBOR_DOMAINS: &[&str] = &[
     "agent", "audit", "focus", "registry", "schema", "session", "view",
 ];
 
-pub fn is_safe_harbor_verb(fqn: &str) -> bool {
+pub(crate) fn is_safe_harbor_verb(fqn: &str) -> bool {
     SAFE_HARBOR_DOMAINS
         .iter()
         .any(|domain| fqn.starts_with(&format!("{domain}.")))
@@ -284,7 +284,7 @@ fn workflow_allowed_domains(stage_focus: &str) -> Option<HashSet<&'static str>> 
 // ── Computation context ─────────────────────────────────────────
 
 /// Input context for computing the verb surface.
-pub struct VerbSurfaceContext<'a> {
+pub(crate) struct VerbSurfaceContext<'a> {
     /// Current agent mode (Research vs Governed).
     pub agent_mode: AgentMode,
     /// Session workflow focus (e.g., "semos-kyc", "semos-onboarding").
@@ -321,7 +321,7 @@ pub struct VerbSurfaceContext<'a> {
 /// 5. Lifecycle state filter
 /// 6. FailPolicy check (safe-harbor reduction when SemReg unavailable)
 /// 7. Rank + composite state bias + fingerprint
-pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerbSurface {
+pub(crate) fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerbSurface {
     let registry = runtime_registry();
 
     // Collect all verbs as (fqn, RuntimeVerb ref)
@@ -616,7 +616,7 @@ pub fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> SessionVerb
 ///
 /// With `entity_state == None`, lifecycle cannot be checked, so every verb is
 /// reported reachable.
-pub fn observe_state_reachability(
+pub(crate) fn observe_state_reachability(
     fqns: &[String],
     entity_state: Option<&str>,
 ) -> Vec<crate::agent::telemetry::StateObservation> {
@@ -735,19 +735,19 @@ impl SessionVerbSurface {
     /// lets the macro/scenario tiers in verb search surface them: those tiers
     /// match then drop any FQN not in this set, so a workspace macro must be in
     /// the set to survive. Cross-workspace macros are absent → still dropped.
-    pub fn allowed_fqns(&self) -> HashSet<String> {
+    pub(crate) fn allowed_fqns(&self) -> HashSet<String> {
         let mut fqns: HashSet<String> = self.verbs.iter().map(|v| v.fqn.clone()).collect();
         fqns.extend(self.owned_macros.iter().cloned());
         fqns
     }
 
     /// Filter verbs by domain.
-    pub fn verbs_for_domain(&self, domain: &str) -> Vec<&SurfaceVerb> {
+    pub(crate) fn verbs_for_domain(&self, domain: &str) -> Vec<&SurfaceVerb> {
         self.verbs.iter().filter(|v| v.domain == domain).collect()
     }
 
     /// Get unique domain names in the surface (sorted).
-    pub fn domains(&self) -> Vec<&str> {
+    pub(crate) fn domains(&self) -> Vec<&str> {
         let mut domains: Vec<&str> = self
             .verbs
             .iter()
@@ -760,7 +760,7 @@ impl SessionVerbSurface {
     }
 
     /// Check if a specific verb FQN is in the surface.
-    pub fn contains(&self, fqn: &str) -> bool {
+    pub(crate) fn contains(&self, fqn: &str) -> bool {
         self.verbs.iter().any(|v| v.fqn == fqn)
     }
 
@@ -781,7 +781,7 @@ impl SessionVerbSurface {
     }
 
     /// True if the surface is in safe-harbor mode (FailClosed, SemReg unavailable).
-    pub fn is_safe_harbor(&self) -> bool {
+    pub(crate) fn is_safe_harbor(&self) -> bool {
         self.fail_policy_applied == VerbSurfaceFailPolicy::FailClosed
             && self.semreg_fingerprint.is_none()
     }

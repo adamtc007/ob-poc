@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// Named `AgentDisambiguationPrompt` to avoid collision with the
 /// Phase 7 `DisambiguationPrompt` type in context_resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentDisambiguationPrompt {
+pub(crate) struct AgentDisambiguationPrompt {
     /// Unique prompt identifier.
     pub prompt_id: Uuid,
     /// Decision that triggered this prompt.
@@ -55,7 +55,7 @@ pub struct AgentDisambiguationPrompt {
 
 /// An option in a disambiguation prompt.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PromptOption {
+pub(crate) struct PromptOption {
     /// Option identifier.
     pub id: String,
     /// Display label.
@@ -73,7 +73,7 @@ pub struct PromptOption {
 /// requires human approval, or when the agent encounters a situation
 /// it cannot resolve autonomously.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentEscalationRecord {
+pub(crate) struct AgentEscalationRecord {
     /// Unique escalation identifier.
     pub escalation_id: Uuid,
     /// Decision that triggered this escalation.
@@ -106,13 +106,13 @@ pub struct AgentEscalationRecord {
 // ── Escalation Store ──────────────────────────────────────────
 
 /// Database operations for disambiguation prompts and escalation records.
-pub struct EscalationStore;
+pub(crate) struct EscalationStore;
 
 impl EscalationStore {
     // ── Disambiguation Prompts ────────────────────────────────
 
     /// Insert a new disambiguation prompt (immutable INSERT).
-    pub async fn insert_prompt(pool: &PgPool, prompt: &AgentDisambiguationPrompt) -> Result<Uuid> {
+    pub(crate) async fn insert_prompt(pool: &PgPool, prompt: &AgentDisambiguationPrompt) -> Result<Uuid> {
         let options_json = serde_json::to_value(&prompt.options)?;
 
         let prompt_id = sqlx::query_scalar::<_, Uuid>(
@@ -146,7 +146,7 @@ impl EscalationStore {
     }
 
     /// Record the answer to a disambiguation prompt.
-    pub async fn answer_prompt(
+    pub(crate) async fn answer_prompt(
         pool: &PgPool,
         prompt_id: Uuid,
         chosen_option: &str,
@@ -171,7 +171,7 @@ impl EscalationStore {
     }
 
     /// Load a disambiguation prompt by ID.
-    pub async fn load_prompt(
+    pub(crate) async fn load_prompt(
         pool: &PgPool,
         prompt_id: Uuid,
     ) -> Result<Option<AgentDisambiguationPrompt>> {
@@ -196,7 +196,7 @@ impl EscalationStore {
     }
 
     /// List unanswered disambiguation prompts for a plan.
-    pub async fn list_unanswered_for_plan(
+    pub(crate) async fn list_unanswered_for_plan(
         pool: &PgPool,
         plan_id: Uuid,
     ) -> Result<Vec<AgentDisambiguationPrompt>> {
@@ -221,7 +221,7 @@ impl EscalationStore {
     // ── Escalation Records ────────────────────────────────────
 
     /// Insert a new escalation record.
-    pub async fn insert_escalation(pool: &PgPool, record: &AgentEscalationRecord) -> Result<Uuid> {
+    pub(crate) async fn insert_escalation(pool: &PgPool, record: &AgentEscalationRecord) -> Result<Uuid> {
         let escalation_id = sqlx::query_scalar::<_, Uuid>(
             r#"
             INSERT INTO sem_reg.escalation_records (
@@ -251,7 +251,7 @@ impl EscalationStore {
     }
 
     /// Resolve an escalation record (UPDATE resolved_at + resolution).
-    pub async fn resolve_escalation(
+    pub(crate) async fn resolve_escalation(
         pool: &PgPool,
         escalation_id: Uuid,
         resolution: &str,
@@ -273,7 +273,7 @@ impl EscalationStore {
     }
 
     /// Load an escalation record by ID.
-    pub async fn load_escalation(
+    pub(crate) async fn load_escalation(
         pool: &PgPool,
         escalation_id: Uuid,
     ) -> Result<Option<AgentEscalationRecord>> {
@@ -298,7 +298,7 @@ impl EscalationStore {
     }
 
     /// List unresolved escalation records, newest first.
-    pub async fn list_unresolved(pool: &PgPool, limit: i64) -> Result<Vec<AgentEscalationRecord>> {
+    pub(crate) async fn list_unresolved(pool: &PgPool, limit: i64) -> Result<Vec<AgentEscalationRecord>> {
         let rows = sqlx::query_as::<_, EscalationRow>(
             r#"
             SELECT escalation_id, decision_id, reason, severity,

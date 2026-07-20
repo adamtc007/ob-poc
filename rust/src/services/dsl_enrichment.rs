@@ -29,7 +29,7 @@ use crate::dsl_v2::parse_program;
 
 /// Session binding info (minimal struct for lookups)
 #[derive(Debug, Clone)]
-pub struct BindingInfo {
+pub(crate) struct BindingInfo {
     pub id: Uuid,
     pub display_name: String,
     pub entity_type: String,
@@ -42,7 +42,7 @@ pub struct BindingInfo {
 /// 2. Walks AST to find SymbolRef and EntityRef nodes
 /// 3. Looks up each reference in the provided bindings map
 /// 4. Produces segments for rich UI rendering
-pub fn enrich_dsl(
+pub(crate) fn enrich_dsl(
     source: &str,
     bindings: &HashMap<String, BindingInfo>,
     active_cbu: Option<&BindingInfo>,
@@ -327,7 +327,7 @@ fn build_binding_summary(
 }
 
 /// Convert session context bindings to BindingInfo map
-pub fn bindings_from_session_context(
+pub(crate) fn bindings_from_session_context(
     bindings: &HashMap<String, crate::api::session::BoundEntity>,
 ) -> HashMap<String, BindingInfo> {
     bindings

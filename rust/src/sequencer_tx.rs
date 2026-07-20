@@ -203,7 +203,7 @@ impl PgTransactionScope {
 
 /// Outcome of [`PgTransactionScope::commit_attested`].
 #[derive(Debug)]
-pub enum CommitAttestationError {
+pub(crate) enum CommitAttestationError {
     /// The commit or rollback itself failed at the database layer.
     Db(sqlx::Error),
     /// The transaction was rolled back because captured writes exceeded

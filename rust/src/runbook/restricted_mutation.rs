@@ -15,7 +15,7 @@ use super::mutation_preflight::{
 use super::types::{CompiledRunbook, CompiledRunbookId, CompiledStep, ExecutionMode};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RestrictedMutationRunbookCompilation {
+pub(crate) struct RestrictedMutationRunbookCompilation {
     pub compiled_runbook_id: CompiledRunbookId,
     pub workbook_id: super::workbook::ExecutionWorkbookId,
     pub approval_token_id: super::approval_token::ApprovalTokenId,
@@ -25,7 +25,7 @@ pub struct RestrictedMutationRunbookCompilation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RestrictedMutationExecutionReceipt {
+pub(crate) struct RestrictedMutationExecutionReceipt {
     pub compiled_runbook_id: CompiledRunbookId,
     pub workbook_id: super::workbook::ExecutionWorkbookId,
     pub approval_token_id: super::approval_token::ApprovalTokenId,
@@ -38,7 +38,7 @@ pub struct RestrictedMutationExecutionReceipt {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum RestrictedMutationRunbookCompilationError {
+pub(crate) enum RestrictedMutationRunbookCompilationError {
     UnsupportedExecutor {
         executor: MutationExecutor,
     },
@@ -79,7 +79,7 @@ pub enum RestrictedMutationRunbookCompilationError {
 /// ).unwrap();
 /// ```
 #[allow(clippy::result_large_err)]
-pub fn compile_restricted_mutation_preflight(
+pub(crate) fn compile_restricted_mutation_preflight(
     session_id: Uuid,
     runbook_version: u64,
     pack_id: Option<String>,
@@ -194,7 +194,7 @@ pub fn compile_restricted_mutation_preflight(
 }
 
 #[allow(clippy::result_large_err)]
-pub fn record_restricted_mutation_execution_receipt(
+pub(crate) fn record_restricted_mutation_execution_receipt(
     compilation: &RestrictedMutationRunbookCompilation,
     preflight: &RestrictedMutationPreflight,
     actual_diff: MutationSemanticDiff,

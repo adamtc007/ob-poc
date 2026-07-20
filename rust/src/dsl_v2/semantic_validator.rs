@@ -32,7 +32,7 @@ use uuid::Uuid;
 pub(crate) type RefCache = HashMap<(RefType, String), ResolveResult>;
 
 /// Semantic validator that checks AST against live database
-pub struct SemanticValidator {
+pub(crate) struct SemanticValidator {
     resolver: Box<dyn RefResolver>,
     csg_linter: Option<CsgLinter>,
     pool: PgPool,
@@ -40,7 +40,7 @@ pub struct SemanticValidator {
 
 impl SemanticValidator {
     /// Create a SemanticValidator with EntityGateway resolver
-    pub async fn new(pool: PgPool) -> Result<Self, String> {
+    pub(crate) async fn new(pool: PgPool) -> Result<Self, String> {
         let gateway_resolver = GatewayRefResolver::connect(&gateway_addr()).await?;
         Ok(Self {
             resolver: Box::new(gateway_resolver),
@@ -49,18 +49,9 @@ impl SemanticValidator {
         })
     }
 
-    /// Create a SemanticValidator with EntityGateway at specific URL
-    pub async fn with_gateway(pool: PgPool, gateway_url: &str) -> Result<Self, String> {
-        let gateway_resolver = GatewayRefResolver::connect(gateway_url).await?;
-        Ok(Self {
-            resolver: Box::new(gateway_resolver),
-            csg_linter: None,
-            pool,
-        })
-    }
 
     /// Initialize with CSG linter for context-sensitive validation
-    pub async fn with_csg_linter(mut self) -> Result<Self, String> {
+    pub(crate) async fn with_csg_linter(mut self) -> Result<Self, String> {
         let mut linter = CsgLinter::new(self.pool.clone());
         linter.initialize().await?;
         self.csg_linter = Some(linter);
@@ -75,7 +66,7 @@ impl SemanticValidator {
     /// - 30 refs with 5 types = 5 gRPC calls instead of 30 (~6x speedup)
     ///
     /// Returns a cache map: (RefType, value) → ResolveResult
-    pub async fn batch_resolve_all_refs(
+    pub(crate) async fn batch_resolve_all_refs(
         &mut self,
         program: &Program,
     ) -> HashMap<(RefType, String), ResolveResult> {
@@ -137,29 +128,10 @@ impl SemanticValidator {
         all_results
     }
 
-    /// Run CSG linting pass on parsed AST
-    pub async fn lint_csg(
-        &self,
-        source: &str,
-        context: &ValidationContext,
-    ) -> Result<LintResult, String> {
-        let program = parse_program(source).map_err(|e| format!("Parse error: {}", e))?;
-
-        if let Some(ref linter) = self.csg_linter {
-            Ok(linter.lint(program, context, source).await)
-        } else {
-            // Return empty result if linter not initialized
-            Ok(LintResult {
-                ast: program,
-                diagnostics: vec![],
-                inferred_context: Default::default(),
-            })
-        }
-    }
 
     /// Full validation pipeline with CSG linting
     /// Runs: Parse -> CSG Lint -> Semantic Validation
-    pub async fn validate_with_csg(&mut self, request: &ValidationRequest) -> ValidationResult {
+    pub(crate) async fn validate_with_csg(&mut self, request: &ValidationRequest) -> ValidationResult {
         // Step 1: Parse
         let program = match parse_program(&request.source) {
             Ok(p) => p,
@@ -190,7 +162,7 @@ impl SemanticValidator {
 
     /// Validate DSL source - parse and validate in one step
     /// Returns Rust-style formatted errors or validated program with resolved AST
-    pub async fn validate(&mut self, request: &ValidationRequest) -> ValidationResult {
+    pub(crate) async fn validate(&mut self, request: &ValidationRequest) -> ValidationResult {
         // Clear resolver cache for fresh validation
         self.resolver.clear_cache();
 

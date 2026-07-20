@@ -30,7 +30,7 @@ use uuid::Uuid;
 
 /// Query params for entity search
 #[derive(Debug, Deserialize)]
-pub struct EntitySearchQuery {
+pub(crate) struct EntitySearchQuery {
     /// Entity type nickname: cbu, entity, person, company, product, role, jurisdiction, etc.
     #[serde(rename = "type")]
     pub entity_type: String,
@@ -66,7 +66,7 @@ fn default_limit() -> u32 {
 
 /// Scope info derived from session for search filtering
 #[derive(Debug, Clone, Default)]
-pub struct EntitySearchScope {
+pub(crate) struct EntitySearchScope {
     /// Client group ID (constraint cascade level 1)
     pub client_id: Option<Uuid>,
     /// Structure type (constraint cascade level 2)
@@ -80,7 +80,7 @@ use ob_poc_types::EntityMatch;
 
 /// Response from entity search
 #[derive(Debug, Clone, Serialize)]
-pub struct EntitySearchResponse {
+pub(crate) struct EntitySearchResponse {
     /// List of matches
     pub matches: Vec<EntityMatch>,
 
@@ -252,7 +252,7 @@ fn extract_jurisdiction(display: &str) -> Option<String> {
 
 /// Legacy query params (deprecated - use EntitySearchQuery)
 #[derive(Debug, Deserialize)]
-pub struct LegacySearchQuery {
+pub(crate) struct LegacySearchQuery {
     pub q: String,
     #[serde(default)]
     pub entity_type: Option<String>,
@@ -284,7 +284,7 @@ async fn search_entities_legacy(
 
 /// State for session-scoped entity search
 #[derive(Clone)]
-pub struct ScopedEntitySearchState {
+pub(crate) struct ScopedEntitySearchState {
     pub sessions: SessionStore,
 }
 
@@ -463,7 +463,7 @@ pub fn create_entity_router() -> Router {
 }
 
 /// Create router for session-scoped entity endpoints (requires session state)
-pub fn create_scoped_entity_router(sessions: SessionStore) -> Router {
+pub(crate) fn create_scoped_entity_router(sessions: SessionStore) -> Router {
     let state = ScopedEntitySearchState { sessions };
     Router::new()
         .route(

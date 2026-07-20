@@ -14,7 +14,7 @@ use uuid::Uuid;
 /// The primary domain/entity type currently being operated on
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ActiveDomain {
+pub(crate) enum ActiveDomain {
     /// No specific domain active (initial state)
     #[default]
     None,
@@ -56,7 +56,7 @@ impl fmt::Display for ActiveDomain {
 /// Context for a single batch iteration
 /// Captures what we're iterating over and where to return
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IterationContext {
+pub(crate) struct IterationContext {
     /// Index in the batch (0-based)
     pub index: usize,
 
@@ -108,7 +108,7 @@ struct DomainContextFrame {
 /// This captures the active domain and associated entity IDs,
 /// supporting nested operations via a context stack.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DomainContext {
+pub(crate) struct DomainContext {
     /// Currently active domain
     pub active_domain: ActiveDomain,
 
@@ -148,12 +148,12 @@ pub struct DomainContext {
 
 impl DomainContext {
     /// Create a new empty context
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Create context with a CBU as the active domain
-    pub fn for_cbu(cbu_id: Uuid, cbu_name: Option<String>) -> Self {
+    pub(crate) fn for_cbu(cbu_id: Uuid, cbu_name: Option<String>) -> Self {
         Self {
             active_domain: ActiveDomain::Cbu,
             active_cbu_id: Some(cbu_id),
@@ -165,7 +165,7 @@ impl DomainContext {
     /// Push current state and enter a new domain
     ///
     /// Use when entering a nested context (e.g., CBU → KYC Case)
-    pub fn push_domain(&mut self, domain: ActiveDomain, reason: impl Into<String>) {
+    pub(crate) fn push_domain(&mut self, domain: ActiveDomain, reason: impl Into<String>) {
         let frame = DomainContextFrame {
             domain: self.active_domain,
             cbu_id: self.active_cbu_id,
@@ -190,7 +190,7 @@ impl DomainContext {
     /// Pop back to previous domain context
     ///
     /// Returns false if stack was empty (nothing to pop)
-    pub fn pop_domain(&mut self) -> bool {
+    pub(crate) fn pop_domain(&mut self) -> bool {
         if let Some(frame) = self.context_stack.pop() {
             self.active_domain = frame.domain;
             self.active_cbu_id = frame.cbu_id;
@@ -214,7 +214,7 @@ impl DomainContext {
     }
 
     /// Execute a closure with a pushed domain, automatically popping after
-    pub fn with_domain<F, R>(&mut self, domain: ActiveDomain, reason: &str, f: F) -> R
+    pub(crate) fn with_domain<F, R>(&mut self, domain: ActiveDomain, reason: &str, f: F) -> R
     where
         F: FnOnce(&mut Self) -> R,
     {
@@ -225,17 +225,17 @@ impl DomainContext {
     }
 
     /// Get current stack depth (0 = root context)
-    pub fn stack_depth(&self) -> usize {
+    pub(crate) fn stack_depth(&self) -> usize {
         self.context_stack.len()
     }
 
     /// Check if we're inside a batch iteration
-    pub fn in_batch_iteration(&self) -> bool {
+    pub(crate) fn in_batch_iteration(&self) -> bool {
         self.iteration.is_some()
     }
 
     /// Get iteration info if in batch
-    pub fn iteration_info(&self) -> Option<(usize, &str)> {
+    pub(crate) fn iteration_info(&self) -> Option<(usize, &str)> {
         self.iteration
             .as_ref()
             .map(|i| (i.index, i.iteration_key.as_str()))
@@ -248,7 +248,7 @@ impl DomainContext {
 
 impl DomainContext {
     /// Set the active CBU (switches to CBU domain if not already there)
-    pub fn set_active_cbu(&mut self, cbu_id: Uuid, name: Option<String>) {
+    pub(crate) fn set_active_cbu(&mut self, cbu_id: Uuid, name: Option<String>) {
         self.active_cbu_id = Some(cbu_id);
         self.active_cbu_name = name;
         if self.active_domain == ActiveDomain::None {
@@ -257,41 +257,16 @@ impl DomainContext {
     }
 
     /// Set the active KYC case (pushes KycCase domain)
-    pub fn set_active_case(&mut self, case_id: Uuid) {
+    pub(crate) fn set_active_case(&mut self, case_id: Uuid) {
         if self.active_domain != ActiveDomain::KycCase {
             self.push_domain(ActiveDomain::KycCase, "kyc-case activated");
         }
         self.active_case_id = Some(case_id);
     }
 
-    /// Set the active onboarding request
-    pub fn set_active_request(&mut self, request_id: Uuid) {
-        if self.active_domain != ActiveDomain::OnboardingRequest {
-            self.push_domain(
-                ActiveDomain::OnboardingRequest,
-                "onboarding-request activated",
-            );
-        }
-        self.active_request_id = Some(request_id);
-    }
 
-    /// Set the active entity (for workstream/UBO operations)
-    pub fn set_active_entity(&mut self, entity_id: Uuid) {
-        self.active_entity_id = Some(entity_id);
-    }
 
-    /// Set the active trading profile
-    pub fn set_active_profile(&mut self, profile_id: Uuid) {
-        if self.active_domain != ActiveDomain::TradingProfile {
-            self.push_domain(ActiveDomain::TradingProfile, "trading-profile activated");
-        }
-        self.active_profile_id = Some(profile_id);
-    }
 
-    /// Clear the active entity (when leaving entity-specific operations)
-    pub fn clear_active_entity(&mut self) {
-        self.active_entity_id = None;
-    }
 }
 
 // ============================================================================
@@ -300,7 +275,7 @@ impl DomainContext {
 
 impl DomainContext {
     /// Enter a batch iteration context
-    pub fn enter_iteration(
+    pub(crate) fn enter_iteration(
         &mut self,
         index: usize,
         key: impl Into<String>,
@@ -320,7 +295,7 @@ impl DomainContext {
     }
 
     /// Exit batch iteration context
-    pub fn exit_iteration(&mut self) {
+    pub(crate) fn exit_iteration(&mut self) {
         if let Some(iter) = self.iteration.take() {
             tracing::debug!(index = iter.index, "Exited batch iteration");
         }
@@ -329,7 +304,7 @@ impl DomainContext {
     /// Create a child context for a batch iteration
     ///
     /// Inherits CBU/Case context from parent, sets iteration info
-    pub fn child_for_iteration(
+    pub(crate) fn child_for_iteration(
         &self,
         index: usize,
         key: impl Into<String>,

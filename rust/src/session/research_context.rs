@@ -14,7 +14,7 @@ use crate::research::{ApprovedResearch, ResearchResult};
 
 /// Research state within a session
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ResearchContext {
+pub(crate) struct ResearchContext {
     /// Current pending result awaiting review
     pub pending: Option<ResearchResult>,
 
@@ -31,7 +31,7 @@ pub struct ResearchContext {
 /// Research workflow state machine
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ResearchState {
+pub(crate) enum ResearchState {
     /// No active research
     #[default]
     Idle,
@@ -59,12 +59,12 @@ impl std::fmt::Display for ResearchState {
 
 impl ResearchContext {
     /// Create a new empty research context
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Set pending research result (transitions to PendingReview)
-    pub fn set_pending(&mut self, result: ResearchResult) {
+    pub(crate) fn set_pending(&mut self, result: ResearchResult) {
         self.pending = Some(result);
         self.state = ResearchState::PendingReview;
         self.generated_verbs = None;
@@ -79,7 +79,7 @@ impl ResearchContext {
     ///
     /// # Returns
     /// Reference to the approved research, or error if no pending research
-    pub fn approve(&mut self, edits: Option<Value>) -> Result<&ApprovedResearch, &'static str> {
+    pub(crate) fn approve(&mut self, edits: Option<Value>) -> Result<&ApprovedResearch, &'static str> {
         let edits_made = edits.is_some();
         let result = self
             .pending
@@ -105,51 +105,43 @@ impl ResearchContext {
     }
 
     /// Reject pending result (transitions to Idle)
-    pub fn reject(&mut self) {
+    pub(crate) fn reject(&mut self) {
         self.pending = None;
         self.state = ResearchState::Idle;
     }
 
     /// Mark verbs as executed (transitions to Executed)
-    pub fn mark_executed(&mut self) {
+    pub(crate) fn mark_executed(&mut self) {
         self.generated_verbs = None;
         self.state = ResearchState::Executed;
     }
 
     /// Clear and return to idle state
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.pending = None;
         self.generated_verbs = None;
         self.state = ResearchState::Idle;
     }
 
-    /// Get the most recently approved research
-    pub fn last_approved(&self) -> Option<&ApprovedResearch> {
-        self.approved.values().max_by_key(|a| a.approved_at)
-    }
 
-    /// Get approved research by ID
-    pub fn get_approved(&self, result_id: Uuid) -> Option<&ApprovedResearch> {
-        self.approved.get(&result_id)
-    }
 
     /// Check if there's pending research
-    pub fn has_pending(&self) -> bool {
+    pub(crate) fn has_pending(&self) -> bool {
         self.pending.is_some()
     }
 
     /// Check if verbs are ready for execution
-    pub fn has_verbs_ready(&self) -> bool {
+    pub(crate) fn has_verbs_ready(&self) -> bool {
         self.generated_verbs.is_some()
     }
 
     /// Get pending macro name
-    pub fn pending_macro_name(&self) -> Option<&str> {
+    pub(crate) fn pending_macro_name(&self) -> Option<&str> {
         self.pending.as_ref().map(|r| r.macro_name.as_str())
     }
 
     /// Get count of approved research results
-    pub fn approved_count(&self) -> usize {
+    pub(crate) fn approved_count(&self) -> usize {
         self.approved.len()
     }
 }

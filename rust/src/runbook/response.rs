@@ -28,7 +28,7 @@ use super::types::{CompiledRunbook, CompiledRunbookId};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
-pub enum OrchestratorResponse {
+pub(crate) enum OrchestratorResponse {
     /// Compilation succeeded — a runbook is ready for execution.
     Compiled(CompiledRunbookSummary),
 
@@ -44,7 +44,7 @@ pub enum OrchestratorResponse {
 
 impl OrchestratorResponse {
     /// Convenience: is this a successful compilation?
-    pub fn is_compiled(&self) -> bool {
+    pub(crate) fn is_compiled(&self) -> bool {
         matches!(self, Self::Compiled(_))
     }
 }
@@ -59,7 +59,7 @@ impl OrchestratorResponse {
 /// in `RunbookStore` before execution. The runbook is skipped during
 /// JSON serialization (API responses use the summary fields only).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompiledRunbookSummary {
+pub(crate) struct CompiledRunbookSummary {
     /// The execution handle to pass to `execute_runbook()`.
     pub compiled_runbook_id: CompiledRunbookId,
 
@@ -83,7 +83,7 @@ pub struct CompiledRunbookSummary {
 
 /// Preview of a single compiled step (for UI display before execution).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StepPreview {
+pub(crate) struct StepPreview {
     pub step_id: Uuid,
     pub verb: String,
     pub sentence: String,
@@ -95,7 +95,7 @@ pub struct StepPreview {
 
 /// Request for additional information before compilation can proceed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClarificationRequest {
+pub(crate) struct ClarificationRequest {
     /// Human-readable question to show the user.
     pub question: String,
 
@@ -108,7 +108,7 @@ pub struct ClarificationRequest {
 
 /// A field that needs user input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MissingField {
+pub(crate) struct MissingField {
     /// Argument name (e.g., `"depositary"`).
     pub field_name: String,
 
@@ -124,7 +124,7 @@ pub struct MissingField {
 
 /// Context attached to a clarification request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClarificationContext {
+pub(crate) struct ClarificationContext {
     /// Verb that was matched.
     pub verb: Option<String>,
 
@@ -141,7 +141,7 @@ pub struct ClarificationContext {
 
 /// Detail returned when the expanded plan violates pack constraints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstraintViolationDetail {
+pub(crate) struct ConstraintViolationDetail {
     /// Human-readable explanation of the violation.
     pub explanation: String,
 
@@ -157,7 +157,7 @@ pub struct ConstraintViolationDetail {
 
 /// A constraint that was violated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActiveConstraint {
+pub(crate) struct ActiveConstraint {
     /// Pack that imposed this constraint.
     pub pack_id: String,
 
@@ -171,7 +171,7 @@ pub struct ActiveConstraint {
 /// Type of pack constraint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ConstraintType {
+pub(crate) enum ConstraintType {
     /// Verb is not in the allowed set.
     ForbiddenVerb { verb: String },
     /// Entity kind is not in the allowed set.
@@ -181,7 +181,7 @@ pub enum ConstraintType {
 /// A remediation option presented to the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum Remediation {
+pub(crate) enum Remediation {
     /// Widen the scope by activating additional packs.
     WidenScope { suggested_packs: Vec<String> },
     /// Suspend the constraining pack temporarily.
@@ -192,7 +192,7 @@ pub enum Remediation {
 
 /// An alternative verb that would satisfy constraints.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AlternativeVerb {
+pub(crate) struct AlternativeVerb {
     pub verb: String,
     pub description: String,
     pub score: f32,

@@ -31,7 +31,7 @@ pub struct EntityRow {
 
 /// Proper person row - matches canonical DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ProperPersonRow {
+pub(crate) struct ProperPersonRow {
     pub proper_person_id: Uuid,
     pub first_name: String,
     pub last_name: String,
@@ -47,7 +47,7 @@ pub struct ProperPersonRow {
 
 /// Fields for creating a new entity
 #[derive(Debug, Clone)]
-pub struct NewEntityFields {
+pub(crate) struct NewEntityFields {
     pub entity_type: String, // e.g., "PROPER_PERSON", "COMPANY"
     pub name: String,
     pub external_id: Option<String>,
@@ -55,7 +55,7 @@ pub struct NewEntityFields {
 
 /// Fields for creating a proper person
 #[derive(Debug, Clone)]
-pub struct NewProperPersonFields {
+pub(crate) struct NewProperPersonFields {
     pub first_name: String,
     pub last_name: String,
     pub middle_names: Option<String>,
@@ -68,7 +68,7 @@ pub struct NewProperPersonFields {
 
 /// Fields for creating a limited company
 #[derive(Debug, Clone)]
-pub struct NewLimitedCompanyFields {
+pub(crate) struct NewLimitedCompanyFields {
     pub name: String,
     pub jurisdiction: Option<String>,
     pub registration_number: Option<String>,
@@ -79,7 +79,7 @@ pub struct NewLimitedCompanyFields {
 
 /// Fields for creating a partnership
 #[derive(Debug, Clone)]
-pub struct NewPartnershipFields {
+pub(crate) struct NewPartnershipFields {
     pub name: String,
     pub jurisdiction: Option<String>,
     pub partnership_type: Option<String>, // LP, LLP, GP
@@ -90,7 +90,7 @@ pub struct NewPartnershipFields {
 
 /// Fields for creating a trust
 #[derive(Debug, Clone)]
-pub struct NewTrustFields {
+pub(crate) struct NewTrustFields {
     pub name: String,
     pub jurisdiction: String,
     pub trust_type: Option<String>, // Discretionary, Fixed, Unit
@@ -102,7 +102,7 @@ pub struct NewTrustFields {
 
 /// Limited company row - matches DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct LimitedCompanyRow {
+pub(crate) struct LimitedCompanyRow {
     pub limited_company_id: Uuid,
     pub company_name: String,
     pub registration_number: Option<String>,
@@ -116,7 +116,7 @@ pub struct LimitedCompanyRow {
 
 /// Partnership row - matches DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct PartnershipRow {
+pub(crate) struct PartnershipRow {
     pub partnership_id: Uuid,
     pub partnership_name: String,
     pub partnership_type: Option<String>,
@@ -130,7 +130,7 @@ pub struct PartnershipRow {
 
 /// Trust row - matches DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct TrustRow {
+pub(crate) struct TrustRow {
     pub trust_id: Uuid,
     pub trust_name: String,
     pub trust_type: Option<String>,
@@ -145,7 +145,7 @@ pub struct TrustRow {
 
 /// CBU entity role row - matches DB schema
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CbuEntityRoleRow {
+pub(crate) struct CbuEntityRoleRow {
     pub cbu_entity_role_id: Uuid,
     pub cbu_id: Uuid,
     pub entity_id: Uuid,

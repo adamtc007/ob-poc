@@ -29,7 +29,7 @@ use crate::templates::{ExpansionContext, TemplateDefinition, TemplateExpander};
 
 /// Error handling mode for batch execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum OnErrorMode {
+pub(crate) enum OnErrorMode {
     /// Continue processing remaining items (default)
     #[default]
     Continue,
@@ -56,7 +56,7 @@ impl std::str::FromStr for OnErrorMode {
 /// Collects primary keys and bindings from each successful iteration,
 /// enabling post-batch operations like `batch.add-products`.
 #[derive(Debug, Clone, Default)]
-pub struct BatchResultAccumulator {
+pub(crate) struct BatchResultAccumulator {
     /// Per-iteration bindings: each entry is the symbol table from that iteration
     pub iteration_bindings: Vec<HashMap<String, Uuid>>,
 
@@ -87,7 +87,7 @@ pub struct BatchResultAccumulator {
 
 impl BatchResultAccumulator {
     /// Create a new accumulator for a template
-    pub fn new(template: &TemplateDefinition) -> Self {
+    pub(crate) fn new(template: &TemplateDefinition) -> Self {
         // Extract primary entity info from template
         let (entity_type, binding_name) = template
             .primary_entity
@@ -112,7 +112,7 @@ impl BatchResultAccumulator {
     }
 
     /// Create an empty accumulator with specified primary entity info
-    pub fn with_primary(entity_type: impl Into<String>, binding_name: impl Into<String>) -> Self {
+    pub(crate) fn with_primary(entity_type: impl Into<String>, binding_name: impl Into<String>) -> Self {
         Self {
             primary_entity_type: entity_type.into(),
             primary_binding_name: binding_name.into(),
@@ -121,12 +121,12 @@ impl BatchResultAccumulator {
     }
 
     /// Get all primary entity IDs (alias for common use case)
-    pub fn cbu_ids(&self) -> &[Uuid] {
+    pub(crate) fn cbu_ids(&self) -> &[Uuid] {
         &self.primary_entity_ids
     }
 
     /// Record a successful iteration
-    pub fn record_success(
+    pub(crate) fn record_success(
         &mut self,
         index: usize,
         symbols: HashMap<String, Uuid>,
@@ -149,7 +149,7 @@ impl BatchResultAccumulator {
     }
 
     /// Record a failed iteration
-    pub fn record_failure(&mut self, index: usize, error: String) {
+    pub(crate) fn record_failure(&mut self, index: usize, error: String) {
         self.errors.insert(index, error.clone());
         self.failure_count += 1;
 
@@ -157,26 +157,20 @@ impl BatchResultAccumulator {
     }
 
     /// Check if batch was fully successful
-    pub fn is_complete_success(&self) -> bool {
+    pub(crate) fn is_complete_success(&self) -> bool {
         self.failure_count == 0 && self.skipped_count == 0
     }
 
     /// Get total items processed (success + failure)
-    pub fn total_processed(&self) -> usize {
+    pub(crate) fn total_processed(&self) -> usize {
         self.success_count + self.failure_count
     }
 
-    /// Get binding from a specific iteration
-    pub fn get_iteration_binding(&self, index: usize, name: &str) -> Option<Uuid> {
-        self.iteration_bindings
-            .get(index)
-            .and_then(|bindings| bindings.get(name).copied())
-    }
 }
 
 /// Result of batch execution
 #[derive(Debug)]
-pub struct BatchExecutionResult {
+pub(crate) struct BatchExecutionResult {
     /// Accumulated results from all iterations
     pub accumulator: BatchResultAccumulator,
 
@@ -192,7 +186,7 @@ pub struct BatchExecutionResult {
 
 impl BatchExecutionResult {
     /// Create a successful batch result
-    pub fn success(accumulator: BatchResultAccumulator, total_items: usize) -> Self {
+    pub(crate) fn success(accumulator: BatchResultAccumulator, total_items: usize) -> Self {
         Self {
             accumulator,
             total_items,
@@ -202,7 +196,7 @@ impl BatchExecutionResult {
     }
 
     /// Create an aborted batch result
-    pub fn aborted(
+    pub(crate) fn aborted(
         accumulator: BatchResultAccumulator,
         total_items: usize,
         at_index: usize,
@@ -226,7 +220,7 @@ impl BatchExecutionResult {
 /// 5. Executes plan respecting topo order
 /// 6. Propagates bindings to BatchResultAccumulator
 #[cfg(feature = "database")]
-pub struct BatchExecutor {
+pub(crate) struct BatchExecutor {
     pool: PgPool,
     template: TemplateDefinition,
     shared_params: HashMap<String, String>,
@@ -236,7 +230,7 @@ pub struct BatchExecutor {
 #[cfg(feature = "database")]
 impl BatchExecutor {
     /// Create a new batch executor
-    pub fn new(
+    pub(crate) fn new(
         pool: PgPool,
         template: TemplateDefinition,
         shared_params: HashMap<String, String>,
@@ -257,7 +251,7 @@ impl BatchExecutor {
     /// * `bind_param` - Template param name to bind each item's ID to
     /// * `on_error` - Error handling mode
     /// * `limit` - Optional limit on items to process
-    pub async fn execute_batch(
+    pub(crate) async fn execute_batch(
         &self,
         items: Vec<(Uuid, String)>,
         bind_param: &str,

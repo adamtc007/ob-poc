@@ -19,7 +19,7 @@ use ob_poc_boundary::policy::ActorResolver;
 use sem_os_client::SemOsClient;
 
 /// MCP Server
-pub struct McpServer {
+pub(crate) struct McpServer {
     handlers: ToolHandlers,
     pool: PgPool,
     sem_os_client: Option<Arc<dyn SemOsClient>>,
@@ -30,7 +30,7 @@ impl McpServer {
     /// Create a new MCP server with database pool and embedder (REQUIRED)
     ///
     /// There is only ONE path - all MCP tools require the Candle embedder.
-    pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
+    pub(crate) fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
         Self {
             handlers: ToolHandlers::new(pool.clone(), embedder),
             pool,
@@ -40,14 +40,14 @@ impl McpServer {
     }
 
     /// Set the Semantic OS client for sem_reg resource reads and tool dispatch.
-    pub fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
+    pub(crate) fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
         self.sem_os_client = Some(client.clone());
         self.handlers = self.handlers.with_sem_os_client(client);
         self
     }
 
     /// Set the pre-built CoreService shared across all MCP tool calls.
-    pub fn with_sem_os_service(
+    pub(crate) fn with_sem_os_service(
         mut self,
         service: Arc<dyn sem_os_policy::service::CoreService>,
     ) -> Self {
@@ -59,13 +59,13 @@ impl McpServer {
     /// Install the canonical SemOS plugin op registry. Threaded into the
     /// handler's inner `DslExecutor` construction so plugin verbs dispatch
     /// correctly (post-Phase-5c-migrate slice #80).
-    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
+    pub(crate) fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
         self.handlers = self.handlers.with_sem_os_ops(ops);
         self
     }
 
     /// Set the REPL V2 Orchestrator.
-    pub fn with_orchestrator(
+    pub(crate) fn with_orchestrator(
         mut self,
         orchestrator: Arc<crate::sequencer::ReplOrchestratorV2>,
     ) -> Self {
@@ -74,7 +74,7 @@ impl McpServer {
     }
 
     /// Run the server, reading from stdin and writing to stdout
-    pub async fn run(&self) -> anyhow::Result<()> {
+    pub(crate) async fn run(&self) -> anyhow::Result<()> {
         let stdin = std::io::stdin();
         let mut stdout = std::io::stdout();
 

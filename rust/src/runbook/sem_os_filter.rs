@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 
 /// Result of filtering expanded verbs against Sem OS.
 #[derive(Debug, Clone)]
-pub struct SemOsFilterResult {
+pub(crate) struct SemOsFilterResult {
     /// Verbs that Sem OS allows.
     pub allowed: Vec<String>,
 
@@ -39,7 +39,7 @@ pub struct SemOsFilterResult {
 
 /// A verb that was denied by Sem OS.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemOsDeniedVerb {
+pub(crate) struct SemOsDeniedVerb {
     /// The verb FQN that was denied.
     pub verb: String,
 
@@ -49,7 +49,7 @@ pub struct SemOsDeniedVerb {
 
 impl SemOsFilterResult {
     /// All verbs allowed when the caller chooses to bypass filtering.
-    pub fn allow_all(verbs: &[String]) -> Self {
+    pub(crate) fn allow_all(verbs: &[String]) -> Self {
         Self {
             allowed: verbs.to_vec(),
             denied_with_reasons: vec![],
@@ -58,12 +58,12 @@ impl SemOsFilterResult {
     }
 
     /// Whether any verbs were denied.
-    pub fn has_denials(&self) -> bool {
+    pub(crate) fn has_denials(&self) -> bool {
         !self.denied_with_reasons.is_empty()
     }
 
     /// Get the first denied verb (for error reporting).
-    pub fn first_denied(&self) -> Option<&SemOsDeniedVerb> {
+    pub(crate) fn first_denied(&self) -> Option<&SemOsDeniedVerb> {
         self.denied_with_reasons.first()
     }
 }
@@ -86,7 +86,7 @@ impl SemOsFilterResult {
 /// # Returns
 ///
 /// A `SemOsFilterResult` with allowed and denied verbs.
-pub fn filter_verbs_against_allowed_set(
+pub(crate) fn filter_verbs_against_allowed_set(
     expanded_verbs: &[String],
     allowed_verbs: &HashSet<String>,
 ) -> SemOsFilterResult {

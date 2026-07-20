@@ -11,7 +11,7 @@ use super::binding_context::{BindingContext, BindingInfo};
 
 /// Represents one executed "block" of DSL
 #[derive(Clone, Debug)]
-pub struct ExecutedBlock {
+pub(crate) struct ExecutedBlock {
     /// The parsed program that was executed
     pub program: Program,
     /// Bindings created during this block's execution: symbol name → UUID
@@ -24,7 +24,7 @@ pub struct ExecutedBlock {
 
 impl ExecutedBlock {
     /// Create a new executed block
-    pub fn new(
+    pub(crate) fn new(
         program: Program,
         bindings: HashMap<String, Uuid>,
         types: HashMap<String, String>,
@@ -38,13 +38,13 @@ impl ExecutedBlock {
     }
 
     /// Create with a block ID
-    pub fn with_id(mut self, id: impl Into<String>) -> Self {
+    pub(crate) fn with_id(mut self, id: impl Into<String>) -> Self {
         self.block_id = Some(id.into());
         self
     }
 
     /// Get binding count
-    pub fn binding_count(&self) -> usize {
+    pub(crate) fn binding_count(&self) -> usize {
         self.bindings_created.len()
     }
 }
@@ -54,7 +54,7 @@ impl ExecutedBlock {
 /// Tracks all bindings from previously executed DSL blocks,
 /// allowing new DSL to reference them.
 #[derive(Clone, Debug, Default)]
-pub struct ReplSession {
+pub(crate) struct ReplSession {
     /// Stack of executed blocks (for undo)
     blocks: Vec<ExecutedBlock>,
     /// Flattened view of all current bindings: name → UUID
@@ -67,12 +67,12 @@ pub struct ReplSession {
 
 impl ReplSession {
     /// Create a new empty session
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Create a new session with an ID
-    pub fn with_id(id: Uuid) -> Self {
+    pub(crate) fn with_id(id: Uuid) -> Self {
         Self {
             session_id: Some(id),
             ..Self::default()
@@ -80,12 +80,12 @@ impl ReplSession {
     }
 
     /// Get session ID if set
-    pub fn session_id(&self) -> Option<Uuid> {
+    pub(crate) fn session_id(&self) -> Option<Uuid> {
         self.session_id
     }
 
     /// Record a successfully executed block
-    pub fn append_executed(
+    pub(crate) fn append_executed(
         &mut self,
         program: Program,
         bindings: HashMap<String, Uuid>,
@@ -107,7 +107,7 @@ impl ReplSession {
     /// Undo the last executed block
     ///
     /// Returns the undone block if any, None if stack is empty.
-    pub fn undo(&mut self) -> Option<ExecutedBlock> {
+    pub(crate) fn undo(&mut self) -> Option<ExecutedBlock> {
         if let Some(block) = self.blocks.pop() {
             // Remove bindings from flattened view
             for name in block.bindings_created.keys() {
@@ -123,7 +123,7 @@ impl ReplSession {
     /// Undo multiple blocks
     ///
     /// Returns the number of blocks actually undone.
-    pub fn undo_n(&mut self, n: usize) -> usize {
+    pub(crate) fn undo_n(&mut self, n: usize) -> usize {
         let mut count = 0;
         for _ in 0..n {
             if self.undo().is_some() {
@@ -136,37 +136,37 @@ impl ReplSession {
     }
 
     /// Check if a binding exists
-    pub fn has_binding(&self, name: &str) -> bool {
+    pub(crate) fn has_binding(&self, name: &str) -> bool {
         self.all_bindings.contains_key(name)
     }
 
     /// Get binding PK by name
-    pub fn get_binding(&self, name: &str) -> Option<Uuid> {
+    pub(crate) fn get_binding(&self, name: &str) -> Option<Uuid> {
         self.all_bindings.get(name).copied()
     }
 
     /// Get entity type for a binding
-    pub fn get_binding_type(&self, name: &str) -> Option<&str> {
+    pub(crate) fn get_binding_type(&self, name: &str) -> Option<&str> {
         self.all_types.get(name).map(|s| s.as_str())
     }
 
     /// Get all binding names
-    pub fn binding_names(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn binding_names(&self) -> impl Iterator<Item = &str> {
         self.all_bindings.keys().map(|s| s.as_str())
     }
 
     /// Get binding count
-    pub fn binding_count(&self) -> usize {
+    pub(crate) fn binding_count(&self) -> usize {
         self.all_bindings.len()
     }
 
     /// Get block count
-    pub fn block_count(&self) -> usize {
+    pub(crate) fn block_count(&self) -> usize {
         self.blocks.len()
     }
 
     /// Check if session is empty
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.blocks.is_empty()
     }
 
@@ -174,7 +174,7 @@ impl ReplSession {
     ///
     /// This context can be passed to the planner so it knows about
     /// previously executed bindings.
-    pub fn binding_context(&self) -> BindingContext {
+    pub(crate) fn binding_context(&self) -> BindingContext {
         let mut ctx = BindingContext::new();
 
         for (name, pk) in &self.all_bindings {
@@ -200,14 +200,14 @@ impl ReplSession {
     }
 
     /// Clear all session state
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.blocks.clear();
         self.all_bindings.clear();
         self.all_types.clear();
     }
 
     /// Get a summary of the session state
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         format!(
             "ReplSession: {} blocks, {} bindings",
             self.blocks.len(),
@@ -216,7 +216,7 @@ impl ReplSession {
     }
 
     /// List all bindings with their types for display
-    pub fn list_bindings(&self) -> Vec<String> {
+    pub(crate) fn list_bindings(&self) -> Vec<String> {
         let mut bindings: Vec<_> = self
             .all_bindings
             .keys()

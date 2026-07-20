@@ -61,18 +61,14 @@ pub mod verb_search;
 pub mod verb_search_factory;
 pub mod verb_search_intent_matcher;
 
-pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
-pub use macro_integration::{
-    check_macro_prereqs, get_all_verb_readiness, get_macro_schema, get_ready_verbs,
-    get_verb_readiness, init_macro_registry, is_macro, is_verb_ready, list_macros, macro_registry,
-    macros_by_mode, try_expand_macro, update_dag_after_execution, MacroAttemptResult, MacroInfo,
-    VerbReadiness, VerbReadinessInfo,
-};
-pub use resolution::{
+pub(crate) use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
+pub use macro_integration::{init_macro_registry, is_macro, macro_registry};
+pub(crate) use macro_integration::{check_macro_prereqs, get_all_verb_readiness, get_macro_schema, get_ready_verbs, get_verb_readiness, is_verb_ready, list_macros, macros_by_mode, try_expand_macro, update_dag_after_execution, MacroAttemptResult, MacroInfo, VerbReadiness, VerbReadinessInfo};
+pub(crate) use resolution::{
     ConversationContext, EnrichedMatch, ResolutionConfidence, ResolutionResult, ResolutionStrategy,
     SuggestedAction,
 };
-pub use scope_resolution::{
+pub(crate) use scope_resolution::{
     EntityMatch, ScopeCandidate, ScopeContext, ScopeResolutionOutcome, ScopeResolver,
 };
-pub use server::McpServer;
+pub(crate) use server::McpServer;

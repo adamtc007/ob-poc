@@ -11,7 +11,7 @@ use uuid::Uuid;
 use super::store::StewardshipStore;
 
 /// Result of an idempotency check.
-pub enum IdempotencyCheck {
+pub(crate) enum IdempotencyCheck {
     /// First time seeing this request — proceed with execution.
     New,
     /// Cached result from a previous execution of the same request.

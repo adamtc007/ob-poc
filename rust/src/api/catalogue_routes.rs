@@ -26,12 +26,12 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Clone)]
-pub struct CatalogueState {
+pub(crate) struct CatalogueState {
     pub pool: PgPool,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ProposalListQuery {
+pub(crate) struct ProposalListQuery {
     /// pending (DRAFT|STAGED) | committed | rolled_back | all
     #[serde(default = "default_status")]
     pub status: String,
@@ -42,7 +42,7 @@ fn default_status() -> String {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ProposalSummary {
+pub(crate) struct ProposalSummary {
     pub proposal_id: Uuid,
     pub verb_fqn: String,
     pub status: String,
@@ -53,7 +53,7 @@ pub struct ProposalSummary {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ProposalDetail {
+pub(crate) struct ProposalDetail {
     pub proposal_id: Uuid,
     pub verb_fqn: String,
     pub status: String,
@@ -70,7 +70,7 @@ pub struct ProposalDetail {
 }
 
 #[derive(Debug, Serialize)]
-pub struct TierDistribution {
+pub(crate) struct TierDistribution {
     /// Per-tier counts across the catalogue.
     pub by_tier: HashMap<String, i64>,
     /// Per-domain × per-tier (for the heatmap rendering).

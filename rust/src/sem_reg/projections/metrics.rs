@@ -15,7 +15,7 @@ use sqlx::PgPool;
 
 /// Tier distribution breakdown.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TierDistribution {
+pub(crate) struct TierDistribution {
     pub governed: i64,
     pub operational: i64,
     pub total: i64,

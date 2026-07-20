@@ -21,7 +21,7 @@ pub struct CalibrationFixtures {
 
 /// One known fixture entity.
 #[derive(Debug, Clone)]
-pub struct FixtureEntity {
+pub(crate) struct FixtureEntity {
     pub entity_id: Uuid,
     pub entity_type: String,
     pub current_state: String,

@@ -86,7 +86,8 @@ pub mod response_adapter;
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
-pub use entity_routes::{create_entity_router, create_scoped_entity_router};
+pub use entity_routes::{create_entity_router};
+pub(crate) use entity_routes::{create_scoped_entity_router};
 
 #[cfg(feature = "server")]
 pub use agent_state::{create_agent_router_with_semantic, AgentState};
@@ -101,25 +102,27 @@ pub use dsl_viewer_routes::create_dsl_viewer_router;
 pub use graph_routes::{create_graph_router, create_session_graph_router};
 
 #[cfg(feature = "server")]
-pub use session::{create_session_store, SessionStore};
+pub use session::{create_session_store};
+pub(crate) use session::{SessionStore};
 
 #[cfg(feature = "server")]
-pub use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
+pub(crate) use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
 
 #[cfg(feature = "server")]
-pub use agent_service::{AgentChatResponse, AgentCommand, AgentService, ChatRequest, ClientScope};
+pub use agent_service::{AgentCommand, AgentService, ChatRequest};
+pub(crate) use agent_service::{AgentChatResponse, ClientScope};
 
 #[cfg(feature = "server")]
 pub use trading_matrix_routes::create_trading_matrix_router;
 
 #[cfg(feature = "server")]
-pub use capital_routes::create_capital_router;
+pub(crate) use capital_routes::create_capital_router;
 
 #[cfg(feature = "server")]
 pub use constellation_routes::create_constellation_router;
 
 #[cfg(feature = "server")]
-pub use workflow_routes::{create_workflow_router, WorkflowState};
+pub(crate) use workflow_routes::{create_workflow_router, WorkflowState};
 
 #[cfg(feature = "server")]
 pub use display_nouns::{translate_json, translate_string, DisplayNounTranslator};
@@ -133,9 +136,8 @@ pub use deal_types::{
 };
 
 #[cfg(feature = "server")]
-pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
+pub use deal_routes::{create_deal_router};
+pub(crate) use deal_routes::{create_deal_router_simple, DealState};
 
-pub use repl_routes_v2::{
-    navigation_router as create_repl_navigation_router, router as create_repl_v2_router,
-    ReplV2RouteState,
-};
+pub use repl_routes_v2::{router as create_repl_v2_router};
+pub(crate) use repl_routes_v2::{navigation_router as create_repl_navigation_router, ReplV2RouteState};

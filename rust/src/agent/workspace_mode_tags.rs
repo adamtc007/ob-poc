@@ -19,7 +19,7 @@ use std::sync::OnceLock;
 
 /// A workspace's accepted mode-tag set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorkspaceModeTags {
+pub(crate) enum WorkspaceModeTags {
     /// An explicit accepted-tag list.
     Tags(&'static [&'static str]),
     /// Umbrella workspace — accepts every mode-tag.
@@ -41,7 +41,7 @@ pub enum WorkspaceModeTags {
 /// | `instrument_matrix`  | trading, structure              |
 /// | `sem_os_maintenance` | stewardship, governance         |
 /// | _unknown_            | (none) — fail-closed            |
-pub fn workspace_accepted_mode_tags(workspace: &str) -> WorkspaceModeTags {
+pub(crate) fn workspace_accepted_mode_tags(workspace: &str) -> WorkspaceModeTags {
     match workspace {
         "cbu" => WorkspaceModeTags::Tags(&["structure", "trading", "onboarding"]),
         "kyc" => WorkspaceModeTags::Tags(&["kyc", "onboarding"]),
@@ -72,7 +72,7 @@ pub fn workspace_accepts_any_mode_tag(workspace: &str, tags: &[String]) -> bool 
 /// the rank-boost primary-*domain* map in `verb_surface::compute_rank_boost`
 /// (which maps `stage_focus` → an atomic-verb domain like `"registry"`/`"focus"`,
 /// not a mode-tag workspace key).
-pub fn stage_focus_to_workspace(stage_focus: &str) -> Option<&'static str> {
+pub(crate) fn stage_focus_to_workspace(stage_focus: &str) -> Option<&'static str> {
     match stage_focus {
         "semos-onboarding" => Some("cbu"),
         "semos-kyc" => Some("kyc"),
@@ -102,7 +102,7 @@ fn macro_mode_tag_table() -> &'static [(String, Vec<String>)] {
 /// A macro is owned when its declared `mode_tags` intersect the workspace's
 /// accepted set (or the workspace is the umbrella `on_boarding`). Macros with no
 /// mode-tags are owned by no workspace (they cannot be admitted by membership).
-pub fn workspace_owned_macro_fqns(workspace: &str) -> HashSet<String> {
+pub(crate) fn workspace_owned_macro_fqns(workspace: &str) -> HashSet<String> {
     let accepts_all = matches!(
         workspace_accepted_mode_tags(workspace),
         WorkspaceModeTags::All

@@ -55,7 +55,7 @@ impl ObservatoryError {
 /// is only populated by the legacy POST /navigate endpoint. It will be removed
 /// when /navigate is fully decommissioned.
 #[derive(Debug, Clone, Default)]
-pub struct SessionNavHistory {
+pub(crate) struct SessionNavHistory {
     /// Ordered list of orientation snapshots.
     entries: Vec<OrientationContract>,
     /// Points to the "current" entry. Always `entries.len() - 1` after a new
@@ -64,14 +64,14 @@ pub struct SessionNavHistory {
 }
 
 /// Thread-safe store for all sessions' navigation histories.
-pub type NavigationHistory = Arc<RwLock<HashMap<Uuid, SessionNavHistory>>>;
+pub(crate) type NavigationHistory = Arc<RwLock<HashMap<Uuid, SessionNavHistory>>>;
 
 /// Thread-safe store for REPL V2 sessions (canonical DAG source).
-pub type ReplSessionStore = Arc<RwLock<HashMap<Uuid, ReplSessionV2>>>;
+pub(crate) type ReplSessionStore = Arc<RwLock<HashMap<Uuid, ReplSessionV2>>>;
 
 /// Route state for observatory endpoints.
 #[derive(Clone)]
-pub struct ObservatoryState {
+pub(crate) struct ObservatoryState {
     pub pool: PgPool,
     pub sessions: SessionStore,
     /// REPL V2 session store — the canonical source for hydrated constellation DAG.

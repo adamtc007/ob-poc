@@ -24,7 +24,7 @@ pub fn canonical_json_with_hash(value: &serde_json::Value) -> (String, Vec<u8>) 
 }
 
 /// Compute BLAKE3 hash of a string, returning the 32-byte digest.
-pub fn blake3_bytes(input: &str) -> Vec<u8> {
+pub(crate) fn blake3_bytes(input: &str) -> Vec<u8> {
     blake3::hash(input.as_bytes()).as_bytes().to_vec()
 }
 

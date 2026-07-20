@@ -147,7 +147,7 @@ pub struct DecisionLog {
 /// What kind of interaction this turn represented.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum TurnType {
+pub(crate) enum TurnType {
     /// Normal user message → verb match → DSL.
     IntentMatch,
     /// User selected from disambiguation options.
@@ -170,7 +170,7 @@ pub enum TurnType {
 
 /// Full record of verb matching for this turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbDecision {
+pub(crate) struct VerbDecision {
     /// Raw candidates from semantic search (before pack scoring).
     pub raw_candidates: Vec<VerbCandidateSnapshot>,
 
@@ -209,7 +209,7 @@ pub struct VerbDecision {
 
 /// Log entry for precondition filtering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PreconditionFilterLog {
+pub(crate) struct PreconditionFilterLog {
     /// Candidates before filtering.
     pub before_count: usize,
     /// Candidates after filtering.
@@ -220,7 +220,7 @@ pub struct PreconditionFilterLog {
 
 /// A verb removed by precondition filter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PreconditionRemovedVerb {
+pub(crate) struct PreconditionRemovedVerb {
     pub verb_fqn: String,
     pub reasons: Vec<String>,
     pub suggested_verb: Option<String>,
@@ -259,7 +259,7 @@ impl Default for VerbDecision {
 
 /// Record of entity resolution for a single arg slot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityDecision {
+pub(crate) struct EntityDecision {
     /// Arg name that needed entity resolution (e.g. "entity-id").
     pub arg_name: String,
 
@@ -282,7 +282,7 @@ pub struct EntityDecision {
 /// How an entity was resolved.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum EntityResolutionMethod {
+pub(crate) enum EntityResolutionMethod {
     /// Resolved via pronoun/focus (zero cost).
     Focus,
     /// Resolved via accumulated Q&A answers.
@@ -299,7 +299,7 @@ pub enum EntityResolutionMethod {
 
 /// Snapshot of an entity candidate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityCandidateSnapshot {
+pub(crate) struct EntityCandidateSnapshot {
     pub entity_id: Uuid,
     pub display_name: String,
     pub entity_type: Option<String>,
@@ -312,7 +312,7 @@ pub struct EntityCandidateSnapshot {
 
 /// Record of how arguments were extracted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractionDecision {
+pub(crate) struct ExtractionDecision {
     /// Method used for extraction.
     pub method: ExtractionMethod,
 
@@ -335,7 +335,7 @@ pub struct ExtractionDecision {
 /// How args were extracted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ExtractionMethod {
+pub(crate) enum ExtractionMethod {
     /// All args filled deterministically (no LLM).
     Deterministic,
     /// LLM was used for arg extraction.
@@ -370,7 +370,7 @@ impl Default for ExtractionDecision {
 /// Captures enough to understand the decision without the full
 /// ContextStack (which contains large collections).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContextSummary {
+pub(crate) struct ContextSummary {
     /// Client group name (if in scope).
     pub client_group: Option<String>,
 
@@ -491,7 +491,7 @@ impl DecisionLog {
 }
 
 impl ContextSummary {
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self {
             client_group: None,
             cbu_count: 0,
@@ -512,7 +512,7 @@ impl ContextSummary {
     }
 
     /// Build from a ContextStack.
-    pub fn from_context(ctx: &super::context_stack::ContextStack) -> Self {
+    pub(crate) fn from_context(ctx: &super::context_stack::ContextStack) -> Self {
         let (active_pack_id, active_pack_domain, pack_allowed, pack_forbidden) =
             if let Some(pack) = ctx.active_pack() {
                 (
@@ -650,7 +650,7 @@ pub enum GoldenMatchMode {
 
 /// Expected entity resolution for a golden test case.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoldenEntityExpectation {
+pub(crate) struct GoldenEntityExpectation {
     pub arg_name: String,
     pub expected_method: EntityResolutionMethod,
     pub expected_value: Option<String>,

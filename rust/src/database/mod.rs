@@ -55,38 +55,37 @@ pub mod visualization_repository;
 // pub mod taxonomy_repository;
 
 // Re-export for convenience
-pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
-pub use bods_service::BodsService;
-pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
-pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
-pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
-pub use document_service::{
+pub(crate) use attribute_values_service::{AttributeValueRow, AttributeValuesService};
+pub(crate) use bods_service::BodsService;
+pub use cbu_entity_roles_service::{RoleRow};
+pub(crate) use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService};
+pub use cbu_service::{CbuRow, CbuService};
+pub(crate) use cbu_service::{NewCbuFields};
+pub(crate) use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
+pub(crate) use document_service::{
     DocumentCatalogEntry, DocumentService, DocumentType, NewDocumentFields,
 };
-pub use dsl_repository::{DslRepository, DslSaveResult};
-pub use entity_service::{
-    CbuEntityRoleRow, EntityRow, EntityService, LimitedCompanyRow, NewEntityFields,
-    NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields,
-    PartnershipRow, TrustRow,
-};
+pub(crate) use dsl_repository::{DslRepository, DslSaveResult};
+pub use entity_service::{EntityRow, EntityService};
+pub(crate) use entity_service::{CbuEntityRoleRow, LimitedCompanyRow, NewEntityFields, NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields, PartnershipRow, TrustRow};
 pub use ob_poc_bods::{
     BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
     GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,
     PersonPepStatus, UboInterest,
 };
 
-pub use generation_log_repository::{
+pub(crate) use generation_log_repository::{
     CompileResult, CorrectionPair, GenerationAttempt, GenerationLogRepository, GenerationLogRow,
     GenerationStatsSummary, LintResult, ParseResult, PromptStats, TrainingPair,
 };
-pub use product_service::{ProductRow, ProductService};
-pub use resource_instance_service::{
+pub(crate) use product_service::{ProductRow, ProductService};
+pub(crate) use resource_instance_service::{
     NewResourceInstance, ResourceInstanceAttributeRow, ResourceInstanceRow,
     ResourceInstanceService, ServiceDeliveryRow, SetInstanceAttribute,
 };
-pub use service_resource_service::{ServiceResourceRow, ServiceResourceService};
-pub use service_service::{ServiceRow, ServiceService};
-pub use visualization_repository::{
+pub(crate) use service_resource_service::{ServiceResourceRow, ServiceResourceService};
+pub(crate) use service_service::{ServiceRow, ServiceService};
+pub(crate) use visualization_repository::{
     CbuBasicView, CbuDocumentView, CbuEntityView, CbuRoleView, CbuScreeningView, CbuSummaryView,
     CbuView, ControlRelationshipView, DocumentAttributeView, DocumentTypeView, EntityAttributeView,
     EntityBasicView, EntityCbuView, EntityRoleView, EntityScreeningView, EntityTypeView,
@@ -94,55 +93,54 @@ pub use visualization_repository::{
     ServiceDeliveryView, ShareClassView, VisualizationRepository,
 };
 
-pub use session_repository::{
+pub(crate) use session_repository::{
     detect_domain, extract_domains, CbuDslState, DslSnapshot, EntityCreated, PersistedSession,
     SessionEventType, SessionRepository, SessionStatus,
 };
 
-pub use graph_repository::{DerivedBook, GraphRepository, PgGraphRepository};
+pub(crate) use graph_repository::{DerivedBook, GraphRepository, PgGraphRepository};
 
-pub use locks::{
-    acquire_locks, advisory_xact_lock, lock_key, lock_key_from_struct, try_advisory_xact_lock,
-    LockAcquisitionResult, LockError,
-};
+pub use locks::{acquire_locks, advisory_xact_lock, lock_key, try_advisory_xact_lock};
+pub(crate) use locks::{lock_key_from_struct, LockAcquisitionResult, LockError};
 
-pub use policy_version_binding_service::{
+pub(crate) use policy_version_binding_service::{
     NewPolicyVersionBinding, PolicyVersionBindingRow, PolicyVersionBindingService,
 };
 
-pub use execution_audit::{
+pub(crate) use execution_audit::{
     ExecutionAuditRepository, ExecutionByVerbHash, ExecutionVerbAudit, VerbConfigAtExecution,
 };
 
-pub use expansion_audit::{ExpansionAuditRepository, ExpansionReportRow};
+pub(crate) use expansion_audit::{ExpansionAuditRepository, ExpansionReportRow};
 
-pub use context_discovery_service::{
+pub(crate) use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,
 };
 
-pub use view_state_audit::{
+pub(crate) use view_state_audit::{
     RecordViewStateChange, SessionViewHistoryEntry, ViewStateAuditRepository, ViewStateChange,
 };
 
-pub use verb_service::{SemanticMatch, UserLearnedExactMatch, VerbDescription, VerbService};
+pub use verb_service::{VerbService};
+pub(crate) use verb_service::{SemanticMatch, UserLearnedExactMatch, VerbDescription};
 
 pub use view_config_service::{
     EdgeTypeConfig, LayoutCacheEntry, LayoutConfigEntry, NodeLayoutOverride, NodeTypeConfig,
     ViewConfigService, ViewModeConfig,
 };
 
-pub use viewport_service::{
+pub(crate) use viewport_service::{
     CbuCategoryCounts, CbuEntityMember, CbuViewportContainer, ConfidenceZone, EntityRelationship,
     EntityViewportDetail, InstrumentMatrixSummary, InstrumentTypeNode, ViewportService,
 };
 
 pub use semantic_state_service::derive_semantic_state;
 
-pub use deal_repository::DealRepository;
+pub(crate) use deal_repository::DealRepository;
 
 /// Database configuration
 #[derive(Debug, Clone)]
-pub struct DatabaseConfig {
+pub(crate) struct DatabaseConfig {
     pub database_url: String,
     pub max_connections: u32,
     pub connection_timeout: Duration,

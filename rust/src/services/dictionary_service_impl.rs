@@ -9,12 +9,12 @@ use ob_poc_authoring::data_dictionary::{
 };
 use sqlx::PgPool;
 
-pub struct DictionaryServiceImpl {
+pub(crate) struct DictionaryServiceImpl {
     pool: PgPool,
 }
 
 impl DictionaryServiceImpl {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -28,7 +28,7 @@ impl DictionaryServiceImpl {
             .map_err(|e| e.to_string())
     }
 
-    pub async fn validate_attribute_value_ref(
+    pub(crate) async fn validate_attribute_value_ref(
         &self,
         attribute_ref: &str,
         value: &serde_json::Value,

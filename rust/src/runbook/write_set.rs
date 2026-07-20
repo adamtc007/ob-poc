@@ -30,7 +30,7 @@ use crate::repl::verb_config_index::VerbConfigIndex;
 /// argument values (e.g., `:entity-id <uuid>`, `:cbu-id <uuid>`).
 ///
 /// Returns a `BTreeSet` for deterministic ordering (INV-2).
-pub fn derive_write_set_heuristic(args: &BTreeMap<String, String>) -> BTreeSet<Uuid> {
+pub(crate) fn derive_write_set_heuristic(args: &BTreeMap<String, String>) -> BTreeSet<Uuid> {
     args.values()
         .filter_map(|v| {
             let trimmed = v.trim().trim_matches(|c| c == '<' || c == '>');
@@ -53,7 +53,7 @@ pub fn derive_write_set_heuristic(args: &BTreeMap<String, String>) -> BTreeSet<U
 ///
 /// Returns `BTreeSet<Uuid>` for deterministic ordering (INV-2).
 #[cfg(feature = "write-set-contract")]
-pub fn derive_write_set_from_contract(
+pub(crate) fn derive_write_set_from_contract(
     verb_fqn: &str,
     args: &BTreeMap<String, String>,
     verb_config_index: &VerbConfigIndex,
@@ -119,7 +119,7 @@ pub fn derive_write_set_from_contract(
 ///
 /// Returns `BTreeSet<Uuid>` for deterministic ordering (INV-2).
 #[cfg(feature = "write-set-contract")]
-pub fn derive_write_set(
+pub(crate) fn derive_write_set(
     verb_fqn: &str,
     args: &BTreeMap<String, String>,
     verb_config_index: Option<&VerbConfigIndex>,
@@ -136,7 +136,7 @@ pub fn derive_write_set(
 
 /// Heuristic-only write_set derivation (when `write-set-contract` is disabled).
 #[cfg(not(feature = "write-set-contract"))]
-pub fn derive_write_set(
+pub(crate) fn derive_write_set(
     _verb_fqn: &str,
     args: &BTreeMap<String, String>,
     _verb_config_index: Option<&()>,

@@ -6,7 +6,7 @@ use super::protocol::Tool;
 use serde_json::json;
 
 /// Get all available MCP tools
-pub fn get_tools() -> Vec<Tool> {
+pub(crate) fn get_tools() -> Vec<Tool> {
     let mut tools = vec![
         Tool {
             name: "dsl_validate".into(),

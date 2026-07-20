@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 /// Constellation runtime error type.
 #[derive(Debug, Error)]
-pub enum ConstellationError {
+pub(crate) enum ConstellationError {
     #[error("parse error: {0}")]
     Parse(String),
     #[error("validation error: {0}")]
@@ -35,11 +35,11 @@ pub enum ConstellationError {
 }
 
 /// Standard result type for constellation runtime operations.
-pub type ConstellationResult<T> = Result<T, ConstellationError>;
+pub(crate) type ConstellationResult<T> = Result<T, ConstellationError>;
 
 /// Raw constellation map definition loaded from YAML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ConstellationMapDef {
+pub(crate) struct ConstellationMapDef {
     pub constellation: String,
     pub description: Option<String>,
     pub jurisdiction: String,
@@ -48,7 +48,7 @@ pub struct ConstellationMapDef {
 
 /// Raw slot definition loaded from YAML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SlotDef {
+pub(crate) struct SlotDef {
     #[serde(rename = "type")]
     pub slot_type: SlotType,
     #[serde(default)]
@@ -102,7 +102,7 @@ where
 /// Supported slot classes.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SlotType {
+pub(crate) enum SlotType {
     Cbu,
     Entity,
     EntityGraph,
@@ -114,7 +114,7 @@ pub enum SlotType {
 /// Supported cardinality semantics.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum Cardinality {
+pub(crate) enum Cardinality {
     Root,
     Mandatory,
     Optional,
@@ -123,7 +123,7 @@ pub enum Cardinality {
 
 /// Join definition for non-root slots.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub struct JoinDef {
+pub(crate) struct JoinDef {
     pub via: String,
     pub parent_fk: String,
     pub child_fk: String,
@@ -134,7 +134,7 @@ pub struct JoinDef {
 /// Dependency declaration for a slot.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum DependencyEntry {
+pub(crate) enum DependencyEntry {
     Simple(String),
     Explicit { slot: String, min_state: String },
 }
@@ -149,7 +149,7 @@ impl DependencyEntry {
     /// let dep = DependencyEntry::Simple(String::from("cbu"));
     /// assert_eq!(dep.slot_name(), "cbu");
     /// ```
-    pub fn slot_name(&self) -> &str {
+    pub(crate) fn slot_name(&self) -> &str {
         match self {
             Self::Simple(slot) => slot,
             Self::Explicit { slot, .. } => slot,
@@ -165,7 +165,7 @@ impl DependencyEntry {
     /// let dep = DependencyEntry::Simple(String::from("cbu"));
     /// assert_eq!(dep.min_state(), "filled");
     /// ```
-    pub fn min_state(&self) -> &str {
+    pub(crate) fn min_state(&self) -> &str {
         match self {
             Self::Simple(_) => "filled",
             Self::Explicit { min_state, .. } => min_state,
@@ -176,7 +176,7 @@ impl DependencyEntry {
 /// Verb palette entry in simple or gated form.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum VerbPaletteEntry {
+pub(crate) enum VerbPaletteEntry {
     Simple(String),
     Gated {
         verb: String,
@@ -194,37 +194,19 @@ impl VerbPaletteEntry {
     /// let entry = VerbPaletteEntry::Simple(String::from("cbu.read"));
     /// assert_eq!(entry.verb_fqn(), "cbu.read");
     /// ```
-    pub fn verb_fqn(&self) -> &str {
+    pub(crate) fn verb_fqn(&self) -> &str {
         match self {
             Self::Simple(verb) => verb,
             Self::Gated { verb, .. } => verb,
         }
     }
 
-    /// Return the reducer states in which the verb is available.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::sem_os_runtime::constellation_runtime::{VerbAvailability, VerbPaletteEntry};
-    ///
-    /// let entry = VerbPaletteEntry::Gated {
-    ///     verb: String::from("entity.read"),
-    ///     when: VerbAvailability::Many(vec![String::from("filled")]),
-    /// };
-    /// assert_eq!(entry.available_in(), vec![String::from("filled")]);
-    /// ```
-    pub fn available_in(&self) -> Vec<String> {
-        match self {
-            Self::Simple(_) => Vec::new(),
-            Self::Gated { when, .. } => when.to_vec(),
-        }
-    }
 }
 
 /// Availability expression for gated verbs.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum VerbAvailability {
+pub(crate) enum VerbAvailability {
     One(String),
     Many(Vec<String>),
 }
@@ -240,7 +222,7 @@ impl VerbAvailability {
 
 /// High-level summary for a hydrated constellation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstellationSummary {
+pub(crate) struct ConstellationSummary {
     pub total_slots: usize,
     pub slots_filled: usize,
     pub slots_empty_mandatory: usize,
@@ -257,7 +239,7 @@ pub struct ConstellationSummary {
 
 /// Ownership chain summary extracted from hydrated graph slots.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OwnershipSummary {
+pub(crate) struct OwnershipSummary {
     pub total_entities: usize,
     pub total_edges: usize,
     pub chain_complete: bool,
@@ -265,7 +247,7 @@ pub struct OwnershipSummary {
 
 /// Flattened slot with path and parent metadata.
 #[derive(Debug, Clone)]
-pub struct ResolvedSlot {
+pub(crate) struct ResolvedSlot {
     pub name: String,
     pub path: String,
     pub def: SlotDef,
@@ -275,7 +257,7 @@ pub struct ResolvedSlot {
 
 /// Runtime state-machine metadata retained on validated constellation maps.
 #[derive(Debug, Clone)]
-pub struct RuntimeStateMachine {
+pub(crate) struct RuntimeStateMachine {
     pub name: String,
     pub states: Vec<String>,
     pub initial: String,
@@ -286,7 +268,7 @@ pub struct RuntimeStateMachine {
 
 /// Runtime transition metadata needed for Sem OS grounding and diagnostics.
 #[derive(Debug, Clone)]
-pub struct RuntimeStateTransition {
+pub(crate) struct RuntimeStateTransition {
     pub from: String,
     pub to: String,
     pub verbs: Vec<String>,
@@ -294,7 +276,7 @@ pub struct RuntimeStateTransition {
 
 /// Runtime overlay-source metadata needed for validation and reducer wiring.
 #[derive(Debug, Clone)]
-pub struct RuntimeOverlaySource {
+pub(crate) struct RuntimeOverlaySource {
     pub table: String,
     pub join: String,
     pub provides: Vec<String>,
@@ -303,20 +285,20 @@ pub struct RuntimeOverlaySource {
 
 /// Runtime block reason surfaced from grounded or reducer-backed legality.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuntimeBlockReason {
+pub(crate) struct RuntimeBlockReason {
     pub message: String,
 }
 
 /// Runtime blocked-verb payload stored on hydrated slots.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuntimeBlockedVerb {
+pub(crate) struct RuntimeBlockedVerb {
     pub verb: String,
     pub reasons: Vec<RuntimeBlockReason>,
 }
 
 /// Runtime reducer result retained in raw hydration traces.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RuntimeSlotReduceResult {
+pub(crate) struct RuntimeSlotReduceResult {
     pub slot_path: String,
     pub computed_state: String,
     pub effective_state: String,
@@ -328,7 +310,7 @@ pub struct RuntimeSlotReduceResult {
 
 /// Validated constellation map with flattened slot index.
 #[derive(Debug, Clone)]
-pub struct ValidatedConstellationMap {
+pub(crate) struct ValidatedConstellationMap {
     pub constellation: String,
     pub description: Option<String>,
     pub jurisdiction: String,
@@ -340,7 +322,7 @@ pub struct ValidatedConstellationMap {
 
 /// Raw hydration bundle collected before normalization.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RawHydrationData {
+pub(crate) struct RawHydrationData {
     pub root: Option<Uuid>,
     pub slot_rows: HashMap<String, Vec<RawSlotRow>>,
     pub overlay_rows: HashMap<String, Vec<RawOverlayRow>>,
@@ -353,7 +335,7 @@ pub struct RawHydrationData {
 
 /// Raw slot row before singular/graph normalization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawSlotRow {
+pub(crate) struct RawSlotRow {
     pub entity_id: Option<Uuid>,
     pub record_id: Option<Uuid>,
     pub filter_value: Option<String>,
@@ -362,7 +344,7 @@ pub struct RawSlotRow {
 
 /// Raw overlay row before reducer binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawOverlayRow {
+pub(crate) struct RawOverlayRow {
     pub entity_id: Option<Uuid>,
     pub source_name: String,
     pub fields: serde_json::Value,
@@ -370,7 +352,7 @@ pub struct RawOverlayRow {
 
 /// Raw graph edge for recursive slots.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawGraphEdge {
+pub(crate) struct RawGraphEdge {
     pub from_entity_id: Uuid,
     pub to_entity_id: Uuid,
     pub percentage: Option<f64>,
@@ -380,7 +362,7 @@ pub struct RawGraphEdge {
 
 /// Reducer-relevant slot context discovered from a constellation map.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstellationSlotContext {
+pub(crate) struct ConstellationSlotContext {
     pub slot_path: String,
     pub entity_id: Uuid,
     pub slot_type: String,
@@ -389,7 +371,7 @@ pub struct ConstellationSlotContext {
 
 /// Hydrated constellation payload returned by the runtime.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HydratedConstellation {
+pub(crate) struct HydratedConstellation {
     pub constellation: String,
     pub description: Option<String>,
     pub jurisdiction: String,
@@ -401,7 +383,7 @@ pub struct HydratedConstellation {
 
 /// Hydrated ownership graph node used by entity-graph slots.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HydratedGraphNode {
+pub(crate) struct HydratedGraphNode {
     pub entity_id: Uuid,
     pub name: Option<String>,
     pub entity_type: Option<String>,
@@ -409,7 +391,7 @@ pub struct HydratedGraphNode {
 
 /// Hydrated ownership graph edge used by entity-graph slots.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HydratedGraphEdge {
+pub(crate) struct HydratedGraphEdge {
     pub from_entity_id: Uuid,
     pub to_entity_id: Uuid,
     pub percentage: Option<f64>,
@@ -420,7 +402,7 @@ pub struct HydratedGraphEdge {
 /// Hydrated slot-type classification exposed by the public runtime.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum HydratedSlotType {
+pub(crate) enum HydratedSlotType {
     Cbu,
     Entity,
     EntityGraph,
@@ -432,7 +414,7 @@ pub enum HydratedSlotType {
 /// Hydrated cardinality classification exposed by the public runtime.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum HydratedCardinality {
+pub(crate) enum HydratedCardinality {
     Root,
     Mandatory,
     Optional,
@@ -441,7 +423,7 @@ pub enum HydratedCardinality {
 
 /// Hydrated slot in normalized tree form.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HydratedSlot {
+pub(crate) struct HydratedSlot {
     pub name: String,
     pub path: String,
     pub slot_type: HydratedSlotType,
@@ -465,20 +447,20 @@ pub struct HydratedSlot {
 
 /// Batch hydration plan grouped by slot depth.
 #[derive(Debug, Clone)]
-pub struct HydrationQueryPlan {
+pub(crate) struct HydrationQueryPlan {
     pub levels: Vec<QueryLevel>,
 }
 
 /// Queries to execute for a specific depth.
 #[derive(Debug, Clone)]
-pub struct QueryLevel {
+pub(crate) struct QueryLevel {
     pub depth: usize,
     pub queries: Vec<SlotQuery>,
 }
 
 /// Single compiled query for a slot.
 #[derive(Debug, Clone)]
-pub struct SlotQuery {
+pub(crate) struct SlotQuery {
     pub slot_name: String,
     pub query_type: QueryType,
     pub sql: String,
@@ -486,7 +468,7 @@ pub struct SlotQuery {
 
 /// Query shape used to hydrate a slot.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum QueryType {
+pub(crate) enum QueryType {
     FetchOne,
     JoinLookup,
     BatchFetch,
@@ -529,7 +511,7 @@ pub fn load_constellation_map(yaml: &str) -> ConstellationResult<ValidatedConste
 ///
 /// assert_eq!(compute_map_revision("demo").len(), 16);
 /// ```
-pub fn compute_map_revision(yaml: &str) -> String {
+pub(crate) fn compute_map_revision(yaml: &str) -> String {
     let hash = Sha256::digest(yaml.as_bytes());
     hex::encode(&hash[..8])
 }
@@ -543,7 +525,7 @@ pub fn compute_map_revision(yaml: &str) -> String {
 /// let map = load_builtin_constellation_map("struct.lux.ucits.sicav").unwrap();
 /// assert_eq!(map.constellation, "struct.lux.ucits.sicav");
 /// ```
-pub fn load_builtin_constellation_map(
+pub(crate) fn load_builtin_constellation_map(
     name: &str,
 ) -> ConstellationResult<ValidatedConstellationMap> {
     if !name
@@ -586,7 +568,7 @@ pub fn load_builtin_constellation_map(
 /// let validated = validate_constellation_map(&definition).unwrap();
 /// assert_eq!(validated.constellation, "demo");
 /// ```
-pub fn validate_constellation_map(
+pub(crate) fn validate_constellation_map(
     definition: &ConstellationMapDef,
 ) -> ConstellationResult<ValidatedConstellationMap> {
     let mut flattened = Vec::new();
@@ -656,7 +638,7 @@ pub fn validate_constellation_map(
 /// let plan = compile_query_plan(&map);
 /// assert!(!plan.levels.is_empty());
 /// ```
-pub fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQueryPlan {
+pub(crate) fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQueryPlan {
     let mut levels = BTreeMap::<usize, Vec<SlotQuery>>::new();
     let role_batch = compile_role_batch_query(map);
 
@@ -699,7 +681,7 @@ pub fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQueryPlan
 /// let normalized = normalize_slots(&map, Uuid::nil(), None, RawHydrationData::default());
 /// assert_eq!(normalized.constellation, "struct.lux.ucits.sicav");
 /// ```
-pub fn normalize_slots(
+pub(crate) fn normalize_slots(
     map: &ValidatedConstellationMap,
     cbu_id: Uuid,
     case_id: Option<Uuid>,
@@ -720,7 +702,7 @@ pub fn normalize_slots(
 /// let summary = compute_summary(&hydrated);
 /// assert!(summary.total_slots >= 1);
 /// ```
-pub fn compute_summary(hydrated: &HydratedConstellation) -> ConstellationSummary {
+pub(crate) fn compute_summary(hydrated: &HydratedConstellation) -> ConstellationSummary {
     let slots = flatten_slots(&hydrated.slots);
     let total_slots = slots.len();
     let slots_filled = slots
@@ -797,7 +779,7 @@ pub fn compute_summary(hydrated: &HydratedConstellation) -> ConstellationSummary
 /// let surfaced = compute_action_surface(&map, hydrated);
 /// assert_eq!(surfaced.constellation, "struct.lux.ucits.sicav");
 /// ```
-pub fn compute_action_surface(
+pub(crate) fn compute_action_surface(
     map: &ValidatedConstellationMap,
     mut hydrated: HydratedConstellation,
 ) -> HydratedConstellation {

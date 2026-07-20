@@ -28,7 +28,7 @@ use super::unified::{
 /// The search scope is used to narrow entity queries based on the
 /// constraint cascade. Each level in the cascade further constrains
 /// the search space.
-pub fn derive_search_scope(session: &UnifiedSession) -> SearchScope {
+pub(crate) fn derive_search_scope(session: &UnifiedSession) -> SearchScope {
     SearchScope {
         client_id: session.client.as_ref().map(|c| c.client_id),
         structure_type: session.structure_type,
@@ -38,14 +38,14 @@ pub fn derive_search_scope(session: &UnifiedSession) -> SearchScope {
 
 /// Extended search scope with case context
 #[derive(Debug, Clone, Default)]
-pub struct ExtendedSearchScope {
+pub(crate) struct ExtendedSearchScope {
     pub base: SearchScope,
     pub case_id: Option<Uuid>,
     pub persona: Persona,
 }
 
 /// Derive extended search scope including case and persona
-pub fn derive_extended_scope(session: &UnifiedSession) -> ExtendedSearchScope {
+pub(crate) fn derive_extended_scope(session: &UnifiedSession) -> ExtendedSearchScope {
     ExtendedSearchScope {
         base: derive_search_scope(session),
         case_id: session.current_case.as_ref().map(|c| c.case_id),
@@ -59,7 +59,7 @@ pub fn derive_extended_scope(session: &UnifiedSession) -> ExtendedSearchScope {
 
 /// Errors that can occur when modifying the constraint cascade
 #[derive(Debug, Clone, thiserror::Error)]
-pub enum CascadeError {
+pub(crate) enum CascadeError {
     #[error("Cannot select structure type without selecting a client first")]
     NoClientForStructureType,
 
@@ -83,7 +83,7 @@ pub enum CascadeError {
 }
 
 /// Validate that setting a client is valid (always valid)
-pub fn validate_set_client(
+pub(crate) fn validate_set_client(
     _session: &UnifiedSession,
     _client: &ClientRef,
 ) -> Result<(), CascadeError> {
@@ -92,7 +92,7 @@ pub fn validate_set_client(
 }
 
 /// Validate that setting structure type is valid
-pub fn validate_set_structure_type(
+pub(crate) fn validate_set_structure_type(
     session: &UnifiedSession,
     _structure_type: StructureType,
 ) -> Result<(), CascadeError> {
@@ -103,7 +103,7 @@ pub fn validate_set_structure_type(
 }
 
 /// Validate that selecting a structure is valid
-pub fn validate_set_structure(
+pub(crate) fn validate_set_structure(
     session: &UnifiedSession,
     structure: &StructureRef,
 ) -> Result<(), CascadeError> {
@@ -126,7 +126,7 @@ pub fn validate_set_structure(
 }
 
 /// Validate that selecting a case is valid
-pub fn validate_set_case(session: &UnifiedSession, _case: &CaseRef) -> Result<(), CascadeError> {
+pub(crate) fn validate_set_case(session: &UnifiedSession, _case: &CaseRef) -> Result<(), CascadeError> {
     // Must have a structure selected
     if session.current_structure.is_none() {
         return Err(CascadeError::NoStructureForCase);
@@ -141,7 +141,7 @@ pub fn validate_set_case(session: &UnifiedSession, _case: &CaseRef) -> Result<()
 
 /// Result of a cascade update, indicating what was cleared
 #[derive(Debug, Clone, Default)]
-pub struct CascadeUpdateResult {
+pub(crate) struct CascadeUpdateResult {
     pub client_cleared: bool,
     pub structure_type_cleared: bool,
     pub structure_cleared: bool,
@@ -149,7 +149,7 @@ pub struct CascadeUpdateResult {
 }
 
 /// Set client and clear downstream selections
-pub fn set_client(session: &mut UnifiedSession, client: Option<ClientRef>) -> CascadeUpdateResult {
+pub(crate) fn set_client(session: &mut UnifiedSession, client: Option<ClientRef>) -> CascadeUpdateResult {
     let mut result = CascadeUpdateResult::default();
 
     let client_changed = match (&session.client, &client) {
@@ -181,7 +181,7 @@ pub fn set_client(session: &mut UnifiedSession, client: Option<ClientRef>) -> Ca
 }
 
 /// Set structure type and clear downstream selections
-pub fn set_structure_type(
+pub(crate) fn set_structure_type(
     session: &mut UnifiedSession,
     structure_type: Option<StructureType>,
 ) -> Result<CascadeUpdateResult, CascadeError> {
@@ -214,7 +214,7 @@ pub fn set_structure_type(
 }
 
 /// Set current structure and clear downstream case
-pub fn set_structure(
+pub(crate) fn set_structure(
     session: &mut UnifiedSession,
     structure: Option<StructureRef>,
 ) -> Result<CascadeUpdateResult, CascadeError> {
@@ -249,7 +249,7 @@ pub fn set_structure(
 }
 
 /// Set current case
-pub fn set_case(
+pub(crate) fn set_case(
     session: &mut UnifiedSession,
     case: Option<CaseRef>,
 ) -> Result<CascadeUpdateResult, CascadeError> {
@@ -270,7 +270,7 @@ pub fn set_case(
 // =============================================================================
 
 /// Update DAG state when cascade changes
-pub fn update_dag_from_cascade(session: &mut UnifiedSession) {
+pub(crate) fn update_dag_from_cascade(session: &mut UnifiedSession) {
     // Set state flags based on current selections
     session
         .dag_state
@@ -296,7 +296,7 @@ pub fn update_dag_from_cascade(session: &mut UnifiedSession) {
 /// Filter verbs based on persona
 ///
 /// Returns true if the verb is available for the given persona
-pub fn verb_available_for_persona(verb_fqn: &str, persona: Persona) -> bool {
+pub(crate) fn verb_available_for_persona(verb_fqn: &str, persona: Persona) -> bool {
     // Domain-based filtering
     let domain = verb_fqn.split('.').next().unwrap_or("");
 

@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 /// that produced it. Used as the payload of `OrchestratorResponse::CompilationError`.
 #[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
 #[error("{kind}")]
-pub struct CompilationError {
+pub(crate) struct CompilationError {
     /// Which phase of the §6.2 pipeline failed.
     ///
     /// Serialized as `"error_kind"` to avoid clash with `OrchestratorResponse`'s
@@ -46,7 +46,7 @@ pub struct CompilationError {
 
 impl CompilationError {
     /// Convenience constructor.
-    pub fn new(kind: CompilationErrorKind, source_phase: &str) -> Self {
+    pub(crate) fn new(kind: CompilationErrorKind, source_phase: &str) -> Self {
         Self {
             kind,
             source_phase: source_phase.to_string(),
@@ -63,7 +63,7 @@ impl CompilationError {
 /// INV-7: exactly 8 variants, all constructible, all `thiserror`-derived.
 #[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
 #[serde(tag = "error_kind", rename_all = "snake_case")]
-pub enum CompilationErrorKind {
+pub(crate) enum CompilationErrorKind {
     /// Macro expansion failed (general — missing required, template error, etc.).
     #[error("Expansion failed: {reason}")]
     ExpansionFailed { reason: String },

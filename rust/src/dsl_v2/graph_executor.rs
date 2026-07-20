@@ -24,21 +24,21 @@ use crate::graph::query_engine::GraphQueryEngine;
 
 /// Executor for graph.* DSL verbs
 #[cfg(feature = "database")]
-pub struct GraphQueryExecutor {
+pub(crate) struct GraphQueryExecutor {
     engine: GraphQueryEngine,
 }
 
 #[cfg(feature = "database")]
 impl GraphQueryExecutor {
     /// Create a new GraphQueryExecutor
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self {
             engine: GraphQueryEngine::new(pool),
         }
     }
 
     /// Execute a graph query verb
-    pub async fn execute(
+    pub(crate) async fn execute(
         &self,
         verb: &RuntimeVerb,
         config: &RuntimeGraphQueryConfig,
@@ -411,7 +411,7 @@ impl GraphQueryExecutor {
 
 /// Result of a graph query execution
 #[derive(Debug, Clone)]
-pub enum GraphQueryResult {
+pub(crate) enum GraphQueryResult {
     /// Standard graph result
     Graph(Box<GraphViewModel>),
     /// Comparison result
@@ -420,7 +420,7 @@ pub enum GraphQueryResult {
 
 impl GraphQueryResult {
     /// Convert to JSON value for DSL result
-    pub fn to_json(&self) -> serde_json::Value {
+    pub(crate) fn to_json(&self) -> serde_json::Value {
         match self {
             GraphQueryResult::Graph(model) => {
                 serde_json::to_value(model).unwrap_or(serde_json::Value::Null)
@@ -431,13 +431,6 @@ impl GraphQueryResult {
         }
     }
 
-    /// Get as GraphViewModel if this is a Graph result
-    pub fn as_graph(&self) -> Option<&GraphViewModel> {
-        match self {
-            GraphQueryResult::Graph(model) => Some(model),
-            _ => None,
-        }
-    }
 }
 
 #[cfg(test)]

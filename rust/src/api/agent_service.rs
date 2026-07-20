@@ -134,7 +134,7 @@ use uuid::Uuid;
 
 /// Lookup info extracted from LLM intent
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EntityLookup {
+pub(crate) struct EntityLookup {
     pub search_text: String,
     #[serde(default)]
     pub entity_type: Option<String>,
@@ -160,7 +160,7 @@ pub use ob_poc_types::ChatRequest;
 
 /// Extended chat response that includes disambiguation status
 #[derive(Debug, Serialize)]
-pub struct AgentChatResponse {
+pub(crate) struct AgentChatResponse {
     /// Agent's response message
     pub message: String,
     /// Current session state
@@ -228,7 +228,7 @@ pub use ob_poc_types::AgentCommand;
 
 /// Configuration for the agent service
 #[derive(Debug, Clone)]
-pub struct AgentServiceConfig {
+pub(crate) struct AgentServiceConfig {
     /// Maximum retries for DSL generation with validation
     pub max_retries: usize,
     /// EntityGateway address
@@ -256,7 +256,7 @@ impl Default for AgentServiceConfig {
 
 /// Client scope - restricts what a client can see and do
 #[derive(Debug, Clone)]
-pub struct ClientScope {
+pub(crate) struct ClientScope {
     /// Client identity
     pub client_id: Uuid,
     /// CBUs this client has access to
@@ -267,7 +267,7 @@ pub struct ClientScope {
 
 impl ClientScope {
     /// Create a new client scope
-    pub fn new(client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
+    pub(crate) fn new(client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
         Self {
             client_id,
             accessible_cbus,
@@ -276,12 +276,12 @@ impl ClientScope {
     }
 
     /// Check if this client can access a specific CBU
-    pub fn can_access_cbu(&self, cbu_id: &Uuid) -> bool {
+    pub(crate) fn can_access_cbu(&self, cbu_id: &Uuid) -> bool {
         self.accessible_cbus.contains(cbu_id)
     }
 
     /// Get the default CBU for this client (first accessible)
-    pub fn default_cbu(&self) -> Option<Uuid> {
+    pub(crate) fn default_cbu(&self) -> Option<Uuid> {
         self.accessible_cbus.first().copied()
     }
 }

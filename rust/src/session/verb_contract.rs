@@ -17,7 +17,7 @@ pub struct VerbDiagnostics {
 
 /// A single diagnostic message
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbDiagnostic {
+pub(crate) struct VerbDiagnostic {
     /// Diagnostic code (e.g., "MISSING_LOOKUP_CONFIG")
     pub code: String,
     /// Human-readable message

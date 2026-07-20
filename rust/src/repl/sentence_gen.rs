@@ -16,7 +16,7 @@
 use std::collections::HashMap;
 
 /// Deterministic sentence generator — no LLM, no network.
-pub struct SentenceGenerator;
+pub(crate) struct SentenceGenerator;
 
 impl SentenceGenerator {
     /// Generate a human-readable sentence for a verb invocation.
@@ -27,7 +27,7 @@ impl SentenceGenerator {
     /// * `args` — Extracted arguments (e.g. {"product": "IRS", "cbu-name": "Allianz Lux"}).
     /// * `invocation_phrases` — Invocation phrases from VerbConfig (may be empty).
     /// * `description` — Verb description from VerbConfig (fallback).
-    pub fn generate(
+    pub(crate) fn generate(
         &self,
         verb: &str,
         args: &HashMap<String, String>,
@@ -201,7 +201,7 @@ impl SentenceGenerator {
     /// - 2 items → "A and B"
     /// - 3+ items → "A, B, and C"
     #[allow(dead_code)] // Used by integration tests (rust/tests/repl_v2_golden_loop.rs)
-    pub fn format_list(values: &[String]) -> String {
+    pub(crate) fn format_list(values: &[String]) -> String {
         match values.len() {
             0 => String::new(),
             1 => values[0].clone(),

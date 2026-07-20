@@ -24,7 +24,7 @@ use crate::dsl_v2::syntax::parse_program;
 
 /// Result of testing a single template
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateTestResult {
+pub(crate) struct TemplateTestResult {
     pub template_id: String,
     pub template_name: String,
     /// Primary entity type for this template (cbu, kyc_case, onboarding_request)
@@ -53,7 +53,7 @@ pub struct TemplateTestResult {
 
 /// Result of running the full test harness
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HarnessResult {
+pub(crate) struct HarnessResult {
     pub total_templates: usize,
     pub expansion_complete: usize,
     pub expansion_incomplete: usize,
@@ -71,7 +71,7 @@ pub struct HarnessResult {
 
 impl HarnessResult {
     /// Print a summary to stdout
-    pub fn print_summary(&self) {
+    pub(crate) fn print_summary(&self) {
         println!("\n=== Template Test Harness Results ===\n");
         println!("Total templates:      {}", self.total_templates);
         println!("Expansion complete:   {}", self.expansion_complete);
@@ -143,14 +143,14 @@ impl HarnessResult {
     }
 
     /// Check if all templates passed the full pipeline
-    pub fn all_passed(&self) -> bool {
+    pub(crate) fn all_passed(&self) -> bool {
         self.plan_failed == 0 && self.parse_failed == 0
     }
 }
 
 /// Sample parameters for each template
 /// Returns (template_id, HashMap of param_name -> value)
-pub fn get_sample_params() -> HashMap<String, HashMap<String, String>> {
+pub(crate) fn get_sample_params() -> HashMap<String, HashMap<String, String>> {
     let mut samples = HashMap::new();
 
     // Generate sample UUIDs for consistency

@@ -11,7 +11,7 @@ use super::types::{
 
 /// Minimal row needed to classify one calibration utterance execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CalibrationUtteranceRow {
+pub(crate) struct CalibrationUtteranceRow {
     pub utterance_id: Uuid,
     pub text: String,
     pub calibration_mode: CalibrationMode,

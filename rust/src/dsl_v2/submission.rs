@@ -25,7 +25,7 @@ use dsl_core::{Argument, AstNode, Literal, Span, Statement, VerbCall};
 /// - 1: Singleton execution
 /// - N: Batch expansion (N iterations)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SymbolBinding {
+pub(crate) struct SymbolBinding {
     /// The bound UUIDs
     pub ids: Vec<Uuid>,
     /// Optional display names (parallel to ids)
@@ -38,12 +38,12 @@ pub struct SymbolBinding {
 
 impl SymbolBinding {
     /// Create an unresolved binding (cardinality 0)
-    pub fn unresolved() -> Self {
+    pub(crate) fn unresolved() -> Self {
         Self::default()
     }
 
     /// Create a singleton binding (cardinality 1)
-    pub fn singleton(id: Uuid) -> Self {
+    pub(crate) fn singleton(id: Uuid) -> Self {
         Self {
             ids: vec![id],
             names: vec![],
@@ -51,17 +51,9 @@ impl SymbolBinding {
         }
     }
 
-    /// Create a singleton binding with a display name
-    pub fn singleton_named(id: Uuid, name: String) -> Self {
-        Self {
-            ids: vec![id],
-            names: vec![name],
-            entity_type: None,
-        }
-    }
 
     /// Create a multiple binding (cardinality N)
-    pub fn multiple(ids: Vec<Uuid>) -> Self {
+    pub(crate) fn multiple(ids: Vec<Uuid>) -> Self {
         Self {
             ids,
             names: vec![],
@@ -70,7 +62,7 @@ impl SymbolBinding {
     }
 
     /// Create a multiple binding with display names
-    pub fn multiple_named(items: Vec<(Uuid, String)>) -> Self {
+    pub(crate) fn multiple_named(items: Vec<(Uuid, String)>) -> Self {
         let (ids, names) = items.into_iter().unzip();
         Self {
             ids,
@@ -79,54 +71,41 @@ impl SymbolBinding {
         }
     }
 
-    /// Add entity type hint
-    pub fn with_type(mut self, t: String) -> Self {
-        self.entity_type = Some(t);
-        self
-    }
 
     /// Number of bound UUIDs
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.ids.len()
     }
 
     /// True if no UUIDs bound
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.ids.is_empty()
     }
 
     /// Cardinality 0 - draft state
-    pub fn is_unresolved(&self) -> bool {
+    pub(crate) fn is_unresolved(&self) -> bool {
         self.ids.is_empty()
     }
 
     /// Cardinality 1 - singleton
-    pub fn is_singleton(&self) -> bool {
+    pub(crate) fn is_singleton(&self) -> bool {
         self.ids.len() == 1
     }
 
     /// Cardinality > 1 - batch
-    pub fn is_multiple(&self) -> bool {
+    pub(crate) fn is_multiple(&self) -> bool {
         self.ids.len() > 1
     }
 
     /// Get the single UUID (panics if not singleton)
-    pub fn id(&self) -> Uuid {
+    pub(crate) fn id(&self) -> Uuid {
         assert!(self.is_singleton(), "Expected singleton binding");
         self.ids[0]
     }
 
-    /// Get the single UUID if singleton
-    pub fn id_opt(&self) -> Option<Uuid> {
-        if self.is_singleton() {
-            Some(self.ids[0])
-        } else {
-            None
-        }
-    }
 
     /// Add a UUID to the binding
-    pub fn add(&mut self, id: Uuid, name: Option<String>) {
+    pub(crate) fn add(&mut self, id: Uuid, name: Option<String>) {
         self.ids.push(id);
         if let Some(n) = name {
             self.names.push(n);
@@ -134,7 +113,7 @@ impl SymbolBinding {
     }
 
     /// Remove a UUID from the binding
-    pub fn remove(&mut self, id: Uuid) -> bool {
+    pub(crate) fn remove(&mut self, id: Uuid) -> bool {
         if let Some(idx) = self.ids.iter().position(|i| *i == id) {
             self.ids.remove(idx);
             if idx < self.names.len() {
@@ -147,7 +126,7 @@ impl SymbolBinding {
     }
 
     /// Get name for a given index
-    pub fn name_at(&self, idx: usize) -> Option<&str> {
+    pub(crate) fn name_at(&self, idx: usize) -> Option<&str> {
         self.names.get(idx).map(|s| s.as_str())
     }
 }
@@ -158,7 +137,7 @@ impl SymbolBinding {
 
 /// A DSL submission with statements and symbol bindings
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslSubmission {
+pub(crate) struct DslSubmission {
     /// The DSL statements to execute
     pub statements: Vec<Statement>,
     /// Symbol bindings: symbol name → bound UUIDs
@@ -168,7 +147,7 @@ pub struct DslSubmission {
 /// State of a submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
-pub enum SubmissionState {
+pub(crate) enum SubmissionState {
     /// Has unresolved symbols (cardinality 0)
     Draft { unresolved: Vec<String> },
     /// Ready to execute
@@ -185,7 +164,7 @@ pub enum SubmissionState {
 
 /// Limits for submission validation
 #[derive(Debug, Clone)]
-pub struct SubmissionLimits {
+pub(crate) struct SubmissionLimits {
     /// Warn if iterations exceed this
     pub warn_iterations: usize,
     /// Reject if iterations exceed this
@@ -212,7 +191,7 @@ impl Default for SubmissionLimits {
 
 /// Errors during submission processing
 #[derive(Debug, Clone, thiserror::Error)]
-pub enum SubmissionError {
+pub(crate) enum SubmissionError {
     #[error("Unresolved symbols: {0:?}")]
     UnresolvedSymbols(Vec<String>),
     #[error("Multiple iteration symbols not supported: {0:?}")]
@@ -223,7 +202,7 @@ pub enum SubmissionError {
 
 impl DslSubmission {
     /// Create a new submission from statements
-    pub fn new(statements: Vec<Statement>) -> Self {
+    pub(crate) fn new(statements: Vec<Statement>) -> Self {
         Self {
             statements,
             bindings: HashMap::new(),
@@ -231,48 +210,34 @@ impl DslSubmission {
     }
 
     /// Add a binding (builder pattern)
-    pub fn bind(mut self, symbol: impl Into<String>, binding: SymbolBinding) -> Self {
+    pub(crate) fn bind(mut self, symbol: impl Into<String>, binding: SymbolBinding) -> Self {
         self.bindings.insert(symbol.into(), binding);
         self
     }
 
     /// Add a singleton binding (builder pattern)
-    pub fn bind_one(mut self, symbol: impl Into<String>, id: Uuid) -> Self {
+    pub(crate) fn bind_one(mut self, symbol: impl Into<String>, id: Uuid) -> Self {
         self.bindings
             .insert(symbol.into(), SymbolBinding::singleton(id));
         self
     }
 
     /// Add a multiple binding (builder pattern)
-    pub fn bind_many(mut self, symbol: impl Into<String>, ids: Vec<Uuid>) -> Self {
+    pub(crate) fn bind_many(mut self, symbol: impl Into<String>, ids: Vec<Uuid>) -> Self {
         self.bindings
             .insert(symbol.into(), SymbolBinding::multiple(ids));
         self
     }
 
     /// Set a binding
-    pub fn set_binding(&mut self, symbol: &str, binding: SymbolBinding) {
+    pub(crate) fn set_binding(&mut self, symbol: &str, binding: SymbolBinding) {
         self.bindings.insert(symbol.to_string(), binding);
     }
 
-    /// Add a UUID to an existing binding (or create one)
-    pub fn add_to_binding(&mut self, symbol: &str, id: Uuid, name: Option<String>) {
-        self.bindings
-            .entry(symbol.to_string())
-            .or_insert_with(SymbolBinding::unresolved)
-            .add(id, name);
-    }
 
-    /// Remove a UUID from a binding
-    pub fn remove_from_binding(&mut self, symbol: &str, id: Uuid) -> bool {
-        self.bindings
-            .get_mut(symbol)
-            .map(|b| b.remove(id))
-            .unwrap_or(false)
-    }
 
     /// Get all symbols referenced in DSL statements
-    pub fn symbols_in_dsl(&self) -> Vec<String> {
+    pub(crate) fn symbols_in_dsl(&self) -> Vec<String> {
         let mut symbols = vec![];
         for stmt in &self.statements {
             collect_symbols(stmt, &mut symbols);
@@ -283,7 +248,7 @@ impl DslSubmission {
     }
 
     /// Get symbols with cardinality 0 (unresolved)
-    pub fn unresolved_symbols(&self) -> Vec<String> {
+    pub(crate) fn unresolved_symbols(&self) -> Vec<String> {
         self.symbols_in_dsl()
             .into_iter()
             .filter(|s| {
@@ -295,19 +260,11 @@ impl DslSubmission {
             .collect()
     }
 
-    /// True if any symbols are unresolved
-    pub fn has_unresolved(&self) -> bool {
-        !self.unresolved_symbols().is_empty()
-    }
 
-    /// True if all symbols are resolved
-    pub fn is_resolved(&self) -> bool {
-        self.unresolved_symbols().is_empty()
-    }
 
     /// Find the symbol with cardinality > 1 (for iteration)
     /// Errors if multiple symbols have cardinality > 1
-    pub fn iteration_symbol(&self) -> Result<Option<String>, SubmissionError> {
+    pub(crate) fn iteration_symbol(&self) -> Result<Option<String>, SubmissionError> {
         let multi: Vec<_> = self
             .bindings
             .iter()
@@ -322,12 +279,12 @@ impl DslSubmission {
     }
 
     /// True if this is a batch submission (any symbol has cardinality > 1)
-    pub fn is_batch(&self) -> bool {
+    pub(crate) fn is_batch(&self) -> bool {
         self.bindings.values().any(|b| b.is_multiple())
     }
 
     /// Number of iterations (max cardinality across all bindings)
-    pub fn iteration_count(&self) -> usize {
+    pub(crate) fn iteration_count(&self) -> usize {
         self.bindings
             .values()
             .map(|b| b.len())
@@ -337,12 +294,12 @@ impl DslSubmission {
     }
 
     /// Total operations (iterations × statements)
-    pub fn total_operations(&self) -> usize {
+    pub(crate) fn total_operations(&self) -> usize {
         self.iteration_count() * self.statements.len()
     }
 
     /// Get current submission state
-    pub fn state(&self, limits: &SubmissionLimits) -> SubmissionState {
+    pub(crate) fn state(&self, limits: &SubmissionLimits) -> SubmissionState {
         let unresolved = self.unresolved_symbols();
         if !unresolved.is_empty() {
             return SubmissionState::Draft { unresolved };
@@ -379,7 +336,7 @@ impl DslSubmission {
     }
 
     /// True if submission can be executed
-    pub fn can_execute(&self, limits: &SubmissionLimits) -> bool {
+    pub(crate) fn can_execute(&self, limits: &SubmissionLimits) -> bool {
         matches!(
             self.state(limits),
             SubmissionState::Ready | SubmissionState::ReadyWithWarning { .. }
@@ -393,7 +350,7 @@ impl DslSubmission {
 
 /// Expanded submission ready for execution
 #[derive(Debug)]
-pub struct ExpandedSubmission {
+pub(crate) struct ExpandedSubmission {
     /// Individual iterations
     pub iterations: Vec<IterationStatements>,
     /// True if this was a batch (N > 1)
@@ -404,7 +361,7 @@ pub struct ExpandedSubmission {
 
 /// Statements for a single iteration
 #[derive(Debug, Clone)]
-pub struct IterationStatements {
+pub(crate) struct IterationStatements {
     /// Iteration index (0-based)
     pub index: usize,
     /// Key for this iteration (if batch)
@@ -415,7 +372,7 @@ pub struct IterationStatements {
 
 /// Key identifying a batch iteration
 #[derive(Debug, Clone)]
-pub struct IterationKey {
+pub(crate) struct IterationKey {
     /// Symbol that was iterated
     pub symbol: String,
     /// UUID for this iteration
@@ -426,7 +383,7 @@ pub struct IterationKey {
 
 impl DslSubmission {
     /// Expand the submission into executable iterations
-    pub fn expand(&self) -> Result<ExpandedSubmission, SubmissionError> {
+    pub(crate) fn expand(&self) -> Result<ExpandedSubmission, SubmissionError> {
         let unresolved = self.unresolved_symbols();
         if !unresolved.is_empty() {
             return Err(SubmissionError::UnresolvedSymbols(unresolved));

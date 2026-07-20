@@ -21,7 +21,7 @@ use super::{ModeExpectations, SessionSeed};
 ///
 /// Uses minimal verb searcher (no DB, no embedder) and configurable PolicyGate.
 #[cfg(feature = "database")]
-pub fn build_stub_context(
+pub(crate) fn build_stub_context(
     pool: &sqlx::PgPool,
     session_id: Uuid,
     seed: &SessionSeed,

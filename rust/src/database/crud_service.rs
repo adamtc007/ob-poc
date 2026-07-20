@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 /// Types of assets that can be operated on
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum AssetType {
+pub(crate) enum AssetType {
     Cbu,
     ProperPerson,
     Company,
@@ -40,7 +40,7 @@ impl std::fmt::Display for AssetType {
 
 /// Types of CRUD operations
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum OperationType {
+pub(crate) enum OperationType {
     Create,
     Read,
     Update,
@@ -60,7 +60,7 @@ impl std::fmt::Display for OperationType {
 
 /// CRUD operation record
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CrudOperation {
+pub(crate) struct CrudOperation {
     pub operation_id: Uuid,
     pub operation_type: String,
     pub asset_type: String,
@@ -83,7 +83,7 @@ pub struct CrudOperation {
 
 /// Parameters for logging a CRUD operation
 #[derive(Debug, Clone)]
-pub struct CrudOperationLog {
+pub(crate) struct CrudOperationLog {
     /// Type of operation (Create, Read, Update, Delete)
     pub operation_type: OperationType,
     /// Type of asset being operated on
@@ -102,7 +102,7 @@ pub struct CrudOperationLog {
 
 /// AI provider context for audit trail
 #[derive(Debug, Clone, Default)]
-pub struct AiContext {
+pub(crate) struct AiContext {
     pub provider: String,
     pub model: String,
 }
@@ -113,59 +113,19 @@ pub struct AiContext {
 
 /// Service for CRUD operation logging
 #[derive(Clone, Debug)]
-pub struct CrudService {
+pub(crate) struct CrudService {
     pool: PgPool,
 }
 
 impl CrudService {
     /// Create a new CRUD service
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Get reference to the connection pool
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
-    /// Log a CRUD operation
-    pub async fn log_crud_operation(&self, log: CrudOperationLog) -> Result<Uuid> {
-        let operation_id = Uuid::new_v4();
-
-        let (ai_provider, ai_model) = log
-            .ai_context
-            .as_ref()
-            .map(|ctx| (Some(ctx.provider.as_str()), Some(ctx.model.as_str())))
-            .unwrap_or((None, None));
-
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".crud_operations (
-                operation_id, operation_type, asset_type, entity_table_name,
-                generated_dsl, ai_instruction, affected_records,
-                execution_status, ai_provider, ai_model, created_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, 'COMPLETED', $8, $9, NOW())
-            "#,
-        )
-        .bind(operation_id)
-        .bind(log.operation_type.to_string())
-        .bind(log.asset_type.to_string())
-        .bind(&log.entity_table_name)
-        .bind(&log.generated_dsl)
-        .bind(&log.ai_instruction)
-        .bind(&log.affected_records)
-        .bind(ai_provider)
-        .bind(ai_model)
-        .execute(&self.pool)
-        .await
-        .context("Failed to log CRUD operation")?;
-
-        info!(
-            "Logged {} {} operation {} on {}",
-            log.operation_type, log.asset_type, operation_id, log.entity_table_name
-        );
-
-        Ok(operation_id)
-    }
 }

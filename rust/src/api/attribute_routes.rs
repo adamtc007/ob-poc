@@ -21,7 +21,7 @@ use uuid::Uuid;
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct UploadDocumentRequest {
+pub(crate) struct UploadDocumentRequest {
     pub cbu_id: Uuid,
     pub file_name: String,
     pub content_base64: String,
@@ -29,38 +29,38 @@ pub struct UploadDocumentRequest {
 }
 
 #[derive(Debug, Serialize)]
-pub struct UploadDocumentResponse {
+pub(crate) struct UploadDocumentResponse {
     pub doc_id: Uuid,
     pub file_hash: String,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ValidateDslRequest {
+pub(crate) struct ValidateDslRequest {
     pub dsl: String,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ValidateDslResponse {
+pub(crate) struct ValidateDslResponse {
     pub valid: bool,
     pub attribute_ids: Vec<String>,
     pub message: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ValidateValueRequest {
+pub(crate) struct ValidateValueRequest {
     pub attribute_id: String,
     pub value: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
-pub struct ValidateValueResponse {
+pub(crate) struct ValidateValueResponse {
     pub valid: bool,
     pub message: String,
 }
 
 #[derive(Debug, Serialize)]
-pub struct AttributeValue {
+pub(crate) struct AttributeValue {
     pub attribute_id: String,
     pub attribute_name: String,
     pub value: String,
@@ -69,7 +69,7 @@ pub struct AttributeValue {
 }
 
 #[derive(Debug, Serialize)]
-pub struct AttributeListResponse {
+pub(crate) struct AttributeListResponse {
     pub cbu_id: String,
     pub attributes: Vec<AttributeValue>,
     pub count: usize,

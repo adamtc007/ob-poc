@@ -24,7 +24,7 @@ use std::collections::HashMap;
 /// errors when all 50 failed for the same reason.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ErrorCause {
+pub(crate) enum ErrorCause {
     /// Entity was deleted (possibly mid-batch)
     EntityDeleted { entity_id: String },
     /// Entity not found
@@ -52,7 +52,7 @@ pub enum ErrorCause {
 
 impl ErrorCause {
     /// Create from an anyhow error, attempting to categorize it
-    pub fn from_error(error: &anyhow::Error) -> Self {
+    pub(crate) fn from_error(error: &anyhow::Error) -> Self {
         let msg = error.to_string().to_lowercase();
 
         // Try to extract entity ID from common patterns
@@ -120,32 +120,9 @@ impl ErrorCause {
         }
     }
 
-    /// Get a short description of the cause
-    pub fn short_description(&self) -> String {
-        match self {
-            ErrorCause::EntityDeleted { entity_id } => format!("Entity {} was deleted", entity_id),
-            ErrorCause::EntityNotFound { entity_id } => format!("Entity {} not found", entity_id),
-            ErrorCause::VersionConflict { entity_id } => {
-                format!("Version conflict on entity {}", entity_id)
-            }
-            ErrorCause::PermissionDenied { resource } => format!("Permission denied: {}", resource),
-            ErrorCause::ValidationFailed { rule } => format!("Validation failed: {}", rule),
-            ErrorCause::ForeignKeyViolation { constraint } => {
-                format!("Foreign key violation: {}", constraint)
-            }
-            ErrorCause::UniqueViolation { constraint } => {
-                format!("Unique constraint violation: {}", constraint)
-            }
-            ErrorCause::LockContention { entity_type, .. } => {
-                format!("Lock contention on {}", entity_type)
-            }
-            ErrorCause::DatabaseError { code } => format!("Database error: {}", code),
-            ErrorCause::Other { code } => format!("Error: {}", code),
-        }
-    }
 
     /// Get the entity ID if this cause relates to a specific entity
-    pub fn entity_id(&self) -> Option<&str> {
+    pub(crate) fn entity_id(&self) -> Option<&str> {
         match self {
             ErrorCause::EntityDeleted { entity_id }
             | ErrorCause::EntityNotFound { entity_id }
@@ -162,7 +139,7 @@ impl ErrorCause {
 
 /// Details about an error cause
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CauseDetails {
+pub(crate) struct CauseDetails {
     /// Entity name (if known)
     pub entity_name: Option<String>,
     /// Who deleted the entity (if known)
@@ -179,7 +156,7 @@ pub struct CauseDetails {
 
 impl CauseDetails {
     /// Create details from an error cause
-    pub fn from_cause(cause: &ErrorCause) -> Self {
+    pub(crate) fn from_cause(cause: &ErrorCause) -> Self {
         let (hint, recoverable) = match cause {
             ErrorCause::EntityDeleted { .. } => (
                 "The entity was deleted. Check if another user or process deleted it.".to_string(),
@@ -231,7 +208,7 @@ impl CauseDetails {
 
 /// Information about a verb that was affected by an error
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AffectedVerb {
+pub(crate) struct AffectedVerb {
     /// Index of the verb in the execution plan
     pub index: usize,
     /// Verb name (e.g., "create")
@@ -251,7 +228,7 @@ pub struct AffectedVerb {
 /// Detect if failure happened mid-execution (race condition)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum FailureTiming {
+pub(crate) enum FailureTiming {
     /// Entity was already deleted/missing when batch started
     PreExisting {
         /// When the entity was deleted
@@ -278,7 +255,7 @@ pub enum FailureTiming {
 
 /// Collection of errors sharing the same root cause
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CausedErrors {
+pub(crate) struct CausedErrors {
     /// The root cause
     pub cause: ErrorCause,
     /// Details about the cause
@@ -297,7 +274,7 @@ pub struct CausedErrors {
 
 /// Aggregated execution errors grouped by root cause
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ExecutionErrors {
+pub(crate) struct ExecutionErrors {
     /// Errors grouped by cause
     pub by_cause: HashMap<String, CausedErrors>,
     /// Total number of failed operations
@@ -308,17 +285,17 @@ pub struct ExecutionErrors {
 
 impl ExecutionErrors {
     /// Create a new empty error collection
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Record a successful operation
-    pub fn record_success(&mut self) {
+    pub(crate) fn record_success(&mut self) {
         self.total_succeeded += 1;
     }
 
     /// Record a failed operation
-    pub fn record_failure(
+    pub(crate) fn record_failure(
         &mut self,
         verb_index: usize,
         domain: &str,
@@ -353,17 +330,17 @@ impl ExecutionErrors {
     }
 
     /// Check if there are any errors
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.by_cause.is_empty()
     }
 
     /// Get the number of unique error causes
-    pub fn cause_count(&self) -> usize {
+    pub(crate) fn cause_count(&self) -> usize {
         self.by_cause.len()
     }
 
     /// Generate human-readable summary
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         if self.by_cause.is_empty() {
             return format!("✓ {} succeeded", self.total_succeeded);
         }
@@ -410,33 +387,22 @@ impl ExecutionErrors {
     }
 
     /// Get all errors as a flat list
-    pub fn all_errors(&self) -> Vec<&AffectedVerb> {
+    pub(crate) fn all_errors(&self) -> Vec<&AffectedVerb> {
         self.by_cause
             .values()
             .flat_map(|e| e.affected_verbs.iter())
             .collect()
     }
 
-    /// Check if any errors are recoverable
-    pub fn has_recoverable(&self) -> bool {
-        self.by_cause.values().any(|e| e.details.recoverable)
-    }
 
     /// Get only recoverable errors
-    pub fn recoverable_errors(&self) -> Vec<&CausedErrors> {
+    pub(crate) fn recoverable_errors(&self) -> Vec<&CausedErrors> {
         self.by_cause
             .values()
             .filter(|e| e.details.recoverable)
             .collect()
     }
 
-    /// Get only non-recoverable errors
-    pub fn non_recoverable_errors(&self) -> Vec<&CausedErrors> {
-        self.by_cause
-            .values()
-            .filter(|e| !e.details.recoverable)
-            .collect()
-    }
 }
 
 // =============================================================================

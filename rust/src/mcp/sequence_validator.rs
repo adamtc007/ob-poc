@@ -24,7 +24,7 @@ use crate::dsl_v2::macros::{MacroPrereq, MacroRegistry, MacroSchema};
 
 /// Result of checking a single prerequisite.
 #[derive(Debug, Clone)]
-pub enum PrereqCheck {
+pub(crate) enum PrereqCheck {
     /// Prerequisite is satisfied (by current state or earlier macro in sequence).
     Pass,
 
@@ -47,7 +47,7 @@ pub enum PrereqCheck {
 
 /// Validation result for a single macro in the sequence.
 #[derive(Debug, Clone)]
-pub struct MacroValidation {
+pub(crate) struct MacroValidation {
     /// The macro FQN being validated.
     pub macro_fqn: String,
     /// Position in the sequence (0-indexed).
@@ -60,7 +60,7 @@ pub struct MacroValidation {
 
 /// Detail for a single prerequisite check.
 #[derive(Debug, Clone)]
-pub struct PrereqDetail {
+pub(crate) struct PrereqDetail {
     /// Human-readable description of the prerequisite.
     pub description: String,
     /// Check result.
@@ -69,7 +69,7 @@ pub struct PrereqDetail {
 
 /// Result of validating an entire macro sequence.
 #[derive(Debug, Clone)]
-pub struct SequenceValidationResult {
+pub(crate) struct SequenceValidationResult {
     /// Per-macro validation results, in sequence order.
     pub validations: Vec<MacroValidation>,
     /// Whether the overall sequence is feasible.
@@ -179,7 +179,7 @@ impl ProducerIndex {
 /// # Returns
 ///
 /// A `SequenceValidationResult` with per-macro validation and overall feasibility.
-pub fn validate_macro_sequence(
+pub(crate) fn validate_macro_sequence(
     macros: &[String],
     registry: &MacroRegistry,
     current_state_flags: &HashSet<String>,

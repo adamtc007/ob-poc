@@ -38,7 +38,7 @@ use crate::graph::types::ProngFilter;
 /// let (remaining, cmd) = parse_nav_command("go up").unwrap();
 /// assert!(remaining.is_empty());
 /// ```
-pub fn parse_nav_command(input: &str) -> IResult<&str, NavCommand> {
+pub(crate) fn parse_nav_command(input: &str) -> IResult<&str, NavCommand> {
     let input = input.trim();
 
     // Nest alt() calls to stay under the 21-alternative limit

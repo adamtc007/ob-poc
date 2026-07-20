@@ -19,7 +19,7 @@ use tracing::{error, info, warn};
 
 /// Status of the learning system
 #[derive(Debug, Clone, Default)]
-pub struct LearningStatus {
+pub(crate) struct LearningStatus {
     /// Last time analysis was run
     pub last_analysis: Option<chrono::DateTime<chrono::Utc>>,
     /// Patterns applied in last run
@@ -33,7 +33,7 @@ pub struct LearningStatus {
 }
 
 /// Shared learning status accessible from MCP tools
-pub type SharedLearningStatus = Arc<RwLock<LearningStatus>>;
+pub(crate) type SharedLearningStatus = Arc<RwLock<LearningStatus>>;
 
 /// Create shared learning status
 pub fn create_learning_status() -> SharedLearningStatus {
@@ -320,7 +320,7 @@ pub async fn trigger_learning_cycle(
 
 /// Result of a learning cycle
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct LearningCycleResult {
+pub(crate) struct LearningCycleResult {
     pub patterns_discovered: usize,
     pub confusion_pairs: usize,
     pub gaps: usize,

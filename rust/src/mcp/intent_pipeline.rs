@@ -73,7 +73,7 @@ pub use ob_poc_types::intent::{IntentArgValue, IntentArgument, StructuredIntent}
 
 /// Pipeline outcome enum for clear status reporting
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum PipelineOutcome {
+pub(crate) enum PipelineOutcome {
     /// DSL ready for execution (may have unresolved refs)
     Ready,
     /// Missing required arguments - need user input
@@ -103,7 +103,7 @@ pub enum PipelineOutcome {
 
 /// Pipeline result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PipelineResult {
+pub(crate) struct PipelineResult {
     pub intent: StructuredIntent,
     pub verb_candidates: Vec<VerbSearchResult>,
     pub dsl: String,
@@ -126,7 +126,7 @@ pub struct PipelineResult {
 
 /// An unresolved entity reference that needs lookup
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnresolvedRef {
+pub(crate) struct UnresolvedRef {
     pub param_name: String,
     pub search_value: String,
     pub entity_type: Option<String>,
@@ -137,7 +137,7 @@ pub struct UnresolvedRef {
 }
 
 /// Structured intent extraction pipeline
-pub struct IntentPipeline {
+pub(crate) struct IntentPipeline {
     verb_searcher: HybridVerbSearcher,
     llm_client: Option<Arc<dyn LlmClient>>,
     scope_resolver: ScopeResolver,
@@ -154,7 +154,7 @@ pub struct IntentPipeline {
 
 impl IntentPipeline {
     /// Create pipeline with verb searcher (lazy LLM init)
-    pub fn new(verb_searcher: HybridVerbSearcher) -> Self {
+    pub(crate) fn new(verb_searcher: HybridVerbSearcher) -> Self {
         Self {
             verb_searcher,
             llm_client: None,
@@ -168,7 +168,7 @@ impl IntentPipeline {
 
     /// Create pipeline with database pool for scope resolution
     #[cfg(feature = "database")]
-    pub fn with_pool(verb_searcher: HybridVerbSearcher, pool: PgPool) -> Self {
+    pub(crate) fn with_pool(verb_searcher: HybridVerbSearcher, pool: PgPool) -> Self {
         Self {
             verb_searcher,
             llm_client: None,
@@ -181,7 +181,7 @@ impl IntentPipeline {
 
     /// Set SemReg-allowed verb constraint (Phase 3 CCIR).
     /// When set, verb search only considers verbs in this set.
-    pub fn with_allowed_verbs(mut self, allowed: std::collections::HashSet<String>) -> Self {
+    pub(crate) fn with_allowed_verbs(mut self, allowed: std::collections::HashSet<String>) -> Self {
         self.allowed_verbs = Some(allowed);
         self
     }
@@ -189,7 +189,7 @@ impl IntentPipeline {
     /// Set entity mention spans from entity linking (entity-first parsing).
     /// When set, verb search noun extraction skips these character ranges so that
     /// entity names don't pollute domain noun matching.
-    pub fn with_entity_mention_spans(mut self, spans: Vec<(usize, usize)>) -> Self {
+    pub(crate) fn with_entity_mention_spans(mut self, spans: Vec<(usize, usize)>) -> Self {
         if !spans.is_empty() {
             self.entity_mention_spans = Some(spans);
         }
@@ -202,7 +202,7 @@ impl IntentPipeline {
     /// extracts arguments via LLM, and assembles DSL. This ensures user
     /// disambiguation selections are binding and cannot be overridden by
     /// re-running free-form ranking.
-    pub async fn process_with_forced_verb(
+    pub(crate) async fn process_with_forced_verb(
         &self,
         instruction: &str,
         forced_verb_fqn: &str,
@@ -346,7 +346,7 @@ impl IntentPipeline {
     /// 3. Deterministic UX: Resolved → chip, Candidates → picker, else → continue
     ///
     /// Pass `None` for `existing_scope` on first call; subsequent calls can pass scope context.
-    pub async fn process_with_scope(
+    pub(crate) async fn process_with_scope(
         &self,
         instruction: &str,
         domain_hint: Option<&str>,

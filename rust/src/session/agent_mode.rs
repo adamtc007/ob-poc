@@ -29,7 +29,7 @@ use uuid::Uuid;
 /// Session operating mode
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SessionMode {
+pub(crate) enum SessionMode {
     /// User types DSL commands directly (default)
     #[default]
     Manual,
@@ -54,7 +54,7 @@ impl std::fmt::Display for SessionMode {
 /// Agent task type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum AgentTask {
+pub(crate) enum AgentTask {
     /// Resolve ownership gaps for an entity/group
     ResolveGaps,
     /// Build complete ownership chain to UBO
@@ -82,7 +82,7 @@ impl std::fmt::Display for AgentTask {
 /// Agent execution status
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum AgentStatus {
+pub(crate) enum AgentStatus {
     /// Agent loop is running
     #[default]
     Running,
@@ -119,7 +119,7 @@ impl std::fmt::Display for AgentStatus {
 /// Checkpoint type requiring user input
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum CheckpointType {
+pub(crate) enum CheckpointType {
     /// Multiple candidates found, need user selection
     AmbiguousMatch,
 
@@ -160,7 +160,7 @@ pub struct Candidate {
 
 /// Context for a checkpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckpointContext {
+pub(crate) struct CheckpointContext {
     /// What was searched for
     pub search_query: String,
 
@@ -176,7 +176,7 @@ pub struct CheckpointContext {
 
 /// A checkpoint awaiting user response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Checkpoint {
+pub(crate) struct Checkpoint {
     /// Unique checkpoint ID
     pub checkpoint_id: Uuid,
 
@@ -195,7 +195,7 @@ pub struct Checkpoint {
 
 impl Checkpoint {
     /// Create a new checkpoint for ambiguous matches
-    pub fn ambiguous_match(
+    pub(crate) fn ambiguous_match(
         search_query: String,
         source: String,
         candidates: Vec<Candidate>,
@@ -215,31 +215,11 @@ impl Checkpoint {
         }
     }
 
-    /// Create a checkpoint for screening hits
-    pub fn screening_hit(
-        entity_name: String,
-        source: String,
-        matches: Vec<Candidate>,
-        target_entity_id: Uuid,
-    ) -> Self {
-        Self {
-            checkpoint_id: Uuid::new_v4(),
-            checkpoint_type: CheckpointType::ScreeningHit,
-            context: CheckpointContext {
-                search_query: entity_name,
-                source,
-                target_entity_id: Some(target_entity_id),
-                context: None,
-            },
-            candidates: matches,
-            created_at: Utc::now(),
-        }
-    }
 }
 
 /// Reference to a recorded decision
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecisionRef {
+pub(crate) struct DecisionRef {
     pub decision_id: Uuid,
     pub decision_type: String,
     pub source_provider: String,
@@ -248,7 +228,7 @@ pub struct DecisionRef {
 
 /// Reference to a recorded action
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActionRef {
+pub(crate) struct ActionRef {
     pub action_id: Uuid,
     pub verb_fqn: String,
     pub success: bool,

@@ -1021,17 +1021,17 @@ fn split_fqn(fqn: &str) -> dsl_runtime::Result<(String, String)> {
 }
 
 /// Public wrapper for use by the dsl_v2::executor compatibility shim.
-pub fn build_verb_call_pub(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
+pub(crate) fn build_verb_call_pub(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
     build_verb_call(domain, verb, args)
 }
 
 /// Public wrapper for use by the compatibility shim.
-pub fn to_dsl_context_pub(ctx: &VerbExecutionContext) -> ExecutionContext {
+pub(crate) fn to_dsl_context_pub(ctx: &VerbExecutionContext) -> ExecutionContext {
     to_dsl_context(ctx)
 }
 
 /// Public wrapper for use by the compatibility shim.
-pub fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
+pub(crate) fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
     to_verb_outcome(result)
 }
 
@@ -1039,7 +1039,7 @@ pub fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
 /// `ExecutionContext`'s `pending_*` fields. Called by `dsl_v2::executor`
 /// after dispatch to propagate session/view/agent mutations the op staged
 /// on its `VerbExecutionContext`.
-pub fn apply_sem_ctx_extensions_to_exec_ctx(
+pub(crate) fn apply_sem_ctx_extensions_to_exec_ctx(
     sem_ctx: &VerbExecutionContext,
     exec_ctx: &mut ExecutionContext,
 ) {
@@ -1106,7 +1106,7 @@ pub fn apply_sem_ctx_extensions_to_exec_ctx(
 /// Convert a `VerbCall`'s argument list back into a JSON object — inverse
 /// of [`build_verb_call`]. Used by `dsl_v2::executor` when invoking ops
 /// whose execute path takes a JSON args object.
-pub fn verb_call_to_json(vc: &VerbCall) -> serde_json::Value {
+pub(crate) fn verb_call_to_json(vc: &VerbCall) -> serde_json::Value {
     let mut map = serde_json::Map::new();
     for arg in &vc.arguments {
         map.insert(arg.key.clone(), ast_node_to_json_value(&arg.value));
@@ -1150,7 +1150,7 @@ fn ast_node_to_json_value(node: &AstNode) -> serde_json::Value {
 
 /// Convert a `VerbExecutionOutcome` back into a legacy `ExecutionResult`.
 /// Inverse of [`to_verb_outcome`].
-pub fn from_verb_outcome(outcome: VerbExecutionOutcome) -> ExecutionResult {
+pub(crate) fn from_verb_outcome(outcome: VerbExecutionOutcome) -> ExecutionResult {
     match outcome {
         VerbExecutionOutcome::Uuid(u) => ExecutionResult::Uuid(u),
         VerbExecutionOutcome::Record(v) => ExecutionResult::Record(v),

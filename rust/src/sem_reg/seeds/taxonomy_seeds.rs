@@ -28,7 +28,7 @@ use crate::sem_reg::{
 
 /// Report from taxonomy seeding.
 #[derive(Debug, Default)]
-pub struct TaxonomySeedReport {
+pub(crate) struct TaxonomySeedReport {
     pub taxonomies_published: usize,
     pub taxonomies_skipped: usize,
     pub taxonomies_updated: usize,

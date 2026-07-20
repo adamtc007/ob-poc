@@ -106,7 +106,7 @@ fn merge_payload(
 }
 
 /// Validate that a template is self-consistent.
-pub fn validate_template(template: &StewardshipTemplate) -> Vec<String> {
+pub(crate) fn validate_template(template: &StewardshipTemplate) -> Vec<String> {
     let mut errors = Vec::new();
 
     if template.fqn.is_empty() {

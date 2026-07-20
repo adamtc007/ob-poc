@@ -46,7 +46,7 @@ use crate::sequencer::ReplOrchestratorV2;
 
 /// Shared state for V2 REPL routes.
 #[derive(Clone)]
-pub struct ReplV2RouteState {
+pub(crate) struct ReplV2RouteState {
     pub orchestrator: Arc<ReplOrchestratorV2>,
 }
 
@@ -66,7 +66,7 @@ static REPL_ACP_AGENTS: LazyLock<
 /// so the client sends `{ "type": "message", "content": "..." }`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum InputRequestV2 {
+pub(crate) enum InputRequestV2 {
     /// Free-text conversational input.
     Message { content: String },
 
@@ -221,7 +221,7 @@ impl From<InputRequestV2> for UserInputV2 {
 
 /// Response for session creation.
 #[derive(Debug, Serialize)]
-pub struct CreateSessionResponseV2 {
+pub(crate) struct CreateSessionResponseV2 {
     pub session_id: Uuid,
     /// Full initial response including state + kind (ScopeRequired).
     pub response: ReplResponseV2,
@@ -229,7 +229,7 @@ pub struct CreateSessionResponseV2 {
 
 /// Response for session state query.
 #[derive(Debug, Serialize)]
-pub struct SessionStateResponseV2 {
+pub(crate) struct SessionStateResponseV2 {
     pub session_id: Uuid,
     pub state: ReplStateV2,
     pub runbook_step_count: usize,
@@ -239,7 +239,7 @@ pub struct SessionStateResponseV2 {
 
 /// Request to push a new workspace context onto the session stack.
 #[derive(Debug, Clone, Deserialize)]
-pub struct SessionPushRequest {
+pub(crate) struct SessionPushRequest {
     pub context: ConstellationContextRef,
     #[serde(default)]
     pub peek: bool,
@@ -247,26 +247,21 @@ pub struct SessionPushRequest {
 
 /// Request for stack commit/pop operations.
 #[derive(Debug, Clone, Deserialize)]
-pub struct SessionStackRequest {
+pub(crate) struct SessionStackRequest {
     pub session_id: Uuid,
 }
 
-/// Query for current session-scoped constellation context.
-#[derive(Debug, Clone, Deserialize)]
-pub struct SessionContextQuery {
-    pub session_id: Uuid,
-}
 
 /// Response returned by session stack routes.
 #[derive(Debug, Clone, Serialize)]
-pub struct SessionFeedbackResponse {
+pub(crate) struct SessionFeedbackResponse {
     pub resolved: ResolvedConstellationContext,
     pub feedback: SessionFeedback,
 }
 
 /// Request for non-mutating KYC update-status workbook dry-run.
 #[derive(Debug, Clone, Deserialize)]
-pub struct KycUpdateStatusDryRunRequest {
+pub(crate) struct KycUpdateStatusDryRunRequest {
     pub case_id: Uuid,
     #[serde(default = "default_kyc_update_status_transition_ref")]
     pub transition_ref: String,
@@ -282,7 +277,7 @@ pub struct KycUpdateStatusDryRunRequest {
 
 /// Request to issue a restricted-mutation approval token for a workbook.
 #[derive(Debug, Clone, Deserialize)]
-pub struct KycApprovalTokenRequest {
+pub(crate) struct KycApprovalTokenRequest {
     pub workbook: crate::runbook::ExecutionWorkbook,
     pub approved_by_actor_id: String,
     pub approval_text: String,
@@ -291,7 +286,7 @@ pub struct KycApprovalTokenRequest {
 
 /// Request to prepare a restricted mutation preflight. This does not execute mutation.
 #[derive(Debug, Clone, Deserialize)]
-pub struct KycRestrictedMutationPreflightRequest {
+pub(crate) struct KycRestrictedMutationPreflightRequest {
     pub workbook: crate::runbook::ExecutionWorkbook,
     pub approval_token: crate::runbook::MutationApprovalToken,
     pub observed_configuration_version: String,
@@ -303,13 +298,13 @@ pub struct KycRestrictedMutationPreflightRequest {
 
 /// Request to compile a prepared restricted mutation preflight into a runbook.
 #[derive(Debug, Clone, Deserialize)]
-pub struct KycRestrictedMutationCompileRunbookRequest {
+pub(crate) struct KycRestrictedMutationCompileRunbookRequest {
     pub preflight: crate::runbook::RestrictedMutationPreflight,
 }
 
 /// Request to record actual semantic diff after the compiled runbook gate executes.
 #[derive(Debug, Clone, Deserialize)]
-pub struct KycRestrictedMutationReceiptRequest {
+pub(crate) struct KycRestrictedMutationReceiptRequest {
     pub preflight: crate::runbook::RestrictedMutationPreflight,
     pub compilation: crate::runbook::RestrictedMutationRunbookCompilation,
     pub actual_diff: crate::runbook::MutationSemanticDiff,
@@ -321,7 +316,7 @@ fn default_kyc_update_status_transition_ref() -> String {
 
 /// Request to open an ACP adapter session.
 #[derive(Debug, Clone, Deserialize)]
-pub struct AcpOpenSessionRequest {
+pub(crate) struct AcpOpenSessionRequest {
     #[serde(default = "default_acp_adapter")]
     pub adapter: ob_poc_boundary::acp::AcpAdapterKind,
     #[serde(default)]
@@ -330,7 +325,7 @@ pub struct AcpOpenSessionRequest {
 
 /// Request to assemble redacted Sage context for an ACP session.
 #[derive(Debug, Clone, Deserialize)]
-pub struct AcpContextAssemblyRequest {
+pub(crate) struct AcpContextAssemblyRequest {
     #[serde(default = "default_acp_adapter")]
     pub adapter: ob_poc_boundary::acp::AcpAdapterKind,
     pub probe_id: String,
@@ -348,7 +343,7 @@ pub struct AcpContextAssemblyRequest {
 
 /// Generic ACP JSON-RPC gateway request for the REPL HTTP boundary.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AcpGatewayRouteRequest {
+pub(crate) struct AcpGatewayRouteRequest {
     pub method: String,
     #[serde(default)]
     pub params: serde_json::Value,
@@ -385,7 +380,7 @@ impl From<ReplSessionV2> for SessionStateResponseV2 {
 
 /// Error response.
 #[derive(Debug, Serialize)]
-pub struct ErrorResponseV2 {
+pub(crate) struct ErrorResponseV2 {
     pub error: String,
     pub recoverable: bool,
 }
@@ -624,7 +619,7 @@ async fn ensure_runbook_step_workspace_ready(
 /// External systems (workflow engines, approval portals) POST to `/api/repl/v2/signal`
 /// with the `correlation_key` that was provided when the entry was parked.
 #[derive(Debug, Deserialize)]
-pub struct ReplSignalRequest {
+pub(crate) struct ReplSignalRequest {
     /// The correlation key linking this signal to a parked runbook entry.
     pub correlation_key: String,
     /// Signal status: `"completed"` or `"failed"`.
@@ -994,7 +989,7 @@ pub fn router() -> Router<ReplV2RouteState> {
 /// let app = Router::new()
 ///     .merge(repl_routes_v2::navigation_router().with_state(v2_state));
 /// ```
-pub fn navigation_router() -> Router<ReplV2RouteState> {
+pub(crate) fn navigation_router() -> Router<ReplV2RouteState> {
     // Note: /api/constellation/context is registered by create_constellation_router().
     // This router is now empty but retained for API compatibility.
     Router::new()
@@ -1004,7 +999,7 @@ pub fn navigation_router() -> Router<ReplV2RouteState> {
 ///
 /// These MUST be merged into the same router as agent routes to avoid
 /// axum 0.7 overlapping-route panics (`:id` wildcard vs literal segments).
-pub fn session_scoped_router() -> Router<ReplV2RouteState> {
+pub(crate) fn session_scoped_router() -> Router<ReplV2RouteState> {
     Router::new()
         // Navigation stack ops
         .route("/api/session/push", post(push_session_context))

@@ -61,7 +61,7 @@ pub fn is_macro(verb_fqn: &str) -> bool {
 
 /// Result of macro expansion attempt
 #[derive(Debug)]
-pub enum MacroAttemptResult {
+pub(crate) enum MacroAttemptResult {
     /// Verb is not a macro - continue normal processing
     NotAMacro,
     /// Macro expanded successfully
@@ -74,7 +74,7 @@ pub enum MacroAttemptResult {
 ///
 /// Returns `MacroAttemptResult::NotAMacro` if the verb is not in the macro registry,
 /// allowing normal processing to continue.
-pub fn try_expand_macro(
+pub(crate) fn try_expand_macro(
     verb_fqn: &str,
     args: &BTreeMap<String, String>,
     session: &UnifiedSession,
@@ -107,7 +107,7 @@ pub fn try_expand_macro(
 ///
 /// Extracts string values from IntentArguments for macro expansion.
 /// Enum values use the UI key (macro expansion handles internal mapping).
-pub fn intent_args_to_macro_args(intent: &StructuredIntent) -> BTreeMap<String, String> {
+pub(crate) fn intent_args_to_macro_args(intent: &StructuredIntent) -> BTreeMap<String, String> {
     let mut args = BTreeMap::new();
 
     for arg in &intent.arguments {
@@ -143,12 +143,12 @@ fn extract_string_value(value: &IntentArgValue) -> Option<String> {
 }
 
 /// Get macro schema for a verb (for UI display)
-pub fn get_macro_schema(verb_fqn: &str) -> Option<&'static crate::dsl_v2::macros::MacroSchema> {
+pub(crate) fn get_macro_schema(verb_fqn: &str) -> Option<&'static crate::dsl_v2::macros::MacroSchema> {
     macro_registry().get(verb_fqn)
 }
 
 /// List all available macros
-pub fn list_macros() -> Vec<MacroInfo> {
+pub(crate) fn list_macros() -> Vec<MacroInfo> {
     macro_registry()
         .all()
         .map(|(fqn, schema)| MacroInfo {
@@ -164,7 +164,7 @@ pub fn list_macros() -> Vec<MacroInfo> {
 
 /// Macro information for UI display
 #[derive(Debug, Clone)]
-pub struct MacroInfo {
+pub(crate) struct MacroInfo {
     pub fqn: String,
     pub label: String,
     pub description: String,
@@ -174,7 +174,7 @@ pub struct MacroInfo {
 }
 
 /// Get macros filtered by mode tag
-pub fn macros_by_mode(mode_tag: &str) -> Vec<MacroInfo> {
+pub(crate) fn macros_by_mode(mode_tag: &str) -> Vec<MacroInfo> {
     macro_registry()
         .by_mode_tag(mode_tag)
         .into_iter()
@@ -201,7 +201,7 @@ pub fn macros_by_mode(mode_tag: &str) -> Vec<MacroInfo> {
 
 /// Verb readiness status
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VerbReadiness {
+pub(crate) enum VerbReadiness {
     /// Verb can be executed (all prereqs satisfied)
     Ready,
     /// Verb is blocked by unmet prerequisites
@@ -210,7 +210,7 @@ pub enum VerbReadiness {
 
 /// Information about a verb's readiness for UI display
 #[derive(Debug, Clone)]
-pub struct VerbReadinessInfo {
+pub(crate) struct VerbReadinessInfo {
     pub fqn: String,
     pub label: String,
     pub description: String,
@@ -247,7 +247,7 @@ fn macro_prereq_to_condition(prereq: &MacroPrereq) -> PrereqCondition {
 }
 
 /// Check if a macro's prereqs are satisfied
-pub fn check_macro_prereqs(schema: &MacroSchema, dag_state: &DagState) -> VerbReadiness {
+pub(crate) fn check_macro_prereqs(schema: &MacroSchema, dag_state: &DagState) -> VerbReadiness {
     let mut missing = Vec::new();
 
     for prereq in &schema.prereqs {
@@ -282,7 +282,7 @@ pub fn check_macro_prereqs(schema: &MacroSchema, dag_state: &DagState) -> VerbRe
 }
 
 /// Check if a verb (by FQN) is ready to execute
-pub fn is_verb_ready(verb_fqn: &str, dag_state: &DagState) -> bool {
+pub(crate) fn is_verb_ready(verb_fqn: &str, dag_state: &DagState) -> bool {
     if let Some(schema) = macro_registry().get(verb_fqn) {
         matches!(check_macro_prereqs(schema, dag_state), VerbReadiness::Ready)
     } else {
@@ -292,7 +292,7 @@ pub fn is_verb_ready(verb_fqn: &str, dag_state: &DagState) -> bool {
 }
 
 /// Get readiness info for a specific verb
-pub fn get_verb_readiness(verb_fqn: &str, dag_state: &DagState) -> Option<VerbReadinessInfo> {
+pub(crate) fn get_verb_readiness(verb_fqn: &str, dag_state: &DagState) -> Option<VerbReadinessInfo> {
     let schema = macro_registry().get(verb_fqn)?;
     let readiness = check_macro_prereqs(schema, dag_state);
 
@@ -306,7 +306,7 @@ pub fn get_verb_readiness(verb_fqn: &str, dag_state: &DagState) -> Option<VerbRe
 }
 
 /// Get all ready verbs for a session (filtered by mode tag if provided)
-pub fn get_ready_verbs(session: &UnifiedSession, mode_tag: Option<&str>) -> Vec<VerbReadinessInfo> {
+pub(crate) fn get_ready_verbs(session: &UnifiedSession, mode_tag: Option<&str>) -> Vec<VerbReadinessInfo> {
     let dag_state = &session.dag_state;
 
     macro_registry()
@@ -337,7 +337,7 @@ pub fn get_ready_verbs(session: &UnifiedSession, mode_tag: Option<&str>) -> Vec<
 }
 
 /// Get all verbs with their readiness status for UI (e.g., DAG visualization)
-pub fn get_all_verb_readiness(
+pub(crate) fn get_all_verb_readiness(
     session: &UnifiedSession,
     mode_tag: Option<&str>,
 ) -> Vec<VerbReadinessInfo> {
@@ -370,7 +370,7 @@ pub fn get_all_verb_readiness(
 /// This should be called after a macro executes successfully to:
 /// 1. Mark the verb as completed
 /// 2. Set any state flags defined in the macro's `sets_state`
-pub fn update_dag_after_execution(session: &mut UnifiedSession, verb_fqn: &str) {
+pub(crate) fn update_dag_after_execution(session: &mut UnifiedSession, verb_fqn: &str) {
     // Mark verb as completed
     session.dag_state.mark_completed(verb_fqn);
 

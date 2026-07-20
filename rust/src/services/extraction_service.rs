@@ -14,11 +14,11 @@ use super::attribute_identity_service::AttributeIdentityService;
 // Note: ObPocError removed - not available in current error module
 
 /// Result type for extraction operations
-pub type ExtractionResult<T> = Result<T, ExtractionError>;
+pub(crate) type ExtractionResult<T> = Result<T, ExtractionError>;
 
 /// Extraction-specific errors
 #[derive(Debug, thiserror::Error)]
-pub enum ExtractionError {
+pub(crate) enum ExtractionError {
     #[error("Document not found: {0}")]
     DocumentNotFound(Uuid),
 
@@ -40,7 +40,7 @@ pub enum ExtractionError {
 
 /// Metadata about an extraction operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractionMetadata {
+pub(crate) struct ExtractionMetadata {
     pub method: String,
     pub confidence: f64,
     pub processing_time_ms: u64,
@@ -51,7 +51,7 @@ pub struct ExtractionMetadata {
 
 /// Bounding box for extracted data location
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BoundingBox {
+pub(crate) struct BoundingBox {
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -60,7 +60,7 @@ pub struct BoundingBox {
 
 /// Result of an extraction attempt
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractionAttempt {
+pub(crate) struct ExtractionAttempt {
     pub success: bool,
     pub value: Option<serde_json::Value>,
     pub metadata: ExtractionMetadata,
@@ -69,7 +69,7 @@ pub struct ExtractionAttempt {
 
 /// Core trait for document extraction services
 #[async_trait]
-pub trait ExtractionService: Send + Sync {
+pub(crate) trait ExtractionService: Send + Sync {
     /// Extract an attribute value from a document
     async fn extract(
         &self,
@@ -127,12 +127,12 @@ pub trait ExtractionService: Send + Sync {
 }
 
 /// OCR-based extraction service
-pub struct OcrExtractionService {
+pub(crate) struct OcrExtractionService {
     pool: PgPool,
 }
 
 impl OcrExtractionService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 

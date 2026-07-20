@@ -44,7 +44,7 @@ type DepRow = (
 
 /// Kind of dependency relationship
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DependencyKind {
+pub(crate) enum DependencyKind {
     /// Must exist before this entity can be created
     Required,
     /// May be linked if available
@@ -75,7 +75,7 @@ impl std::fmt::Display for DependencyKind {
 
 /// A single entity dependency
 #[derive(Debug, Clone)]
-pub struct EntityDep {
+pub(crate) struct EntityDep {
     /// Source entity type (e.g., "resource")
     pub from_type: String,
     /// Source entity subtype (e.g., "CUSTODY_ACCT")
@@ -96,13 +96,13 @@ pub struct EntityDep {
 
 /// Entity type key (type + optional subtype)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct EntityTypeKey {
+pub(crate) struct EntityTypeKey {
     pub entity_type: String,
     pub subtype: Option<String>,
 }
 
 impl EntityTypeKey {
-    pub fn new(entity_type: impl Into<String>, subtype: Option<impl Into<String>>) -> Self {
+    pub(crate) fn new(entity_type: impl Into<String>, subtype: Option<impl Into<String>>) -> Self {
         Self {
             entity_type: entity_type.into(),
             subtype: subtype.map(|s| s.into()),
@@ -110,7 +110,7 @@ impl EntityTypeKey {
     }
 
     /// Match with wildcard support (None matches any subtype)
-    pub fn matches(&self, other: &EntityTypeKey) -> bool {
+    pub(crate) fn matches(&self, other: &EntityTypeKey) -> bool {
         if self.entity_type != other.entity_type {
             return false;
         }
@@ -132,7 +132,7 @@ impl std::fmt::Display for EntityTypeKey {
 
 /// Registry of entity dependencies loaded from database
 #[derive(Debug, Clone)]
-pub struct EntityDependencyRegistry {
+pub(crate) struct EntityDependencyRegistry {
     /// All dependencies indexed by source entity
     deps_by_source: HashMap<EntityTypeKey, Vec<EntityDep>>,
     /// Reverse index: what depends on this entity
@@ -143,7 +143,7 @@ pub struct EntityDependencyRegistry {
 
 impl EntityDependencyRegistry {
     /// Create empty registry
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             deps_by_source: HashMap::new(),
             deps_by_target: HashMap::new(),
@@ -153,7 +153,7 @@ impl EntityDependencyRegistry {
 
     /// Load dependencies from database
     #[cfg(feature = "database")]
-    pub async fn load(pool: &PgPool) -> Result<Self, sqlx::Error> {
+    pub(crate) async fn load(pool: &PgPool) -> Result<Self, sqlx::Error> {
         let rows: Vec<DepRow> = sqlx::query_as(
             r#"SELECT from_type, from_subtype, to_type, to_subtype, via_arg,
                       dependency_kind, condition_expr, priority
@@ -201,7 +201,7 @@ impl EntityDependencyRegistry {
     }
 
     /// Get dependencies for an entity type (what does it need?)
-    pub fn dependencies_of(&self, entity_type: &str, subtype: Option<&str>) -> Vec<&EntityDep> {
+    pub(crate) fn dependencies_of(&self, entity_type: &str, subtype: Option<&str>) -> Vec<&EntityDep> {
         let key = EntityTypeKey::new(entity_type, subtype);
 
         // Try exact match first
@@ -217,20 +217,9 @@ impl EntityDependencyRegistry {
             .unwrap_or_default()
     }
 
-    /// Get required dependencies only
-    pub fn required_dependencies_of(
-        &self,
-        entity_type: &str,
-        subtype: Option<&str>,
-    ) -> Vec<&EntityDep> {
-        self.dependencies_of(entity_type, subtype)
-            .into_iter()
-            .filter(|d| d.kind == DependencyKind::Required)
-            .collect()
-    }
 
     /// Get dependents of an entity type (what needs it?)
-    pub fn dependents_of(&self, entity_type: &str, subtype: Option<&str>) -> Vec<&EntityDep> {
+    pub(crate) fn dependents_of(&self, entity_type: &str, subtype: Option<&str>) -> Vec<&EntityDep> {
         let key = EntityTypeKey::new(entity_type, subtype);
 
         // Try exact match first
@@ -246,18 +235,14 @@ impl EntityDependencyRegistry {
             .unwrap_or_default()
     }
 
-    /// Check if an entity type has any dependencies
-    pub fn has_dependencies(&self, entity_type: &str, subtype: Option<&str>) -> bool {
-        !self.dependencies_of(entity_type, subtype).is_empty()
-    }
 
     /// Get all known entity types
-    pub fn known_types(&self) -> impl Iterator<Item = &EntityTypeKey> {
+    pub(crate) fn known_types(&self) -> impl Iterator<Item = &EntityTypeKey> {
         self.known_types.iter()
     }
 
     /// Add a dependency programmatically (for testing)
-    pub fn add_dependency(&mut self, dep: EntityDep) {
+    pub(crate) fn add_dependency(&mut self, dep: EntityDep) {
         let source_key = EntityTypeKey::new(&dep.from_type, dep.from_subtype.as_ref());
         let target_key = EntityTypeKey::new(&dep.to_type, dep.to_subtype.as_ref());
 
@@ -285,7 +270,7 @@ impl Default for EntityDependencyRegistry {
 
 /// Entity instance for topological sorting
 #[derive(Debug, Clone)]
-pub struct EntityInstance {
+pub(crate) struct EntityInstance {
     /// Unique identifier for this instance (e.g., binding name or temp ID)
     pub id: String,
     /// Entity type
@@ -298,7 +283,7 @@ pub struct EntityInstance {
 
 /// Result of topological sort
 #[derive(Debug)]
-pub struct TopoSortUnifiedResult {
+pub(crate) struct TopoSortUnifiedResult {
     /// Sorted entity IDs
     pub sorted: Vec<String>,
     /// Parallel execution stages (if applicable)
@@ -309,7 +294,7 @@ pub struct TopoSortUnifiedResult {
 
 /// Topological sort error
 #[derive(Debug, Clone)]
-pub enum TopoSortUnifiedError {
+pub(crate) enum TopoSortUnifiedError {
     /// Cyclic dependency detected
     CyclicDependency { cycle: Vec<String> },
     /// Missing dependency
@@ -334,7 +319,7 @@ impl std::error::Error for TopoSortUnifiedError {}
 /// Topologically sort entity instances using Kahn's algorithm
 ///
 /// Returns both a linear ordering and parallel execution stages.
-pub fn topological_sort_unified(
+pub(crate) fn topological_sort_unified(
     instances: &[EntityInstance],
 ) -> Result<TopoSortUnifiedResult, TopoSortUnifiedError> {
     if instances.is_empty() {
@@ -435,7 +420,7 @@ static ENTITY_DEPS_REGISTRY: OnceLock<EntityDependencyRegistry> = OnceLock::new(
 ///
 /// This is a compile-time fallback that returns an empty registry.
 /// In production, use `init_entity_deps()` to load from database.
-pub fn entity_deps() -> &'static EntityDependencyRegistry {
+pub(crate) fn entity_deps() -> &'static EntityDependencyRegistry {
     ENTITY_DEPS_REGISTRY.get_or_init(EntityDependencyRegistry::new)
 }
 

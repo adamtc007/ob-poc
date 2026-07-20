@@ -7,7 +7,7 @@ use anyhow::{bail, Result};
 use super::pipeline::OnboardingRequest;
 
 /// Validate the onboarding request for structural correctness.
-pub fn validate_request(request: &OnboardingRequest) -> Result<()> {
+pub(crate) fn validate_request(request: &OnboardingRequest) -> Result<()> {
     validate_entity_type(request)?;
     validate_attributes(request)?;
     validate_verb_contracts(request)?;

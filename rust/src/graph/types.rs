@@ -48,7 +48,7 @@ use uuid::Uuid;
 /// - A jurisdiction scope
 /// - An entity neighborhood (N hops from a focal entity)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityGraph {
+pub(crate) struct EntityGraph {
     /// All entity nodes, indexed by entity_id
     pub nodes: HashMap<Uuid, GraphNode>,
 
@@ -100,7 +100,7 @@ impl Default for EntityGraph {
 
 impl EntityGraph {
     /// Create a new empty graph
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             nodes: HashMap::new(),
             cbus: HashMap::new(),
@@ -119,70 +119,40 @@ impl EntityGraph {
         }
     }
 
-    /// Create a graph with a specific scope
-    pub fn with_scope(scope: GraphScope) -> Self {
-        let mut graph = Self::new();
-        graph.scope = scope;
-        graph
-    }
 
     /// Add an entity node to the graph
-    pub fn add_node(&mut self, node: GraphNode) {
+    pub(crate) fn add_node(&mut self, node: GraphNode) {
         self.nodes.insert(node.entity_id, node);
     }
 
     /// Add a CBU container node
-    pub fn add_cbu(&mut self, cbu: CbuNode) {
+    pub(crate) fn add_cbu(&mut self, cbu: CbuNode) {
         self.cbus.insert(cbu.cbu_id, cbu);
     }
 
     /// Get a node by ID
-    pub fn get_node(&self, entity_id: &Uuid) -> Option<&GraphNode> {
+    pub(crate) fn get_node(&self, entity_id: &Uuid) -> Option<&GraphNode> {
         self.nodes.get(entity_id)
     }
 
-    /// Get a mutable node by ID
-    pub fn get_node_mut(&mut self, entity_id: &Uuid) -> Option<&mut GraphNode> {
-        self.nodes.get_mut(entity_id)
-    }
 
     /// Get a CBU by ID
-    pub fn get_cbu(&self, cbu_id: &Uuid) -> Option<&CbuNode> {
+    pub(crate) fn get_cbu(&self, cbu_id: &Uuid) -> Option<&CbuNode> {
         self.cbus.get(cbu_id)
     }
 
     /// Check if a node exists
-    pub fn has_node(&self, entity_id: &Uuid) -> bool {
+    pub(crate) fn has_node(&self, entity_id: &Uuid) -> bool {
         self.nodes.contains_key(entity_id)
     }
 
-    /// Add an ownership edge
-    pub fn add_ownership_edge(&mut self, edge: OwnershipEdge) {
-        self.ownership_edges.push(edge);
-    }
 
-    /// Add a control edge
-    pub fn add_control_edge(&mut self, edge: ControlEdge) {
-        self.control_edges.push(edge);
-    }
 
-    /// Add a fund structure edge
-    pub fn add_fund_edge(&mut self, edge: FundEdge) {
-        self.fund_edges.push(edge);
-    }
 
-    /// Add a service edge
-    pub fn add_service_edge(&mut self, edge: ServiceEdge) {
-        self.service_edges.push(edge);
-    }
 
-    /// Add a role assignment
-    pub fn add_role_assignment(&mut self, role: RoleAssignment) {
-        self.role_assignments.push(role);
-    }
 
     /// Compute statistics for the graph
-    pub fn compute_stats(&mut self) {
+    pub(crate) fn compute_stats(&mut self) {
         let total_edges = self.ownership_edges.len()
             + self.control_edges.len()
             + self.fund_edges.len()
@@ -209,7 +179,7 @@ impl EntityGraph {
     ///
     /// A terminus is a node with no owners (top of ownership chain).
     /// Depth 0 = terminus, depth N = N ownership hops from nearest terminus.
-    pub fn compute_depths(&mut self) {
+    pub(crate) fn compute_depths(&mut self) {
         use std::collections::VecDeque;
 
         // First, identify termini (nodes with no owners) and reset depths
@@ -258,7 +228,7 @@ impl EntityGraph {
     ///
     /// Call this after loading edges to populate the owners/owned/controls/controlled_by
     /// vectors in each node.
-    pub fn rebuild_adjacency(&mut self) {
+    pub(crate) fn rebuild_adjacency(&mut self) {
         // Clear existing adjacency lists
         for node in self.nodes.values_mut() {
             node.owners.clear();
@@ -296,7 +266,7 @@ impl EntityGraph {
     /// - Computes depths from termini
     /// - Computes statistics
     #[cfg(feature = "database")]
-    pub async fn load(
+    pub(crate) async fn load(
         scope: GraphScope,
         repo: &impl crate::database::GraphRepository,
     ) -> anyhow::Result<Self> {
@@ -337,7 +307,7 @@ impl EntityGraph {
 
     /// Load with a specific as-of date for temporal queries
     #[cfg(feature = "database")]
-    pub async fn load_as_of(
+    pub(crate) async fn load_as_of(
         scope: GraphScope,
         as_of: NaiveDate,
         repo: &impl crate::database::GraphRepository,
@@ -384,7 +354,7 @@ impl EntityGraph {
     ///
     /// This positions all nodes based on their role categories and the
     /// LayoutBehavior derived from the taxonomy.
-    pub fn layout(&mut self, view_mode: &str, orientation: &str) {
+    pub(crate) fn layout(&mut self, view_mode: &str, orientation: &str) {
         match (
             view_mode.to_uppercase().as_str(),
             orientation.to_uppercase().as_str(),
@@ -858,7 +828,7 @@ impl GraphNode {
 
 /// A CBU container node (for CBU container view)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CbuNode {
+pub(crate) struct CbuNode {
     /// CBU ID
     pub cbu_id: Uuid,
 
@@ -894,7 +864,7 @@ pub struct CbuNode {
 }
 
 impl CbuNode {
-    pub fn new(cbu_id: Uuid, name: String) -> Self {
+    pub(crate) fn new(cbu_id: Uuid, name: String) -> Self {
         Self {
             cbu_id,
             name,
@@ -918,7 +888,7 @@ impl CbuNode {
 
 /// Ownership edge (percentage-based ownership relationship)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OwnershipEdge {
+pub(crate) struct OwnershipEdge {
     /// Edge ID
     pub id: Uuid,
 
@@ -949,7 +919,7 @@ pub struct OwnershipEdge {
 }
 
 impl OwnershipEdge {
-    pub fn new(
+    pub(crate) fn new(
         from_entity_id: Uuid,
         to_entity_id: Uuid,
         percentage: Decimal,
@@ -969,7 +939,7 @@ impl OwnershipEdge {
     }
 
     /// Check if this edge is effective as of a given date
-    pub fn is_effective_as_of(&self, date: NaiveDate) -> bool {
+    pub(crate) fn is_effective_as_of(&self, date: NaiveDate) -> bool {
         let from_ok = self.effective_from.is_none_or(|d| d <= date);
         let to_ok = self.effective_to.is_none_or(|d| d >= date);
         from_ok && to_ok
@@ -978,7 +948,7 @@ impl OwnershipEdge {
 
 /// Control edge (non-ownership control relationship)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ControlEdge {
+pub(crate) struct ControlEdge {
     /// Edge ID
     pub id: Uuid,
 
@@ -1003,7 +973,7 @@ pub struct ControlEdge {
 }
 
 impl ControlEdge {
-    pub fn new(controller_id: Uuid, controlled_id: Uuid, control_type: ControlType) -> Self {
+    pub(crate) fn new(controller_id: Uuid, controlled_id: Uuid, control_type: ControlType) -> Self {
         Self {
             id: Uuid::new_v4(),
             controller_id,
@@ -1016,7 +986,7 @@ impl ControlEdge {
     }
 
     /// Check if this edge is effective as of a given date
-    pub fn is_effective_as_of(&self, date: NaiveDate) -> bool {
+    pub(crate) fn is_effective_as_of(&self, date: NaiveDate) -> bool {
         let from_ok = self.effective_from.is_none_or(|d| d <= date);
         let to_ok = self.effective_to.is_none_or(|d| d >= date);
         from_ok && to_ok
@@ -1025,7 +995,7 @@ impl ControlEdge {
 
 /// Fund structure edge
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FundEdge {
+pub(crate) struct FundEdge {
     /// Edge ID
     pub id: Uuid,
 
@@ -1044,7 +1014,7 @@ pub struct FundEdge {
 }
 
 impl FundEdge {
-    pub fn new(parent_id: Uuid, child_id: Uuid, relationship_type: FundRelationshipType) -> Self {
+    pub(crate) fn new(parent_id: Uuid, child_id: Uuid, relationship_type: FundRelationshipType) -> Self {
         Self {
             id: Uuid::new_v4(),
             parent_id,
@@ -1057,7 +1027,7 @@ impl FundEdge {
 
 /// Service delivery edge
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceEdge {
+pub(crate) struct ServiceEdge {
     /// Edge ID
     pub id: Uuid,
 
@@ -1077,7 +1047,7 @@ pub struct ServiceEdge {
 
 /// Role assignment (entity role within a CBU)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RoleAssignment {
+pub(crate) struct RoleAssignment {
     /// Assignment ID
     pub id: Uuid,
 
@@ -1108,7 +1078,7 @@ pub struct RoleAssignment {
 }
 
 impl RoleAssignment {
-    pub fn new(cbu_id: Uuid, entity_id: Uuid, role: String) -> Self {
+    pub(crate) fn new(cbu_id: Uuid, entity_id: Uuid, role: String) -> Self {
         Self {
             id: Uuid::new_v4(),
             cbu_id,
@@ -1130,7 +1100,7 @@ impl RoleAssignment {
 /// Entity type classification
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum EntityType {
+pub(crate) enum EntityType {
     #[default]
     Unknown,
     // Natural persons
@@ -1188,12 +1158,12 @@ impl FromStr for EntityType {
 
 impl EntityType {
     /// Check if this is a natural person type
-    pub fn is_natural_person(&self) -> bool {
+    pub(crate) fn is_natural_person(&self) -> bool {
         matches!(self, Self::ProperPerson)
     }
 
     /// Check if this is a fund type
-    pub fn is_fund(&self) -> bool {
+    pub(crate) fn is_fund(&self) -> bool {
         matches!(
             self,
             Self::Fund
@@ -1232,7 +1202,7 @@ impl EntityType {
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum PersonState {
+pub(crate) enum PersonState {
     /// Ghost - name only, minimal attributes
     /// Discovered from document mention, ownership chain, or allegation
     /// Cannot complete KYC until identified
@@ -1259,7 +1229,7 @@ impl FromStr for PersonState {
 }
 
 impl PersonState {
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Ghost => "GHOST",
             Self::Identified => "IDENTIFIED",
@@ -1267,28 +1237,28 @@ impl PersonState {
         }
     }
 
-    pub fn is_ghost(&self) -> bool {
+    pub(crate) fn is_ghost(&self) -> bool {
         matches!(self, Self::Ghost)
     }
 
-    pub fn is_verified(&self) -> bool {
+    pub(crate) fn is_verified(&self) -> bool {
         matches!(self, Self::Verified)
     }
 
     /// Can this entity proceed to KYC screening?
     /// Ghost entities need identification first.
-    pub fn can_screen(&self) -> bool {
+    pub(crate) fn can_screen(&self) -> bool {
         !self.is_ghost()
     }
 
     /// Can this entity complete KYC?
     /// Only verified entities can complete.
-    pub fn can_complete_kyc(&self) -> bool {
+    pub(crate) fn can_complete_kyc(&self) -> bool {
         self.is_verified()
     }
 
     /// Display label for UI
-    pub fn display_label(&self) -> &str {
+    pub(crate) fn display_label(&self) -> &str {
         match self {
             Self::Ghost => "👻 Ghost",
             Self::Identified => "Identified",
@@ -1300,7 +1270,7 @@ impl PersonState {
 /// Ownership type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum OwnershipType {
+pub(crate) enum OwnershipType {
     #[default]
     Direct,
     Indirect,
@@ -1325,7 +1295,7 @@ impl FromStr for OwnershipType {
 /// Control type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ControlType {
+pub(crate) enum ControlType {
     #[default]
     VotingRights,
     BoardMember,
@@ -1360,7 +1330,7 @@ impl FromStr for ControlType {
 /// Fund structure relationship type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum FundRelationshipType {
+pub(crate) enum FundRelationshipType {
     /// Umbrella contains subfund
     #[default]
     Contains,
@@ -1398,7 +1368,7 @@ impl FromStr for FundRelationshipType {
 /// Service relationship type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ServiceRelationshipType {
+pub(crate) enum ServiceRelationshipType {
     /// CBU uses product
     UsesProduct,
     /// Product provides service
@@ -1412,7 +1382,7 @@ pub enum ServiceRelationshipType {
 /// CBU status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CbuStatus {
+pub(crate) enum CbuStatus {
     #[default]
     Active,
     Pending,
@@ -1423,7 +1393,7 @@ pub enum CbuStatus {
 /// Verification status for edges
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum VerificationStatus {
+pub(crate) enum VerificationStatus {
     #[default]
     Unverified,
     Alleged,
@@ -1452,7 +1422,7 @@ impl FromStr for VerificationStatus {
 /// UBO treatment for entities
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum UboTreatment {
+pub(crate) enum UboTreatment {
     /// Natural person - terminus of ownership chain
     Terminus,
     /// Look through this entity to find owners
@@ -1490,7 +1460,7 @@ impl FromStr for UboTreatment {
 /// Role category from taxonomy - determines layout behavior
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum RoleCategory {
+pub(crate) enum RoleCategory {
     /// Ownership chain - pyramid layout with UBOs at apex
     OwnershipChain,
     /// Control chain - overlay on owned entities
@@ -1547,7 +1517,7 @@ impl FromStr for RoleCategory {
 }
 
 impl RoleCategory {
-    pub fn layout_behavior(&self) -> LayoutBehavior {
+    pub(crate) fn layout_behavior(&self) -> LayoutBehavior {
         match self {
             Self::OwnershipChain | Self::OwnershipControl => LayoutBehavior::PyramidUp,
             Self::ControlChain => LayoutBehavior::Overlay,
@@ -1564,7 +1534,7 @@ impl RoleCategory {
         }
     }
 
-    pub fn is_ownership_or_control(&self) -> bool {
+    pub(crate) fn is_ownership_or_control(&self) -> bool {
         matches!(
             self,
             Self::OwnershipChain
@@ -1583,7 +1553,7 @@ impl RoleCategory {
 /// Layout behavior hint for node positioning
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum LayoutBehavior {
+pub(crate) enum LayoutBehavior {
     PyramidUp,
     PyramidDown,
     TreeDown,
@@ -1620,7 +1590,7 @@ impl FromStr for LayoutBehavior {
 
 /// Graph filters for visibility control
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphFilters {
+pub(crate) struct GraphFilters {
     /// Ownership/control prong filter
     pub prong: ProngFilter,
 
@@ -1672,7 +1642,7 @@ impl Default for GraphFilters {
 /// Ownership/control prong filter
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ProngFilter {
+pub(crate) enum ProngFilter {
     /// Show both ownership and control
     #[default]
     Both,
@@ -1685,7 +1655,7 @@ pub enum ProngFilter {
 /// Scope of the loaded graph
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum GraphScope {
+pub(crate) enum GraphScope {
     /// Empty graph (initial state)
     #[default]
     Empty,
@@ -1715,7 +1685,7 @@ pub enum GraphScope {
 
 /// Navigation history for back/forward in the graph
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct NavigationHistory {
+pub(crate) struct NavigationHistory {
     /// Stack of previously visited entities
     back_stack: Vec<Uuid>,
 
@@ -1727,7 +1697,7 @@ pub struct NavigationHistory {
 }
 
 impl NavigationHistory {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             back_stack: Vec::new(),
             forward_stack: Vec::new(),
@@ -1736,7 +1706,7 @@ impl NavigationHistory {
     }
 
     /// Push current location before navigating away
-    pub fn push(&mut self, entity_id: Uuid) {
+    pub(crate) fn push(&mut self, entity_id: Uuid) {
         self.back_stack.push(entity_id);
         self.forward_stack.clear(); // Forward stack clears on new navigation
 
@@ -1747,7 +1717,7 @@ impl NavigationHistory {
     }
 
     /// Go back to previous location
-    pub fn go_back(&mut self, current: Option<Uuid>) -> Option<Uuid> {
+    pub(crate) fn go_back(&mut self, current: Option<Uuid>) -> Option<Uuid> {
         if let Some(prev) = self.back_stack.pop() {
             if let Some(curr) = current {
                 self.forward_stack.push(curr);
@@ -1759,7 +1729,7 @@ impl NavigationHistory {
     }
 
     /// Go forward
-    pub fn go_forward(&mut self, current: Option<Uuid>) -> Option<Uuid> {
+    pub(crate) fn go_forward(&mut self, current: Option<Uuid>) -> Option<Uuid> {
         if let Some(next) = self.forward_stack.pop() {
             if let Some(curr) = current {
                 self.back_stack.push(curr);
@@ -1771,18 +1741,18 @@ impl NavigationHistory {
     }
 
     /// Clear all history
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.back_stack.clear();
         self.forward_stack.clear();
     }
 
     /// Check if we can go back
-    pub fn can_go_back(&self) -> bool {
+    pub(crate) fn can_go_back(&self) -> bool {
         !self.back_stack.is_empty()
     }
 
     /// Check if we can go forward
-    pub fn can_go_forward(&self) -> bool {
+    pub(crate) fn can_go_forward(&self) -> bool {
         !self.forward_stack.is_empty()
     }
 }
@@ -1793,7 +1763,7 @@ impl NavigationHistory {
 
 /// Graph statistics
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct GraphStats {
+pub(crate) struct GraphStats {
     pub total_nodes: usize,
     pub total_edges: usize,
     pub nodes_by_layer: HashMap<String, usize>,
@@ -1809,7 +1779,7 @@ pub struct GraphStats {
 /// View mode for graph rendering
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ViewMode {
+pub(crate) enum ViewMode {
     /// CBU as container with entities inside
     #[default]
     CbuContainer,
@@ -1850,7 +1820,7 @@ impl FromStr for ViewMode {
 /// Canvas orientation
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum Orientation {
+pub(crate) enum Orientation {
     #[default]
     Vertical,
     Horizontal,
@@ -1862,7 +1832,7 @@ pub enum Orientation {
 
 /// Per-node position offset from template layout
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeOffset {
+pub(crate) struct NodeOffset {
     pub node_id: String,
     pub dx: f32,
     pub dy: f32,
@@ -1870,7 +1840,7 @@ pub struct NodeOffset {
 
 /// Per-node size override
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeSizeOverride {
+pub(crate) struct NodeSizeOverride {
     pub node_id: String,
     pub w: f32,
     pub h: f32,
@@ -1878,7 +1848,7 @@ pub struct NodeSizeOverride {
 
 /// Saved layout overrides for a CBU/view
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct LayoutOverride {
+pub(crate) struct LayoutOverride {
     #[serde(default)]
     pub positions: Vec<NodeOffset>,
     #[serde(default)]
@@ -1893,13 +1863,13 @@ pub struct LayoutOverride {
 ///
 /// This type is maintained for backward compatibility with existing code.
 /// New code should use `EntityGraph` directly.
-pub type CbuGraph = LegacyCbuGraph;
+pub(crate) type CbuGraph = LegacyCbuGraph;
 
 /// Legacy CBU graph structure for backward compatibility
 ///
 /// This wraps EntityGraph to provide the old API shape for existing tests and code.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LegacyCbuGraph {
+pub(crate) struct LegacyCbuGraph {
     pub cbu_id: Uuid,
     pub label: String,
     pub cbu_category: Option<String>,
@@ -1912,7 +1882,7 @@ pub struct LegacyCbuGraph {
 
 /// Legacy graph node for backward compatibility
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct LegacyGraphNode {
+pub(crate) struct LegacyGraphNode {
     pub id: String,
     pub node_type: NodeType,
     pub layer: LayerType,
@@ -1984,7 +1954,7 @@ fn is_false(b: &bool) -> bool {
 
 /// Legacy graph edge for backward compatibility
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LegacyGraphEdge {
+pub(crate) struct LegacyGraphEdge {
     pub id: String,
     pub source: String,
     pub target: String,
@@ -2034,7 +2004,7 @@ pub enum NodeType {
 /// Legacy layer types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum LayerType {
+pub(crate) enum LayerType {
     #[default]
     Core,
     Custody,
@@ -2047,7 +2017,7 @@ pub enum LayerType {
 /// Legacy node status
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum NodeStatus {
+pub(crate) enum NodeStatus {
     #[default]
     Active,
     Pending,
@@ -2390,7 +2360,7 @@ impl EdgeType {
 
 /// Layer info for UI rendering
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LayerInfo {
+pub(crate) struct LayerInfo {
     pub layer_type: LayerType,
     pub label: String,
     pub color: String,
@@ -2400,7 +2370,7 @@ pub struct LayerInfo {
 
 /// Legacy graph stats
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct LegacyGraphStats {
+pub(crate) struct LegacyGraphStats {
     pub total_nodes: usize,
     pub total_edges: usize,
     pub nodes_by_layer: HashMap<String, usize>,
@@ -2408,7 +2378,7 @@ pub struct LegacyGraphStats {
 }
 
 impl LegacyCbuGraph {
-    pub fn new(cbu_id: Uuid, label: String) -> Self {
+    pub(crate) fn new(cbu_id: Uuid, label: String) -> Self {
         Self {
             cbu_id,
             label,
@@ -2421,7 +2391,7 @@ impl LegacyCbuGraph {
         }
     }
 
-    pub fn with_metadata(
+    pub(crate) fn with_metadata(
         cbu_id: Uuid,
         label: String,
         cbu_category: Option<String>,
@@ -2439,19 +2409,19 @@ impl LegacyCbuGraph {
         }
     }
 
-    pub fn add_node(&mut self, node: LegacyGraphNode) {
+    pub(crate) fn add_node(&mut self, node: LegacyGraphNode) {
         self.nodes.push(node);
     }
 
-    pub fn has_node(&self, id: &str) -> bool {
+    pub(crate) fn has_node(&self, id: &str) -> bool {
         self.nodes.iter().any(|n| n.id == id)
     }
 
-    pub fn add_edge(&mut self, edge: LegacyGraphEdge) {
+    pub(crate) fn add_edge(&mut self, edge: LegacyGraphEdge) {
         self.edges.push(edge);
     }
 
-    pub fn compute_stats(&mut self) {
+    pub(crate) fn compute_stats(&mut self) {
         self.stats.total_nodes = self.nodes.len();
         self.stats.total_edges = self.edges.len();
 
@@ -2467,7 +2437,7 @@ impl LegacyCbuGraph {
         }
     }
 
-    pub fn filter_to_products_only(&mut self) {
+    pub(crate) fn filter_to_products_only(&mut self) {
         let kept_node_ids: std::collections::HashSet<String> = self
             .nodes
             .iter()
@@ -2485,7 +2455,7 @@ impl LegacyCbuGraph {
     // Filtering is now done at query time by ConfigDrivenGraphBuilder using
     // view_modes.node_types and view_modes.edge_types from the database.
 
-    pub fn compute_visual_hints(&mut self) {
+    pub(crate) fn compute_visual_hints(&mut self) {
         let mut edge_counts: HashMap<String, usize> = HashMap::new();
         for edge in &self.edges {
             *edge_counts.entry(edge.source.clone()).or_insert(0) += 1;
@@ -2535,7 +2505,7 @@ impl LegacyCbuGraph {
         }
     }
 
-    pub fn build_layer_info(&mut self) {
+    pub(crate) fn build_layer_info(&mut self) {
         self.layers = vec![
             LayerInfo {
                 layer_type: LayerType::Core,

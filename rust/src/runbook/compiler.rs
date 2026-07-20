@@ -92,7 +92,7 @@ use super::verb_classifier::VerbClassification;
 /// - `ConstraintViolation` — expanded verbs violate pack constraints
 /// - `CompilationError` — typed error from a §6.2 pipeline phase (INV-7)
 #[allow(clippy::too_many_arguments)]
-pub fn compile_verb(
+pub(crate) fn compile_verb(
     session_id: Uuid,
     classification: &VerbClassification<'_>,
     args: &BTreeMap<String, String>,

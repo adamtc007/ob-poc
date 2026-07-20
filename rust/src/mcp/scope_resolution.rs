@@ -110,7 +110,7 @@ const MIN_SINGLE_TOKEN_CONFIDENCE: f64 = 0.85;
 /// Outcome of scope resolution - deterministic UX contract
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum ScopeResolutionOutcome {
+pub(crate) enum ScopeResolutionOutcome {
     /// Scope resolved unambiguously - set anchor silently, show "Client: X" chip
     Resolved {
         group_id: Uuid,
@@ -127,7 +127,7 @@ pub enum ScopeResolutionOutcome {
 
 /// A candidate for scope resolution (when ambiguous)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScopeCandidate {
+pub(crate) struct ScopeCandidate {
     pub group_id: Uuid,
     pub group_name: String,
     pub matched_alias: String,
@@ -140,7 +140,7 @@ pub struct ScopeCandidate {
 
 /// Scope context for entity resolution
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ScopeContext {
+pub(crate) struct ScopeContext {
     /// Active client group ID (if resolved)
     pub client_group_id: Option<Uuid>,
     /// Client group name (for display)
@@ -150,23 +150,19 @@ pub struct ScopeContext {
 }
 
 impl ScopeContext {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_client_group(mut self, group_id: Uuid, group_name: String) -> Self {
+    pub(crate) fn with_client_group(mut self, group_id: Uuid, group_name: String) -> Self {
         self.client_group_id = Some(group_id);
         self.client_group_name = Some(group_name);
         self
     }
 
-    pub fn with_persona(mut self, persona: String) -> Self {
-        self.persona = Some(persona);
-        self
-    }
 
     /// Check if we have client scope set
-    pub fn has_scope(&self) -> bool {
+    pub(crate) fn has_scope(&self) -> bool {
         self.client_group_id.is_some()
     }
 }
@@ -176,7 +172,7 @@ impl ScopeContext {
 // =============================================================================
 
 /// Scope resolver - detects and resolves client group context
-pub struct ScopeResolver {
+pub(crate) struct ScopeResolver {
     /// Threshold for exact match (alias_norm = query)
     #[allow(dead_code)]
     exact_threshold: f64,
@@ -197,7 +193,7 @@ impl Default for ScopeResolver {
 }
 
 impl ScopeResolver {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
@@ -209,7 +205,7 @@ impl ScopeResolver {
     ///
     /// The old "≤3 words" heuristic is REMOVED - it was too permissive and caused
     /// "Allianz CBU", "Allianz custody", "Lux funds" to be consumed by Stage 0.
-    pub fn is_scope_phrase(input: &str) -> bool {
+    pub(crate) fn is_scope_phrase(input: &str) -> bool {
         let lower = input.to_lowercase();
 
         // GUARD: If contains target indicators, NOT a scope phrase
@@ -238,7 +234,7 @@ impl ScopeResolver {
 
     /// Check if input has target indicators (CBU, fund, entity, etc.)
     /// If present, the input is referencing a target, not setting scope.
-    pub fn has_target_indicator(input: &str) -> bool {
+    pub(crate) fn has_target_indicator(input: &str) -> bool {
         let lower = input.to_lowercase();
         TARGET_INDICATORS.iter().any(|t| {
             lower
@@ -263,7 +259,7 @@ impl ScopeResolver {
     }
 
     /// Extract the potential client name from a scope phrase
-    pub fn extract_client_name(input: &str) -> Option<String> {
+    pub(crate) fn extract_client_name(input: &str) -> Option<String> {
         let lower = input.to_lowercase();
         let prefixes = [
             "work on ",
@@ -305,7 +301,7 @@ impl ScopeResolver {
     /// - `Unresolved` if no match found
     /// - `NotScopePhrase` if input doesn't look like a scope-setting phrase
     #[cfg(feature = "database")]
-    pub async fn resolve(&self, input: &str, pool: &PgPool) -> Result<ScopeResolutionOutcome> {
+    pub(crate) async fn resolve(&self, input: &str, pool: &PgPool) -> Result<ScopeResolutionOutcome> {
         // Check if this looks like a scope-setting phrase
         if !Self::is_scope_phrase(input) {
             return Ok(ScopeResolutionOutcome::NotScopePhrase);
@@ -413,7 +409,7 @@ impl ScopeResolver {
     ///
     /// When user picks a candidate from the list, reinforce that alias
     #[cfg(feature = "database")]
-    pub async fn record_selection(
+    pub(crate) async fn record_selection(
         pool: &PgPool,
         group_id: Uuid,
         alias_used: &str,
@@ -501,7 +497,7 @@ pub async fn search_entities_in_scope(
 
 /// An entity match from scoped search
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityMatch {
+pub(crate) struct EntityMatch {
     pub entity_id: Uuid,
     pub entity_name: String,
     pub matched_tag: String,
@@ -516,7 +512,7 @@ pub struct EntityMatch {
 /// Unified scoped match result - works for CBU, entity, client_group, etc.
 /// Includes display metadata for disambiguation UI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScopedMatch {
+pub(crate) struct ScopedMatch {
     pub id: Uuid,
     pub name: String,
     pub matched_tag: String,

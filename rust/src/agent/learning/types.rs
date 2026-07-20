@@ -12,7 +12,7 @@ use uuid::Uuid;
 /// Emitted at key points in the intent resolution pipeline.
 /// Fire-and-forget - never blocks the hot path.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentEvent {
+pub(crate) struct AgentEvent {
     pub timestamp: DateTime<Utc>,
     pub session_id: Option<Uuid>,
     pub payload: AgentEventPayload,
@@ -21,7 +21,7 @@ pub struct AgentEvent {
 /// Event payload variants for the intent resolution pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
-pub enum AgentEventPayload {
+pub(crate) enum AgentEventPayload {
     /// User message received, about to process
     MessageReceived {
         message: String,
@@ -96,7 +96,7 @@ pub enum AgentEventPayload {
 
 /// An intent extracted by the LLM.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractedIntent {
+pub(crate) struct ExtractedIntent {
     pub action: String,
     pub entity_refs: Vec<String>,
     pub parameters: serde_json::Value,
@@ -105,7 +105,7 @@ pub struct ExtractedIntent {
 
 /// A resolved entity reference.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedEntity {
+pub(crate) struct ResolvedEntity {
     pub entity_id: Uuid,
     pub name: String,
     pub entity_type: String,
@@ -114,7 +114,7 @@ pub struct ResolvedEntity {
 
 /// Candidate entity during resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityCandidate {
+pub(crate) struct EntityCandidate {
     pub entity_id: Uuid,
     pub name: String,
     pub score: f32,
@@ -123,7 +123,7 @@ pub struct EntityCandidate {
 
 /// How entity was resolved.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ResolutionMethod {
+pub(crate) enum ResolutionMethod {
     /// Exact name match
     ExactMatch,
     /// Fuzzy match via EntityGateway
@@ -138,7 +138,7 @@ pub enum ResolutionMethod {
 
 /// Type of correction made by user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum CorrectionType {
+pub(crate) enum CorrectionType {
     /// Changed the verb
     VerbChange { from_verb: String, to_verb: String },
     /// Changed entity reference
@@ -163,7 +163,7 @@ pub enum CorrectionType {
 impl AgentEvent {
     /// Create a message received event.
     #[inline]
-    pub fn message_received(
+    pub(crate) fn message_received(
         session_id: Option<Uuid>,
         message: String,
         cbu_id: Option<Uuid>,
@@ -177,7 +177,7 @@ impl AgentEvent {
 
     /// Create an intent extracted event.
     #[inline]
-    pub fn intent_extracted(
+    pub(crate) fn intent_extracted(
         session_id: Option<Uuid>,
         user_message: String,
         intents: Vec<ExtractedIntent>,
@@ -200,7 +200,7 @@ impl AgentEvent {
 
     /// Create a verb selected event.
     #[inline]
-    pub fn verb_selected(
+    pub(crate) fn verb_selected(
         session_id: Option<Uuid>,
         intent_summary: String,
         selected_verb: String,
@@ -221,7 +221,7 @@ impl AgentEvent {
 
     /// Create an entity resolved event.
     #[inline]
-    pub fn entity_resolved(
+    pub(crate) fn entity_resolved(
         session_id: Option<Uuid>,
         query: String,
         resolved_to: Option<ResolvedEntity>,
@@ -242,7 +242,7 @@ impl AgentEvent {
 
     /// Create an entity resolution failed event.
     #[inline]
-    pub fn entity_resolution_failed(
+    pub(crate) fn entity_resolution_failed(
         session_id: Option<Uuid>,
         query: String,
         reason: String,
@@ -261,7 +261,7 @@ impl AgentEvent {
 
     /// Create a DSL generated event.
     #[inline]
-    pub fn dsl_generated(
+    pub(crate) fn dsl_generated(
         session_id: Option<Uuid>,
         intents_count: u32,
         dsl: String,
@@ -280,7 +280,7 @@ impl AgentEvent {
 
     /// Create a user correction event.
     #[inline]
-    pub fn user_correction(
+    pub(crate) fn user_correction(
         session_id: Option<Uuid>,
         original_message: String,
         generated_dsl: String,
@@ -301,7 +301,7 @@ impl AgentEvent {
 
     /// Create an execution completed event.
     #[inline]
-    pub fn execution_completed(
+    pub(crate) fn execution_completed(
         session_id: Option<Uuid>,
         dsl: String,
         success: bool,
@@ -322,7 +322,7 @@ impl AgentEvent {
 
     /// Create a session summary event.
     #[inline]
-    pub fn session_summary(
+    pub(crate) fn session_summary(
         session_id: Uuid,
         messages_processed: u32,
         intents_extracted: u32,
@@ -348,7 +348,7 @@ impl AgentEvent {
 
 impl AgentEventPayload {
     /// Get the event type as a string (for DB storage).
-    pub fn event_type_str(&self) -> &'static str {
+    pub(crate) fn event_type_str(&self) -> &'static str {
         match self {
             AgentEventPayload::MessageReceived { .. } => "message_received",
             AgentEventPayload::IntentExtracted { .. } => "intent_extracted",
@@ -363,7 +363,7 @@ impl AgentEventPayload {
     }
 
     /// Is this a learning signal (indicates something to learn from)?
-    pub fn is_learning_signal(&self) -> bool {
+    pub(crate) fn is_learning_signal(&self) -> bool {
         matches!(
             self,
             AgentEventPayload::UserCorrection { .. }

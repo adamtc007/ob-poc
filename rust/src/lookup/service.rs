@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 /// Result of unified lookup analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LookupResult {
+pub(crate) struct LookupResult {
     /// Entity snapshot metadata used for this lookup pass.
     pub entity_snapshot: EntitySnapshotMetadata,
 
@@ -40,7 +40,7 @@ pub struct LookupResult {
 
 /// Metadata for the entity-linking snapshot used during lookup.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EntitySnapshotMetadata {
+pub(crate) struct EntitySnapshotMetadata {
     pub hash: String,
     pub version: u32,
     pub entity_count: usize,
@@ -48,7 +48,7 @@ pub struct EntitySnapshotMetadata {
 
 /// The dominant entity from analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DominantEntity {
+pub(crate) struct DominantEntity {
     pub entity_id: Uuid,
     pub canonical_name: String,
     pub entity_kind: String,
@@ -315,7 +315,7 @@ impl LookupService {
 
 #[cfg(test)]
 /// Create a stub lookup service for testing
-pub fn stub_lookup_service() -> LookupService {
+pub(crate) fn stub_lookup_service() -> LookupService {
     use ob_poc_entity_linking::NullEntityLinkingService;
     LookupService::new(Arc::new(NullEntityLinkingService))
 }

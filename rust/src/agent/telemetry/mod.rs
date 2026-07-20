@@ -6,7 +6,7 @@
 pub mod redaction;
 pub mod store;
 
-pub use redaction::{normalize_utterance, preview_redacted, utterance_hash};
+pub(crate) use redaction::{normalize_utterance, preview_redacted, utterance_hash};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// the current entity state. This is the counterfactual the Option A vs B fork
 /// is decided on.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StateObservation {
+pub(crate) struct StateObservation {
     pub verb: String,
     pub state_reachable: bool,
     /// The lifecycle predicate that fails when `state_reachable == false`
@@ -37,7 +37,7 @@ pub struct StateObservation {
 /// so it observes search output without instrumenting (and risking) the search
 /// body itself.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct SoftStageFlow {
+pub(crate) struct SoftStageFlow {
     /// Surviving candidate count by `VerbSearchSource` label.
     pub by_source: BTreeMap<String, usize>,
     /// Surviving candidate count by ordinal `Tier` label.
@@ -47,7 +47,7 @@ pub struct SoftStageFlow {
 
 /// Row model mirroring `"ob-poc".intent_events`.
 #[derive(Debug, Clone)]
-pub struct IntentEventRow {
+pub(crate) struct IntentEventRow {
     pub event_id: Uuid,
     pub session_id: Uuid,
     pub actor_id: String,
@@ -105,7 +105,7 @@ pub struct IntentEventRow {
 }
 
 /// Map a PipelineOutcome to its telemetry string label.
-pub fn outcome_label(outcome: &crate::mcp::intent_pipeline::PipelineOutcome) -> &'static str {
+pub(crate) fn outcome_label(outcome: &crate::mcp::intent_pipeline::PipelineOutcome) -> &'static str {
     use crate::mcp::intent_pipeline::PipelineOutcome;
     match outcome {
         PipelineOutcome::Ready => "ready",
@@ -120,7 +120,7 @@ pub fn outcome_label(outcome: &crate::mcp::intent_pipeline::PipelineOutcome) -> 
 }
 
 /// Convert verb candidates to a compact JSON array: [["verb", score], ...]
-pub fn candidates_to_json(candidates: &[(String, f32)]) -> Option<JsonValue> {
+pub(crate) fn candidates_to_json(candidates: &[(String, f32)]) -> Option<JsonValue> {
     if candidates.is_empty() {
         return None;
     }

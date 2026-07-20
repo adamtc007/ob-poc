@@ -11,13 +11,13 @@ use uuid::Uuid;
 use super::types::*;
 
 /// Database operations for stewardship-layer tables.
-pub struct StewardshipStore;
+pub(crate) struct StewardshipStore;
 
 impl StewardshipStore {
     // ─── Events (§9.4) ─────────────────────────────────────────
 
     /// Append an immutable event to the stewardship audit chain.
-    pub async fn append_event(pool: &PgPool, record: &StewardshipRecord) -> Result<()> {
+    pub(crate) async fn append_event(pool: &PgPool, record: &StewardshipRecord) -> Result<()> {
         let payload = serde_json::to_value(&record.event_type)?;
         sqlx::query(
             r#"
@@ -40,7 +40,7 @@ impl StewardshipStore {
     }
 
     /// List events for a changeset, ordered by creation time.
-    pub async fn list_events(
+    pub(crate) async fn list_events(
         pool: &PgPool,
         changeset_id: Uuid,
         limit: i64,
@@ -66,7 +66,7 @@ impl StewardshipStore {
     // ─── Basis (§9.3) ──────────────────────────────────────────
 
     /// Insert a basis record.
-    pub async fn insert_basis(pool: &PgPool, basis: &BasisRecord) -> Result<()> {
+    pub(crate) async fn insert_basis(pool: &PgPool, basis: &BasisRecord) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO sem_reg.basis_records (
@@ -89,7 +89,7 @@ impl StewardshipStore {
     }
 
     /// List basis records for a changeset.
-    pub async fn list_basis(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<BasisRecord>> {
+    pub(crate) async fn list_basis(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<BasisRecord>> {
         let rows = sqlx::query_as::<_, BasisRow>(
             r#"
             SELECT basis_id, changeset_id, entry_id, kind,
@@ -107,7 +107,7 @@ impl StewardshipStore {
     }
 
     /// Insert a basis claim.
-    pub async fn insert_claim(pool: &PgPool, claim: &BasisClaim) -> Result<()> {
+    pub(crate) async fn insert_claim(pool: &PgPool, claim: &BasisClaim) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO sem_reg.basis_claims (
@@ -129,7 +129,7 @@ impl StewardshipStore {
     }
 
     /// List claims for a basis record.
-    pub async fn list_claims(pool: &PgPool, basis_id: Uuid) -> Result<Vec<BasisClaim>> {
+    pub(crate) async fn list_claims(pool: &PgPool, basis_id: Uuid) -> Result<Vec<BasisClaim>> {
         let rows = sqlx::query_as::<_, ClaimRow>(
             r#"
             SELECT claim_id, basis_id, claim_text, reference_uri,
@@ -160,7 +160,7 @@ impl StewardshipStore {
     // ─── Conflicts (§9.6) ──────────────────────────────────────
 
     /// Insert a conflict record.
-    pub async fn insert_conflict(pool: &PgPool, conflict: &ConflictRecord) -> Result<()> {
+    pub(crate) async fn insert_conflict(pool: &PgPool, conflict: &ConflictRecord) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO sem_reg.conflict_records (
@@ -180,7 +180,7 @@ impl StewardshipStore {
     }
 
     /// List conflicts for a changeset.
-    pub async fn list_conflicts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<ConflictRecord>> {
+    pub(crate) async fn list_conflicts(pool: &PgPool, changeset_id: Uuid) -> Result<Vec<ConflictRecord>> {
         let rows = sqlx::query_as::<_, ConflictRow>(
             r#"
             SELECT conflict_id, changeset_id, competing_changeset_id,
@@ -199,7 +199,7 @@ impl StewardshipStore {
     }
 
     /// Resolve a conflict with a strategy.
-    pub async fn resolve_conflict(
+    pub(crate) async fn resolve_conflict(
         pool: &PgPool,
         conflict_id: Uuid,
         strategy: ConflictStrategy,
@@ -232,7 +232,7 @@ impl StewardshipStore {
     // ─── Templates (§9.5) ──────────────────────────────────────
 
     /// Insert a template.
-    pub async fn insert_template(pool: &PgPool, template: &StewardshipTemplate) -> Result<()> {
+    pub(crate) async fn insert_template(pool: &PgPool, template: &StewardshipTemplate) -> Result<()> {
         let scope_json = serde_json::to_value(&template.scope)?;
         let items_json = serde_json::to_value(&template.items)?;
 
@@ -266,7 +266,7 @@ impl StewardshipStore {
     }
 
     /// Get the active template for a given FQN.
-    pub async fn get_active_template(
+    pub(crate) async fn get_active_template(
         pool: &PgPool,
         fqn: &str,
     ) -> Result<Option<StewardshipTemplate>> {
@@ -289,7 +289,7 @@ impl StewardshipStore {
     }
 
     /// List templates, optionally filtered by status.
-    pub async fn list_templates(
+    pub(crate) async fn list_templates(
         pool: &PgPool,
         status: Option<TemplateStatus>,
     ) -> Result<Vec<StewardshipTemplate>> {
@@ -329,7 +329,7 @@ impl StewardshipStore {
     // ─── Verb Bindings (§9.7) ──────────────────────────────────
 
     /// Insert a verb implementation binding.
-    pub async fn insert_binding(pool: &PgPool, binding: &VerbImplementationBinding) -> Result<()> {
+    pub(crate) async fn insert_binding(pool: &PgPool, binding: &VerbImplementationBinding) -> Result<()> {
         let exec_modes_json = serde_json::to_value(&binding.exec_modes)?;
 
         sqlx::query(
@@ -354,7 +354,7 @@ impl StewardshipStore {
     }
 
     /// Get the active binding for a verb FQN.
-    pub async fn get_active_binding(
+    pub(crate) async fn get_active_binding(
         pool: &PgPool,
         verb_fqn: &str,
     ) -> Result<Option<VerbImplementationBinding>> {
@@ -375,7 +375,7 @@ impl StewardshipStore {
     }
 
     /// List bindings, optionally filtered by status.
-    pub async fn list_bindings(
+    pub(crate) async fn list_bindings(
         pool: &PgPool,
         status: Option<BindingStatus>,
     ) -> Result<Vec<VerbImplementationBinding>> {
@@ -411,7 +411,7 @@ impl StewardshipStore {
     // ─── Idempotency (§6.2) ────────────────────────────────────
 
     /// Check if a client_request_id has already been processed.
-    pub async fn check_idempotency(
+    pub(crate) async fn check_idempotency(
         pool: &PgPool,
         client_request_id: Uuid,
     ) -> Result<Option<serde_json::Value>> {
@@ -428,7 +428,7 @@ impl StewardshipStore {
     }
 
     /// Record an idempotency key with the tool result.
-    pub async fn record_idempotency(
+    pub(crate) async fn record_idempotency(
         pool: &PgPool,
         client_request_id: Uuid,
         tool_name: &str,
@@ -453,7 +453,7 @@ impl StewardshipStore {
     // ─── Viewport Manifests (Phase 1) ──────────────────────────
 
     /// Insert a viewport manifest (immutable audit record).
-    pub async fn insert_viewport_manifest(
+    pub(crate) async fn insert_viewport_manifest(
         pool: &PgPool,
         manifest: &ViewportManifest,
     ) -> Result<()> {

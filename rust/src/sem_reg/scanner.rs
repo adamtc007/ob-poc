@@ -76,7 +76,7 @@ pub fn suggest_security_label(
 
 /// Summary report from a scan run.
 #[derive(Debug, Default)]
-pub struct ScanReport {
+pub(crate) struct ScanReport {
     pub verb_contracts_published: usize,
     pub verb_contracts_skipped: usize,
     pub verb_contracts_updated: usize,

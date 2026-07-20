@@ -22,8 +22,9 @@ pub use ob_templates::{
 
 // Keep harness module in main crate (has heavy dsl_v2 dependencies)
 pub mod harness;
-pub use harness::{run_harness_no_db, HarnessResult};
+pub use harness::{run_harness_no_db};
+pub(crate) use harness::{HarnessResult};
 
 // Extension trait for ExpansionContext integration with main crate session types
 mod context_ext;
-pub use context_ext::ExpansionContextExt;
+pub(crate) use context_ext::ExpansionContextExt;

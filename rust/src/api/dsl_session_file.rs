@@ -34,7 +34,7 @@ const DSL_SESSIONS_DIR: &str = "/tmp/dsl-sessions";
 
 /// Metadata about a DSL session stored alongside the DSL file
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslSessionMetadata {
+pub(crate) struct DslSessionMetadata {
     /// Session ID
     pub session_id: Uuid,
     /// When the session was created
@@ -57,7 +57,7 @@ pub struct DslSessionMetadata {
 
 /// A single modification to the DSL
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DslHistoryEntry {
+pub(crate) struct DslHistoryEntry {
     /// Sequential version number
     pub version: u32,
     /// When this change was made
@@ -71,7 +71,7 @@ pub struct DslHistoryEntry {
 }
 
 /// Manager for file-based DSL sessions
-pub struct DslSessionFileManager {
+pub(crate) struct DslSessionFileManager {
     base_dir: PathBuf,
 }
 
@@ -83,14 +83,14 @@ impl Default for DslSessionFileManager {
 
 impl DslSessionFileManager {
     /// Create a new file manager with default base directory
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             base_dir: PathBuf::from(DSL_SESSIONS_DIR),
         }
     }
 
     /// Create with custom base directory (useful for testing)
-    pub fn with_base_dir(base_dir: impl AsRef<Path>) -> Self {
+    pub(crate) fn with_base_dir(base_dir: impl AsRef<Path>) -> Self {
         Self {
             base_dir: base_dir.as_ref().to_path_buf(),
         }
@@ -117,7 +117,7 @@ impl DslSessionFileManager {
     }
 
     /// Create a new DSL session with empty file
-    pub async fn create_session(
+    pub(crate) async fn create_session(
         &self,
         session_id: Uuid,
         domain_hint: Option<String>,
@@ -158,7 +158,7 @@ impl DslSessionFileManager {
     }
 
     /// Load session metadata
-    pub async fn load_metadata(
+    pub(crate) async fn load_metadata(
         &self,
         session_id: Uuid,
     ) -> Result<DslSessionMetadata, std::io::Error> {
@@ -169,7 +169,7 @@ impl DslSessionFileManager {
     }
 
     /// Save session metadata
-    pub async fn save_metadata(&self, metadata: &DslSessionMetadata) -> Result<(), std::io::Error> {
+    pub(crate) async fn save_metadata(&self, metadata: &DslSessionMetadata) -> Result<(), std::io::Error> {
         let path = self.metadata_path(metadata.session_id);
         let content = serde_json::to_string_pretty(metadata)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
@@ -177,7 +177,7 @@ impl DslSessionFileManager {
     }
 
     /// Read the current DSL content
-    pub async fn read_dsl(&self, session_id: Uuid) -> Result<String, std::io::Error> {
+    pub(crate) async fn read_dsl(&self, session_id: Uuid) -> Result<String, std::io::Error> {
         fs::read_to_string(self.main_dsl_path(session_id)).await
     }
 
@@ -185,7 +185,7 @@ impl DslSessionFileManager {
     ///
     /// This is the primary way to add DSL - it appends rather than replaces,
     /// similar to how Claude Code adds code incrementally.
-    pub async fn append_dsl(
+    pub(crate) async fn append_dsl(
         &self,
         session_id: Uuid,
         new_statements: &str,
@@ -238,7 +238,7 @@ impl DslSessionFileManager {
     }
 
     /// Replace the entire DSL content (use sparingly - prefer append)
-    pub async fn write_dsl(
+    pub(crate) async fn write_dsl(
         &self,
         session_id: Uuid,
         dsl: &str,
@@ -285,7 +285,7 @@ impl DslSessionFileManager {
     }
 
     /// Update bindings after execution
-    pub async fn update_bindings(
+    pub(crate) async fn update_bindings(
         &self,
         session_id: Uuid,
         bindings: &HashMap<String, Uuid>,
@@ -311,12 +311,12 @@ impl DslSessionFileManager {
     }
 
     /// Check if a session exists
-    pub async fn session_exists(&self, session_id: Uuid) -> bool {
+    pub(crate) async fn session_exists(&self, session_id: Uuid) -> bool {
         self.session_dir(session_id).exists()
     }
 
     /// Delete a session and all its files
-    pub async fn delete_session(&self, session_id: Uuid) -> Result<(), std::io::Error> {
+    pub(crate) async fn delete_session(&self, session_id: Uuid) -> Result<(), std::io::Error> {
         let session_dir = self.session_dir(session_id);
         if session_dir.exists() {
             fs::remove_dir_all(session_dir).await?;
@@ -324,28 +324,9 @@ impl DslSessionFileManager {
         Ok(())
     }
 
-    /// List all sessions
-    pub async fn list_sessions(&self) -> Result<Vec<Uuid>, std::io::Error> {
-        let mut sessions = Vec::new();
-
-        if !self.base_dir.exists() {
-            return Ok(sessions);
-        }
-
-        let mut entries = fs::read_dir(&self.base_dir).await?;
-        while let Some(entry) = entries.next_entry().await? {
-            if entry.file_type().await?.is_dir() {
-                if let Ok(id) = Uuid::parse_str(&entry.file_name().to_string_lossy()) {
-                    sessions.push(id);
-                }
-            }
-        }
-
-        Ok(sessions)
-    }
 
     /// Get a specific history version
-    pub async fn read_history_version(
+    pub(crate) async fn read_history_version(
         &self,
         session_id: Uuid,
         version: u32,
@@ -368,7 +349,7 @@ impl DslSessionFileManager {
     }
 
     /// Revert to a previous version
-    pub async fn revert_to_version(
+    pub(crate) async fn revert_to_version(
         &self,
         session_id: Uuid,
         version: u32,

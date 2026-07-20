@@ -29,7 +29,7 @@ use crate::session::ViewState;
 
 /// A recorded view state change
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ViewStateChange {
+pub(crate) struct ViewStateChange {
     pub change_id: Uuid,
     pub idempotency_key: String,
     pub session_id: Option<Uuid>,
@@ -46,7 +46,7 @@ pub struct ViewStateChange {
 
 /// Input for recording a view state change
 #[derive(Debug, Clone)]
-pub struct RecordViewStateChange {
+pub(crate) struct RecordViewStateChange {
     pub idempotency_key: String,
     pub session_id: Option<Uuid>,
     pub verb_name: String,
@@ -56,7 +56,7 @@ pub struct RecordViewStateChange {
 
 /// Session view history entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionViewHistoryEntry {
+pub(crate) struct SessionViewHistoryEntry {
     pub session_id: Uuid,
     pub change_id: Uuid,
     pub verb_name: String,
@@ -71,12 +71,12 @@ pub struct SessionViewHistoryEntry {
 }
 
 /// View state audit repository
-pub struct ViewStateAuditRepository {
+pub(crate) struct ViewStateAuditRepository {
     pool: PgPool,
 }
 
 impl ViewStateAuditRepository {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -85,7 +85,7 @@ impl ViewStateAuditRepository {
     /// This is called from the DSL executor when a view.* operation produces
     /// a new ViewState. It creates a complete audit trail linking the view
     /// state to the execution and session.
-    pub async fn record_view_state_change(&self, input: RecordViewStateChange) -> Result<Uuid> {
+    pub(crate) async fn record_view_state_change(&self, input: RecordViewStateChange) -> Result<Uuid> {
         // Serialize view state components
         let taxonomy_context = serde_json::to_value(&input.view_state.context)?;
         let refinements = serde_json::to_value(&input.view_state.refinements)?;
@@ -127,7 +127,7 @@ impl ViewStateAuditRepository {
     ///
     /// Called before executing a statement to record what selection/view
     /// state was active. This is critical for batch operation auditing.
-    pub async fn record_input_view_state(
+    pub(crate) async fn record_input_view_state(
         &self,
         idempotency_key: &str,
         view_state: &ViewState,
@@ -155,7 +155,7 @@ impl ViewStateAuditRepository {
     ///
     /// Called after executing a view.* operation to record the resulting
     /// view state. This enables reconstruction of the visual state.
-    pub async fn record_output_view_state(
+    pub(crate) async fn record_output_view_state(
         &self,
         idempotency_key: &str,
         view_state: &ViewState,
@@ -178,7 +178,7 @@ impl ViewStateAuditRepository {
     }
 
     /// Get view state change by ID
-    pub async fn get_view_state_change(&self, change_id: Uuid) -> Result<Option<ViewStateChange>> {
+    pub(crate) async fn get_view_state_change(&self, change_id: Uuid) -> Result<Option<ViewStateChange>> {
         let row = sqlx::query_as::<
             _,
             (
@@ -235,7 +235,7 @@ impl ViewStateAuditRepository {
     }
 
     /// Get view state history for a session
-    pub async fn get_session_view_history(
+    pub(crate) async fn get_session_view_history(
         &self,
         session_id: Uuid,
         limit: Option<i64>,
@@ -303,7 +303,7 @@ impl ViewStateAuditRepository {
     /// Find view state changes that affected specific entities
     ///
     /// Uses the GIN index on selection array for efficient lookup
-    pub async fn find_changes_affecting_entities(
+    pub(crate) async fn find_changes_affecting_entities(
         &self,
         entity_ids: &[Uuid],
         limit: Option<i64>,
@@ -372,7 +372,7 @@ impl ViewStateAuditRepository {
     }
 
     /// Reconstruct view state from snapshot
-    pub fn reconstruct_view_state(snapshot: &serde_json::Value) -> Result<ViewState> {
+    pub(crate) fn reconstruct_view_state(snapshot: &serde_json::Value) -> Result<ViewState> {
         let view_state: ViewState = serde_json::from_value(snapshot.clone())?;
         Ok(view_state)
     }

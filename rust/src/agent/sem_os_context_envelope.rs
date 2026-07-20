@@ -23,7 +23,7 @@ use sem_os_policy::context_resolution::{
 /// Every orchestrator call produces one of these (or `unavailable()` if Sem OS
 /// is not configured).
 #[derive(Debug, Clone, Serialize)]
-pub struct SemOsContextEnvelope {
+pub(crate) struct SemOsContextEnvelope {
     /// Verbs explicitly allowed by ABAC + tier + preconditions.
     pub allowed_verbs: HashSet<String>,
     /// Summary of each allowed verb contract (for downstream consumers).
@@ -57,7 +57,7 @@ pub struct SemOsContextEnvelope {
 
 /// Summary of an allowed verb contract (lightweight projection).
 #[derive(Debug, Clone, Serialize)]
-pub struct VerbCandidateSummary {
+pub(crate) struct VerbCandidateSummary {
     pub fqn: String,
     pub description: String,
     pub governance_tier: String,
@@ -68,7 +68,7 @@ pub struct VerbCandidateSummary {
 
 /// A verb that was pruned from the allowed set with a structured reason.
 #[derive(Debug, Clone, Serialize)]
-pub struct PrunedVerb {
+pub(crate) struct PrunedVerb {
     pub fqn: String,
     pub reason: PruneReason,
 }
@@ -76,7 +76,7 @@ pub struct PrunedVerb {
 /// Why a verb was pruned from the allowed set.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum PruneReason {
+pub(crate) enum PruneReason {
     /// ABAC denied access.
     AbacDenied {
         actor_role: String,
@@ -98,7 +98,7 @@ pub enum PruneReason {
 /// Deterministic: identical verb sets always produce the same fingerprint.
 /// Format: `"v1:<hex>"` (versioned for future algorithm changes).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct AllowedVerbSetFingerprint(pub String);
+pub(crate) struct AllowedVerbSetFingerprint(pub String);
 
 impl std::fmt::Display for AllowedVerbSetFingerprint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -108,7 +108,7 @@ impl std::fmt::Display for AllowedVerbSetFingerprint {
 
 impl AllowedVerbSetFingerprint {
     /// Compute from a set of allowed verb FQNs.
-    pub fn compute(allowed: &HashSet<String>) -> Self {
+    pub(crate) fn compute(allowed: &HashSet<String>) -> Self {
         let mut sorted: Vec<&str> = allowed.iter().map(|s| s.as_str()).collect();
         sorted.sort();
         let joined = sorted.join("\n");
@@ -121,14 +121,14 @@ impl AllowedVerbSetFingerprint {
     }
 
     /// Empty fingerprint (no verbs).
-    pub fn empty() -> Self {
+    pub(crate) fn empty() -> Self {
         Self::compute(&HashSet::new())
     }
 }
 
 /// Governance signal summary (lightweight projection of GovernanceSignal).
 #[derive(Debug, Clone, Serialize)]
-pub struct GovernanceSignalSummary {
+pub(crate) struct GovernanceSignalSummary {
     pub kind: String,
     pub message: String,
     pub severity: String,
@@ -144,7 +144,7 @@ pub struct GovernanceSignalSummary {
 /// Only performed when `OBPOC_STRICT_SEMREG=true`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
-pub enum TocTouResult {
+pub(crate) enum TocTouResult {
     /// Fingerprint unchanged — the allowed set is identical.
     StillAllowed,
     /// Fingerprint changed but the selected verb is still allowed.
@@ -165,7 +165,7 @@ impl SemOsContextEnvelope {
     ///
     /// Partitions candidate_verbs into allowed (AccessDecision::Allow) and
     /// pruned (everything else), preserving structured prune reasons.
-    pub fn from_resolution(response: &ContextResolutionResponse) -> Self {
+    pub(crate) fn from_resolution(response: &ContextResolutionResponse) -> Self {
         let mut allowed = HashSet::new();
         let mut allowed_contracts = Vec::new();
         let mut pruned = Vec::new();
@@ -248,7 +248,7 @@ impl SemOsContextEnvelope {
     }
 
     /// Create an "unavailable" envelope (SemReg not configured or resolution failed).
-    pub fn unavailable() -> Self {
+    pub(crate) fn unavailable() -> Self {
         SemOsContextEnvelope {
             allowed_verbs: HashSet::new(),
             allowed_verb_contracts: vec![],
@@ -267,7 +267,7 @@ impl SemOsContextEnvelope {
     }
 
     /// Create a "deny all" envelope (resolution succeeded, zero verbs allowed).
-    pub fn deny_all() -> Self {
+    pub(crate) fn deny_all() -> Self {
         SemOsContextEnvelope {
             allowed_verbs: HashSet::new(),
             allowed_verb_contracts: vec![],
@@ -286,27 +286,27 @@ impl SemOsContextEnvelope {
     }
 
     /// Check if a specific verb FQN is in the allowed set.
-    pub fn is_allowed(&self, fqn: &str) -> bool {
+    pub(crate) fn is_allowed(&self, fqn: &str) -> bool {
         self.allowed_verbs.contains(fqn)
     }
 
     /// True if resolution succeeded but zero verbs are allowed.
-    pub fn is_deny_all(&self) -> bool {
+    pub(crate) fn is_deny_all(&self) -> bool {
         self.deny_all
     }
 
     /// True if SemReg was unavailable (not configured or resolution failed).
-    pub fn is_unavailable(&self) -> bool {
+    pub(crate) fn is_unavailable(&self) -> bool {
         self.unavailable
     }
 
     /// True when Sem OS is asking the caller to continue discovery instead of executing.
-    pub fn is_discovery_stage(&self) -> bool {
+    pub(crate) fn is_discovery_stage(&self) -> bool {
         self.resolution_stage == ResolutionStage::Discovery
     }
 
     /// First discovery-stage question Sem OS wants the caller to ask, if any.
-    pub fn first_discovery_question(&self) -> Option<&str> {
+    pub(crate) fn first_discovery_question(&self) -> Option<&str> {
         self.discovery_surface
             .as_ref()
             .and_then(|surface| surface.entry_questions.first())
@@ -314,7 +314,7 @@ impl SemOsContextEnvelope {
     }
 
     /// Backward-compatible label matching old `SemRegVerbPolicy::label()`.
-    pub fn label(&self) -> &'static str {
+    pub(crate) fn label(&self) -> &'static str {
         if self.unavailable {
             "unavailable"
         } else if self.deny_all {
@@ -325,18 +325,18 @@ impl SemOsContextEnvelope {
     }
 
     /// Number of pruned verbs.
-    pub fn pruned_count(&self) -> usize {
+    pub(crate) fn pruned_count(&self) -> usize {
         self.pruned_verbs.len()
     }
 
     /// Fingerprint string for trace/telemetry.
-    pub fn fingerprint_str(&self) -> &str {
+    pub(crate) fn fingerprint_str(&self) -> &str {
         &self.fingerprint.0
     }
 
     /// Create a test envelope with specific allowed verbs (deny_all = false, unavailable = false).
     #[cfg(test)]
-    pub fn test_with_verbs(verbs: &[&str]) -> Self {
+    pub(crate) fn test_with_verbs(verbs: &[&str]) -> Self {
         Self::test_with_verbs_and_pruned(verbs, vec![])
     }
 
@@ -344,7 +344,7 @@ impl SemOsContextEnvelope {
     /// exercising T2.1 exclusion-reason translation
     /// (`agent::control_plane_shadow::build_evaluation_context`).
     #[cfg(test)]
-    pub fn test_with_verbs_and_pruned(verbs: &[&str], pruned_verbs: Vec<PrunedVerb>) -> Self {
+    pub(crate) fn test_with_verbs_and_pruned(verbs: &[&str], pruned_verbs: Vec<PrunedVerb>) -> Self {
         let allowed: HashSet<String> = verbs.iter().map(|v| v.to_string()).collect();
         let fingerprint = AllowedVerbSetFingerprint::compute(&allowed);
         SemOsContextEnvelope {
@@ -370,7 +370,7 @@ impl SemOsContextEnvelope {
     /// and checks whether the selected verb is still allowed.
     ///
     /// Returns `None` if this envelope is unavailable (no TOCTOU possible).
-    pub fn toctou_recheck(
+    pub(crate) fn toctou_recheck(
         &self,
         new_envelope: &SemOsContextEnvelope,
         selected_verb: &str,

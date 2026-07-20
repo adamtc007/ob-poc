@@ -20,11 +20,11 @@ use crate::repl::types_v2::{SubjectKind, VerbRef, WorkspaceKind};
 
 /// Content-addressed plan identifier (SHA-256 hex of canonical plan bytes).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct RunbookPlanId(pub String);
+pub(crate) struct RunbookPlanId(pub String);
 
 impl RunbookPlanId {
     /// Compute a content-addressed ID from canonical bytes.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
         let hash = Sha256::digest(bytes);
         Self(hex::encode(hash))
     }
@@ -50,7 +50,7 @@ impl AsRef<str> for RunbookPlanId {
 /// reference to an output from a prior step.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum EntityBinding {
+pub(crate) enum EntityBinding {
     /// A known UUID (entity already exists).
     Literal { id: Uuid },
     /// A forward reference to an output field of a prior step.
@@ -66,7 +66,7 @@ pub enum EntityBinding {
 
 /// Tracks named entity bindings and their resolved UUIDs.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BindingTable {
+pub(crate) struct BindingTable {
     /// Named bindings (e.g. "$created_cbu_id" → EntityBinding).
     pub entries: BTreeMap<String, EntityBinding>,
     /// Resolved UUIDs (populated during execution as forward refs are fulfilled).
@@ -76,13 +76,13 @@ pub struct BindingTable {
 impl BindingTable {
     /// Number of named bindings.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the binding table has no entries.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
@@ -90,7 +90,7 @@ impl BindingTable {
     ///
     /// Literal bindings always resolve. Forward refs resolve only after the
     /// source step has executed and populated `resolved`.
-    pub fn resolve(&self, name: &str) -> Option<Uuid> {
+    pub(crate) fn resolve(&self, name: &str) -> Option<Uuid> {
         match self.entries.get(name)? {
             EntityBinding::Literal { id } => Some(*id),
             EntityBinding::ForwardRef { output_field, .. } => {
@@ -107,7 +107,7 @@ impl BindingTable {
 /// Status of an individual plan step.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum PlanStepStatus {
+pub(crate) enum PlanStepStatus {
     Pending,
     Ready,
     Executing,
@@ -118,7 +118,7 @@ pub enum PlanStepStatus {
 
 /// A single step in a multi-workspace runbook plan.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RunbookPlanStep {
+pub(crate) struct RunbookPlanStep {
     pub seq: usize,
     pub workspace: WorkspaceKind,
     pub constellation_map: String,
@@ -142,7 +142,7 @@ pub struct RunbookPlanStep {
 /// Overall status of a runbook plan.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "status", rename_all = "snake_case")]
-pub enum RunbookPlanStatus {
+pub(crate) enum RunbookPlanStatus {
     Compiled,
     AwaitingApproval,
     Approved,
@@ -161,7 +161,7 @@ pub enum RunbookPlanStatus {
 
 /// Approval record for a runbook plan.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RunbookApproval {
+pub(crate) struct RunbookApproval {
     pub approved_by: String,
     pub approved_at: DateTime<Utc>,
     pub plan_hash: String,
@@ -169,7 +169,7 @@ pub struct RunbookApproval {
 
 /// Result of executing a single plan step.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StepResult {
+pub(crate) struct StepResult {
     pub step_seq: usize,
     pub verb_fqn: String,
     pub status: PlanStepStatus,
@@ -182,7 +182,7 @@ pub struct StepResult {
 
 /// A multi-workspace runbook plan.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunbookPlan {
+pub(crate) struct RunbookPlan {
     pub id: RunbookPlanId,
     pub session_id: Uuid,
     pub compiled_at: DateTime<Utc>,
@@ -198,14 +198,14 @@ pub struct RunbookPlan {
 
 impl RunbookPlan {
     /// Compute a content-addressed ID from the plan's canonical representation.
-    pub fn compute_id(steps: &[RunbookPlanStep], bindings: &BindingTable) -> RunbookPlanId {
+    pub(crate) fn compute_id(steps: &[RunbookPlanStep], bindings: &BindingTable) -> RunbookPlanId {
         let canonical = serde_json::to_vec(&(steps, bindings))
             .expect("RunbookPlan steps and bindings must be serializable");
         RunbookPlanId::from_bytes(&canonical)
     }
 
     /// Create a new plan with a content-addressed ID.
-    pub fn new(
+    pub(crate) fn new(
         session_id: Uuid,
         steps: Vec<RunbookPlanStep>,
         bindings: BindingTable,

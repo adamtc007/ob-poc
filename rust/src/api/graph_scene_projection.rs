@@ -10,7 +10,7 @@ use ob_poc_types::galaxy::ViewLevel;
 use ob_poc_types::graph_scene::*;
 
 /// Project a GraphSceneModel from a HydratedConstellation at a given view level.
-pub fn project_graph_scene(
+pub(crate) fn project_graph_scene(
     constellation: &str,
     jurisdiction: &str,
     cbu_id: &str,
@@ -154,7 +154,7 @@ pub fn project_graph_scene(
 
 /// Lightweight slot projection — extracted from HydratedSlot for the projection function.
 #[derive(Debug, Clone)]
-pub struct SlotProjection {
+pub(crate) struct SlotProjection {
     pub name: String,
     pub path: String,
     pub slot_type: String,
@@ -170,7 +170,7 @@ pub struct SlotProjection {
 
 /// Lightweight graph edge projection.
 #[derive(Debug, Clone)]
-pub struct GraphEdgeProjection {
+pub(crate) struct GraphEdgeProjection {
     pub from_id: String,
     pub to_id: String,
     pub edge_type: String,

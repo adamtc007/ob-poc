@@ -15,7 +15,7 @@ use sqlx::PgPool;
 
 /// All loaded applicability rules
 #[derive(Debug, Default)]
-pub struct ApplicabilityRules {
+pub(crate) struct ApplicabilityRules {
     pub document_rules: HashMap<String, DocumentApplicability>,
     pub attribute_rules: HashMap<String, AttributeApplicability>,
     pub entity_type_hierarchy: HashMap<String, Vec<String>>,
@@ -23,7 +23,7 @@ pub struct ApplicabilityRules {
 
 /// Applicability rules for a document type
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct DocumentApplicability {
+pub(crate) struct DocumentApplicability {
     #[serde(default)]
     pub entity_types: Vec<String>,
 
@@ -48,7 +48,7 @@ pub struct DocumentApplicability {
 
 impl DocumentApplicability {
     /// Check if document applies to given entity type (supports wildcards)
-    pub fn applies_to_entity_type(&self, entity_type: &str) -> bool {
+    pub(crate) fn applies_to_entity_type(&self, entity_type: &str) -> bool {
         if self.entity_types.is_empty() {
             return true; // No restriction
         }
@@ -64,7 +64,7 @@ impl DocumentApplicability {
     }
 
     /// Check if document applies to given jurisdiction
-    pub fn applies_to_jurisdiction(&self, jurisdiction: &str) -> bool {
+    pub(crate) fn applies_to_jurisdiction(&self, jurisdiction: &str) -> bool {
         if self.jurisdictions.is_empty() {
             return true;
         }
@@ -72,7 +72,7 @@ impl DocumentApplicability {
     }
 
     /// Check if document applies to given client type
-    pub fn applies_to_client_type(&self, client_type: &str) -> bool {
+    pub(crate) fn applies_to_client_type(&self, client_type: &str) -> bool {
         if self.client_types.is_empty() {
             return true;
         }
@@ -80,7 +80,7 @@ impl DocumentApplicability {
     }
 
     /// Check if document is required for given entity type
-    pub fn is_required_for(&self, entity_type: &str) -> bool {
+    pub(crate) fn is_required_for(&self, entity_type: &str) -> bool {
         self.required_for.iter().any(|req| {
             if req.ends_with('*') {
                 let prefix = &req[..req.len() - 1];
@@ -94,7 +94,7 @@ impl DocumentApplicability {
 
 /// Applicability rules for an attribute
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AttributeApplicability {
+pub(crate) struct AttributeApplicability {
     #[serde(default)]
     pub entity_types: Vec<String>,
 
@@ -109,7 +109,7 @@ pub struct AttributeApplicability {
 }
 
 impl AttributeApplicability {
-    pub fn applies_to_entity_type(&self, entity_type: &str) -> bool {
+    pub(crate) fn applies_to_entity_type(&self, entity_type: &str) -> bool {
         if self.entity_types.is_empty() {
             return true;
         }
@@ -131,7 +131,7 @@ impl AttributeApplicability {
 impl ApplicabilityRules {
     /// Load all rules from database
     #[cfg(feature = "database")]
-    pub async fn load(pool: &PgPool) -> Result<Self, String> {
+    pub(crate) async fn load(pool: &PgPool) -> Result<Self, String> {
         Ok(Self {
             document_rules: Self::load_document_rules(pool).await?,
             attribute_rules: Self::load_attribute_rules(pool).await?,
@@ -212,7 +212,7 @@ impl ApplicabilityRules {
     }
 
     /// Find valid documents for an entity type
-    pub fn valid_documents_for_entity(&self, entity_type: &str) -> Vec<&str> {
+    pub(crate) fn valid_documents_for_entity(&self, entity_type: &str) -> Vec<&str> {
         self.document_rules
             .iter()
             .filter(|(_, rule)| rule.applies_to_entity_type(entity_type))
@@ -220,23 +220,7 @@ impl ApplicabilityRules {
             .collect()
     }
 
-    /// Find required documents for an entity type
-    pub fn required_documents_for_entity(&self, entity_type: &str) -> Vec<&str> {
-        self.document_rules
-            .iter()
-            .filter(|(_, rule)| rule.is_required_for(entity_type))
-            .map(|(code, _)| code.as_str())
-            .collect()
-    }
 
-    /// Check if an entity type is in the hierarchy of another
-    pub fn is_subtype_of(&self, entity_type: &str, parent_type: &str) -> bool {
-        if let Some(path) = self.entity_type_hierarchy.get(entity_type) {
-            path.contains(&parent_type.to_string())
-        } else {
-            false
-        }
-    }
 }
 
 #[cfg(test)]

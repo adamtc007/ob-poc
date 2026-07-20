@@ -24,7 +24,7 @@ use sem_os_core::types::EvidenceGrade;
 
 /// Report from derivation spec seeding.
 #[derive(Debug, Default)]
-pub struct DerivationSeedReport {
+pub(crate) struct DerivationSeedReport {
     pub derivations_published: usize,
     pub derivations_skipped: usize,
     pub derivations_updated: usize,

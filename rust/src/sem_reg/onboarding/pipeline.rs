@@ -28,7 +28,7 @@ use super::validators;
 
 /// Specification for onboarding a single entity type into the semantic registry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OnboardingRequest {
+pub(crate) struct OnboardingRequest {
     /// The entity type to create (must include `fqn`, `name`, `domain`).
     pub entity_type: EntityTypeDefBody,
 
@@ -70,7 +70,7 @@ fn default_created_by() -> String {
 
 /// Aggregated result of the full onboarding pipeline.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct OnboardingResult {
+pub(crate) struct OnboardingResult {
     pub entity_type_step: StepResult,
     pub attributes_step: StepResult,
     pub verb_contracts_step: StepResult,
@@ -86,7 +86,7 @@ pub struct OnboardingResult {
 }
 
 impl OnboardingResult {
-    pub fn total_published(&self) -> usize {
+    pub(crate) fn total_published(&self) -> usize {
         self.entity_type_step.published
             + self.attributes_step.published
             + self.verb_contracts_step.published
@@ -95,7 +95,7 @@ impl OnboardingResult {
             + self.evidence_step.published
     }
 
-    pub fn total_skipped(&self) -> usize {
+    pub(crate) fn total_skipped(&self) -> usize {
         self.entity_type_step.skipped
             + self.attributes_step.skipped
             + self.verb_contracts_step.skipped
@@ -104,7 +104,7 @@ impl OnboardingResult {
             + self.evidence_step.skipped
     }
 
-    pub fn total_updated(&self) -> usize {
+    pub(crate) fn total_updated(&self) -> usize {
         self.entity_type_step.updated
             + self.attributes_step.updated
             + self.verb_contracts_step.updated
@@ -141,11 +141,11 @@ impl StepResult {
 // ── Pipeline ────────────────────────────────────────────────────────────────
 
 /// Orchestrates the 6-step onboarding pipeline.
-pub struct OnboardingPipeline;
+pub(crate) struct OnboardingPipeline;
 
 impl OnboardingPipeline {
     /// Run the full 6-step pipeline.
-    pub async fn run(pool: &PgPool, request: &OnboardingRequest) -> Result<OnboardingResult> {
+    pub(crate) async fn run(pool: &PgPool, request: &OnboardingRequest) -> Result<OnboardingResult> {
         // Validate the request before doing anything
         validators::validate_request(request)?;
 

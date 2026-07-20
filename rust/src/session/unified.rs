@@ -191,7 +191,7 @@ pub struct UnifiedSession {
 
 /// Target universe - the anchor for this session
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TargetUniverse {
+pub(crate) struct TargetUniverse {
     pub description: String,
     pub definition: UniverseDefinition,
     pub declared_at: DateTime<Utc>,
@@ -199,7 +199,7 @@ pub struct TargetUniverse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum UniverseDefinition {
+pub(crate) enum UniverseDefinition {
     /// All CBUs under an apex entity
     Galaxy {
         apex_entity_id: Uuid,
@@ -223,7 +223,7 @@ pub enum UniverseDefinition {
 
 /// Current entity scope - what the viewport shows
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct EntityScope {
+pub(crate) struct EntityScope {
     /// CBU IDs in scope
     pub cbu_ids: HashSet<Uuid>,
     /// Entity IDs in scope (within CBUs)
@@ -236,7 +236,7 @@ pub struct EntityScope {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ZoomLevel {
+pub(crate) enum ZoomLevel {
     #[default]
     Universe,
     Galaxy,
@@ -248,7 +248,7 @@ pub enum ZoomLevel {
 
 impl ZoomLevel {
     /// Returns true if this level is more zoomed in than other
-    pub fn is_deeper_than(&self, other: &ZoomLevel) -> bool {
+    pub(crate) fn is_deeper_than(&self, other: &ZoomLevel) -> bool {
         self.depth() > other.depth()
     }
 
@@ -266,53 +266,53 @@ impl ZoomLevel {
 
 /// Run sheet - DSL statement ledger
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct RunSheet {
+pub(crate) struct RunSheet {
     pub entries: Vec<RunSheetEntry>,
     pub cursor: usize,
 }
 
 impl RunSheet {
     /// Get entry at cursor
-    pub fn current(&self) -> Option<&RunSheetEntry> {
+    pub(crate) fn current(&self) -> Option<&RunSheetEntry> {
         self.entries.get(self.cursor)
     }
 
     /// Get mutable entry at cursor
-    pub fn current_mut(&mut self) -> Option<&mut RunSheetEntry> {
+    pub(crate) fn current_mut(&mut self) -> Option<&mut RunSheetEntry> {
         self.entries.get_mut(self.cursor)
     }
 
     /// Count entries by status
-    pub fn count_by_status(&self, status: EntryStatus) -> usize {
+    pub(crate) fn count_by_status(&self, status: EntryStatus) -> usize {
         self.entries.iter().filter(|e| e.status == status).count()
     }
 
     /// Get all draft entries
-    pub fn drafts(&self) -> impl Iterator<Item = &RunSheetEntry> {
+    pub(crate) fn drafts(&self) -> impl Iterator<Item = &RunSheetEntry> {
         self.entries
             .iter()
             .filter(|e| e.status == EntryStatus::Draft)
     }
 
     /// Get all executed entries
-    pub fn executed(&self) -> impl Iterator<Item = &RunSheetEntry> {
+    pub(crate) fn executed(&self) -> impl Iterator<Item = &RunSheetEntry> {
         self.entries
             .iter()
             .filter(|e| e.status == EntryStatus::Executed)
     }
 
     /// Get entries by DAG depth (phase)
-    pub fn by_phase(&self, depth: u32) -> impl Iterator<Item = &RunSheetEntry> {
+    pub(crate) fn by_phase(&self, depth: u32) -> impl Iterator<Item = &RunSheetEntry> {
         self.entries.iter().filter(move |e| e.dag_depth == depth)
     }
 
     /// Get the maximum DAG depth in the run sheet
-    pub fn max_depth(&self) -> u32 {
+    pub(crate) fn max_depth(&self) -> u32 {
         self.entries.iter().map(|e| e.dag_depth).max().unwrap_or(0)
     }
 
     /// Get entries ready for execution (dependencies satisfied)
-    pub fn ready_for_execution(&self) -> Vec<&RunSheetEntry> {
+    pub(crate) fn ready_for_execution(&self) -> Vec<&RunSheetEntry> {
         let executed_ids: HashSet<_> = self
             .entries
             .iter()
@@ -330,16 +330,9 @@ impl RunSheet {
             .collect()
     }
 
-    /// Check if all entries in a phase are complete
-    pub fn phase_complete(&self, depth: u32) -> bool {
-        self.entries
-            .iter()
-            .filter(|e| e.dag_depth == depth)
-            .all(|e| e.status.is_terminal())
-    }
 
     /// Mark all entries that depend on a failed entry as skipped
-    pub fn cascade_skip(&mut self, failed_id: Uuid) {
+    pub(crate) fn cascade_skip(&mut self, failed_id: Uuid) {
         let mut to_skip: Vec<Uuid> = vec![failed_id];
         let mut idx = 0;
 
@@ -363,7 +356,7 @@ impl RunSheet {
     }
 
     /// Get combined DSL source from all entries
-    pub fn combined_dsl(&self) -> Option<String> {
+    pub(crate) fn combined_dsl(&self) -> Option<String> {
         if self.entries.is_empty() {
             return None;
         }
@@ -379,7 +372,7 @@ impl RunSheet {
     /// Get DSL for runnable entries only (Draft + Ready).
     /// Excludes Executed, Failed, Skipped, Cancelled entries.
     /// This prevents re-running previously executed DSL when new entries are staged.
-    pub fn runnable_dsl(&self) -> Option<String> {
+    pub(crate) fn runnable_dsl(&self) -> Option<String> {
         let runnable: Vec<&str> = self
             .entries
             .iter()
@@ -393,14 +386,14 @@ impl RunSheet {
     }
 
     /// Check if there are runnable entries (draft or ready)
-    pub fn has_runnable(&self) -> bool {
+    pub(crate) fn has_runnable(&self) -> bool {
         self.entries
             .iter()
             .any(|e| matches!(e.status, EntryStatus::Draft | EntryStatus::Ready))
     }
 
     /// Mark all draft/ready entries as executed
-    pub fn mark_all_executed(&mut self) {
+    pub(crate) fn mark_all_executed(&mut self) {
         for entry in &mut self.entries {
             if matches!(entry.status, EntryStatus::Draft | EntryStatus::Ready) {
                 entry.status = EntryStatus::Executed;
@@ -410,7 +403,7 @@ impl RunSheet {
     }
 
     /// Convert to API response format (ob_poc_types::RunSheet)
-    pub fn to_api(&self) -> ob_poc_types::RunSheet {
+    pub(crate) fn to_api(&self) -> ob_poc_types::RunSheet {
         ob_poc_types::RunSheet {
             entries: self
                 .entries
@@ -447,7 +440,7 @@ impl RunSheet {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunSheetEntry {
+pub(crate) struct RunSheetEntry {
     pub id: Uuid,
     pub dsl_source: String,
     pub display_dsl: String,
@@ -488,7 +481,7 @@ pub enum EntryStatus {
 
 /// Validation error for a run sheet entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidationError {
+pub(crate) struct ValidationError {
     pub code: String,
     pub message: String,
     pub span: Option<(usize, usize)>,
@@ -548,7 +541,7 @@ impl Default for ViewState {
 /// When verb search returns multiple matches with similar confidence,
 /// user needs to pick one. This state tracks the pending options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingVerbDisambiguation {
+pub(crate) struct PendingVerbDisambiguation {
     /// Original user input that triggered disambiguation
     pub original_input: String,
     /// Verb options to choose from (ordered by score descending)
@@ -559,7 +552,7 @@ pub struct PendingVerbDisambiguation {
 
 /// A verb option in disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbDisambiguationOption {
+pub(crate) struct VerbDisambiguationOption {
     /// Fully qualified verb name
     pub verb_fqn: String,
     /// Human-readable description
@@ -574,7 +567,7 @@ pub struct VerbDisambiguationOption {
 
 /// Verb candidate for learning signal recording
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbCandidate {
+pub(crate) struct VerbCandidate {
     pub verb: String,
     pub score: f32,
 }
@@ -584,7 +577,7 @@ pub struct VerbCandidate {
 /// When verb search returns candidates spanning multiple intents (navigate vs create),
 /// user picks the intent first, then optionally scope, before seeing specific verbs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingIntentTier {
+pub(crate) struct PendingIntentTier {
     /// Request ID for tracking
     pub request_id: String,
     /// Current tier number (1 = action intent, 2 = scope)
@@ -601,7 +594,7 @@ pub struct PendingIntentTier {
 
 /// An entry in the intent tier selection path
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentTierPathEntry {
+pub(crate) struct IntentTierPathEntry {
     pub tier: u32,
     pub option_id: String,
     pub option_label: String,
@@ -609,7 +602,7 @@ pub struct IntentTierPathEntry {
 
 /// Inline resolution state (not a sub-session)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolutionState {
+pub(crate) struct ResolutionState {
     /// Refs needing resolution
     pub refs: Vec<UnresolvedRef>,
     /// Current index being resolved
@@ -620,12 +613,12 @@ pub struct ResolutionState {
 
 impl ResolutionState {
     /// Get current ref being resolved
-    pub fn current(&self) -> Option<&UnresolvedRef> {
+    pub(crate) fn current(&self) -> Option<&UnresolvedRef> {
         self.refs.get(self.current_index)
     }
 
     /// Move to next ref (returns true if moved, false if at end)
-    pub fn advance(&mut self) -> bool {
+    pub(crate) fn advance(&mut self) -> bool {
         if self.current_index + 1 < self.refs.len() {
             self.current_index += 1;
             true
@@ -635,7 +628,7 @@ impl ResolutionState {
     }
 
     /// Move to previous ref
-    pub fn prev(&mut self) -> bool {
+    pub(crate) fn prev(&mut self) -> bool {
         if self.current_index > 0 {
             self.current_index -= 1;
             true
@@ -645,19 +638,19 @@ impl ResolutionState {
     }
 
     /// Check if all refs are resolved
-    pub fn is_complete(&self) -> bool {
+    pub(crate) fn is_complete(&self) -> bool {
         self.refs
             .iter()
             .all(|r| self.resolutions.contains_key(&r.ref_id))
     }
 
     /// Get unresolved count
-    pub fn unresolved_count(&self) -> usize {
+    pub(crate) fn unresolved_count(&self) -> usize {
         self.refs.len() - self.resolutions.len()
     }
 
     /// Resolve current ref
-    pub fn resolve_current(&mut self, resolved_key: String, display: String) {
+    pub(crate) fn resolve_current(&mut self, resolved_key: String, display: String) {
         if let Some(current) = self.current() {
             let ref_id = current.ref_id.clone();
             self.resolutions.insert(
@@ -673,7 +666,7 @@ impl ResolutionState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UnresolvedRef {
+pub(crate) struct UnresolvedRef {
     pub ref_id: String,
     pub entity_type: String,
     pub search_value: String,
@@ -684,7 +677,7 @@ pub struct UnresolvedRef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchKeyField {
+pub(crate) struct SearchKeyField {
     pub name: String,
     pub label: String,
     pub value: Option<String>,
@@ -694,7 +687,7 @@ pub struct SearchKeyField {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscriminatorField {
+pub(crate) struct DiscriminatorField {
     pub name: String,
     pub label: String,
     pub value: Option<String>,
@@ -704,7 +697,7 @@ pub struct DiscriminatorField {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum FieldType {
+pub(crate) enum FieldType {
     #[default]
     Text,
     Enum,
@@ -713,13 +706,13 @@ pub enum FieldType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnumValue {
+pub(crate) struct EnumValue {
     pub code: String,
     pub display: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityMatch {
+pub(crate) struct EntityMatch {
     pub id: String,
     pub display: String,
     pub score: f32,
@@ -728,7 +721,7 @@ pub struct EntityMatch {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedRef {
+pub(crate) struct ResolvedRef {
     pub ref_id: String,
     pub resolved_key: String,
     pub display: String,
@@ -736,7 +729,7 @@ pub struct ResolvedRef {
 
 /// Chat message
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatMessage {
+pub(crate) struct ChatMessage {
     pub id: Uuid,
     pub role: MessageRole,
     pub content: String,
@@ -763,7 +756,7 @@ pub struct ChatMessage {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum MessageRole {
+pub(crate) enum MessageRole {
     User,
     Agent,
     System,
@@ -771,7 +764,7 @@ pub enum MessageRole {
 
 /// Bound entity in symbol table
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BoundEntity {
+pub(crate) struct BoundEntity {
     pub id: Uuid,
     pub entity_type: String,
     pub display_name: String,
@@ -783,7 +776,7 @@ pub struct BoundEntity {
 
 /// Reference to a client (constraint cascade level 1)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClientRef {
+pub(crate) struct ClientRef {
     pub client_id: Uuid,
     pub display_name: String,
 }
@@ -793,7 +786,7 @@ pub struct ClientRef {
 /// Internal: "private-equity", "sicav", "hedge"
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum StructureType {
+pub(crate) enum StructureType {
     #[default]
     Pe,
     Sicav,
@@ -806,7 +799,7 @@ pub enum StructureType {
 
 impl StructureType {
     /// Display label (what operator sees)
-    pub fn display_label(&self) -> &'static str {
+    pub(crate) fn display_label(&self) -> &'static str {
         match self {
             Self::Pe => "Private Equity",
             Self::Sicav => "SICAV",
@@ -819,7 +812,7 @@ impl StructureType {
     }
 
     /// Short key (for macro valid_for matching)
-    pub fn short_key(&self) -> &'static str {
+    pub(crate) fn short_key(&self) -> &'static str {
         match self {
             Self::Pe => "pe",
             Self::Sicav => "sicav",
@@ -832,7 +825,7 @@ impl StructureType {
     }
 
     /// Internal token (what DSL uses)
-    pub fn internal_token(&self) -> &'static str {
+    pub(crate) fn internal_token(&self) -> &'static str {
         match self {
             Self::Pe => "private-equity",
             Self::Sicav => "sicav",
@@ -845,7 +838,7 @@ impl StructureType {
     }
 
     /// Parse from internal token
-    pub fn from_internal(token: &str) -> Option<Self> {
+    pub(crate) fn from_internal(token: &str) -> Option<Self> {
         match token {
             "private-equity" | "pe" => Some(Self::Pe),
             "sicav" => Some(Self::Sicav),
@@ -867,7 +860,7 @@ impl std::fmt::Display for StructureType {
 
 /// Reference to a structure (constraint cascade level 3)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StructureRef {
+pub(crate) struct StructureRef {
     pub structure_id: Uuid,
     pub display_name: String,
     pub structure_type: StructureType,
@@ -875,14 +868,14 @@ pub struct StructureRef {
 
 /// Reference to a KYC case
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CaseRef {
+pub(crate) struct CaseRef {
     pub case_id: Uuid,
     pub display_name: String,
 }
 
 /// Reference to a mandate (trading profile)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MandateRef {
+pub(crate) struct MandateRef {
     pub mandate_id: Uuid,
     pub display_name: String,
 }
@@ -890,7 +883,7 @@ pub struct MandateRef {
 /// Persona - filters available verbs by user role
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum Persona {
+pub(crate) enum Persona {
     #[default]
     Ops,
     Kyc,
@@ -900,7 +893,7 @@ pub enum Persona {
 
 impl Persona {
     /// Get mode tags this persona can access
-    pub fn mode_tags(&self) -> &'static [&'static str] {
+    pub(crate) fn mode_tags(&self) -> &'static [&'static str] {
         match self {
             Self::Ops => &["onboarding", "kyc", "trading"],
             Self::Kyc => &["kyc", "onboarding"],
@@ -917,7 +910,7 @@ impl Persona {
 /// DAG state for prereq checking
 /// Tracks which verbs have been completed and which state flags are set
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DagState {
+pub(crate) struct DagState {
     /// Completed verb FQNs (e.g., "structure.setup", "case.open")
     pub completed: HashSet<String>,
     /// State flags (e.g., "structure.exists" → true, "case.approved" → false)
@@ -928,37 +921,37 @@ pub struct DagState {
 
 impl DagState {
     /// Mark a verb as completed
-    pub fn mark_completed(&mut self, verb_fqn: &str) {
+    pub(crate) fn mark_completed(&mut self, verb_fqn: &str) {
         self.completed.insert(verb_fqn.to_string());
     }
 
     /// Check if a verb was completed
-    pub fn is_completed(&self, verb_fqn: &str) -> bool {
+    pub(crate) fn is_completed(&self, verb_fqn: &str) -> bool {
         self.completed.contains(verb_fqn)
     }
 
     /// Set a state flag
-    pub fn set_flag(&mut self, key: &str, value: bool) {
+    pub(crate) fn set_flag(&mut self, key: &str, value: bool) {
         self.state_flags.insert(key.to_string(), value);
     }
 
     /// Get a state flag (defaults to false)
-    pub fn get_flag(&self, key: &str) -> bool {
+    pub(crate) fn get_flag(&self, key: &str) -> bool {
         self.state_flags.get(key).copied().unwrap_or(false)
     }
 
     /// Set a fact predicate
-    pub fn set_fact(&mut self, key: &str, value: serde_json::Value) {
+    pub(crate) fn set_fact(&mut self, key: &str, value: serde_json::Value) {
         self.facts.insert(key.to_string(), value);
     }
 
     /// Get a fact predicate
-    pub fn get_fact(&self, key: &str) -> Option<&serde_json::Value> {
+    pub(crate) fn get_fact(&self, key: &str) -> Option<&serde_json::Value> {
         self.facts.get(key)
     }
 
     /// Clear all state (for session reset)
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.completed.clear();
         self.state_flags.clear();
         self.facts.clear();
@@ -968,7 +961,7 @@ impl DagState {
 /// Search scope derived from constraint cascade
 /// Used to narrow entity searches based on session context
 #[derive(Debug, Clone, Default)]
-pub struct SearchScope {
+pub(crate) struct SearchScope {
     pub client_id: Option<Uuid>,
     pub structure_type: Option<StructureType>,
     pub structure_id: Option<Uuid>,
@@ -976,7 +969,7 @@ pub struct SearchScope {
 
 impl SearchScope {
     /// Check if scope has any constraints set
-    pub fn is_constrained(&self) -> bool {
+    pub(crate) fn is_constrained(&self) -> bool {
         self.client_id.is_some() || self.structure_type.is_some() || self.structure_id.is_some()
     }
 }
@@ -987,7 +980,7 @@ impl SearchScope {
 
 /// Snapshot of CBU set for undo/redo
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct CbuSnapshot {
+pub(crate) struct CbuSnapshot {
     /// CBU IDs at this point
     pub cbu_ids: HashSet<Uuid>,
     /// Action that led to this state
@@ -998,7 +991,7 @@ pub struct CbuSnapshot {
 
 impl CbuSnapshot {
     /// Create a snapshot of current CBU set
-    pub fn capture(cbu_ids: &HashSet<Uuid>, action: &str) -> Self {
+    pub(crate) fn capture(cbu_ids: &HashSet<Uuid>, action: &str) -> Self {
         Self {
             cbu_ids: cbu_ids.clone(),
             action: action.to_string(),
@@ -1021,7 +1014,7 @@ impl CbuSnapshot {
 ///                                   (reset on failure or restart)
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
-pub enum ReplState {
+pub(crate) enum ReplState {
     /// No scope defined yet
     #[default]
     Empty,
@@ -1045,37 +1038,37 @@ pub enum ReplState {
 
 impl ReplState {
     /// Check if state allows setting scope
-    pub fn can_set_scope(&self) -> bool {
+    pub(crate) fn can_set_scope(&self) -> bool {
         matches!(self, Self::Empty | Self::Scoped | Self::Executed { .. })
     }
 
     /// Check if state allows setting template
-    pub fn can_set_template(&self) -> bool {
+    pub(crate) fn can_set_template(&self) -> bool {
         matches!(self, Self::Scoped)
     }
 
     /// Check if state allows confirming intent
-    pub fn can_confirm_intent(&self) -> bool {
+    pub(crate) fn can_confirm_intent(&self) -> bool {
         matches!(self, Self::Templated { confirmed: false })
     }
 
     /// Check if state allows generating sheet
-    pub fn can_generate(&self) -> bool {
+    pub(crate) fn can_generate(&self) -> bool {
         matches!(self, Self::Templated { confirmed: true })
     }
 
     /// Check if state allows execution
-    pub fn can_execute(&self) -> bool {
+    pub(crate) fn can_execute(&self) -> bool {
         matches!(self, Self::Ready)
     }
 
     /// Check if state is terminal
-    pub fn is_terminal(&self) -> bool {
+    pub(crate) fn is_terminal(&self) -> bool {
         matches!(self, Self::Executed { .. })
     }
 
     /// Get human-readable state name
-    pub fn name(&self) -> &'static str {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
             Self::Empty => "empty",
             Self::Scoped => "scoped",
@@ -1113,7 +1106,7 @@ impl std::fmt::Display for ReplState {
 /// Session lifecycle states (migrated from AgentSession)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum SessionState {
+pub(crate) enum SessionState {
     /// Just created, awaiting scope selection
     #[default]
     New,
@@ -1133,7 +1126,7 @@ pub enum SessionState {
 
 /// Event that triggers a session state transition
 #[derive(Debug, Clone)]
-pub enum SessionEvent {
+pub(crate) enum SessionEvent {
     /// Scope has been set (CBUs loaded via session.load-*)
     ScopeSet,
     /// DSL is pending validation (unresolved refs, needs user input)
@@ -1157,7 +1150,7 @@ pub enum SessionEvent {
 /// Sub-session type - determines the purpose and behavior of a child session
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SubSessionType {
+pub(crate) enum SubSessionType {
     /// Root session - full agent capabilities (not a sub-session)
     #[default]
     Root,
@@ -1173,7 +1166,7 @@ pub enum SubSessionType {
 
 /// Resolution sub-session state - entity disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct ResolutionSubSession {
+pub(crate) struct ResolutionSubSession {
     /// Unresolved refs to work through
     pub unresolved_refs: Vec<UnresolvedRefInfo>,
     /// Which DSL statement index triggered this (in parent)
@@ -1186,7 +1179,7 @@ pub struct ResolutionSubSession {
 
 /// Info about an unresolved entity reference (full metadata for resolution UI)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct UnresolvedRefInfo {
+pub(crate) struct UnresolvedRefInfo {
     /// Unique ID for this ref (stmt_idx:arg_name)
     pub ref_id: String,
     /// Entity type (e.g., "entity", "cbu", "person")
@@ -1207,7 +1200,7 @@ pub struct UnresolvedRefInfo {
 
 /// Entity match info for resolution UI
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EntityMatchInfo {
+pub(crate) struct EntityMatchInfo {
     /// Primary key (UUID or code)
     pub value: String,
     /// Display name
@@ -1220,12 +1213,12 @@ pub struct EntityMatchInfo {
 
 impl ResolutionSubSession {
     /// Create a new empty resolution sub-session
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Create from AST statements - extracts unresolved entity refs
-    pub fn from_statements(statements: &[crate::dsl_v2::Statement]) -> Self {
+    pub(crate) fn from_statements(statements: &[crate::dsl_v2::Statement]) -> Self {
         use crate::dsl_v2::Statement;
 
         let mut unresolved_refs = Vec::new();
@@ -1309,14 +1302,14 @@ impl ResolutionSubSession {
     }
 
     /// Get resolution progress as (resolved, total)
-    pub fn progress(&self) -> (usize, usize) {
+    pub(crate) fn progress(&self) -> (usize, usize) {
         let resolved = self.resolutions.len();
         let total = self.unresolved_refs.len();
         (resolved, total)
     }
 
     /// Select a resolution for a ref_id
-    pub fn select(&mut self, ref_id: &str, resolved_key: &str) -> Result<(), String> {
+    pub(crate) fn select(&mut self, ref_id: &str, resolved_key: &str) -> Result<(), String> {
         if !self.unresolved_refs.iter().any(|r| r.ref_id == ref_id) {
             return Err(format!("Unknown ref_id: {}", ref_id));
         }
@@ -1326,19 +1319,19 @@ impl ResolutionSubSession {
     }
 
     /// Check if all refs have been resolved
-    pub fn is_complete(&self) -> bool {
+    pub(crate) fn is_complete(&self) -> bool {
         self.unresolved_refs
             .iter()
             .all(|r| self.resolutions.contains_key(&r.ref_id))
     }
 
     /// Get the current unresolved ref being worked on
-    pub fn current_ref(&self) -> Option<&UnresolvedRefInfo> {
+    pub(crate) fn current_ref(&self) -> Option<&UnresolvedRefInfo> {
         self.unresolved_refs.get(self.current_ref_index)
     }
 
     /// Move to next unresolved ref
-    pub fn next_ref(&mut self) -> bool {
+    pub(crate) fn next_ref(&mut self) -> bool {
         if self.current_ref_index + 1 < self.unresolved_refs.len() {
             self.current_ref_index += 1;
             true
@@ -1351,7 +1344,7 @@ impl ResolutionSubSession {
     ///
     /// For each resolution in self.resolutions, find the corresponding EntityRef
     /// in the statements and set its resolved_key.
-    pub fn apply_to_statements(
+    pub(crate) fn apply_to_statements(
         &self,
         statements: &mut [crate::dsl_v2::Statement],
     ) -> Result<(), String> {
@@ -1409,7 +1402,7 @@ impl ResolutionSubSession {
 
 /// Research sub-session state - GLEIF/UBO discovery
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct ResearchSubSession {
+pub(crate) struct ResearchSubSession {
     /// Target entity being researched (if known)
     pub target_entity_id: Option<Uuid>,
     /// Research type (gleif, ubo, companies_house, etc.)
@@ -1420,7 +1413,7 @@ pub struct ResearchSubSession {
 
 /// Review sub-session state - DSL review before execute
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct ReviewSubSession {
+pub(crate) struct ReviewSubSession {
     /// The DSL pending review
     pub pending_dsl: String,
     /// Review status
@@ -1429,7 +1422,7 @@ pub struct ReviewSubSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ReviewStatus {
+pub(crate) enum ReviewStatus {
     #[default]
     Pending,
     Approved,
@@ -1439,7 +1432,7 @@ pub enum ReviewStatus {
 
 /// Correction sub-session state - fix screening hits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct CorrectionSubSession {
+pub(crate) struct CorrectionSubSession {
     /// Entity with screening hit
     pub entity_id: Option<Uuid>,
     /// Screening hit ID
@@ -1451,7 +1444,7 @@ pub struct CorrectionSubSession {
 /// Prereq condition for DAG navigation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum PrereqCondition {
+pub(crate) enum PrereqCondition {
     /// A specific verb must have been completed
     VerbCompleted { verb: String },
     /// Any of the listed verbs must have been completed
@@ -1464,7 +1457,7 @@ pub enum PrereqCondition {
 
 impl PrereqCondition {
     /// Check if this prereq is satisfied
-    pub fn is_satisfied(&self, dag_state: &DagState) -> bool {
+    pub(crate) fn is_satisfied(&self, dag_state: &DagState) -> bool {
         match self {
             Self::VerbCompleted { verb } => dag_state.is_completed(verb),
             Self::AnyOf { verbs } => verbs.iter().any(|v| dag_state.is_completed(v)),
@@ -2645,7 +2638,7 @@ impl UnifiedSession {
 
 /// Session list item for API responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionListItem {
+pub(crate) struct SessionListItem {
     pub id: Uuid,
     pub name: Option<String>,
     pub cbu_count: i32,
@@ -3053,7 +3046,7 @@ mod tests {
 
 /// Execution phase - a group of entries at the same DAG depth
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecutionPhase {
+pub(crate) struct ExecutionPhase {
     /// Phase depth (0 = first phase, no dependencies)
     pub depth: u32,
     /// Entry IDs in this phase
@@ -3066,7 +3059,7 @@ pub struct ExecutionPhase {
 
 impl ExecutionPhase {
     /// Create a new empty phase
-    pub fn new(depth: u32) -> Self {
+    pub(crate) fn new(depth: u32) -> Self {
         Self {
             depth,
             entry_ids: Vec::new(),
@@ -3076,14 +3069,14 @@ impl ExecutionPhase {
     }
 
     /// Get count of entries in this phase
-    pub fn entry_count(&self) -> usize {
+    pub(crate) fn entry_count(&self) -> usize {
         self.entry_ids.len()
     }
 }
 
 /// Error codes for DSL execution
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ErrorCode {
+pub(crate) enum ErrorCode {
     // Syntax errors
     SyntaxError,
     InvalidVerb,
@@ -3134,7 +3127,7 @@ impl std::fmt::Display for ErrorCode {
 
 /// Overall sheet execution status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum SheetStatus {
+pub(crate) enum SheetStatus {
     /// All entries executed successfully
     Success,
     /// At least one entry failed, transaction rolled back
@@ -3145,7 +3138,7 @@ pub enum SheetStatus {
 
 impl SheetStatus {
     /// Get status as string for database storage
-    pub fn as_str(&self) -> &'static str {
+    pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Success => "success",
             Self::Failed => "failed",
@@ -3156,7 +3149,7 @@ impl SheetStatus {
 
 /// Detailed error for a single entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntryError {
+pub(crate) struct EntryError {
     /// Error code
     pub code: ErrorCode,
     /// Error message
@@ -3171,7 +3164,7 @@ pub struct EntryError {
 
 /// Result of executing a single entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntryResult {
+pub(crate) struct EntryResult {
     /// Entry ID
     pub entry_id: Uuid,
     /// DAG depth
@@ -3192,7 +3185,7 @@ pub struct EntryResult {
 
 /// Result of executing a run sheet
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SheetExecutionResult {
+pub(crate) struct SheetExecutionResult {
     /// Session ID
     pub session_id: Uuid,
     /// Overall status
@@ -3213,7 +3206,7 @@ pub struct SheetExecutionResult {
 
 impl SheetExecutionResult {
     /// Get count of successful entries
-    pub fn success_count(&self) -> usize {
+    pub(crate) fn success_count(&self) -> usize {
         self.entries
             .iter()
             .filter(|e| e.status == EntryStatus::Executed)
@@ -3221,7 +3214,7 @@ impl SheetExecutionResult {
     }
 
     /// Get count of failed entries
-    pub fn failed_count(&self) -> usize {
+    pub(crate) fn failed_count(&self) -> usize {
         self.entries
             .iter()
             .filter(|e| e.status == EntryStatus::Failed)
@@ -3229,7 +3222,7 @@ impl SheetExecutionResult {
     }
 
     /// Get count of skipped entries
-    pub fn skipped_count(&self) -> usize {
+    pub(crate) fn skipped_count(&self) -> usize {
         self.entries
             .iter()
             .filter(|e| e.status == EntryStatus::Skipped)
@@ -3237,7 +3230,7 @@ impl SheetExecutionResult {
     }
 
     /// Check if execution was successful
-    pub fn is_success(&self) -> bool {
+    pub(crate) fn is_success(&self) -> bool {
         self.overall_status == SheetStatus::Success
     }
 }

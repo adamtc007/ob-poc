@@ -43,7 +43,7 @@ use crate::repl::sentence_gen::SentenceGenerator;
 ///
 /// A tuple of `(entries, template_hash)` where the hash is derived from the
 /// template structure for provenance tracking.
-pub fn instantiate_template(
+pub(crate) fn instantiate_template(
     template: &PackTemplate,
     context_vars: &HashMap<String, String>,
     answers: &HashMap<String, serde_json::Value>,
@@ -327,7 +327,7 @@ fn compute_template_hash(template: &PackTemplate) -> String {
 
 /// Errors from template instantiation.
 #[derive(Debug)]
-pub enum TemplateError {
+pub(crate) enum TemplateError {
     MissingListSlot { key: String },
 }
 

@@ -13,11 +13,11 @@ use super::store::StewardshipStore;
 use super::types::*;
 
 /// FocusState store operations.
-pub struct FocusStore;
+pub(crate) struct FocusStore;
 
 impl FocusStore {
     /// Get the current focus state for a session.
-    pub async fn get(pool: &PgPool, session_id: Uuid) -> Result<Option<FocusState>> {
+    pub(crate) async fn get(pool: &PgPool, session_id: Uuid) -> Result<Option<FocusState>> {
         let row = sqlx::query_as::<_, FocusRow>(
             r#"
             SELECT session_id, changeset_id, overlay_mode, overlay_changeset_id,
@@ -38,7 +38,7 @@ impl FocusStore {
     }
 
     /// Set focus state — upserts and emits FocusChanged audit event.
-    pub async fn set(
+    pub(crate) async fn set(
         pool: &PgPool,
         focus: &FocusState,
         source: FocusUpdateSource,
@@ -108,7 +108,7 @@ impl FocusStore {
     }
 
     /// Delete focus state for a session.
-    pub async fn delete(pool: &PgPool, session_id: Uuid) -> Result<()> {
+    pub(crate) async fn delete(pool: &PgPool, session_id: Uuid) -> Result<()> {
         sqlx::query("DELETE FROM sem_reg.focus_states WHERE session_id = $1")
             .bind(session_id)
             .execute(pool)

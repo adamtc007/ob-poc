@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 /// Entity type for enrichment queries
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EntityType {
+pub(crate) enum EntityType {
     ProperPerson,
     LegalEntity,
     Cbu,
@@ -18,7 +18,7 @@ pub enum EntityType {
 
 impl EntityType {
     /// Parse from string (case-insensitive)
-    pub fn parse(s: &str) -> Option<Self> {
+    pub(crate) fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "person" | "proper_person" | "properperson" => Some(Self::ProperPerson),
             "company" | "legal_entity" | "legalentity" | "limited_company" => {
@@ -32,17 +32,17 @@ impl EntityType {
 }
 
 /// Enriches entities with contextual information for disambiguation
-pub struct EntityEnricher {
+pub(crate) struct EntityEnricher {
     pool: PgPool,
 }
 
 impl EntityEnricher {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     /// Enrich a batch of entity IDs with context
-    pub async fn enrich(
+    pub(crate) async fn enrich(
         &self,
         entity_type: EntityType,
         ids: &[Uuid],
@@ -286,7 +286,7 @@ impl EntityEnricher {
 
 /// Rich context for entity disambiguation
 #[derive(Debug, Clone, Default, Serialize)]
-pub struct EntityContext {
+pub(crate) struct EntityContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nationality: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -303,7 +303,7 @@ pub struct EntityContext {
 
 /// Role context for a specific CBU
 #[derive(Debug, Clone, Serialize)]
-pub struct RoleContext {
+pub(crate) struct RoleContext {
     pub role: String,
     pub cbu_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -312,7 +312,7 @@ pub struct RoleContext {
 
 /// Ownership context
 #[derive(Debug, Clone, Serialize)]
-pub struct OwnershipContext {
+pub(crate) struct OwnershipContext {
     pub owned_name: String,
     pub percentage: f64,
     pub ownership_type: String,
@@ -320,7 +320,7 @@ pub struct OwnershipContext {
 
 impl EntityContext {
     /// Build human-readable disambiguation label
-    pub fn disambiguation_label(&self, display: &str, entity_type: EntityType) -> String {
+    pub(crate) fn disambiguation_label(&self, display: &str, entity_type: EntityType) -> String {
         match entity_type {
             EntityType::ProperPerson => {
                 let mut parts = vec![display.to_string()];

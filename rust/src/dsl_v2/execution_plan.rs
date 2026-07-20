@@ -44,7 +44,7 @@ use std::collections::{HashMap, HashSet};
 /// Both carry the same dependency information; `dag` is the typed authority,
 /// `steps` is the ordered execution sequence.
 #[derive(Debug, Clone)]
-pub struct ExecutionPlan {
+pub(crate) struct ExecutionPlan {
     pub steps: Vec<ExecutionStep>,
     /// Typed Populated Execution DAG — the load-bearing runtime structure (v0.5 §4.5).
     /// Populated from all `DagEdge` entries across every `ExecutionStep::dag_edges`.
@@ -53,7 +53,7 @@ pub struct ExecutionPlan {
 
 impl ExecutionPlan {
     /// Build the plan from a sorted step list, collecting all dag_edges into `dag`.
-    pub fn from_steps(steps: Vec<ExecutionStep>) -> Self {
+    pub(crate) fn from_steps(steps: Vec<ExecutionStep>) -> Self {
         let mut dag = PopulatedExecutionDag::new();
         for step in &steps {
             for edge in &step.dag_edges {
@@ -68,7 +68,7 @@ impl ExecutionPlan {
     /// Each step that declares `bind_as` with a known `produces_entity_type`
     /// contributes a typed `BindingSlot`. Steps that produce bindings without
     /// a declared entity type contribute an untyped slot (entity_type: None).
-    pub fn binding_frame_schema(&self) -> dsl_core::BindingFrameSchema {
+    pub(crate) fn binding_frame_schema(&self) -> dsl_core::BindingFrameSchema {
         use dsl_core::BindingSlotId;
         use dsl_core::{BindingFrameSchema, BindingSlot};
         let slots = self
@@ -87,7 +87,7 @@ impl ExecutionPlan {
 
 /// A single step in the execution plan
 #[derive(Debug, Clone)]
-pub struct ExecutionStep {
+pub(crate) struct ExecutionStep {
     /// The verb call to execute (with nested children removed)
     pub verb_call: VerbCall,
 
@@ -138,7 +138,7 @@ pub struct ExecutionStep {
 
 /// Instruction to inject a previous step's result into this step's arguments
 #[derive(Debug, Clone)]
-pub struct Injection {
+pub(crate) struct Injection {
     /// Index of the step that produces the value
     pub from_step: usize,
 
@@ -148,7 +148,7 @@ pub struct Injection {
 
 /// Compilation errors
 #[derive(Debug, Clone)]
-pub enum CompileError {
+pub(crate) enum CompileError {
     /// Verb not found in registry
     UnknownVerb {
         domain: String,
@@ -206,14 +206,14 @@ impl std::error::Error for CompileError {}
 
 /// Context for the planning pass - tracks available bindings from session/environment
 #[derive(Debug, Clone, Default)]
-pub struct PlanningContext {
+pub(crate) struct PlanningContext {
     /// Bindings available from session context (e.g., @last_cbu)
     available_bindings: HashMap<String, BindingInfo>,
 }
 
 /// Information about an available binding
 #[derive(Debug, Clone)]
-pub struct BindingInfo {
+pub(crate) struct BindingInfo {
     /// The type of entity this binding refers to
     pub entity_type: String,
     /// Optional subtype (for entities with subtypes)
@@ -224,12 +224,12 @@ pub struct BindingInfo {
 
 impl PlanningContext {
     /// Create empty context
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Add a binding to the context
-    pub fn add_binding(&mut self, name: &str, entity_type: &str) {
+    pub(crate) fn add_binding(&mut self, name: &str, entity_type: &str) {
         self.available_bindings.insert(
             name.to_string(),
             BindingInfo {
@@ -241,24 +241,24 @@ impl PlanningContext {
     }
 
     /// Add a binding with full info
-    pub fn add_binding_info(&mut self, name: &str, info: BindingInfo) {
+    pub(crate) fn add_binding_info(&mut self, name: &str, info: BindingInfo) {
         self.available_bindings.insert(name.to_string(), info);
     }
 
     /// Check if a binding is available
-    pub fn has_binding(&self, name: &str) -> bool {
+    pub(crate) fn has_binding(&self, name: &str) -> bool {
         self.available_bindings.contains_key(name)
     }
 
     /// Get binding info
-    pub fn get_binding(&self, name: &str) -> Option<&BindingInfo> {
+    pub(crate) fn get_binding(&self, name: &str) -> Option<&BindingInfo> {
         self.available_bindings.get(name)
     }
 }
 
 /// Result of compile_with_planning
 #[derive(Debug, Clone)]
-pub struct PlanningResult {
+pub(crate) struct PlanningResult {
     /// The compiled execution plan
     pub plan: ExecutionPlan,
     /// Synthetic steps that were injected
@@ -271,7 +271,7 @@ pub struct PlanningResult {
 
 /// A synthetic step that was injected by the planner
 #[derive(Debug, Clone)]
-pub struct SyntheticStep {
+pub(crate) struct SyntheticStep {
     /// The binding this step produces
     pub binding: String,
     /// The verb that was injected (e.g., "cbu.create")
@@ -284,7 +284,7 @@ pub struct SyntheticStep {
 
 /// Diagnostic message from the planner
 #[derive(Debug, Clone)]
-pub enum PlannerDiagnostic {
+pub(crate) enum PlannerDiagnostic {
     /// A synthetic step was injected to create a missing binding
     SyntheticStepInjected {
         binding: String,
@@ -537,7 +537,7 @@ pub fn compile(program: &Program) -> Result<ExecutionPlan, CompileError> {
 ///
 /// # Returns
 /// * `PlanningResult` containing the plan, synthetic steps, and diagnostics
-pub fn compile_with_planning(
+pub(crate) fn compile_with_planning(
     program: &Program,
     context: &PlanningContext,
 ) -> Result<PlanningResult, CompileError> {
@@ -1161,7 +1161,7 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
 
 impl ExecutionPlan {
     /// Pretty print the plan for debugging
-    pub fn debug_print(&self) -> String {
+    pub(crate) fn debug_print(&self) -> String {
         let mut out = String::new();
         out.push_str("=== Execution Plan ===\n");
 
@@ -1194,7 +1194,7 @@ impl ExecutionPlan {
     }
 
     /// Get execution order as domain.verb sequence (for logging)
-    pub fn execution_sequence(&self) -> Vec<String> {
+    pub(crate) fn execution_sequence(&self) -> Vec<String> {
         self.steps
             .iter()
             .map(|s| format!("{}.{}", s.verb_call.domain, s.verb_call.verb))
@@ -1202,12 +1202,12 @@ impl ExecutionPlan {
     }
 
     /// Count of steps
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.steps.len()
     }
 
     /// Check if empty
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.steps.is_empty()
     }
 }

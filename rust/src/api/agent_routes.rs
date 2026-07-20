@@ -55,22 +55,8 @@ use uuid::Uuid;
 
 // Re-export all request/response types from agent_types
 pub(crate) use crate::api::agent_types::ExecutionOutcome;
-pub use crate::api::agent_types::{
-    BatchAddProductsRequest, BatchAddProductsResponse, BatchProductResult, CompleteRequest,
-    CompleteResponse, CompleteSubSessionRequest, CompleteSubSessionResponse, CompletionItem,
-    CreateSubSessionRequest, CreateSubSessionResponse, CreateSubSessionType, DomainInfo,
-    DomainsResponse, EntityCandidateResponse, EntityMentionResponse, EvidenceResponse,
-    ExecuteDslRequest, ExtractEntitiesRequest, ExtractEntitiesResponse, GenerateDslRequest,
-    GenerateDslResponse, HealthResponse, MissingArg, OnboardingExecutionResult, OnboardingRequest,
-    OnboardingResponse, ParseDiscriminatorsRequest, ParseDiscriminatorsResponse, ParseDslRequest,
-    ParseDslResponse, ParsedDiscriminators, PipelineStage, RefId, RemainingUnresolvedRef,
-    ReportCorrectionRequest, ReportCorrectionResponse, ResolutionState, ResolutionStats,
-    ResolveByRefIdRequest, ResolveByRefIdResponse, ResolveRefRequest, ResolveRefResponse,
-    SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse,
-    SubSessionChatRequest, SubSessionMessage, SubSessionStateResponse, UnresolvedRef,
-    ValidationError, ValidationResult, VerbInfo, VerbSurfaceQuery, VocabQuery, VocabResponse,
-    WatchQuery, WatchResponse,
-};
+pub use crate::api::agent_types::{VerbInfo};
+pub(crate) use crate::api::agent_types::{BatchAddProductsRequest, BatchAddProductsResponse, BatchProductResult, CompleteRequest, CompleteResponse, CompleteSubSessionRequest, CompleteSubSessionResponse, CompletionItem, CreateSubSessionRequest, CreateSubSessionResponse, CreateSubSessionType, DomainInfo, DomainsResponse, EntityCandidateResponse, EntityMentionResponse, EvidenceResponse, ExecuteDslRequest, ExtractEntitiesRequest, ExtractEntitiesResponse, GenerateDslRequest, GenerateDslResponse, HealthResponse, MissingArg, OnboardingExecutionResult, OnboardingRequest, OnboardingResponse, ParseDiscriminatorsRequest, ParseDiscriminatorsResponse, ParseDslRequest, ParseDslResponse, ParsedDiscriminators, PipelineStage, RefId, RemainingUnresolvedRef, ReportCorrectionRequest, ReportCorrectionResponse, ResolutionState, ResolutionStats, ResolveByRefIdRequest, ResolveByRefIdResponse, ResolveRefRequest, ResolveRefResponse, SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse, SubSessionChatRequest, SubSessionMessage, SubSessionStateResponse, UnresolvedRef, ValidationError, ValidationResult, VerbSurfaceQuery, VocabQuery, VocabResponse, WatchQuery, WatchResponse};
 
 // ============================================================================
 // State — see agent_state.rs for AgentState and create_agent_router_with_semantic()

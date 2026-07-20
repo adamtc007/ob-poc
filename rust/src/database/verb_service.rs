@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 /// A user-learned phrase match (exact)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserLearnedExactMatch {
+pub(crate) struct UserLearnedExactMatch {
     pub phrase: String,
     pub verb: String,
     pub confidence: f32,
@@ -26,7 +26,7 @@ pub struct UserLearnedExactMatch {
 
 /// A semantic match with similarity score
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemanticMatch {
+pub(crate) struct SemanticMatch {
     pub phrase: String,
     pub verb: String,
     pub similarity: f64,
@@ -36,7 +36,7 @@ pub struct SemanticMatch {
 
 /// Verb description from dsl_verbs table
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct VerbDescription {
+pub(crate) struct VerbDescription {
     pub full_name: String,
     pub description: Option<String>,
 }
@@ -96,7 +96,7 @@ struct VerbCentroidRow {
 
 /// Centroid match result with score and phrase count
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbCentroidMatch {
+pub(crate) struct VerbCentroidMatch {
     pub verb_name: String,
     pub score: f64,
     pub phrase_count: i32,
@@ -1027,7 +1027,7 @@ struct PhoneticMatchRow {
 
 /// A phonetic match result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhoneticMatch {
+pub(crate) struct PhoneticMatch {
     pub verb: String,
     pub pattern: String,
     pub phonetic_codes: Vec<String>,

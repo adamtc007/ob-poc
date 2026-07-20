@@ -21,7 +21,7 @@ use crate::sem_os_runtime::constellation_runtime::{HydratedCardinality, Hydrated
 ///
 /// Call this after verb execution when `writes_since_push > 0` and
 /// the constellation has been re-hydrated.
-pub fn compute_narration(
+pub(crate) fn compute_narration(
     pre_slots: &[SlotSnapshot],
     post_slots: &[HydratedSlot],
     last_verb: &str,
@@ -76,7 +76,7 @@ pub fn compute_narration(
 ///
 /// These are "where are we" / "what's next" questions that the constellation
 /// can answer deterministically without embedding search.
-pub fn is_contextual_query(utterance: &str) -> bool {
+pub(crate) fn is_contextual_query(utterance: &str) -> bool {
     let normalized = utterance.trim().to_lowercase();
     CONTEXTUAL_PATTERNS.iter().any(|p| normalized.contains(p))
 }
@@ -120,7 +120,7 @@ const CONTEXTUAL_PATTERNS: &[&str] = &[
 /// Unlike `compute_narration()` (which is post-execution with delta),
 /// this produces a snapshot view: current gaps, blockers, progress,
 /// and suggested next steps — no delta since nothing changed.
-pub fn query_narration(
+pub(crate) fn query_narration(
     post_slots: &[HydratedSlot],
     constellation_label: &str,
     current_workspace: Option<&str>,
@@ -165,7 +165,7 @@ pub fn query_narration(
 /// Lightweight snapshot of a slot's state before execution.
 /// Captured before verb execution so we can compute the delta.
 #[derive(Debug, Clone)]
-pub struct SlotSnapshot {
+pub(crate) struct SlotSnapshot {
     pub name: String,
     pub effective_state: String,
     pub entity_name: Option<String>,
@@ -173,7 +173,7 @@ pub struct SlotSnapshot {
 
 impl SlotSnapshot {
     /// Capture snapshots from hydrated slots (call before execution).
-    pub fn capture(slots: &[HydratedSlot]) -> Vec<Self> {
+    pub(crate) fn capture(slots: &[HydratedSlot]) -> Vec<Self> {
         fn collect(slots: &[HydratedSlot], out: &mut Vec<SlotSnapshot>) {
             for slot in slots {
                 out.push(SlotSnapshot {
@@ -483,28 +483,6 @@ fn parse_dependency_state(msg: &str) -> Option<(String, String, String)> {
 // Cross-workspace staleness → blockers
 // ---------------------------------------------------------------------------
 
-/// Convert stale shared fact refs into NarrationBlockers.
-///
-/// Called by the orchestrator when building the response, to merge
-/// cross-workspace staleness blockers into the narration payload.
-pub fn blockers_from_stale_shared_facts(
-    stale_facts: &[dsl_runtime::StaleSharedFactRef],
-) -> Vec<NarrationBlocker> {
-    stale_facts
-        .iter()
-        .map(|sf| NarrationBlocker {
-            blocked_verb: format!("(all verbs reading {})", sf.atom_path),
-            reason: format!(
-                "Shared fact '{}' has been superseded in {} workspace (held v{}, current v{})",
-                sf.atom_path, sf.owner_workspace, sf.held_version, sf.current_version
-            ),
-            unblock_hint: format!(
-                "Run shared-atom.acknowledge-shared-update for '{}'",
-                sf.atom_path
-            ),
-        })
-        .collect()
-}
 
 // ---------------------------------------------------------------------------
 // Helpers

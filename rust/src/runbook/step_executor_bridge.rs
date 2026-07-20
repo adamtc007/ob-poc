@@ -72,7 +72,7 @@ impl super::executor::StepExecutor for DslStepExecutor {
 /// This adapter handles the `Parked` outcome from `DslExecutorV2`, mapping it
 /// to `StepOutcome::Parked` so the execution gate can suspend the runbook
 /// and record the cursor for later resumption.
-pub struct DslExecutorV2StepExecutor {
+pub(crate) struct DslExecutorV2StepExecutor {
     executor: Arc<dyn DslExecutorV2>,
     /// Runbook ID passed through to `execute_v2` for correlation.
     runbook_id: Uuid,
@@ -80,7 +80,7 @@ pub struct DslExecutorV2StepExecutor {
 }
 
 impl DslExecutorV2StepExecutor {
-    pub fn new(
+    pub(crate) fn new(
         executor: Arc<dyn DslExecutorV2>,
         runbook_id: Uuid,
         session_stack: Option<ob_poc_types::session_stack::SessionStackState>,
@@ -134,7 +134,7 @@ impl super::executor::StepExecutor for DslExecutorV2StepExecutor {
 /// catalogue-platform-refinement-v1_3 §3.3 — runtime impact). When a
 /// `GatePipeline` is attached, every step is gate-checked against the
 /// loaded DAG taxonomies before dispatch.
-pub struct VerbExecutionPortStepExecutor {
+pub(crate) struct VerbExecutionPortStepExecutor {
     port: Arc<dyn dsl_runtime::VerbExecutionPort>,
     /// Principal used for all executions in this runbook.
     principal: sem_os_core::principal::Principal,
@@ -178,7 +178,7 @@ pub struct GatePipeline {
 /// Resolves a verb FQN to its v1.3 `transition_args` metadata. Caller
 /// implements this via a HashMap pre-populated from VerbsConfig at
 /// startup.
-pub trait VerbTransitionLookup: Send + Sync {
+pub(crate) trait VerbTransitionLookup: Send + Sync {
     fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::TransitionArgs>;
 }
 
@@ -317,7 +317,7 @@ pub(crate) async fn resolve_transition_probe<'a>(
 }
 
 impl VerbExecutionPortStepExecutor {
-    pub fn new(
+    pub(crate) fn new(
         port: Arc<dyn dsl_runtime::VerbExecutionPort>,
         principal: sem_os_core::principal::Principal,
         session_id: Option<Uuid>,
@@ -336,7 +336,7 @@ impl VerbExecutionPortStepExecutor {
     /// `phase5_runtime_recheck` (or its `HumanGate` re-seal sibling)
     /// persisted for this step's `entry_id` — replaces the hardcoded
     /// `None` handle at the consume call site.
-    pub fn with_pool(mut self, pool: sqlx::PgPool) -> Self {
+    pub(crate) fn with_pool(mut self, pool: sqlx::PgPool) -> Self {
         self.pool = Some(pool);
         self
     }
@@ -344,7 +344,7 @@ impl VerbExecutionPortStepExecutor {
     /// Attach a v1.3 gate-check pipeline. When set, each `execute_step`
     /// call invokes the GateChecker against the verb's declared
     /// transitions before dispatching to the port.
-    pub fn with_gate_pipeline(mut self, pipeline: GatePipeline) -> Self {
+    pub(crate) fn with_gate_pipeline(mut self, pipeline: GatePipeline) -> Self {
         self.gate_pipeline = Some(pipeline);
         self
     }

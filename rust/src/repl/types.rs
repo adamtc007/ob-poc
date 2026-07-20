@@ -26,7 +26,7 @@ use uuid::Uuid;
 /// [`ContextStack`]: super::context_stack::ContextStack
 /// [`IntentMatcher`]: super::intent_matcher::IntentMatcher
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MatchContext {
+pub(crate) struct MatchContext {
     /// Current client group (if set)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_group_id: Option<Uuid>,
@@ -80,7 +80,7 @@ pub struct MatchContext {
 
 /// Scope context for matching
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScopeContext {
+pub(crate) struct ScopeContext {
     /// CBU IDs in scope
     pub cbu_ids: Vec<Uuid>,
     /// Scope description
@@ -89,7 +89,7 @@ pub struct ScopeContext {
 
 /// Intent match result (returned from IntentMatcher)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntentMatchResult {
+pub(crate) struct IntentMatchResult {
     /// Match outcome
     pub outcome: MatchOutcome,
 
@@ -121,7 +121,7 @@ pub struct IntentMatchResult {
 /// Match outcome
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum MatchOutcome {
+pub(crate) enum MatchOutcome {
     /// Clear winner found
     Matched { verb: String, confidence: f32 },
 
@@ -149,7 +149,7 @@ pub enum MatchOutcome {
 
 /// Verb candidate from search
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct VerbCandidate {
+pub(crate) struct VerbCandidate {
     /// Fully qualified verb name (e.g., "session.load-galaxy")
     pub verb_fqn: String,
     /// Verb description
@@ -166,7 +166,7 @@ pub struct VerbCandidate {
 
 /// Entity mention found in input
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EntityMention {
+pub(crate) struct EntityMention {
     /// Text span in original input
     pub text: String,
     /// Character offset start
@@ -188,7 +188,7 @@ pub struct EntityMention {
 
 /// Scope candidate for selection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ScopeCandidate {
+pub(crate) struct ScopeCandidate {
     /// Unique ID for this option
     pub id: String,
     /// Display name
@@ -202,7 +202,7 @@ pub struct ScopeCandidate {
 
 /// Unresolved entity reference
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct UnresolvedRef {
+pub(crate) struct UnresolvedRef {
     /// Reference ID (for tracking)
     pub ref_id: String,
     /// Original text
@@ -216,7 +216,7 @@ pub struct UnresolvedRef {
 
 /// Entity candidate for resolution
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct EntityCandidate {
+pub(crate) struct EntityCandidate {
     /// Entity ID
     pub entity_id: Uuid,
     /// Entity name
@@ -230,7 +230,7 @@ pub struct EntityCandidate {
 
 /// Client group option for selection
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ClientGroupOption {
+pub(crate) struct ClientGroupOption {
     /// Group ID
     pub group_id: Uuid,
     /// Group name
@@ -245,7 +245,7 @@ pub struct ClientGroupOption {
 
 /// Intent tier option (high-level categorization)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct IntentTierOption {
+pub(crate) struct IntentTierOption {
     /// Option ID
     pub id: String,
     /// Label (e.g., "Navigate & View")
@@ -262,7 +262,7 @@ pub struct IntentTierOption {
 
 /// Debug information for intent matching
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MatchDebugInfo {
+pub(crate) struct MatchDebugInfo {
     /// Time spent on each stage (ms)
     #[serde(default)]
     pub timing: Vec<(String, u64)>,

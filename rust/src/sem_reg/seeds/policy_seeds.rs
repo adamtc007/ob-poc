@@ -24,7 +24,7 @@ use crate::sem_reg::{
 
 /// Report from policy seeding.
 #[derive(Debug, Default)]
-pub struct PolicySeedReport {
+pub(crate) struct PolicySeedReport {
     pub policies_published: usize,
     pub policies_skipped: usize,
     pub policies_updated: usize,

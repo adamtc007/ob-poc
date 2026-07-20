@@ -41,7 +41,7 @@ use uuid::Uuid;
 /// We send a snapshot rather than the full session to avoid
 /// holding locks while subscribers process updates.
 #[derive(Debug, Clone)]
-pub struct SessionSnapshot {
+pub(crate) struct SessionSnapshot {
     /// Session ID
     pub session_id: Uuid,
     /// Version number (incremented on each update)
@@ -65,7 +65,7 @@ pub struct SessionSnapshot {
 
 impl SessionSnapshot {
     /// Create a snapshot from a session
-    pub fn from_session(session: &UnifiedSession) -> Self {
+    pub(crate) fn from_session(session: &UnifiedSession) -> Self {
         // Extract scope info from session context
         let (scope_definition, scope_loaded) = session
             .context
@@ -92,7 +92,7 @@ impl SessionSnapshot {
     }
 
     /// Create an empty snapshot for initialization
-    pub fn empty(session_id: Uuid) -> Self {
+    pub(crate) fn empty(session_id: Uuid) -> Self {
         Self {
             session_id,
             version: 0,
@@ -108,7 +108,7 @@ impl SessionSnapshot {
 }
 
 /// Session watcher - a receiver that yields on every session update.
-pub type SessionWatcher = watch::Receiver<SessionSnapshot>;
+pub(crate) type SessionWatcher = watch::Receiver<SessionSnapshot>;
 
 /// Internal watcher entry with sender and subscriber count
 struct WatcherEntry {
@@ -127,7 +127,7 @@ type WatcherMap = Arc<RwLock<HashMap<Uuid, WatcherEntry>>>;
 /// - Coordinating REPL and Viewport state
 ///
 /// The underlying SessionStore remains accessible for backward compatibility.
-pub struct SessionManager {
+pub(crate) struct SessionManager {
     /// The underlying session store
     store: SessionStore,
 
@@ -137,7 +137,7 @@ pub struct SessionManager {
 
 impl SessionManager {
     /// Create a new SessionManager wrapping an existing store
-    pub fn new(store: SessionStore) -> Self {
+    pub(crate) fn new(store: SessionStore) -> Self {
         Self {
             store,
             watchers: Arc::new(RwLock::new(HashMap::new())),
@@ -145,22 +145,22 @@ impl SessionManager {
     }
 
     /// Get the underlying session store (for backward compatibility)
-    pub fn store(&self) -> &SessionStore {
+    pub(crate) fn store(&self) -> &SessionStore {
         &self.store
     }
 
     /// Get a session by ID (read-only clone)
-    pub async fn get_session(&self, id: Uuid) -> Option<UnifiedSession> {
+    pub(crate) async fn get_session(&self, id: Uuid) -> Option<UnifiedSession> {
         self.store.read().await.get(&id).cloned()
     }
 
     /// Check if a session exists
-    pub async fn exists(&self, id: Uuid) -> bool {
+    pub(crate) async fn exists(&self, id: Uuid) -> bool {
         self.store.read().await.contains_key(&id)
     }
 
     /// Insert a new session
-    pub async fn insert_session(&self, session: UnifiedSession) {
+    pub(crate) async fn insert_session(&self, session: UnifiedSession) {
         let id = session.id;
         let snapshot = SessionSnapshot::from_session(&session);
 
@@ -183,7 +183,7 @@ impl SessionManager {
     /// 4. Notifies all watchers
     ///
     /// Returns `None` if the session doesn't exist.
-    pub async fn update_session<F>(&self, id: Uuid, f: F) -> Option<()>
+    pub(crate) async fn update_session<F>(&self, id: Uuid, f: F) -> Option<()>
     where
         F: FnOnce(&mut UnifiedSession),
     {
@@ -209,7 +209,7 @@ impl SessionManager {
     /// Update a session and return a result.
     ///
     /// Like `update_session` but allows returning a value from the callback.
-    pub async fn update_session_with<F, T>(&self, id: Uuid, f: F) -> Option<T>
+    pub(crate) async fn update_session_with<F, T>(&self, id: Uuid, f: F) -> Option<T>
     where
         F: FnOnce(&mut UnifiedSession) -> T,
     {
@@ -236,7 +236,7 @@ impl SessionManager {
     /// Query a session without mutating it.
     ///
     /// This acquires only a read lock.
-    pub async fn query_session<F, T>(&self, id: Uuid, f: F) -> Option<T>
+    pub(crate) async fn query_session<F, T>(&self, id: Uuid, f: F) -> Option<T>
     where
         F: FnOnce(&UnifiedSession) -> T,
     {
@@ -260,7 +260,7 @@ impl SessionManager {
     ///     }
     /// }
     /// ```
-    pub async fn subscribe(&self, id: Uuid) -> Option<SessionWatcher> {
+    pub(crate) async fn subscribe(&self, id: Uuid) -> Option<SessionWatcher> {
         // Check if session exists
         let session = self.get_session(id).await?;
 
@@ -283,7 +283,7 @@ impl SessionManager {
     ///
     /// Call this when a subscriber is done listening.
     /// The watch channel is cleaned up when the last subscriber leaves.
-    pub async fn unsubscribe(&self, id: Uuid) {
+    pub(crate) async fn unsubscribe(&self, id: Uuid) {
         let mut watchers = self.watchers.write().await;
         if let Some(entry) = watchers.get_mut(&id) {
             entry.subscriber_count = entry.subscriber_count.saturating_sub(1);
@@ -294,13 +294,13 @@ impl SessionManager {
     }
 
     /// Get the number of active subscribers for a session
-    pub async fn subscriber_count(&self, id: Uuid) -> usize {
+    pub(crate) async fn subscriber_count(&self, id: Uuid) -> usize {
         let watchers = self.watchers.read().await;
         watchers.get(&id).map(|e| e.subscriber_count).unwrap_or(0)
     }
 
     /// Remove a session and clean up its watchers
-    pub async fn remove_session(&self, id: Uuid) -> Option<UnifiedSession> {
+    pub(crate) async fn remove_session(&self, id: Uuid) -> Option<UnifiedSession> {
         // Remove watcher first
         {
             let mut watchers = self.watchers.write().await;
@@ -312,17 +312,17 @@ impl SessionManager {
     }
 
     /// List all active session IDs
-    pub async fn list_session_ids(&self) -> Vec<Uuid> {
+    pub(crate) async fn list_session_ids(&self) -> Vec<Uuid> {
         self.store.read().await.keys().cloned().collect()
     }
 
     /// Get count of active sessions
-    pub async fn session_count(&self) -> usize {
+    pub(crate) async fn session_count(&self) -> usize {
         self.store.read().await.len()
     }
 
     /// Force notify all watchers for a session (useful after external mutation)
-    pub async fn notify(&self, id: Uuid) {
+    pub(crate) async fn notify(&self, id: Uuid) {
         if let Some(session) = self.get_session(id).await {
             let watchers = self.watchers.read().await;
             if let Some(entry) = watchers.get(&id) {
@@ -347,7 +347,7 @@ impl Clone for SessionManager {
 
 /// A single edit made by the user to the proposed DSL
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DslEdit {
+pub(crate) struct DslEdit {
     /// The field/parameter that was changed
     pub field: String,
     /// Original value (from proposed DSL)
@@ -358,7 +358,7 @@ pub struct DslEdit {
 
 /// Result of computing DSL diff
 #[derive(Debug, Clone)]
-pub struct DslDiff {
+pub(crate) struct DslDiff {
     /// DSL as proposed by agent
     pub proposed: String,
     /// DSL as executed (after user edits)
@@ -378,7 +378,7 @@ impl SessionManager {
     ///
     /// This captures the DSL as generated by the agent, before any user edits.
     /// Also sets current_dsl to the same value initially.
-    pub async fn set_proposed_dsl(&self, session_id: Uuid, dsl: &str) {
+    pub(crate) async fn set_proposed_dsl(&self, session_id: Uuid, dsl: &str) {
         self.update_session(session_id, |session| {
             session.context.proposed_dsl = Some(dsl.to_string());
             session.context.current_dsl = Some(dsl.to_string());
@@ -389,7 +389,7 @@ impl SessionManager {
     /// Update the current DSL (called when REPL edit happens)
     ///
     /// This tracks what the user has edited in the REPL.
-    pub async fn update_current_dsl(&self, session_id: Uuid, dsl: &str) {
+    pub(crate) async fn update_current_dsl(&self, session_id: Uuid, dsl: &str) {
         self.update_session(session_id, |session| {
             session.context.current_dsl = Some(dsl.to_string());
         })
@@ -400,7 +400,7 @@ impl SessionManager {
     ///
     /// Returns the diff between proposed and current DSL, then clears the
     /// tracking fields so the next interaction starts fresh.
-    pub async fn capture_dsl_diff(&self, session_id: Uuid, final_dsl: &str) -> Option<DslDiff> {
+    pub(crate) async fn capture_dsl_diff(&self, session_id: Uuid, final_dsl: &str) -> Option<DslDiff> {
         self.update_session_with(session_id, |session| {
             let proposed = session.context.proposed_dsl.take();
             let _ = session.context.current_dsl.take(); // Clear but don't need
@@ -434,21 +434,21 @@ impl SessionManager {
     }
 
     /// Get the current proposed DSL (for inspection)
-    pub async fn get_proposed_dsl(&self, session_id: Uuid) -> Option<String> {
+    pub(crate) async fn get_proposed_dsl(&self, session_id: Uuid) -> Option<String> {
         self.query_session(session_id, |session| session.context.proposed_dsl.clone())
             .await
             .flatten()
     }
 
     /// Get the current DSL in REPL (for inspection)
-    pub async fn get_current_dsl(&self, session_id: Uuid) -> Option<String> {
+    pub(crate) async fn get_current_dsl(&self, session_id: Uuid) -> Option<String> {
         self.query_session(session_id, |session| session.context.current_dsl.clone())
             .await
             .flatten()
     }
 
     /// Check if DSL has been edited (proposed != current)
-    pub async fn has_dsl_edits(&self, session_id: Uuid) -> bool {
+    pub(crate) async fn has_dsl_edits(&self, session_id: Uuid) -> bool {
         self.query_session(session_id, |session| {
             match (&session.context.proposed_dsl, &session.context.current_dsl) {
                 (Some(proposed), Some(current)) => proposed != current,

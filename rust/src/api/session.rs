@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// Session mode - determines how the session processes user input
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum SessionMode {
+pub(crate) enum SessionMode {
     /// Normal chat mode - agent generates DSL from natural language
     #[default]
     Chat,
@@ -38,7 +38,7 @@ pub enum SessionMode {
 /// Sub-session type - determines the purpose and behavior of a child session
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SubSessionType {
+pub(crate) enum SubSessionType {
     /// Root session - full agent capabilities (not a sub-session)
     #[default]
     Root,
@@ -54,7 +54,7 @@ pub enum SubSessionType {
 
 /// Resolution sub-session state - entity disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ResolutionSubSession {
+pub(crate) struct ResolutionSubSession {
     /// Unresolved refs to work through
     pub unresolved_refs: Vec<UnresolvedRefInfo>,
     /// Which DSL statement index triggered this (in parent)
@@ -73,7 +73,7 @@ pub struct ResolutionSubSession {
 /// - Discriminator fields with current values
 /// - The resolved PK (UUID) once found
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct UnresolvedRefInfo {
+pub(crate) struct UnresolvedRefInfo {
     /// Unique ID for this ref (stmt_idx:arg_name)
     pub ref_id: String,
     /// Entity type (e.g., "entity", "cbu", "person") - from verb arg lookup config
@@ -115,7 +115,7 @@ pub struct UnresolvedRefInfo {
 
 /// Search key field definition with current value
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct SearchKeyField {
+pub(crate) struct SearchKeyField {
     /// Field key (e.g., "name", "lei", "jurisdiction")
     pub key: String,
     /// Display label (e.g., "Entity Name", "LEI Code")
@@ -130,7 +130,7 @@ pub struct SearchKeyField {
 
 /// Discriminator field for narrowing search results
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct DiscriminatorField {
+pub(crate) struct DiscriminatorField {
     /// Field key (e.g., "manco_name", "fund_type")
     pub key: String,
     /// Display label
@@ -146,7 +146,7 @@ pub struct DiscriminatorField {
 /// Resolution mode hint from entity config
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ResolutionModeHint {
+pub(crate) enum ResolutionModeHint {
     /// Show search modal with multiple fields
     #[default]
     SearchModal,
@@ -158,7 +158,7 @@ pub enum ResolutionModeHint {
 
 /// Context about which verb/arg created this ref
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct VerbArgContext {
+pub(crate) struct VerbArgContext {
     /// Full verb name (e.g., "session.set-cbu")
     pub verb: String,
     /// Argument name (e.g., "cbu-id")
@@ -169,7 +169,7 @@ pub struct VerbArgContext {
 
 /// Entity match info for resolution UI
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct EntityMatchInfo {
+pub(crate) struct EntityMatchInfo {
     /// Primary key (UUID or code)
     pub value: String,
     /// Display name
@@ -186,7 +186,7 @@ pub struct EntityMatchInfo {
 
 impl ResolutionSubSession {
     /// Create a new empty resolution sub-session
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             unresolved_refs: Vec::new(),
             parent_dsl_index: 0,
@@ -201,7 +201,7 @@ impl ResolutionSubSession {
     /// Each ref gets a unique ref_id based on its span location.
     ///
     /// Also captures verb/arg context so we can look up the LookupConfig from verb registry.
-    pub fn from_statements(statements: &[Statement]) -> Self {
+    pub(crate) fn from_statements(statements: &[Statement]) -> Self {
         use crate::dsl_v2::verb_registry::registry;
 
         let mut unresolved_refs = Vec::new();
@@ -415,7 +415,7 @@ impl ResolutionSubSession {
     ///
     /// Stores the mapping from ref_id to resolved_key.
     /// Validation against gateway should be done by caller before calling this.
-    pub fn select(&mut self, ref_id: &str, resolved_key: &str) -> Result<(), String> {
+    pub(crate) fn select(&mut self, ref_id: &str, resolved_key: &str) -> Result<(), String> {
         // Verify ref_id exists
         if !self.unresolved_refs.iter().any(|r| r.ref_id == ref_id) {
             return Err(format!("Unknown ref_id: {}", ref_id));
@@ -427,19 +427,19 @@ impl ResolutionSubSession {
     }
 
     /// Clear a resolution for a ref_id (undo selection)
-    pub fn clear(&mut self, ref_id: &str) {
+    pub(crate) fn clear(&mut self, ref_id: &str) {
         self.resolutions.remove(ref_id);
     }
 
     /// Check if all refs have been resolved
-    pub fn is_complete(&self) -> bool {
+    pub(crate) fn is_complete(&self) -> bool {
         self.unresolved_refs
             .iter()
             .all(|r| self.resolutions.contains_key(&r.ref_id))
     }
 
     /// Get number of resolved vs total refs
-    pub fn progress(&self) -> ResolutionProgress {
+    pub(crate) fn progress(&self) -> ResolutionProgress {
         let resolved = self
             .unresolved_refs
             .iter()
@@ -452,12 +452,12 @@ impl ResolutionSubSession {
     }
 
     /// Get the current unresolved ref being worked on
-    pub fn current_ref(&self) -> Option<&UnresolvedRefInfo> {
+    pub(crate) fn current_ref(&self) -> Option<&UnresolvedRefInfo> {
         self.unresolved_refs.get(self.current_ref_index)
     }
 
     /// Move to next unresolved ref
-    pub fn next_ref(&mut self) -> bool {
+    pub(crate) fn next_ref(&mut self) -> bool {
         if self.current_ref_index + 1 < self.unresolved_refs.len() {
             self.current_ref_index += 1;
             true
@@ -466,21 +466,12 @@ impl ResolutionSubSession {
         }
     }
 
-    /// Move to previous ref
-    pub fn prev_ref(&mut self) -> bool {
-        if self.current_ref_index > 0 {
-            self.current_ref_index -= 1;
-            true
-        } else {
-            false
-        }
-    }
 
     /// Apply all resolutions to AST statements
     ///
     /// Walks the AST and sets `resolved_key` on EntityRef nodes
     /// where we have a resolution stored.
-    pub fn apply_to_statements(&self, statements: &mut [Statement]) -> Result<usize, String> {
+    pub(crate) fn apply_to_statements(&self, statements: &mut [Statement]) -> Result<usize, String> {
         let mut applied = 0;
 
         for stmt in statements.iter_mut() {
@@ -555,7 +546,7 @@ impl Default for ResolutionSubSession {
 
 /// Research sub-session state - GLEIF/UBO discovery
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ResearchSubSession {
+pub(crate) struct ResearchSubSession {
     /// Target entity being researched (if known)
     pub target_entity_id: Option<Uuid>,
     /// Research type (gleif, ubo, companies_house, etc.)
@@ -566,7 +557,7 @@ pub struct ResearchSubSession {
 
 /// Review sub-session state - DSL review before execute
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ReviewSubSession {
+pub(crate) struct ReviewSubSession {
     /// The DSL pending review
     pub pending_dsl: String,
     /// Review status
@@ -575,7 +566,7 @@ pub struct ReviewSubSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum ReviewStatus {
+pub(crate) enum ReviewStatus {
     #[default]
     Pending,
     Approved,
@@ -585,7 +576,7 @@ pub enum ReviewStatus {
 
 /// Correction sub-session state - fix screening hits
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct CorrectionSubSession {
+pub(crate) struct CorrectionSubSession {
     /// Entity with screening hit
     pub entity_id: Uuid,
     /// Screening hit ID
@@ -602,7 +593,7 @@ pub struct CorrectionSubSession {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
-pub enum SessionState {
+pub(crate) enum SessionState {
     /// Just created, awaiting scope selection (client/CBU set)
     /// This is the initial state - nothing else can happen until scope is set
     #[default]
@@ -625,7 +616,7 @@ pub enum SessionState {
 ///
 /// Use with `AgentSession::transition()` - the single entry point for all state changes.
 #[derive(Debug, Clone)]
-pub enum SessionEvent {
+pub(crate) enum SessionEvent {
     /// Scope has been set (CBUs loaded via session.load-*)
     ScopeSet,
     /// DSL is pending validation (unresolved refs, needs user input)
@@ -646,7 +637,7 @@ pub enum SessionEvent {
 /// This is the state machine for individual DSL fragments
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum DslStatus {
+pub(crate) enum DslStatus {
     /// DSL parsed and AST valid, awaiting user confirmation
     #[default]
     Draft,
@@ -662,23 +653,18 @@ pub enum DslStatus {
 
 impl DslStatus {
     /// Can this DSL be executed?
-    pub fn is_runnable(&self) -> bool {
+    pub(crate) fn is_runnable(&self) -> bool {
         matches!(self, DslStatus::Draft | DslStatus::Ready)
     }
 
     /// Is this DSL in a terminal state?
-    pub fn is_terminal(&self) -> bool {
+    pub(crate) fn is_terminal(&self) -> bool {
         matches!(
             self,
             DslStatus::Executed | DslStatus::Cancelled | DslStatus::Failed
         )
     }
 
-    /// Should this DSL be persisted to database?
-    pub fn should_persist(&self) -> bool {
-        // Only persist executed DSL - drafts and cancelled stay in memory
-        matches!(self, DslStatus::Executed)
-    }
 }
 
 // =============================================================================
@@ -687,7 +673,7 @@ impl DslStatus {
 
 /// Server-side run sheet - DSL statement ledger with per-statement status
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ServerRunSheet {
+pub(crate) struct ServerRunSheet {
     /// Entries in the run sheet (ordered by creation)
     pub entries: Vec<ServerRunSheetEntry>,
     /// Current cursor position (index of active/draft entry)
@@ -696,7 +682,7 @@ pub struct ServerRunSheet {
 
 impl ServerRunSheet {
     /// Add a new draft entry
-    pub fn add_draft(&mut self, dsl_source: String, ast: Vec<Statement>) -> Uuid {
+    pub(crate) fn add_draft(&mut self, dsl_source: String, ast: Vec<Statement>) -> Uuid {
         let id = Uuid::new_v4();
         self.entries.push(ServerRunSheetEntry {
             id,
@@ -716,27 +702,27 @@ impl ServerRunSheet {
     }
 
     /// Get current entry at cursor
-    pub fn current(&self) -> Option<&ServerRunSheetEntry> {
+    pub(crate) fn current(&self) -> Option<&ServerRunSheetEntry> {
         self.entries.get(self.cursor)
     }
 
     /// Get mutable current entry at cursor
-    pub fn current_mut(&mut self) -> Option<&mut ServerRunSheetEntry> {
+    pub(crate) fn current_mut(&mut self) -> Option<&mut ServerRunSheetEntry> {
         self.entries.get_mut(self.cursor)
     }
 
     /// Get entry by ID
-    pub fn get(&self, id: Uuid) -> Option<&ServerRunSheetEntry> {
+    pub(crate) fn get(&self, id: Uuid) -> Option<&ServerRunSheetEntry> {
         self.entries.iter().find(|e| e.id == id)
     }
 
     /// Get mutable entry by ID
-    pub fn get_mut(&mut self, id: Uuid) -> Option<&mut ServerRunSheetEntry> {
+    pub(crate) fn get_mut(&mut self, id: Uuid) -> Option<&mut ServerRunSheetEntry> {
         self.entries.iter_mut().find(|e| e.id == id)
     }
 
     /// Mark entry as executed
-    pub fn mark_executed(
+    pub(crate) fn mark_executed(
         &mut self,
         id: Uuid,
         affected: Vec<Uuid>,
@@ -751,7 +737,7 @@ impl ServerRunSheet {
     }
 
     /// Mark entry as failed
-    pub fn mark_failed(&mut self, id: Uuid, error: String) {
+    pub(crate) fn mark_failed(&mut self, id: Uuid, error: String) {
         if let Some(entry) = self.get_mut(id) {
             entry.status = DslStatus::Failed;
             entry.error = Some(error);
@@ -759,7 +745,7 @@ impl ServerRunSheet {
     }
 
     /// Mark all runnable entries as executed
-    pub fn mark_all_executed(&mut self) {
+    pub(crate) fn mark_all_executed(&mut self) {
         let now = Utc::now();
         for entry in &mut self.entries {
             if entry.status.is_runnable() {
@@ -770,14 +756,14 @@ impl ServerRunSheet {
     }
 
     /// Get all executed entries
-    pub fn executed(&self) -> impl Iterator<Item = &ServerRunSheetEntry> {
+    pub(crate) fn executed(&self) -> impl Iterator<Item = &ServerRunSheetEntry> {
         self.entries
             .iter()
             .filter(|e| e.status == DslStatus::Executed)
     }
 
     /// Get combined DSL source (for backwards compat)
-    pub fn combined_dsl(&self) -> Option<String> {
+    pub(crate) fn combined_dsl(&self) -> Option<String> {
         let sources: Vec<_> = self.entries.iter().map(|e| e.dsl_source.as_str()).collect();
         if sources.is_empty() {
             None
@@ -787,12 +773,12 @@ impl ServerRunSheet {
     }
 
     /// Check if there's any runnable DSL
-    pub fn has_runnable(&self) -> bool {
+    pub(crate) fn has_runnable(&self) -> bool {
         self.entries.iter().any(|e| e.status.is_runnable())
     }
 
     /// Count runnable entries
-    pub fn runnable_count(&self) -> usize {
+    pub(crate) fn runnable_count(&self) -> usize {
         self.entries
             .iter()
             .filter(|e| e.status.is_runnable())
@@ -800,7 +786,7 @@ impl ServerRunSheet {
     }
 
     /// Undo (cancel) the last draft/ready entry, returns the removed entry
-    pub fn undo_last(&mut self) -> Option<ServerRunSheetEntry> {
+    pub(crate) fn undo_last(&mut self) -> Option<ServerRunSheetEntry> {
         // Find last undoable entry (draft or ready, not executed)
         let idx = self.entries.iter().rposition(|e| e.status.is_runnable())?;
         let mut entry = self.entries.remove(idx);
@@ -814,37 +800,10 @@ impl ServerRunSheet {
         Some(entry)
     }
 
-    /// Clear all draft/ready entries (cancel them)
-    pub fn clear_drafts(&mut self) {
-        for entry in &mut self.entries {
-            if entry.status.is_runnable() {
-                entry.status = DslStatus::Cancelled;
-            }
-        }
-        // Remove cancelled entries
-        self.entries.retain(|e| e.status != DslStatus::Cancelled);
-        self.cursor = 0;
-    }
 
-    /// Remove a runnable entry matching the search term (case-insensitive)
-    pub fn remove_matching(&mut self, search_term: &str) -> Option<ServerRunSheetEntry> {
-        let search_lower = search_term.to_lowercase();
-        let idx = self.entries.iter().position(|e| {
-            e.status.is_runnable() && e.dsl_source.to_lowercase().contains(&search_lower)
-        })?;
-        let mut entry = self.entries.remove(idx);
-        entry.status = DslStatus::Cancelled;
-        // Adjust cursor
-        if self.cursor >= self.entries.len() && !self.entries.is_empty() {
-            self.cursor = self.entries.len() - 1;
-        } else if self.entries.is_empty() {
-            self.cursor = 0;
-        }
-        Some(entry)
-    }
 
     /// Convert to API type for responses
-    pub fn to_api(&self) -> ob_poc_types::RunSheet {
+    pub(crate) fn to_api(&self) -> ob_poc_types::RunSheet {
         ob_poc_types::RunSheet {
             entries: self.entries.iter().map(|e| e.to_api()).collect(),
             cursor: self.cursor,
@@ -854,7 +813,7 @@ impl ServerRunSheet {
 
 /// Single entry in the server-side run sheet
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerRunSheetEntry {
+pub(crate) struct ServerRunSheetEntry {
     /// Unique entry ID
     pub id: Uuid,
     /// DSL source text
@@ -883,7 +842,7 @@ pub struct ServerRunSheetEntry {
 
 impl ServerRunSheetEntry {
     /// Convert to API type
-    pub fn to_api(&self) -> ob_poc_types::RunSheetEntry {
+    pub(crate) fn to_api(&self) -> ob_poc_types::RunSheetEntry {
         ob_poc_types::RunSheetEntry {
             id: self.id.to_string(),
             dsl_source: self.dsl_source.clone(),
@@ -924,7 +883,7 @@ impl ServerRunSheetEntry {
 
 /// Pending DSL/AST pair in the session (not yet persisted to DB)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PendingDsl {
+pub(crate) struct PendingDsl {
     /// Unique ID for this pending DSL fragment
     pub id: Uuid,
     /// The DSL source code
@@ -948,25 +907,7 @@ pub struct PendingDsl {
 }
 
 impl PendingDsl {
-    /// DSL for user display (in chat) - human readable, no UUIDs
-    /// Shows entity names like "BlackRock ManCo" not UUIDs
-    pub fn to_user_dsl(&self) -> String {
-        self.ast
-            .iter()
-            .map(|s| s.to_user_dsl_string())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
 
-    /// DSL for execution/internal use (with resolved UUIDs)
-    /// Note: Executor should use AST directly, not this string
-    pub fn to_exec_dsl(&self) -> String {
-        self.ast
-            .iter()
-            .map(|s| s.to_dsl_string())
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
 }
 
 // ============================================================================
@@ -976,7 +917,7 @@ impl PendingDsl {
 /// The main agent session - lives server-side
 /// Session key = (user_id, entity_type, entity_id)
 #[derive(Debug, Clone, Serialize)]
-pub struct AgentSession {
+pub(crate) struct AgentSession {
     /// Unique session identifier (for backwards compat - may equal entity_id)
     pub id: Uuid,
     /// User ID for audit trail (nil UUID = anonymous/dev mode)
@@ -1025,7 +966,7 @@ impl AgentSession {
     /// - user_id: None = anonymous/dev mode (nil UUID)
     /// - entity_type: "cbu", "kyc_case", "onboarding", etc.
     /// - entity_id: Some(uuid) if known, None if creating new
-    pub fn new_for_entity(
+    pub(crate) fn new_for_entity(
         user_id: Option<Uuid>,
         entity_type: &str,
         entity_id: Option<Uuid>,
@@ -1054,7 +995,7 @@ impl AgentSession {
     }
 
     /// Create a new CBU session (anonymous/dev mode)
-    pub fn new(domain_hint: Option<String>) -> Self {
+    pub(crate) fn new(domain_hint: Option<String>) -> Self {
         Self::new_for_entity(None, "cbu", None, domain_hint)
     }
 
@@ -1065,7 +1006,7 @@ impl AgentSession {
     /// - User ID from parent
     /// - Entity context from parent
     /// - Symbol bindings for reference resolution
-    pub fn new_subsession(parent: &AgentSession, sub_session_type: SubSessionType) -> Self {
+    pub(crate) fn new_subsession(parent: &AgentSession, sub_session_type: SubSessionType) -> Self {
         let now = Utc::now();
 
         // Inherit symbols from parent's bindings
@@ -1097,12 +1038,12 @@ impl AgentSession {
     }
 
     /// Check if this is a sub-session
-    pub fn is_subsession(&self) -> bool {
+    pub(crate) fn is_subsession(&self) -> bool {
         self.parent_session_id.is_some()
     }
 
     /// Get the sub-session type if this is a resolution session
-    pub fn as_resolution(&self) -> Option<&ResolutionSubSession> {
+    pub(crate) fn as_resolution(&self) -> Option<&ResolutionSubSession> {
         match &self.sub_session_type {
             SubSessionType::Resolution(r) => Some(r),
             _ => None,
@@ -1110,7 +1051,7 @@ impl AgentSession {
     }
 
     /// Get mutable resolution sub-session state
-    pub fn as_resolution_mut(&mut self) -> Option<&mut ResolutionSubSession> {
+    pub(crate) fn as_resolution_mut(&mut self) -> Option<&mut ResolutionSubSession> {
         match &mut self.sub_session_type {
             SubSessionType::Resolution(r) => Some(r),
             _ => None,
@@ -1119,7 +1060,7 @@ impl AgentSession {
 
     /// Get all known symbols for validation (own bindings + inherited from parent)
     /// Returns HashMap<String, Uuid> suitable for ValidationContext::with_known_symbols
-    pub fn all_known_symbols(&self) -> HashMap<String, Uuid> {
+    pub(crate) fn all_known_symbols(&self) -> HashMap<String, Uuid> {
         let mut symbols = HashMap::new();
 
         // Add inherited symbols first (can be overridden by own bindings)
@@ -1141,7 +1082,7 @@ impl AgentSession {
     }
 
     /// Set entity ID after creation (e.g., after cbu.ensure executes)
-    pub fn set_entity_id(&mut self, entity_id: Uuid) {
+    pub(crate) fn set_entity_id(&mut self, entity_id: Uuid) {
         self.entity_id = Some(entity_id);
         self.id = entity_id; // Session ID follows entity ID
         self.updated_at = Utc::now();
@@ -1168,7 +1109,7 @@ impl AgentSession {
     ///                                                │
     ///                                                └──► (back to Scoped if has_scope, else Executed)
     /// ```
-    pub fn transition(&mut self, event: SessionEvent) {
+    pub(crate) fn transition(&mut self, event: SessionEvent) {
         use SessionEvent::*;
         use SessionState::*;
 
@@ -1244,13 +1185,13 @@ impl AgentSession {
     }
 
     /// Check if session has scope set (CBUs loaded)
-    pub fn has_scope_set(&self) -> bool {
+    pub(crate) fn has_scope_set(&self) -> bool {
         !self.context.cbu_ids.is_empty() || self.context.has_scope()
     }
 
     /// Convenience: update state after operations complete
     /// Determines appropriate state based on current session context
-    pub fn update_state(&mut self) {
+    pub(crate) fn update_state(&mut self) {
         // Determine what just happened and transition appropriately
         if self.has_scope_set() && self.state == SessionState::New {
             self.transition(SessionEvent::ScopeSet);
@@ -1269,7 +1210,7 @@ impl AgentSession {
     // ========================================================================
 
     /// Set pending DSL (parsed, validated, and planned - ready for user confirmation)
-    pub fn set_pending_dsl(
+    pub(crate) fn set_pending_dsl(
         &mut self,
         source: String,
         ast: Vec<Statement>,
@@ -1280,7 +1221,7 @@ impl AgentSession {
     }
 
     /// Set pending DSL with provenance labels (journey/scenario metadata).
-    pub fn set_pending_dsl_with_labels(
+    pub(crate) fn set_pending_dsl_with_labels(
         &mut self,
         source: String,
         ast: Vec<Statement>,
@@ -1301,14 +1242,14 @@ impl AgentSession {
     }
 
     /// Cancel pending DSL (user declined)
-    pub fn cancel_pending(&mut self) {
+    pub(crate) fn cancel_pending(&mut self) {
         // Cancel last draft entry
         self.run_sheet.undo_last();
         self.transition(SessionEvent::Cancelled);
     }
 
     /// Mark pending DSL as ready to execute (user confirmed)
-    pub fn confirm_pending(&mut self) {
+    pub(crate) fn confirm_pending(&mut self) {
         // Mark current entry as ready
         if let Some(entry) = self.run_sheet.current_mut() {
             entry.status = DslStatus::Ready;
@@ -1317,7 +1258,7 @@ impl AgentSession {
     }
 
     /// Mark current run sheet entry as executed (after successful execution)
-    pub fn mark_executed(&mut self) {
+    pub(crate) fn mark_executed(&mut self) {
         if let Some(entry) = self.run_sheet.current_mut() {
             entry.status = DslStatus::Executed;
             entry.executed_at = Some(Utc::now());
@@ -1326,7 +1267,7 @@ impl AgentSession {
     }
 
     /// Mark current run sheet entry as failed (execution error)
-    pub fn mark_failed(&mut self, error: String) {
+    pub(crate) fn mark_failed(&mut self, error: String) {
         if let Some(entry) = self.run_sheet.current_mut() {
             entry.status = DslStatus::Failed;
             entry.error = Some(error);
@@ -1336,17 +1277,17 @@ impl AgentSession {
     }
 
     /// Get current runnable entry from run sheet
-    pub fn get_runnable_dsl(&self) -> Option<&ServerRunSheetEntry> {
+    pub(crate) fn get_runnable_dsl(&self) -> Option<&ServerRunSheetEntry> {
         self.run_sheet.current().filter(|e| e.status.is_runnable())
     }
 
     /// Check if there's runnable DSL in the run sheet
-    pub fn has_pending(&self) -> bool {
+    pub(crate) fn has_pending(&self) -> bool {
         self.run_sheet.has_runnable()
     }
 
     /// Add a user message to the session
-    pub fn add_user_message(&mut self, content: String) -> Uuid {
+    pub(crate) fn add_user_message(&mut self, content: String) -> Uuid {
         let id = Uuid::new_v4();
         self.messages.push(ChatMessage {
             id,
@@ -1365,7 +1306,7 @@ impl AgentSession {
     }
 
     /// Add an agent message to the session
-    pub fn add_agent_message(
+    pub(crate) fn add_agent_message(
         &mut self,
         content: String,
         _intents: Option<()>,
@@ -1389,7 +1330,7 @@ impl AgentSession {
     }
 
     /// Record execution results and update context
-    pub fn record_execution(&mut self, results: Vec<ExecutionResult>) {
+    pub(crate) fn record_execution(&mut self, results: Vec<ExecutionResult>) {
         // Update context with created entities
         for result in &results {
             if result.success {
@@ -1419,12 +1360,12 @@ impl AgentSession {
     }
 
     /// Get all accumulated DSL as a single combined string
-    pub fn combined_dsl(&self) -> String {
+    pub(crate) fn combined_dsl(&self) -> String {
         self.run_sheet.combined_dsl().unwrap_or_default()
     }
 
     /// Check if the session can execute
-    pub fn can_execute(&self) -> bool {
+    pub(crate) fn can_execute(&self) -> bool {
         self.state == SessionState::ReadyToExecute && self.run_sheet.has_runnable()
     }
 }
@@ -1435,7 +1376,7 @@ impl AgentSession {
 
 /// A message in the conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatMessage {
+pub(crate) struct ChatMessage {
     /// Unique message ID
     pub id: Uuid,
     /// Who sent this message
@@ -1467,7 +1408,7 @@ pub struct ChatMessage {
 /// Role of a message sender
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum MessageRole {
+pub(crate) enum MessageRole {
     User,
     Agent,
     System,
@@ -1479,7 +1420,7 @@ pub enum MessageRole {
 
 /// Information about a bound entity in the session
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BoundEntity {
+pub(crate) struct BoundEntity {
     /// The UUID of the entity
     pub id: Uuid,
     /// The entity type (e.g., "cbu", "entity", "case")
@@ -1498,7 +1439,7 @@ pub struct BoundEntity {
 
 /// Status counts for batch items: pending/completed/skipped/failed
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct BatchStatusCounts {
+pub(crate) struct BatchStatusCounts {
     pub pending: usize,
     pub completed: usize,
     pub skipped: usize,
@@ -1507,7 +1448,7 @@ pub struct BatchStatusCounts {
 
 /// Progress tracking for batch execution: processed/total/success/failed
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct BatchProgress {
+pub(crate) struct BatchProgress {
     pub processed: usize,
     pub total: usize,
     pub success: usize,
@@ -1516,7 +1457,7 @@ pub struct BatchProgress {
 
 /// Resolution progress: resolved/total
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct ResolutionProgress {
+pub(crate) struct ResolutionProgress {
     pub resolved: usize,
     pub total: usize,
 }
@@ -1524,7 +1465,7 @@ pub struct ResolutionProgress {
 /// Status of a batch item
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum BatchItemStatus {
+pub(crate) enum BatchItemStatus {
     /// Not yet processed
     #[default]
     Pending,
@@ -1540,7 +1481,7 @@ pub enum BatchItemStatus {
 
 /// A single item in the batch working set
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BatchItem {
+pub(crate) struct BatchItem {
     /// Source entity ID (e.g., fund entity that will become a CBU)
     pub source_id: Uuid,
     /// Display name for the item
@@ -1568,7 +1509,7 @@ pub struct BatchItem {
 /// A resolved entity reference for template expansion
 /// This is the LookupRef triplet: (entity_type, search_key, uuid)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedEntityRef {
+pub(crate) struct ResolvedEntityRef {
     /// Entity type (e.g., "fund", "limited_company")
     pub entity_type: String,
     /// Human-readable search key / display name
@@ -1583,7 +1524,7 @@ pub struct ResolvedEntityRef {
 /// Key set for a template parameter
 /// Captures what the agent has collected for a specific param
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TemplateParamKeySet {
+pub(crate) struct TemplateParamKeySet {
     /// Parameter name from template (e.g., "fund_entity", "manco_entity")
     pub param_name: String,
     /// Entity type expected (e.g., "fund", "limited_company")
@@ -1603,7 +1544,7 @@ pub struct TemplateParamKeySet {
 /// Agent's working memory for template-driven batch execution
 /// This is what the agent reads/writes across conversation turns
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct TemplateExecutionContext {
+pub(crate) struct TemplateExecutionContext {
     /// Template being used
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
@@ -1637,7 +1578,7 @@ pub struct TemplateExecutionContext {
 /// Phase of template execution workflow
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum TemplatePhase {
+pub(crate) enum TemplatePhase {
     /// Agent is identifying which template to use
     #[default]
     SelectingTemplate,
@@ -1655,7 +1596,7 @@ pub enum TemplatePhase {
 
 /// Result from executing one batch item
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BatchItemResult {
+pub(crate) struct BatchItemResult {
     /// Index in the batch
     pub index: usize,
     /// Source entity that was processed
@@ -1675,30 +1616,30 @@ pub struct BatchItemResult {
 
 impl TemplateExecutionContext {
     /// Check if all required key sets are complete
-    pub fn all_key_sets_complete(&self) -> bool {
+    pub(crate) fn all_key_sets_complete(&self) -> bool {
         self.key_sets.values().all(|ks| ks.is_complete)
     }
 
     /// Get the batch key set (the one we iterate over)
-    pub fn batch_key_set(&self) -> Option<&TemplateParamKeySet> {
+    pub(crate) fn batch_key_set(&self) -> Option<&TemplateParamKeySet> {
         self.key_sets.values().find(|ks| ks.cardinality == "batch")
     }
 
     /// Get count of batch items to process
-    pub fn batch_size(&self) -> usize {
+    pub(crate) fn batch_size(&self) -> usize {
         self.batch_key_set()
             .map(|ks| ks.entities.len())
             .unwrap_or(0)
     }
 
     /// Get current batch item being processed
-    pub fn current_batch_entity(&self) -> Option<&ResolvedEntityRef> {
+    pub(crate) fn current_batch_entity(&self) -> Option<&ResolvedEntityRef> {
         self.batch_key_set()
             .and_then(|ks| ks.entities.get(self.current_batch_index))
     }
 
     /// Get shared entities (same for all batch items)
-    pub fn shared_entities(&self) -> Vec<(&str, &ResolvedEntityRef)> {
+    pub(crate) fn shared_entities(&self) -> Vec<(&str, &ResolvedEntityRef)> {
         self.key_sets
             .iter()
             .filter(|(_, ks)| ks.cardinality == "shared")
@@ -1707,13 +1648,13 @@ impl TemplateExecutionContext {
     }
 
     /// Advance to next batch item, returns true if more to process
-    pub fn advance(&mut self) -> bool {
+    pub(crate) fn advance(&mut self) -> bool {
         self.current_batch_index += 1;
         self.current_batch_index < self.batch_size()
     }
 
     /// Get progress string like "3/10 complete"
-    pub fn progress_string(&self) -> String {
+    pub(crate) fn progress_string(&self) -> String {
         let total = self.batch_size();
         let completed = self.batch_results.iter().filter(|r| r.success).count();
         let failed = self.batch_results.iter().filter(|r| !r.success).count();
@@ -1725,12 +1666,12 @@ impl TemplateExecutionContext {
     }
 
     /// Check if template execution is active
-    pub fn is_active(&self) -> bool {
+    pub(crate) fn is_active(&self) -> bool {
         self.template_id.is_some() && self.phase != TemplatePhase::Complete
     }
 
     /// Reset for a new template execution
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         *self = Self::default();
     }
 }
@@ -1738,7 +1679,7 @@ impl TemplateExecutionContext {
 /// Batch context for bulk REPL operations
 /// Holds the "working set" of entities the agent and user are processing
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct BatchContext {
+pub(crate) struct BatchContext {
     /// Whether batch mode is active
     #[serde(default)]
     pub is_active: bool,
@@ -1767,17 +1708,17 @@ pub struct BatchContext {
 
 impl BatchContext {
     /// Get the current batch item being processed
-    pub fn current_item(&self) -> Option<&BatchItem> {
+    pub(crate) fn current_item(&self) -> Option<&BatchItem> {
         self.items.get(self.current_index)
     }
 
     /// Get mutable reference to current batch item
-    pub fn current_item_mut(&mut self) -> Option<&mut BatchItem> {
+    pub(crate) fn current_item_mut(&mut self) -> Option<&mut BatchItem> {
         self.items.get_mut(self.current_index)
     }
 
     /// Advance to next pending item, returns true if there's more to process
-    pub fn advance_to_next(&mut self) -> bool {
+    pub(crate) fn advance_to_next(&mut self) -> bool {
         for i in (self.current_index + 1)..self.items.len() {
             if self.items[i].status == BatchItemStatus::Pending {
                 self.current_index = i;
@@ -1788,7 +1729,7 @@ impl BatchContext {
     }
 
     /// Count items by status
-    pub fn count_by_status(&self) -> BatchStatusCounts {
+    pub(crate) fn count_by_status(&self) -> BatchStatusCounts {
         let mut counts = BatchStatusCounts::default();
         for item in &self.items {
             match item.status {
@@ -1802,7 +1743,7 @@ impl BatchContext {
     }
 
     /// Get progress string like "5/15 complete"
-    pub fn progress_string(&self) -> String {
+    pub(crate) fn progress_string(&self) -> String {
         let counts = self.count_by_status();
         let total = self.items.len();
         if counts.failed > 0 {
@@ -1828,7 +1769,7 @@ impl BatchContext {
 /// Status of a DSL-native batch execution
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum BatchStatus {
+pub(crate) enum BatchStatus {
     /// Batch is actively running
     #[default]
     Running,
@@ -1848,7 +1789,7 @@ pub enum BatchStatus {
 /// Unlike `TemplateExecutionContext` which is for agent-driven conversational batch,
 /// this is for programmatic batch execution that can be paused/resumed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActiveBatchState {
+pub(crate) struct ActiveBatchState {
     /// Template being executed
     pub template_id: String,
 
@@ -1923,7 +1864,7 @@ impl Default for ActiveBatchState {
 
 impl ActiveBatchState {
     /// Create a new active batch state
-    pub fn new(
+    pub(crate) fn new(
         template_id: impl Into<String>,
         source_query: impl Into<String>,
         bind_param: impl Into<String>,
@@ -1945,7 +1886,7 @@ impl ActiveBatchState {
     }
 
     /// Pause the batch execution
-    pub fn pause(&mut self) {
+    pub(crate) fn pause(&mut self) {
         if self.status == BatchStatus::Running {
             self.status = BatchStatus::Paused;
             self.paused_at = Some(Utc::now());
@@ -1953,7 +1894,7 @@ impl ActiveBatchState {
     }
 
     /// Resume the batch execution
-    pub fn resume(&mut self) {
+    pub(crate) fn resume(&mut self) {
         if self.status == BatchStatus::Paused {
             self.status = BatchStatus::Running;
             self.paused_at = None;
@@ -1961,31 +1902,31 @@ impl ActiveBatchState {
     }
 
     /// Mark batch as completed
-    pub fn complete(&mut self) {
+    pub(crate) fn complete(&mut self) {
         self.status = BatchStatus::Completed;
         self.ended_at = Some(Utc::now());
     }
 
     /// Mark batch as failed
-    pub fn fail(&mut self, error: impl Into<String>) {
+    pub(crate) fn fail(&mut self, error: impl Into<String>) {
         self.status = BatchStatus::Failed;
         self.ended_at = Some(Utc::now());
         self.error = Some(error.into());
     }
 
     /// Abort the batch
-    pub fn abort(&mut self) {
+    pub(crate) fn abort(&mut self) {
         self.status = BatchStatus::Aborted;
         self.ended_at = Some(Utc::now());
     }
 
     /// Get the next item to process
-    pub fn next_item(&self) -> Option<&(Uuid, String)> {
+    pub(crate) fn next_item(&self) -> Option<&(Uuid, String)> {
         self.remaining_items.first()
     }
 
     /// Advance to next item, returning the item that was processed
-    pub fn advance(&mut self) -> Option<(Uuid, String)> {
+    pub(crate) fn advance(&mut self) -> Option<(Uuid, String)> {
         if !self.remaining_items.is_empty() {
             self.current_index += 1;
             Some(self.remaining_items.remove(0))
@@ -1995,17 +1936,17 @@ impl ActiveBatchState {
     }
 
     /// Skip the current item
-    pub fn skip_current(&mut self) -> Option<(Uuid, String)> {
+    pub(crate) fn skip_current(&mut self) -> Option<(Uuid, String)> {
         self.advance()
     }
 
     /// Check if batch can continue
-    pub fn can_continue(&self) -> bool {
+    pub(crate) fn can_continue(&self) -> bool {
         self.status == BatchStatus::Running && !self.remaining_items.is_empty()
     }
 
     /// Check if batch is in a terminal state
-    pub fn is_terminal(&self) -> bool {
+    pub(crate) fn is_terminal(&self) -> bool {
         matches!(
             self.status,
             BatchStatus::Completed | BatchStatus::Failed | BatchStatus::Aborted
@@ -2013,7 +1954,7 @@ impl ActiveBatchState {
     }
 
     /// Get progress as BatchProgress struct
-    pub fn progress(&self) -> BatchProgress {
+    pub(crate) fn progress(&self) -> BatchProgress {
         BatchProgress {
             processed: self.current_index,
             total: self.total_items,
@@ -2023,7 +1964,7 @@ impl ActiveBatchState {
     }
 
     /// Get progress string like "47/205 (45 success, 2 failed)"
-    pub fn progress_string(&self) -> String {
+    pub(crate) fn progress_string(&self) -> String {
         let p = self.progress();
         if p.failed > 0 {
             format!(
@@ -2036,13 +1977,13 @@ impl ActiveBatchState {
     }
 
     /// Get elapsed time since start
-    pub fn elapsed(&self) -> chrono::Duration {
+    pub(crate) fn elapsed(&self) -> chrono::Duration {
         let end = self.ended_at.unwrap_or_else(Utc::now);
         end - self.started_at
     }
 
     /// Get elapsed time as human-readable string
-    pub fn elapsed_string(&self) -> String {
+    pub(crate) fn elapsed_string(&self) -> String {
         let elapsed = self.elapsed();
         let secs = elapsed.num_seconds();
         if secs < 60 {
@@ -2060,7 +2001,7 @@ impl ActiveBatchState {
     }
 
     /// Get status summary for batch.status verb
-    pub fn status_summary(&self) -> serde_json::Value {
+    pub(crate) fn status_summary(&self) -> serde_json::Value {
         serde_json::json!({
             "template": self.template_id,
             "status": self.status,
@@ -2089,7 +2030,7 @@ impl ActiveBatchState {
 /// mention text so that subsequent utterances referencing the same name
 /// can reuse the UUID without re-resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedEntity {
+pub(crate) struct ResolvedEntity {
     /// The resolved entity UUID.
     pub entity_id: Uuid,
     /// Canonical display name from the entity snapshot.
@@ -2105,7 +2046,7 @@ pub struct ResolvedEntity {
 
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct SessionContext {
+pub(crate) struct SessionContext {
     /// Version of business_reference when loaded (for optimistic locking)
     /// When saving, this version must match the DB version or we get a conflict
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -2316,7 +2257,7 @@ pub struct SessionContext {
 
 /// Primary domain keys tracked across the session
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct PrimaryDomainKeys {
+pub(crate) struct PrimaryDomainKeys {
     /// Onboarding request ID (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub onboarding_request_id: Option<Uuid>,
@@ -2336,7 +2277,7 @@ pub struct PrimaryDomainKeys {
 
 impl SessionContext {
     /// Resolve a reference like "@last_cbu" or "@last_entity"
-    pub fn resolve_ref(&self, ref_name: &str) -> Option<String> {
+    pub(crate) fn resolve_ref(&self, ref_name: &str) -> Option<String> {
         match ref_name {
             "@last_cbu" => self.last_cbu_id.map(|u| format!("\"{}\"", u)),
             "@last_entity" => self.last_entity_id.map(|u| format!("\"{}\"", u)),
@@ -2349,7 +2290,7 @@ impl SessionContext {
     }
 
     /// Set a named reference
-    pub fn set_named_ref(&mut self, name: &str, id: Uuid) {
+    pub(crate) fn set_named_ref(&mut self, name: &str, id: Uuid) {
         self.named_refs.insert(name.to_string(), id);
     }
 
@@ -2358,7 +2299,7 @@ impl SessionContext {
     ///
     /// Special handling for "cbu" binding: always replaces (no suffix) since
     /// the UI's active CBU should always be @cbu, not @cbu_2, @cbu_3, etc.
-    pub fn set_binding(
+    pub(crate) fn set_binding(
         &mut self,
         name: &str,
         id: Uuid,
@@ -2399,7 +2340,7 @@ impl SessionContext {
 
     /// Get bindings formatted for LLM context
     /// Returns strings like "@aviva_lux_9 (CBU: Aviva Lux 9)"
-    pub fn bindings_for_llm(&self) -> Vec<String> {
+    pub(crate) fn bindings_for_llm(&self) -> Vec<String> {
         self.bindings
             .iter()
             .map(|(name, binding)| {
@@ -2415,7 +2356,7 @@ impl SessionContext {
 
     /// Get the active CBU context formatted for LLM
     /// Returns something like "ACTIVE_CBU: Aviva Lux 9 (uuid: 327804f8-...)"
-    pub fn active_cbu_for_llm(&self) -> Option<String> {
+    pub(crate) fn active_cbu_for_llm(&self) -> Option<String> {
         self.active_cbu
             .as_ref()
             .map(|cbu| format!("ACTIVE_CBU: \"{}\" (id: {})", cbu.display_name, cbu.id))
@@ -2423,7 +2364,7 @@ impl SessionContext {
 
     /// Get the session scope context formatted for LLM
     /// Returns multi-CBU scope info for bulk operations
-    pub fn scope_context_for_llm(&self) -> Option<String> {
+    pub(crate) fn scope_context_for_llm(&self) -> Option<String> {
         if self.cbu_ids.is_empty() {
             return None;
         }
@@ -2442,7 +2383,7 @@ impl SessionContext {
     }
 
     /// Set the active CBU for this session
-    pub fn set_active_cbu(&mut self, id: Uuid, display_name: &str) {
+    pub(crate) fn set_active_cbu(&mut self, id: Uuid, display_name: &str) {
         self.active_cbu = Some(BoundEntity {
             id,
             entity_type: "cbu".to_string(),
@@ -2451,7 +2392,7 @@ impl SessionContext {
     }
 
     /// Clear the active CBU
-    pub fn clear_active_cbu(&mut self) {
+    pub(crate) fn clear_active_cbu(&mut self) {
         self.active_cbu = None;
     }
 
@@ -2460,14 +2401,14 @@ impl SessionContext {
     // =========================================================================
 
     /// Add statements to the AST
-    pub fn add_statements(&mut self, statements: Vec<Statement>) {
+    pub(crate) fn add_statements(&mut self, statements: Vec<Statement>) {
         for stmt in statements {
             self.add_statement(stmt);
         }
     }
 
     /// Add a single statement to the AST, indexing by binding name if present
-    pub fn add_statement(&mut self, statement: Statement) {
+    pub(crate) fn add_statement(&mut self, statement: Statement) {
         let idx = self.ast.len();
 
         // If statement has a binding (:as @name), index it
@@ -2490,17 +2431,17 @@ impl SessionContext {
     }
 
     /// Get AST statement by binding key (e.g., "cbu_id" → the cbu.ensure statement)
-    pub fn get_ast_by_key(&self, key: &str) -> Option<&Statement> {
+    pub(crate) fn get_ast_by_key(&self, key: &str) -> Option<&Statement> {
         self.ast_index.get(key).and_then(|&idx| self.ast.get(idx))
     }
 
     /// Get AST statement index by binding key
-    pub fn get_ast_index_by_key(&self, key: &str) -> Option<usize> {
+    pub(crate) fn get_ast_index_by_key(&self, key: &str) -> Option<usize> {
         self.ast_index.get(key).copied()
     }
 
     /// Update primary keys from execution result
-    pub fn update_primary_key(&mut self, domain: &str, binding: &str, id: Uuid) {
+    pub(crate) fn update_primary_key(&mut self, domain: &str, binding: &str, id: Uuid) {
         match domain {
             "cbu" if self.primary_keys.cbu_id.is_none() => {
                 self.primary_keys.cbu_id = Some(id);
@@ -2521,14 +2462,14 @@ impl SessionContext {
     }
 
     /// Get the AST as a Program for compilation/execution
-    pub fn as_program(&self) -> Program {
+    pub(crate) fn as_program(&self) -> Program {
         Program {
             statements: self.ast.clone(),
         }
     }
 
     /// Render the AST back to DSL source for display
-    pub fn to_dsl_source(&self) -> String {
+    pub(crate) fn to_dsl_source(&self) -> String {
         self.ast
             .iter()
             .map(|s| s.to_dsl_string())
@@ -2537,7 +2478,7 @@ impl SessionContext {
     }
 
     /// Find a statement by binding name
-    pub fn find_by_binding(&self, binding_name: &str) -> Option<&Statement> {
+    pub(crate) fn find_by_binding(&self, binding_name: &str) -> Option<&Statement> {
         self.ast.iter().find(|s| {
             if let Statement::VerbCall(vc) = s {
                 vc.binding.as_deref() == Some(binding_name)
@@ -2548,7 +2489,7 @@ impl SessionContext {
     }
 
     /// Update a statement's argument value by binding name
-    pub fn update_arg(
+    pub(crate) fn update_arg(
         &mut self,
         binding_name: &str,
         arg_key: &str,
@@ -2570,7 +2511,7 @@ impl SessionContext {
     }
 
     /// Remove a statement by binding name
-    pub fn remove_by_binding(&mut self, binding_name: &str) -> bool {
+    pub(crate) fn remove_by_binding(&mut self, binding_name: &str) -> bool {
         let original_len = self.ast.len();
         self.ast.retain(|s| {
             if let Statement::VerbCall(vc) = s {
@@ -2583,12 +2524,12 @@ impl SessionContext {
     }
 
     /// Clear all AST statements
-    pub fn clear_ast(&mut self) {
+    pub(crate) fn clear_ast(&mut self) {
         self.ast.clear();
     }
 
     /// Get count of statements
-    pub fn statement_count(&self) -> usize {
+    pub(crate) fn statement_count(&self) -> usize {
         self.ast.len()
     }
 
@@ -2598,22 +2539,22 @@ impl SessionContext {
 
     /// Set the view state from view.* operations
     /// This is called after DSL execution when view.* verbs produce a ViewState
-    pub fn set_view_state(&mut self, view: crate::session::ViewState) {
+    pub(crate) fn set_view_state(&mut self, view: crate::session::ViewState) {
         self.view_state = Some(view);
     }
 
     /// Get the current view state
-    pub fn view_state(&self) -> Option<&crate::session::ViewState> {
+    pub(crate) fn view_state(&self) -> Option<&crate::session::ViewState> {
         self.view_state.as_ref()
     }
 
     /// Take the view state (consumes it)
-    pub fn take_view_state(&mut self) -> Option<crate::session::ViewState> {
+    pub(crate) fn take_view_state(&mut self) -> Option<crate::session::ViewState> {
         self.view_state.take()
     }
 
     /// Check if there's a view state set
-    pub fn has_view_state(&self) -> bool {
+    pub(crate) fn has_view_state(&self) -> bool {
         self.view_state.is_some()
     }
 
@@ -2623,33 +2564,33 @@ impl SessionContext {
 
     /// Set the viewport state from viewport.* operations
     /// This is called after DSL execution when viewport.* verbs produce a ViewportState
-    pub fn set_viewport_state(&mut self, state: ob_poc_types::ViewportState) {
+    pub(crate) fn set_viewport_state(&mut self, state: ob_poc_types::ViewportState) {
         self.viewport_state = Some(state);
     }
 
     /// Get the current viewport state
-    pub fn viewport_state(&self) -> Option<&ob_poc_types::ViewportState> {
+    pub(crate) fn viewport_state(&self) -> Option<&ob_poc_types::ViewportState> {
         self.viewport_state.as_ref()
     }
 
     /// Get mutable reference to the viewport state
-    pub fn viewport_state_mut(&mut self) -> Option<&mut ob_poc_types::ViewportState> {
+    pub(crate) fn viewport_state_mut(&mut self) -> Option<&mut ob_poc_types::ViewportState> {
         self.viewport_state.as_mut()
     }
 
     /// Take the viewport state (consumes it)
-    pub fn take_viewport_state(&mut self) -> Option<ob_poc_types::ViewportState> {
+    pub(crate) fn take_viewport_state(&mut self) -> Option<ob_poc_types::ViewportState> {
         self.viewport_state.take()
     }
 
     /// Check if there's a viewport state set
-    pub fn has_viewport_state(&self) -> bool {
+    pub(crate) fn has_viewport_state(&self) -> bool {
         self.viewport_state.is_some()
     }
 
     /// Get or initialize the viewport state with default
     /// Useful for operations that need to modify viewport state
-    pub fn viewport_state_or_default(&mut self) -> &mut ob_poc_types::ViewportState {
+    pub(crate) fn viewport_state_or_default(&mut self) -> &mut ob_poc_types::ViewportState {
         if self.viewport_state.is_none() {
             self.viewport_state = Some(ob_poc_types::ViewportState::default());
         }
@@ -2662,28 +2603,28 @@ impl SessionContext {
 
     /// Set the session scope from session.* operations
     /// This is called after DSL execution when session.set-* verbs produce a scope change
-    pub fn set_scope(&mut self, scope: crate::session::SessionScope) {
+    pub(crate) fn set_scope(&mut self, scope: crate::session::SessionScope) {
         self.scope = Some(scope);
     }
 
     /// Get the current session scope
-    pub fn scope(&self) -> Option<&crate::session::SessionScope> {
+    pub(crate) fn scope(&self) -> Option<&crate::session::SessionScope> {
         self.scope.as_ref()
     }
 
     /// Take the session scope (consumes it)
-    pub fn take_scope(&mut self) -> Option<crate::session::SessionScope> {
+    pub(crate) fn take_scope(&mut self) -> Option<crate::session::SessionScope> {
         self.scope.take()
     }
 
     /// Check if there's a session scope set
-    pub fn has_scope(&self) -> bool {
+    pub(crate) fn has_scope(&self) -> bool {
         self.scope.is_some()
     }
 
     /// Get or initialize the scope with empty
     /// Useful for operations that need to modify scope
-    pub fn scope_or_default(&mut self) -> &mut crate::session::SessionScope {
+    pub(crate) fn scope_or_default(&mut self) -> &mut crate::session::SessionScope {
         if self.scope.is_none() {
             self.scope = Some(crate::session::SessionScope::empty());
         }
@@ -2695,22 +2636,22 @@ impl SessionContext {
     // =========================================================================
 
     /// Set the client scope from Stage 0 scope resolution
-    pub fn set_client_scope(&mut self, scope: ScopeContext) {
+    pub(crate) fn set_client_scope(&mut self, scope: ScopeContext) {
         self.client_scope = Some(scope);
     }
 
     /// Get the current client scope
-    pub fn client_scope(&self) -> Option<&ScopeContext> {
+    pub(crate) fn client_scope(&self) -> Option<&ScopeContext> {
         self.client_scope.as_ref()
     }
 
     /// Take the client scope (consumes it)
-    pub fn take_client_scope(&mut self) -> Option<ScopeContext> {
+    pub(crate) fn take_client_scope(&mut self) -> Option<ScopeContext> {
         self.client_scope.take()
     }
 
     /// Check if client scope is set
-    pub fn has_client_scope(&self) -> bool {
+    pub(crate) fn has_client_scope(&self) -> bool {
         self.client_scope
             .as_ref()
             .map(|s| s.has_scope())
@@ -2718,19 +2659,19 @@ impl SessionContext {
     }
 
     /// Get the client group ID if scope is set
-    pub fn client_group_id(&self) -> Option<Uuid> {
+    pub(crate) fn client_group_id(&self) -> Option<Uuid> {
         self.client_scope.as_ref().and_then(|s| s.client_group_id)
     }
 
     /// Get the client group name if scope is set
-    pub fn client_group_name(&self) -> Option<&str> {
+    pub(crate) fn client_group_name(&self) -> Option<&str> {
         self.client_scope
             .as_ref()
             .and_then(|s| s.client_group_name.as_deref())
     }
 
     /// Clear the client scope
-    pub fn clear_client_scope(&mut self) {
+    pub(crate) fn clear_client_scope(&mut self) {
         self.client_scope = None;
     }
 
@@ -2739,47 +2680,47 @@ impl SessionContext {
     // =========================================================================
 
     /// Set the view mode
-    pub fn set_view_mode(&mut self, mode: &str) {
+    pub(crate) fn set_view_mode(&mut self, mode: &str) {
         self.view_mode = Some(mode.to_string());
     }
 
     /// Get the view mode, defaulting to "KYC_UBO" if not set
-    pub fn get_view_mode(&self) -> &str {
+    pub(crate) fn get_view_mode(&self) -> &str {
         self.view_mode.as_deref().unwrap_or("KYC_UBO")
     }
 
     /// Clear the view mode (reset to default)
-    pub fn clear_view_mode(&mut self) {
+    pub(crate) fn clear_view_mode(&mut self) {
         self.view_mode = None;
     }
 
     /// Set the zoom level
-    pub fn set_zoom_level(&mut self, level: f32) {
+    pub(crate) fn set_zoom_level(&mut self, level: f32) {
         self.zoom_level = Some(level);
     }
 
     /// Get the zoom level, defaulting to 1.0 if not set
-    pub fn get_zoom_level(&self) -> f32 {
+    pub(crate) fn get_zoom_level(&self) -> f32 {
         self.zoom_level.unwrap_or(1.0)
     }
 
     /// Clear the zoom level (reset to default)
-    pub fn clear_zoom_level(&mut self) {
+    pub(crate) fn clear_zoom_level(&mut self) {
         self.zoom_level = None;
     }
 
     /// Expand a node (add to expanded set)
-    pub fn expand_node(&mut self, node_id: Uuid) {
+    pub(crate) fn expand_node(&mut self, node_id: Uuid) {
         self.expanded_nodes.insert(node_id);
     }
 
     /// Collapse a node (remove from expanded set)
-    pub fn collapse_node(&mut self, node_id: Uuid) {
+    pub(crate) fn collapse_node(&mut self, node_id: Uuid) {
         self.expanded_nodes.remove(&node_id);
     }
 
     /// Toggle node expansion
-    pub fn toggle_node_expansion(&mut self, node_id: Uuid) {
+    pub(crate) fn toggle_node_expansion(&mut self, node_id: Uuid) {
         if self.expanded_nodes.contains(&node_id) {
             self.expanded_nodes.remove(&node_id);
         } else {
@@ -2788,22 +2729,22 @@ impl SessionContext {
     }
 
     /// Check if a node is expanded
-    pub fn is_node_expanded(&self, node_id: Uuid) -> bool {
+    pub(crate) fn is_node_expanded(&self, node_id: Uuid) -> bool {
         self.expanded_nodes.contains(&node_id)
     }
 
     /// Clear all expanded nodes
-    pub fn clear_expanded_nodes(&mut self) {
+    pub(crate) fn clear_expanded_nodes(&mut self) {
         self.expanded_nodes.clear();
     }
 
     /// Get the number of expanded nodes
-    pub fn expanded_node_count(&self) -> usize {
+    pub(crate) fn expanded_node_count(&self) -> usize {
         self.expanded_nodes.len()
     }
 
     /// Set multiple expanded nodes at once (replaces existing)
-    pub fn set_expanded_nodes(&mut self, nodes: impl IntoIterator<Item = Uuid>) {
+    pub(crate) fn set_expanded_nodes(&mut self, nodes: impl IntoIterator<Item = Uuid>) {
         self.expanded_nodes = nodes.into_iter().collect();
     }
 
@@ -2812,17 +2753,17 @@ impl SessionContext {
     // =========================================================================
 
     /// Get the current scope path
-    pub fn scope_path(&self) -> &crate::session::ScopePath {
+    pub(crate) fn scope_path(&self) -> &crate::session::ScopePath {
         &self.scope_path
     }
 
     /// Get mutable reference to scope path
-    pub fn scope_path_mut(&mut self) -> &mut crate::session::ScopePath {
+    pub(crate) fn scope_path_mut(&mut self) -> &mut crate::session::ScopePath {
         &mut self.scope_path
     }
 
     /// Navigate into universe view (cluster by dimension)
-    pub fn navigate_to_universe(&mut self, cluster_by: &str) {
+    pub(crate) fn navigate_to_universe(&mut self, cluster_by: &str) {
         self.scope_path = crate::session::ScopePath::universe(cluster_by);
         // Clear mass cache - will be recomputed
         self.struct_mass = None;
@@ -2831,7 +2772,7 @@ impl SessionContext {
     }
 
     /// Navigate into a specific book within a clustering dimension
-    pub fn navigate_to_book(&mut self, cluster_by: &str, book_id: &str, label: &str) {
+    pub(crate) fn navigate_to_book(&mut self, cluster_by: &str, book_id: &str, label: &str) {
         self.scope_path = crate::session::ScopePath::book(cluster_by, book_id, label);
         self.struct_mass = None;
         self.mass_breakdown = None;
@@ -2839,7 +2780,7 @@ impl SessionContext {
     }
 
     /// Navigate into a specific CBU
-    pub fn navigate_to_cbu(&mut self, cbu_id: Uuid, name: &str) {
+    pub(crate) fn navigate_to_cbu(&mut self, cbu_id: Uuid, name: &str) {
         self.scope_path = crate::session::ScopePath::cbu(cbu_id, name);
         self.struct_mass = None;
         self.mass_breakdown = None;
@@ -2847,7 +2788,7 @@ impl SessionContext {
     }
 
     /// Navigate into a specific entity within current scope
-    pub fn navigate_to_entity(&mut self, entity_id: Uuid, name: &str, entity_type: &str) {
+    pub(crate) fn navigate_to_entity(&mut self, entity_id: Uuid, name: &str, entity_type: &str) {
         self.scope_path.push(crate::session::ScopeSegment::Entity {
             entity_id,
             name: name.to_string(),
@@ -2859,7 +2800,7 @@ impl SessionContext {
     }
 
     /// Navigate up one level in the scope hierarchy
-    pub fn navigate_up(&mut self) -> bool {
+    pub(crate) fn navigate_up(&mut self) -> bool {
         let popped = self.scope_path.pop();
         if popped.is_some() {
             self.struct_mass = None;
@@ -2870,7 +2811,7 @@ impl SessionContext {
     }
 
     /// Get breadcrumbs for current scope
-    pub fn scope_breadcrumbs(&self) -> Vec<String> {
+    pub(crate) fn scope_breadcrumbs(&self) -> Vec<String> {
         self.scope_path
             .breadcrumbs()
             .into_iter()
@@ -2879,7 +2820,7 @@ impl SessionContext {
     }
 
     /// Get current scope depth
-    pub fn scope_depth(&self) -> usize {
+    pub(crate) fn scope_depth(&self) -> usize {
         self.scope_path.depth()
     }
 
@@ -2888,24 +2829,24 @@ impl SessionContext {
     // =========================================================================
 
     /// Set structural mass (computed externally from graph data)
-    pub fn set_struct_mass(&mut self, mass: crate::session::StructMass) {
+    pub(crate) fn set_struct_mass(&mut self, mass: crate::session::StructMass) {
         self.mass_breakdown = Some(mass.breakdown.clone());
         self.auto_view_mode = Some(mass.suggested_view_mode());
         self.struct_mass = Some(mass);
     }
 
     /// Get the current structural mass
-    pub fn struct_mass(&self) -> Option<&crate::session::StructMass> {
+    pub(crate) fn struct_mass(&self) -> Option<&crate::session::StructMass> {
         self.struct_mass.as_ref()
     }
 
     /// Get the mass breakdown
-    pub fn mass_breakdown(&self) -> Option<&crate::session::MassBreakdown> {
+    pub(crate) fn mass_breakdown(&self) -> Option<&crate::session::MassBreakdown> {
         self.mass_breakdown.as_ref()
     }
 
     /// Get the effective view mode (manual override or auto-selected)
-    pub fn effective_view_mode(&self) -> Option<&crate::session::MassViewMode> {
+    pub(crate) fn effective_view_mode(&self) -> Option<&crate::session::MassViewMode> {
         if self.view_mode_manual {
             // Manual mode takes precedence - but we return auto for type consistency
             // The actual string view_mode field is used directly
@@ -2916,13 +2857,13 @@ impl SessionContext {
     }
 
     /// Set view mode manually (overrides auto-selection)
-    pub fn set_view_mode_manual(&mut self, mode: &str) {
+    pub(crate) fn set_view_mode_manual(&mut self, mode: &str) {
         self.view_mode = Some(mode.to_string());
         self.view_mode_manual = true;
     }
 
     /// Clear manual view mode override (revert to auto-selection)
-    pub fn clear_view_mode_manual(&mut self) {
+    pub(crate) fn clear_view_mode_manual(&mut self) {
         self.view_mode_manual = false;
         // Restore auto mode if available
         if let Some(ref auto_mode) = self.auto_view_mode {
@@ -2931,17 +2872,17 @@ impl SessionContext {
     }
 
     /// Check if view mode is manually overridden
-    pub fn is_view_mode_manual(&self) -> bool {
+    pub(crate) fn is_view_mode_manual(&self) -> bool {
         self.view_mode_manual
     }
 
     /// Get total mass value (convenience method)
-    pub fn total_mass(&self) -> Option<f32> {
+    pub(crate) fn total_mass(&self) -> Option<f32> {
         self.struct_mass.as_ref().map(|m| m.total)
     }
 
     /// Clear all mass-related cached data
-    pub fn clear_mass_cache(&mut self) {
+    pub(crate) fn clear_mass_cache(&mut self) {
         self.struct_mass = None;
         self.mass_breakdown = None;
         self.auto_view_mode = None;
@@ -2982,7 +2923,7 @@ pub struct ExecutionResult {
 ///
 /// NOTE: This now uses `UnifiedSession` as the single session type.
 /// `AgentSession` is deprecated and will be removed in a future version.
-pub type SessionStore = Arc<RwLock<HashMap<Uuid, crate::session::UnifiedSession>>>;
+pub(crate) type SessionStore = Arc<RwLock<HashMap<Uuid, crate::session::UnifiedSession>>>;
 
 /// Create a new session store
 pub fn create_session_store() -> SessionStore {
@@ -2995,7 +2936,7 @@ pub fn create_session_store() -> SessionStore {
 
 /// Reference to a client for session scope initialization
 #[derive(Debug, Clone, Deserialize)]
-pub struct InitialClientRef {
+pub(crate) struct InitialClientRef {
     /// Client group ID (if known)
     pub client_id: Option<Uuid>,
     /// Client name/alias to search for (if client_id not known)
@@ -3004,7 +2945,7 @@ pub struct InitialClientRef {
 
 /// Request to create a new session
 #[derive(Debug, Deserialize)]
-pub struct CreateSessionRequest {
+pub(crate) struct CreateSessionRequest {
     /// Optional domain hint to focus generation
     pub domain_hint: Option<String>,
     /// Optional initial client to set session scope
@@ -3023,7 +2964,7 @@ pub struct CreateSessionRequest {
 }
 
 /// Welcome message constant - agent's opening question
-pub const WELCOME_MESSAGE: &str = "Which client would you like to work with today?";
+pub(crate) const WELCOME_MESSAGE: &str = "Which client would you like to work with today?";
 
 /// Response after creating a session
 #[derive(Debug, Serialize)]
@@ -3048,7 +2989,7 @@ pub struct CreateSessionResponse {
 
 /// Response with session state
 #[derive(Debug, Serialize)]
-pub struct SessionStateResponse {
+pub(crate) struct SessionStateResponse {
     /// Session ID
     pub session_id: Uuid,
     /// Entity type this session operates on ("cbu", "kyc_case", "onboarding", "bulk", etc.)
@@ -3084,7 +3025,7 @@ pub struct SessionStateResponse {
 
 /// Request to execute accumulated DSL
 #[derive(Debug, Deserialize)]
-pub struct ExecuteRequest {
+pub(crate) struct ExecuteRequest {
     /// Whether to execute in dry-run mode
     #[serde(default)]
     pub dry_run: bool,
@@ -3096,14 +3037,14 @@ pub struct ExecuteRequest {
 
 /// Response for run sheet state
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunSheetResponse {
+pub(crate) struct RunSheetResponse {
     pub entries: Vec<RunSheetEntryResponse>,
     pub cursor: usize,
 }
 
 /// Response for a single run sheet entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunSheetEntryResponse {
+pub(crate) struct RunSheetEntryResponse {
     pub id: Uuid,
     pub dsl_source: String,
     pub display_dsl: String,
@@ -3136,7 +3077,7 @@ pub struct ExecuteResponse {
 
 /// Disambiguation request - sent when entity references are ambiguous
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisambiguationRequest {
+pub(crate) struct DisambiguationRequest {
     /// Unique ID for this disambiguation request
     pub request_id: Uuid,
     /// The ambiguous items that need resolution
@@ -3151,7 +3092,7 @@ pub struct DisambiguationRequest {
 /// A single ambiguous item needing resolution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum DisambiguationItem {
+pub(crate) enum DisambiguationItem {
     /// Multiple entities match a search term
     EntityMatch {
         /// Parameter name (e.g., "entity-id")
@@ -3188,7 +3129,7 @@ pub enum DisambiguationItem {
 
 /// A matching client group for scope disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClientGroupCandidate {
+pub(crate) struct ClientGroupCandidate {
     /// Client group UUID
     pub group_id: Uuid,
     /// Canonical group name (e.g., "Allianz Global Investors")
@@ -3204,7 +3145,7 @@ pub struct ClientGroupCandidate {
 
 /// A matching entity for disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityMatchOption {
+pub(crate) struct EntityMatchOption {
     /// Entity UUID
     pub entity_id: Uuid,
     /// Display name
@@ -3224,7 +3165,7 @@ pub struct EntityMatchOption {
 
 /// A possible interpretation of ambiguous text
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Interpretation {
+pub(crate) struct Interpretation {
     /// Interpretation ID
     pub id: String,
     /// Human-readable label
@@ -3238,7 +3179,7 @@ pub struct Interpretation {
 
 /// User's disambiguation response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DisambiguationResponse {
+pub(crate) struct DisambiguationResponse {
     /// The request ID being responded to
     pub request_id: Uuid,
     /// Selected resolutions
@@ -3248,7 +3189,7 @@ pub struct DisambiguationResponse {
 /// A single disambiguation selection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum DisambiguationSelection {
+pub(crate) enum DisambiguationSelection {
     /// Selected entity for an EntityMatch
     Entity {
         param: String,
@@ -3267,7 +3208,7 @@ pub enum DisambiguationSelection {
 /// Chat response status - indicates whether response is ready or needs disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
-pub enum ChatResponseStatus {
+pub(crate) enum ChatResponseStatus {
     /// DSL is ready (no ambiguity or already resolved)
     Ready,
     /// Needs user disambiguation before generating DSL

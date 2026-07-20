@@ -39,7 +39,7 @@ use crate::session::unified::UnifiedSession;
 /// Carried inside `MacroExpansionAudit` so that replay can verify the limits
 /// haven't changed since compilation (INV-12).
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ExpansionLimits {
+pub(crate) struct ExpansionLimits {
     /// Maximum recursion depth for nested macro invocations.
     /// Paper §6.1: default 8.
     pub max_depth: usize,
@@ -66,7 +66,7 @@ pub(crate) const EXPANSION_LIMITS: ExpansionLimits = ExpansionLimits {
 
 /// Errors during macro expansion
 #[derive(Debug, Error)]
-pub enum MacroExpansionError {
+pub(crate) enum MacroExpansionError {
     #[error("Unknown macro: {0}")]
     UnknownMacro(String),
 
@@ -111,7 +111,7 @@ pub enum MacroExpansionError {
 
 /// Output from macro expansion
 #[derive(Debug, Clone)]
-pub struct MacroExpansionOutput {
+pub(crate) struct MacroExpansionOutput {
     /// Expanded DSL statements (primitive verbs)
     pub statements: Vec<String>,
 
@@ -127,7 +127,7 @@ pub struct MacroExpansionOutput {
 
 /// Audit trail for macro expansion
 #[derive(Debug, Clone)]
-pub struct MacroExpansionAudit {
+pub(crate) struct MacroExpansionAudit {
     /// Unique expansion ID
     pub expansion_id: Uuid,
 

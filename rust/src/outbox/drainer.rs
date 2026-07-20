@@ -426,14 +426,14 @@ fn parse_effect_kind(raw: &str) -> Result<OutboxEffectKind> {
 
 /// Handle returned by [`OutboxDrainerImpl::spawn`] for graceful
 /// shutdown at process exit.
-pub struct OutboxDrainerHandle {
+pub(crate) struct OutboxDrainerHandle {
     cancel: Arc<Notify>,
     task: JoinHandle<()>,
 }
 
 impl OutboxDrainerHandle {
     /// Signal the drainer loop to exit and wait for it to finish.
-    pub async fn shutdown(self) {
+    pub(crate) async fn shutdown(self) {
         self.cancel.notify_waiters();
         if let Err(e) = self.task.await {
             tracing::warn!(error = %e, "outbox drainer task join failed");

@@ -29,7 +29,7 @@ use serde::{Deserialize, Serialize};
 /// Each type maps to one or more internal entity kinds.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum OperatorType {
+pub(crate) enum OperatorType {
     /// Reference to a structure (fund, mandate vehicle)
     /// Internal: cbu
     StructureRef,
@@ -72,7 +72,7 @@ impl OperatorType {
     ///
     /// These are the actual entity_ref kinds used in database queries.
     /// The operator never sees these.
-    pub fn internal_kinds(&self) -> &'static [&'static str] {
+    pub(crate) fn internal_kinds(&self) -> &'static [&'static str] {
         match self {
             Self::StructureRef => &["cbu"],
             Self::PartyRef => &["person", "company", "trust"],
@@ -89,7 +89,7 @@ impl OperatorType {
     /// Get UI display label (what operator sees)
     ///
     /// Never returns internal names like "cbu" or "trading-profile".
-    pub fn display_label(&self) -> &'static str {
+    pub(crate) fn display_label(&self) -> &'static str {
         match self {
             Self::StructureRef => "Structure",
             Self::PartyRef => "Party",
@@ -104,7 +104,7 @@ impl OperatorType {
     }
 
     /// Get the placeholder text for search/picker UI
-    pub fn placeholder(&self) -> &'static str {
+    pub(crate) fn placeholder(&self) -> &'static str {
         match self {
             Self::StructureRef => "Search structures...",
             Self::PartyRef => "Search parties...",
@@ -119,7 +119,7 @@ impl OperatorType {
     }
 
     /// Parse from string (used in YAML schema parsing)
-    pub fn parse(s: &str) -> Option<Self> {
+    pub(crate) fn parse(s: &str) -> Option<Self> {
         match s {
             "structure_ref" | "StructureRef" => Some(Self::StructureRef),
             "party_ref" | "PartyRef" => Some(Self::PartyRef),
@@ -135,7 +135,7 @@ impl OperatorType {
     }
 
     /// Get schema type name (for YAML serialization)
-    pub fn schema_name(&self) -> &'static str {
+    pub(crate) fn schema_name(&self) -> &'static str {
         match self {
             Self::StructureRef => "structure_ref",
             Self::PartyRef => "party_ref",
@@ -152,7 +152,7 @@ impl OperatorType {
     /// Check if this type is a subset of another
     ///
     /// e.g., PersonRef is a subset of PartyRef
-    pub fn is_subset_of(&self, other: &Self) -> bool {
+    pub(crate) fn is_subset_of(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::PersonRef, Self::PartyRef) => true,
             (Self::CompanyRef, Self::PartyRef) => true,
@@ -172,7 +172,7 @@ impl std::fmt::Display for OperatorType {
 /// Maps operator-facing role names to internal role codes.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum OperatorRole {
+pub(crate) enum OperatorRole {
     /// General Partner (PE/Hedge only)
     Gp,
     /// Limited Partner
@@ -195,7 +195,7 @@ pub enum OperatorRole {
 
 impl OperatorRole {
     /// Get internal role code
-    pub fn internal_code(&self) -> &'static str {
+    pub(crate) fn internal_code(&self) -> &'static str {
         match self {
             Self::Gp => "general-partner",
             Self::Lp => "limited-partner",
@@ -210,7 +210,7 @@ impl OperatorRole {
     }
 
     /// Get display label
-    pub fn display_label(&self) -> &'static str {
+    pub(crate) fn display_label(&self) -> &'static str {
         match self {
             Self::Gp => "General Partner",
             Self::Lp => "Limited Partner",
@@ -225,7 +225,7 @@ impl OperatorRole {
     }
 
     /// Get short label (for compact UI)
-    pub fn short_label(&self) -> &'static str {
+    pub(crate) fn short_label(&self) -> &'static str {
         match self {
             Self::Gp => "GP",
             Self::Lp => "LP",
@@ -240,7 +240,7 @@ impl OperatorRole {
     }
 
     /// Parse from operator key (what user types)
-    pub fn from_operator_key(key: &str) -> Option<Self> {
+    pub(crate) fn from_operator_key(key: &str) -> Option<Self> {
         match key.to_lowercase().as_str() {
             "gp" | "general-partner" | "general_partner" => Some(Self::Gp),
             "lp" | "limited-partner" | "limited_partner" => Some(Self::Lp),
@@ -256,7 +256,7 @@ impl OperatorRole {
     }
 
     /// Check if this role is valid for a given structure type
-    pub fn valid_for_structure(
+    pub(crate) fn valid_for_structure(
         &self,
         structure_type: &crate::session::unified::StructureType,
     ) -> bool {

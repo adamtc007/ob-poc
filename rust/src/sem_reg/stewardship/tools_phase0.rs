@@ -31,7 +31,7 @@ use super::types::*;
 // ═══════════════════════════════════════════════════════════════
 
 /// Returns all Phase 0 stewardship tool specifications.
-pub fn phase0_tool_specs() -> Vec<SemRegToolSpec> {
+pub(crate) fn phase0_tool_specs() -> Vec<SemRegToolSpec> {
     let mut specs = Vec::new();
     specs.extend(stewardship_mutating_specs());
     specs.extend(stewardship_query_specs());

@@ -26,13 +26,13 @@ use sqlx::PgPool;
 // ============================================================================
 
 #[derive(Debug, Serialize)]
-pub struct DslListResponse {
+pub(crate) struct DslListResponse {
     pub instances: Vec<DslInstanceSummary>,
     pub total: usize,
 }
 
 #[derive(Debug, Serialize)]
-pub struct DslShowResponse {
+pub(crate) struct DslShowResponse {
     pub business_reference: String,
     pub domain_name: String,
     pub version: i32,
@@ -44,7 +44,7 @@ pub struct DslShowResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ExecutionStepInfo {
+pub(crate) struct ExecutionStepInfo {
     pub step: usize,
     pub verb: String,
     pub bind_as: Option<String>,
@@ -52,13 +52,13 @@ pub struct ExecutionStepInfo {
 }
 
 #[derive(Debug, Serialize)]
-pub struct DslHistoryResponse {
+pub(crate) struct DslHistoryResponse {
     pub business_reference: String,
     pub versions: Vec<DslVersionSummary>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct DslVersionSummary {
+pub(crate) struct DslVersionSummary {
     pub version: i32,
     pub operation_type: String,
     pub compilation_status: String,
@@ -66,7 +66,7 @@ pub struct DslVersionSummary {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ErrorResponse {
+pub(crate) struct ErrorResponse {
     pub error: String,
 }
 
@@ -75,7 +75,7 @@ pub struct ErrorResponse {
 // ============================================================================
 
 #[derive(Debug, Deserialize)]
-pub struct ListQuery {
+pub(crate) struct ListQuery {
     pub limit: Option<i32>,
     pub domain: Option<String>,
 }
@@ -85,7 +85,7 @@ pub struct ListQuery {
 // ============================================================================
 
 #[derive(Clone)]
-pub struct DslViewerState {
+pub(crate) struct DslViewerState {
     pub pool: PgPool,
 }
 

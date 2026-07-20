@@ -44,12 +44,12 @@ use uuid::Uuid;
 /// Returns a single safe-harbour allowed verb to keep
 /// `envelope.deny_all = false`. The minimal verb searcher then fails to
 /// match anything and the orchestrator emits `NoMatch` as scenarios expect.
-pub struct HarnessSemOsClient;
+pub(crate) struct HarnessSemOsClient;
 
 impl HarnessSemOsClient {
     /// Build the stub as a trait-object Arc ready to assign to
     /// `OrchestratorContext::sem_os_client`.
-    pub fn new_arc() -> Arc<dyn SemOsClient> {
+    pub(crate) fn new_arc() -> Arc<dyn SemOsClient> {
         Arc::new(Self)
     }
 

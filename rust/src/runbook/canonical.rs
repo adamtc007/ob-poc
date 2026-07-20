@@ -38,7 +38,7 @@ use super::types::{CompiledRunbookId, CompiledStep};
 // ---------------------------------------------------------------------------
 
 /// Serialize a slice of compiled steps to deterministic bincode bytes.
-pub fn canonical_bytes_for_steps(steps: &[CompiledStep]) -> Vec<u8> {
+pub(crate) fn canonical_bytes_for_steps(steps: &[CompiledStep]) -> Vec<u8> {
     // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings —
     // bincode serialization cannot fail for these types.
     bincode::serialize(steps).expect("bincode serialization of CompiledStep slice is infallible")
@@ -48,7 +48,7 @@ pub fn canonical_bytes_for_steps(steps: &[CompiledStep]) -> Vec<u8> {
 ///
 /// Only the `EnvelopeCore` (no timestamps) feeds into the content-addressed
 /// hash. The full `ReplayEnvelope` is stored for audit but not hashed.
-pub fn canonical_bytes_for_envelope_core(core: &EnvelopeCore) -> Vec<u8> {
+pub(crate) fn canonical_bytes_for_envelope_core(core: &EnvelopeCore) -> Vec<u8> {
     // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings —
     // bincode serialization cannot fail for these types.
     bincode::serialize(core).expect("bincode serialization of EnvelopeCore is infallible")
@@ -58,12 +58,12 @@ pub fn canonical_bytes_for_envelope_core(core: &EnvelopeCore) -> Vec<u8> {
 ///
 /// Used for storage/integrity checks, NOT for content-addressed ID hashing.
 /// For ID hashing, use `canonical_bytes_for_envelope_core()`.
-pub fn canonical_bytes_for_envelope(envelope: &ReplayEnvelope) -> Vec<u8> {
+pub(crate) fn canonical_bytes_for_envelope(envelope: &ReplayEnvelope) -> Vec<u8> {
     bincode::serialize(envelope).expect("bincode serialization of ReplayEnvelope is infallible")
 }
 
 /// Serialize a single compiled step to deterministic bincode bytes.
-pub fn canonical_bytes_for_step(step: &CompiledStep) -> Vec<u8> {
+pub(crate) fn canonical_bytes_for_step(step: &CompiledStep) -> Vec<u8> {
     // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings.
     bincode::serialize(step).expect("bincode serialization of CompiledStep is infallible")
 }
@@ -90,7 +90,7 @@ pub(crate) fn canonical_bytes_for_audit(audit: &MacroExpansionAudit) -> Vec<u8> 
 ///
 /// This is the **only** way to derive a `CompiledRunbookId` in production.
 /// `CompiledRunbookId::new()` (random UUID) is retained only for `#[cfg(test)]`.
-pub fn content_addressed_id(
+pub(crate) fn content_addressed_id(
     steps: &[CompiledStep],
     envelope: &ReplayEnvelope,
 ) -> CompiledRunbookId {
@@ -110,7 +110,7 @@ pub fn content_addressed_id(
 ///
 /// Uses the deterministic `EnvelopeCore` — same hash basis as
 /// `content_addressed_id()` so truncated ID matches full hash prefix.
-pub fn full_sha256(steps: &[CompiledStep], envelope: &ReplayEnvelope) -> [u8; 32] {
+pub(crate) fn full_sha256(steps: &[CompiledStep], envelope: &ReplayEnvelope) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(canonical_bytes_for_steps(steps));
     hasher.update(canonical_bytes_for_envelope_core(&envelope.core));

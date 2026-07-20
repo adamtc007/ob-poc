@@ -49,13 +49,13 @@ type RelationshipRow = (
 /// - Finding paths between nodes
 /// - Traversing ancestors/descendants
 /// - Comparing graph snapshots
-pub struct GraphQueryEngine {
+pub(crate) struct GraphQueryEngine {
     pool: PgPool,
 }
 
 impl GraphQueryEngine {
     /// Create a new GraphQueryEngine
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -68,7 +68,7 @@ impl GraphQueryEngine {
     /// This is the primary entry point for graph visualization.
     /// It fetches all related entities, relationships, and builds
     /// a complete GraphViewModel.
-    pub async fn execute_view(
+    pub(crate) async fn execute_view(
         &self,
         root_id: Uuid,
         view_mode: &str,
@@ -111,7 +111,7 @@ impl GraphQueryEngine {
     }
 
     /// Focus on a specific node with its immediate neighborhood
-    pub async fn execute_focus(
+    pub(crate) async fn execute_focus(
         &self,
         root_id: Uuid,
         focus_id: Uuid,
@@ -147,7 +147,7 @@ impl GraphQueryEngine {
     // =========================================================================
 
     /// Filter an existing graph by criteria
-    pub fn execute_filter(
+    pub(crate) fn execute_filter(
         &self,
         model: &GraphViewModel,
         filter: &GraphFilter,
@@ -252,7 +252,7 @@ impl GraphQueryEngine {
     // =========================================================================
 
     /// Group nodes by an attribute
-    pub fn execute_group_by(
+    pub(crate) fn execute_group_by(
         &self,
         model: &GraphViewModel,
         group_by: &str,
@@ -303,7 +303,7 @@ impl GraphQueryEngine {
     // =========================================================================
 
     /// Find shortest path between two nodes
-    pub fn execute_path(
+    pub(crate) fn execute_path(
         &self,
         model: &GraphViewModel,
         from_id: &str,
@@ -374,7 +374,7 @@ impl GraphQueryEngine {
     }
 
     /// Find all connected nodes from a starting point
-    pub fn execute_find_connected(
+    pub(crate) fn execute_find_connected(
         &self,
         model: &GraphViewModel,
         start_id: &str,
@@ -444,7 +444,7 @@ impl GraphQueryEngine {
     // =========================================================================
 
     /// Find all ancestors (BFS upward through ownership/control)
-    pub async fn execute_ancestors(
+    pub(crate) async fn execute_ancestors(
         &self,
         entity_id: Uuid,
         max_depth: u32,
@@ -454,7 +454,7 @@ impl GraphQueryEngine {
     }
 
     /// Find all descendants (BFS downward through ownership/control)
-    pub async fn execute_descendants(
+    pub(crate) async fn execute_descendants(
         &self,
         entity_id: Uuid,
         max_depth: u32,
@@ -523,7 +523,7 @@ impl GraphQueryEngine {
     // =========================================================================
 
     /// Compare two graph snapshots
-    pub fn execute_compare(
+    pub(crate) fn execute_compare(
         &self,
         left: &GraphViewModel,
         right: &GraphViewModel,

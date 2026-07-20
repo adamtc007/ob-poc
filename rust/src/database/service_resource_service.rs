@@ -10,7 +10,7 @@ use tracing::info;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ServiceResourceRow {
+pub(crate) struct ServiceResourceRow {
     pub resource_id: Uuid,
     pub name: String,
     pub description: Option<String>,
@@ -50,15 +50,15 @@ pub(crate) struct NewServiceResourceFields {
 }
 
 #[derive(Clone, Debug)]
-pub struct ServiceResourceService {
+pub(crate) struct ServiceResourceService {
     pool: PgPool,
 }
 
 impl ServiceResourceService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -81,30 +81,8 @@ impl ServiceResourceService {
         Ok(resource_id)
     }
 
-    pub async fn get_service_resource_by_id(
-        &self,
-        resource_id: Uuid,
-    ) -> Result<Option<ServiceResourceRow>> {
-        sqlx::query_as::<_, ServiceResourceRow>(r#"SELECT resource_id, name, description, owner, dictionary_group, resource_code, resource_type, vendor, version, api_endpoint, api_version, authentication_method, authentication_config, capabilities, capacity_limits, is_active, metadata, created_at, updated_at FROM "ob-poc".service_resource_types WHERE resource_id = $1"#)
-            .bind(resource_id).fetch_optional(&self.pool).await.context("Failed to get Service Resource by ID")
-    }
 
-    pub async fn get_service_resource_by_name(
-        &self,
-        name: &str,
-    ) -> Result<Option<ServiceResourceRow>> {
-        sqlx::query_as::<_, ServiceResourceRow>(r#"SELECT resource_id, name, description, owner, dictionary_group, resource_code, resource_type, vendor, version, api_endpoint, api_version, authentication_method, authentication_config, capabilities, capacity_limits, is_active, metadata, created_at, updated_at FROM "ob-poc".service_resource_types WHERE name = $1"#)
-            .bind(name).fetch_optional(&self.pool).await.context("Failed to get Service Resource by name")
-    }
 
-    pub async fn list_service_resources(
-        &self,
-        limit: Option<i32>,
-        offset: Option<i32>,
-    ) -> Result<Vec<ServiceResourceRow>> {
-        sqlx::query_as::<_, ServiceResourceRow>(r#"SELECT resource_id, name, description, owner, dictionary_group, resource_code, resource_type, vendor, version, api_endpoint, api_version, authentication_method, authentication_config, capabilities, capacity_limits, is_active, metadata, created_at, updated_at FROM "ob-poc".service_resource_types ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
-            .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Service Resources")
-    }
 
     #[allow(dead_code)]
     pub(crate) async fn update_service_resource(

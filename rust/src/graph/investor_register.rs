@@ -33,7 +33,7 @@ use uuid::Uuid;
 /// Use this struct instead of multiple function arguments.
 /// All fields except `issuer_entity_id` are optional.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct InvestorRegisterQuery {
+pub(crate) struct InvestorRegisterQuery {
     /// The issuer entity (fund, company) - REQUIRED
     pub issuer_entity_id: Uuid,
 
@@ -54,7 +54,7 @@ pub struct InvestorRegisterQuery {
 ///
 /// Use this struct for the investor list endpoint.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct InvestorListQuery {
+pub(crate) struct InvestorListQuery {
     /// The issuer entity - REQUIRED
     pub issuer_entity_id: Uuid,
 
@@ -98,7 +98,7 @@ pub struct InvestorListQuery {
 
 /// Complete response for investor register visualization
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InvestorRegisterView {
+pub(crate) struct InvestorRegisterView {
     /// The issuer entity (fund, company)
     pub issuer: IssuerSummary,
 
@@ -140,7 +140,7 @@ pub struct InvestorRegisterView {
 
 /// Summary of the issuer entity
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IssuerSummary {
+pub(crate) struct IssuerSummary {
     pub entity_id: Uuid,
     pub name: String,
     pub entity_type: String,
@@ -150,7 +150,7 @@ pub struct IssuerSummary {
 
 /// Threshold configuration for control determination
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThresholdConfig {
+pub(crate) struct ThresholdConfig {
     /// Disclosure threshold (default 5%)
     pub disclosure_pct: Decimal,
     /// Material threshold (default 10%)
@@ -184,7 +184,7 @@ impl Default for ThresholdConfig {
 /// Only for holders above threshold or with special rights.
 /// Rendered as individual nodes in the graph visualization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ControlHolderNode {
+pub(crate) struct ControlHolderNode {
     /// Entity ID of the holder
     pub entity_id: Uuid,
 
@@ -255,7 +255,7 @@ pub struct ControlHolderNode {
 ///
 /// Rendered as a single clickable node that expands to show breakdown.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AggregateInvestorsNode {
+pub(crate) struct AggregateInvestorsNode {
     /// Number of investors in aggregate
     pub investor_count: i32,
 
@@ -295,7 +295,7 @@ pub struct AggregateInvestorsNode {
 
 /// Breakdown category for aggregate summaries
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AggregateBreakdown {
+pub(crate) struct AggregateBreakdown {
     /// Category key (e.g., "RETAIL", "APPROVED", "LU")
     pub key: String,
 
@@ -318,7 +318,7 @@ pub struct AggregateBreakdown {
 
 /// Paginated list of investors for drill-down view
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InvestorListResponse {
+pub(crate) struct InvestorListResponse {
     /// Current page items
     pub items: Vec<InvestorListItem>,
 
@@ -331,7 +331,7 @@ pub struct InvestorListResponse {
 
 /// Single investor in the list view
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InvestorListItem {
+pub(crate) struct InvestorListItem {
     pub entity_id: Uuid,
     pub name: String,
     pub entity_type: String,
@@ -346,7 +346,7 @@ pub struct InvestorListItem {
 
 /// Pagination metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaginationInfo {
+pub(crate) struct PaginationInfo {
     /// Current page (1-indexed)
     pub page: i32,
     /// Items per page
@@ -359,7 +359,7 @@ pub struct PaginationInfo {
 
 /// Active filters for investor list (echoed in response)
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct InvestorFilters {
+pub(crate) struct InvestorFilters {
     pub investor_type: Option<String>,
     pub kyc_status: Option<String>,
     pub jurisdiction: Option<String>,
@@ -373,41 +373,21 @@ pub struct InvestorFilters {
 
 impl InvestorRegisterQuery {
     /// Create a new query for an issuer
-    pub fn new(issuer_entity_id: Uuid) -> Self {
+    pub(crate) fn new(issuer_entity_id: Uuid) -> Self {
         Self {
             issuer_entity_id,
             ..Default::default()
         }
     }
 
-    /// Set share class filter
-    pub fn with_share_class(mut self, share_class_id: Uuid) -> Self {
-        self.share_class_id = Some(share_class_id);
-        self
-    }
 
-    /// Set as-of date
-    pub fn with_as_of(mut self, date: NaiveDate) -> Self {
-        self.as_of_date = Some(date);
-        self
-    }
 
-    /// Include dilution instruments
-    pub fn with_dilution(mut self) -> Self {
-        self.include_dilution = Some(true);
-        self
-    }
 
-    /// Set control basis
-    pub fn with_basis(mut self, basis: &str) -> Self {
-        self.control_basis = Some(basis.to_string());
-        self
-    }
 }
 
 impl InvestorListQuery {
     /// Create a new query for an issuer
-    pub fn new(issuer_entity_id: Uuid) -> Self {
+    pub(crate) fn new(issuer_entity_id: Uuid) -> Self {
         Self {
             issuer_entity_id,
             page: Some(1),
@@ -417,41 +397,15 @@ impl InvestorListQuery {
     }
 
     /// Set page
-    pub fn with_page(mut self, page: i32) -> Self {
+    pub(crate) fn with_page(mut self, page: i32) -> Self {
         self.page = Some(page);
         self
     }
 
-    /// Set page size
-    pub fn with_page_size(mut self, size: i32) -> Self {
-        self.page_size = Some(size.min(200)); // Cap at 200
-        self
-    }
 
-    /// Filter by investor type
-    pub fn with_investor_type(mut self, investor_type: &str) -> Self {
-        self.investor_type = Some(investor_type.to_string());
-        self
-    }
 
-    /// Filter by KYC status
-    pub fn with_kyc_status(mut self, status: &str) -> Self {
-        self.kyc_status = Some(status.to_string());
-        self
-    }
 
-    /// Search by name
-    pub fn with_search(mut self, search: &str) -> Self {
-        self.search = Some(search.to_string());
-        self
-    }
 
-    /// Sort by field
-    pub fn with_sort(mut self, field: &str, ascending: bool) -> Self {
-        self.sort_by = Some(field.to_string());
-        self.sort_dir = Some(if ascending { "asc" } else { "desc" }.to_string());
-        self
-    }
 }
 
 // =============================================================================
@@ -460,14 +414,14 @@ impl InvestorListQuery {
 
 impl AggregateInvestorsNode {
     /// Create display label from count and percentage
-    pub fn make_display_label(count: i32, economic_pct: Decimal) -> String {
+    pub(crate) fn make_display_label(count: i32, economic_pct: Decimal) -> String {
         format!("{} other investors ({:.1}%)", count, economic_pct)
     }
 }
 
 impl ControlHolderNode {
     /// Determine inclusion reason based on flags
-    pub fn compute_inclusion_reason(&self, thresholds: &ThresholdConfig) -> String {
+    pub(crate) fn compute_inclusion_reason(&self, thresholds: &ThresholdConfig) -> String {
         let mut reasons = Vec::new();
 
         if self.has_control {

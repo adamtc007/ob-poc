@@ -29,7 +29,7 @@ use crate::journey::pack_manager::{ConstraintViolation, EffectiveConstraints, Vi
 ///
 /// `Ok(())` if all verbs pass, or a `ConstraintViolationDetail` with
 /// violation info and remediation options.
-pub fn check_pack_constraints(
+pub(crate) fn check_pack_constraints(
     expanded_verbs: &[String],
     constraints: &EffectiveConstraints,
 ) -> Result<(), ConstraintViolationDetail> {

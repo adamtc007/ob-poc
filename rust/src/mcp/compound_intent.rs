@@ -249,7 +249,7 @@ static VEHICLE_JURISDICTION_MAP: &[(&str, &str)] = &[
 /// or a multi-step journey request. The ScenarioIndex (Tier -2A) requires
 /// at least one compound signal present (gate G1).
 #[derive(Debug, Clone, Default)]
-pub struct CompoundSignals {
+pub(crate) struct CompoundSignals {
     /// Whether a compound action verb was detected ("onboard", "set up", etc.)
     pub has_compound_action: bool,
     /// The specific compound action matched, if any.
@@ -283,7 +283,7 @@ impl CompoundSignals {
     ///
     /// This is the gate G1 check for the ScenarioIndex — if no compound
     /// signals exist, the utterance should be resolved at lower tiers (single verb).
-    pub fn has_any(&self) -> bool {
+    pub(crate) fn has_any(&self) -> bool {
         self.has_compound_action
             || self.has_jurisdiction_structure_pair
             || self.has_multi_noun_workflow
@@ -292,7 +292,7 @@ impl CompoundSignals {
 
     /// Strength score for compound signals (higher = more likely composite).
     /// Used to decide whether compound resolution (scenario/macro) should take priority.
-    pub fn strength(&self) -> u32 {
+    pub(crate) fn strength(&self) -> u32 {
         let mut s = 0u32;
         if self.has_compound_action {
             s += 2;
@@ -325,7 +325,7 @@ impl CompoundSignals {
 ///
 /// This is the primary entry point. Performs all signal detection in a single
 /// pass over the normalized utterance.
-pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
+pub(crate) fn extract_compound_signals(utterance: &str) -> CompoundSignals {
     let lower = utterance.to_lowercase();
     let mut signals = CompoundSignals::default();
 
@@ -412,7 +412,7 @@ pub fn extract_compound_signals(utterance: &str) -> CompoundSignals {
 ///
 /// Returns `None` if no recognizable action stem is found (falls through
 /// to embedding search).
-pub fn extract_action_stem(utterance: &str) -> Option<String> {
+pub(crate) fn extract_action_stem(utterance: &str) -> Option<String> {
     // Ordered: multi-word phrases first, then single words.
     // Each entry is (user_phrase, canonical_stem).
     const STEM_MAP: &[(&str, &str)] = &[
@@ -505,7 +505,7 @@ pub fn extract_action_stem(utterance: &str) -> Option<String> {
 /// - "upward" = who owns/controls this entity (tracing to parents/UBOs)
 /// - "downward" = what does this entity own/control (tracing to subsidiaries)
 /// - "full" = complete structure / graph / all relationships
-pub fn extract_query_direction(utterance: &str) -> Option<String> {
+pub(crate) fn extract_query_direction(utterance: &str) -> Option<String> {
     // Upward patterns: "who owns X", "shareholders", "parent", "UBOs"
     const UPWARD: &[&str] = &[
         "who owns",
@@ -575,7 +575,7 @@ pub fn extract_query_direction(utterance: &str) -> Option<String> {
 /// - "ownership" = shareholding, equity, economic interest
 /// - "control" = board, voting, management, PSC
 /// - "all" = both ownership and control vectors
-pub fn extract_relationship_type(utterance: &str) -> Option<String> {
+pub(crate) fn extract_relationship_type(utterance: &str) -> Option<String> {
     const OWNERSHIP: &[&str] = &[
         "ownership",
         "shareholder",
@@ -617,7 +617,7 @@ pub fn extract_relationship_type(utterance: &str) -> Option<String> {
 ///
 /// Uses `VEHICLE_TYPE_MAP` ordered most-specific-first. Prefers multi-word
 /// matches (longer aliases) over single-word matches.
-pub fn extract_vehicle_type(utterance: &str) -> Option<String> {
+pub(crate) fn extract_vehicle_type(utterance: &str) -> Option<String> {
     // Sort by alias length descending so "unit trust" beats "aut"
     let mut sorted: Vec<_> = VEHICLE_TYPE_MAP.iter().collect();
     sorted.sort_by_key(|item| std::cmp::Reverse(item.0.len()));
@@ -634,7 +634,7 @@ pub fn extract_vehicle_type(utterance: &str) -> Option<String> {
 ///
 /// Returns the FIRST matching jurisdiction. Uses word-boundary checks to
 /// avoid false positives (e.g., "us" in "focus").
-pub fn extract_jurisdiction(utterance: &str) -> Option<String> {
+pub(crate) fn extract_jurisdiction(utterance: &str) -> Option<String> {
     let lower = utterance.to_lowercase();
 
     // Check multi-word aliases first (longer matches take priority)
@@ -695,7 +695,7 @@ fn contains_strict_word(haystack: &str, word: &str) -> bool {
 }
 
 /// Return the set of known jurisdiction codes.
-pub fn known_jurisdiction_codes() -> HashSet<String> {
+pub(crate) fn known_jurisdiction_codes() -> HashSet<String> {
     JURISDICTION_MAP
         .iter()
         .map(|(_, code)| code.to_string())

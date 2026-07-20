@@ -22,12 +22,12 @@ use uuid::Uuid;
 use super::types::*;
 
 /// ShowLoop engine — computes ShowPacket from current FocusState.
-pub struct ShowLoop;
+pub(crate) struct ShowLoop;
 
 impl ShowLoop {
     /// Compute full ShowPacket from current focus.
     /// Focus + Diff are always Ready. Gates may be Loading.
-    pub async fn compute_show_packet(
+    pub(crate) async fn compute_show_packet(
         pool: &PgPool,
         focus: &FocusState,
         _actor: &str,
@@ -276,7 +276,7 @@ impl ShowLoop {
     }
 
     /// Compute ViewportManifest for audit (SHA-256 hashes per RFC 8785).
-    pub fn compute_manifest(
+    pub(crate) fn compute_manifest(
         focus: &FocusState,
         viewports: &[ViewportModel],
         assumed_principal: Option<&str>,
@@ -312,7 +312,7 @@ impl ShowLoop {
     }
 
     /// Persist a ViewportManifest to the audit table.
-    pub async fn persist_manifest(pool: &PgPool, manifest: &ViewportManifest) -> Result<()> {
+    pub(crate) async fn persist_manifest(pool: &PgPool, manifest: &ViewportManifest) -> Result<()> {
         let focus_json = serde_json::to_value(&manifest.focus_state)?;
         let viewport_refs_json = serde_json::to_value(&manifest.rendered_viewports)?;
 

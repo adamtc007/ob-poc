@@ -197,7 +197,7 @@ tool_name_enum! {
 }
 
 /// Tool handlers with database access, EntityGateway client, and UI session store
-pub struct ToolHandlers {
+pub(crate) struct ToolHandlers {
     pub(super) pool: PgPool,
     pub(super) generation_log: GenerationLogRepository,
     pub(super) repo: VisualizationRepository,
@@ -243,7 +243,7 @@ impl ToolHandlers {
     /// Create handlers with embedder (REQUIRED for semantic pipeline)
     ///
     /// There is only ONE path - all tools require the Candle embedder for semantic search.
-    pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
+    pub(crate) fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
         ToolHandlers {
             generation_log: GenerationLogRepository::new(pool.clone()),
             repo: VisualizationRepository::new(pool.clone()),
@@ -267,7 +267,7 @@ impl ToolHandlers {
     }
 
     /// Set the REPL V2 Orchestrator.
-    pub fn with_orchestrator(
+    pub(crate) fn with_orchestrator(
         mut self,
         orchestrator: Arc<crate::sequencer::ReplOrchestratorV2>,
     ) -> Self {
@@ -275,20 +275,15 @@ impl ToolHandlers {
         self
     }
 
-    /// Set the authoring pipeline mode (Research vs Governed).
-    pub fn with_agent_mode(mut self, mode: sem_os_types::agent_mode::AgentMode) -> Self {
-        self.agent_mode = mode;
-        self
-    }
 
     /// Set the lexicon service for fast in-memory lexical verb search
-    pub fn with_lexicon(mut self, lexicon: crate::mcp::verb_search::SharedLexicon) -> Self {
+    pub(crate) fn with_lexicon(mut self, lexicon: crate::mcp::verb_search::SharedLexicon) -> Self {
         self.lexicon = Some(lexicon);
         self
     }
 
     /// Set the macro index for deterministic Tier -2B macro search
-    pub fn with_macro_index(
+    pub(crate) fn with_macro_index(
         mut self,
         macro_index: Arc<crate::mcp::macro_index::MacroIndex>,
     ) -> Self {
@@ -297,7 +292,7 @@ impl ToolHandlers {
     }
 
     /// Set the scenario index for journey-level Tier -2A resolution
-    pub fn with_scenario_index(
+    pub(crate) fn with_scenario_index(
         mut self,
         scenario_index: Arc<crate::mcp::scenario_index::ScenarioIndex>,
     ) -> Self {
@@ -306,13 +301,13 @@ impl ToolHandlers {
     }
 
     /// Set the Semantic OS client for sem_reg_* tool dispatch
-    pub fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
+    pub(crate) fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
         self.sem_os_client = Some(client);
         self
     }
 
     /// Set the pre-built CoreService shared across all MCP tool calls.
-    pub fn with_sem_os_service(
+    pub(crate) fn with_sem_os_service(
         mut self,
         service: Arc<dyn sem_os_policy::service::CoreService>,
     ) -> Self {
@@ -323,7 +318,7 @@ impl ToolHandlers {
     /// Install the canonical SemOS plugin op registry. Threaded into every
     /// inner `DslExecutor` these handlers construct so plugin verbs dispatch
     /// correctly (post-Phase-5c-migrate slice #80).
-    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
+    pub(crate) fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
         self.sem_os_ops = Some(ops);
         self
     }
@@ -445,7 +440,7 @@ impl ToolHandlers {
     }
 
     /// Handle a tool call by name
-    pub async fn handle(&self, name: &str, args: Value) -> ToolCallResult {
+    pub(crate) async fn handle(&self, name: &str, args: Value) -> ToolCallResult {
         match self.dispatch(name, args).await {
             Ok(v) => ToolCallResult::json(&v),
             Err(e) => ToolCallResult::error(e.to_string()),
