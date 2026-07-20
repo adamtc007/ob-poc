@@ -4,7 +4,7 @@ use serde_json::json;
 
 /// Evaluated Phase 5 result for a single turn.
 #[derive(Debug, Clone)]
-pub struct Phase5Evaluation {
+pub(crate) struct Phase5Evaluation {
     pub payload: serde_json::Value,
     pub execution_shape_kind: Option<String>,
 }
@@ -19,7 +19,7 @@ impl Phase5Evaluation {
     /// let evaluation = Phase5Evaluation::new(serde_json::json!({"status": "available"}), None);
     /// assert_eq!(evaluation.payload()["status"], "available");
     /// ```
-    pub fn new(payload: serde_json::Value, execution_shape_kind: Option<String>) -> Self {
+    pub(crate) fn new(payload: serde_json::Value, execution_shape_kind: Option<String>) -> Self {
         Self {
             payload,
             execution_shape_kind,
@@ -35,7 +35,7 @@ impl Phase5Evaluation {
     /// let evaluation = Phase5Evaluation::new(serde_json::json!({"status": "available"}), None);
     /// assert_eq!(evaluation.payload()["status"], "available");
     /// ```
-    pub fn payload(&self) -> serde_json::Value {
+    pub(crate) fn payload(&self) -> serde_json::Value {
         self.payload.clone()
     }
 
@@ -48,7 +48,7 @@ impl Phase5Evaluation {
     /// let evaluation = Phase5Evaluation::new(serde_json::json!({}), Some("singleton".to_string()));
     /// assert_eq!(evaluation.execution_shape_kind(), Some("singleton"));
     /// ```
-    pub fn execution_shape_kind(&self) -> Option<&str> {
+    pub(crate) fn execution_shape_kind(&self) -> Option<&str> {
         self.execution_shape_kind.as_deref()
     }
 
@@ -62,7 +62,7 @@ impl Phase5Evaluation {
     /// assert!(evaluation.is_unavailable());
     /// ```
     #[allow(dead_code)] // kept for tests
-    pub fn is_unavailable(&self) -> bool {
+    pub(crate) fn is_unavailable(&self) -> bool {
         self.payload
             .get("status")
             .and_then(serde_json::Value::as_str)
@@ -79,7 +79,7 @@ impl Phase5Evaluation {
 /// let payload = build_phase5_unavailable_payload("repl_v2");
 /// assert_eq!(payload["status"], "unavailable");
 /// ```
-pub fn build_phase5_unavailable_payload(entrypoint: &str) -> serde_json::Value {
+pub(crate) fn build_phase5_unavailable_payload(entrypoint: &str) -> serde_json::Value {
     json!({
         "status": "unavailable",
         "entrypoint": entrypoint,
@@ -223,7 +223,7 @@ pub fn evaluate_phase5_agent(
 /// let runbook = Runbook::new(Uuid::nil());
 /// assert_eq!(build_repl_execution_shape_kind(&runbook), None);
 /// ```
-pub fn build_repl_execution_shape_kind(
+pub(crate) fn build_repl_execution_shape_kind(
     runbook: &crate::repl::runbook::Runbook,
 ) -> Option<&'static str> {
     if runbook.entries.is_empty() {
@@ -265,7 +265,7 @@ pub fn build_phase5_repl_payload(
 /// ```rust,ignore
 /// // Built from a real REPL response at runtime.
 /// ```
-pub fn evaluate_phase5_repl(
+pub(crate) fn evaluate_phase5_repl(
     session: &crate::repl::session_v2::ReplSessionV2,
     response: &crate::repl::response_v2::ReplResponseV2,
 ) -> Phase5Evaluation {

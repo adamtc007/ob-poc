@@ -71,7 +71,7 @@ pub fn canonical_bytes_for_step(step: &CompiledStep) -> Vec<u8> {
 
 /// Serialize a macro expansion audit to deterministic bincode bytes.
 #[cfg(test)]
-pub fn canonical_bytes_for_audit(audit: &MacroExpansionAudit) -> Vec<u8> {
+pub(crate) fn canonical_bytes_for_audit(audit: &MacroExpansionAudit) -> Vec<u8> {
     bincode::serialize(audit).expect("bincode serialization of MacroExpansionAudit is infallible")
 }
 

@@ -42,28 +42,28 @@
 //! | `provisioning_events` | Append-only event log |
 //! | `cbu_service_readiness` | Derived readiness status |
 
-pub mod discovery;
-pub mod onboarding_data_request;
-pub mod provisioning;
+pub(crate) mod discovery;
+pub(crate) mod onboarding_data_request;
+pub(crate) mod provisioning;
 
-pub mod service;
-pub mod srdef_loader;
-pub mod types;
+pub(crate) mod service;
+pub(crate) mod srdef_loader;
+pub(crate) mod types;
 
 // Re-export main types
-pub use types::{AttributeSource, EvidenceRef, NewServiceIntent, SetCbuAttrValue};
+pub(crate) use types::{AttributeSource, EvidenceRef, NewServiceIntent, SetCbuAttrValue};
 
-pub use service::ServiceResourcePipelineService;
+pub(crate) use service::ServiceResourcePipelineService;
 
-pub use onboarding_data_request::OnboardingDataRequestService;
+pub(crate) use onboarding_data_request::OnboardingDataRequestService;
 
 // Re-export loader types
-pub use srdef_loader::{load_and_sync_srdefs, load_srdefs_from_config};
+pub(crate) use srdef_loader::{load_and_sync_srdefs, load_srdefs_from_config};
 
 // Re-export discovery engine types
-pub use discovery::{
+pub(crate) use discovery::{
     run_discovery_pipeline, run_discovery_pipeline_in, AttributeRollupEngine, PopulationEngine,
 };
 
 // Re-export provisioning types
-pub use provisioning::{run_provisioning_pipeline, ReadinessEngine};
+pub(crate) use provisioning::{run_provisioning_pipeline, ReadinessEngine};

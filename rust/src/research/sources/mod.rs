@@ -7,9 +7,9 @@
 //!
 //! `gleif` stays local — see the parent module's doc for why.
 
-pub use ob_poc_agent::research::sources::{
+pub(crate) use ob_poc_agent::research::sources::{
     normalized, registry, traits, CompaniesHouseLoader, SecEdgarLoader,
 };
 
-pub mod gleif;
-pub use gleif::GleifLoader;
+pub(crate) mod gleif;
+pub(crate) use gleif::GleifLoader;

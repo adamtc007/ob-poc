@@ -20,7 +20,7 @@ use super::plan_types::{
 ///
 /// Returns the step result and whether more steps remain.
 /// The caller is responsible for workspace transitions and actual verb execution.
-pub fn advance_plan_step(
+pub(crate) fn advance_plan_step(
     plan: &mut RunbookPlan,
     cursor: usize,
     execution_result: Result<serde_json::Value>,
@@ -60,7 +60,7 @@ pub fn advance_plan_step(
 /// Resolve forward references for a step from the binding table.
 ///
 /// Returns the resolved subject UUID if the step uses a forward ref.
-pub fn resolve_step_bindings(plan: &RunbookPlan, step_seq: usize) -> Result<Option<Uuid>> {
+pub(crate) fn resolve_step_bindings(plan: &RunbookPlan, step_seq: usize) -> Result<Option<Uuid>> {
     let step = plan
         .steps
         .get(step_seq)
@@ -78,7 +78,7 @@ pub fn resolve_step_bindings(plan: &RunbookPlan, step_seq: usize) -> Result<Opti
 }
 
 /// Record a resolved output into the binding table.
-pub fn record_step_output(
+pub(crate) fn record_step_output(
     bindings: &mut BindingTable,
     _step_seq: usize,
     field_name: &str,
@@ -88,7 +88,7 @@ pub fn record_step_output(
 }
 
 /// Skip all steps that depend (directly or transitively) on a failed step.
-pub fn skip_dependent_steps(plan: &mut RunbookPlan, failed_step: usize) -> Vec<StepResult> {
+pub(crate) fn skip_dependent_steps(plan: &mut RunbookPlan, failed_step: usize) -> Vec<StepResult> {
     let mut skipped_seqs = std::collections::HashSet::new();
     skipped_seqs.insert(failed_step);
 
@@ -131,7 +131,7 @@ pub fn skip_dependent_steps(plan: &mut RunbookPlan, failed_step: usize) -> Vec<S
 }
 
 /// Check if the next step requires a workspace transition.
-pub fn needs_workspace_transition(
+pub(crate) fn needs_workspace_transition(
     plan: &RunbookPlan,
     current_cursor: usize,
 ) -> Option<crate::repl::types_v2::WorkspaceKind> {
@@ -145,7 +145,7 @@ pub fn needs_workspace_transition(
 }
 
 /// Cancel a plan mid-execution, marking remaining steps as Skipped.
-pub fn cancel_plan(plan: &mut RunbookPlan) -> Vec<StepResult> {
+pub(crate) fn cancel_plan(plan: &mut RunbookPlan) -> Vec<StepResult> {
     let mut cancelled = Vec::new();
     for step in &mut plan.steps {
         if matches!(step.status, PlanStepStatus::Pending | PlanStepStatus::Ready) {
@@ -165,7 +165,7 @@ pub fn cancel_plan(plan: &mut RunbookPlan) -> Vec<StepResult> {
 }
 
 /// Update plan status based on step results.
-pub fn update_plan_status(plan: &mut RunbookPlan) {
+pub(crate) fn update_plan_status(plan: &mut RunbookPlan) {
     let all_done = plan.steps.iter().all(|s| {
         matches!(
             s.status,

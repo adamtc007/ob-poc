@@ -16,7 +16,7 @@ pub struct Phase2BlockedAction {
 
 /// Structured constellation block surfaced by Phase 2 legality.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Phase2ConstellationBlock {
+pub(crate) struct Phase2ConstellationBlock {
     pub blocked_verb: Option<String>,
     pub blocking_entity: Option<String>,
     pub blocking_state: Option<String>,
@@ -35,7 +35,7 @@ pub struct Phase2ConstellationBlock {
 /// - runtime halt reasoning
 /// - legality presence checks
 #[derive(Debug, Clone, Default)]
-pub struct Phase2Artifacts {
+pub(crate) struct Phase2Artifacts {
     pub lookup: Option<LookupResult>,
     pub envelope: Option<SemOsContextEnvelope>,
 }
@@ -45,7 +45,7 @@ pub struct Phase2Artifacts {
 /// This is the service-shaped runtime handoff object that callers should prefer
 /// over re-deriving legality metadata from `Phase2Artifacts` repeatedly.
 #[derive(Debug, Clone)]
-pub struct Phase2Evaluation {
+pub(crate) struct Phase2Evaluation {
     pub artifacts: Phase2Artifacts,
     pub halt_reason_code: Option<&'static str>,
     pub halt_phase: Option<i16>,
@@ -68,7 +68,7 @@ impl Phase2Evaluation {
     /// let payload = evaluation.payload();
     /// assert!(payload.get("status").is_some());
     /// ```
-    pub fn payload(&self) -> serde_json::Value {
+    pub(crate) fn payload(&self) -> serde_json::Value {
         self.artifacts.payload()
     }
 
@@ -82,7 +82,7 @@ impl Phase2Evaluation {
     /// let payload = evaluation.payload_or_unavailable("example");
     /// assert_eq!(payload["status"], "unavailable");
     /// ```
-    pub fn payload_or_unavailable(&self, source: &str) -> serde_json::Value {
+    pub(crate) fn payload_or_unavailable(&self, source: &str) -> serde_json::Value {
         self.artifacts.payload_or_unavailable(source)
     }
 
@@ -95,7 +95,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert_eq!(evaluation.situation_signature_hash(), None);
     /// ```
-    pub fn situation_signature_hash(&self) -> Option<i64> {
+    pub(crate) fn situation_signature_hash(&self) -> Option<i64> {
         self.artifacts.situation_signature_hash()
     }
 
@@ -108,7 +108,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert_eq!(evaluation.constellation_template_version(), None);
     /// ```
-    pub fn constellation_template_version(&self) -> Option<String> {
+    pub(crate) fn constellation_template_version(&self) -> Option<String> {
         self.artifacts.constellation_template_version()
     }
 
@@ -121,7 +121,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert_eq!(evaluation.constellation_template_id(), None);
     /// ```
-    pub fn constellation_template_id(&self) -> Option<String> {
+    pub(crate) fn constellation_template_id(&self) -> Option<String> {
         self.artifacts.constellation_template_id()
     }
 
@@ -134,7 +134,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert_eq!(evaluation.legal_verb_count(), 0);
     /// ```
-    pub fn legal_verb_count(&self) -> usize {
+    pub(crate) fn legal_verb_count(&self) -> usize {
         self.artifacts.legal_verb_count()
     }
 
@@ -147,7 +147,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert_eq!(evaluation.pruned_verb_count(), 0);
     /// ```
-    pub fn pruned_verb_count(&self) -> usize {
+    pub(crate) fn pruned_verb_count(&self) -> usize {
         self.artifacts.pruned_verb_count()
     }
 
@@ -160,7 +160,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert_eq!(evaluation.fingerprint(), None);
     /// ```
-    pub fn fingerprint(&self) -> Option<String> {
+    pub(crate) fn fingerprint(&self) -> Option<String> {
         self.artifacts.fingerprint()
     }
 
@@ -173,7 +173,7 @@ impl Phase2Evaluation {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert!(evaluation.primary_constellation_block().is_none());
     /// ```
-    pub fn primary_constellation_block(&self) -> Option<Phase2ConstellationBlock> {
+    pub(crate) fn primary_constellation_block(&self) -> Option<Phase2ConstellationBlock> {
         self.artifacts.primary_constellation_block()
     }
 
@@ -197,7 +197,7 @@ impl Phase2Evaluation {
 /// This keeps lookup recovery + Sem OS legality assembly behind one named
 /// boundary so the rest of the repo does not scatter ad hoc constructors.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct Phase2Service;
+pub(crate) struct Phase2Service;
 
 impl Phase2Service {
     /// Compose Phase 2 artifacts from owned lookup and Sem OS inputs.
@@ -209,7 +209,7 @@ impl Phase2Service {
     /// let artifacts = Phase2Service::compose(None, None);
     /// assert!(artifacts.is_unavailable());
     /// ```
-    pub fn compose(
+    pub(crate) fn compose(
         lookup: Option<LookupResult>,
         envelope: Option<SemOsContextEnvelope>,
     ) -> Phase2Artifacts {
@@ -225,7 +225,7 @@ impl Phase2Service {
     /// let artifacts = Phase2Service::compose_from_refs(None, None);
     /// assert!(artifacts.is_unavailable());
     /// ```
-    pub fn compose_from_refs(
+    pub(crate) fn compose_from_refs(
         lookup: Option<&LookupResult>,
         envelope: Option<&SemOsContextEnvelope>,
     ) -> Phase2Artifacts {
@@ -245,7 +245,7 @@ impl Phase2Service {
     /// let artifacts = Phase2Service::compose_from_envelope(SemOsContextEnvelope::deny_all());
     /// assert!(artifacts.is_deny_all());
     /// ```
-    pub fn compose_from_envelope(envelope: SemOsContextEnvelope) -> Phase2Artifacts {
+    pub(crate) fn compose_from_envelope(envelope: SemOsContextEnvelope) -> Phase2Artifacts {
         Phase2Artifacts {
             lookup: None,
             envelope: Some(envelope),
@@ -261,7 +261,7 @@ impl Phase2Service {
     /// let evaluation = Phase2Service::evaluate(None, None);
     /// assert!(!evaluation.is_available);
     /// ```
-    pub fn evaluate(
+    pub(crate) fn evaluate(
         lookup: Option<LookupResult>,
         envelope: Option<SemOsContextEnvelope>,
     ) -> Phase2Evaluation {
@@ -277,7 +277,7 @@ impl Phase2Service {
     /// let evaluation = Phase2Service::evaluate_from_refs(None, None);
     /// assert!(!evaluation.is_available);
     /// ```
-    pub fn evaluate_from_refs(
+    pub(crate) fn evaluate_from_refs(
         lookup: Option<&LookupResult>,
         envelope: Option<&SemOsContextEnvelope>,
     ) -> Phase2Evaluation {
@@ -294,7 +294,7 @@ impl Phase2Service {
     /// let evaluation = Phase2Service::evaluate_from_envelope(SemOsContextEnvelope::deny_all());
     /// assert!(evaluation.is_deny_all);
     /// ```
-    pub fn evaluate_from_envelope(envelope: SemOsContextEnvelope) -> Phase2Evaluation {
+    pub(crate) fn evaluate_from_envelope(envelope: SemOsContextEnvelope) -> Phase2Evaluation {
         Self::evaluate_artifacts(Self::compose_from_envelope(envelope))
     }
 
@@ -307,7 +307,7 @@ impl Phase2Service {
     /// let evaluation = Phase2Service::evaluate_artifacts(Phase2Artifacts::new(None, None));
     /// assert_eq!(evaluation.halt_phase, None);
     /// ```
-    pub fn evaluate_artifacts(artifacts: Phase2Artifacts) -> Phase2Evaluation {
+    pub(crate) fn evaluate_artifacts(artifacts: Phase2Artifacts) -> Phase2Evaluation {
         let halt_reason_code = Self::halt_reason_code(&artifacts);
         let halt_phase = Self::halt_phase(&artifacts);
         let is_available = Self::is_available(&artifacts);
@@ -338,7 +338,7 @@ impl Phase2Service {
     ///
     /// assert_eq!(Phase2Service::halt_reason_code(&Phase2Artifacts::new(None, None)), None);
     /// ```
-    pub fn halt_reason_code(artifacts: &Phase2Artifacts) -> Option<&'static str> {
+    pub(crate) fn halt_reason_code(artifacts: &Phase2Artifacts) -> Option<&'static str> {
         artifacts.halt_reason_code()
     }
 
@@ -350,7 +350,7 @@ impl Phase2Service {
     ///
     /// assert_eq!(Phase2Service::halt_phase(&Phase2Artifacts::new(None, None)), None);
     /// ```
-    pub fn halt_phase(artifacts: &Phase2Artifacts) -> Option<i16> {
+    pub(crate) fn halt_phase(artifacts: &Phase2Artifacts) -> Option<i16> {
         Self::halt_reason_code(artifacts).map(|_| 2)
     }
 
@@ -365,7 +365,7 @@ impl Phase2Service {
     ///     "blocked_unavailable"
     /// );
     /// ```
-    pub fn runtime_gate_status(artifacts: &Phase2Artifacts, verb: &str) -> &'static str {
+    pub(crate) fn runtime_gate_status(artifacts: &Phase2Artifacts, verb: &str) -> &'static str {
         if artifacts.is_unavailable() {
             "blocked_unavailable"
         } else if artifacts.is_deny_all() {
@@ -386,7 +386,7 @@ impl Phase2Service {
     /// assert!(Phase2Service::runtime_gate_failure(&Phase2Artifacts::new(None, None), "case.open")
     ///     .is_some());
     /// ```
-    pub fn runtime_gate_failure(artifacts: &Phase2Artifacts, verb: &str) -> Option<String> {
+    pub(crate) fn runtime_gate_failure(artifacts: &Phase2Artifacts, verb: &str) -> Option<String> {
         match Self::runtime_gate_status(artifacts, verb) {
             "blocked_unavailable" => Some(format!(
                 "Phase 5 runtime re-check blocked '{verb}' because Sem OS was unavailable."
@@ -421,7 +421,7 @@ impl Phase2Service {
     ///
     /// assert_eq!(Phase2Service::legal_verb_names(&Phase2Artifacts::new(None, None)), None);
     /// ```
-    pub fn legal_verb_names(artifacts: &Phase2Artifacts) -> Option<Vec<String>> {
+    pub(crate) fn legal_verb_names(artifacts: &Phase2Artifacts) -> Option<Vec<String>> {
         if artifacts.is_unavailable() {
             None
         } else {
@@ -437,7 +437,7 @@ impl Phase2Service {
     ///
     /// assert!(!Phase2Service::has_usable_legal_set(&Phase2Artifacts::new(None, None)));
     /// ```
-    pub fn has_usable_legal_set(artifacts: &Phase2Artifacts) -> bool {
+    pub(crate) fn has_usable_legal_set(artifacts: &Phase2Artifacts) -> bool {
         !artifacts.is_unavailable() && !artifacts.is_deny_all()
     }
 
@@ -449,7 +449,7 @@ impl Phase2Service {
     ///
     /// assert!(!Phase2Service::is_available(&Phase2Artifacts::new(None, None)));
     /// ```
-    pub fn is_available(artifacts: &Phase2Artifacts) -> bool {
+    pub(crate) fn is_available(artifacts: &Phase2Artifacts) -> bool {
         !artifacts.is_unavailable()
     }
 
@@ -461,7 +461,7 @@ impl Phase2Service {
     ///
     /// assert!(!Phase2Service::is_deny_all(&Phase2Artifacts::new(None, None)));
     /// ```
-    pub fn is_deny_all(artifacts: &Phase2Artifacts) -> bool {
+    pub(crate) fn is_deny_all(artifacts: &Phase2Artifacts) -> bool {
         artifacts.is_deny_all()
     }
 
@@ -473,7 +473,7 @@ impl Phase2Service {
     ///
     /// assert_eq!(Phase2Service::policy_label(&Phase2Artifacts::new(None, None)), "unavailable");
     /// ```
-    pub fn policy_label(artifacts: &Phase2Artifacts) -> &'static str {
+    pub(crate) fn policy_label(artifacts: &Phase2Artifacts) -> &'static str {
         artifacts.label()
     }
 
@@ -489,7 +489,7 @@ impl Phase2Service {
     /// );
     /// assert_eq!(denied, vec!["case.open".to_string()]);
     /// ```
-    pub fn collect_denied_verbs<I>(artifacts: &Phase2Artifacts, verbs: I) -> Vec<String>
+    pub(crate) fn collect_denied_verbs<I>(artifacts: &Phase2Artifacts, verbs: I) -> Vec<String>
     where
         I: IntoIterator<Item = String>,
     {
@@ -507,7 +507,7 @@ impl Phase2Service {
     ///
     /// assert!(Phase2Service::legal_verbs_or_empty(&Phase2Artifacts::new(None, None)).is_empty());
     /// ```
-    pub fn legal_verbs_or_empty(artifacts: &Phase2Artifacts) -> HashSet<String> {
+    pub(crate) fn legal_verbs_or_empty(artifacts: &Phase2Artifacts) -> HashSet<String> {
         if Self::has_usable_legal_set(artifacts) {
             artifacts.legal_verbs()
         } else {
@@ -523,7 +523,7 @@ impl Phase2Service {
     ///
     /// assert!(Phase2Service::legal_verbs_if_usable(&Phase2Artifacts::new(None, None)).is_none());
     /// ```
-    pub fn legal_verbs_if_usable(artifacts: &Phase2Artifacts) -> Option<HashSet<String>> {
+    pub(crate) fn legal_verbs_if_usable(artifacts: &Phase2Artifacts) -> Option<HashSet<String>> {
         Self::has_usable_legal_set(artifacts).then(|| artifacts.legal_verbs())
     }
 }
@@ -552,7 +552,7 @@ impl Phase2Artifacts {
     /// let payload = Phase2Artifacts::new(None, None).payload();
     /// assert_eq!(payload["status"], "unavailable");
     /// ```
-    pub fn payload(&self) -> serde_json::Value {
+    pub(crate) fn payload(&self) -> serde_json::Value {
         if self.lookup.is_none() && self.envelope.is_none() {
             crate::traceability::build_phase2_unavailable_payload("phase2_artifacts")
         } else {
@@ -572,7 +572,7 @@ impl Phase2Artifacts {
     /// let payload = Phase2Artifacts::new(None, None).payload_or_unavailable("example");
     /// assert_eq!(payload["entrypoint"], "example");
     /// ```
-    pub fn payload_or_unavailable(&self, source: &str) -> serde_json::Value {
+    pub(crate) fn payload_or_unavailable(&self, source: &str) -> serde_json::Value {
         if self.is_unavailable() {
             crate::traceability::build_phase2_unavailable_payload(source)
         } else {
@@ -589,7 +589,7 @@ impl Phase2Artifacts {
     /// let hash = Phase2Artifacts::new(None, None).situation_signature_hash();
     /// assert!(hash.is_none());
     /// ```
-    pub fn situation_signature_hash(&self) -> Option<i64> {
+    pub(crate) fn situation_signature_hash(&self) -> Option<i64> {
         if self.is_unavailable() {
             return None;
         }
@@ -607,7 +607,7 @@ impl Phase2Artifacts {
     ///
     /// assert_eq!(Phase2Artifacts::new(None, None).constellation_template_version(), None);
     /// ```
-    pub fn constellation_template_version(&self) -> Option<String> {
+    pub(crate) fn constellation_template_version(&self) -> Option<String> {
         self.envelope
             .as_ref()
             .and_then(|envelope| envelope.snapshot_set_id.clone())
@@ -621,7 +621,7 @@ impl Phase2Artifacts {
     ///
     /// assert_eq!(Phase2Artifacts::new(None, None).constellation_template_id(), None);
     /// ```
-    pub fn constellation_template_id(&self) -> Option<String> {
+    pub(crate) fn constellation_template_id(&self) -> Option<String> {
         self.envelope.as_ref().and_then(|envelope| {
             envelope
                 .grounded_action_surface
@@ -638,7 +638,7 @@ impl Phase2Artifacts {
     ///
     /// assert!(Phase2Artifacts::new(None, None).legal_verbs().is_empty());
     /// ```
-    pub fn legal_verbs(&self) -> std::collections::HashSet<String> {
+    pub(crate) fn legal_verbs(&self) -> std::collections::HashSet<String> {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.allowed_verbs.clone())
@@ -653,7 +653,7 @@ impl Phase2Artifacts {
     ///
     /// assert_eq!(Phase2Artifacts::new(None, None).legal_verb_count(), 0);
     /// ```
-    pub fn legal_verb_count(&self) -> usize {
+    pub(crate) fn legal_verb_count(&self) -> usize {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.allowed_verbs.len())
@@ -668,7 +668,7 @@ impl Phase2Artifacts {
     ///
     /// assert_eq!(Phase2Artifacts::new(None, None).pruned_verb_count(), 0);
     /// ```
-    pub fn pruned_verb_count(&self) -> usize {
+    pub(crate) fn pruned_verb_count(&self) -> usize {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.pruned_count())
@@ -683,7 +683,7 @@ impl Phase2Artifacts {
     ///
     /// assert_eq!(Phase2Artifacts::new(None, None).fingerprint(), None);
     /// ```
-    pub fn fingerprint(&self) -> Option<String> {
+    pub(crate) fn fingerprint(&self) -> Option<String> {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.fingerprint_str().to_string())
@@ -697,7 +697,7 @@ impl Phase2Artifacts {
     ///
     /// assert_eq!(Phase2Artifacts::new(None, None).label(), "unavailable");
     /// ```
-    pub fn label(&self) -> &'static str {
+    pub(crate) fn label(&self) -> &'static str {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.label())
@@ -712,7 +712,7 @@ impl Phase2Artifacts {
     ///
     /// assert!(!Phase2Artifacts::new(None, None).is_deny_all());
     /// ```
-    pub fn is_deny_all(&self) -> bool {
+    pub(crate) fn is_deny_all(&self) -> bool {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.is_deny_all())
@@ -727,7 +727,7 @@ impl Phase2Artifacts {
     ///
     /// assert!(!Phase2Artifacts::new(None, None).allows_verb("case.open"));
     /// ```
-    pub fn allows_verb(&self, verb: &str) -> bool {
+    pub(crate) fn allows_verb(&self, verb: &str) -> bool {
         self.envelope
             .as_ref()
             .map(|envelope| envelope.is_allowed(verb))
@@ -772,7 +772,7 @@ impl Phase2Artifacts {
     /// let blocks = Phase2Artifacts::new(None, None).constellation_blocks();
     /// assert!(blocks.is_empty());
     /// ```
-    pub fn constellation_blocks(&self) -> Vec<Phase2ConstellationBlock> {
+    pub(crate) fn constellation_blocks(&self) -> Vec<Phase2ConstellationBlock> {
         let Some(surface) = self
             .envelope
             .as_ref()
@@ -833,7 +833,7 @@ impl Phase2Artifacts {
     ///
     /// assert!(Phase2Artifacts::new(None, None).primary_constellation_block().is_none());
     /// ```
-    pub fn primary_constellation_block(&self) -> Option<Phase2ConstellationBlock> {
+    pub(crate) fn primary_constellation_block(&self) -> Option<Phase2ConstellationBlock> {
         self.constellation_blocks().into_iter().next()
     }
 
@@ -846,7 +846,7 @@ impl Phase2Artifacts {
     /// let artifacts = Phase2Artifacts::new(None, None);
     /// assert_eq!(artifacts.halt_reason_code(), None);
     /// ```
-    pub fn halt_reason_code(&self) -> Option<&'static str> {
+    pub(crate) fn halt_reason_code(&self) -> Option<&'static str> {
         if let Some(envelope) = self.envelope.as_ref() {
             if envelope.is_deny_all() {
                 return Some("no_allowed_verbs");
@@ -890,7 +890,7 @@ impl Phase2Artifacts {
     ///
     /// assert!(Phase2Artifacts::new(None, None).is_unavailable());
     /// ```
-    pub fn is_unavailable(&self) -> bool {
+    pub(crate) fn is_unavailable(&self) -> bool {
         let sem_os_unavailable = self
             .envelope
             .as_ref()

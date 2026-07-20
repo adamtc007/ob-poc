@@ -60,7 +60,7 @@ impl Default for ExpansionLimits {
 }
 
 /// Production expansion limits (compile-time constant).
-pub const EXPANSION_LIMITS: ExpansionLimits = ExpansionLimits {
+pub(crate) const EXPANSION_LIMITS: ExpansionLimits = ExpansionLimits {
     max_depth: 8,
     max_steps: 500,
 };
@@ -157,7 +157,7 @@ pub struct MacroExpansionAudit {
 /// # Returns
 ///
 /// Expanded DSL statements ready for the normal pipeline
-pub fn expand_macro(
+pub(crate) fn expand_macro(
     macro_fqn: &str,
     args: &BTreeMap<String, String>,
     session: &UnifiedSession,
@@ -264,7 +264,7 @@ fn build_expansion_output(
 /// 4. Check depth limit, step limit, per-path cycle
 /// 5. Recursively expand, splicing results in-place
 /// 6. Repeat until no directives remain (fixpoint)
-pub fn expand_macro_fixpoint(
+pub(crate) fn expand_macro_fixpoint(
     macro_fqn: &str,
     args: &BTreeMap<String, String>,
     session: &UnifiedSession,
@@ -297,7 +297,7 @@ pub fn expand_macro_fixpoint(
 
 /// Output from fixpoint expansion — includes all nested audits.
 #[derive(Debug, Clone)]
-pub struct FixpointExpansionOutput {
+pub(crate) struct FixpointExpansionOutput {
     /// Fully expanded DSL statements (no `@invoke-macro` directives remain).
     pub statements: Vec<String>,
 

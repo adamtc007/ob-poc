@@ -35,7 +35,7 @@ use super::errors::AssemblyError;
 /// Result of plan assembly — steps with resolved dependencies and phases.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // kept for tests
-pub struct PlanAssemblyResult {
+pub(crate) struct PlanAssemblyResult {
     /// Steps in dependency order (topologically sorted).
     pub steps: Vec<CompiledStep>,
     /// Whether any reordering occurred.
@@ -50,7 +50,7 @@ pub struct PlanAssemblyResult {
 /// An execution phase — group of steps at the same DAG depth.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // kept for tests
-pub struct ExecutionPhase {
+pub(crate) struct ExecutionPhase {
     /// Phase depth (0 = roots, 1 = depends on roots, …).
     pub depth: usize,
     /// Indices into `PlanAssemblyResult.steps`.
@@ -60,13 +60,13 @@ pub struct ExecutionPhase {
 /// Informational diagnostic from assembly.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // kept for tests
-pub struct AssemblyDiagnostic {
+pub(crate) struct AssemblyDiagnostic {
     pub kind: DiagnosticKind,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)] // kept for tests
-pub enum DiagnosticKind {
+pub(crate) enum DiagnosticKind {
     /// Steps were reordered to satisfy dependencies.
     Reordered,
     /// A binding reference could not be resolved (warning, not error).
@@ -87,7 +87,7 @@ pub enum DiagnosticKind {
 ///
 /// Returns `AssemblyError::CyclicDependency` if the dependency graph has
 /// cycles, and `AssemblyError::EmptyPlan` if no steps are provided.
-pub fn assemble_plan(steps: Vec<CompiledStep>) -> Result<PlanAssemblyResult, AssemblyError> {
+pub(crate) fn assemble_plan(steps: Vec<CompiledStep>) -> Result<PlanAssemblyResult, AssemblyError> {
     if steps.is_empty() {
         return Err(AssemblyError::EmptyPlan);
     }

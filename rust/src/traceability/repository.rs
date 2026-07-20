@@ -9,7 +9,7 @@ use super::types::{
 };
 
 /// Repository for storing first-class utterance traces.
-pub struct UtteranceTraceRepository {
+pub(crate) struct UtteranceTraceRepository {
     pool: PgPool,
 }
 
@@ -24,7 +24,7 @@ impl UtteranceTraceRepository {
     /// let _repo = UtteranceTraceRepository::new(pool);
     /// # }
     /// ```
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -47,7 +47,7 @@ impl UtteranceTraceRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn insert(&self, trace: &NewUtteranceTrace) -> Result<()> {
+    pub(crate) async fn insert(&self, trace: &NewUtteranceTrace) -> Result<()> {
         let surface_versions =
             serde_json::to_value(&trace.surface_versions).context("serialize surface_versions")?;
 
@@ -134,7 +134,7 @@ impl UtteranceTraceRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn update(&self, trace: &NewUtteranceTrace) -> Result<()> {
+    pub(crate) async fn update(&self, trace: &NewUtteranceTrace) -> Result<()> {
         let surface_versions =
             serde_json::to_value(&trace.surface_versions).context("serialize surface_versions")?;
 
@@ -209,7 +209,7 @@ impl UtteranceTraceRepository {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn get(&self, trace_id: Uuid) -> Result<Option<UtteranceTraceRecord>> {
+    pub(crate) async fn get(&self, trace_id: Uuid) -> Result<Option<UtteranceTraceRecord>> {
         let row = sqlx::query(
             r#"
             SELECT
@@ -261,7 +261,7 @@ impl UtteranceTraceRepository {
     /// # }
     /// ```
     #[allow(dead_code)]
-    pub async fn list_for_session(
+    pub(crate) async fn list_for_session(
         &self,
         session_id: Uuid,
         limit: i64,
@@ -320,7 +320,7 @@ impl UtteranceTraceRepository {
     /// # }
     /// ```
     #[allow(dead_code)]
-    pub async fn set_synthetic(&self, trace_id: Uuid, is_synthetic: bool) -> Result<()> {
+    pub(crate) async fn set_synthetic(&self, trace_id: Uuid, is_synthetic: bool) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE "ob-poc".utterance_traces

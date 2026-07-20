@@ -20,9 +20,9 @@
 // `executor::SearchQuality` directly — invisible to a plain lib build,
 // hence the allow.
 #[allow(unused_imports)]
-pub use ob_poc_agent::research::{
+pub(crate) use ob_poc_agent::research::{
     executor, ApprovedResearch, ClaudeResearchClient, ResearchExecutor, ResearchMacroRegistry,
     ResearchResult, ReviewRequirement,
 };
 
-pub mod sources;
+pub(crate) mod sources;

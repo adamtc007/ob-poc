@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 /// assert!(payload.get("phase_0").is_some());
 /// assert!(payload.get("phase_1").is_some());
 /// ```
-pub fn build_phase_trace_payload(
+pub(crate) fn build_phase_trace_payload(
     utterance: &str,
     ctx: &crate::sage::SageContext,
 ) -> serde_json::Value {
@@ -66,7 +66,7 @@ pub fn build_phase_trace_payload(
 /// assert_eq!(payload["phase_3"]["status"], "unavailable");
 /// ```
 #[cfg(feature = "database")]
-pub fn build_trace_scaffold_payload(
+pub(crate) fn build_trace_scaffold_payload(
     utterance: &str,
     ctx: &crate::sage::SageContext,
     phase2_payload: serde_json::Value,
@@ -94,7 +94,7 @@ pub fn build_trace_scaffold_payload(
 /// assert_eq!(payload["authoritative_source"], "sem_os_context_envelope");
 /// ```
 #[cfg(feature = "database")]
-pub fn build_phase2_trace_payload(
+pub(crate) fn build_phase2_trace_payload(
     lookup: Option<&crate::lookup::LookupResult>,
     envelope: Option<&crate::agent::sem_os_context_envelope::SemOsContextEnvelope>,
 ) -> serde_json::Value {
@@ -139,7 +139,7 @@ pub fn build_phase2_trace_payload(
 /// let payload = build_phase2_unavailable_payload("agent_service_direct");
 /// assert_eq!(payload["status"], "unavailable");
 /// ```
-pub fn build_phase2_unavailable_payload(entrypoint: &str) -> serde_json::Value {
+pub(crate) fn build_phase2_unavailable_payload(entrypoint: &str) -> serde_json::Value {
     json!({
         "authoritative_source": "sem_os_context_envelope",
         "status": "unavailable",
@@ -168,7 +168,7 @@ pub fn build_phase2_unavailable_payload(entrypoint: &str) -> serde_json::Value {
 /// assert!(hash.is_some());
 /// ```
 #[cfg(feature = "database")]
-pub fn compute_phase2_situation_signature_hash(
+pub(crate) fn compute_phase2_situation_signature_hash(
     lookup: Option<&crate::lookup::LookupResult>,
     envelope: Option<&crate::agent::sem_os_context_envelope::SemOsContextEnvelope>,
 ) -> Option<i64> {

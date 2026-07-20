@@ -30,19 +30,19 @@ use ob_poc_derived_attributes::derived_attributes::repository::{
 // =============================================================================
 
 /// Engine for discovering required SRDEFs from service intents
-pub struct ResourceDiscoveryEngine<'a> {
+pub(crate) struct ResourceDiscoveryEngine<'a> {
     // The add-product path threads a `&mut PgConnection` per method so every
     // write joins the ambient transaction; the engine only needs the registry.
     registry: &'a SrdefRegistry,
 }
 
 impl<'a> ResourceDiscoveryEngine<'a> {
-    pub fn new(registry: &'a SrdefRegistry) -> Self {
+    pub(crate) fn new(registry: &'a SrdefRegistry) -> Self {
         Self { registry }
     }
 
     /// Discover required SRDEFs for a CBU based on their service intents
-    pub async fn discover_for_cbu(
+    pub(crate) async fn discover_for_cbu(
         &self,
         conn: &mut PgConnection,
         cbu_id: Uuid,
@@ -295,7 +295,7 @@ fn merge_parameter_objects(left: &JsonValue, right: &JsonValue) -> JsonValue {
 
 /// Information about a discovered SRDEF
 #[derive(Debug, Clone)]
-pub struct DiscoveredSrdefInfo {
+pub(crate) struct DiscoveredSrdefInfo {
     pub srdef_id: String,
     pub parameters: JsonValue,
     pub triggered_by: Vec<Uuid>,
@@ -304,7 +304,7 @@ pub struct DiscoveredSrdefInfo {
 
 /// Result of discovery operation
 #[derive(Debug, Default)]
-pub struct DiscoveryResult {
+pub(crate) struct DiscoveryResult {
     pub discovered: Vec<DiscoveredSrdefInfo>,
     pub total_discovered: usize,
 }
@@ -315,15 +315,15 @@ pub struct DiscoveryResult {
 
 /// Engine for rolling up attribute requirements across discovered SRDEFs
 #[derive(Default)]
-pub struct AttributeRollupEngine;
+pub(crate) struct AttributeRollupEngine;
 
 impl AttributeRollupEngine {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self
     }
 
     /// Build unified attribute requirements for a CBU
-    pub async fn rollup_for_cbu(
+    pub(crate) async fn rollup_for_cbu(
         &self,
         conn: &mut PgConnection,
         cbu_id: Uuid,
@@ -501,7 +501,7 @@ struct AttributeRollupInfo {
 
 /// Result of rollup operation
 #[derive(Debug, Default)]
-pub struct RollupResult {
+pub(crate) struct RollupResult {
     pub total_attributes: usize,
     pub required_count: usize,
     pub optional_count: usize,
@@ -513,7 +513,7 @@ pub struct RollupResult {
 // =============================================================================
 
 /// Engine for populating attribute values from various sources
-pub struct PopulationEngine<'a> {
+pub(crate) struct PopulationEngine<'a> {
     // `pool` drives the static-registry reads (bridge, derivation specs) and
     // the standalone recompute path; `identity` resolves SemOS FQNs. The
     // populate path threads a `&mut PgConnection` so its writes join the
@@ -543,7 +543,7 @@ struct EffectiveAttrValue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RecomputeOutcome {
+pub(crate) enum RecomputeOutcome {
     Recomputed,
     StillStale,
     #[allow(dead_code)] // kept for future use
@@ -551,7 +551,7 @@ pub enum RecomputeOutcome {
 }
 
 impl<'a> PopulationEngine<'a> {
-    pub fn new(pool: &'a PgPool) -> Self {
+    pub(crate) fn new(pool: &'a PgPool) -> Self {
         Self {
             pool,
             identity: AttributeIdentityService::new(pool.clone()),
@@ -559,7 +559,7 @@ impl<'a> PopulationEngine<'a> {
     }
 
     /// Attempt to populate missing attribute values for a CBU
-    pub async fn populate_for_cbu(
+    pub(crate) async fn populate_for_cbu(
         &self,
         conn: &mut PgConnection,
         cbu_id: Uuid,
@@ -645,7 +645,7 @@ impl<'a> PopulationEngine<'a> {
     }
 
     /// Recompute a single derived attribute target.
-    pub async fn recompute_derived(
+    pub(crate) async fn recompute_derived(
         &self,
         entity_type: &str,
         entity_id: Uuid,
@@ -678,7 +678,7 @@ impl<'a> PopulationEngine<'a> {
     }
 
     /// Recompute stale rows from the canonical queue in deterministic order.
-    pub async fn recompute_stale_batch(&self, limit: i64) -> Result<BatchRecomputeResult> {
+    pub(crate) async fn recompute_stale_batch(&self, limit: i64) -> Result<BatchRecomputeResult> {
         let queue = get_recompute_queue(self.pool, limit).await?;
         let queue_size = queue.len();
         let mut result = BatchRecomputeResult::default();
@@ -1389,7 +1389,7 @@ fn sum_aggregate(
 
 /// Result of population operation
 #[derive(Debug, Default)]
-pub struct PopulationResult {
+pub(crate) struct PopulationResult {
     pub populated: usize,
     pub already_populated: usize,
     pub still_missing: usize,
@@ -1405,7 +1405,7 @@ pub struct PopulationResult {
 /// pipeline on it. All writes land on that connection (not the ambient txn —
 /// there is none on this path). Used by the standalone `discovery.run` MCP/batch
 /// callers that have no `TransactionScope`.
-pub async fn run_discovery_pipeline(
+pub(crate) async fn run_discovery_pipeline(
     pool: &PgPool,
     registry: &SrdefRegistry,
     cbu_id: Uuid,
@@ -1422,7 +1422,7 @@ pub async fn run_discovery_pipeline(
 /// (`ensure_semos_registry_bridge`, `load_derivation_specs_by_attr`,
 /// `AttributeIdentityService`) which read immutable sem_reg snapshots, not
 /// in-flight pipeline data.
-pub async fn run_discovery_pipeline_in(
+pub(crate) async fn run_discovery_pipeline_in(
     conn: &mut PgConnection,
     pool: &PgPool,
     registry: &SrdefRegistry,
@@ -1451,7 +1451,7 @@ pub async fn run_discovery_pipeline_in(
 
 /// Result of running the full pipeline
 #[derive(Debug)]
-pub struct PipelineResult {
+pub(crate) struct PipelineResult {
     pub cbu_id: Uuid,
     pub srdefs_discovered: usize,
     pub attrs_rolled_up: usize,

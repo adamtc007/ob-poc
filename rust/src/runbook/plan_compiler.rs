@@ -23,7 +23,7 @@ use sem_os_ontology::verb_contract::VerbOutput;
 
 /// A workspace context with its hydrated constellation state, used as compiler input.
 #[derive(Debug, Clone)]
-pub struct WorkspaceInput {
+pub(crate) struct WorkspaceInput {
     pub workspace: WorkspaceKind,
     pub constellation_map: String,
     pub subject_kind: SubjectKind,
@@ -43,7 +43,7 @@ pub struct WorkspaceInput {
 /// 2. Order by workspace grouping + dependency edges
 /// 3. Detect cross-workspace entity references → create ForwardRef bindings
 /// 4. Compute content-addressed plan ID
-pub fn compile_runbook_plan(
+pub(crate) fn compile_runbook_plan(
     session_id: Uuid,
     workspace_inputs: &[WorkspaceInput],
     source_research: Vec<u64>,
@@ -147,7 +147,7 @@ fn compute_dependencies(current_seq: usize, prior_steps: &[RunbookPlanStep]) -> 
 
 /// A non-terminal slot discovered during constellation DAG traversal.
 #[derive(Debug, Clone)]
-pub struct AdvancingSlot {
+pub(crate) struct AdvancingSlot {
     /// Dot-delimited path within the constellation tree.
     pub slot_path: String,
     /// Whether this slot blocks overall progress.
@@ -160,7 +160,7 @@ pub struct AdvancingSlot {
 /// with available advancing verbs.
 ///
 /// Returns slots ordered depth-first, blocking slots first within each level.
-pub fn discover_advancing_slots(
+pub(crate) fn discover_advancing_slots(
     hydrated: &crate::sem_os_runtime::constellation_runtime::HydratedConstellation,
 ) -> Vec<AdvancingSlot> {
     let mut results = Vec::new();
@@ -206,7 +206,7 @@ fn collect_advancing_slots_recursive(
 ///
 /// Uses DAG discovery to automatically derive advancing verbs from
 /// non-terminal constellation slots.
-pub fn input_from_hydrated_constellation(
+pub(crate) fn input_from_hydrated_constellation(
     workspace: &WorkspaceKind,
     constellation_map: &str,
     subject_kind: SubjectKind,

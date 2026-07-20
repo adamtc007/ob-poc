@@ -639,7 +639,7 @@ fn parse_status(
 
 /// Serialize a `CompiledRunbookStatus` to a status string for event storage.
 #[cfg(feature = "database")]
-pub fn status_to_string(status: &CompiledRunbookStatus) -> &'static str {
+pub(crate) fn status_to_string(status: &CompiledRunbookStatus) -> &'static str {
     match status {
         CompiledRunbookStatus::Compiled => "compiled",
         CompiledRunbookStatus::Executing { .. } => "executing",
@@ -651,7 +651,7 @@ pub fn status_to_string(status: &CompiledRunbookStatus) -> &'static str {
 
 /// Serialize status detail to JSON for event storage.
 #[cfg(feature = "database")]
-pub fn status_detail(status: &CompiledRunbookStatus) -> Option<serde_json::Value> {
+pub(crate) fn status_detail(status: &CompiledRunbookStatus) -> Option<serde_json::Value> {
     match status {
         CompiledRunbookStatus::Compiled => None,
         CompiledRunbookStatus::Executing { current_step } => {
@@ -868,7 +868,7 @@ pub async fn execute_runbook_unlocked_for_tests(
 /// The store backend handles event emission: the Postgres backend appends
 /// status_change events on `update_status()` and persists lock/step events
 /// via `append_event()`. The in-memory backend no-ops on events.
-pub async fn execute_runbook_with_pool(
+pub(crate) async fn execute_runbook_with_pool(
     store: &dyn RunbookStoreBackend,
     runbook_id: CompiledRunbookId,
     cursor: Option<StepCursor>,

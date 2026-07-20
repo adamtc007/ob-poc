@@ -10,23 +10,23 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub struct GleifRepository {
+pub(crate) struct GleifRepository {
     pub(crate) pool: Arc<PgPool>,
 }
 
 impl GleifRepository {
-    pub fn new(pool: Arc<PgPool>) -> Self {
+    pub(crate) fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
     }
 
     /// Get a reference to the connection pool
     #[allow(dead_code)] // kept for external access
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
     /// Update entity with GLEIF data
-    pub async fn update_entity_from_gleif(
+    pub(crate) async fn update_entity_from_gleif(
         &self,
         entity_id: Uuid,
         record: &LeiRecord,
@@ -108,7 +108,7 @@ impl GleifRepository {
     }
 
     /// Insert alternative names
-    pub async fn insert_entity_names(&self, entity_id: Uuid, record: &LeiRecord) -> Result<i32> {
+    pub(crate) async fn insert_entity_names(&self, entity_id: Uuid, record: &LeiRecord) -> Result<i32> {
         let entity = &record.attributes.entity;
         let mut count = 0;
 
@@ -200,7 +200,7 @@ impl GleifRepository {
     }
 
     /// Insert addresses
-    pub async fn insert_entity_addresses(
+    pub(crate) async fn insert_entity_addresses(
         &self,
         entity_id: Uuid,
         record: &LeiRecord,
@@ -286,7 +286,7 @@ impl GleifRepository {
     }
 
     /// Insert identifiers (LEI, BIC, etc.)
-    pub async fn insert_entity_identifiers(
+    pub(crate) async fn insert_entity_identifiers(
         &self,
         entity_id: Uuid,
         record: &LeiRecord,
@@ -366,7 +366,7 @@ impl GleifRepository {
     }
 
     /// Insert parent relationships
-    pub async fn insert_parent_relationship(
+    pub(crate) async fn insert_parent_relationship(
         &self,
         child_entity_id: Uuid,
         parent_lei: &str,
@@ -413,7 +413,7 @@ impl GleifRepository {
     }
 
     /// Insert lifecycle events
-    pub async fn insert_lifecycle_events(
+    pub(crate) async fn insert_lifecycle_events(
         &self,
         entity_id: Uuid,
         record: &LeiRecord,
@@ -480,7 +480,7 @@ impl GleifRepository {
     }
 
     /// Update entity with parent exception codes
-    pub async fn update_parent_exceptions(
+    pub(crate) async fn update_parent_exceptions(
         &self,
         entity_id: Uuid,
         direct_exception: Option<&str>,
@@ -505,7 +505,7 @@ impl GleifRepository {
     }
 
     /// Update UBO status for an entity
-    pub async fn update_ubo_status(&self, entity_id: Uuid, status: &str) -> Result<()> {
+    pub(crate) async fn update_ubo_status(&self, entity_id: Uuid, status: &str) -> Result<()> {
         sqlx::query(
             r#"
             UPDATE "ob-poc".entity_limited_companies
@@ -524,7 +524,7 @@ impl GleifRepository {
 
     /// Log a sync operation
     #[allow(clippy::too_many_arguments)]
-    pub async fn log_sync(
+    pub(crate) async fn log_sync(
         &self,
         entity_id: Option<Uuid>,
         lei: Option<&str>,
@@ -560,7 +560,7 @@ impl GleifRepository {
     }
 
     /// Find entity by LEI
-    pub async fn find_entity_by_lei(&self, lei: &str) -> Result<Option<Uuid>> {
+    pub(crate) async fn find_entity_by_lei(&self, lei: &str) -> Result<Option<Uuid>> {
         let entity_id: Option<Uuid> = sqlx::query_scalar(
             r#"
             SELECT entity_id FROM "ob-poc".entity_limited_companies
@@ -577,7 +577,7 @@ impl GleifRepository {
     /// Create a new entity from GLEIF data
     ///
     /// Uses DSL entity.ensure for idempotent upsert (dedup by name)
-    pub async fn create_entity_from_gleif(&self, record: &LeiRecord) -> Result<Uuid> {
+    pub(crate) async fn create_entity_from_gleif(&self, record: &LeiRecord) -> Result<Uuid> {
         let entity = &record.attributes.entity;
         let name = &entity.legal_name.name;
         let jurisdiction = entity.jurisdiction.as_deref().unwrap_or("XX");

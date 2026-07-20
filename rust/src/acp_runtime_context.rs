@@ -15,7 +15,7 @@
 // AcpRuntimeContextProjection, AcpRuntimeContextDiagnostic,
 // build_acp_runtime_context_projection, acp_runtime_context_field_allowed,
 // ACP_RUNTIME_CONTEXT_*}` callers continue working unchanged.
-pub use ob_poc_boundary::acp_runtime_context::*;
+pub(crate) use ob_poc_boundary::acp_runtime_context::*;
 
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;

@@ -18,13 +18,13 @@ use async_trait::async_trait;
 ///
 /// Provides access to the GLEIF LEI database for entity lookup and
 /// corporate hierarchy traversal.
-pub struct GleifLoader {
+pub(crate) struct GleifLoader {
     client: GleifClient,
 }
 
 impl GleifLoader {
     /// Create a new GLEIF loader
-    pub fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         Ok(Self {
             client: GleifClient::new()?,
         })
@@ -32,7 +32,7 @@ impl GleifLoader {
 
     /// Create with an existing client (for testing or shared client)
     #[allow(dead_code)] // kept for tests
-    pub fn with_client(client: GleifClient) -> Self {
+    pub(crate) fn with_client(client: GleifClient) -> Self {
         Self { client }
     }
 }

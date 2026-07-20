@@ -12,6 +12,8 @@
 //! - Proposal generation via `proposal_engine`
 //! - Runbook editing + execution via `runbook`
 
+#![allow(dead_code)]
+
 // ============================================================================
 // Shared Intent Matching (used by V2)
 // ============================================================================
@@ -30,49 +32,36 @@ pub use types::{
 // REPL v2 — Pack-Guided Runbook Architecture (vnext-repl feature)
 // ============================================================================
 
+// Public submodules required by external integration tests or crates
 pub mod runbook;
-
 pub mod verb_config_index;
-
 pub mod executor_bridge;
-
-pub mod sentence_gen;
-
 pub mod types_v2;
-
-pub mod session_v2;
-
-pub mod response_v2;
-
 pub mod intent_service;
-
-pub mod proposal_engine;
-
-// Phase 5b — `orchestrator_v2` relocated to `ob_poc::sequencer` (§8.1 alignment).
-// All consumers now reach it via `crate::sequencer` / `ob_poc::sequencer`.
+pub mod decision_log;
 
 #[cfg(feature = "database")]
 pub mod session_repository;
 
-pub mod bootstrap;
-
-pub mod context_stack;
-
-pub mod scoring;
+// strictly internal submodules
+pub(crate) mod sentence_gen;
+pub(crate) mod session_v2;
+pub(crate) mod response_v2;
+pub(crate) mod proposal_engine;
+pub(crate) mod bootstrap;
+pub(crate) mod context_stack;
+pub(crate) mod scoring;
 
 #[cfg(test)]
-pub mod entity_resolution;
+pub(crate) mod entity_resolution;
 
-pub mod deterministic_extraction;
-
-pub mod decision_log;
-
-pub mod preconditions;
+pub(crate) mod deterministic_extraction;
+pub(crate) mod preconditions;
 
 // Phase 3 slice 2c.2b (2026-05-12): relocated to ob-poc-boundary.
 pub use ob_poc_boundary::session_trace;
 
 #[cfg(feature = "database")]
-pub mod trace_repository;
+pub(crate) mod trace_repository;
 
-pub mod session_replay;
+pub(crate) mod session_replay;

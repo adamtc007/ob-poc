@@ -13,4 +13,4 @@
 mod loader;
 mod normalize;
 
-pub use loader::GleifLoader;
+pub(crate) use loader::GleifLoader;

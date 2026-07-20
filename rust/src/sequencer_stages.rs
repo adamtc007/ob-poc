@@ -47,7 +47,7 @@ use crate::repl::types_v2::UserInputV2;
 ///
 /// Maps to `ReplOrchestratorV2::process()` lines 763-788.
 #[derive(Debug, Clone)]
-pub struct UtteranceReceiptInput {
+pub(crate) struct UtteranceReceiptInput {
     pub session_id: Uuid,
     pub input: UserInputV2,
 }
@@ -64,7 +64,7 @@ impl UtteranceReceiptInput {
     /// shadow extraction can land without behavior change. Phase
     /// 5b-deep-stage-1 will plumb this output into the orchestrator;
     /// for now it is consumable directly by harnesses.
-    pub fn run(
+    pub(crate) fn run(
         self,
         now: chrono::DateTime<chrono::Utc>,
         envelope_version: EnvelopeVersion,
@@ -92,7 +92,7 @@ fn hash_utterance(content: &str) -> String {
 /// timestamp. The receipt step itself is non-fallible past argument
 /// validation; the only meaningful product is the trace anchor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UtteranceReceiptOutput {
+pub(crate) struct UtteranceReceiptOutput {
     pub session_id: Uuid,
     pub trace_id: TraceId,
     pub envelope_version: EnvelopeVersion,
@@ -111,7 +111,7 @@ pub struct UtteranceReceiptOutput {
 /// when the utterance is contextual ("what's next?") or
 /// non-actionable.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UtteranceInterpretationOutput {
+pub(crate) struct UtteranceInterpretationOutput {
     pub triples: Vec<EntityTriple>,
     pub verb_intent: Option<Vec<String>>,
     /// Confidence in [0, 1] from the NLP layer. The harness pins this
@@ -120,7 +120,7 @@ pub struct UtteranceInterpretationOutput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityTriple {
+pub(crate) struct EntityTriple {
     pub kind: String,
     pub name: String,
     pub scope: Option<String>,
@@ -130,13 +130,13 @@ pub struct EntityTriple {
 
 /// Stage 2b output: triples mapped to canonical entity ids.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityResolutionOutput {
+pub(crate) struct EntityResolutionOutput {
     pub resolved: Vec<ResolvedEntity>,
     pub unresolved: Vec<EntityTriple>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedEntity {
+pub(crate) struct ResolvedEntity {
     pub triple: EntityTriple,
     pub entity_id: Uuid,
     pub entity_kind: String,
@@ -146,14 +146,14 @@ pub struct ResolvedEntity {
 
 /// Stage 3 output: current state nodes for the session's DAG cursor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DagNavigationOutput {
+pub(crate) struct DagNavigationOutput {
     pub current_state_nodes: Vec<StateNodeRef>,
     /// True if rehydration was triggered (writes_since_push > 0).
     pub rehydrated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StateNodeRef {
+pub(crate) struct StateNodeRef {
     pub node_id: Uuid,
     pub state_kind: String,
 }
@@ -166,7 +166,7 @@ pub struct StateNodeRef {
 /// `InPack` tollgate.
 #[derive(Debug, Clone)]
 #[allow(clippy::enum_variant_names)] // shared `SemOs` prefix is meaningful here: every variant names a SemOS-availability x pack-presence case, not an accidental naming collision
-pub enum VerbSurfaceComposition {
+pub(crate) enum VerbSurfaceComposition {
     /// SemOS responded; Phase 2 evaluation produced a non-empty legal
     /// verb set. Carries the fingerprint and pruned count for the
     /// determinism harness.
@@ -210,7 +210,7 @@ impl VerbSurfaceComposition {
     /// allowed_verbs / fingerprint / pruned_count construction in
     /// `ReplOrchestratorV2::handle_in_pack` so the determinism
     /// harness can pin per-fixture surface bytes.
-    pub fn run(self) -> VerbSurfaceOutput {
+    pub(crate) fn run(self) -> VerbSurfaceOutput {
         match self {
             Self::SemOsAvailable {
                 legal_verbs,
@@ -266,7 +266,7 @@ impl VerbSurfaceComposition {
 /// Stage 4 output: candidate verb set (5–60 verbs typical) plus
 /// pruning attribution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbSurfaceOutput {
+pub(crate) struct VerbSurfaceOutput {
     pub allowed_verbs: Vec<String>,
     pub fingerprint: String,
     /// Number of verbs pruned from the universe by tier/policy. Used
@@ -278,7 +278,7 @@ pub struct VerbSurfaceOutput {
 
 /// Stage 5 output: selected verb + arg binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NlpMatchOutput {
+pub(crate) struct NlpMatchOutput {
     pub selected_verb: String,
     pub arg_bindings: serde_json::Value,
     pub match_score: f64,
@@ -294,7 +294,7 @@ pub struct NlpMatchOutput {
 /// we project to its typed shape here so the contract surface is
 /// uniform with the other stages.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunbookCompilationOutput {
+pub(crate) struct RunbookCompilationOutput {
     pub runbook_id: Uuid,
     pub step_count: usize,
 }
@@ -304,7 +304,7 @@ pub struct RunbookCompilationOutput {
 /// Stage 8 output: per-step outcomes + cumulative
 /// `PendingStateAdvance` totals.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DispatchLoopOutput {
+pub(crate) struct DispatchLoopOutput {
     pub steps_executed: usize,
     pub steps_succeeded: usize,
     pub steps_failed: usize,
@@ -316,7 +316,7 @@ pub struct DispatchLoopOutput {
 /// Stage 9a output: commit confirmation + the outbox row count that
 /// will be drained in stage 9b.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitOutput {
+pub(crate) struct CommitOutput {
     pub committed_at: chrono::DateTime<chrono::Utc>,
     pub outbox_rows_committed: usize,
     pub commit_duration: Duration,
@@ -330,7 +330,7 @@ pub struct CommitOutput {
 /// are recorded against `public.outbox`; this stage output is a
 /// per-trace summary the harness can pin against fixtures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PostCommitDrainOutput {
+pub(crate) struct PostCommitDrainOutput {
     pub rows_done: usize,
     pub rows_retryable: usize,
     pub rows_terminal: usize,
@@ -345,7 +345,7 @@ impl RunbookCompilationOutput {
     /// the wider `CompiledRunbook` shape to the §8.3 boundary (just
     /// the id + step count, since the per-step content is the
     /// runtime's concern not the harness's).
-    pub fn from_compiled(runbook_id: Uuid, step_count: usize) -> Self {
+    pub(crate) fn from_compiled(runbook_id: Uuid, step_count: usize) -> Self {
         Self {
             runbook_id,
             step_count,
@@ -360,7 +360,7 @@ impl PostCommitDrainOutput {
     /// §8.3 typed Stage 9b output. The drainer itself records each
     /// row's outcome against `public.outbox`; this rollup is what the
     /// determinism harness pins per fixture.
-    pub fn from_counters(rows_done: usize, rows_retryable: usize, rows_terminal: usize) -> Self {
+    pub(crate) fn from_counters(rows_done: usize, rows_retryable: usize, rows_terminal: usize) -> Self {
         Self {
             rows_done,
             rows_retryable,
@@ -371,7 +371,7 @@ impl PostCommitDrainOutput {
     /// True when every emitted outbox row reached a terminal state
     /// (done OR failed_terminal). Used as the gate for the per-trace
     /// drain assertion in the harness.
-    pub fn fully_drained(&self) -> bool {
+    pub(crate) fn fully_drained(&self) -> bool {
         self.rows_retryable == 0
     }
 }
@@ -384,7 +384,7 @@ impl DagNavigationOutput {
     /// constellation slot UUIDs the freshly-rehydrated TOS exposes;
     /// `rehydrated` records whether the rehydrate path actually
     /// fired this turn (writes_since_push > 0) vs. was a no-op.
-    pub fn from_rehydrate(
+    pub(crate) fn from_rehydrate(
         state_node_ids: impl IntoIterator<Item = (Uuid, String)>,
         rehydrated: bool,
     ) -> Self {
@@ -411,7 +411,7 @@ impl CommitOutput {
     /// etc. rows the dispatch loop emitted into `public.outbox`
     /// before commit; the duration is wall-clock from the txn open
     /// → commit transition.
-    pub fn from_commit(
+    pub(crate) fn from_commit(
         committed_at: chrono::DateTime<chrono::Utc>,
         outbox_rows_committed: usize,
         commit_duration: Duration,
@@ -430,7 +430,7 @@ impl DispatchLoopOutput {
     /// Aggregate per-step outcomes from the dispatch loop. The loop
     /// records every step's outcome inline; this rollup is the
     /// typed handoff to Stage 9a (commit) and the harness fixture.
-    pub fn from_step_outcomes(
+    pub(crate) fn from_step_outcomes(
         steps_executed: usize,
         steps_succeeded: usize,
         steps_failed: usize,
@@ -446,7 +446,7 @@ impl DispatchLoopOutput {
 
     /// All-success predicate. The harness pins this to detect silent
     /// step failures the orchestrator might otherwise paper over.
-    pub fn all_succeeded(&self) -> bool {
+    pub(crate) fn all_succeeded(&self) -> bool {
         self.steps_failed == 0 && self.steps_executed > 0
     }
 }
@@ -459,7 +459,7 @@ impl UtteranceInterpretationOutput {
     /// is the (kind, name, scope) projection IntentService produces;
     /// `verb_intent` is the candidate verb FQN(s) from intent
     /// resolution; `confidence` is the top-1 score.
-    pub fn from_intent_service(
+    pub(crate) fn from_intent_service(
         triples: Vec<EntityTriple>,
         verb_intent: Option<Vec<String>>,
         confidence: f64,
@@ -479,7 +479,7 @@ impl EntityResolutionOutput {
     /// triples. The orchestrator's `handle_scope_gate` and
     /// `handle_in_pack` both invoke entity resolution paths whose
     /// output collapses to `(resolved, unresolved)`.
-    pub fn from_lookup(resolved: Vec<ResolvedEntity>, unresolved: Vec<EntityTriple>) -> Self {
+    pub(crate) fn from_lookup(resolved: Vec<ResolvedEntity>, unresolved: Vec<EntityTriple>) -> Self {
         Self {
             resolved,
             unresolved,
@@ -488,7 +488,7 @@ impl EntityResolutionOutput {
 
     /// True when every triple resolved to a canonical id — the
     /// happy-path predicate the harness pins per fixture.
-    pub fn fully_resolved(&self) -> bool {
+    pub(crate) fn fully_resolved(&self) -> bool {
         self.unresolved.is_empty()
     }
 }
@@ -501,7 +501,7 @@ impl NlpMatchOutput {
     /// the matched FQN; `arg_bindings` is the JSON-shaped extracted
     /// argument map; `match_score` is the matcher's confidence in
     /// `[0, 1]`.
-    pub fn from_match(
+    pub(crate) fn from_match(
         selected_verb: String,
         arg_bindings: serde_json::Value,
         match_score: f64,
@@ -522,7 +522,7 @@ impl NlpMatchOutput {
 /// failure.
 #[allow(dead_code)] // kept for tests
 #[derive(Debug, thiserror::Error)]
-pub enum StageError {
+pub(crate) enum StageError {
     #[error("stage 2a — utterance interpretation failed: {0}")]
     UtteranceInterpretationError(String),
     #[error("stage 2b — entity resolution failed: {0}")]

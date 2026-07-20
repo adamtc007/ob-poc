@@ -68,10 +68,10 @@
 //! This applies to all external integrations: GLEIF, BODS, screening providers,
 //! market data feeds, etc.
 
-pub mod client;
-pub mod enrichment;
-pub mod repository;
-pub mod types;
+pub(crate) mod client;
+pub(crate) mod enrichment;
+pub(crate) mod repository;
+pub(crate) mod types;
 
-pub use client::GleifClient;
-pub use enrichment::GleifEnrichmentService;
+pub(crate) use client::GleifClient;
+pub(crate) use enrichment::GleifEnrichmentService;

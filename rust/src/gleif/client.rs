@@ -14,7 +14,7 @@ const RATE_LIMIT_DELAY_MS: u64 = 200; // 5 req/sec to be safe
 
 /// A discovered parent-child relationship from tree traversal
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct DiscoveredRelationship {
+pub(crate) struct DiscoveredRelationship {
     pub child_lei: String,
     pub parent_lei: String,
     pub relationship_type: String,
@@ -26,7 +26,7 @@ pub struct DiscoveredRelationship {
 
 /// Result of fetching a corporate tree - includes both entities and relationships
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CorporateTreeResult {
+pub(crate) struct CorporateTreeResult {
     pub records: Vec<LeiRecord>,
     pub relationships: Vec<DiscoveredRelationship>,
     /// Count of fund entities discovered (subset of records where is_fund=true)
@@ -37,7 +37,7 @@ pub struct CorporateTreeResult {
 
 /// Options for controlling corporate tree traversal behavior
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TreeFetchOptions {
+pub(crate) struct TreeFetchOptions {
     /// Maximum depth for consolidation hierarchy traversal
     pub max_depth: usize,
     /// Include funds managed by entities in the tree (IS_FUND-MANAGED_BY)
@@ -68,13 +68,13 @@ impl Default for TreeFetchOptions {
     }
 }
 
-pub struct GleifClient {
+pub(crate) struct GleifClient {
     client: Client,
     last_request: Mutex<Instant>,
 }
 
 impl GleifClient {
-    pub fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .no_proxy()
@@ -103,7 +103,7 @@ impl GleifClient {
     }
 
     /// Fetch a single LEI record by LEI
-    pub async fn get_lei_record(&self, lei: &str) -> Result<LeiRecord> {
+    pub(crate) async fn get_lei_record(&self, lei: &str) -> Result<LeiRecord> {
         self.rate_limit().await;
         let url = format!("{}/lei-records/{}", GLEIF_API_BASE, lei);
 
@@ -121,7 +121,7 @@ impl GleifClient {
     }
 
     /// Search for LEI records by entity name
-    pub async fn search_by_name(&self, name: &str, limit: usize) -> Result<Vec<LeiRecord>> {
+    pub(crate) async fn search_by_name(&self, name: &str, limit: usize) -> Result<Vec<LeiRecord>> {
         self.rate_limit().await;
         let url = format!(
             "{}/lei-records?filter[entity.legalName]={}&page[size]={}",
@@ -206,7 +206,7 @@ impl GleifClient {
     }
 
     /// Fetch direct parent relationship record
-    pub async fn get_direct_parent(&self, lei: &str) -> Result<Option<RelationshipRecord>> {
+    pub(crate) async fn get_direct_parent(&self, lei: &str) -> Result<Option<RelationshipRecord>> {
         self.rate_limit().await;
         let url = format!(
             "{}/lei-records/{}/direct-parent-relationship",
@@ -228,7 +228,7 @@ impl GleifClient {
     }
 
     /// Fetch ultimate parent relationship record
-    pub async fn get_ultimate_parent(&self, lei: &str) -> Result<Option<RelationshipRecord>> {
+    pub(crate) async fn get_ultimate_parent(&self, lei: &str) -> Result<Option<RelationshipRecord>> {
         self.rate_limit().await;
         let url = format!(
             "{}/lei-records/{}/ultimate-parent-relationship",
@@ -250,7 +250,7 @@ impl GleifClient {
     }
 
     /// Fetch all direct children of an entity
-    pub async fn get_direct_children(&self, lei: &str) -> Result<Vec<LeiRecord>> {
+    pub(crate) async fn get_direct_children(&self, lei: &str) -> Result<Vec<LeiRecord>> {
         let mut all_children = Vec::new();
         let mut page = 1;
         let page_size = 100;
@@ -297,7 +297,7 @@ impl GleifClient {
     }
 
     /// Fetch BIC mappings for an entity
-    pub async fn get_bic_mappings(&self, lei: &str) -> Result<Vec<BicMapping>> {
+    pub(crate) async fn get_bic_mappings(&self, lei: &str) -> Result<Vec<BicMapping>> {
         self.rate_limit().await;
         let url = format!("{}/lei-records/{}/bics", GLEIF_API_BASE, lei);
 
@@ -317,7 +317,7 @@ impl GleifClient {
 
     /// Fetch the full corporate tree starting from a root LEI
     /// Returns all entities in the tree (parents and children) plus discovered relationships
-    pub async fn fetch_corporate_tree(
+    pub(crate) async fn fetch_corporate_tree(
         &self,
         root_lei: &str,
         max_depth: usize,
@@ -416,7 +416,7 @@ impl GleifClient {
     /// # Arguments
     /// * `root_lei` - The LEI to start traversal from
     /// * `options` - Controls fund loading behavior and limits
-    pub async fn fetch_corporate_tree_with_options(
+    pub(crate) async fn fetch_corporate_tree_with_options(
         &self,
         root_lei: &str,
         options: TreeFetchOptions,
@@ -643,7 +643,7 @@ impl GleifClient {
 
     /// Fetch all funds managed by a given fund manager LEI
     /// Uses the GLEIF relationship endpoint: /{manager_lei}/managed-funds
-    pub async fn get_managed_funds(&self, manager_lei: &str) -> Result<Vec<LeiRecord>> {
+    pub(crate) async fn get_managed_funds(&self, manager_lei: &str) -> Result<Vec<LeiRecord>> {
         let mut all_funds = Vec::new();
         let mut page = 1;
         let page_size = 100;
@@ -750,7 +750,7 @@ impl GleifClient {
     }
 
     /// Fetch umbrella fund for a sub-fund (IS_SUBFUND_OF relationship)
-    pub async fn get_umbrella_fund(&self, lei: &str) -> Result<Option<LeiRecord>> {
+    pub(crate) async fn get_umbrella_fund(&self, lei: &str) -> Result<Option<LeiRecord>> {
         self.rate_limit().await;
 
         // First get the fund's relationships to find umbrella
@@ -770,7 +770,7 @@ impl GleifClient {
     }
 
     /// Fetch fund manager for a fund (IS_FUND-MANAGED_BY relationship)
-    pub async fn get_fund_manager(&self, lei: &str) -> Result<Option<LeiRecord>> {
+    pub(crate) async fn get_fund_manager(&self, lei: &str) -> Result<Option<LeiRecord>> {
         self.rate_limit().await;
 
         let record = self.get_lei_record(lei).await?;
@@ -789,7 +789,7 @@ impl GleifClient {
     }
 
     /// Fetch master fund for a feeder fund (IS_FEEDER_TO relationship)
-    pub async fn get_master_fund(&self, lei: &str) -> Result<Option<LeiRecord>> {
+    pub(crate) async fn get_master_fund(&self, lei: &str) -> Result<Option<LeiRecord>> {
         self.rate_limit().await;
 
         let record = self.get_lei_record(lei).await?;
@@ -808,7 +808,7 @@ impl GleifClient {
     }
 
     /// Look up LEI by ISIN (uses GLEIF ISIN-LEI mapping endpoint)
-    pub async fn lookup_by_isin(&self, isin: &str) -> Result<Option<LeiRecord>> {
+    pub(crate) async fn lookup_by_isin(&self, isin: &str) -> Result<Option<LeiRecord>> {
         self.rate_limit().await;
 
         // GLEIF provides ISIN-LEI mappings via the lei-records endpoint with filter
@@ -837,7 +837,7 @@ impl GleifClient {
 
     /// Search for funds by name pattern with category filter
     /// This is a fallback when the managed-funds relationship endpoint returns empty
-    pub async fn search_funds_by_name(
+    pub(crate) async fn search_funds_by_name(
         &self,
         name_pattern: &str,
         limit: usize,
@@ -938,7 +938,7 @@ impl Default for GleifClient {
 }
 
 /// Extract LEI from a GLEIF API URL like "/api/v1/lei-records/5493001KJTIIGC8Y1R12"
-pub fn extract_lei_from_url(url: &str) -> Option<String> {
+pub(crate) fn extract_lei_from_url(url: &str) -> Option<String> {
     url.split('/').next_back().map(|s| s.to_string())
 }
 

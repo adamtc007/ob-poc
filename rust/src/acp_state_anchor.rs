@@ -6,7 +6,7 @@
 //! below depend on `ReplV2RouteState` (an execution-tier handle) and
 //! therefore must stay in this crate.
 
-pub use ob_poc_boundary::acp_state_anchor::*;
+pub(crate) use ob_poc_boundary::acp_state_anchor::*;
 
 use sem_os_policy::state_simulation::{
     SemanticStateDiff, SimulatedStateAdvance, StateSimulationResult,

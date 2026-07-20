@@ -26,7 +26,7 @@ use serde::Serialize;
 /// blocked_by }` payloads vary per row and only the variant matters for a
 /// rejection-rate metric.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct GateOutcomeCount {
+pub(crate) struct GateOutcomeCount {
     pub gate: String,
     pub outcome_kind: String,
     pub provenance: String,
@@ -37,13 +37,13 @@ pub struct GateOutcomeCount {
 /// row (T2.7). A non-zero `diverged` count is the graduation-blocking signal
 /// plan §0 names: a gate cannot move to enforce mode while divergence exists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct ShadowDivergenceStats {
+pub(crate) struct ShadowDivergenceStats {
     pub total_decisions: i64,
     pub diverged: i64,
 }
 
 impl ShadowDivergenceStats {
-    pub fn divergence_rate(&self) -> f64 {
+    pub(crate) fn divergence_rate(&self) -> f64 {
         if self.total_decisions == 0 {
             0.0
         } else {
@@ -57,13 +57,13 @@ impl ShadowDivergenceStats {
 /// live-DB tests — no production caller invokes `commit_attested` yet, see
 /// the ownership ledger's C-032 entry).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-pub struct WriteAttestationBreachStats {
+pub(crate) struct WriteAttestationBreachStats {
     pub total_attestations: i64,
     pub breaches: i64,
 }
 
 impl WriteAttestationBreachStats {
-    pub fn breach_rate(&self) -> f64 {
+    pub(crate) fn breach_rate(&self) -> f64 {
         if self.total_attestations == 0 {
             0.0
         } else {
@@ -75,7 +75,7 @@ impl WriteAttestationBreachStats {
 /// One row of the envelope status breakdown (`control_plane_envelopes.status`,
 /// T4.2): `sealed` / `consumed` / `expired` / `voided`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct EnvelopeStatusCount {
+pub(crate) struct EnvelopeStatusCount {
     pub status: String,
     pub count: i64,
 }
@@ -90,7 +90,7 @@ pub struct EnvelopeStatusCount {
 /// proof-bearing gates (`PROOF_BEARING_GATES`, `decision.rs`) plus
 /// `RunbookProof` and `StpClassifier`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SealableRateByVerb {
+pub(crate) struct SealableRateByVerb {
     pub verb_fqn: String,
     pub total: i64,
     pub sealable: i64,
@@ -233,7 +233,7 @@ pub(crate) async fn gate_outcome_counts(
 /// falls back to `gate_outcome_counts`' existing path-blind check for
 /// G10/G14.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct GateOutcomeCountByPath {
+pub(crate) struct GateOutcomeCountByPath {
     pub execution_path: String,
     pub gate: String,
     pub outcome_kind: String,

@@ -21,7 +21,7 @@ use crate::runbook::response::{
 /// Maps to `OrchestratorResponse::Clarification`.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // kept for tests
-pub struct ClassificationError {
+pub(crate) struct ClassificationError {
     /// The verb name that failed classification.
     pub verb_name: String,
     /// Human-readable explanation.
@@ -32,7 +32,7 @@ pub struct ClassificationError {
 
 impl ClassificationError {
     #[allow(dead_code)] // kept for tests
-    pub fn unknown(verb_name: impl Into<String>) -> Self {
+    pub(crate) fn unknown(verb_name: impl Into<String>) -> Self {
         let name = verb_name.into();
         Self {
             reason: format!("Unknown verb: '{}'. Did you mean something else?", name),
@@ -42,14 +42,14 @@ impl ClassificationError {
     }
 
     #[allow(dead_code)] // kept for tests
-    pub fn with_suggestions(mut self, suggestions: Vec<String>) -> Self {
+    pub(crate) fn with_suggestions(mut self, suggestions: Vec<String>) -> Self {
         self.suggestions = suggestions;
         self
     }
 
     /// Convert to the OrchestratorResponse representation.
     #[allow(dead_code)] // kept for tests
-    pub fn into_response(self) -> OrchestratorResponse {
+    pub(crate) fn into_response(self) -> OrchestratorResponse {
         OrchestratorResponse::Clarification(ClarificationRequest {
             question: self.reason,
             missing_fields: vec![],
@@ -71,7 +71,7 @@ impl ClassificationError {
 ///
 /// Maps to `OrchestratorResponse::Clarification` with diagnostic detail.
 #[derive(Debug, Clone)]
-pub enum AssemblyError {
+pub(crate) enum AssemblyError {
     /// Circular dependency detected between steps.
     CyclicDependency {
         /// Verbs involved in the cycle.
@@ -97,7 +97,7 @@ impl std::error::Error for AssemblyError {}
 impl AssemblyError {
     /// Convert to the OrchestratorResponse representation.
     #[allow(dead_code)] // kept for tests
-    pub fn into_response(self) -> OrchestratorResponse {
+    pub(crate) fn into_response(self) -> OrchestratorResponse {
         OrchestratorResponse::Clarification(ClarificationRequest {
             question: format!("Plan assembly error: {}", self),
             missing_fields: vec![],
@@ -118,7 +118,7 @@ impl AssemblyError {
 ///
 /// Each variant maps to a specific `OrchestratorResponse`.
 #[derive(Debug, Clone)]
-pub enum PlanBuilderError {
+pub(crate) enum PlanBuilderError {
     Classification(ClassificationError),
     Assembly(AssemblyError),
 }
@@ -126,7 +126,7 @@ pub enum PlanBuilderError {
 impl PlanBuilderError {
     /// Convert to the `OrchestratorResponse` representation.
     #[allow(dead_code)] // kept for tests
-    pub fn into_response(self) -> OrchestratorResponse {
+    pub(crate) fn into_response(self) -> OrchestratorResponse {
         match self {
             PlanBuilderError::Classification(e) => e.into_response(),
             PlanBuilderError::Assembly(e) => e.into_response(),

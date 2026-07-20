@@ -2223,13 +2223,13 @@ impl DslExecutor {
 /// production; set `OB_POC_LIFECYCLE_GATE_MODE=fail-open` to restore the
 /// original C1 fail-open behaviour (dev/test only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LifecycleGateMode {
+pub(crate) enum LifecycleGateMode {
     FailOpen,
     FailClosed,
 }
 
 impl LifecycleGateMode {
-    pub fn from_env() -> Self {
+    pub(crate) fn from_env() -> Self {
         match std::env::var("OB_POC_LIFECYCLE_GATE_MODE") {
             Ok(v) if v.eq_ignore_ascii_case("fail-open") => LifecycleGateMode::FailOpen,
             _ => LifecycleGateMode::FailClosed,

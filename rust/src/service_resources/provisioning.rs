@@ -21,14 +21,14 @@ use super::types::*;
 // =============================================================================
 
 /// Orchestrates provisioning of resources for a CBU
-pub struct ProvisioningOrchestrator<'a> {
+pub(crate) struct ProvisioningOrchestrator<'a> {
     pool: &'a PgPool,
     service: ServiceResourcePipelineService,
     registry: &'a SrdefRegistry,
 }
 
 impl<'a> ProvisioningOrchestrator<'a> {
-    pub fn new(pool: &'a PgPool, registry: &'a SrdefRegistry) -> Self {
+    pub(crate) fn new(pool: &'a PgPool, registry: &'a SrdefRegistry) -> Self {
         Self {
             pool,
             service: ServiceResourcePipelineService::new(pool.clone()),
@@ -37,7 +37,7 @@ impl<'a> ProvisioningOrchestrator<'a> {
     }
 
     /// Provision all ready SRDEFs for a CBU
-    pub async fn provision_for_cbu(&self, cbu_id: Uuid) -> Result<ProvisioningOrchestratorResult> {
+    pub(crate) async fn provision_for_cbu(&self, cbu_id: Uuid) -> Result<ProvisioningOrchestratorResult> {
         info!("Starting provisioning orchestration for CBU {}", cbu_id);
 
         // Get active discoveries
@@ -405,7 +405,7 @@ enum SrdefReadinessResult {
 
 /// Result of provisioning orchestration
 #[derive(Debug, Default)]
-pub struct ProvisioningOrchestratorResult {
+pub(crate) struct ProvisioningOrchestratorResult {
     pub requests_created: usize,
     pub created_request_ids: Vec<Uuid>,
     pub already_active: usize,
@@ -419,14 +419,14 @@ pub struct ProvisioningOrchestratorResult {
 // =============================================================================
 
 /// Computes service readiness ("good to transact") for a CBU
-pub struct ReadinessEngine<'a> {
+pub(crate) struct ReadinessEngine<'a> {
     pool: &'a PgPool,
     service: ServiceResourcePipelineService,
     registry: &'a SrdefRegistry,
 }
 
 impl<'a> ReadinessEngine<'a> {
-    pub fn new(pool: &'a PgPool, registry: &'a SrdefRegistry) -> Self {
+    pub(crate) fn new(pool: &'a PgPool, registry: &'a SrdefRegistry) -> Self {
         Self {
             pool,
             service: ServiceResourcePipelineService::new(pool.clone()),
@@ -435,7 +435,7 @@ impl<'a> ReadinessEngine<'a> {
     }
 
     /// Compute readiness for all services of a CBU
-    pub async fn compute_for_cbu(&self, cbu_id: Uuid) -> Result<ReadinessComputeResult> {
+    pub(crate) async fn compute_for_cbu(&self, cbu_id: Uuid) -> Result<ReadinessComputeResult> {
         info!("Computing service readiness for CBU {}", cbu_id);
 
         // Get active service intents
@@ -689,7 +689,7 @@ impl<'a> ReadinessEngine<'a> {
 
 /// Result of readiness computation
 #[derive(Debug, Default)]
-pub struct ReadinessComputeResult {
+pub(crate) struct ReadinessComputeResult {
     pub total_services: usize,
     pub ready: usize,
     pub partial: usize,
@@ -701,7 +701,7 @@ pub struct ReadinessComputeResult {
 // =============================================================================
 
 /// Run the full provisioning + readiness pipeline for a CBU
-pub async fn run_provisioning_pipeline(
+pub(crate) async fn run_provisioning_pipeline(
     pool: &PgPool,
     registry: &SrdefRegistry,
     cbu_id: Uuid,
@@ -727,7 +727,7 @@ pub async fn run_provisioning_pipeline(
 
 /// Result of running the full provisioning pipeline
 #[derive(Debug)]
-pub struct FullPipelineResult {
+pub(crate) struct FullPipelineResult {
     pub cbu_id: Uuid,
     pub requests_created: usize,
     pub already_active: usize,

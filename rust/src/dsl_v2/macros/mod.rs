@@ -61,7 +61,7 @@ pub use dsl_analysis::macros::{
     MacroRegistry,
 };
 #[allow(unreachable_pub)]
-pub use expander::{
+pub(crate) use expander::{
     expand_macro, expand_macro_fixpoint, ExpansionLimits, MacroExpansionError,
     MacroExpansionOutput, EXPANSION_LIMITS,
 };

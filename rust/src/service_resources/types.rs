@@ -22,7 +22,7 @@ use uuid::Uuid;
 /// What a CBU wants: a subscription to a product/service combination with options.
 /// This is the INPUT to the resource discovery engine.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct ServiceIntent {
+pub(crate) struct ServiceIntent {
     pub intent_id: Uuid,
     pub cbu_id: Uuid,
     pub product_id: Uuid,
@@ -36,7 +36,7 @@ pub struct ServiceIntent {
 
 /// Input for creating a new service intent
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewServiceIntent {
+pub(crate) struct NewServiceIntent {
     pub cbu_id: Uuid,
     pub product_id: Uuid,
     pub service_id: Uuid,
@@ -51,7 +51,7 @@ pub struct NewServiceIntent {
 /// Service Resource Definition - defines what resources are needed.
 /// Maps to service_resource_types table with srdef_id computed column.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct Srdef {
+pub(crate) struct Srdef {
     pub resource_id: Uuid,
     pub name: String,
     pub description: Option<String>,
@@ -72,7 +72,7 @@ pub struct Srdef {
 /// Why a particular SRDEF was discovered for a CBU.
 /// Output of the resource discovery engine.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct SrdefDiscoveryReason {
+pub(crate) struct SrdefDiscoveryReason {
     pub discovery_id: Uuid,
     pub cbu_id: Uuid,
     pub srdef_id: String,
@@ -87,7 +87,7 @@ pub struct SrdefDiscoveryReason {
 
 /// Input for recording a discovery reason
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewSrdefDiscovery {
+pub(crate) struct NewSrdefDiscovery {
     pub cbu_id: Uuid,
     pub srdef_id: String,
     pub resource_type_id: Option<Uuid>,
@@ -104,7 +104,7 @@ pub struct NewSrdefDiscovery {
 /// Rolled-up attribute requirement for a CBU.
 /// Derived from all discovered SRDEFs.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CbuUnifiedAttrRequirement {
+pub(crate) struct CbuUnifiedAttrRequirement {
     pub cbu_id: Uuid,
     pub attr_id: Uuid,
     pub requirement_strength: String,
@@ -119,7 +119,7 @@ pub struct CbuUnifiedAttrRequirement {
 /// Attribute source (where value came from)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum AttributeSource {
+pub(crate) enum AttributeSource {
     Derived,
     Entity,
     Cbu,
@@ -147,7 +147,7 @@ impl std::fmt::Display for AttributeSource {
 
 /// CBU-level attribute value (populated from various sources).
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CbuAttrValue {
+pub(crate) struct CbuAttrValue {
     pub cbu_id: Uuid,
     pub attr_id: Uuid,
     pub value: JsonValue,
@@ -161,7 +161,7 @@ pub struct CbuAttrValue {
 
 /// Input for setting a CBU attribute value
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SetCbuAttrValue {
+pub(crate) struct SetCbuAttrValue {
     pub cbu_id: Uuid,
     pub attr_id: Uuid,
     pub value: JsonValue,
@@ -172,7 +172,7 @@ pub struct SetCbuAttrValue {
 
 /// Reference to evidence supporting an attribute value
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvidenceRef {
+pub(crate) struct EvidenceRef {
     #[serde(rename = "type")]
     pub ref_type: String, // "document", "entity_field", "api_response", etc.
     pub id: Option<String>,
@@ -182,7 +182,7 @@ pub struct EvidenceRef {
 
 /// Explanation of how a value was derived
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExplainRef {
+pub(crate) struct ExplainRef {
     pub rule: String,
     pub input: Option<JsonValue>,
     pub output: Option<JsonValue>,
@@ -196,7 +196,7 @@ pub struct ExplainRef {
 // kept for sqlx query_as
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 #[allow(dead_code)]
-pub struct ProvisioningRequest {
+pub(crate) struct ProvisioningRequest {
     pub request_id: Uuid,
     pub cbu_id: Uuid,
     pub srdef_id: String,
@@ -213,7 +213,7 @@ pub struct ProvisioningRequest {
 
 /// Input for creating a new provisioning request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NewProvisioningRequest {
+pub(crate) struct NewProvisioningRequest {
     pub cbu_id: Uuid,
     pub srdef_id: String,
     pub instance_id: Option<Uuid>,
@@ -226,7 +226,7 @@ pub struct NewProvisioningRequest {
 /// Who requested the provisioning
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum RequestedBy {
+pub(crate) enum RequestedBy {
     Agent,
     User,
     #[default]
@@ -245,7 +245,7 @@ impl std::fmt::Display for RequestedBy {
 
 /// Payload for a provisioning request
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProvisioningPayload {
+pub(crate) struct ProvisioningPayload {
     pub attrs: JsonValue,
     pub bind_to: Option<JsonValue>,
     pub evidence_refs: Option<Vec<EvidenceRef>>,
@@ -260,7 +260,7 @@ pub struct ProvisioningPayload {
 // kept for sqlx query_as
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 #[allow(dead_code)]
-pub struct ProvisioningEvent {
+pub(crate) struct ProvisioningEvent {
     pub event_id: Uuid,
     pub request_id: Uuid,
     pub occurred_at: DateTime<Utc>,
@@ -272,7 +272,7 @@ pub struct ProvisioningEvent {
 
 /// Event direction
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EventDirection {
+pub(crate) enum EventDirection {
     #[serde(rename = "OUT")]
     Out,
     #[serde(rename = "IN")]
@@ -291,7 +291,7 @@ impl std::fmt::Display for EventDirection {
 /// Event kind
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum EventKind {
+pub(crate) enum EventKind {
     RequestSent,
     Ack,
     Result,
@@ -319,7 +319,7 @@ impl std::fmt::Display for EventKind {
 
 /// Service readiness status for a CBU.
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub struct CbuServiceReadiness {
+pub(crate) struct CbuServiceReadiness {
     pub cbu_id: Uuid,
     pub product_id: Uuid,
     pub service_id: Uuid,
@@ -336,7 +336,7 @@ pub struct CbuServiceReadiness {
 /// Readiness status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum ReadinessStatus {
+pub(crate) enum ReadinessStatus {
     Ready,
     #[default]
     Blocked,
@@ -355,7 +355,7 @@ impl std::fmt::Display for ReadinessStatus {
 
 /// A reason why a service is blocked
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BlockingReason {
+pub(crate) struct BlockingReason {
     #[serde(rename = "type")]
     pub reason_type: BlockingReasonType,
     pub srdef_id: Option<String>,
@@ -366,7 +366,7 @@ pub struct BlockingReason {
 /// Types of blocking reasons
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum BlockingReasonType {
+pub(crate) enum BlockingReasonType {
     MissingSrdef,
     PendingProvisioning,
     FailedProvisioning,

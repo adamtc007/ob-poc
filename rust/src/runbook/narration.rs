@@ -16,7 +16,7 @@ use crate::repl::types_v2::WorkspaceKind;
 /// Outcome of narrating a single step.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
-pub enum NarrationOutcome {
+pub(crate) enum NarrationOutcome {
     Success {
         what_changed: String,
         state_now: String,
@@ -33,7 +33,7 @@ pub enum NarrationOutcome {
 
 /// Narration for a single plan step.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StepNarration {
+pub(crate) struct StepNarration {
     pub step_index: usize,
     pub verb_fqn: String,
     pub sentence: String,
@@ -45,7 +45,7 @@ pub struct StepNarration {
 
 /// Aggregate narration for an entire plan.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanNarration {
+pub(crate) struct PlanNarration {
     pub plan_id: String,
     pub total_steps: usize,
     pub completed: usize,
@@ -60,7 +60,7 @@ pub struct PlanNarration {
 // ---------------------------------------------------------------------------
 
 /// Generate narration for a single step result.
-pub fn narrate_step(plan: &RunbookPlan, result: &StepResult) -> StepNarration {
+pub(crate) fn narrate_step(plan: &RunbookPlan, result: &StepResult) -> StepNarration {
     let step = plan.steps.get(result.step_seq);
     let sentence = step
         .map(|s| s.sentence.clone())
@@ -119,7 +119,7 @@ pub fn narrate_step(plan: &RunbookPlan, result: &StepResult) -> StepNarration {
 }
 
 /// Generate aggregate narration from all step results.
-pub fn narrate_plan(plan: &RunbookPlan, results: &[StepResult]) -> PlanNarration {
+pub(crate) fn narrate_plan(plan: &RunbookPlan, results: &[StepResult]) -> PlanNarration {
     let step_narrations: Vec<StepNarration> =
         results.iter().map(|r| narrate_step(plan, r)).collect();
 

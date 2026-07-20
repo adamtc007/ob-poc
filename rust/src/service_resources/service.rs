@@ -12,17 +12,17 @@ use super::types::*;
 
 /// Service for the CBU resource pipeline operations.
 #[derive(Clone, Debug)]
-pub struct ServiceResourcePipelineService {
+pub(crate) struct ServiceResourcePipelineService {
     pool: PgPool,
 }
 
 impl ServiceResourcePipelineService {
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
     #[allow(dead_code)] // kept for external access
-    pub fn pool(&self) -> &PgPool {
+    pub(crate) fn pool(&self) -> &PgPool {
         &self.pool
     }
 
@@ -94,14 +94,14 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get service intents for a CBU
-    pub async fn get_service_intents(&self, cbu_id: Uuid) -> Result<Vec<ServiceIntent>> {
+    pub(crate) async fn get_service_intents(&self, cbu_id: Uuid) -> Result<Vec<ServiceIntent>> {
         let mut conn = self.pool.acquire().await?;
         Self::get_service_intents_in(&mut conn, cbu_id).await
     }
 
     /// Get a specific service intent
     #[allow(dead_code)] // kept for future use
-    pub async fn get_service_intent(&self, intent_id: Uuid) -> Result<Option<ServiceIntent>> {
+    pub(crate) async fn get_service_intent(&self, intent_id: Uuid) -> Result<Option<ServiceIntent>> {
         sqlx::query_as::<_, ServiceIntent>(
             r#"
             SELECT intent_id, cbu_id, product_id, service_id, options, status,
@@ -192,7 +192,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get active discoveries for a CBU
-    pub async fn get_active_discoveries(&self, cbu_id: Uuid) -> Result<Vec<SrdefDiscoveryReason>> {
+    pub(crate) async fn get_active_discoveries(&self, cbu_id: Uuid) -> Result<Vec<SrdefDiscoveryReason>> {
         let mut conn = self.pool.acquire().await?;
         Self::get_active_discoveries_in(&mut conn, cbu_id).await
     }
@@ -265,7 +265,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get unified attribute requirements for a CBU
-    pub async fn get_unified_attr_requirements(
+    pub(crate) async fn get_unified_attr_requirements(
         &self,
         cbu_id: Uuid,
     ) -> Result<Vec<CbuUnifiedAttrRequirement>> {
@@ -382,7 +382,7 @@ impl ServiceResourcePipelineService {
     ///
     /// This returns legacy non-derived rows from `cbu_attr_values` together with
     /// canonical derived rows projected from `v_cbu_derived_values`.
-    pub async fn get_cbu_attr_values(&self, cbu_id: Uuid) -> Result<Vec<CbuAttrValue>> {
+    pub(crate) async fn get_cbu_attr_values(&self, cbu_id: Uuid) -> Result<Vec<CbuAttrValue>> {
         let mut conn = self.pool.acquire().await?;
         Self::get_cbu_attr_values_in(&mut conn, cbu_id).await
     }
@@ -430,7 +430,7 @@ impl ServiceResourcePipelineService {
     /// Derived rows resolve from the canonical projection view rather than the
     /// legacy `cbu_attr_values` table.
     #[allow(dead_code)] // kept for future use
-    pub async fn get_cbu_attr_value(
+    pub(crate) async fn get_cbu_attr_value(
         &self,
         cbu_id: Uuid,
         attr_id: Uuid,
@@ -480,7 +480,7 @@ impl ServiceResourcePipelineService {
 
     /// Get provisioning requests for a CBU
     #[allow(dead_code)] // kept for future use
-    pub async fn get_provisioning_requests(
+    pub(crate) async fn get_provisioning_requests(
         &self,
         cbu_id: Uuid,
     ) -> Result<Vec<ProvisioningRequest>> {
@@ -502,7 +502,7 @@ impl ServiceResourcePipelineService {
 
     /// Get pending provisioning requests
     #[allow(dead_code)] // kept for future use
-    pub async fn get_pending_requests(&self) -> Result<Vec<ProvisioningRequest>> {
+    pub(crate) async fn get_pending_requests(&self) -> Result<Vec<ProvisioningRequest>> {
         sqlx::query_as::<_, ProvisioningRequest>(
             r#"
             SELECT request_id, cbu_id, srdef_id, instance_id, requested_by, requested_at,
@@ -559,7 +559,7 @@ impl ServiceResourcePipelineService {
 
     /// Get events for a request
     #[allow(dead_code)] // kept for future use
-    pub async fn get_request_events(&self, request_id: Uuid) -> Result<Vec<ProvisioningEvent>> {
+    pub(crate) async fn get_request_events(&self, request_id: Uuid) -> Result<Vec<ProvisioningEvent>> {
         sqlx::query_as::<_, ProvisioningEvent>(
             r#"
             SELECT event_id, request_id, occurred_at, direction, kind, payload, content_hash
@@ -576,7 +576,7 @@ impl ServiceResourcePipelineService {
 
     /// Check if event hash exists (for deduplication)
     #[allow(dead_code)] // kept for future use
-    pub async fn event_hash_exists(&self, content_hash: &str) -> Result<bool> {
+    pub(crate) async fn event_hash_exists(&self, content_hash: &str) -> Result<bool> {
         let result = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT COUNT(*) FROM "ob-poc".provisioning_events WHERE content_hash = $1
@@ -644,7 +644,7 @@ impl ServiceResourcePipelineService {
     }
 
     /// Get service readiness for a CBU
-    pub async fn get_service_readiness(&self, cbu_id: Uuid) -> Result<Vec<CbuServiceReadiness>> {
+    pub(crate) async fn get_service_readiness(&self, cbu_id: Uuid) -> Result<Vec<CbuServiceReadiness>> {
         sqlx::query_as::<_, CbuServiceReadiness>(
             r#"
             SELECT cbu_id, product_id, service_id, status, blocking_reasons,
@@ -663,7 +663,7 @@ impl ServiceResourcePipelineService {
 
     /// Get stale readiness records (need recomputation)
     #[allow(dead_code)] // kept for future use
-    pub async fn get_stale_readiness(&self) -> Result<Vec<(Uuid, Uuid, Uuid)>> {
+    pub(crate) async fn get_stale_readiness(&self) -> Result<Vec<(Uuid, Uuid, Uuid)>> {
         sqlx::query_as::<_, (Uuid, Uuid, Uuid)>(
             r#"
             SELECT cbu_id, product_id, service_id
@@ -681,7 +681,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Lookup SRDEF by ID
-    pub async fn get_srdef_by_id(&self, srdef_id: &str) -> Result<Option<Srdef>> {
+    pub(crate) async fn get_srdef_by_id(&self, srdef_id: &str) -> Result<Option<Srdef>> {
         sqlx::query_as::<_, Srdef>(
             r#"
             SELECT resource_id, name, description, owner, resource_code, resource_type,
@@ -698,7 +698,7 @@ impl ServiceResourcePipelineService {
 
     /// Get all active SRDEFs
     #[allow(dead_code)] // kept for future use
-    pub async fn get_all_srdefs(&self) -> Result<Vec<Srdef>> {
+    pub(crate) async fn get_all_srdefs(&self) -> Result<Vec<Srdef>> {
         sqlx::query_as::<_, Srdef>(
             r#"
             SELECT resource_id, name, description, owner, resource_code, resource_type,

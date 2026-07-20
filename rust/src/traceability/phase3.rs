@@ -7,7 +7,7 @@ use crate::traceability::Phase2Evaluation;
 
 /// Result of enforcing the Phase 2 legality ceiling on a Phase 3 candidate set.
 #[derive(Debug, Clone)]
-pub struct Phase3SubsetResult {
+pub(crate) struct Phase3SubsetResult {
     pub retained_candidates: Vec<VerbSearchResult>,
     pub eliminated_candidates: Vec<VerbSearchResult>,
 }
@@ -25,14 +25,14 @@ impl Phase3SubsetResult {
     /// };
     /// assert!(!result.had_violation());
     /// ```
-    pub fn had_violation(&self) -> bool {
+    pub(crate) fn had_violation(&self) -> bool {
         !self.eliminated_candidates.is_empty()
     }
 }
 
 /// Evaluated Phase 3 result for a single turn.
 #[derive(Debug, Clone)]
-pub struct Phase3Evaluation {
+pub(crate) struct Phase3Evaluation {
     pub subset_result: Phase3SubsetResult,
     pub filter_name: &'static str,
 }
@@ -53,7 +53,7 @@ impl Phase3Evaluation {
     /// );
     /// assert_eq!(evaluation.filter_name, "phase2_legal_ceiling");
     /// ```
-    pub fn new(subset_result: Phase3SubsetResult, filter_name: &'static str) -> Self {
+    pub(crate) fn new(subset_result: Phase3SubsetResult, filter_name: &'static str) -> Self {
         Self {
             subset_result,
             filter_name,
@@ -75,7 +75,7 @@ impl Phase3Evaluation {
     /// );
     /// assert_eq!(evaluation.payload()["status"], "available");
     /// ```
-    pub fn payload(&self) -> serde_json::Value {
+    pub(crate) fn payload(&self) -> serde_json::Value {
         build_phase3_payload(&self.subset_result, self.filter_name)
     }
 
@@ -97,7 +97,7 @@ impl Phase3Evaluation {
     ///     "available"
     /// );
     /// ```
-    pub fn payload_or_unavailable(&self, entrypoint: &str) -> serde_json::Value {
+    pub(crate) fn payload_or_unavailable(&self, entrypoint: &str) -> serde_json::Value {
         let _ = entrypoint;
         self.payload()
     }
@@ -144,7 +144,7 @@ impl Phase3Evaluation {
 /// let payload = build_phase3_payload(&result, "action_surface");
 /// assert_eq!(payload["phase4_candidate_set"][0], "kyc-case.create");
 /// ```
-pub fn build_phase3_payload(result: &Phase3SubsetResult, filter_name: &str) -> serde_json::Value {
+pub(crate) fn build_phase3_payload(result: &Phase3SubsetResult, filter_name: &str) -> serde_json::Value {
     serde_json::json!({
         "status": "available",
         "legal_set_in_count": result.retained_candidates.len() + result.eliminated_candidates.len(),
@@ -199,7 +199,7 @@ pub fn build_phase3_payload(result: &Phase3SubsetResult, filter_name: &str) -> s
 /// let payload = build_phase3_unavailable_payload("repl_v2");
 /// assert_eq!(payload["status"], "unavailable");
 /// ```
-pub fn build_phase3_unavailable_payload(entrypoint: &str) -> serde_json::Value {
+pub(crate) fn build_phase3_unavailable_payload(entrypoint: &str) -> serde_json::Value {
     serde_json::json!({
         "status": "unavailable",
         "entrypoint": entrypoint,
@@ -236,7 +236,7 @@ pub fn build_phase3_unavailable_payload(entrypoint: &str) -> serde_json::Value {
 /// let result = enforce_phase2_legal_subset(candidates, Some(&legal));
 /// assert_eq!(result.retained_candidates.len(), 1);
 /// ```
-pub fn enforce_phase2_legal_subset(
+pub(crate) fn enforce_phase2_legal_subset(
     candidates: Vec<VerbSearchResult>,
     legal_verbs: Option<&HashSet<String>>,
 ) -> Phase3SubsetResult {
@@ -267,7 +267,7 @@ pub fn enforce_phase2_legal_subset(
 /// let result = enforce_phase2_evaluation_subset(vec![], &evaluation);
 /// assert_eq!(result.retained_candidates.len(), 0);
 /// ```
-pub fn enforce_phase2_evaluation_subset(
+pub(crate) fn enforce_phase2_evaluation_subset(
     candidates: Vec<VerbSearchResult>,
     phase2: &Phase2Evaluation,
 ) -> Phase3SubsetResult {
@@ -283,7 +283,7 @@ pub fn enforce_phase2_evaluation_subset(
 /// let evaluation = evaluate_phase3_against_phase2(vec![], &Phase2Service::evaluate(None, None));
 /// assert_eq!(evaluation.filter_name, "phase2_legal_ceiling");
 /// ```
-pub fn evaluate_phase3_against_phase2(
+pub(crate) fn evaluate_phase3_against_phase2(
     candidates: Vec<VerbSearchResult>,
     phase2: &Phase2Evaluation,
 ) -> Phase3Evaluation {

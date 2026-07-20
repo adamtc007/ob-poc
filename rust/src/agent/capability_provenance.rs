@@ -91,7 +91,7 @@ pub(crate) fn record_capability_invocation(capability_entry: &str, has_cp_proven
 
 /// One row of the C2 metric: a capability entry point's invocation counts.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct CapabilityProvenanceCount {
+pub(crate) struct CapabilityProvenanceCount {
     pub capability_entry: String,
     pub with_provenance: u64,
     pub without_provenance: u64,

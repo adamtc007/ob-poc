@@ -30,8 +30,8 @@
 //! The entire module is gated behind `vnext-repl` because it depends on
 //! `VerbConfigIndex` and `journey::pack_manager`.
 
-pub mod errors;
-pub mod plan_assembler;
+pub(crate) mod errors;
+pub(crate) mod plan_assembler;
 
 // Re-export verb_classifier and constraint_gate from runbook module.
 // These remain physically in runbook/ because compiler.rs uses them via

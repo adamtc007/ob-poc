@@ -53,7 +53,7 @@ use super::session_context::EntityState;
 // `sem_os_runtime::constellation_runtime` and other execution-tier deps.
 // ---------------------------------------------------------------------------
 
-pub use ob_poc_sage::valid_verb_set::{ValidVerbSet, VerbCandidate, VerbSource};
+pub(crate) use ob_poc_sage::valid_verb_set::{ValidVerbSet, VerbCandidate, VerbSource};
 
 static VERB_KEYWORDS: OnceLock<HashMap<String, Vec<String>>> = OnceLock::new();
 static RESOLVER_INPUTS: OnceLock<Result<ResolverInputs, String>> = OnceLock::new();
@@ -114,7 +114,7 @@ pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
 /// assert!(stack.iter().any(|map| map.constellation == "kyc.onboarding"));
 /// ```
 #[deprecated(note = "transitional; see D-008")]
-pub fn load_constellation_stack(id: &str) -> Result<Vec<ConstellationMapDefBody>> {
+pub(crate) fn load_constellation_stack(id: &str) -> Result<Vec<ConstellationMapDefBody>> {
     load_constellation_stack_for_workspace(id, "cbu")
 }
 
@@ -127,7 +127,7 @@ pub fn load_constellation_stack(id: &str) -> Result<Vec<ConstellationMapDefBody>
 /// let stack = load_constellation_stack_for_workspace("struct.lux.ucits.sicav", "cbu").unwrap();
 /// assert!(stack.iter().any(|map| map.constellation == "group.ownership"));
 /// ```
-pub fn load_constellation_stack_for_workspace(
+pub(crate) fn load_constellation_stack_for_workspace(
     id: &str,
     workspace: &str,
 ) -> Result<Vec<ConstellationMapDefBody>> {
@@ -188,7 +188,7 @@ pub fn compute_valid_verb_set(
 /// let valid = compute_valid_verb_set_for_constellations(&Vec::<EntityState>::new(), &stack, Uuid::nil());
 /// assert_eq!(valid.client_group_id, Uuid::nil());
 /// ```
-pub fn compute_valid_verb_set_for_constellations(
+pub(crate) fn compute_valid_verb_set_for_constellations(
     entity_states: &[EntityState],
     constellations: &[ConstellationMapDefBody],
     client_group_id: Uuid,

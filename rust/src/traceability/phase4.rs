@@ -8,7 +8,7 @@ use crate::traceability::Phase2Evaluation;
 
 /// Evaluated Phase 4 result for a single turn.
 #[derive(Debug, Clone)]
-pub struct Phase4Evaluation {
+pub(crate) struct Phase4Evaluation {
     pub resolved_verb: Option<String>,
     pub candidates_in: Vec<String>,
     pub resolution_strategy: String,
@@ -27,7 +27,7 @@ impl Phase4Evaluation {
     /// let evaluation = Phase4Evaluation::new(None, vec![], "failed", 0.0, None, None);
     /// assert_eq!(evaluation.resolution_strategy, "failed");
     /// ```
-    pub fn new(
+    pub(crate) fn new(
         resolved_verb: Option<String>,
         candidates_in: Vec<String>,
         resolution_strategy: impl Into<String>,
@@ -61,7 +61,7 @@ impl Phase4Evaluation {
     /// );
     /// assert_eq!(evaluation.payload()["resolved_verb"], "kyc-case.create");
     /// ```
-    pub fn payload(&self) -> serde_json::Value {
+    pub(crate) fn payload(&self) -> serde_json::Value {
         build_phase4_payload(
             self.resolved_verb.as_deref(),
             &self.candidates_in,
@@ -83,7 +83,7 @@ impl Phase4Evaluation {
     ///     "unavailable"
     /// );
     /// ```
-    pub fn payload_or_unavailable(&self, entrypoint: &str) -> serde_json::Value {
+    pub(crate) fn payload_or_unavailable(&self, entrypoint: &str) -> serde_json::Value {
         if self.is_unavailable() {
             build_phase4_unavailable_payload(entrypoint)
         } else {
@@ -100,7 +100,7 @@ impl Phase4Evaluation {
     /// let evaluation = Phase4Evaluation::new(None, vec![], "failed", 0.0, None, None);
     /// assert!(!evaluation.fallback_invoked());
     /// ```
-    pub fn fallback_invoked(&self) -> bool {
+    pub(crate) fn fallback_invoked(&self) -> bool {
         self.fallback_reason.is_some()
     }
 
@@ -123,7 +123,7 @@ impl Phase4Evaluation {
     ///     Some("pattern_mismatch".to_string())
     /// );
     /// ```
-    pub fn fallback_reason_code_for_trace(&self) -> Option<String> {
+    pub(crate) fn fallback_reason_code_for_trace(&self) -> Option<String> {
         fallback_reason_code_for_trace(self.fallback_reason.as_deref())
     }
 
@@ -136,7 +136,7 @@ impl Phase4Evaluation {
     /// let evaluation = Phase4Evaluation::new(None, vec![], "failed", 0.0, None, None);
     /// assert!(evaluation.is_unavailable());
     /// ```
-    pub fn is_unavailable(&self) -> bool {
+    pub(crate) fn is_unavailable(&self) -> bool {
         self.candidates_in.is_empty() && self.resolved_verb.is_none()
     }
 }
@@ -156,7 +156,7 @@ impl Phase4Evaluation {
 /// );
 /// assert_eq!(payload["resolved_verb"], "kyc-case.create");
 /// ```
-pub fn build_phase4_payload(
+pub(crate) fn build_phase4_payload(
     resolved_verb: Option<&str>,
     candidates_in: &[String],
     resolution_strategy: &str,
@@ -209,7 +209,7 @@ pub fn build_phase4_payload(
 /// let payload = build_phase4_unavailable_payload("repl_v2");
 /// assert_eq!(payload["status"], "unavailable");
 /// ```
-pub fn build_phase4_unavailable_payload(entrypoint: &str) -> serde_json::Value {
+pub(crate) fn build_phase4_unavailable_payload(entrypoint: &str) -> serde_json::Value {
     json!({
         "status": "unavailable",
         "entrypoint": entrypoint,
@@ -238,7 +238,7 @@ pub fn build_phase4_unavailable_payload(entrypoint: &str) -> serde_json::Value {
 ///     Some("phase4_widened_outside_phase2")
 /// );
 /// ```
-pub fn enforce_phase4_resolution_within_phase2(
+pub(crate) fn enforce_phase4_resolution_within_phase2(
     resolved_verb: Option<&str>,
     legal_verbs: Option<&HashSet<String>>,
 ) -> Option<&'static str> {
@@ -264,7 +264,7 @@ pub fn enforce_phase4_resolution_within_phase2(
 ///     None
 /// );
 /// ```
-pub fn enforce_phase4_resolution_within_evaluation(
+pub(crate) fn enforce_phase4_resolution_within_evaluation(
     resolved_verb: Option<&str>,
     phase2: &Phase2Evaluation,
 ) -> Option<&'static str> {
@@ -287,7 +287,7 @@ pub fn enforce_phase4_resolution_within_evaluation(
 /// );
 /// assert_eq!(evaluation.resolved_verb, None);
 /// ```
-pub fn evaluate_phase4_within_phase2(
+pub(crate) fn evaluate_phase4_within_phase2(
     resolved_verb: Option<String>,
     candidates_in: Vec<String>,
     resolution_strategy: impl Into<String>,
@@ -318,7 +318,7 @@ pub fn evaluate_phase4_within_phase2(
 ///     Some("pattern_mismatch".to_string())
 /// );
 /// ```
-pub fn fallback_reason_code_for_trace(reason: Option<&str>) -> Option<String> {
+pub(crate) fn fallback_reason_code_for_trace(reason: Option<&str>) -> Option<String> {
     reason.map(|value| fallback_reason_code(value).to_string())
 }
 

@@ -12,7 +12,7 @@ use crate::mcp::verb_search::HybridVerbSearcher;
 
 /// How the constrained match resolved (or didn't).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum MatchStrategy {
+pub(crate) enum MatchStrategy {
     /// Resolved via keyword overlap scoring.
     Keyword,
     /// Resolved via semantic search constrained to the valid verb set.
@@ -23,7 +23,7 @@ pub enum MatchStrategy {
 
 /// Result of constrained match attempt.
 #[derive(Debug, Clone)]
-pub struct ConstrainedResult {
+pub(crate) struct ConstrainedResult {
     pub verb_fqn: Option<String>,
     pub confidence: f32,
     pub strategy: MatchStrategy,
@@ -32,7 +32,7 @@ pub struct ConstrainedResult {
 
 impl ConstrainedResult {
     /// Whether this result should be used (high enough confidence).
-    pub fn resolved(&self) -> bool {
+    pub(crate) fn resolved(&self) -> bool {
         matches!(
             self.strategy,
             MatchStrategy::Keyword | MatchStrategy::ScopedEmbedding
@@ -40,7 +40,7 @@ impl ConstrainedResult {
     }
 
     /// Create a fallthrough result (no match).
-    pub fn fallthrough() -> Self {
+    pub(crate) fn fallthrough() -> Self {
         Self {
             verb_fqn: None,
             confidence: 0.0,
@@ -540,7 +540,7 @@ fn score_candidate(utterance_tokens: &[String], candidate: &VerbCandidate) -> Ma
 /// 3. Score = hits / total_keywords
 /// 4. Return top candidate if: ≥2 hits AND score ≥ 0.5 AND sufficient margin over second place
 /// 5. Strong match (≥3 hits, score ≥ 0.6) resolves regardless of margin
-pub fn resolve_constrained(utterance: &str, valid_verbs: &ValidVerbSet) -> ConstrainedResult {
+pub(crate) fn resolve_constrained(utterance: &str, valid_verbs: &ValidVerbSet) -> ConstrainedResult {
     if valid_verbs.is_empty() {
         return ConstrainedResult::fallthrough();
     }
@@ -787,7 +787,7 @@ impl ConstrainedResult {
 /// assert!(result.resolved() || matches!(result.strategy, ob_poc::sage::constrained_match::MatchStrategy::Fallthrough));
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub async fn resolve_constrained_hybrid(
+pub(crate) async fn resolve_constrained_hybrid(
     utterance: &str,
     valid_verbs: &ValidVerbSet,
     searcher: &HybridVerbSearcher,

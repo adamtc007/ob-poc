@@ -24,7 +24,7 @@ use crate::sem_reg::{ChangeType, ObjectType, SnapshotMeta, SnapshotStore};
 
 /// Root of an SRDEF YAML file
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SrdefConfigFile {
+pub(crate) struct SrdefConfigFile {
     pub domain: String,
     pub description: Option<String>,
     pub srdefs: Vec<SrdefConfig>,
@@ -32,7 +32,7 @@ pub struct SrdefConfigFile {
 
 /// Individual SRDEF configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SrdefConfig {
+pub(crate) struct SrdefConfig {
     pub code: String,
     pub name: String,
     pub resource_type: String,
@@ -64,7 +64,7 @@ pub struct SrdefConfig {
 
 /// Attribute requirement in SRDEF config
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SrdefAttributeConfig {
+pub(crate) struct SrdefAttributeConfig {
     pub id: String,
     pub requirement: String,
 
@@ -84,7 +84,7 @@ pub struct SrdefAttributeConfig {
 
 /// Optional L4 application binding policy for an SRDEF.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SrdefApplicationBindingConfig {
+pub(crate) struct SrdefApplicationBindingConfig {
     pub application_id: Option<Uuid>,
     pub application_instance_id: Option<Uuid>,
 
@@ -98,7 +98,7 @@ pub struct SrdefApplicationBindingConfig {
 
 /// A fully loaded SRDEF with resolved attribute UUIDs
 #[derive(Debug, Clone)]
-pub struct LoadedSrdef {
+pub(crate) struct LoadedSrdef {
     pub srdef_id: String,
     pub code: String,
     pub name: String,
@@ -117,7 +117,7 @@ pub struct LoadedSrdef {
 
 /// Loaded attribute with resolved UUID
 #[derive(Debug, Clone)]
-pub struct LoadedSrdefAttribute {
+pub(crate) struct LoadedSrdefAttribute {
     pub attr_id: String,
     pub requirement: String,
     pub source_policy: Vec<String>,
@@ -130,7 +130,7 @@ pub struct LoadedSrdefAttribute {
 
 /// Loaded optional L4 application binding policy for an SRDEF.
 #[derive(Debug, Clone)]
-pub struct LoadedSrdefApplicationBinding {
+pub(crate) struct LoadedSrdefApplicationBinding {
     pub application_id: Option<Uuid>,
     pub application_instance_id: Option<Uuid>,
     pub require_live_binding: bool,
@@ -142,7 +142,7 @@ pub struct LoadedSrdefApplicationBinding {
 
 /// In-memory registry of loaded SRDEFs
 #[derive(Debug, Default)]
-pub struct SrdefRegistry {
+pub(crate) struct SrdefRegistry {
     /// SRDEFs indexed by srdef_id
     pub srdefs: HashMap<String, LoadedSrdef>,
 
@@ -154,17 +154,17 @@ pub struct SrdefRegistry {
 }
 
 impl SrdefRegistry {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Get an SRDEF by ID
-    pub fn get(&self, srdef_id: &str) -> Option<&LoadedSrdef> {
+    pub(crate) fn get(&self, srdef_id: &str) -> Option<&LoadedSrdef> {
         self.srdefs.get(srdef_id)
     }
 
     /// Get all SRDEFs triggered by a service
-    pub fn get_by_service(&self, service_code: &str) -> Vec<&LoadedSrdef> {
+    pub(crate) fn get_by_service(&self, service_code: &str) -> Vec<&LoadedSrdef> {
         self.service_triggers
             .get(service_code)
             .map(|ids| ids.iter().filter_map(|id| self.srdefs.get(id)).collect())
@@ -174,7 +174,7 @@ impl SrdefRegistry {
     // (get_by_service covers the common case; topo_sort consumes deps directly)
 
     /// Topological sort of SRDEFs (dependencies first)
-    pub fn topo_sort(&self, srdef_ids: &[String]) -> Result<Vec<String>> {
+    pub(crate) fn topo_sort(&self, srdef_ids: &[String]) -> Result<Vec<String>> {
         let mut result = Vec::new();
         let mut visited = std::collections::HashSet::new();
         let mut temp_visited = std::collections::HashSet::new();
@@ -221,19 +221,19 @@ impl SrdefRegistry {
 // =============================================================================
 
 /// Loads SRDEF configurations from YAML files
-pub struct SrdefLoader {
+pub(crate) struct SrdefLoader {
     config_dir: std::path::PathBuf,
 }
 
 impl SrdefLoader {
-    pub fn new<P: AsRef<Path>>(config_dir: P) -> Self {
+    pub(crate) fn new<P: AsRef<Path>>(config_dir: P) -> Self {
         Self {
             config_dir: config_dir.as_ref().to_path_buf(),
         }
     }
 
     /// Load all SRDEF configs from the config directory
-    pub fn load_all(&self) -> Result<SrdefRegistry> {
+    pub(crate) fn load_all(&self) -> Result<SrdefRegistry> {
         let mut registry = SrdefRegistry::new();
 
         // Find all YAML files
@@ -351,7 +351,7 @@ impl SrdefLoader {
     }
 
     /// Sync loaded SRDEFs to the database
-    pub async fn sync_to_database(
+    pub(crate) async fn sync_to_database(
         &self,
         pool: &PgPool,
         registry: &SrdefRegistry,
@@ -801,7 +801,7 @@ impl SrdefLoader {
 
 /// Result of syncing SRDEFs to database
 #[derive(Debug, Default)]
-pub struct SyncResult {
+pub(crate) struct SyncResult {
     pub inserted: usize,
     pub updated: usize,
     pub unchanged: usize,
@@ -827,7 +827,7 @@ impl SyncResult {
     /// result.attribute_updated = 2;
     /// assert_eq!(result.recorded_transitions(), 3);
     /// ```
-    pub fn recorded_transitions(&self) -> usize {
+    pub(crate) fn recorded_transitions(&self) -> usize {
         self.inserted
             + self.updated
             + self.owner_inserted
@@ -1001,7 +1001,7 @@ async fn publish_service_resource_def_snapshot(
 // =============================================================================
 
 /// Load SRDEFs from the default config directory
-pub fn load_srdefs_from_config() -> Result<SrdefRegistry> {
+pub(crate) fn load_srdefs_from_config() -> Result<SrdefRegistry> {
     let config_dir =
         std::env::var("SRDEF_CONFIG_DIR").unwrap_or_else(|_| "config/srdefs".to_string());
 
@@ -1010,7 +1010,7 @@ pub fn load_srdefs_from_config() -> Result<SrdefRegistry> {
 }
 
 /// Load and sync SRDEFs to database
-pub async fn load_and_sync_srdefs(pool: &PgPool) -> Result<(SrdefRegistry, SyncResult)> {
+pub(crate) async fn load_and_sync_srdefs(pool: &PgPool) -> Result<(SrdefRegistry, SyncResult)> {
     let config_dir =
         std::env::var("SRDEF_CONFIG_DIR").unwrap_or_else(|_| "config/srdefs".to_string());
 

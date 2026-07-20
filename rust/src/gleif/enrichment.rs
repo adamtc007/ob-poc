@@ -16,7 +16,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub struct GleifEnrichmentService {
+pub(crate) struct GleifEnrichmentService {
     client: GleifClient,
     repository: GleifRepository,
 }
@@ -27,7 +27,7 @@ pub struct GleifEnrichmentService {
 /// `persist_enrichment`. JSON-round-trippable so the `GleifEnrich` op
 /// can pass it through the pre_fetch → args → execute pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnrichmentFetch {
+pub(crate) struct EnrichmentFetch {
     pub record: LeiRecord,
     pub bics: Vec<BicMapping>,
     /// (parent_lei, parent_name) — None if no direct parent reported
@@ -40,7 +40,7 @@ pub struct EnrichmentFetch {
 }
 
 impl GleifEnrichmentService {
-    pub fn new(pool: Arc<PgPool>) -> Result<Self> {
+    pub(crate) fn new(pool: Arc<PgPool>) -> Result<Self> {
         Ok(Self {
             client: GleifClient::new()?,
             repository: GleifRepository::new(pool),
@@ -53,7 +53,7 @@ impl GleifEnrichmentService {
     /// the DB writes via `persist_enrichment`.
     ///
     /// Pure reads against GLEIF — no DB writes, no side effects.
-    pub async fn fetch_all_for_enrich(&self, lei: &str) -> Result<EnrichmentFetch> {
+    pub(crate) async fn fetch_all_for_enrich(&self, lei: &str) -> Result<EnrichmentFetch> {
         let record = self
             .client
             .get_lei_record(lei)
@@ -133,7 +133,7 @@ impl GleifEnrichmentService {
     /// under the new `GleifEnrich::pre_fetch` / `execute` flow the
     /// split is explicit.
     #[allow(dead_code)] // kept for legacy compat
-    pub async fn enrich_entity(&self, entity_id: Uuid, lei: &str) -> Result<EnrichmentResult> {
+    pub(crate) async fn enrich_entity(&self, entity_id: Uuid, lei: &str) -> Result<EnrichmentResult> {
         let fetched = self.fetch_all_for_enrich(lei).await?;
         self.persist_enrichment(entity_id, lei, fetched).await
     }
@@ -142,7 +142,7 @@ impl GleifEnrichmentService {
     /// `GleifEnrich::execute` inside the caller's transaction scope.
     /// All writes; no HTTP.
     #[allow(clippy::too_many_lines)]
-    pub async fn persist_enrichment(
+    pub(crate) async fn persist_enrichment(
         &self,
         entity_id: Uuid,
         lei: &str,
@@ -378,7 +378,7 @@ impl GleifEnrichmentService {
     /// tree. Produces a `CorporateTreeResult` that `persist_corporate_tree`
     /// consumes. Exposed so `GleifImportTree::pre_fetch` can call it
     /// outside the txn.
-    pub async fn fetch_corporate_tree_only(
+    pub(crate) async fn fetch_corporate_tree_only(
         &self,
         root_lei: &str,
         max_depth: usize,
@@ -389,7 +389,7 @@ impl GleifEnrichmentService {
     /// Phase F.3b-6 (2026-04-22): HTTP-only fetch for the enhanced
     /// corporate tree (with fund inclusion options). Used by
     /// `GleifImportToClientGroup::pre_fetch` when `include-funds=true`.
-    pub async fn fetch_corporate_tree_with_options_only(
+    pub(crate) async fn fetch_corporate_tree_with_options_only(
         &self,
         root_lei: &str,
         options: super::client::TreeFetchOptions,
@@ -403,7 +403,7 @@ impl GleifEnrichmentService {
     /// `CorporateTreeResult` and writes all entities + relationships.
     /// No HTTP.
     #[allow(clippy::too_many_lines)]
-    pub async fn persist_corporate_tree(
+    pub(crate) async fn persist_corporate_tree(
         &self,
         root_lei: &str,
         tree_result: super::client::CorporateTreeResult,
@@ -507,7 +507,7 @@ impl GleifEnrichmentService {
 
     /// Import a corporate tree starting from a root LEI
     #[allow(dead_code)] // kept for legacy compat
-    pub async fn import_corporate_tree(
+    pub(crate) async fn import_corporate_tree(
         &self,
         root_lei: &str,
         max_depth: usize,
@@ -613,7 +613,7 @@ impl GleifEnrichmentService {
     ///
     /// Returns an enhanced TreeImportResult with fund counts.
     #[allow(dead_code)] // kept for legacy compat
-    pub async fn import_corporate_tree_with_options(
+    pub(crate) async fn import_corporate_tree_with_options(
         &self,
         root_lei: &str,
         options: super::client::TreeFetchOptions,
@@ -746,7 +746,7 @@ impl GleifEnrichmentService {
 
     /// Refresh GLEIF data for an entity
     #[allow(dead_code)] // kept for legacy compat
-    pub async fn refresh_entity(&self, entity_id: Uuid) -> Result<EnrichmentResult> {
+    pub(crate) async fn refresh_entity(&self, entity_id: Uuid) -> Result<EnrichmentResult> {
         // Get the LEI for this entity
         let lei: Option<String> = sqlx::query_scalar(
             r#"

@@ -41,7 +41,6 @@ use crate::graph::types::{EntityGraph, GraphFilters};
 use crate::graph::ViewportContext;
 use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
-pub use crate::research::ApprovedResearch;
 pub use agent_mode::{
     ActionRef, AgentState, AgentStatus, AgentTask, Candidate, Checkpoint, CheckpointContext,
     CheckpointType, DecisionRef, SessionMode,

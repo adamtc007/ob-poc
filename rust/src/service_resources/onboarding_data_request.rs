@@ -23,7 +23,7 @@ static SIMPLE_CONDITION: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Result returned by `onboarding.compile-data-request`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompileDataRequestResult {
+pub(crate) struct CompileDataRequestResult {
     pub data_request_id: Uuid,
     pub onboarding_request_id: Uuid,
     pub cbu_id: Uuid,
@@ -35,7 +35,7 @@ pub struct CompileDataRequestResult {
 
 /// Result returned after dispatching ready data-request slices.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DispatchReadySlicesResult {
+pub(crate) struct DispatchReadySlicesResult {
     pub data_request_id: Uuid,
     pub dispatched_slices: u64,
     pub outbox_rows_created: u64,
@@ -43,7 +43,7 @@ pub struct DispatchReadySlicesResult {
 
 /// Result returned by owner confirmation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConfirmProvisioningResult {
+pub(crate) struct ConfirmProvisioningResult {
     pub provisioning_request_id: Uuid,
     pub event_id: Option<Uuid>,
     pub was_duplicate: bool,
@@ -52,13 +52,13 @@ pub struct ConfirmProvisioningResult {
 
 /// Result returned by cancellation verbs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CancellationResult {
+pub(crate) struct CancellationResult {
     pub affected_slices: u64,
     pub outbox_rows_created: u64,
 }
 
 /// Service for compiling and progressing onboarding data requests.
-pub struct OnboardingDataRequestService {
+pub(crate) struct OnboardingDataRequestService {
     pool: PgPool,
 }
 
@@ -70,7 +70,7 @@ impl OnboardingDataRequestService {
     /// ```ignore
     /// let service = OnboardingDataRequestService::new(pool.clone());
     /// ```
-    pub fn new(pool: PgPool) -> Self {
+    pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -82,7 +82,7 @@ impl OnboardingDataRequestService {
     /// let result = service.compile_data_request(onboarding_request_id).await?;
     /// assert_eq!(result.onboarding_request_id, onboarding_request_id);
     /// ```
-    pub async fn compile_data_request(
+    pub(crate) async fn compile_data_request(
         &self,
         onboarding_request_id: Uuid,
     ) -> Result<CompileDataRequestResult> {
@@ -190,7 +190,7 @@ impl OnboardingDataRequestService {
     /// let result = service.dispatch_ready_slices(data_request_id).await?;
     /// assert!(result.dispatched_slices <= result.outbox_rows_created);
     /// ```
-    pub async fn dispatch_ready_slices(
+    pub(crate) async fn dispatch_ready_slices(
         &self,
         data_request_id: Uuid,
     ) -> Result<DispatchReadySlicesResult> {
@@ -306,7 +306,7 @@ impl OnboardingDataRequestService {
     ///     .await?;
     /// assert!(!result.new_status.is_empty());
     /// ```
-    pub async fn confirm_provisioning_result(
+    pub(crate) async fn confirm_provisioning_result(
         &self,
         provisioning_request_id: Uuid,
         payload: Value,
@@ -457,7 +457,7 @@ impl OnboardingDataRequestService {
     /// let result = service.cancel_data_request(data_request_id).await?;
     /// assert!(result.affected_slices >= 0);
     /// ```
-    pub async fn cancel_data_request(&self, data_request_id: Uuid) -> Result<CancellationResult> {
+    pub(crate) async fn cancel_data_request(&self, data_request_id: Uuid) -> Result<CancellationResult> {
         self.cancel_where("data_request_id = $1", data_request_id)
             .await
     }
@@ -470,7 +470,7 @@ impl OnboardingDataRequestService {
     /// let result = service.cancel_slice(slice_id).await?;
     /// assert!(result.affected_slices <= 1);
     /// ```
-    pub async fn cancel_slice(&self, slice_id: Uuid) -> Result<CancellationResult> {
+    pub(crate) async fn cancel_slice(&self, slice_id: Uuid) -> Result<CancellationResult> {
         self.cancel_where("slice_id = $1", slice_id).await
     }
 

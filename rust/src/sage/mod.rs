@@ -21,7 +21,7 @@
 //! | E-SAGE-5 | `cargo check -p ob-poc` passes after every sub-phase |
 //! | E-SAGE-6 | data_management_rewrite() unchanged until Sage accuracy exceeds it |
 
-pub mod constrained_match;
+pub(crate) mod constrained_match;
 // Phase 2A of the capability-crate restructure (2026-05-13) — the eight
 // pure-type sage modules moved out of `ob-poc-boundary::sage::*` into
 // `ob-poc-sage::*` at the top level. `valid_verb_set` (still here) and the
@@ -34,20 +34,20 @@ pub mod constrained_match;
 // `verb_resolve.rs`) moved to `ob-poc-agent::sage`, which re-exports them
 // independently; `constrained_match.rs`/`valid_verb_set.rs` (still here)
 // never used them.
-pub use ob_poc_sage::context;
-pub use ob_poc_sage::disposition;
-pub use ob_poc_sage::outcome;
-pub use ob_poc_sage::plane;
-pub use ob_poc_sage::polarity;
-pub use ob_poc_sage::pre_classify;
+pub(crate) use ob_poc_sage::context;
+pub(crate) use ob_poc_sage::disposition;
+pub(crate) use ob_poc_sage::outcome;
+pub(crate) use ob_poc_sage::plane;
+pub(crate) use ob_poc_sage::polarity;
+pub(crate) use ob_poc_sage::pre_classify;
 // Phase 2B (2026-05-13) — session_context with its sqlx::PgPool loaders
 // joined the other eight sage modules in ob-poc-sage. The
 // ob-poc-boundary::sage submodule is gone. Deliberately NOT re-exported
 // from ob-poc-agent::sage (MCA-001's AB4 finding — a capability-shaped
 // re-export, T11.3's read-lens remedy, not carried into the agent-tier
 // crate) — stays here, orchestrator.rs's only consumer is in ob-poc too.
-pub use ob_poc_sage::session_context;
-pub mod valid_verb_set;
+pub(crate) use ob_poc_sage::session_context;
+pub(crate) mod valid_verb_set;
 
 // T11.1b (2026-07-12): re-export the six moved engines' flattened public
 // surface so every existing `crate::sage::{DeterministicSage,DrafterEngine,
@@ -56,24 +56,24 @@ pub mod valid_verb_set;
 // references them by that path (only via the flattened re-exports below,
 // which don't need them); `ob_poc_agent::sage::{verb_index,verb_resolve}`
 // remains reachable directly for any future caller that does.
-pub use ob_poc_agent::sage::{arg_assembly, deterministic, drafter, llm_sage};
+pub(crate) use ob_poc_agent::sage::{arg_assembly, deterministic, drafter, llm_sage};
 
 // Re-export core types for convenience
-pub use context::{RecentIntent, SageContext};
-pub use deterministic::DeterministicSage;
-pub use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
+pub(crate) use context::{RecentIntent, SageContext};
+pub(crate) use deterministic::DeterministicSage;
+pub(crate) use disposition::{DelegateIntent, PendingMutation, ServeIntent, UtteranceDisposition};
 // `DrafterEngine` is only ever reached via the fully-qualified
 // `crate::sage::DrafterEngine::load()` path (orchestrator.rs, integration
 // tests) — never through a `use` statement — so it trips `unused_imports`
 // despite being load-bearing.
 #[allow(unused_imports)]
-pub use drafter::{DraftResult, DrafterEngine};
-pub use llm_sage::LlmSage;
-pub use outcome::{OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence};
-pub use plane::ObservationPlane;
-pub use polarity::IntentPolarity;
+pub(crate) use drafter::{DraftResult, DrafterEngine};
+pub(crate) use llm_sage::LlmSage;
+pub(crate) use outcome::{OutcomeAction, OutcomeIntent, OutcomeStep, SageConfidence};
+pub(crate) use plane::ObservationPlane;
+pub(crate) use polarity::IntentPolarity;
 
 // Phase 2.2 (2026-05-13): SageEngine trait relocated to
 // `ob_poc_sage::engine`. Compat re-export keeps existing `crate::sage::
 // SageEngine` callers (orchestrator, deterministic, llm_sage) working.
-pub use ob_poc_sage::engine::SageEngine;
+pub(crate) use ob_poc_sage::engine::SageEngine;

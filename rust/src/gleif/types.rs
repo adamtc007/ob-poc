@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // kept for serde deserialization
 #[allow(dead_code)]
-pub enum EntityCategory {
+pub(crate) enum EntityCategory {
     Fund,
     General,
     Branch,
@@ -33,7 +33,7 @@ pub enum EntityCategory {
 // kept for serde deserialization
 #[allow(dead_code)]
 impl EntityCategory {
-    pub fn parse(s: &str) -> Self {
+    pub(crate) fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "FUND" => Self::Fund,
             "GENERAL" => Self::General,
@@ -47,7 +47,7 @@ impl EntityCategory {
     }
 
     #[allow(dead_code)]
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Fund => "FUND",
             Self::General => "GENERAL",
@@ -57,11 +57,11 @@ impl EntityCategory {
         }
     }
 
-    pub fn is_fund(&self) -> bool {
+    pub(crate) fn is_fund(&self) -> bool {
         matches!(self, Self::Fund)
     }
 
-    pub fn is_unknown(&self) -> bool {
+    pub(crate) fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
 }
@@ -78,7 +78,7 @@ impl Default for EntityCategory {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // kept for serde deserialization
 #[allow(dead_code)]
-pub enum EntityStatus {
+pub(crate) enum EntityStatus {
     Active,
     Inactive,
     /// Unknown status from GLEIF - captured verbatim
@@ -88,7 +88,7 @@ pub enum EntityStatus {
 // kept for serde deserialization
 #[allow(dead_code)]
 impl EntityStatus {
-    pub fn parse(s: &str) -> Self {
+    pub(crate) fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "ACTIVE" => Self::Active,
             "INACTIVE" => Self::Inactive,
@@ -99,7 +99,7 @@ impl EntityStatus {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Active => "ACTIVE",
             Self::Inactive => "INACTIVE",
@@ -107,11 +107,11 @@ impl EntityStatus {
         }
     }
 
-    pub fn is_active(&self) -> bool {
+    pub(crate) fn is_active(&self) -> bool {
         matches!(self, Self::Active)
     }
 
-    pub fn is_unknown(&self) -> bool {
+    pub(crate) fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
 }
@@ -127,7 +127,7 @@ impl Default for EntityStatus {
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(dead_code)] // kept for serde deserialization
-pub enum RegistrationStatus {
+pub(crate) enum RegistrationStatus {
     Issued,
     Lapsed,
     Merged,
@@ -145,7 +145,7 @@ pub enum RegistrationStatus {
 // kept for serde deserialization
 #[allow(dead_code)]
 impl RegistrationStatus {
-    pub fn parse(s: &str) -> Self {
+    pub(crate) fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "ISSUED" => Self::Issued,
             "LAPSED" => Self::Lapsed,
@@ -164,7 +164,7 @@ impl RegistrationStatus {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::Issued => "ISSUED",
             Self::Lapsed => "LAPSED",
@@ -180,11 +180,11 @@ impl RegistrationStatus {
         }
     }
 
-    pub fn is_valid(&self) -> bool {
+    pub(crate) fn is_valid(&self) -> bool {
         matches!(self, Self::Issued)
     }
 
-    pub fn is_unknown(&self) -> bool {
+    pub(crate) fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
 }
@@ -200,7 +200,7 @@ impl Default for RegistrationStatus {
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(dead_code)] // kept for serde deserialization
-pub enum CorroborationLevel {
+pub(crate) enum CorroborationLevel {
     FullyCorroborated,
     PartiallyCorroborated,
     NotCorroborated,
@@ -211,7 +211,7 @@ pub enum CorroborationLevel {
 // kept for serde deserialization
 #[allow(dead_code)]
 impl CorroborationLevel {
-    pub fn parse(s: &str) -> Self {
+    pub(crate) fn parse(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
             "FULLY_CORROBORATED" => Self::FullyCorroborated,
             "PARTIALLY_CORROBORATED" => Self::PartiallyCorroborated,
@@ -223,7 +223,7 @@ impl CorroborationLevel {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::FullyCorroborated => "FULLY_CORROBORATED",
             Self::PartiallyCorroborated => "PARTIALLY_CORROBORATED",
@@ -232,11 +232,11 @@ impl CorroborationLevel {
         }
     }
 
-    pub fn is_fully_corroborated(&self) -> bool {
+    pub(crate) fn is_fully_corroborated(&self) -> bool {
         matches!(self, Self::FullyCorroborated)
     }
 
-    pub fn is_unknown(&self) -> bool {
+    pub(crate) fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
 }
@@ -252,7 +252,7 @@ impl Default for CorroborationLevel {
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(dead_code)] // kept for serde deserialization
-pub enum RelationshipType {
+pub(crate) enum RelationshipType {
     IsDirectlyConsolidatedBy,
     IsUltimatelyConsolidatedBy,
     IsFundManagedBy,
@@ -265,7 +265,7 @@ pub enum RelationshipType {
 // kept for serde deserialization
 #[allow(dead_code)]
 impl RelationshipType {
-    pub fn parse(s: &str) -> Self {
+    pub(crate) fn parse(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
             "IS_DIRECTLY_CONSOLIDATED_BY" => Self::IsDirectlyConsolidatedBy,
             "IS_ULTIMATELY_CONSOLIDATED_BY" => Self::IsUltimatelyConsolidatedBy,
@@ -279,7 +279,7 @@ impl RelationshipType {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::IsDirectlyConsolidatedBy => "IS_DIRECTLY_CONSOLIDATED_BY",
             Self::IsUltimatelyConsolidatedBy => "IS_ULTIMATELY_CONSOLIDATED_BY",
@@ -290,21 +290,21 @@ impl RelationshipType {
         }
     }
 
-    pub fn is_parent_relationship(&self) -> bool {
+    pub(crate) fn is_parent_relationship(&self) -> bool {
         matches!(
             self,
             Self::IsDirectlyConsolidatedBy | Self::IsUltimatelyConsolidatedBy
         )
     }
 
-    pub fn is_fund_relationship(&self) -> bool {
+    pub(crate) fn is_fund_relationship(&self) -> bool {
         matches!(
             self,
             Self::IsFundManagedBy | Self::IsSubfundOf | Self::IsFeederTo
         )
     }
 
-    pub fn is_unknown(&self) -> bool {
+    pub(crate) fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
 }
@@ -323,7 +323,7 @@ impl Default for RelationshipType {
 ///
 /// Uses resilience pattern - unknown values captured verbatim.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum RelationshipCategory {
+pub(crate) enum RelationshipCategory {
     /// Corporate ownership - consolidation hierarchy (IS_DIRECTLY_CONSOLIDATED_BY, IS_ULTIMATELY_CONSOLIDATED_BY)
     Ownership,
     /// Investment management - ManCo manages fund (IS_FUND-MANAGED_BY)
@@ -338,26 +338,26 @@ pub enum RelationshipCategory {
 
 /// Top-level API response wrapper
 #[derive(Debug, Clone, Deserialize)]
-pub struct GleifResponse<T> {
+pub(crate) struct GleifResponse<T> {
     pub data: T,
     #[serde(default)]
     pub meta: Option<ResponseMeta>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct ResponseMeta {
+pub(crate) struct ResponseMeta {
     pub pagination: Option<PaginationInfo>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct PaginationInfo {
+pub(crate) struct PaginationInfo {
     #[serde(rename = "lastPage")]
     pub last_page: i32,
 }
 
 /// LEI Record (Level 1 data)
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct LeiRecord {
+pub(crate) struct LeiRecord {
     pub id: String, // The LEI
     #[serde(rename = "type")]
     pub record_type: String,
@@ -371,12 +371,12 @@ pub struct LeiRecord {
 
 impl LeiRecord {
     /// Get the LEI, preferring attributes.lei but falling back to id
-    pub fn lei(&self) -> &str {
+    pub(crate) fn lei(&self) -> &str {
         self.attributes.lei.as_deref().unwrap_or_else(|| &self.id)
     }
 
     /// Get entity category as typed enum (never fails - unknown values captured)
-    pub fn category(&self) -> EntityCategory {
+    pub(crate) fn category(&self) -> EntityCategory {
         self.attributes
             .entity
             .category
@@ -386,7 +386,7 @@ impl LeiRecord {
     }
 
     /// Get entity status as typed enum (never fails - unknown values captured)
-    pub fn entity_status(&self) -> EntityStatus {
+    pub(crate) fn entity_status(&self) -> EntityStatus {
         self.attributes
             .entity
             .status
@@ -396,24 +396,24 @@ impl LeiRecord {
     }
 
     /// Check if this is a fund entity
-    pub fn is_fund(&self) -> bool {
+    pub(crate) fn is_fund(&self) -> bool {
         self.category().is_fund()
     }
 
     /// Get legal name safely (never panics)
     #[allow(dead_code)] // kept for serde deserialization
-    pub fn legal_name(&self) -> &str {
+    pub(crate) fn legal_name(&self) -> &str {
         &self.attributes.entity.legal_name.name
     }
 
     /// Get jurisdiction if present
-    pub fn jurisdiction(&self) -> Option<&str> {
+    pub(crate) fn jurisdiction(&self) -> Option<&str> {
         self.attributes.entity.jurisdiction.as_deref()
     }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct LeiAttributes {
+pub(crate) struct LeiAttributes {
     /// The LEI - may be missing in some older records (use parent id instead)
     #[serde(default)]
     pub lei: Option<String>,
@@ -437,7 +437,7 @@ pub struct LeiAttributes {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EntityInfo {
+pub(crate) struct EntityInfo {
     #[serde(rename = "legalName")]
     pub legal_name: NameValue,
 
@@ -490,14 +490,14 @@ pub struct EntityInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct NameValue {
+pub(crate) struct NameValue {
     pub name: String,
     #[serde(default)]
     pub language: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct OtherName {
+pub(crate) struct OtherName {
     pub name: String,
     #[serde(rename = "type")]
     pub name_type: Option<String>,
@@ -506,7 +506,7 @@ pub struct OtherName {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Address {
+pub(crate) struct Address {
     #[serde(default)]
     pub language: Option<String>,
     #[serde(rename = "addressLines", default)]
@@ -525,7 +525,7 @@ pub struct Address {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TypedAddress {
+pub(crate) struct TypedAddress {
     #[serde(rename = "type")]
     pub address_type: String,
     #[serde(flatten)]
@@ -533,25 +533,25 @@ pub struct TypedAddress {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RegistrationAuthority {
+pub(crate) struct RegistrationAuthority {
     pub id: Option<String>,
     pub other: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct LegalForm {
+pub(crate) struct LegalForm {
     pub id: Option<String>,
     pub other: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct SuccessorEntity {
+pub(crate) struct SuccessorEntity {
     pub lei: String,
     pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EventGroup {
+pub(crate) struct EventGroup {
     #[serde(rename = "groupType")]
     pub group_type: String,
     #[serde(default)]
@@ -559,7 +559,7 @@ pub struct EventGroup {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct EntityEvent {
+pub(crate) struct EntityEvent {
     #[serde(rename = "type")]
     pub event_type: String,
     pub status: Option<String>,
@@ -576,13 +576,13 @@ pub struct EntityEvent {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AffectedField {
+pub(crate) struct AffectedField {
     pub xpath: Option<String>,
     pub value: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RegistrationInfo {
+pub(crate) struct RegistrationInfo {
     #[serde(rename = "initialRegistrationDate")]
     pub initial_registration_date: Option<String>,
     #[serde(rename = "lastUpdateDate")]
@@ -601,7 +601,7 @@ pub struct RegistrationInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct LeiRelationships {
+pub(crate) struct LeiRelationships {
     #[serde(rename = "managing-lou", default)]
     pub managing_lou: Option<RelationshipLink>,
     #[serde(rename = "lei-issuer", default)]
@@ -637,12 +637,12 @@ pub struct LeiRelationships {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipLink {
+pub(crate) struct RelationshipLink {
     pub links: RelationshipLinkData,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipLinkData {
+pub(crate) struct RelationshipLinkData {
     #[serde(default)]
     pub related: Option<String>,
     #[serde(rename = "relationship-record", default)]
@@ -660,7 +660,7 @@ pub struct RelationshipLinkData {
 // =============================================================================
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipRecord {
+pub(crate) struct RelationshipRecord {
     pub id: String,
     #[serde(rename = "type")]
     pub record_type: String,
@@ -668,7 +668,7 @@ pub struct RelationshipRecord {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipAttributes {
+pub(crate) struct RelationshipAttributes {
     pub relationship: RelationshipDetail,
     pub registration: RelationshipRegistration,
     /// Valid from date
@@ -683,7 +683,7 @@ pub struct RelationshipAttributes {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipDetail {
+pub(crate) struct RelationshipDetail {
     #[serde(rename = "startNode")]
     pub start_node: RelationshipNode,
     #[serde(rename = "endNode")]
@@ -702,7 +702,7 @@ pub struct RelationshipDetail {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipNode {
+pub(crate) struct RelationshipNode {
     /// Node ID - API returns as "id" but we also accept "nodeID"
     #[serde(alias = "nodeID")]
     pub id: String,
@@ -712,7 +712,7 @@ pub struct RelationshipNode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipPeriod {
+pub(crate) struct RelationshipPeriod {
     #[serde(rename = "startDate")]
     pub start_date: Option<String>,
     #[serde(rename = "endDate", default)]
@@ -723,7 +723,7 @@ pub struct RelationshipPeriod {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipQualifier {
+pub(crate) struct RelationshipQualifier {
     #[serde(rename = "qualifierDimension")]
     pub qualifier_dimension: String,
     #[serde(rename = "qualifierCategory")]
@@ -731,7 +731,7 @@ pub struct RelationshipQualifier {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RelationshipRegistration {
+pub(crate) struct RelationshipRegistration {
     #[serde(rename = "initialRegistrationDate", default)]
     pub initial_registration_date: Option<String>,
     #[serde(rename = "lastUpdateDate", default)]
@@ -762,7 +762,7 @@ pub struct RelationshipRegistration {
 // =============================================================================
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct BicMapping {
+pub(crate) struct BicMapping {
     pub id: String,
     #[serde(rename = "type")]
     pub record_type: String,
@@ -770,7 +770,7 @@ pub struct BicMapping {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct BicMappingAttributes {
+pub(crate) struct BicMappingAttributes {
     pub bic: String,
     pub lei: String,
 }
@@ -786,7 +786,7 @@ pub struct BicMappingAttributes {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // kept for serde deserialization
 #[allow(dead_code)]
-pub enum ReportingException {
+pub(crate) enum ReportingException {
     /// Widely held / publicly traded - no single UBO
     NoKnownPerson,
     /// Human owners without LEI - need BODS lookup
@@ -810,7 +810,7 @@ pub enum ReportingException {
 #[allow(dead_code)]
 impl ReportingException {
     /// Parse from GLEIF API string. Never returns None - unknown codes become Unknown(code).
-    pub fn parse(s: &str) -> Self {
+    pub(crate) fn parse(s: &str) -> Self {
         match s {
             "NO_KNOWN_PERSON" => Self::NoKnownPerson,
             "NATURAL_PERSONS" => Self::NaturalPersons,
@@ -830,7 +830,7 @@ impl ReportingException {
     }
 
     /// Convert to string for storage/display
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             Self::NoKnownPerson => "NO_KNOWN_PERSON",
             Self::NaturalPersons => "NATURAL_PERSONS",
@@ -844,17 +844,17 @@ impl ReportingException {
     }
 
     /// Returns true if this exception means we should query BODS for UBOs
-    pub fn requires_bods_lookup(&self) -> bool {
+    pub(crate) fn requires_bods_lookup(&self) -> bool {
         matches!(self, Self::NaturalPersons)
     }
 
     /// Returns true if this exception means the entity is widely held (no single UBO)
-    pub fn is_public_float(&self) -> bool {
+    pub(crate) fn is_public_float(&self) -> bool {
         matches!(self, Self::NoKnownPerson)
     }
 
     /// Returns true if this is an unknown/unrecognized exception code
-    pub fn is_unknown(&self) -> bool {
+    pub(crate) fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
     }
 }
@@ -865,7 +865,7 @@ impl ReportingException {
 
 /// Result of enriching an entity from GLEIF
 #[derive(Debug, Clone)]
-pub struct EnrichmentResult {
+pub(crate) struct EnrichmentResult {
     pub names_added: i32,
     pub addresses_added: i32,
     pub identifiers_added: i32,
@@ -874,7 +874,7 @@ pub struct EnrichmentResult {
 
 /// Result of importing a corporate tree
 #[derive(Debug, Clone)]
-pub struct TreeImportResult {
+pub(crate) struct TreeImportResult {
     pub root_lei: String,
     pub entities_created: i32,
     pub entities_updated: i32,
@@ -886,7 +886,7 @@ pub struct TreeImportResult {
 
 /// An entity at the end of an ownership chain
 #[derive(Debug, Clone)]
-pub struct TerminalEntity;
+pub(crate) struct TerminalEntity;
 
 // =============================================================================
 // UBO and Ownership Chain Types
@@ -894,7 +894,7 @@ pub struct TerminalEntity;
 
 /// UBO terminus status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum UboStatus {
+pub(crate) enum UboStatus {
     /// Publicly traded - no single UBO
     PublicFloat,
     /// Government/state owned
@@ -909,7 +909,7 @@ pub enum UboStatus {
 
 /// Discovered entity from GLEIF
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiscoveredEntity {
+pub(crate) struct DiscoveredEntity {
     pub lei: String,
     pub name: String,
     pub jurisdiction: Option<String>,
@@ -921,7 +921,7 @@ pub struct DiscoveredEntity {
 }
 
 impl DiscoveredEntity {
-    pub fn from_lei_record(record: &LeiRecord) -> Self {
+    pub(crate) fn from_lei_record(record: &LeiRecord) -> Self {
         Self {
             lei: record.lei().to_string(),
             name: record.attributes.entity.legal_name.name.clone(),
@@ -942,7 +942,7 @@ impl DiscoveredEntity {
 
 /// Ownership chain trace result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OwnershipChain {
+pub(crate) struct OwnershipChain {
     pub start_lei: String,
     pub start_name: String,
     pub chain: Vec<ChainLink>,
@@ -952,7 +952,7 @@ pub struct OwnershipChain {
 
 /// Single link in ownership chain
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChainLink {
+pub(crate) struct ChainLink {
     pub lei: String,
     pub name: String,
     pub jurisdiction: Option<String>,
@@ -962,7 +962,7 @@ pub struct ChainLink {
 
 /// Result of managed funds query
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FundListResult {
+pub(crate) struct FundListResult {
     pub manager_lei: String,
     pub manager_name: Option<String>,
     pub funds: Vec<DiscoveredEntity>,
@@ -972,7 +972,7 @@ pub struct FundListResult {
 
 /// Result of successor resolution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SuccessorResult {
+pub(crate) struct SuccessorResult {
     pub original_lei: String,
     pub current_lei: String,
     pub chain: Vec<String>,
@@ -986,7 +986,7 @@ pub struct SuccessorResult {
 
 /// Result of umbrella fund lookup (IS_SUBFUND_OF)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UmbrellaResult {
+pub(crate) struct UmbrellaResult {
     pub subfund_lei: String,
     pub subfund_name: String,
     pub umbrella: Option<UmbrellaEntity>,
@@ -994,7 +994,7 @@ pub struct UmbrellaResult {
 
 /// Umbrella fund entity info
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UmbrellaEntity {
+pub(crate) struct UmbrellaEntity {
     pub lei: String,
     pub name: String,
     pub jurisdiction: Option<String>,
@@ -1002,7 +1002,7 @@ pub struct UmbrellaEntity {
 
 /// Result of fund manager lookup (IS_FUND-MANAGED_BY)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ManagerResult {
+pub(crate) struct ManagerResult {
     pub fund_lei: String,
     pub fund_name: String,
     pub manager: Option<ManagerEntity>,
@@ -1010,7 +1010,7 @@ pub struct ManagerResult {
 
 /// Fund manager entity info
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ManagerEntity {
+pub(crate) struct ManagerEntity {
     pub lei: String,
     pub name: String,
     pub jurisdiction: Option<String>,
@@ -1019,7 +1019,7 @@ pub struct ManagerEntity {
 
 /// Result of master fund lookup (IS_FEEDER_TO)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MasterFundResult {
+pub(crate) struct MasterFundResult {
     pub feeder_lei: String,
     pub feeder_name: String,
     pub master: Option<MasterEntity>,
@@ -1027,7 +1027,7 @@ pub struct MasterFundResult {
 
 /// Master fund entity info
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MasterEntity {
+pub(crate) struct MasterEntity {
     pub lei: String,
     pub name: String,
     pub jurisdiction: Option<String>,
@@ -1035,7 +1035,7 @@ pub struct MasterEntity {
 
 /// Result of ISIN to LEI lookup
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IsinLookupResult {
+pub(crate) struct IsinLookupResult {
     pub isin: String,
     pub lei: String,
     pub name: String,
