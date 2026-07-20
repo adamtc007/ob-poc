@@ -103,7 +103,7 @@ pub(crate) fn build_phase5_unavailable_payload(entrypoint: &str) -> serde_json::
 /// // Built from a real chat execution response at runtime.
 /// ```
 #[cfg(all(test, feature = "database"))]
-pub fn build_phase5_agent_payload(
+pub(crate) fn build_phase5_agent_payload(
     session: &crate::session::UnifiedSession,
     response: &crate::api::agent_service::AgentChatResponse,
 ) -> serde_json::Value {
@@ -117,7 +117,7 @@ pub fn build_phase5_agent_payload(
 /// // Built from a real chat execution response at runtime.
 /// ```
 #[cfg(all(test, feature = "database"))]
-pub fn evaluate_phase5_agent(
+pub(crate) fn evaluate_phase5_agent(
     session: &crate::session::UnifiedSession,
     response: &crate::api::agent_service::AgentChatResponse,
 ) -> Phase5Evaluation {
@@ -252,7 +252,7 @@ pub(crate) fn build_repl_execution_shape_kind(
 /// // Built from a real REPL response at runtime.
 /// ```
 #[cfg(test)]
-pub fn build_phase5_repl_payload(
+pub(crate) fn build_phase5_repl_payload(
     session: &crate::repl::session_v2::ReplSessionV2,
     response: &crate::repl::response_v2::ReplResponseV2,
 ) -> serde_json::Value {

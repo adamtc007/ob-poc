@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Bridge adapters from REPL executor traits to `StepExecutor`.
 //!
 //! Two bridges are provided:

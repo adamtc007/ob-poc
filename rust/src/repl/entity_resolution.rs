@@ -24,7 +24,7 @@ use super::types::{EntityCandidate, UnresolvedRef};
 
 /// Outcome of context-aware entity resolution.
 #[derive(Debug, Clone)]
-pub enum EntityResolutionOutcome {
+pub(crate) enum EntityResolutionOutcome {
     /// Resolved to a single entity via focus/pronoun.
     ResolvedByFocus {
         entity_id: Uuid,
@@ -60,7 +60,7 @@ pub enum EntityResolutionOutcome {
 ///
 /// The resolver CHOOSES from this set, never invents.
 #[derive(Debug, Clone, Default)]
-pub struct CandidateUniverse {
+pub(crate) struct CandidateUniverse {
     /// Entity types allowed for this arg slot.
     pub expected_kinds: HashSet<String>,
 
@@ -82,7 +82,7 @@ pub struct CandidateUniverse {
 
 impl CandidateUniverse {
     /// Check if a candidate should be included.
-    pub fn accepts(&self, candidate: &EntityCandidate) -> bool {
+    pub(crate) fn accepts(&self, candidate: &EntityCandidate) -> bool {
         // Exclusion filter
         if self.excluded_entity_ids.contains(&candidate.entity_id) {
             return false;
@@ -105,7 +105,7 @@ impl CandidateUniverse {
     }
 
     /// Filter a list of candidates through the universe constraints.
-    pub fn filter(&self, candidates: Vec<EntityCandidate>) -> Vec<EntityCandidate> {
+    pub(crate) fn filter(&self, candidates: Vec<EntityCandidate>) -> Vec<EntityCandidate> {
         candidates.into_iter().filter(|c| self.accepts(c)).collect()
     }
 }
@@ -122,7 +122,7 @@ impl CandidateUniverse {
 /// 2. Canonicalization
 /// 3. Accumulated answers
 /// 4. Build candidate universe for search delegation
-pub fn resolve_with_context(
+pub(crate) fn resolve_with_context(
     input: &str,
     expected_kinds: &[String],
     context: &ContextStack,
@@ -194,7 +194,7 @@ pub fn resolve_with_context(
 ///
 /// Invariant I-4:
 /// `candidates = (scope_entities ∩ expected_types ∩ pack_expected) − exclusions`
-pub fn build_candidate_universe(
+pub(crate) fn build_candidate_universe(
     expected_kinds: &[String],
     context: &ContextStack,
 ) -> CandidateUniverse {
@@ -232,7 +232,7 @@ pub fn build_candidate_universe(
 ///
 /// Filters candidates in each UnresolvedRef through the universe
 /// constraints, removing excluded or type-mismatched candidates.
-pub fn filter_unresolved_refs(refs: &mut [UnresolvedRef], context: &ContextStack) {
+pub(crate) fn filter_unresolved_refs(refs: &mut [UnresolvedRef], context: &ContextStack) {
     for uref in refs.iter_mut() {
         let expected_kinds: Vec<String> = uref
             .expected_kind

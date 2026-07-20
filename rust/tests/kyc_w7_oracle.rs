@@ -13,9 +13,9 @@
 //! on hand-authored edges) is therefore the complete W7 oracle for this environment.
 //! This test is the live-DB attestation of that fact.
 
-use ob_poc_kyc_substrate::determination::{DeterminationStrategy, OwnershipProngStrategy};
 use ob_poc_kyc_substrate::{
-    ControlState, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, PersonId,
+    ControlState, DeterminationStrategy, EdgeId, EdgeKind, EdgeState, EdgeStatus, EntityId,
+    EventId, OwnershipProngStrategy, PersonId,
 };
 
 use std::collections::BTreeSet;

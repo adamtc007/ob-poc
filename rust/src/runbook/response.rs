@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Orchestrator response types for the compile surface.
 //!
 //! `compile_invocation()` returns exactly one of four variants:

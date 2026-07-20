@@ -2,6 +2,6 @@
 //! Both are pure functions over the per-subject event stream.
 //! `state = fold(events)`.
 
-pub mod control;
-pub mod obligation;
-pub mod registry;
+pub(crate) mod control;
+pub(crate) mod obligation;
+pub(crate) mod registry;

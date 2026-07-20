@@ -7,7 +7,7 @@ use std::collections::HashSet;
 /// Structured blocked action surfaced by Phase 2 legality.
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Phase2BlockedAction {
+pub(crate) struct Phase2BlockedAction {
     pub action_id: String,
     pub action_kind: String,
     pub description: String,
@@ -187,7 +187,7 @@ impl Phase2Evaluation {
     /// assert!(!evaluation.allows_verb("case.open"));
     /// ```
     #[cfg(test)]
-    pub fn allows_verb(&self, verb: &str) -> bool {
+    pub(crate) fn allows_verb(&self, verb: &str) -> bool {
         self.artifacts.allows_verb(verb)
     }
 }
@@ -539,7 +539,7 @@ impl Phase2Artifacts {
     /// assert!(artifacts.is_unavailable());
     /// ```
     #[cfg(test)]
-    pub fn new(lookup: Option<LookupResult>, envelope: Option<SemOsContextEnvelope>) -> Self {
+    pub(crate) fn new(lookup: Option<LookupResult>, envelope: Option<SemOsContextEnvelope>) -> Self {
         Phase2Service::compose(lookup, envelope)
     }
 
@@ -744,7 +744,7 @@ impl Phase2Artifacts {
     /// assert!(blocked.is_empty());
     /// ```
     #[cfg(test)]
-    pub fn blocked_actions(&self) -> Vec<Phase2BlockedAction> {
+    pub(crate) fn blocked_actions(&self) -> Vec<Phase2BlockedAction> {
         self.envelope
             .as_ref()
             .and_then(|envelope| envelope.grounded_action_surface.as_ref())

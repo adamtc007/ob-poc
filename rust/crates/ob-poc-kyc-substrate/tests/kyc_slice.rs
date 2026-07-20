@@ -18,15 +18,13 @@ use std::collections::BTreeSet;
 use chrono::{TimeZone, Utc};
 use uuid::Uuid;
 
-use ob_poc_kyc_substrate::determination::DeterminationStrategy;
-use ob_poc_kyc_substrate::fold::control::ControlState;
-use ob_poc_kyc_substrate::fold::obligation::ObligationState;
 use ob_poc_kyc_substrate::{
     check_control_preconditions, fold_control, fold_control_versioned, fold_obligations,
     fold_obligations_versioned, freeze_determination, phase1_lexicon, reconciled_economic_edges,
-    recover_determination_at, AuthorityRef, DeterminationInProgress, EdgeId, EntityId, EventId,
-    FoldImpl, FoldRegistry, Hash, IdemKey, IntentEvent, ObligationId, OwnershipProngStrategy,
-    PersonId, Principal, Prong, RecoveryPin, SmoResult, SubjectId, TargetBinding, V1FoldImpl,
+    recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
+    DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
+    IntentEvent, ObligationId, ObligationState, OwnershipProngStrategy, PersonId, Principal,
+    Prong, RecoveryPin, SmoResult, SubjectId, TargetBinding, V1FoldImpl,
 };
 use std::sync::Arc;
 
@@ -1457,7 +1455,7 @@ fn phase1_fold_determinism_stress_graph_hash() {
             let event_refs: Vec<&IntentEvent> = events.iter().collect();
             let control = fold_control(&event_refs);
             let edges = reconciled_economic_edges(&control);
-            ob_poc_kyc_substrate::determination::DeterminationPin::compute_graph_hash(&edges)
+            ob_poc_kyc_substrate::DeterminationPin::compute_graph_hash(&edges)
         })
         .collect();
 
@@ -1736,8 +1734,7 @@ fn d2_phase3b_registry_replay_is_bit_identical() {
     let state2 = fold_control_versioned(&refs, &registry).expect("second fold must succeed");
 
     // Compare via the deterministic graph-hash.
-    use ob_poc_kyc_substrate::determination::DeterminationPin;
-    use ob_poc_kyc_substrate::fold::control::reconciled_economic_edges;
+    use ob_poc_kyc_substrate::DeterminationPin;
 
     let edges1 = reconciled_economic_edges(&state1);
     let edges2 = reconciled_economic_edges(&state2);

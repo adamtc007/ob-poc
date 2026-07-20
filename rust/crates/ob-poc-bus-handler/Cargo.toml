@@ -35,3 +35,4 @@ tonic = "0.12"
 
 [lints.rust]
 dead_code = "deny"
+unreachable_pub = "deny"

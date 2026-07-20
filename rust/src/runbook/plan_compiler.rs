@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Multi-workspace runbook plan compilation.
 //!
 //! Compiles a `RunbookPlan` from hydrated constellation states across workspaces.

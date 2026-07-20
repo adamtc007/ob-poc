@@ -7,8 +7,8 @@ use sqlx::{PgConnection, PgPool, Row};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    fold::obligation::SubjectOverallState, fold_control_versioned, fold_obligations_versioned,
-    FoldRegistry, IntentEvent, SubjectId,
+    fold_control_versioned, fold_obligations_versioned, FoldRegistry, IntentEvent, SubjectId,
+    SubjectOverallState,
 };
 
 use crate::error::StoreError;

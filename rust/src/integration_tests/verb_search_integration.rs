@@ -111,7 +111,7 @@ async fn get_shared_embedder() -> &'static Arc<CandleEmbedder> {
 ///
 /// This is a local helper that mirrors the logic in verb_search.rs but allows
 /// varying the margin for threshold sweeps.
-pub fn check_ambiguity_with_margin(
+pub(crate) fn check_ambiguity_with_margin(
     candidates: &[VerbSearchResult],
     threshold: f32,
     margin: f32,
@@ -274,7 +274,7 @@ impl VerbSearchTestHarness {
 #[cfg(feature = "database")]
 /// Expected outcome type for a test scenario
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ExpectedOutcome {
+pub(crate) enum ExpectedOutcome {
     /// Should match a specific verb with high confidence
     Matched,
     /// Should trigger ambiguity (multiple close candidates)
@@ -289,7 +289,7 @@ pub enum ExpectedOutcome {
 #[cfg(feature = "database")]
 /// Enhanced test scenario with outcome type and allowed alternatives
 #[derive(Debug, Clone)]
-pub struct TestScenario {
+pub(crate) struct TestScenario {
     /// Human-readable name
     pub name: &'static str,
     /// Input phrase to search
@@ -311,7 +311,7 @@ pub struct TestScenario {
 #[cfg(feature = "database")]
 impl TestScenario {
     /// Expect a specific verb match
-    pub fn matched(name: &'static str, query: &'static str, verb: &'static str) -> Self {
+    pub(crate) fn matched(name: &'static str, query: &'static str, verb: &'static str) -> Self {
         Self {
             name,
             query,
@@ -325,7 +325,7 @@ impl TestScenario {
     }
 
     /// Expect a match with minimum score
-    pub fn matched_with_score(
+    pub(crate) fn matched_with_score(
         name: &'static str,
         query: &'static str,
         verb: &'static str,
@@ -344,7 +344,7 @@ impl TestScenario {
     }
 
     /// Expect ambiguity (multiple close candidates)
-    pub fn ambiguous(name: &'static str, query: &'static str) -> Self {
+    pub(crate) fn ambiguous(name: &'static str, query: &'static str) -> Self {
         Self {
             name,
             query,
@@ -358,7 +358,7 @@ impl TestScenario {
     }
 
     /// Expect no match (below threshold)
-    pub fn no_match(name: &'static str, query: &'static str) -> Self {
+    pub(crate) fn no_match(name: &'static str, query: &'static str) -> Self {
         Self {
             name,
             query,
@@ -372,27 +372,27 @@ impl TestScenario {
     }
 
     /// Mark as hard negative (dangerous confusion test)
-    pub fn hard_negative(mut self) -> Self {
+    pub(crate) fn hard_negative(mut self) -> Self {
         self.is_hard_negative = true;
         self.category = "hard_negative";
         self
     }
 
     /// Set category
-    pub fn with_category(mut self, category: &'static str) -> Self {
+    pub(crate) fn with_category(mut self, category: &'static str) -> Self {
         self.category = category;
         self
     }
 
     /// Add alternative acceptable verbs
-    pub fn with_alternatives(mut self, alts: &[&'static str]) -> Self {
+    pub(crate) fn with_alternatives(mut self, alts: &[&'static str]) -> Self {
         self.allowed_verbs.extend(alts.iter().copied());
         self
     }
 
     /// Safety-first: either correct match OR ambiguity is acceptable
     /// Use for dangerous verbs where forcing clarification is preferable to guessing wrong
-    pub fn safety_first(
+    pub(crate) fn safety_first(
         name: &'static str,
         query: &'static str,
         preferred_verb: &'static str,
@@ -417,7 +417,7 @@ impl TestScenario {
 #[cfg(feature = "database")]
 /// Full decision trace for a single query
 #[derive(Debug, Clone, Serialize)]
-pub struct DecisionTrace {
+pub(crate) struct DecisionTrace {
     pub query: String,
     pub threshold: f32,
     pub margin: f32,
@@ -430,7 +430,7 @@ pub struct DecisionTrace {
 
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CandidateTrace {
+pub(crate) struct CandidateTrace {
     pub rank: usize,
     pub verb: String,
     pub score: f32,
@@ -492,7 +492,7 @@ impl DecisionTrace {
 
 #[cfg(feature = "database")]
 #[derive(Debug, Default)]
-pub struct TestReport {
+pub(crate) struct TestReport {
     // Basic counts
     pub total: usize,
     pub passed: usize,
@@ -520,7 +520,7 @@ pub struct TestReport {
 
 #[cfg(feature = "database")]
 #[derive(Debug, Default, Clone)]
-pub struct CategoryStats {
+pub(crate) struct CategoryStats {
     pub total: usize,
     pub passed: usize,
     pub failed: usize,
@@ -528,11 +528,11 @@ pub struct CategoryStats {
 
 #[cfg(feature = "database")]
 impl TestReport {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
-    pub fn record(
+    pub(crate) fn record(
         &mut self,
         scenario: &TestScenario,
         outcome: &VerbSearchOutcome,
@@ -656,7 +656,7 @@ impl TestReport {
         }
     }
 
-    pub fn print_summary(&self) {
+    pub(crate) fn print_summary(&self) {
         println!("\n============================================================");
         println!("                    TEST REPORT");
         println!("============================================================\n");
@@ -754,7 +754,7 @@ impl TestReport {
         }
     }
 
-    pub fn all_passed(&self) -> bool {
+    pub(crate) fn all_passed(&self) -> bool {
         self.failed == 0 && self.errors == 0
     }
 }
@@ -765,7 +765,7 @@ impl TestReport {
 
 #[cfg(feature = "database")]
 #[derive(Debug)]
-pub struct SweepResult {
+pub(crate) struct SweepResult {
     /// Decision threshold (gate for accepting top match)
     pub semantic_threshold: f32,
     /// Retrieval threshold (cutoff for DB queries)
@@ -784,7 +784,7 @@ pub struct SweepResult {
 
 #[cfg(feature = "database")]
 /// Configuration for a threshold sweep
-pub struct SweepConfig {
+pub(crate) struct SweepConfig {
     /// Decision thresholds to test (gate for accepting matches)
     pub semantic_thresholds: Vec<f32>,
     /// Retrieval thresholds to test (cutoff for DB queries)
@@ -807,7 +807,7 @@ impl Default for SweepConfig {
 #[cfg(feature = "database")]
 impl SweepConfig {
     /// Quick sweep - fewer combinations for faster iteration
-    pub fn quick() -> Self {
+    pub(crate) fn quick() -> Self {
         Self {
             semantic_thresholds: vec![0.85, 0.88, 0.90],
             fallback_thresholds: vec![0.78],
@@ -816,7 +816,7 @@ impl SweepConfig {
     }
 
     /// Full sweep - comprehensive threshold exploration
-    pub fn full() -> Self {
+    pub(crate) fn full() -> Self {
         Self {
             semantic_thresholds: vec![0.75, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92],
             fallback_thresholds: vec![0.65, 0.70, 0.75, 0.78, 0.80],
@@ -1668,7 +1668,7 @@ fn test_normalize_candidates() {
 #[cfg(feature = "database")]
 /// Mismatch entry for JSON output
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MismatchEntry {
+pub(crate) struct MismatchEntry {
     /// Test scenario name
     pub name: String,
     /// Input query
@@ -1694,7 +1694,7 @@ pub struct MismatchEntry {
 #[cfg(feature = "database")]
 /// Full mismatch report for JSON output
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MismatchReport {
+pub(crate) struct MismatchReport {
     /// Timestamp of the report
     pub timestamp: String,
     /// Total tests run

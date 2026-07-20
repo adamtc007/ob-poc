@@ -31,7 +31,7 @@ use super::verb_config_index::VerbConfigIndex;
 
 /// Parsed preconditions for a single verb.
 #[derive(Debug, Clone, Default)]
-pub struct Preconditions {
+pub(crate) struct Preconditions {
     /// Scope requirements (e.g., `["cbu"]` means a CBU must be in scope).
     pub requires_scope: Vec<String>,
     /// Prior verb execution requirements (e.g., `["cbu.create"]`).
@@ -44,7 +44,7 @@ pub struct Preconditions {
 
 /// Eligibility mode controls which runbook entries count as "facts".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EligibilityMode {
+pub(crate) enum EligibilityMode {
     /// Only executed entries count as facts.
     Executable,
     /// Executed + staged (confirmed but not yet executed) entries count as facts.
@@ -53,7 +53,7 @@ pub enum EligibilityMode {
 
 /// Result of a precondition check for a single verb.
 #[derive(Debug, Clone)]
-pub struct PreconditionResult {
+pub(crate) struct PreconditionResult {
     /// Fully qualified verb name.
     pub verb_fqn: String,
     /// Whether all preconditions are met.
@@ -64,7 +64,7 @@ pub struct PreconditionResult {
 
 /// Reason a precondition was not met.
 #[derive(Debug, Clone)]
-pub struct UnmetReason {
+pub(crate) struct UnmetReason {
     /// The precondition that failed (e.g., `"requires_scope:cbu"`).
     pub precondition: String,
     /// Human-readable explanation.
@@ -75,7 +75,7 @@ pub struct UnmetReason {
 
 /// Summary statistics for precondition filtering.
 #[derive(Debug, Clone, Default)]
-pub struct FilterStats {
+pub(crate) struct FilterStats {
     /// Candidates before filtering.
     pub before_count: usize,
     /// Candidates after filtering.
@@ -92,7 +92,7 @@ pub struct FilterStats {
 ///
 /// Format: `"key:value"` where key ∈ {requires_scope, requires_prior,
 /// requires_entities, forbids_prior}.
-pub fn parse_preconditions(checks: &[String]) -> Preconditions {
+pub(crate) fn parse_preconditions(checks: &[String]) -> Preconditions {
     let mut result = Preconditions::default();
 
     for check in checks {
@@ -122,7 +122,7 @@ pub fn parse_preconditions(checks: &[String]) -> Preconditions {
 /// Check whether a verb's preconditions are met given the current context.
 ///
 /// Pure function — no side effects.
-pub fn preconditions_met(
+pub(crate) fn preconditions_met(
     preconditions: &Preconditions,
     context: &ContextStack,
     mode: EligibilityMode,
@@ -209,7 +209,7 @@ pub fn preconditions_met(
 /// Batch-check preconditions for all verbs in the index.
 ///
 /// Returns the set of verb FQNs whose preconditions are met.
-pub fn verbs_with_met_preconditions(
+pub(crate) fn verbs_with_met_preconditions(
     verb_index: &VerbConfigIndex,
     context: &ContextStack,
     mode: EligibilityMode,
@@ -238,7 +238,7 @@ pub fn verbs_with_met_preconditions(
 /// Candidates whose preconditions are not met are removed from the list.
 /// If the best pre-filter candidate was removed, the first unmet reason's
 /// `suggested_verb` is returned as a "why not" hint.
-pub fn filter_by_preconditions(
+pub(crate) fn filter_by_preconditions(
     candidates: &mut Vec<super::types::VerbCandidate>,
     verb_index: &VerbConfigIndex,
     context: &ContextStack,

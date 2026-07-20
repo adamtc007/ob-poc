@@ -35,7 +35,7 @@ use super::verb_config_index::{ArgSummary, VerbConfigIndex};
 
 /// Outcome of deterministic extraction.
 #[derive(Debug, Clone)]
-pub struct ExtractionResult {
+pub(crate) struct ExtractionResult {
     /// Filled args (key → value).
     pub args: HashMap<String, String>,
     /// Provenance per slot.
@@ -55,7 +55,7 @@ impl Default for ExtractionResult {
 }
 
 impl ExtractionResult {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
@@ -76,7 +76,7 @@ impl ExtractionResult {
 #[cfg(test)]
 /// Structured context for constraining LLM fallback prompts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClosedWorldPrompt {
+pub(crate) struct ClosedWorldPrompt {
     /// Client group context (if any).
     pub client_group: Option<String>,
     /// Active pack name (if any).
@@ -98,7 +98,7 @@ pub struct ClosedWorldPrompt {
 #[cfg(test)]
 /// An entity in the closed-world candidate list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClosedWorldEntity {
+pub(crate) struct ClosedWorldEntity {
     pub id: String,
     pub name: String,
     pub entity_type: String,
@@ -111,7 +111,7 @@ pub struct ClosedWorldEntity {
 #[cfg(test)]
 /// A detected split in user input.
 #[derive(Debug, Clone)]
-pub struct IntentSplit {
+pub(crate) struct IntentSplit {
     /// The leading portion (may be a confirmation like "yes").
     pub first: String,
     /// The trailing portion (a new intent).
@@ -134,7 +134,7 @@ pub struct IntentSplit {
 ///
 /// Returns `Some(ExtractionResult)` if ALL required args are filled.
 /// Returns `None` if any required arg is missing (caller should use LLM).
-pub fn try_deterministic_extraction(
+pub(crate) fn try_deterministic_extraction(
     verb: &str,
     user_input: &str,
     context: &ContextStack,
@@ -420,7 +420,7 @@ fn extract_entity_type(input: &str) -> Option<String> {
 /// Build a closed-world candidate list for constraining LLM fallback.
 ///
 /// The LLM MUST pick from this list — never invent entity IDs.
-pub fn build_closed_world_prompt(
+pub(crate) fn build_closed_world_prompt(
     _verb: &str,
     context: &ContextStack,
     _verb_config: &VerbConfigIndex,
@@ -486,7 +486,7 @@ pub fn build_closed_world_prompt(
 #[cfg(test)]
 impl ClosedWorldPrompt {
     /// Render as a text block for embedding in an LLM system prompt.
-    pub fn render(&self) -> String {
+    pub(crate) fn render(&self) -> String {
         let mut lines = Vec::new();
 
         lines.push("=== CLOSED-WORLD CONTEXT ===".to_string());
@@ -554,7 +554,7 @@ const CONJUNCTIONS: &[&str] = &[
 /// Examples:
 /// - "Yes, and add State Street as TA" → Some(first="Yes", second="add State Street as TA")
 /// - "Add IRS product" → None (single intent)
-pub fn detect_multi_intent(input: &str) -> Option<IntentSplit> {
+pub(crate) fn detect_multi_intent(input: &str) -> Option<IntentSplit> {
     let input_lower = input.to_lowercase();
 
     // Only split when the leading portion is a short acknowledgement.
@@ -605,7 +605,7 @@ pub fn detect_multi_intent(input: &str) -> Option<IntentSplit> {
 ///
 /// Provides the LLM with structured context so it can extract args
 /// from constrained candidates rather than hallucinating.
-pub fn build_pack_enriched_prompt(context: &ContextStack) -> String {
+pub(crate) fn build_pack_enriched_prompt(context: &ContextStack) -> String {
     let mut lines = Vec::new();
 
     lines.push("=== SESSION CONTEXT ===".to_string());

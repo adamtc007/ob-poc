@@ -18,7 +18,7 @@ use super::types_v2::{SessionScope, WorkspaceFrame};
 /// Replay execution mode.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ReplayMode {
+pub(crate) enum ReplayMode {
     /// Verify intermediate state matches snapshots exactly. Fails on first divergence.
     Strict,
     /// Log divergences, continue replaying.
@@ -29,7 +29,7 @@ pub enum ReplayMode {
 
 /// A divergence detected during replay.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReplayDivergence {
+pub(crate) struct ReplayDivergence {
     pub sequence: u64,
     pub expected: String,
     pub actual: String,
@@ -37,7 +37,7 @@ pub struct ReplayDivergence {
 
 /// Result of a replay operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReplayResult {
+pub(crate) struct ReplayResult {
     pub mode: ReplayMode,
     pub entries_replayed: usize,
     pub divergences: Vec<ReplayDivergence>,
@@ -52,7 +52,7 @@ pub struct ReplayResult {
 /// Replay a trace tape against a fresh session.
 ///
 /// Returns the replay result with any divergences detected.
-pub fn replay_trace(entries: &[TraceEntry], mode: ReplayMode) -> ReplayResult {
+pub(crate) fn replay_trace(entries: &[TraceEntry], mode: ReplayMode) -> ReplayResult {
     let mut session = ReplSessionV2::new();
     session.tracing_suppressed = true; // Replay doesn't generate new trace entries
     let mut divergences = Vec::new();

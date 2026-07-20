@@ -20,17 +20,16 @@ use sem_os_postgres::ops::SemOsVerbOp;
 
 use ob_poc_kyc_seam::{append_in_scope, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
-use ob_poc_kyc_substrate::determination::DeterminationStrategy;
-use ob_poc_kyc_substrate::fold::control::check_control_preconditions;
 use ob_poc_kyc_substrate::{
-    find_subject_entity, fold_control_versioned, fold_obligations_versioned,
-    natural_persons_from_events, phase1_lexicon, AuthorityRef, ControlProngStrategy, EdgeId,
-    FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult, SubjectId,
-    SubjectOverallState, TargetBinding, V1FoldImpl,
+    check_control_preconditions, find_subject_entity, fold_control_versioned,
+    fold_obligations_versioned, natural_persons_from_events, phase1_lexicon, AuthorityRef,
+    ControlProngStrategy, DeterminationStrategy, EdgeId, FoldRegistry, OwnershipProngStrategy,
+    PersonId, Prong, ProngCandidate, SmoResult, SubjectId, SubjectOverallState, TargetBinding,
+    V1FoldImpl,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
 #[allow(unused_imports)]
-use ob_poc_kyc_substrate::fold::obligation::ObligationState as _ObligationStateCheck;
+use ob_poc_kyc_substrate::ObligationState as _ObligationStateCheck;
 
 // ── Shared append helper ──────────────────────────────────────────────────────
 

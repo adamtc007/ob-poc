@@ -28,7 +28,7 @@ pub struct BootstrapCandidate {
 
 /// Outcome of resolving user input against client groups.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BootstrapOutcome {
+pub(crate) enum BootstrapOutcome {
     /// Single clear match — proceed to scope selection.
     Resolved { group_id: Uuid, group_name: String },
     /// Multiple plausible matches — show numbered options.
@@ -96,7 +96,7 @@ fn extract_significant_words(input: &str) -> Vec<String> {
 
 /// Whether the user input indicates an infrastructure / SemOS maintenance intent
 /// rather than a client-group-scoped operational session.
-pub fn is_infrastructure_intent(input: &str) -> bool {
+pub(crate) fn is_infrastructure_intent(input: &str) -> bool {
     let lower = input.trim().to_lowercase();
     lower.contains("infrastructure")
         || lower.contains("semantic os")
@@ -122,7 +122,7 @@ pub fn is_infrastructure_intent(input: &str) -> bool {
 /// 4. Try fuzzy word overlap matching
 /// 5. If 0 → NoMatch; if 1 → Resolved; if 2+ → Ambiguous
 #[cfg(feature = "database")]
-pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcome {
+pub(crate) async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcome {
     use crate::database::deal_repository::DealRepository;
 
     let groups = match DealRepository::get_all_client_groups(pool).await {
@@ -356,7 +356,7 @@ pub async fn resolve_client_input(input: &str, pool: &PgPool) -> BootstrapOutcom
 /// Accepts:
 /// - Numeric index ("1", "2", etc.) — 1-based
 /// - Partial name match ("allianz" matches "Allianz Global Investors")
-pub fn try_numeric_or_name_selection<'a>(
+pub(crate) fn try_numeric_or_name_selection<'a>(
     input: &str,
     candidates: &'a [BootstrapCandidate],
 ) -> Option<&'a BootstrapCandidate> {
@@ -383,7 +383,7 @@ pub fn try_numeric_or_name_selection<'a>(
 // ---------------------------------------------------------------------------
 
 /// Generate the initial greeting message for session creation.
-pub fn format_greeting() -> String {
+pub(crate) fn format_greeting() -> String {
     "What would you like to work on?\n\n\
      1. **Client group** — operational workspaces (KYC, Deal, CBU, OnBoarding, ...)\n\
      2. **Semantic OS infrastructure** — registry governance, attribute lifecycle\n\n\
@@ -392,7 +392,7 @@ pub fn format_greeting() -> String {
 }
 
 /// Format the disambiguation prompt showing numbered candidates.
-pub fn format_disambiguation(candidates: &[BootstrapCandidate], input: &str) -> String {
+pub(crate) fn format_disambiguation(candidates: &[BootstrapCandidate], input: &str) -> String {
     let mut lines = vec![format!(
         "I found multiple matches for \"{}\". Which did you mean?",
         input
@@ -406,7 +406,7 @@ pub fn format_disambiguation(candidates: &[BootstrapCandidate], input: &str) -> 
 }
 
 /// Format the "ready" message after successful scope resolution.
-pub fn format_ready_message(group_name: &str, examples: &[String]) -> String {
+pub(crate) fn format_ready_message(group_name: &str, examples: &[String]) -> String {
     let mut msg = format!("Scope set to {}.", group_name);
     if !examples.is_empty() {
         msg.push_str("\n\nFor example, try:\n");
@@ -418,7 +418,7 @@ pub fn format_ready_message(group_name: &str, examples: &[String]) -> String {
 }
 
 /// Default example phrases when no verb config is available.
-pub fn default_example_phrases() -> Vec<String> {
+pub(crate) fn default_example_phrases() -> Vec<String> {
     vec![
         "Set up a new fund structure".to_string(),
         "Start a KYC case".to_string(),

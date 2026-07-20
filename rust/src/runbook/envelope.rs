@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Replay envelope — captures the determinism boundary for a compiled runbook.
 //!
 //! The envelope records everything that was non-deterministic at compile time

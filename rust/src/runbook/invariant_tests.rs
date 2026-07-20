@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Source-level invariant tests for the runbook module.
 //!
 //! These tests use `include_str!` to scan source files for structural

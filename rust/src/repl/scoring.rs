@@ -20,28 +20,28 @@ use super::types::VerbCandidate;
 // ---------------------------------------------------------------------------
 
 /// Boost applied to verbs in the active pack's allowed set.
-pub const PACK_VERB_BOOST: f32 = 0.10;
+pub(crate) const PACK_VERB_BOOST: f32 = 0.10;
 
 /// Penalty applied to verbs NOT in the active pack (and not forbidden).
-pub const PACK_VERB_PENALTY: f32 = 0.05;
+pub(crate) const PACK_VERB_PENALTY: f32 = 0.05;
 
 /// Boost applied to the verb matching the next expected template step.
-pub const TEMPLATE_STEP_BOOST: f32 = 0.15;
+pub(crate) const TEMPLATE_STEP_BOOST: f32 = 0.15;
 
 /// Small boost for verbs whose domain matches the pack's dominant domain.
-pub const DOMAIN_AFFINITY_BOOST: f32 = 0.03;
+pub(crate) const DOMAIN_AFFINITY_BOOST: f32 = 0.03;
 
 /// Absolute score floor — candidates below this are dropped.
-pub const ABSOLUTE_FLOOR: f32 = 0.55;
+pub(crate) const ABSOLUTE_FLOOR: f32 = 0.55;
 
 /// Decision threshold — top candidate must be above this to be considered.
-pub const THRESHOLD: f32 = 0.55;
+pub(crate) const THRESHOLD: f32 = 0.55;
 
 /// Ambiguity margin — if top - runner-up < MARGIN, it's ambiguous.
-pub const MARGIN: f32 = 0.05;
+pub(crate) const MARGIN: f32 = 0.05;
 
 /// Strong threshold — above this, no disambiguation needed regardless of margin.
-pub const STRONG_THRESHOLD: f32 = 0.70;
+pub(crate) const STRONG_THRESHOLD: f32 = 0.70;
 
 // ---------------------------------------------------------------------------
 // Scoring Functions
@@ -76,7 +76,7 @@ pub const STRONG_THRESHOLD: f32 = 0.70;
 /// let context = ContextStack::from_runbook(&runbook, None, 0);
 /// apply_pack_scoring(&mut candidates, &context);
 /// ```
-pub fn apply_pack_scoring(candidates: &mut Vec<VerbCandidate>, context: &ContextStack) {
+pub(crate) fn apply_pack_scoring(candidates: &mut Vec<VerbCandidate>, context: &ContextStack) {
     let pack = context.active_pack();
 
     candidates.retain_mut(|c| {
@@ -150,7 +150,7 @@ pub fn apply_pack_scoring(candidates: &mut Vec<VerbCandidate>, context: &Context
 
 /// Outcome of ambiguity analysis after scoring.
 #[derive(Debug, Clone, PartialEq)]
-pub enum AmbiguityOutcome {
+pub(crate) enum AmbiguityOutcome {
     /// No candidates survived scoring.
     NoMatch,
 
@@ -177,7 +177,7 @@ pub enum AmbiguityOutcome {
 /// 4. Top 2 candidates ≥ THRESHOLD with margin < MARGIN → `Ambiguous`
 /// 5. Top candidate ≥ THRESHOLD → `Proposed`
 /// 6. Otherwise → `NoMatch`
-pub fn apply_ambiguity_policy(candidates: &[VerbCandidate]) -> AmbiguityOutcome {
+pub(crate) fn apply_ambiguity_policy(candidates: &[VerbCandidate]) -> AmbiguityOutcome {
     if candidates.is_empty() {
         return AmbiguityOutcome::NoMatch;
     }

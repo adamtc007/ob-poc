@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Sem OS verb filter for the compilation pipeline (§6.2 Step 4).
 //!
 //! After macro expansion, DAG assembly, and pack constraint checking, the

@@ -424,3 +424,4 @@ dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0
 
 [lints.rust]
 dead_code = "deny"
+unreachable_pub = "deny"

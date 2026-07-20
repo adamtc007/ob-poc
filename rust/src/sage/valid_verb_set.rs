@@ -82,7 +82,7 @@ fn constellation_maps_dir() -> PathBuf {
 }
 
 #[cfg(test)]
-pub fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
+pub(crate) fn load_constellation_by_id(id: &str) -> Result<ConstellationMapDefBody> {
     for entry in std::fs::read_dir(constellation_maps_dir())? {
         let path = entry?.path();
         let is_yaml = path
@@ -164,7 +164,7 @@ fn cached_resolver_inputs() -> Result<ResolverInputs> {
 /// 3. Add observation verbs (read, list) for all existing entities
 /// 4. Sort by priority, dedup
 #[cfg(test)]
-pub fn compute_valid_verb_set(
+pub(crate) fn compute_valid_verb_set(
     entity_states: &[EntityState],
     constellation: &ConstellationMapDefBody,
     client_group_id: Uuid,

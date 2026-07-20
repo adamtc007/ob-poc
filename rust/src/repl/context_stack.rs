@@ -584,7 +584,7 @@ pub struct FocusRef {
 
 /// Role synonyms for shorthand resolution.
 /// "the ta" → "transfer_agent", "the im" → "investment_manager", etc.
-pub static ROLE_SYNONYMS: &[(&str, &str)] = &[
+pub(crate) static ROLE_SYNONYMS: &[(&str, &str)] = &[
     ("ta", "transfer_agent"),
     ("im", "investment_manager"),
     ("gp", "general_partner"),
@@ -598,7 +598,7 @@ pub static ROLE_SYNONYMS: &[(&str, &str)] = &[
 ];
 
 /// Pronoun patterns that resolve to focus context.
-pub static PRONOUN_PATTERNS: &[(&str, FocusTarget)] = &[
+pub(crate) static PRONOUN_PATTERNS: &[(&str, FocusTarget)] = &[
     ("it", FocusTarget::Entity),
     ("that", FocusTarget::Entity),
     ("this", FocusTarget::Entity),
@@ -617,7 +617,7 @@ pub static PRONOUN_PATTERNS: &[(&str, FocusTarget)] = &[
 
 /// What a pronoun resolves to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FocusTarget {
+pub(crate) enum FocusTarget {
     Entity,
     Cbu,
     Case,
@@ -781,7 +781,7 @@ fn derive_focus(runbook: &Runbook) -> FocusContext {
 /// Used for a soft domain-affinity boost: verbs matching the focus mode's
 /// domain get a small positive adjustment in the scoring pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FocusMode {
+pub(crate) enum FocusMode {
     /// KYC / case management focus.
     KycCase,
     /// Document / proof collection.
@@ -796,7 +796,7 @@ pub enum FocusMode {
 
 impl FocusMode {
     /// The primary domain associated with this focus mode.
-    pub fn domain(&self) -> Option<&'static str> {
+    pub(crate) fn domain(&self) -> Option<&'static str> {
         match self {
             FocusMode::KycCase => Some("kyc"),
             FocusMode::Proofs => Some("document"),
@@ -813,7 +813,7 @@ impl FocusMode {
 /// 1. Active pack's dominant domain (strongest signal)
 /// 2. Domain of the most recent executed verb (weaker signal)
 /// 3. General (no focus)
-pub fn derive_focus_mode(context: &ContextStack) -> FocusMode {
+pub(crate) fn derive_focus_mode(context: &ContextStack) -> FocusMode {
     // 1. Active pack dominant domain
     if let Some(pack) = context.active_pack() {
         if let Some(ref domain) = pack.dominant_domain {
@@ -1124,12 +1124,12 @@ pub struct PackHandoffSuggestion {
     /// The suggested next pack (from `handoff_target`).
     pub suggested_pack_id: String,
     /// Outcome references (`@N`) carried forward from the completed pack.
-    pub outcome_refs: Vec<OutcomeRef>,
+    pub(crate) outcome_refs: Vec<OutcomeRef>,
 }
 
 /// An outcome reference that carries forward across packs.
 #[derive(Debug, Clone)]
-pub struct OutcomeRef {
+pub(crate) struct OutcomeRef {
     /// The entry ID that produced this outcome.
     pub entry_id: Uuid,
     /// The verb that produced the outcome.
@@ -1240,7 +1240,7 @@ fn derive_handoff_target(runbook: &Runbook, pack_id: &str) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 /// Jurisdiction canonical forms.
-pub static JURISDICTION_CANON: &[(&str, &str)] = &[
+pub(crate) static JURISDICTION_CANON: &[(&str, &str)] = &[
     ("luxembourg", "LU"),
     ("lux", "LU"),
     ("ireland", "IE"),
@@ -1281,7 +1281,7 @@ pub static JURISDICTION_CANON: &[(&str, &str)] = &[
 ];
 
 /// Legal form canonical forms.
-pub static LEGAL_FORM_CANON: &[(&str, &str)] = &[
+pub(crate) static LEGAL_FORM_CANON: &[(&str, &str)] = &[
     ("s.a.", "SA"),
     ("sa", "SA"),
     ("s.à r.l.", "SARL"),
@@ -1330,7 +1330,7 @@ pub static LEGAL_FORM_CANON: &[(&str, &str)] = &[
 /// This is pure string processing, zero latency, no ML involved.
 /// Returns the canonicalized form if a match is found, otherwise
 /// returns the input unchanged.
-pub fn canonicalize_mention(input: &str) -> String {
+pub(crate) fn canonicalize_mention(input: &str) -> String {
     let lower = input.to_lowercase();
     let trimmed = lower.trim();
 
@@ -1365,7 +1365,7 @@ pub fn canonicalize_mention(input: &str) -> String {
 
 /// Source of a context value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContextSource {
+pub(crate) enum ContextSource {
     /// User explicitly said this.
     UserExplicit,
     /// System resolved this (e.g., entity resolution).
@@ -1378,7 +1378,7 @@ pub enum ContextSource {
 
 /// A context entry with weighted decay.
 #[derive(Debug, Clone)]
-pub struct ContextEntry {
+pub(crate) struct ContextEntry {
     pub value: String,
     pub source: ContextSource,
     pub set_at_turn: u32,
@@ -1394,7 +1394,7 @@ impl ContextEntry {
     /// - TemplateInferred: 0.5 × decay
     ///
     /// Decay factor: 0.9^(current_turn - set_at_turn)
-    pub fn weight(&self, current_turn: u32) -> f32 {
+    pub(crate) fn weight(&self, current_turn: u32) -> f32 {
         let base = match self.source {
             ContextSource::UserExplicit => 1.0,
             ContextSource::SystemResolved => 0.9,

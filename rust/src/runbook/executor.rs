@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Execution gate for compiled runbooks.
 //!
 //! `execute_runbook()` is the **sole entry point** for running compiled DSL.

@@ -14,9 +14,9 @@ use uuid::Uuid;
 
 use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, map_principal, IntentEventDraft};
-use ob_poc_kyc_substrate::fold::control::{check_control_preconditions, ControlState};
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, AuthorityRef, FoldRegistry, IdemKey, SubjectId, TargetBinding, V1FoldImpl,
+    check_control_preconditions, phase1_lexicon, AuthorityRef, ControlState, FoldRegistry,
+    IdemKey, SubjectId, TargetBinding, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_core::principal::Principal as RuntimePrincipal;

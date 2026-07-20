@@ -6,7 +6,7 @@ use super::types::UtteranceTraceRecord;
 /// Verdict for comparing an original trace resolution to a replayed one.
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ReplayVerdict {
+pub(crate) enum ReplayVerdict {
     Unchanged,
     ImprovedResolution,
     DegradedResolution,
@@ -20,7 +20,7 @@ pub enum ReplayVerdict {
 /// Drift classification for Phase 3 candidate narrowing.
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq)]
-pub enum NarrowingDrift {
+pub(crate) enum NarrowingDrift {
     Stable,
     Weakened { expansion_ratio: f64 },
     Strengthened { contraction_ratio: f64 },
@@ -31,7 +31,7 @@ pub enum NarrowingDrift {
 /// Summary of Phase 3 narrowing differences between an original and replayed trace.
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct ReplayNarrowingDiff {
+pub(crate) struct ReplayNarrowingDiff {
     pub original_phase3_size: usize,
     pub replayed_phase3_size: usize,
     pub original_fallback_invoked: bool,
@@ -42,7 +42,7 @@ pub struct ReplayNarrowingDiff {
 /// Row-level replay comparison result for persisted utterance traces.
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct TraceReplayComparison {
+pub(crate) struct TraceReplayComparison {
     pub trace_id: uuid::Uuid,
     pub original_resolved_verb: Option<String>,
     pub replayed_resolved_verb: Option<String>,
@@ -69,7 +69,7 @@ pub struct TraceReplayComparison {
 /// assert!(matches!(diff.narrowing_drift, NarrowingDrift::Weakened { .. }));
 /// ```
 #[cfg(test)]
-pub fn compute_replay_narrowing_diff(
+pub(crate) fn compute_replay_narrowing_diff(
     original_payload: &serde_json::Value,
     replayed_payload: &serde_json::Value,
 ) -> ReplayNarrowingDiff {
@@ -128,7 +128,7 @@ pub fn compute_replay_narrowing_diff(
 /// );
 /// ```
 #[cfg(test)]
-pub fn derive_replay_verdict(
+pub(crate) fn derive_replay_verdict(
     original_resolved_verb: Option<&str>,
     replayed_resolved_verb: Option<&str>,
     diff: &ReplayNarrowingDiff,
@@ -206,7 +206,7 @@ pub fn derive_replay_verdict(
 /// assert_eq!(comparison.verdict, ob_poc::traceability::ReplayVerdict::Unchanged);
 /// ```
 #[cfg(test)]
-pub fn compare_trace_records(
+pub(crate) fn compare_trace_records(
     original: &UtteranceTraceRecord,
     replayed: &UtteranceTraceRecord,
 ) -> TraceReplayComparison {
@@ -269,7 +269,7 @@ pub fn compare_trace_records(
 /// assert_eq!(compare_trace_sequences(&original, &replayed).len(), 1);
 /// ```
 #[cfg(test)]
-pub fn compare_trace_sequences(
+pub(crate) fn compare_trace_sequences(
     original: &[UtteranceTraceRecord],
     replayed: &[UtteranceTraceRecord],
 ) -> Vec<TraceReplayComparison> {

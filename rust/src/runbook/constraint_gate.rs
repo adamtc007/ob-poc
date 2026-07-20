@@ -1,4 +1,3 @@
-#![allow(unreachable_pub)]
 //! Pack Constraint Gate — post-expansion enforcement.
 //!
 //! Positioned **after** macro expansion, **before** validate/lint in the

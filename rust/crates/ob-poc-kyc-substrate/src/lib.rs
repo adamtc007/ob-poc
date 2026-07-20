@@ -11,12 +11,12 @@
 //! **No sqlx. No DB. No schema.**  The durable `kyc_intent_events` table
 //! replaces `InMemoryEventStore` in W1-proper behind the same interface.
 
-pub mod determination;
-pub mod error;
-pub mod event;
-pub mod fold;
-pub mod lexicon;
-pub mod types;
+pub(crate) mod determination;
+pub(crate) mod error;
+pub(crate) mod event;
+pub(crate) mod fold;
+pub(crate) mod lexicon;
+pub(crate) mod types;
 
 // ── Convenience re-exports ────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
     check_control_preconditions, fold_control, natural_persons_from_events,
     reconciled_control_edges, reconciled_economic_edges, ControlState, EdgeKind, EdgeState,
-    EdgeStatus, ReconciledControlEdge, StructureClass,
+    EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge, StructureClass, TrustRoleKind,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,

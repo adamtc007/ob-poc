@@ -9,12 +9,12 @@ use uuid::Uuid;
 use super::session_trace::TraceEntry;
 
 /// Repository for session trace persistence.
-pub struct SessionTraceRepository;
+pub(crate) struct SessionTraceRepository;
 
 impl SessionTraceRepository {
     /// Append a batch of trace entries to the database.
     #[cfg(feature = "database")]
-    pub async fn append_batch(pool: &sqlx::PgPool, entries: &[TraceEntry]) -> Result<()> {
+    pub(crate) async fn append_batch(pool: &sqlx::PgPool, entries: &[TraceEntry]) -> Result<()> {
         for entry in entries {
             let op_json = serde_json::to_value(&entry.op)?;
             let stack_json = serde_json::to_value(&entry.stack_snapshot)?;
@@ -47,7 +47,7 @@ impl SessionTraceRepository {
 
     /// Load all trace entries for a session, ordered by sequence.
     #[cfg(feature = "database")]
-    pub async fn load_trace(pool: &sqlx::PgPool, session_id: Uuid) -> Result<Vec<TraceEntry>> {
+    pub(crate) async fn load_trace(pool: &sqlx::PgPool, session_id: Uuid) -> Result<Vec<TraceEntry>> {
         let rows = sqlx::query_as::<_, TraceRow>(
             r#"
             SELECT session_id, sequence, agent_mode, op, stack_snapshot, hydrated_snap, created_at,
@@ -66,7 +66,7 @@ impl SessionTraceRepository {
 
     /// Load a single trace entry by session_id and sequence.
     #[cfg(feature = "database")]
-    pub async fn load_entry(
+    pub(crate) async fn load_entry(
         pool: &sqlx::PgPool,
         session_id: Uuid,
         sequence: u64,

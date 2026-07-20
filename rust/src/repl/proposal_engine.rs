@@ -103,10 +103,10 @@ pub struct ProposalSet {
 const TEMPLATE_SCORE_THRESHOLD: f32 = 0.3;
 
 /// Confidence boost for template proposals to implement "prefer templates first".
-pub const TEMPLATE_CONFIDENCE_BOOST: f32 = 0.1;
+pub(crate) const TEMPLATE_CONFIDENCE_BOOST: f32 = 0.1;
 
 /// Confidence threshold for single-proposal auto-advance.
-pub const AUTO_ADVANCE_THRESHOLD: f32 = 0.85;
+pub(crate) const AUTO_ADVANCE_THRESHOLD: f32 = 0.85;
 
 /// Maximum number of verb-match proposals to return.
 const MAX_VERB_PROPOSALS: usize = 5;
@@ -453,7 +453,7 @@ impl ProposalEngine {
 // ============================================================================
 
 /// Filter proposals by pack's allowed_verbs and forbidden_verbs.
-pub fn filter_by_pack_constraints(proposals: &mut Vec<StepProposal>, pack: &PackManifest) {
+pub(crate) fn filter_by_pack_constraints(proposals: &mut Vec<StepProposal>, pack: &PackManifest) {
     if !pack.allowed_verbs.is_empty() {
         proposals.retain(|p| {
             // Direct DSL bypasses pack filtering.
