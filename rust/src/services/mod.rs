@@ -11,29 +11,14 @@
 // See rust/crates/entity-gateway/ for the central lookup service.
 
 // Attribute services
-pub mod attribute_executor;
 pub(crate) mod attribute_identity_service;
 pub(crate) mod attribute_registry_enrichment;
 
 // Dictionary and document services
 pub mod dictionary_service_impl;
-pub mod document_attribute_crud_service;
-pub mod document_catalog_source;
-pub mod document_extraction_service;
-pub mod extraction_service;
-
-// Executor services
-pub mod sink_executor;
-pub mod source_executor;
 
 // DSL enrichment (source → segments for UI display)
 pub mod dsl_enrichment;
-
-// Viewport resolution (lazy loading for viewport state)
-pub mod viewport_resolution_service;
-
-// Board control rules engine (computes who controls the board)
-pub mod board_control_rules;
 
 // Phase 5a — ob-poc-side impl of the `SemanticStateService`
 // trait, registered with the platform `ServiceRegistry` at host startup.
@@ -125,11 +110,8 @@ pub mod attribute_service_impl;
 // Re-exports
 pub use attribute_identity_dispatch_impl::ObPocAttributeIdentityService;
 pub use attribute_service_impl::ObPocAttributeService;
-pub(crate) use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use constellation_runtime_impl::ObPocConstellationRuntime;
 pub(crate) use dictionary_service_impl::DictionaryServiceImpl;
-pub(crate) use document_attribute_crud_service::DocumentAttributeCrudService;
-pub(crate) use document_extraction_service::DocumentExtractionService;
 pub(crate) use dsl_enrichment::{bindings_from_session_context, enrich_dsl, BindingInfo};
 pub use lifecycle_catalog_impl::ObPocLifecycleCatalog;
 pub use mcp_tool_registry_impl::ObPocMcpToolRegistry;
@@ -139,9 +121,6 @@ pub use sem_os_context_resolver_impl::ObPocSemOsContextResolver;
 pub use semantic_state_service_impl::ObPocSemanticStateService;
 pub use service_pipeline_service_impl::ObPocServicePipelineService;
 pub use session_service_impl::ObPocSessionService;
-pub(crate) use sink_executor::CompositeSinkExecutor;
-pub(crate) use source_executor::CompositeSourceExecutor;
 pub use stewardship_dispatch_impl::ObPocStewardshipDispatch;
 pub use trading_profile_document_impl::ObPocTradingProfileDocument;
 pub use view_service_impl::ObPocViewService;
-pub(crate) use viewport_resolution_service::ViewportResolutionService;

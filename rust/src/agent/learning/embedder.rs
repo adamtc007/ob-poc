@@ -376,11 +376,13 @@ impl Embedder for CachedEmbedder {
 }
 
 /// Null embedder for testing (returns zero vectors)
+#[cfg(test)]
 #[derive(Default)]
 pub(crate) struct NullEmbedder {
     dimension: usize,
 }
 
+#[cfg(test)]
 impl NullEmbedder {
     pub(crate) fn new() -> Self {
         Self {
@@ -390,6 +392,7 @@ impl NullEmbedder {
 
 }
 
+#[cfg(test)]
 #[async_trait]
 impl Embedder for NullEmbedder {
     async fn embed(&self, _text: &str) -> Result<Embedding> {

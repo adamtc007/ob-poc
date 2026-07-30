@@ -7,50 +7,32 @@
 //!
 //! # Architecture
 //!
-//! ```text
-//! User Chat → AgentEvent (fire-and-forget) → DB (async drain)
-//!                                                   ↓
-//!                                            Learning Analysis
-//!                                                   ↓
-//!                              ┌─────────────────────────────────────┐
-//!                              │         Trigger Points              │
-//!                              ├─────────────────────────────────────┤
-//!                              │ 1. Startup: Apply pending learnings │
-//!                              │ 2. Threshold: 3+ occurrences        │
-//!                              │ 3. Immediate: User corrections      │
-//!                              │ 4. On-demand: MCP tools             │
-//!                              └─────────────────────────────────────┘
-//! ```
+//! Two independent paths write to `"ob-poc".events` /
+//! `"ob-poc".learning_candidates` and are read back by this module; the
+//! original fire-and-forget `AgentEvent` emitter/drain-task/decay pipeline
+//! that this doc used to describe was never wired to a producer and was
+//! removed (dead-code remediation, 2026-07-30):
 //!
-//! # Two Feedback Loops
+//! - **[`background`]**: periodic post-startup task — feedback analysis,
+//!   auto-apply, promotion pipeline, embedding-coverage checks — via
+//!   `ob_semantic_matcher::{FeedbackService, PatternLearner, PromotionService}`.
+//! - **[`inspector::AgentLearningInspector`]**: on-demand analysis (MCP
+//!   tools) — detects correction-based learning candidates, threshold
+//!   auto-apply, manual approve/reject.
 //!
-//! This system complements the DSL execution feedback loop:
-//!
-//! - **Loop 1 (DSL)**: "Did the DSL execute correctly?" → Fix verbs/handlers
-//! - **Loop 2 (Agent)**: "Did we understand the user?" → Learn from corrections
-//!
-//! Both loops use fire-and-forget emission (< 1μs overhead) with background
-//! database persistence.
+//! [`warmup::LearningWarmup`] loads applied learnings into memory at
+//! startup (and on manual reload) for fast lookup; [`embedder`] provides the
+//! local Candle (BGE-small-en-v1.5) embedding service used for semantic
+//! phrase matching.
 
 pub mod background;
-pub mod decay;
-pub mod drain;
 pub mod embedder;
-pub mod emitter;
 pub mod inspector;
-pub mod types;
 pub mod warmup;
 
-pub(crate) use decay::ConfidenceDecay;
-pub(crate) use drain::{spawn_agent_drain_task, DrainConfig};
 pub use embedder::{CandleEmbedder, Embedder, Embedding};
-pub(crate) use embedder::{CachedEmbedder, NullEmbedder, SharedEmbedder, EMBEDDING_DIMENSION};
-pub(crate) use emitter::{AgentEventEmitter, AgentEventReceiver, SharedAgentEmitter};
+pub(crate) use embedder::{CachedEmbedder, SharedEmbedder, EMBEDDING_DIMENSION};
 pub(crate) use inspector::{AgentLearningInspector, LearningCandidate, LearningStatus, LearningType};
-pub(crate) use types::{
-    AgentEvent, AgentEventPayload, CorrectionType, EntityCandidate, ExtractedIntent,
-    ResolutionMethod, ResolvedEntity,
-};
 pub use warmup::{LearningWarmup};
 pub(crate) use warmup::{LearnedData, SharedLearnedData, WarmupStats};
 

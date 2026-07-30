@@ -190,18 +190,6 @@ impl LearnedData {
             .get(&phrase.to_lowercase())
             .map(|v| v.as_str())
     }
-
-    /// Check if we have any learned data.
-    pub(crate) fn is_empty(&self) -> bool {
-        self.entity_aliases.is_empty()
-            && self.lexicon_tokens.is_empty()
-            && self.invocation_phrases.is_empty()
-    }
-
-    /// Total learned items.
-    pub(crate) fn total_count(&self) -> usize {
-        self.entity_aliases.len() + self.lexicon_tokens.len() + self.invocation_phrases.len()
-    }
 }
 
 #[cfg(test)]
@@ -231,17 +219,5 @@ mod tests {
 
         // Non-existent
         assert!(data.resolve_entity_alias("unknown").is_none());
-    }
-
-    #[test]
-    fn test_learned_data_stats() {
-        let mut data = LearnedData::default();
-        assert!(data.is_empty());
-        assert_eq!(data.total_count(), 0);
-
-        data.entity_aliases
-            .insert("test".to_string(), ("Test".to_string(), None));
-        assert!(!data.is_empty());
-        assert_eq!(data.total_count(), 1);
     }
 }

@@ -6,6 +6,7 @@
 use super::StepExpectation;
 use crate::agent::orchestrator::{IntentTrace, OrchestratorOutcome};
 use crate::mcp::intent_pipeline::PipelineOutcome;
+#[cfg(test)]
 use crate::semtaxonomy_v2::{parse_structured_intent_plan, CompilerInputEnvelope};
 use crate::session::unified::UnifiedSession;
 use serde::Serialize;
@@ -281,6 +282,7 @@ fn check_global_invariants(
 }
 
 /// Validate a canonical NLCI structured-intent fixture.
+#[cfg(test)]
 pub(crate) fn check_nlci_plan_fixture(raw: &str) -> Vec<AssertionFailure> {
     match parse_structured_intent_plan(raw) {
         Ok(_) => Vec::new(),
@@ -293,6 +295,7 @@ pub(crate) fn check_nlci_plan_fixture(raw: &str) -> Vec<AssertionFailure> {
 }
 
 /// Validate a canonical NLCI compiler-envelope fixture.
+#[cfg(test)]
 pub(crate) fn check_nlci_compiler_input_fixture(raw: &str) -> Vec<AssertionFailure> {
     match serde_json::from_str::<CompilerInputEnvelope>(raw) {
         Ok(envelope) => match envelope.validate_invariants() {
