@@ -49,6 +49,23 @@ export interface WorkflowInstanceDetail {
   sage_records: SageReasoningRecord[];
 }
 
+/** A Published workflow template (bpmn-lite Phase B, 2026-07-30). */
+export interface PublishedTemplateSummary {
+  template_key: string;
+  template_version: number;
+  process_key: string;
+  task_manifest: string[];
+  created_at: number;
+  published_at: number | null;
+}
+
+export interface SpawnInstanceResult {
+  instance_id: string;
+  template_key: string;
+  template_version: number;
+  bytecode_version: string;
+}
+
 async function bpmnFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BPMN_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -93,6 +110,26 @@ export const bpmnApi = {
 
   getStack: (id: string) =>
     bpmnFetch<CallStackFrameDto[]>(`/instances/${id}/stack`),
+
+  /** Published templates (workflow_templates registry, Published-only) — the
+   * catalogue view. Distinct from the legacy /bpmn/templates list, which
+   * still reads the older workflow_template_catalog (no lifecycle). */
+  listPublishedTemplates: (key?: string) =>
+    bpmnFetch<PublishedTemplateSummary[]>(
+      key ? `/templates/published?key=${encodeURIComponent(key)}` : "/templates/published"
+    ),
+
+  /** Spawn a runnable instance from a Published template. Omitting
+   * `version` resolves the latest Published version server-side. */
+  spawnFromTemplate: (
+    templateKey: string,
+    version?: number,
+    payload?: Record<string, unknown>
+  ) =>
+    bpmnFetch<SpawnInstanceResult>(`/templates/${encodeURIComponent(templateKey)}/spawn`, {
+      method: "POST",
+      body: JSON.stringify({ version, payload }),
+    }),
 
   getDmnDecision: (decisionId: string) =>
     fetch(`/dmn/decisions/${decisionId}`, {
