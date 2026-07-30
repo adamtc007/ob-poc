@@ -17,8 +17,6 @@ use sqlx::PgPool;
 #[derive(Debug, Default)]
 pub(crate) struct ApplicabilityRules {
     pub document_rules: HashMap<String, DocumentApplicability>,
-    pub attribute_rules: HashMap<String, AttributeApplicability>,
-    pub entity_type_hierarchy: HashMap<String, Vec<String>>,
 }
 
 /// Applicability rules for a document type
@@ -79,49 +77,6 @@ impl DocumentApplicability {
         self.client_types.iter().any(|c| c == client_type)
     }
 
-    /// Check if document is required for given entity type
-    pub(crate) fn is_required_for(&self, entity_type: &str) -> bool {
-        self.required_for.iter().any(|req| {
-            if req.ends_with('*') {
-                let prefix = &req[..req.len() - 1];
-                entity_type.starts_with(prefix)
-            } else {
-                req == entity_type
-            }
-        })
-    }
-}
-
-/// Applicability rules for an attribute
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct AttributeApplicability {
-    #[serde(default)]
-    pub entity_types: Vec<String>,
-
-    #[serde(default)]
-    pub required_for: Vec<String>,
-
-    #[serde(default)]
-    pub source_documents: Vec<String>,
-
-    #[serde(default)]
-    pub depends_on: Vec<String>,
-}
-
-impl AttributeApplicability {
-    pub(crate) fn applies_to_entity_type(&self, entity_type: &str) -> bool {
-        if self.entity_types.is_empty() {
-            return true;
-        }
-        self.entity_types.iter().any(|allowed| {
-            if allowed.ends_with('*') {
-                let prefix = &allowed[..allowed.len() - 1];
-                entity_type.starts_with(prefix)
-            } else {
-                allowed == entity_type
-            }
-        })
-    }
 }
 
 // =============================================================================
@@ -134,8 +89,6 @@ impl ApplicabilityRules {
     pub(crate) async fn load(pool: &PgPool) -> Result<Self, String> {
         Ok(Self {
             document_rules: Self::load_document_rules(pool).await?,
-            attribute_rules: Self::load_attribute_rules(pool).await?,
-            entity_type_hierarchy: Self::load_entity_hierarchy(pool).await?,
         })
     }
 
@@ -162,53 +115,6 @@ impl ApplicabilityRules {
         }
 
         Ok(rules)
-    }
-
-    #[cfg(feature = "database")]
-    async fn load_attribute_rules(
-        pool: &PgPool,
-    ) -> Result<HashMap<String, AttributeApplicability>, String> {
-        let rows = sqlx::query!(
-            r#"SELECT id, applicability
-               FROM "ob-poc".attribute_registry
-               WHERE applicability IS NOT NULL AND applicability != '{}'::jsonb"#
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| format!("Failed to load attribute rules: {}", e))?;
-
-        let mut rules = HashMap::new();
-        for row in rows {
-            let applicability = row
-                .applicability
-                .and_then(|v| serde_json::from_value::<AttributeApplicability>(v).ok())
-                .unwrap_or_default();
-            rules.insert(row.id, applicability);
-        }
-
-        Ok(rules)
-    }
-
-    #[cfg(feature = "database")]
-    async fn load_entity_hierarchy(pool: &PgPool) -> Result<HashMap<String, Vec<String>>, String> {
-        let rows = sqlx::query!(
-            r#"SELECT type_code, type_hierarchy_path
-               FROM "ob-poc".entity_types
-               WHERE type_code IS NOT NULL"#
-        )
-        .fetch_all(pool)
-        .await
-        .map_err(|e| format!("Failed to load entity hierarchy: {}", e))?;
-
-        let mut hierarchy = HashMap::new();
-        for row in rows {
-            if let Some(type_code) = row.type_code {
-                let path = row.type_hierarchy_path.unwrap_or_default();
-                hierarchy.insert(type_code, path);
-            }
-        }
-
-        Ok(hierarchy)
     }
 
     /// Find valid documents for an entity type

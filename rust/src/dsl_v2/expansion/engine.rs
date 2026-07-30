@@ -41,15 +41,6 @@ pub(crate) enum ExpansionError {
 
     #[error("Invalid lock argument {arg}: {value} is not a valid UUID")]
     InvalidLockArg { arg: String, value: String },
-
-    #[error("Parse error: {0}")]
-    ParseError(String),
-
-    #[error("Missing required parameter: {param} for template {template}")]
-    MissingParam { template: String, param: String },
-
-    #[error("Template expansion failed: {0}")]
-    ExpansionFailed(String),
 }
 
 /// Expand templates in DSL source deterministically (PURE - no DB calls)
@@ -782,10 +773,12 @@ mod tests {
 
     #[test]
     fn test_lock_key_sorting() {
+        use super::super::types::LockAccess;
+
         let mut locks = [
             LockKey::write("person", "uuid-3"),
             LockKey::write("cbu", "uuid-1"),
-            LockKey::read("person", "uuid-2"),
+            LockKey::new("person", "uuid-2", LockAccess::Read),
         ];
 
         locks.sort();
@@ -802,7 +795,6 @@ mod tests {
         use super::super::types::{LockAccess, LockTarget};
 
         let policy = LockingPolicy {
-            mode: super::super::types::LockMode::Try,
             timeout_ms: None,
             targets: vec![
                 LockTarget {
@@ -838,7 +830,6 @@ mod tests {
         use super::super::types::{LockAccess, LockTarget};
 
         let policy = LockingPolicy {
-            mode: super::super::types::LockMode::Try,
             timeout_ms: None,
             targets: vec![LockTarget {
                 arg: "missing-arg".to_string(),
@@ -858,7 +849,6 @@ mod tests {
         use super::super::types::{LockAccess, LockTarget};
 
         let policy = LockingPolicy {
-            mode: super::super::types::LockMode::Try,
             timeout_ms: None,
             targets: vec![LockTarget {
                 arg: "entity-id".to_string(),

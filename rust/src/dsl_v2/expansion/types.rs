@@ -168,10 +168,6 @@ pub(crate) struct TemplatePolicy {
 /// causing partial failures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct LockingPolicy {
-    /// Lock acquisition mode (not serialized — `Duration` is not serde-friendly;
-    /// use `timeout_ms` to configure timeout from YAML/JSON).
-    #[serde(skip, default)]
-    pub mode: LockMode,
     /// Timeout in milliseconds (only used with `mode: block`)
     #[serde(default)]
     pub timeout_ms: Option<u64>,
@@ -185,8 +181,6 @@ pub(crate) enum LockMode {
     /// Non-blocking: fail immediately if lock unavailable
     #[default]
     Try,
-    /// Blocking: wait for lock indefinitely
-    Block,
     /// Blocking with timeout: wait up to `duration`, then fail with contention error.
     ///
     /// Implementation: `SET LOCAL statement_timeout = '<ms>'` before
@@ -259,11 +253,6 @@ impl LockKey {
     pub(crate) fn write(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
         Self::new(entity_type, entity_id, LockAccess::Write)
     }
-
-    /// Create a read lock key
-    pub(crate) fn read(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
-        Self::new(entity_type, entity_id, LockAccess::Read)
-    }
 }
 
 impl PartialOrd for LockKey {
@@ -324,7 +313,7 @@ mod tests {
         let mut keys = [
             LockKey::write("person", "uuid-3"),
             LockKey::write("cbu", "uuid-1"),
-            LockKey::read("person", "uuid-2"),
+            LockKey::new("person", "uuid-2", LockAccess::Read),
             LockKey::write("person", "uuid-2"),
         ];
 
@@ -368,8 +357,5 @@ mod tests {
     fn test_lock_key_constructors() {
         let write_key = LockKey::write("person", "uuid-123");
         assert_eq!(write_key.access, LockAccess::Write);
-
-        let read_key = LockKey::read("person", "uuid-123");
-        assert_eq!(read_key.access, LockAccess::Read);
     }
 }

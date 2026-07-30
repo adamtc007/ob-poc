@@ -77,11 +77,6 @@ impl SymbolBinding {
         self.ids.len()
     }
 
-    /// True if no UUIDs bound
-    pub(crate) fn is_empty(&self) -> bool {
-        self.ids.is_empty()
-    }
-
     /// Cardinality 0 - draft state
     pub(crate) fn is_unresolved(&self) -> bool {
         self.ids.is_empty()
@@ -103,27 +98,6 @@ impl SymbolBinding {
         self.ids[0]
     }
 
-
-    /// Add a UUID to the binding
-    pub(crate) fn add(&mut self, id: Uuid, name: Option<String>) {
-        self.ids.push(id);
-        if let Some(n) = name {
-            self.names.push(n);
-        }
-    }
-
-    /// Remove a UUID from the binding
-    pub(crate) fn remove(&mut self, id: Uuid) -> bool {
-        if let Some(idx) = self.ids.iter().position(|i| *i == id) {
-            self.ids.remove(idx);
-            if idx < self.names.len() {
-                self.names.remove(idx);
-            }
-            true
-        } else {
-            false
-        }
-    }
 
     /// Get name for a given index
     pub(crate) fn name_at(&self, idx: usize) -> Option<&str> {
@@ -173,8 +147,6 @@ pub(crate) struct SubmissionLimits {
     pub warn_total_ops: usize,
     /// Reject if total operations exceed this
     pub max_total_ops: usize,
-    /// Chunk size for large batches
-    pub chunk_size: usize,
 }
 
 impl Default for SubmissionLimits {
@@ -184,7 +156,6 @@ impl Default for SubmissionLimits {
             max_iterations: 10_000,
             warn_total_ops: 500,
             max_total_ops: 50_000,
-            chunk_size: 100,
         }
     }
 }
@@ -207,26 +178,6 @@ impl DslSubmission {
             statements,
             bindings: HashMap::new(),
         }
-    }
-
-    /// Add a binding (builder pattern)
-    pub(crate) fn bind(mut self, symbol: impl Into<String>, binding: SymbolBinding) -> Self {
-        self.bindings.insert(symbol.into(), binding);
-        self
-    }
-
-    /// Add a singleton binding (builder pattern)
-    pub(crate) fn bind_one(mut self, symbol: impl Into<String>, id: Uuid) -> Self {
-        self.bindings
-            .insert(symbol.into(), SymbolBinding::singleton(id));
-        self
-    }
-
-    /// Add a multiple binding (builder pattern)
-    pub(crate) fn bind_many(mut self, symbol: impl Into<String>, ids: Vec<Uuid>) -> Self {
-        self.bindings
-            .insert(symbol.into(), SymbolBinding::multiple(ids));
-        self
     }
 
     /// Set a binding
@@ -276,11 +227,6 @@ impl DslSubmission {
             1 => Ok(Some(multi.into_iter().next().unwrap())),
             _ => Err(SubmissionError::MultipleIterationSymbols(multi)),
         }
-    }
-
-    /// True if this is a batch submission (any symbol has cardinality > 1)
-    pub(crate) fn is_batch(&self) -> bool {
-        self.bindings.values().any(|b| b.is_multiple())
     }
 
     /// Number of iterations (max cardinality across all bindings)
@@ -555,7 +501,6 @@ mod tests {
     fn test_symbol_binding_unresolved() {
         let b = SymbolBinding::unresolved();
         assert!(b.is_unresolved());
-        assert!(b.is_empty());
         assert_eq!(b.len(), 0);
     }
 
@@ -576,25 +521,6 @@ mod tests {
         assert!(b.is_multiple());
         assert!(!b.is_singleton());
         assert_eq!(b.len(), 3);
-    }
-
-    #[test]
-    fn test_symbol_binding_add_remove() {
-        let mut b = SymbolBinding::unresolved();
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-
-        b.add(id1, Some("first".to_string()));
-        assert!(b.is_singleton());
-
-        b.add(id2, Some("second".to_string()));
-        assert!(b.is_multiple());
-        assert_eq!(b.len(), 2);
-
-        assert!(b.remove(id1));
-        assert!(b.is_singleton());
-
-        assert!(!b.remove(id1)); // Already removed
     }
 
     #[test]
@@ -643,7 +569,8 @@ mod tests {
             binding: None,
             span: Span::default(),
         });
-        let submission = DslSubmission::new(vec![stmt]).bind_one("target", Uuid::new_v4());
+        let mut submission = DslSubmission::new(vec![stmt]);
+        submission.set_binding("target", SymbolBinding::singleton(Uuid::new_v4()));
 
         let state = submission.state(&SubmissionLimits::default());
         assert!(matches!(state, SubmissionState::Ready));
@@ -668,9 +595,9 @@ mod tests {
         });
 
         let ids = vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
-        let submission = DslSubmission::new(vec![stmt]).bind_many("target", ids.clone());
+        let mut submission = DslSubmission::new(vec![stmt]);
+        submission.set_binding("target", SymbolBinding::multiple(ids.clone()));
 
-        assert!(submission.is_batch());
         assert_eq!(submission.iteration_count(), 3);
 
         let expanded = submission.expand().unwrap();
@@ -698,7 +625,8 @@ mod tests {
         });
 
         let ids: Vec<Uuid> = (0..15000).map(|_| Uuid::new_v4()).collect();
-        let submission = DslSubmission::new(vec![stmt]).bind_many("target", ids);
+        let mut submission = DslSubmission::new(vec![stmt]);
+        submission.set_binding("target", SymbolBinding::multiple(ids));
 
         let state = submission.state(&SubmissionLimits::default());
         assert!(matches!(state, SubmissionState::TooLarge { .. }));
@@ -732,9 +660,15 @@ mod tests {
             span: Span::default(),
         });
 
-        let submission = DslSubmission::new(vec![stmt])
-            .bind_many("sym1", vec![Uuid::new_v4(), Uuid::new_v4()])
-            .bind_many("sym2", vec![Uuid::new_v4(), Uuid::new_v4()]);
+        let mut submission = DslSubmission::new(vec![stmt]);
+        submission.set_binding(
+            "sym1",
+            SymbolBinding::multiple(vec![Uuid::new_v4(), Uuid::new_v4()]),
+        );
+        submission.set_binding(
+            "sym2",
+            SymbolBinding::multiple(vec![Uuid::new_v4(), Uuid::new_v4()]),
+        );
 
         let result = submission.iteration_symbol();
         assert!(matches!(

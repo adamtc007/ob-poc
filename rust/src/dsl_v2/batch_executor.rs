@@ -111,20 +111,6 @@ impl BatchResultAccumulator {
         }
     }
 
-    /// Create an empty accumulator with specified primary entity info
-    pub(crate) fn with_primary(entity_type: impl Into<String>, binding_name: impl Into<String>) -> Self {
-        Self {
-            primary_entity_type: entity_type.into(),
-            primary_binding_name: binding_name.into(),
-            ..Default::default()
-        }
-    }
-
-    /// Get all primary entity IDs (alias for common use case)
-    pub(crate) fn cbu_ids(&self) -> &[Uuid] {
-        &self.primary_entity_ids
-    }
-
     /// Record a successful iteration
     pub(crate) fn record_success(
         &mut self,
@@ -156,16 +142,6 @@ impl BatchResultAccumulator {
         tracing::warn!(index, %error, "Batch iteration failed");
     }
 
-    /// Check if batch was fully successful
-    pub(crate) fn is_complete_success(&self) -> bool {
-        self.failure_count == 0 && self.skipped_count == 0
-    }
-
-    /// Get total items processed (success + failure)
-    pub(crate) fn total_processed(&self) -> usize {
-        self.success_count + self.failure_count
-    }
-
 }
 
 /// Result of batch execution
@@ -179,9 +155,6 @@ pub(crate) struct BatchExecutionResult {
 
     /// Whether batch was aborted early
     pub aborted: bool,
-
-    /// Index at which batch was aborted (if aborted)
-    pub aborted_at: Option<usize>,
 }
 
 impl BatchExecutionResult {
@@ -191,21 +164,15 @@ impl BatchExecutionResult {
             accumulator,
             total_items,
             aborted: false,
-            aborted_at: None,
         }
     }
 
     /// Create an aborted batch result
-    pub(crate) fn aborted(
-        accumulator: BatchResultAccumulator,
-        total_items: usize,
-        at_index: usize,
-    ) -> Self {
+    pub(crate) fn aborted(accumulator: BatchResultAccumulator, total_items: usize) -> Self {
         Self {
             accumulator,
             total_items,
             aborted: true,
-            aborted_at: Some(at_index),
         }
     }
 }
@@ -301,22 +268,14 @@ impl BatchExecutor {
                     match on_error {
                         OnErrorMode::Stop => {
                             tracing::warn!(index, "Batch stopped due to error");
-                            return Ok(BatchExecutionResult::aborted(
-                                accumulator,
-                                total_items,
-                                index,
-                            ));
+                            return Ok(BatchExecutionResult::aborted(accumulator, total_items));
                         }
                         OnErrorMode::Rollback => {
                             tracing::warn!(index, "Batch rolling back due to error");
                             if let Some(tx) = tx.take() {
                                 tx.rollback().await?;
                             }
-                            return Ok(BatchExecutionResult::aborted(
-                                accumulator,
-                                total_items,
-                                index,
-                            ));
+                            return Ok(BatchExecutionResult::aborted(accumulator, total_items));
                         }
                         OnErrorMode::Continue => {
                             // Continue to next iteration
@@ -427,7 +386,11 @@ mod tests {
 
     #[test]
     fn test_batch_result_accumulator_record_success() {
-        let mut acc = BatchResultAccumulator::with_primary("cbu", "cbu");
+        let mut acc = BatchResultAccumulator {
+            primary_entity_type: "cbu".to_string(),
+            primary_binding_name: "cbu".to_string(),
+            ..Default::default()
+        };
 
         let mut symbols = HashMap::new();
         symbols.insert("cbu".to_string(), Uuid::new_v4());
@@ -438,24 +401,31 @@ mod tests {
         assert_eq!(acc.success_count, 1);
         assert_eq!(acc.failure_count, 0);
         assert_eq!(acc.primary_entity_ids.len(), 1);
-        assert!(acc.is_complete_success());
+        assert_eq!(acc.skipped_count, 0);
     }
 
     #[test]
     fn test_batch_result_accumulator_record_failure() {
-        let mut acc = BatchResultAccumulator::with_primary("cbu", "cbu");
+        let mut acc = BatchResultAccumulator {
+            primary_entity_type: "cbu".to_string(),
+            primary_binding_name: "cbu".to_string(),
+            ..Default::default()
+        };
 
         acc.record_failure(0, "Test error".to_string());
 
         assert_eq!(acc.success_count, 0);
         assert_eq!(acc.failure_count, 1);
-        assert!(!acc.is_complete_success());
         assert!(acc.errors.contains_key(&0));
     }
 
     #[test]
     fn test_batch_result_accumulator_mixed() {
-        let mut acc = BatchResultAccumulator::with_primary("cbu", "cbu");
+        let mut acc = BatchResultAccumulator {
+            primary_entity_type: "cbu".to_string(),
+            primary_binding_name: "cbu".to_string(),
+            ..Default::default()
+        };
 
         let mut symbols = HashMap::new();
         let cbu_id = Uuid::new_v4();
@@ -467,29 +437,34 @@ mod tests {
 
         assert_eq!(acc.success_count, 2);
         assert_eq!(acc.failure_count, 1);
-        assert_eq!(acc.total_processed(), 3);
-        assert!(!acc.is_complete_success());
+        assert_eq!(acc.success_count + acc.failure_count, 3);
         assert_eq!(acc.primary_entity_ids.len(), 1);
         assert_eq!(acc.primary_entity_ids[0], cbu_id);
     }
 
     #[test]
     fn test_batch_execution_result_success() {
-        let acc = BatchResultAccumulator::with_primary("cbu", "cbu");
+        let acc = BatchResultAccumulator {
+            primary_entity_type: "cbu".to_string(),
+            primary_binding_name: "cbu".to_string(),
+            ..Default::default()
+        };
         let result = BatchExecutionResult::success(acc, 10);
 
         assert!(!result.aborted);
-        assert!(result.aborted_at.is_none());
         assert_eq!(result.total_items, 10);
     }
 
     #[test]
     fn test_batch_execution_result_aborted() {
-        let acc = BatchResultAccumulator::with_primary("cbu", "cbu");
-        let result = BatchExecutionResult::aborted(acc, 10, 5);
+        let acc = BatchResultAccumulator {
+            primary_entity_type: "cbu".to_string(),
+            primary_binding_name: "cbu".to_string(),
+            ..Default::default()
+        };
+        let result = BatchExecutionResult::aborted(acc, 10);
 
         assert!(result.aborted);
-        assert_eq!(result.aborted_at, Some(5));
         assert_eq!(result.total_items, 10);
     }
 }

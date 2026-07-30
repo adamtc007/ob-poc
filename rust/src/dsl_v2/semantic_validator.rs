@@ -13,7 +13,7 @@
 //! providing a complete diagnostic report (like rustc).
 
 use crate::dsl_v2::ast::{Argument, AstNode, Literal, Program, Span, Statement, VerbCall};
-use crate::dsl_v2::csg_linter::{CsgLinter, LintResult};
+use crate::dsl_v2::csg_linter::CsgLinter;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::parser::parse_program;
 use crate::dsl_v2::ref_resolver::{arg_to_ref_type, RefResolver, ResolveResult};

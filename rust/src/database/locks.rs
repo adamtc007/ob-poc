@@ -155,7 +155,7 @@ pub async fn acquire_locks(
                 // Non-blocking — fail fast if lock unavailable
                 try_advisory_xact_lock(tx, key).await
             }
-            LockMode::Block | LockMode::Timeout(_) => {
+            LockMode::Timeout(_) => {
                 // Blocking — wait for lock (with optional statement_timeout).
                 // On timeout (57014), sqlx returns Err(sqlx::Error::Database(..)).
                 advisory_xact_lock(tx, key).await.map(|()| true)

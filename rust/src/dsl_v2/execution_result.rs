@@ -4,7 +4,6 @@
 //! Each step produces a `StepResult` that explicitly captures what happened.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Result of executing a single DSL step
@@ -98,106 +97,6 @@ impl StepResult {
     }
 }
 
-/// Accumulated results from executing a plan
-#[derive(Clone, Debug, Default)]
-pub(crate) struct ExecutionResults {
-    /// Results indexed by step index
-    pub step_results: Vec<(usize, StepResult)>,
-    /// Bindings created during execution: symbol name → UUID
-    pub bindings_created: HashMap<String, Uuid>,
-    /// Entity types for bindings: symbol name → entity type
-    pub binding_types: HashMap<String, String>,
-    /// Errors encountered: step index → error message
-    pub errors: Vec<(usize, String)>,
-}
-
-impl ExecutionResults {
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
-    /// Record a successful step result
-    pub(crate) fn record_step(&mut self, step_index: usize, result: StepResult, binding: Option<&str>) {
-        // Record binding if provided and result produced a PK
-        if let Some(bind_name) = binding {
-            if let Some(pk) = result.produced_pk() {
-                self.bindings_created.insert(bind_name.to_string(), pk);
-            }
-            if let Some(entity_type) = result.entity_type() {
-                self.binding_types
-                    .insert(bind_name.to_string(), entity_type.to_string());
-            }
-        }
-        self.step_results.push((step_index, result));
-    }
-
-    /// Record an error for a step
-    pub(crate) fn record_error(&mut self, step_index: usize, error: impl Into<String>) {
-        self.errors.push((step_index, error.into()));
-    }
-
-    /// Check if execution was successful (no errors)
-    pub(crate) fn is_success(&self) -> bool {
-        self.errors.is_empty()
-    }
-
-    /// Get the number of successful steps
-    pub(crate) fn success_count(&self) -> usize {
-        self.step_results.len()
-    }
-
-    /// Get the number of errors
-    pub(crate) fn error_count(&self) -> usize {
-        self.errors.len()
-    }
-
-    /// Get binding by name
-    pub(crate) fn get_binding(&self, name: &str) -> Option<Uuid> {
-        self.bindings_created.get(name).copied()
-    }
-
-    /// Check if a binding exists
-    pub(crate) fn has_binding(&self, name: &str) -> bool {
-        self.bindings_created.contains_key(name)
-    }
-
-    /// Get entity type for a binding
-    pub(crate) fn binding_type(&self, name: &str) -> Option<&str> {
-        self.binding_types.get(name).map(|s| s.as_str())
-    }
-
-    /// Merge results from another execution
-    pub(crate) fn merge(&mut self, other: ExecutionResults) {
-        self.step_results.extend(other.step_results);
-        self.bindings_created.extend(other.bindings_created);
-        self.binding_types.extend(other.binding_types);
-        self.errors.extend(other.errors);
-    }
-
-    /// Create a summary string for logging
-    pub(crate) fn summary(&self) -> String {
-        let creates = self
-            .step_results
-            .iter()
-            .filter(|(_, r)| r.is_create())
-            .count();
-        let updates = self
-            .step_results
-            .iter()
-            .filter(|(_, r)| r.is_update())
-            .count();
-
-        format!(
-            "{} steps executed ({} creates, {} updates), {} bindings, {} errors",
-            self.step_results.len(),
-            creates,
-            updates,
-            self.bindings_created.len(),
-            self.errors.len()
-        )
-    }
-}
-
 // =============================================================================
 // Tests
 // =============================================================================
@@ -219,64 +118,5 @@ mod tests {
 
         let noop = StepResult::NoOp;
         assert_eq!(noop.produced_pk(), None);
-    }
-
-    #[test]
-    fn test_execution_results_record() {
-        let mut results = ExecutionResults::new();
-        let pk = Uuid::new_v4();
-
-        results.record_step(
-            0,
-            StepResult::Created {
-                pk,
-                entity_type: "cbu".to_string(),
-            },
-            Some("fund"),
-        );
-
-        assert!(results.is_success());
-        assert_eq!(results.get_binding("fund"), Some(pk));
-        assert_eq!(results.binding_type("fund"), Some("cbu"));
-    }
-
-    #[test]
-    fn test_execution_results_errors() {
-        let mut results = ExecutionResults::new();
-        results.record_error(0, "something went wrong");
-
-        assert!(!results.is_success());
-        assert_eq!(results.error_count(), 1);
-    }
-
-    #[test]
-    fn test_execution_results_merge() {
-        let mut results1 = ExecutionResults::new();
-        let pk1 = Uuid::new_v4();
-        results1.record_step(
-            0,
-            StepResult::Created {
-                pk: pk1,
-                entity_type: "cbu".to_string(),
-            },
-            Some("fund"),
-        );
-
-        let mut results2 = ExecutionResults::new();
-        let pk2 = Uuid::new_v4();
-        results2.record_step(
-            1,
-            StepResult::Created {
-                pk: pk2,
-                entity_type: "proper_person".to_string(),
-            },
-            Some("person"),
-        );
-
-        results1.merge(results2);
-
-        assert_eq!(results1.success_count(), 2);
-        assert!(results1.has_binding("fund"));
-        assert!(results1.has_binding("person"));
     }
 }

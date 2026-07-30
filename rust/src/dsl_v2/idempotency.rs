@@ -43,15 +43,6 @@ struct IdempotencyCheckRow {
     result_affected: Option<i64>,
 }
 
-/// Row struct for atomic view state recording results
-#[cfg(feature = "database")]
-#[derive(Debug, sqlx::FromRow)]
-struct ViewStateRecordRow {
-    idempotency_key: String,
-    view_state_change_id: Option<Uuid>,
-    was_cached: bool,
-}
-
 /// Source of an execution - where did this request originate?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -127,17 +118,6 @@ pub(crate) struct SourceAttribution {
     pub actor_id: Option<Uuid>,
     /// Type of actor
     pub actor_type: ActorType,
-}
-
-impl SourceAttribution {
-    pub(crate) fn new(source: ExecutionSource) -> Self {
-        Self {
-            source,
-            ..Default::default()
-        }
-    }
-
-
 }
 
 /// Cached result from a previous execution
@@ -257,194 +237,6 @@ impl IdempotencyManager {
         }))
     }
 
-    /// Record a successful execution for future idempotency checks
-    ///
-    /// The optional `verb_hash` parameter links this execution to a specific
-    /// verb configuration version for audit trail purposes.
-    ///
-    /// Returns the idempotency key for downstream audit linkage (e.g., view state audit).
-    pub(crate) async fn record(
-        &self,
-        execution_id: Uuid,
-        statement_index: usize,
-        verb: &str,
-        args: &HashMap<String, JsonValue>,
-        result: &ExecutionResult,
-        verb_hash: Option<&[u8]>,
-    ) -> Result<String> {
-        let key = compute_idempotency_key(execution_id, statement_index, verb, args);
-        let args_hash = compute_args_hash(args);
-
-        let (result_type, result_id, result_json, result_affected) = match result {
-            ExecutionResult::Uuid(id) => ("uuid", Some(*id), None, None),
-            ExecutionResult::Affected(n) => ("affected", None, None, Some(*n as i64)),
-            ExecutionResult::Record(json) => ("record", None, Some(json.clone()), None),
-            ExecutionResult::RecordSet(arr) => {
-                ("recordset", None, Some(JsonValue::Array(arr.clone())), None)
-            }
-            ExecutionResult::Void => ("void", None, None, None),
-            ExecutionResult::EntityQuery(query_result) => {
-                // Serialize entity query result as JSON for idempotency caching
-                let json = serde_json::json!({
-                    "items": query_result.items.iter().map(|(id, name)| {
-                        serde_json::json!({"id": id.to_string(), "name": name})
-                    }).collect::<Vec<_>>(),
-                    "entity_type": query_result.entity_type,
-                    "total_count": query_result.total_count,
-                });
-                ("entity_query", None, Some(json), None)
-            }
-            ExecutionResult::TemplateInvoked(invoke_result) => {
-                // Serialize template invoke result as JSON
-                let json = serde_json::json!({
-                    "template_id": invoke_result.template_id,
-                    "statements_executed": invoke_result.statements_executed,
-                    "outputs": invoke_result.outputs.iter().map(|(k, v)| {
-                        (k.clone(), v.to_string())
-                    }).collect::<HashMap<String, String>>(),
-                    "primary_entity_id": invoke_result.primary_entity_id.map(|id| id.to_string()),
-                });
-                (
-                    "template_invoked",
-                    invoke_result.primary_entity_id,
-                    Some(json),
-                    None,
-                )
-            }
-            ExecutionResult::TemplateBatch(batch_result) => {
-                // Serialize template batch result as JSON
-                let json = serde_json::json!({
-                    "template_id": batch_result.template_id,
-                    "total_items": batch_result.total_items,
-                    "success_count": batch_result.success_count,
-                    "failure_count": batch_result.failure_count,
-                    "primary_entity_ids": batch_result.primary_entity_ids.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
-                    "primary_entity_type": batch_result.primary_entity_type,
-                    "aborted": batch_result.aborted,
-                });
-                (
-                    "template_batch",
-                    batch_result.primary_entity_ids.first().copied(),
-                    Some(json),
-                    None,
-                )
-            }
-            ExecutionResult::BatchControl(control_result) => {
-                // Serialize batch control result as JSON
-                let json = serde_json::json!({
-                    "operation": control_result.operation,
-                    "success": control_result.success,
-                    "status": control_result.status,
-                    "message": control_result.message,
-                });
-                ("batch_control", None, Some(json), None)
-            }
-        };
-
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".dsl_idempotency
-               (idempotency_key, execution_id, statement_index, verb, args_hash,
-                result_type, result_id, result_json, result_affected, verb_hash)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-               ON CONFLICT (idempotency_key) DO NOTHING"#,
-        )
-        .bind(&key)
-        .bind(execution_id)
-        .bind(statement_index as i32)
-        .bind(verb)
-        .bind(&args_hash)
-        .bind(result_type)
-        .bind(result_id)
-        .bind(result_json)
-        .bind(result_affected)
-        .bind(verb_hash)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(key)
-    }
-
-
-    /// Atomically record execution AND view state change in a single transaction
-    ///
-    /// This is the preferred method when a view.* operation produces a ViewState.
-    /// It ensures both the idempotency record and view state audit are committed
-    /// together, preventing inconsistency if the process crashes between writes.
-    ///
-    /// Returns (idempotency_key, view_state_change_id, was_cached)
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn record_with_view_state(
-        &self,
-        execution_id: Uuid,
-        statement_index: usize,
-        verb: &str,
-        args: &HashMap<String, JsonValue>,
-        result: &ExecutionResult,
-        verb_hash: Option<&[u8]>,
-        attribution: &SourceAttribution,
-        view_state: Option<&crate::session::ViewState>,
-        session_id: Option<Uuid>,
-    ) -> Result<AtomicRecordResult> {
-        let key = compute_idempotency_key(execution_id, statement_index, verb, args);
-        let args_hash = compute_args_hash(args);
-
-        let (result_type, result_id, result_json, result_affected) =
-            Self::execution_result_to_db(result);
-
-        // Prepare view state params if provided
-        let (view_taxonomy, view_selection, view_refinements, view_stack_depth, view_snapshot) =
-            if let Some(vs) = view_state {
-                (
-                    Some(serde_json::to_value(&vs.context)?),
-                    Some(vs.selection.clone()),
-                    Some(serde_json::to_value(&vs.refinements)?),
-                    Some(vs.stack.depth() as i32),
-                    Some(serde_json::to_value(vs)?),
-                )
-            } else {
-                (None, None, None, None, None)
-            };
-
-        // Call atomic PostgreSQL function
-        let row = sqlx::query_as::<_, ViewStateRecordRow>(
-            r#"SELECT * FROM "ob-poc".record_execution_with_view_state(
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14,
-                $15, $16, $17, $18, $19, $20
-            )"#,
-        )
-        .bind(&key)
-        .bind(execution_id)
-        .bind(statement_index as i32)
-        .bind(verb)
-        .bind(&args_hash)
-        .bind(result_type)
-        .bind(result_id)
-        .bind(&result_json)
-        .bind(result_affected)
-        .bind(verb_hash)
-        // Source attribution
-        .bind(attribution.source.as_str())
-        .bind(attribution.request_id)
-        .bind(attribution.actor_id)
-        .bind(attribution.actor_type.as_str())
-        // View state (optional)
-        .bind(session_id)
-        .bind(&view_taxonomy)
-        .bind(&view_selection)
-        .bind(&view_refinements)
-        .bind(view_stack_depth)
-        .bind(&view_snapshot)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(AtomicRecordResult {
-            idempotency_key: row.idempotency_key,
-            view_state_change_id: row.view_state_change_id,
-            was_cached: row.was_cached,
-        })
-    }
-
     /// Atomically record execution AND view state within a caller-supplied transaction.
     ///
     /// Identical to `record_with_view_state` but executes through `tx` so the
@@ -464,7 +256,7 @@ impl IdempotencyManager {
         attribution: &SourceAttribution,
         view_state: Option<&crate::session::ViewState>,
         session_id: Option<Uuid>,
-    ) -> Result<AtomicRecordResult> {
+    ) -> Result<()> {
         let key = compute_idempotency_key(execution_id, statement_index, verb, args);
         let args_hash = compute_args_hash(args);
 
@@ -484,7 +276,7 @@ impl IdempotencyManager {
                 (None, None, None, None, None)
             };
 
-        let row = sqlx::query_as::<_, ViewStateRecordRow>(
+        sqlx::query(
             r#"SELECT * FROM "ob-poc".record_execution_with_view_state(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14,
@@ -514,11 +306,7 @@ impl IdempotencyManager {
         .fetch_one(&mut **tx)
         .await?;
 
-        Ok(AtomicRecordResult {
-            idempotency_key: row.idempotency_key,
-            view_state_change_id: row.view_state_change_id,
-            was_cached: row.was_cached,
-        })
+        Ok(())
     }
 
     /// Convert ExecutionResult to database columns
@@ -587,17 +375,6 @@ impl IdempotencyManager {
             }
         }
     }
-}
-
-/// Result of atomic execution + view state recording
-#[derive(Debug, Clone)]
-pub(crate) struct AtomicRecordResult {
-    /// The idempotency key for this execution
-    pub idempotency_key: String,
-    /// The view state change ID (if view state was recorded)
-    pub view_state_change_id: Option<Uuid>,
-    /// Whether this was a cached result (already executed)
-    pub was_cached: bool,
 }
 
 #[cfg(test)]

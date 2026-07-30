@@ -76,7 +76,7 @@ fn pool_acquire_timeout() -> std::time::Duration {
 
 // Expansion types for lock derivation
 #[cfg(feature = "database")]
-use super::expansion::{ExpansionReport, LockKey, LockMode};
+use super::expansion::{ExpansionReport, LockMode};
 
 // ============================================================================
 // Pre-Flight Resolution Check
@@ -177,21 +177,6 @@ fn collect_unresolved_from_node(node: &AstNode, unresolved: &mut Vec<UnresolvedR
     }
 }
 
-/// Return type specification for verb execution
-#[derive(Debug, Clone)]
-pub(crate) enum ReturnType {
-    /// Returns a single UUID (e.g., created entity ID)
-    Uuid { name: &'static str, capture: bool },
-    /// Returns a single record as JSON
-    Record,
-    /// Returns multiple records as JSON array
-    RecordSet,
-    /// Returns count of affected rows
-    Affected,
-    /// Returns nothing (void operation)
-    Void,
-}
-
 /// Result of executing a verb
 #[derive(Debug, Clone)]
 pub enum ExecutionResult {
@@ -230,8 +215,6 @@ pub(crate) struct BestEffortExecutionResult {
     pub verb_results: Vec<Option<ExecutionResult>>,
     /// Aggregated errors grouped by root cause
     pub errors: ExecutionErrors,
-    /// Overall batch status
-    pub status: BatchStatus,
 }
 
 /// Status of a batch execution
@@ -245,43 +228,6 @@ pub(crate) enum BatchStatus {
     PartialSuccess,
     /// All operations failed
     AllFailed,
-}
-
-#[cfg(feature = "database")]
-impl BestEffortExecutionResult {
-    /// Check if execution was fully successful
-    pub(crate) fn is_success(&self) -> bool {
-        self.status == BatchStatus::AllSucceeded
-    }
-
-
-    /// Check if any operations failed
-    pub(crate) fn has_failures(&self) -> bool {
-        self.errors.total_failed > 0
-    }
-
-    /// Get a summary of the execution
-    pub(crate) fn summary(&self) -> String {
-        self.errors.summary()
-    }
-
-    /// Get the successful results only
-    pub(crate) fn successful_results(&self) -> Vec<&ExecutionResult> {
-        self.verb_results
-            .iter()
-            .filter_map(|r| r.as_ref())
-            .collect()
-    }
-
-    /// Get count of successful operations
-    pub(crate) fn success_count(&self) -> usize {
-        self.errors.total_succeeded
-    }
-
-    /// Get count of failed operations
-    pub(crate) fn failure_count(&self) -> usize {
-        self.errors.total_failed
-    }
 }
 
 // ============================================================================
@@ -299,10 +245,6 @@ pub(crate) enum AtomicExecutionResult {
     Committed {
         /// Results for each step
         step_results: Vec<ExecutionResult>,
-        /// Locks that were held during execution
-        locks_held: Vec<LockKey>,
-        /// Time spent acquiring locks (milliseconds)
-        lock_wait_ms: u64,
     },
     /// Execution failed and transaction was rolled back
     RolledBack {
@@ -310,10 +252,6 @@ pub(crate) enum AtomicExecutionResult {
         failed_at_step: usize,
         /// Error message from the failed step
         error: String,
-        /// Results from steps that completed before failure
-        completed_steps: Vec<ExecutionResult>,
-        /// Locks that were held (now released due to rollback)
-        locks_held: Vec<LockKey>,
     },
     /// Could not acquire required locks (another session holds them)
     LockContention {
@@ -321,8 +259,6 @@ pub(crate) enum AtomicExecutionResult {
         entity_type: String,
         /// Entity ID that caused contention
         entity_id: String,
-        /// Locks that were acquired before contention
-        locks_acquired_before_contention: Vec<LockKey>,
     },
     /// A prior execution with the same idempotency key already committed.
     /// The prior result is returned without re-executing (v0.5 §9.1, §9.4).
@@ -362,91 +298,6 @@ pub(crate) enum AtomicExecutionResult {
         /// Stringified panic info (message, if available).
         panic_info: String,
     },
-}
-
-#[cfg(feature = "database")]
-impl AtomicExecutionResult {
-    /// Check if execution was successful
-    pub(crate) fn is_success(&self) -> bool {
-        matches!(self, AtomicExecutionResult::Committed { .. })
-    }
-
-
-
-
-
-    /// Get the step results if committed
-    pub(crate) fn results(&self) -> Option<&[ExecutionResult]> {
-        match self {
-            AtomicExecutionResult::Committed { step_results, .. } => Some(step_results),
-            _ => None,
-        }
-    }
-
-    /// Get a summary of the execution
-    pub(crate) fn summary(&self) -> String {
-        match self {
-            AtomicExecutionResult::Committed {
-                step_results,
-                locks_held,
-                lock_wait_ms,
-            } => {
-                format!(
-                    "✓ Committed {} steps (held {} locks, waited {}ms)",
-                    step_results.len(),
-                    locks_held.len(),
-                    lock_wait_ms
-                )
-            }
-            AtomicExecutionResult::RolledBack {
-                failed_at_step,
-                error,
-                completed_steps,
-                ..
-            } => {
-                format!(
-                    "✗ Rolled back at step {} after {} completed: {}",
-                    failed_at_step,
-                    completed_steps.len(),
-                    error
-                )
-            }
-            AtomicExecutionResult::LockContention {
-                entity_type,
-                entity_id,
-                ..
-            } => {
-                format!(
-                    "⚠ Lock contention on {}:{} - another session is modifying this entity",
-                    entity_type, entity_id
-                )
-            }
-            AtomicExecutionResult::IdempotentReplayReturned { prior_result } => {
-                format!(
-                    "↩ Idempotent replay: prior result returned ({} steps, no re-execution)",
-                    prior_result.len()
-                )
-            }
-            AtomicExecutionResult::OptimisticConflict { constraint_name } => {
-                format!(
-                    "⚡ Optimistic conflict on constraint '{constraint_name}' \
-                     — concurrent plan won the race; caller may retry"
-                )
-            }
-            AtomicExecutionResult::TimedOut { stage, elapsed } => {
-                format!(
-                    "⏱ Timed out at stage '{}' after {:?} — transaction rolled back",
-                    stage, elapsed
-                )
-            }
-            AtomicExecutionResult::PanicRecovered { stage, panic_info } => {
-                format!(
-                    "💥 Panic recovered at stage '{}': {} — transaction rolled back",
-                    stage, panic_info
-                )
-            }
-        }
-    }
 }
 
 /// Execution context holding state during DSL execution
@@ -2992,7 +2843,6 @@ impl DslExecutor {
                     Err(LockError::Contention {
                         entity_type,
                         entity_id,
-                        acquired_so_far,
                         ..
                     }) => {
                         // Rollback and return contention error
@@ -3000,7 +2850,6 @@ impl DslExecutor {
                         return Ok(AtomicExecutionResult::LockContention {
                             entity_type,
                             entity_id,
-                            locks_acquired_before_contention: acquired_so_far,
                         });
                     }
                     Err(LockError::Database(e)) => {
@@ -3086,8 +2935,6 @@ impl DslExecutor {
                     return Ok(AtomicExecutionResult::RolledBack {
                         failed_at_step: step_index,
                         error: error_msg,
-                        completed_steps: results,
-                        locks_held,
                     });
                 }
             };
@@ -3178,8 +3025,6 @@ impl DslExecutor {
 
         Ok(AtomicExecutionResult::Committed {
             step_results: results,
-            locks_held,
-            lock_wait_ms,
         })
     }
 
@@ -3342,7 +3187,6 @@ impl DslExecutor {
         Ok(BestEffortExecutionResult {
             verb_results,
             errors,
-            status,
         })
     }
 

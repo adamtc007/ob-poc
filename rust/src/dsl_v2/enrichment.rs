@@ -35,24 +35,10 @@ use super::ast::*;
 use super::config::types::LookupConfig;
 use super::runtime_registry::{RuntimeArg, RuntimeVerbRegistry};
 
-/// Errors that can occur during enrichment
-#[derive(Debug, Clone)]
-pub(crate) struct EnrichmentError {
-    pub message: String,
-    pub span: Span,
-}
-
-impl std::fmt::Display for EnrichmentError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-/// Result of enrichment - enriched AST plus any errors/warnings
+/// Result of enrichment - enriched AST
 #[derive(Debug)]
 pub(crate) struct EnrichmentResult {
     pub program: Program,
-    pub errors: Vec<EnrichmentError>,
 }
 
 /// Enrich a raw AST using verb definitions from the registry
@@ -60,22 +46,15 @@ pub(crate) struct EnrichmentResult {
 /// This transforms `Literal::String` nodes into `EntityRef` nodes
 /// for arguments that have lookup configuration in their verb definition.
 pub(crate) fn enrich_program(program: Program, registry: &RuntimeVerbRegistry) -> EnrichmentResult {
-    let mut enricher = Enricher {
-        registry,
-        errors: Vec::new(),
-    };
+    let mut enricher = Enricher { registry };
 
     let enriched = enricher.enrich_program(program);
 
-    EnrichmentResult {
-        program: enriched,
-        errors: enricher.errors,
-    }
+    EnrichmentResult { program: enriched }
 }
 
 struct Enricher<'a> {
     registry: &'a RuntimeVerbRegistry,
-    errors: Vec<EnrichmentError>,
 }
 
 impl<'a> Enricher<'a> {
@@ -538,7 +517,6 @@ mod tests {
         };
 
         let result = enrich_program(raw, &registry);
-        assert!(result.errors.is_empty());
 
         // Check that jurisdiction was converted to EntityRef
         if let Statement::VerbCall(vc) = &result.program.statements[0] {

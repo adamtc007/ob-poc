@@ -120,17 +120,6 @@ impl ErrorCause {
         }
     }
 
-
-    /// Get the entity ID if this cause relates to a specific entity
-    pub(crate) fn entity_id(&self) -> Option<&str> {
-        match self {
-            ErrorCause::EntityDeleted { entity_id }
-            | ErrorCause::EntityNotFound { entity_id }
-            | ErrorCause::VersionConflict { entity_id }
-            | ErrorCause::LockContention { entity_id, .. } => Some(entity_id),
-            _ => None,
-        }
-    }
 }
 
 // =============================================================================
@@ -334,11 +323,6 @@ impl ExecutionErrors {
         self.by_cause.is_empty()
     }
 
-    /// Get the number of unique error causes
-    pub(crate) fn cause_count(&self) -> usize {
-        self.by_cause.len()
-    }
-
     /// Generate human-readable summary
     pub(crate) fn summary(&self) -> String {
         if self.by_cause.is_empty() {
@@ -384,23 +368,6 @@ impl ExecutionErrors {
         }
 
         lines.join("\n")
-    }
-
-    /// Get all errors as a flat list
-    pub(crate) fn all_errors(&self) -> Vec<&AffectedVerb> {
-        self.by_cause
-            .values()
-            .flat_map(|e| e.affected_verbs.iter())
-            .collect()
-    }
-
-
-    /// Get only recoverable errors
-    pub(crate) fn recoverable_errors(&self) -> Vec<&CausedErrors> {
-        self.by_cause
-            .values()
-            .filter(|e| e.details.recoverable)
-            .collect()
     }
 
 }
@@ -499,26 +466,12 @@ mod tests {
         // Should have 2 successes, 2 failures, 1 cause
         assert_eq!(errors.total_succeeded, 2);
         assert_eq!(errors.total_failed, 2);
-        assert_eq!(errors.cause_count(), 1);
+        assert_eq!(errors.by_cause.len(), 1);
 
         // Summary should mention both failures
         let summary = errors.summary();
         assert!(summary.contains("2 succeeded"));
         assert!(summary.contains("2 failed"));
-    }
-
-    #[test]
-    fn test_execution_errors_multiple_causes() {
-        let mut errors = ExecutionErrors::new();
-
-        let error1 = anyhow::anyhow!("Entity uuid-1 not found");
-        let error2 = anyhow::anyhow!("Permission denied for resource \"admin\"");
-
-        errors.record_failure(0, "cbu", "create", &error1, None);
-        errors.record_failure(1, "user", "delete", &error2, None);
-
-        // Should have 2 different causes
-        assert_eq!(errors.cause_count(), 2);
     }
 
     #[test]

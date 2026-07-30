@@ -53,25 +53,6 @@ impl LintResult {
             .iter()
             .any(|d| d.severity == Severity::Warning)
     }
-
-
-    /// Returns true if DSL is incomplete (only has unresolved symbol errors)
-    /// This means the user just needs to add definitions, not fix invalid syntax
-    pub(crate) fn is_incomplete(&self) -> bool {
-        self.has_errors()
-            && self
-                .diagnostics
-                .iter()
-                .filter(|d| d.severity == Severity::Error)
-                .all(|d| d.code == DiagnosticCode::UnresolvedSymbol)
-    }
-
-    /// Returns true if DSL is valid and complete (no errors)
-    /// This means the DSL is ready to execute
-    pub(crate) fn is_valid(&self) -> bool {
-        !self.has_errors()
-    }
-
 }
 
 /// Context inferred from AST analysis
@@ -79,10 +60,6 @@ impl LintResult {
 pub(crate) struct InferredContext {
     /// Symbol bindings: name → type info
     pub symbols: HashMap<String, SymbolInfo>,
-    /// Operations that create CBUs
-    pub cbu_creates: Vec<CbuCreate>,
-    /// Operations that create entities
-    pub entity_creates: Vec<EntityCreate>,
     /// Operations that reference entities
     pub entity_refs: Vec<EntityRef>,
     /// Operations that catalog documents
@@ -91,27 +68,8 @@ pub(crate) struct InferredContext {
 
 #[derive(Debug, Clone)]
 pub(crate) struct SymbolInfo {
-    pub name: String,
-    pub domain: String,              // "cbu", "entity", "document"
     pub entity_type: Option<String>, // e.g., "LIMITED_COMPANY_PRIVATE", "PROPER_PERSON_NATURAL"
     pub defined_at: SourceSpan,
-}
-
-#[derive(Debug)]
-pub(crate) struct CbuCreate {
-    pub symbol: Option<String>,
-    pub name: Option<String>,
-    pub client_type: Option<String>,
-    pub jurisdiction: Option<String>,
-    pub span: SourceSpan,
-}
-
-#[derive(Debug)]
-pub(crate) struct EntityCreate {
-    pub symbol: Option<String>,
-    pub name: Option<String>,
-    pub entity_type: String, // Inferred or explicit type code
-    pub span: SourceSpan,
 }
 
 #[derive(Debug)]
@@ -124,9 +82,7 @@ pub struct EntityRef {
 
 #[derive(Debug)]
 pub(crate) struct DocumentCatalog {
-    pub symbol: Option<String>,
     pub document_type: String, // type_code from document_types
-    pub cbu_ref: Option<String>,
     pub entity_ref: Option<String>,
     pub span: SourceSpan,
 }
@@ -267,51 +223,24 @@ impl CsgLinter {
             inferred.symbols.insert(
                 binding.clone(),
                 SymbolInfo {
-                    name: binding.clone(),
-                    domain: vc.domain.clone(),
                     entity_type,
                     defined_at: span,
                 },
             );
         }
 
-        // Track specific operation types
-        match (vc.domain.as_str(), vc.verb.as_str()) {
-            ("cbu", "create") | ("cbu", "ensure") => {
-                inferred.cbu_creates.push(CbuCreate {
-                    symbol: vc.binding.clone(),
-                    name: self
-                        .extract_string_arg(vc, "name")
-                        .or_else(|| self.extract_string_arg(vc, "cbu-name")),
-                    client_type: self.extract_string_arg(vc, "client-type"),
-                    jurisdiction: self.extract_string_arg(vc, "jurisdiction"),
-                    span,
-                });
-            }
-            ("entity", verb) if verb.starts_with("create") => {
-                let entity_type = self.infer_entity_type_from_verb(verb, vc);
-                inferred.entity_creates.push(EntityCreate {
-                    symbol: vc.binding.clone(),
-                    name: self.extract_string_arg(vc, "name"),
-                    entity_type,
-                    span,
-                });
-            }
-            _ => {
-                // Use unified registry to check if verb has document-type argument
-                // This handles document.catalog, document.request, and any future document verbs
-                if let Some(verb_def) = registry().get(&vc.domain, &vc.verb) {
-                    if verb_def.accepts_arg("document-type") {
-                        if let Some(doc_type) = self.extract_string_arg(vc, "document-type") {
-                            inferred.document_catalogs.push(DocumentCatalog {
-                                symbol: vc.binding.clone(),
-                                document_type: doc_type,
-                                cbu_ref: self.extract_ref_arg(vc, "cbu-id"),
-                                entity_ref: self.extract_ref_arg(vc, "entity-id"),
-                                span,
-                            });
-                        }
-                    }
+        // Track document-catalog operations. Use unified registry to check if
+        // verb has a document-type argument — this handles document.catalog,
+        // document.request, and any future document verbs. (CBU/entity create
+        // tracking was dead weight — populated but never read — and removed.)
+        if let Some(verb_def) = registry().get(&vc.domain, &vc.verb) {
+            if verb_def.accepts_arg("document-type") {
+                if let Some(doc_type) = self.extract_string_arg(vc, "document-type") {
+                    inferred.document_catalogs.push(DocumentCatalog {
+                        document_type: doc_type,
+                        entity_ref: self.extract_ref_arg(vc, "entity-id"),
+                        span,
+                    });
                 }
             }
         }
@@ -810,11 +739,6 @@ impl CsgLinter {
             offset: span.start as u32,
             length: (span.end - span.start) as u32,
         }
-    }
-
-    /// Get a reference to the loaded rules (for testing/inspection)
-    pub(crate) fn rules(&self) -> &ApplicabilityRules {
-        &self.rules
     }
 
 }

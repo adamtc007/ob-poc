@@ -104,7 +104,6 @@ pub mod applicability_rules;
 #[cfg(feature = "database")]
 pub mod batch_executor;
 pub mod csg_linter;
-pub mod display_nouns;
 
 // Macro expansion (operator vocabulary layer)
 pub mod domain_context;
@@ -123,12 +122,9 @@ pub(crate) mod generic_executor;
 pub mod graph_executor;
 #[cfg(feature = "database")]
 pub mod idempotency;
-pub mod intent;
-pub mod intent_tiers;
 // §9 item 9 slice 6 (2026-05-13): lsp_validator relocated to dsl-runtime.
 pub(crate) use dsl_analysis::lsp_validator;
 pub(crate) mod macros;
-pub mod operator_types;
 // §9 item 9 slice 5 (2026-05-13): planning_facade relocated to dsl-runtime.
 pub(crate) use dsl_analysis::planning_facade;
 // §9 item 9 slice 6 (2026-05-13): ref_resolver relocated to dsl-runtime.
@@ -141,8 +137,6 @@ pub mod repl_session;
 pub(crate) use dsl_analysis::runtime_registry;
 #[cfg(feature = "database")]
 pub(crate) mod semantic_validator;
-#[cfg(feature = "database")]
-pub mod sheet_executor;
 pub mod submission;
 // §9 item 9 slice 3 (2026-05-13): suggestions relocated to dsl-runtime.
 pub use dsl_analysis::suggestions;
@@ -156,39 +150,15 @@ pub use dsl_analysis::verb_registry;
 pub mod verb_taxonomy;
 
 // Re-export local module types
-pub(crate) use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
-#[cfg(feature = "database")]
-pub(crate) use batch_executor::{
-    BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
-};
-pub(crate) use csg_linter::InferredContext;
 // `pub` (not `pub(crate)`): the `dsl_cli` binary (`src/bin/dsl_cli.rs`) is
 // a separate compilation unit and needs to name these across the crate
 // boundary.
 pub use csg_linter::{CsgLinter, LintResult};
-pub(crate) use display_nouns::{
-    contains_forbidden_token, display_noun, display_noun_or_self, has_display_noun, pluralize,
-    FORBIDDEN_UI_TOKENS,
-};
-pub(crate) use domain_context::{ActiveDomain, DomainContext, IterationContext};
-pub(crate) use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
+pub(crate) use enrichment::enrich_program;
 pub use execution_result::{StepResult};
-pub(crate) use execution_result::{ExecutionResults};
-#[cfg(feature = "database")]
-pub(crate) use idempotency::{compute_idempotency_key, IdempotencyManager};
-pub(crate) use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
-pub(crate) use operator_types::{OperatorRole, OperatorType};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
-pub(crate) use repl_session::{ExecutedBlock, ReplSession};
-pub(crate) use submission::{
-    DslSubmission, ExpandedSubmission, IterationKey, IterationStatements, SubmissionError,
-    SubmissionLimits, SubmissionState, SymbolBinding,
-};
-pub(crate) use topo_sort::{
-    topological_sort_with_lifecycle, ExecutionPhase as TopoExecutionPhase, TopoSortError,
-    TopoSortResult,
-};
+pub(crate) use submission::{DslSubmission, SubmissionLimits, SubmissionState, SymbolBinding};
 // `emit_dsl`/`topological_sort` are `pub` (not `pub(crate)`): the `dsl_cli`
 // binary (`src/bin/dsl_cli.rs`) is a separate compilation unit and needs to
 // name them across the crate boundary.
@@ -205,10 +175,6 @@ pub(crate) use expansion::{
     LockMode,
 };
 
-// Re-export error aggregation types
-pub(crate) use errors::{
-    AffectedVerb, CauseDetails, CausedErrors, ErrorCause, ExecutionErrors, FailureTiming,
-};
 
 // Re-export macro expansion types (consumed externally)
 pub use macros::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
@@ -228,10 +194,7 @@ pub mod planning {
         EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
     };
     pub use super::execution_plan::{compile};
-    pub(crate) use super::execution_plan::{
-        CompileError, ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningResult,
-        SyntheticStep,
-    };
+    pub(crate) use super::execution_plan::ExecutionPlan;
     // `compile_with_planning`/`PlanningBindingInfo`/`PlanningContext` are
     // `pub` (not `pub(crate)`): the `dsl_cli` binary (`src/bin/dsl_cli.rs`)
     // is a separate compilation unit and needs to name them across the
@@ -249,11 +212,10 @@ pub mod planning {
 pub mod execution {
     #[cfg(feature = "database")]
     pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
-pub(crate) use super::executor::{AtomicExecutionResult, BatchStatus, BestEffortExecutionResult, IterationResult, SubmissionResult};
+    pub(crate) use super::executor::{AtomicExecutionResult, BestEffortExecutionResult};
     #[cfg(not(feature = "database"))]
     pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 
-    pub(crate) use super::executor::ReturnType;
     #[cfg(feature = "database")]
     pub use super::gateway_resolver::{gateway_addr, GatewayRefResolver};
     #[cfg(feature = "database")]

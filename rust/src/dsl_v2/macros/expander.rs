@@ -115,12 +115,6 @@ pub(crate) struct MacroExpansionOutput {
     /// Expanded DSL statements (primitive verbs)
     pub statements: Vec<String>,
 
-    /// State flags to set after execution
-    pub sets_state: Vec<(String, serde_json::Value)>,
-
-    /// Verbs that become available after this macro
-    pub unlocks: Vec<String>,
-
     /// Audit information
     pub audit: MacroExpansionAudit,
 }
@@ -133,9 +127,6 @@ pub(crate) struct MacroExpansionAudit {
 
     /// Macro FQN that was expanded
     pub macro_fqn: String,
-
-    /// Hash of input arguments
-    pub args_digest: String,
 
     /// Hash of expanded output
     pub output_digest: String,
@@ -181,7 +172,7 @@ pub(crate) fn expand_macro(
             arg: "domain".to_string(),
             message: error.to_string(),
         })?;
-        return Ok(build_expansion_output(macro_fqn, args, schema, statements));
+        return Ok(build_expansion_output(macro_fqn, statements));
     }
 
     // 5. Build variable context
@@ -208,38 +199,20 @@ pub(crate) fn expand_macro(
         statements.push(dsl);
     }
 
-    Ok(build_expansion_output(macro_fqn, args, schema, statements))
+    Ok(build_expansion_output(macro_fqn, statements))
 }
 
-fn build_expansion_output(
-    macro_fqn: &str,
-    args: &BTreeMap<String, String>,
-    schema: &MacroSchema,
-    statements: Vec<String>,
-) -> MacroExpansionOutput {
-    let args_json = serde_json::to_string(args).unwrap_or_default();
+fn build_expansion_output(macro_fqn: &str, statements: Vec<String>) -> MacroExpansionOutput {
     let output_str = statements.join("\n");
 
     let audit = MacroExpansionAudit {
         expansion_id: Uuid::new_v4(),
         macro_fqn: macro_fqn.to_string(),
-        args_digest: hash_string(&args_json),
         output_digest: hash_string(&output_str),
         expanded_at: Utc::now(),
     };
 
-    let sets_state: Vec<_> = schema
-        .sets_state
-        .iter()
-        .map(|s| (s.key.clone(), s.value.clone()))
-        .collect();
-
-    MacroExpansionOutput {
-        statements,
-        sets_state,
-        unlocks: schema.unlocks.clone(),
-        audit,
-    }
+    MacroExpansionOutput { statements, audit }
 }
 
 // ---------------------------------------------------------------------------
@@ -1064,11 +1037,6 @@ structure.setup:
                 || result.statements[0].contains(":name \"Acme Fund\"")
         );
         assert!(result.statements[0].contains(":client-id 11111111-1111-1111-1111-111111111111"));
-
-        // Check state and unlocks
-        assert_eq!(result.sets_state.len(), 1);
-        assert_eq!(result.sets_state[0].0, "structure.exists");
-        assert_eq!(result.unlocks, vec!["structure.assign-role"]);
     }
 
     #[test]

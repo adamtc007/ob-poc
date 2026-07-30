@@ -228,18 +228,6 @@ impl PlanningContext {
         Self::default()
     }
 
-    /// Add a binding to the context
-    pub(crate) fn add_binding(&mut self, name: &str, entity_type: &str) {
-        self.available_bindings.insert(
-            name.to_string(),
-            BindingInfo {
-                entity_type: entity_type.to_string(),
-                subtype: None,
-                state: None,
-            },
-        );
-    }
-
     /// Add a binding with full info
     pub fn add_binding_info(&mut self, name: &str, info: BindingInfo) {
         self.available_bindings.insert(name.to_string(), info);
@@ -248,11 +236,6 @@ impl PlanningContext {
     /// Check if a binding is available
     pub(crate) fn has_binding(&self, name: &str) -> bool {
         self.available_bindings.contains_key(name)
-    }
-
-    /// Get binding info
-    pub(crate) fn get_binding(&self, name: &str) -> Option<&BindingInfo> {
-        self.available_bindings.get(name)
     }
 }
 
@@ -272,12 +255,6 @@ pub struct PlanningResult {
 /// A synthetic step that was injected by the planner
 #[derive(Debug, Clone)]
 pub(crate) struct SyntheticStep {
-    /// The binding this step produces
-    pub binding: String,
-    /// The verb that was injected (e.g., "cbu.create")
-    pub verb: String,
-    /// Entity type being created
-    pub entity_type: String,
     /// Index in the final plan
     pub plan_index: usize,
 }
@@ -615,9 +592,6 @@ pub fn compile_with_planning(
                 });
 
                 synthetic_steps.push(SyntheticStep {
-                    binding: req.binding.clone(),
-                    verb: creator_verb,
-                    entity_type: resolved_type.to_string(),
                     plan_index: synthetic_statements.len(), // Will be adjusted after merge
                 });
 
@@ -1160,55 +1134,9 @@ fn extract_nested_children(vc: &VerbCall) -> (VerbCall, Vec<VerbCall>) {
 // ============================================================================
 
 impl ExecutionPlan {
-    /// Pretty print the plan for debugging
-    pub(crate) fn debug_print(&self) -> String {
-        let mut out = String::new();
-        out.push_str("=== Execution Plan ===\n");
-
-        for step in &self.steps {
-            out.push_str(&format!(
-                "Step {}: {}.{}",
-                step.step_index, step.verb_call.domain, step.verb_call.verb
-            ));
-
-            if let Some(ref binding) = step.bind_as {
-                out.push_str(&format!(" → @{}", binding));
-            }
-            out.push('\n');
-
-            // Show injections
-            for inj in &step.injections {
-                out.push_str(&format!(
-                    "  ← inject ${} as :{}\n",
-                    inj.from_step, inj.into_arg
-                ));
-            }
-
-            // Show args
-            for arg in &step.verb_call.arguments {
-                out.push_str(&format!("  :{} = {:?}\n", arg.key, arg.value));
-            }
-        }
-
-        out
-    }
-
-    /// Get execution order as domain.verb sequence (for logging)
-    pub(crate) fn execution_sequence(&self) -> Vec<String> {
-        self.steps
-            .iter()
-            .map(|s| format!("{}.{}", s.verb_call.domain, s.verb_call.verb))
-            .collect()
-    }
-
     /// Count of steps
     pub(crate) fn len(&self) -> usize {
         self.steps.len()
-    }
-
-    /// Check if empty
-    pub(crate) fn is_empty(&self) -> bool {
-        self.steps.is_empty()
     }
 }
 
@@ -1269,8 +1197,10 @@ mod tests {
         assert!(plan.steps[0].injections.is_empty());
         assert!(plan.steps[1].injections.is_empty());
 
-        let seq = plan.execution_sequence();
-        assert_eq!(seq, vec!["cbu.create", "entity.read"]);
+        assert_eq!(plan.steps[0].verb_call.domain, "cbu");
+        assert_eq!(plan.steps[0].verb_call.verb, "create");
+        assert_eq!(plan.steps[1].verb_call.domain, "entity");
+        assert_eq!(plan.steps[1].verb_call.verb, "read");
     }
 
     #[test]
@@ -1352,8 +1282,6 @@ mod tests {
         // Third step also injects from step 0
         assert_eq!(plan.steps[2].injections.len(), 1);
         assert_eq!(plan.steps[2].injections[0].from_step, 0);
-
-        println!("{}", plan.debug_print());
     }
 
     #[test]
@@ -1431,11 +1359,15 @@ mod tests {
         let mut ctx = PlanningContext::new();
         assert!(!ctx.has_binding("fund"));
 
-        ctx.add_binding("fund", "cbu");
+        ctx.add_binding_info(
+            "fund",
+            BindingInfo {
+                entity_type: "cbu".to_string(),
+                subtype: None,
+                state: None,
+            },
+        );
         assert!(ctx.has_binding("fund"));
-
-        let info = ctx.get_binding("fund").unwrap();
-        assert_eq!(info.entity_type, "cbu");
     }
 
     #[test]
@@ -1445,7 +1377,7 @@ mod tests {
 
         let result = compile_with_planning(&program, &ctx).unwrap();
 
-        assert!(result.plan.is_empty());
+        assert_eq!(result.plan.len(), 0);
         assert!(result.synthetic_steps.is_empty());
         assert!(result.diagnostics.is_empty());
         assert!(!result.reordered);
@@ -1532,7 +1464,14 @@ mod tests {
         };
 
         let mut ctx = PlanningContext::new();
-        ctx.add_binding("fund", "cbu");
+        ctx.add_binding_info(
+            "fund",
+            BindingInfo {
+                entity_type: "cbu".to_string(),
+                subtype: None,
+                state: None,
+            },
+        );
 
         let result = compile_with_planning(&program, &ctx).unwrap();
 
@@ -1670,11 +1609,8 @@ mod tests {
 
         // Should also have a synthetic step in the result
         assert!(
-            result
-                .synthetic_steps
-                .iter()
-                .any(|s| s.binding == "fund" && s.entity_type == "cbu"),
-            "Should have synthetic step for @fund. Steps: {:?}",
+            !result.synthetic_steps.is_empty(),
+            "Should have a synthetic step for @fund. Steps: {:?}",
             result.synthetic_steps
         );
     }
@@ -1854,7 +1790,14 @@ mod tests {
 
         // Pre-add @fund to planning context
         let mut ctx = PlanningContext::new();
-        ctx.add_binding("fund", "cbu");
+        ctx.add_binding_info(
+            "fund",
+            BindingInfo {
+                entity_type: "cbu".to_string(),
+                subtype: None,
+                state: None,
+            },
+        );
 
         let result = compile_with_planning(&program, &ctx).unwrap();
 
