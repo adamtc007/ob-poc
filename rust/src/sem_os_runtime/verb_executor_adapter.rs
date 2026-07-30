@@ -1020,19 +1020,9 @@ fn split_fqn(fqn: &str) -> dsl_runtime::Result<(String, String)> {
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
 
-/// Public wrapper for use by the dsl_v2::executor compatibility shim.
-pub(crate) fn build_verb_call_pub(domain: &str, verb: &str, args: &serde_json::Value) -> VerbCall {
-    build_verb_call(domain, verb, args)
-}
-
 /// Public wrapper for use by the compatibility shim.
 pub(crate) fn to_dsl_context_pub(ctx: &VerbExecutionContext) -> ExecutionContext {
     to_dsl_context(ctx)
-}
-
-/// Public wrapper for use by the compatibility shim.
-pub(crate) fn to_verb_outcome_pub(result: &ExecutionResult) -> VerbExecutionOutcome {
-    to_verb_outcome(result)
 }
 
 /// Unpack `VerbExecutionContext.extensions` side-channel keys back into an

@@ -65,43 +65,36 @@ pub(crate) enum OrchestratorFlag {
 }
 
 /// Result of inspecting a process instance.
+///
+/// Only aggregate fiber/wait counts are retained — the only consumer
+/// (`bpmn.inspect`'s diagnostic projection in `domain_ops::bpmn_lite_ops`)
+/// reports counts, not per-fiber/per-wait detail.
 #[derive(Debug, Clone)]
 pub(crate) struct ProcessInspection {
     pub state: String,
-    pub fibers: Vec<FiberSnapshot>,
-    pub waits: Vec<WaitSnapshot>,
+    pub fiber_count: usize,
+    pub wait_count: usize,
     pub bytecode_version: Vec<u8>,
     pub domain_payload_hash: String,
 }
 
-/// Snapshot of a single fiber in the VM.
-#[derive(Debug, Clone)]
-pub(crate) struct FiberSnapshot {
-    pub fiber_id: String,
-    pub pc: u32,
-    pub wait_state: String,
-}
-
-/// Snapshot of a wait condition.
-#[derive(Debug, Clone)]
-pub(crate) struct WaitSnapshot {
-    pub fiber_id: String,
-    pub wait_type: String,
-    pub detail: String,
-}
-
 /// A single activated job from the job worker protocol.
+///
+/// `service_task_id`, `orch_flags`, and `retries_remaining` are sent by the
+/// server but not retained here: task dispatch keys off `task_type` (not
+/// `service_task_id`), retry/dead-letter decisions are driven by the
+/// worker's own `job_frames`-backed attempt counter (not the server's
+/// `retries_remaining`), and completion explicitly resets `orch_flags`
+/// rather than threading the received ones through (see
+/// `Worker::process_job` in `bpmn_integration::worker`).
 #[derive(Debug, Clone)]
 pub(crate) struct JobActivation {
     pub job_key: String,
     pub process_instance_id: String,
     pub task_type: String,
-    pub service_task_id: String,
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
     pub session_stack: SessionStackState,
-    pub orch_flags: HashMap<String, OrchestratorFlag>,
-    pub retries_remaining: i32,
     pub entry_id: Uuid,
     pub runbook_id: Uuid,
     pub worker_id: String,
@@ -318,24 +311,8 @@ impl BpmnLiteConnection {
 
         Ok(ProcessInspection {
             state: resp.state,
-            fibers: resp
-                .fibers
-                .into_iter()
-                .map(|f| FiberSnapshot {
-                    fiber_id: f.fiber_id,
-                    pc: f.pc,
-                    wait_state: f.wait_state,
-                })
-                .collect(),
-            waits: resp
-                .waits
-                .into_iter()
-                .map(|w| WaitSnapshot {
-                    fiber_id: w.fiber_id,
-                    wait_type: w.wait_type,
-                    detail: w.detail,
-                })
-                .collect(),
+            fiber_count: resp.fibers.len(),
+            wait_count: resp.waits.len(),
             bytecode_version: resp.bytecode_version,
             domain_payload_hash: resp.domain_payload_hash,
         })
@@ -382,12 +359,9 @@ impl BpmnLiteConnection {
                 job_key: msg.job_key,
                 process_instance_id: msg.process_instance_id,
                 task_type: msg.task_type,
-                service_task_id: msg.service_task_id,
                 domain_payload: msg.domain_payload,
                 domain_payload_hash: msg.domain_payload_hash,
                 session_stack,
-                orch_flags: from_proto_flags(msg.orch_flags),
-                retries_remaining: msg.retries_remaining,
                 entry_id: Uuid::parse_str(&msg.entry_id)
                     .context("Invalid entry_id in JobActivationMsg")?,
                 runbook_id: Uuid::parse_str(&msg.runbook_id)
@@ -511,7 +485,6 @@ fn from_proto_flags(
 }
 
 /// Convert a domain lifecycle event from proto.
-#[allow(dead_code)]
 pub(crate) fn lifecycle_event_from_proto(event: proto::LifecycleEvent) -> BpmnLifecycleEvent {
     BpmnLifecycleEvent {
         sequence: event.sequence,

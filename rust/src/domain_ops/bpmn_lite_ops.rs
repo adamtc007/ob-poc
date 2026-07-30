@@ -401,8 +401,8 @@ impl SemOsVerbOp for BpmnInspect {
 
         let typed = BpmnInspectResult {
             state: inspection.state,
-            fiber_count: inspection.fibers.len(),
-            wait_count: inspection.waits.len(),
+            fiber_count: inspection.fiber_count,
+            wait_count: inspection.wait_count,
             bytecode_version_hex: hex::encode(&inspection.bytecode_version),
             domain_payload_hash: inspection.domain_payload_hash,
         };

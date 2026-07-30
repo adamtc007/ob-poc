@@ -257,8 +257,10 @@ mod workflow_ops;
 // `crate::services::session_service_impl::ObPocSessionService`) which
 // wraps `crate::session::UnifiedSession` — a 10934 LOC multi-consumer
 // mega-module that stays in ob-poc. Pending session state crosses turns
-// through `ctx.extensions["_pending_session"]` (mirrors the legacy
-// `ext_set_pending_session` helper).
+// through `ctx.extensions["_pending_session"]` (Phase 9: the superseded
+// `domain_ops::helpers::ext_set_pending_session`/`ext_take_pending_session`
+// pair, which carried the same state under a different key and had no
+// remaining caller, was deleted).
 // Phase 5a composite-blocker #3 — shared_atom_ops relocated to
 // `dsl-runtime::domain_ops::shared_atom_ops`, consuming the already-relocated
 // `dsl_runtime::cross_workspace::{repository, fact_refs, fact_versions,

@@ -24,8 +24,6 @@ use uuid::Uuid;
 /// Constellation runtime error type.
 #[derive(Debug, Error)]
 pub(crate) enum ConstellationError {
-    #[error("parse error: {0}")]
-    Parse(String),
     #[error("validation error: {0}")]
     Validation(String),
     #[error("execution error: {0}")]
@@ -155,22 +153,6 @@ impl DependencyEntry {
             Self::Explicit { slot, .. } => slot,
         }
     }
-
-    /// Return the minimum required state for the dependency.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::sem_os_runtime::constellation_runtime::DependencyEntry;
-    ///
-    /// let dep = DependencyEntry::Simple(String::from("cbu"));
-    /// assert_eq!(dep.min_state(), "filled");
-    /// ```
-    pub(crate) fn min_state(&self) -> &str {
-        match self {
-            Self::Simple(_) => "filled",
-            Self::Explicit { min_state, .. } => min_state,
-        }
-    }
 }
 
 /// Verb palette entry in simple or gated form.
@@ -211,15 +193,6 @@ pub(crate) enum VerbAvailability {
     Many(Vec<String>),
 }
 
-impl VerbAvailability {
-    pub(crate) fn to_vec(&self) -> Vec<String> {
-        match self {
-            Self::One(value) => vec![value.clone()],
-            Self::Many(values) => values.clone(),
-        }
-    }
-}
-
 /// High-level summary for a hydrated constellation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConstellationSummary {
@@ -258,11 +231,14 @@ pub(crate) struct ResolvedSlot {
 /// Runtime state-machine metadata retained on validated constellation maps.
 #[derive(Debug, Clone)]
 pub(crate) struct RuntimeStateMachine {
-    pub name: String,
     pub states: Vec<String>,
     pub initial: String,
     pub transitions: Vec<RuntimeStateTransition>,
-    pub overlay_sources: HashMap<String, RuntimeOverlaySource>,
+    /// Names of overlay sources known to this machine. Only membership
+    /// (`contains`) is consulted by validation — the per-source table/join/
+    /// provides/cardinality metadata is not read anywhere downstream, so it
+    /// isn't retained here.
+    pub overlay_sources: HashSet<String>,
     pub(crate) reducer_backing: crate::sem_os_runtime::reducer_runtime::ReducerMachineBacking,
 }
 
@@ -272,15 +248,6 @@ pub(crate) struct RuntimeStateTransition {
     pub from: String,
     pub to: String,
     pub verbs: Vec<String>,
-}
-
-/// Runtime overlay-source metadata needed for validation and reducer wiring.
-#[derive(Debug, Clone)]
-pub(crate) struct RuntimeOverlaySource {
-    pub table: String,
-    pub join: String,
-    pub provides: Vec<String>,
-    pub cardinality: Option<String>,
 }
 
 /// Runtime block reason surfaced from grounded or reducer-backed legality.
@@ -1097,7 +1064,7 @@ fn validate_flattened_slot(
         let machine =
             load_runtime_state_machine(machine_name).map_err(ConstellationError::Other)?;
         for overlay in &slot.def.overlays {
-            if !machine.overlay_sources.contains_key(overlay) {
+            if !machine.overlay_sources.contains(overlay) {
                 return Err(ConstellationError::Validation(format!(
                     "slot '{}' references unknown overlay '{}' for state machine '{}'",
                     slot.name, overlay, machine_name

@@ -85,15 +85,19 @@ pub(crate) enum VerbSyncError {
     Serialization(#[from] serde_json::Error),
 }
 
-/// Result of a sync operation
+/// Result of a sync operation.
+///
+/// `verbs_removed` and `source_hash` are computed and logged to the DB via
+/// [`VerbSyncService::log_sync`] from local variables inside `sync_all`, but
+/// aren't read back off this struct by any caller (cross-crate: consumed by
+/// `ob-poc-web`'s startup sync, which only reads the four fields below) —
+/// so they aren't duplicated here.
 #[derive(Debug, Clone)]
 pub(crate) struct SyncResult {
     pub verbs_added: i32,
     pub verbs_updated: i32,
     pub verbs_unchanged: i32,
-    pub verbs_removed: i32,
     pub duration_ms: i64,
-    pub source_hash: String,
 }
 
 /// Verb Sync Service - synchronizes YAML verbs to database
@@ -216,9 +220,7 @@ impl VerbSyncService {
             verbs_added: added,
             verbs_updated: updated,
             verbs_unchanged: unchanged,
-            verbs_removed: removed,
             duration_ms,
-            source_hash,
         };
 
         info!(

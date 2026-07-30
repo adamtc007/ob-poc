@@ -10060,8 +10060,6 @@ pub(crate) enum OrchestratorError {
     SessionNotFound(Uuid),
     /// A required persistence operation failed (e.g., parking checkpoint).
     PersistenceFailed(String),
-    /// A persistence-requiring operation was attempted but no repository is configured.
-    NoPersistenceConfigured,
     /// An orchestrator execution failed.
     ExecutionFailed(String),
     /// Orchestrator is misconfigured.
@@ -10073,12 +10071,6 @@ impl std::fmt::Display for OrchestratorError {
         match self {
             Self::SessionNotFound(id) => write!(f, "Session not found: {}", id),
             Self::PersistenceFailed(msg) => write!(f, "Session persistence failed: {}", msg),
-            Self::NoPersistenceConfigured => {
-                write!(
-                    f,
-                    "Session persistence required but no repository configured"
-                )
-            }
             Self::ExecutionFailed(msg) => write!(f, "Execution failed: {}", msg),
             Self::Configuration(msg) => write!(f, "Configuration error: {}", msg),
         }

@@ -23,27 +23,6 @@ pub fn extract_uuid(verb_call: &VerbCall, ctx: &ExecutionContext, arg_name: &str
         .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
-/// Simple UUID extraction without context - for ops that don't use symbol resolution.
-/// Handles literal UUIDs and string UUIDs directly from verb arguments.
-pub(crate) fn get_required_uuid(verb_call: &VerbCall, arg_name: &str) -> Result<Uuid> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            // Try literal UUID
-            if let Some(uuid) = a.value.as_uuid() {
-                return Some(uuid);
-            }
-            // Try parsing string as UUID
-            if let Some(s) = a.value.as_string() {
-                return Uuid::parse_str(s).ok();
-            }
-            None
-        })
-        .ok_or_else(|| anyhow!("Missing or invalid {} argument", arg_name))
-}
-
 /// Extract an optional UUID argument from a verb call.
 /// Handles @symbol references and literal UUIDs.
 pub(crate) fn extract_uuid_opt(
@@ -76,11 +55,6 @@ pub(crate) fn extract_uuid_opt(
 // String Extraction (sync, no DB)
 // ============================================================================
 
-/// Extract a required string argument from a verb call.
-pub(crate) fn extract_string(verb_call: &VerbCall, arg_name: &str) -> Result<String> {
-    extract_string_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
-}
-
 /// Extract an optional string argument from a verb call.
 pub(crate) fn extract_string_opt(verb_call: &VerbCall, arg_name: &str) -> Option<String> {
     verb_call
@@ -89,80 +63,6 @@ pub(crate) fn extract_string_opt(verb_call: &VerbCall, arg_name: &str) -> Option
         .find(|a| a.key == arg_name)
         .and_then(|a| a.value.as_string().map(|s| s.to_string()))
 }
-
-/// Extract a list of strings from a verb argument.
-pub(crate) fn extract_string_list(verb_call: &VerbCall, arg_name: &str) -> Result<Vec<String>> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            a.value.as_list().map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| item.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-        })
-        .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
-}
-
-/// Extract an optional list of strings from a verb argument.
-pub(crate) fn extract_string_list_opt(verb_call: &VerbCall, arg_name: &str) -> Option<Vec<String>> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| {
-            a.value.as_list().map(|items| {
-                items
-                    .iter()
-                    .filter_map(|item| item.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-        })
-}
-
-// ============================================================================
-// Boolean Extraction (sync, no DB)
-// ============================================================================
-
-/// Extract an optional boolean argument from a verb call.
-pub(crate) fn extract_bool_opt(verb_call: &VerbCall, arg_name: &str) -> Option<bool> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| a.value.as_boolean())
-}
-
-/// Extract a required boolean argument from a verb call.
-pub(crate) fn extract_bool(verb_call: &VerbCall, arg_name: &str) -> Result<bool> {
-    extract_bool_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
-}
-
-// ============================================================================
-// Integer Extraction (sync, no DB)
-// ============================================================================
-
-/// Extract an optional integer argument from a verb call.
-pub(crate) fn extract_int_opt(verb_call: &VerbCall, arg_name: &str) -> Option<i64> {
-    verb_call
-        .arguments
-        .iter()
-        .find(|a| a.key == arg_name)
-        .and_then(|a| a.value.as_integer())
-}
-
-/// Extract a required integer argument from a verb call.
-pub(crate) fn extract_int(verb_call: &VerbCall, arg_name: &str) -> Result<i64> {
-    extract_int_opt(verb_call, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
-}
-
-// ============================================================================
-// CBU ID Extraction (sync, no DB) - handles "cbu" or "cbu-id" aliases
-// ============================================================================
-
 
 // ============================================================================
 // CBU Resolution (async, requires DB)
@@ -259,11 +159,6 @@ pub(crate) fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -
 /// Extract an optional boolean from JSON args.
 pub(crate) fn json_extract_bool_opt(args: &serde_json::Value, arg_name: &str) -> Option<bool> {
     args.get(arg_name).and_then(|v| v.as_bool())
-}
-
-/// Extract a required boolean from JSON args.
-pub(crate) fn json_extract_bool(args: &serde_json::Value, arg_name: &str) -> Result<bool> {
-    json_extract_bool_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional integer from JSON args.
@@ -457,54 +352,6 @@ pub async fn extract_entity_ref_opt(
         Ok(None)
     }
 }
-
-// ============================================================================
-// VerbExecutionContext extensions transport
-// ============================================================================
-// Op bodies read/write session-scoped side-channel state through
-// `VerbExecutionContext.extensions` under stable JSON keys. These helpers
-// pack/unpack that state for session/view/agent ops.
-
-use crate::session::{UnifiedSession, ViewState};
-
-/// JSON key used to carry the pending `UnifiedSession` across the
-/// dispatch boundary.
-pub(crate) const EXT_KEY_PENDING_SESSION: &str = "pending_session";
-
-/// JSON key used to carry the pending `ViewState` across the dispatch
-/// boundary.
-pub(crate) const EXT_KEY_PENDING_VIEW_STATE: &str = "pending_view_state";
-
-fn ext_obj_mut(
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-) -> &mut serde_json::Map<String, serde_json::Value> {
-    if !ctx.extensions.is_object() {
-        ctx.extensions = serde_json::Value::Object(serde_json::Map::new());
-    }
-    ctx.extensions.as_object_mut().unwrap()
-}
-
-/// Consume the pending `UnifiedSession` from `sem_ctx.extensions` if any.
-pub(crate) fn ext_take_pending_session(
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-) -> Option<UnifiedSession> {
-    let obj = ctx.extensions.as_object_mut()?;
-    let v = obj.remove(EXT_KEY_PENDING_SESSION)?;
-    serde_json::from_value(v).ok()
-}
-
-/// Write a `UnifiedSession` to `sem_ctx.extensions` under the pending-session key.
-pub(crate) fn ext_set_pending_session(
-    ctx: &mut dsl_runtime::VerbExecutionContext,
-    session: UnifiedSession,
-) {
-    if let Ok(v) = serde_json::to_value(&session) {
-        ext_obj_mut(ctx).insert(EXT_KEY_PENDING_SESSION.to_string(), v);
-    }
-}
-
-
-
 
 // ============================================================================
 // Tests

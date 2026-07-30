@@ -39,7 +39,7 @@ pub(crate) mod worker;
 pub use canonical::{canonical_json_with_hash, validate_payload_hash};
 pub(crate) use canonical::{blake3_bytes};
 pub use client::{BpmnLifecycleEvent, BpmnLiteConnection, CompleteJobRequest, StartProcessRequest};
-pub(crate) use client::{CompileDiagnostic, CompileResult, FiberSnapshot, JobActivation, OrchestratorFlag, ProcessInspection, WaitSnapshot};
+pub(crate) use client::{CompileDiagnostic, CompileResult, JobActivation, OrchestratorFlag, ProcessInspection};
 pub use config::{WorkflowConfig, WorkflowConfigIndex};
 pub use correlation::CorrelationStore;
 pub use dispatcher::WorkflowDispatcher;

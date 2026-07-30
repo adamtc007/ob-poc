@@ -8,8 +8,8 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::sem_os_runtime::constellation_runtime::{
-    RuntimeBlockReason, RuntimeBlockedVerb, RuntimeOverlaySource, RuntimeSlotReduceResult,
-    RuntimeStateMachine, RuntimeStateTransition,
+    RuntimeBlockReason, RuntimeBlockedVerb, RuntimeSlotReduceResult, RuntimeStateMachine,
+    RuntimeStateTransition,
 };
 
 pub(crate) type ReducerMachineBacking = ValidatedStateMachine;
@@ -122,7 +122,6 @@ pub(crate) fn runtime_state_machine_from_reducer(
     machine: ReducerMachineBacking,
 ) -> RuntimeStateMachine {
     RuntimeStateMachine {
-        name: machine.name.clone(),
         states: machine.states.clone(),
         initial: machine.initial.clone(),
         transitions: machine
@@ -134,21 +133,7 @@ pub(crate) fn runtime_state_machine_from_reducer(
                 verbs: transition.verbs.clone(),
             })
             .collect(),
-        overlay_sources: machine
-            .overlay_sources
-            .iter()
-            .map(|(name, source)| {
-                (
-                    name.clone(),
-                    RuntimeOverlaySource {
-                        table: source.table.clone(),
-                        join: source.join.clone(),
-                        provides: source.provides.clone(),
-                        cardinality: source.cardinality.clone(),
-                    },
-                )
-            })
-            .collect(),
+        overlay_sources: machine.overlay_sources.keys().cloned().collect(),
         reducer_backing: machine,
     }
 }

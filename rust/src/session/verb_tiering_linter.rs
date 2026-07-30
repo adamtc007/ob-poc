@@ -188,10 +188,6 @@ impl LintReport {
         self.verbs_with_errors > 0
     }
 
-    pub(crate) fn has_warnings(&self) -> bool {
-        self.verbs_with_warnings > 0
-    }
-
     /// Get only verbs with issues
     pub(crate) fn issues_only(&self) -> Vec<&VerbLintResult> {
         self.results

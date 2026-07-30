@@ -88,14 +88,6 @@ pub(crate) enum ExecutionError {
     #[error("Runbook {0} is not executable (status: {1})")]
     NotExecutable(CompiledRunbookId, String),
 
-    #[error("Lock contention on {entity_type}:{entity_id}")]
-    LockContention {
-        entity_type: String,
-        entity_id: String,
-        /// Best-effort holder of the contested lock (INV-10).
-        holder_runbook_id: Option<uuid::Uuid>,
-    },
-
     /// Lock acquisition timed out (INV-10: 30s timeout).
     ///
     /// Carries the full write_set and all entity IDs that could not be locked,
@@ -112,9 +104,6 @@ pub(crate) enum ExecutionError {
 
     #[error("Database error: {0}")]
     Database(String),
-
-    #[error("Step execution failed: {0}")]
-    StepFailed(String),
 
     /// T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022): a non-empty
     /// write_set was submitted for execution with no database pool to
