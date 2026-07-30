@@ -199,61 +199,6 @@ impl SessionRepository {
         })
     }
 
-    /// Get a session by ID
-    pub(crate) async fn get_session(
-        &self,
-        session_id: Uuid,
-    ) -> Result<Option<PersistedSession>, sqlx::Error> {
-        let row = sqlx::query!(
-            r#"
-            SELECT
-                session_id, status, primary_domain, cbu_id, kyc_case_id, onboarding_request_id,
-                named_refs, client_type, jurisdiction, current_view_state, view_updated_at,
-                created_at, last_activity_at, expires_at,
-                completed_at, error_count, last_error, last_error_at
-            FROM "ob-poc".dsl_sessions
-            WHERE session_id = $1
-            "#,
-            session_id
-        )
-        .fetch_optional(&self.pool)
-        .await?;
-
-        Ok(row.map(|r| {
-            let named_refs: HashMap<String, Uuid> =
-                serde_json::from_value(r.named_refs.clone()).unwrap_or_default();
-
-            PersistedSession {
-                session_id: r.session_id,
-                status: match r.status.as_str() {
-                    "active" => SessionStatus::Active,
-                    "completed" => SessionStatus::Completed,
-                    "aborted" => SessionStatus::Aborted,
-                    "expired" => SessionStatus::Expired,
-                    "error" => SessionStatus::Error,
-                    _ => SessionStatus::Active,
-                },
-                primary_domain: r.primary_domain,
-                cbu_id: r.cbu_id,
-                kyc_case_id: r.kyc_case_id,
-                onboarding_request_id: r.onboarding_request_id,
-                named_refs,
-                client_type: r.client_type,
-                jurisdiction: r.jurisdiction,
-                current_view_state: r.current_view_state,
-                view_updated_at: r.view_updated_at,
-                created_at: r.created_at,
-                last_activity_at: r.last_activity_at,
-                expires_at: r.expires_at,
-                completed_at: r.completed_at,
-                error_count: r.error_count,
-                last_error: r.last_error,
-                last_error_at: r.last_error_at,
-            }
-        }))
-    }
-
-
     /// Update session bindings after successful execution
     pub(crate) async fn update_bindings(
         &self,
@@ -412,15 +357,6 @@ impl SessionRepository {
                 execution_ms: r.execution_ms,
             })
             .collect())
-    }
-
-    /// Get latest snapshot for a session
-    pub(crate) async fn get_latest_snapshot(
-        &self,
-        session_id: Uuid,
-    ) -> Result<Option<DslSnapshot>, sqlx::Error> {
-        let snapshots = self.get_snapshots(session_id).await?;
-        Ok(snapshots.into_iter().last())
     }
 
     // ------------------------------------------------------------------------

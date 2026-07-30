@@ -45,7 +45,6 @@ pub(crate) struct DslSaveResult {
     pub instance_id: Uuid,
     pub version: i32,
     pub business_reference: String,
-    pub success: bool,
 }
 
 /// DSL Instance row - matches canonical DB schema
@@ -128,11 +127,6 @@ impl DslRepository {
     /// Create a new DSL repository
     pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
-    }
-
-    /// Get the pool reference
-    pub(crate) fn pool(&self) -> &PgPool {
-        &self.pool
     }
 
     /// Save DSL instance with version atomically in a transaction
@@ -247,7 +241,6 @@ impl DslRepository {
             instance_id,
             version,
             business_reference: business_reference.to_string(),
-            success: true,
         })
     }
 
@@ -289,34 +282,6 @@ impl DslRepository {
             dsl_content,
             Some(ast_json),
             "EXECUTE",
-        )
-        .await
-    }
-
-    /// Save DSL execution with optimistic locking
-    ///
-    /// # Arguments
-    /// * `expected_version` - The version loaded by the session. Must match DB version.
-    ///
-    /// # Returns
-    /// * `Ok(DslSaveResult)` - Success with new version number
-    /// * `Err(DslSaveError::VersionConflict)` - Another session modified the data
-    pub(crate) async fn save_execution_checked(
-        &self,
-        dsl_content: &str,
-        domain: &str,
-        business_reference: &str,
-        _cbu_id: Option<Uuid>,
-        ast_json: &serde_json::Value,
-        expected_version: Option<i32>,
-    ) -> Result<DslSaveResult, DslSaveError> {
-        self.save_dsl_instance(
-            business_reference,
-            domain,
-            dsl_content,
-            Some(ast_json),
-            "EXECUTE",
-            expected_version,
         )
         .await
     }
@@ -363,47 +328,6 @@ impl DslRepository {
         .await
     }
 
-    /// Update instance status
-    pub(crate) async fn update_status(
-        &self,
-        instance_id: Uuid,
-        status: &str,
-    ) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(
-            r#"
-            UPDATE "ob-poc".dsl_instances
-            SET status = $1, updated_at = NOW()
-            WHERE instance_id = $2
-            "#,
-        )
-        .bind(status)
-        .bind(instance_id)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected() > 0)
-    }
-
-    /// List instances by domain
-    pub(crate) async fn list_by_domain(
-        &self,
-        domain_name: &str,
-        limit: Option<i32>,
-    ) -> Result<Vec<DslInstanceRow>, sqlx::Error> {
-        sqlx::query_as::<_, DslInstanceRow>(
-            r#"
-            SELECT instance_id, domain_name, business_reference, current_version, status, created_at, updated_at
-            FROM "ob-poc".dsl_instances
-            WHERE domain_name = $1
-            ORDER BY updated_at DESC
-            LIMIT $2
-            "#,
-        )
-        .bind(domain_name)
-        .bind(limit.unwrap_or(100))
-        .fetch_all(&self.pool)
-        .await
-    }
 
     /// Get DSL for display/visualization
     /// If version is None, returns latest version

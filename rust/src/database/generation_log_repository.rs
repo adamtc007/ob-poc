@@ -75,59 +75,6 @@ pub(crate) enum ExecutionStatus {
     Skipped,
 }
 
-/// Training pair: user intent → valid DSL
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct TrainingPair {
-    pub user_intent: String,
-    pub valid_dsl: Option<String>,
-}
-
-/// Correction pair: bad DSL + error → fixed DSL
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct CorrectionPair {
-    pub user_intent: String,
-    pub bad_dsl: Option<String>,
-    pub error_message: Option<String>,
-    pub fixed_dsl: Option<String>,
-}
-
-/// Prompt template effectiveness statistics
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct PromptStats {
-    pub template_name: Option<String>,
-    pub total_uses: i64,
-    pub first_try_success: i64,
-    pub avg_attempts: f64,
-    pub avg_latency_ms: Option<f64>,
-}
-
-/// Full generation log row
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct GenerationLogRow {
-    pub log_id: Uuid,
-    pub instance_id: Option<Uuid>,
-    pub user_intent: String,
-    pub final_valid_dsl: Option<String>,
-    pub iterations: serde_json::Value,
-    pub domain_name: String,
-    pub session_id: Option<Uuid>,
-    pub cbu_id: Option<Uuid>,
-    pub model_used: Option<String>,
-    pub total_attempts: i32,
-    pub success: bool,
-    pub total_latency_ms: Option<i32>,
-    pub total_input_tokens: Option<i32>,
-    pub total_output_tokens: Option<i32>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-    // Learning loop fields (migration 039)
-    pub intent_feedback_id: Option<i64>,
-    pub execution_status: Option<ExecutionStatus>,
-    pub execution_error: Option<String>,
-    pub executed_at: Option<DateTime<Utc>>,
-    pub affected_entity_ids: Option<Vec<Uuid>>,
-}
-
 /// Repository for generation log operations
 pub(crate) struct GenerationLogRepository {
     pool: PgPool,
@@ -137,11 +84,6 @@ impl GenerationLogRepository {
     /// Create a new repository
     pub(crate) fn new(pool: PgPool) -> Self {
         Self { pool }
-    }
-
-    /// Get the pool reference
-    pub(crate) fn pool(&self) -> &PgPool {
-        &self.pool
     }
 
     /// Start a new generation log entry
@@ -285,83 +227,6 @@ impl GenerationLogRepository {
 
         Ok(())
     }
-
-
-    /// Get a generation log by ID
-    pub(crate) async fn get_by_id(&self, log_id: Uuid) -> Result<Option<GenerationLogRow>, sqlx::Error> {
-        sqlx::query_as::<_, GenerationLogRow>(
-            r#"
-            SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
-                   domain_name, session_id, cbu_id, model_used, total_attempts,
-                   success, total_latency_ms, total_input_tokens, total_output_tokens,
-                   created_at, completed_at,
-                   intent_feedback_id, execution_status, execution_error, executed_at, affected_entity_ids
-            FROM "ob-poc".dsl_generation_log
-            WHERE log_id = $1
-            "#,
-        )
-        .bind(log_id)
-        .fetch_optional(&self.pool)
-        .await
-    }
-
-    /// List recent generation logs
-    pub(crate) async fn list_recent(&self, limit: i32) -> Result<Vec<GenerationLogRow>, sqlx::Error> {
-        sqlx::query_as::<_, GenerationLogRow>(
-            r#"
-            SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
-                   domain_name, session_id, cbu_id, model_used, total_attempts,
-                   success, total_latency_ms, total_input_tokens, total_output_tokens,
-                   created_at, completed_at,
-                   intent_feedback_id, execution_status, execution_error, executed_at, affected_entity_ids
-            FROM "ob-poc".dsl_generation_log
-            ORDER BY created_at DESC
-            LIMIT $1
-            "#,
-        )
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await
-    }
-
-
-
-
-
-    /// Get logs for a specific session
-    pub(crate) async fn get_by_session(
-        &self,
-        session_id: Uuid,
-    ) -> Result<Vec<GenerationLogRow>, sqlx::Error> {
-        sqlx::query_as::<_, GenerationLogRow>(
-            r#"
-            SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
-                   domain_name, session_id, cbu_id, model_used, total_attempts,
-                   success, total_latency_ms, total_input_tokens, total_output_tokens,
-                   created_at, completed_at,
-                   intent_feedback_id, execution_status, execution_error, executed_at, affected_entity_ids
-            FROM "ob-poc".dsl_generation_log
-            WHERE session_id = $1
-            ORDER BY created_at ASC
-            "#,
-        )
-        .bind(session_id)
-        .fetch_all(&self.pool)
-        .await
-    }
-
-}
-
-/// Summary statistics for generation logs
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
-pub(crate) struct GenerationStatsSummary {
-    pub total_generations: i64,
-    pub successful: i64,
-    pub failed: i64,
-    pub avg_attempts: Option<f64>,
-    pub avg_success_latency_ms: Option<f64>,
-    pub total_input_tokens: Option<i64>,
-    pub total_output_tokens: Option<i64>,
 }
 
 #[cfg(test)]

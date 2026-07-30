@@ -15,79 +15,6 @@ use uuid::Uuid;
 // VIEW MODELS (read-only structs for visualization)
 // =============================================================================
 
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub(crate) struct CbuView {
-    pub cbu_id: Uuid,
-    pub name: String,
-    pub jurisdiction: Option<String>,
-    pub client_type: Option<String>,
-    pub commercial_client_entity_id: Option<Uuid>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct EntityView {
-    pub entity_id: Uuid,
-    pub name: String,
-    pub jurisdiction: Option<String>,
-    pub entity_type: String,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct OfficerView {
-    pub entity_id: Uuid,
-    pub name: String,
-    pub nationality: Option<String>,
-    pub roles: Vec<String>,
-}
-
-/// Entity with role information for CBU tree building
-#[derive(Debug, Clone)]
-pub(crate) struct EntityWithRoleView {
-    pub entity_id: Uuid,
-    pub name: String,
-    pub entity_type: String,
-    pub jurisdiction: Option<String>,
-    pub role_name: String,
-}
-
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub(crate) struct ShareClassView {
-    pub id: Uuid,
-    pub name: String,
-    pub currency: String,
-    pub class_category: Option<String>,
-    pub isin: Option<String>,
-    pub nav_per_share: Option<String>,
-    pub fund_type: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct HoldingView {
-    pub investor_entity_id: Uuid,
-    pub share_class_id: Uuid,
-    pub units: String,
-}
-
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub(crate) struct ControlRelationshipView {
-    pub controller_entity_id: Uuid,
-    pub controlled_entity_id: Uuid,
-    pub control_type: String,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ServiceDeliveryView {
-    pub delivery_id: Uuid,
-    pub product_id: Uuid,
-    pub product_name: String,
-    pub service_id: Uuid,
-    pub service_name: String,
-    pub instance_id: Option<Uuid>,
-    pub instance_name: Option<String>,
-    pub resource_type_name: Option<String>,
-    pub delivery_status: Option<String>,
-}
-
 /// Product view for graph building (via cbus.product_id)
 #[derive(Debug, Clone)]
 pub(crate) struct ProductView {
@@ -137,13 +64,6 @@ pub(crate) struct EntityAttributeView {
     pub value_text: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct DocumentAttributeView {
-    pub attribute_id: Uuid,
-    pub attribute_name: String,
-    pub value: serde_json::Value,
-}
-
 // =============================================================================
 // TRADING VIEW MODELS
 // =============================================================================
@@ -154,13 +74,11 @@ pub(crate) struct TradingProfileView {
     pub profile_id: Uuid,
     pub version: i32,
     pub status: String,
-    pub activated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Universe entry view for graph building - represents tradeable instrument/market combinations
 #[derive(Debug, Clone)]
 pub(crate) struct UniverseEntryView {
-    pub universe_id: Uuid,
     pub instrument_class_id: Uuid,
     pub class_code: String,
     pub class_name: String,
@@ -169,7 +87,6 @@ pub(crate) struct UniverseEntryView {
     pub market_name: Option<String>,
     pub counterparty_id: Option<Uuid>,
     pub counterparty_name: Option<String>,
-    pub currencies: Vec<String>,
     pub is_otc: bool,
 }
 
@@ -196,11 +113,6 @@ pub(crate) struct CsaAgreementView {
 #[derive(Debug, Clone)]
 pub(crate) struct InvestmentManagerView {
     pub entity_id: Uuid,
-    pub entity_name: String,
-    pub can_trade: bool,
-    pub can_settle: bool,
-    pub scope_mics: Vec<String>,
-    pub scope_classes: Vec<String>,
     pub scope_description: String,
 }
 
@@ -297,12 +209,10 @@ pub(crate) struct EntityBasicView {
 
 #[derive(Debug, Clone)]
 pub(crate) struct GraphEntityView {
-    pub cbu_entity_role_id: Uuid,
     pub entity_id: Uuid,
     pub entity_name: String,
     pub entity_type: String,
     pub entity_category: Option<String>,
-    pub role_name: String,
     pub jurisdiction: Option<String>,
     pub roles: Vec<String>,
     pub role_categories: Vec<String>,
@@ -311,8 +221,6 @@ pub(crate) struct GraphEntityView {
     // Role Taxonomy V2 fields
     /// Primary role category from taxonomy (e.g., "OWNERSHIP_CHAIN", "CONTROL_CHAIN")
     pub primary_role_category: Option<String>,
-    /// Layout behavior hint from taxonomy (e.g., "PYRAMID_UP", "OVERLAY")
-    pub layout_category: Option<String>,
     /// UBO treatment code (e.g., "TERMINUS", "LOOK_THROUGH")
     pub ubo_treatment: Option<String>,
     /// KYC obligation level (e.g., "FULL_KYC", "SIMPLIFIED")
@@ -344,10 +252,6 @@ pub(crate) struct SsiView {
     pub cash_currency: Option<String>,
     pub safekeeping_account: Option<String>,
     pub safekeeping_bic: Option<String>,
-    pub cash_account: Option<String>,
-    pub cash_account_bic: Option<String>,
-    pub market_id: Option<Uuid>,
-    pub mic: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -357,11 +261,8 @@ pub(crate) struct BookingRuleView {
     pub priority: i32,
     pub ssi_id: Uuid,
     pub instrument_class_id: Option<Uuid>,
-    pub market_id: Option<Uuid>,
-    pub currency: Option<String>,
     pub is_active: Option<bool>,
     pub class_name: Option<String>,
-    pub mic: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -369,7 +270,6 @@ pub(crate) struct IsdaView {
     pub isda_id: Uuid,
     pub counterparty_entity_id: Uuid,
     pub governing_law: Option<String>,
-    pub agreement_date: chrono::NaiveDate,
     pub is_active: Option<bool>,
     pub counterparty_name: Option<String>,
 }
@@ -388,7 +288,6 @@ pub(crate) struct KycStatusView {
     pub kyc_status: Option<String>,
     pub risk_rating: Option<String>,
     pub next_review_date: Option<chrono::NaiveDate>,
-    pub entity_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -397,17 +296,6 @@ pub(crate) struct DocumentRequestView {
     pub document_type: String,
     pub status: Option<String>,
     pub requested_from_entity_id: Option<Uuid>,
-    pub entity_name: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ScreeningView {
-    pub screening_id: Uuid,
-    pub entity_id: Uuid,
-    pub screening_type: String,
-    pub result: Option<String>,
-    pub resolution: Option<String>,
-    pub entity_name: Option<String>,
 }
 
 /// UBO edge from entity_relationships + ubo_relationship_verification tables
@@ -415,7 +303,6 @@ pub(crate) struct ScreeningView {
 #[derive(Debug, Clone)]
 pub(crate) struct UboEdgeView {
     pub edge_id: Uuid,
-    pub cbu_id: Uuid,
     pub from_entity_id: Uuid,
     pub to_entity_id: Uuid,
     pub edge_type: String,
@@ -451,115 +338,6 @@ pub(crate) struct FundStructureEdgeView {
     pub relationship_type: String,
     pub relationship_status: Option<String>,
     pub source: Option<String>,
-}
-
-/// UBO registry entries (legacy - prefer UboEdgeView)
-#[derive(Debug, Clone)]
-pub(crate) struct UboView {
-    pub ubo_id: Uuid,
-    pub subject_entity_id: Uuid,
-    pub ubo_proper_person_id: Uuid,
-    pub relationship_type: String,
-    pub ownership_percentage: Option<bigdecimal::BigDecimal>,
-    pub control_type: Option<String>,
-    pub verification_status: Option<String>,
-    pub subject_name: Option<String>,
-    pub ubo_name: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct OwnershipView {
-    pub ownership_id: Uuid,
-    pub owner_entity_id: Uuid,
-    pub owned_entity_id: Uuid,
-    pub ownership_type: String,
-    pub ownership_percent: bigdecimal::BigDecimal,
-    pub owner_name: Option<String>,
-    pub owned_name: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ControlView {
-    pub control_id: Uuid,
-    pub controller_entity_id: Uuid,
-    pub controlled_entity_id: Uuid,
-    pub control_type: String,
-    pub description: Option<String>,
-    pub is_active: Option<bool>,
-    pub controller_name: Option<String>,
-    pub controlled_name: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ResourceInstanceView {
-    pub instance_id: Uuid,
-    pub status: String,
-    pub instance_name: Option<String>,
-    pub type_name: String,
-    pub category: Option<String>,
-}
-
-// =============================================================================
-// KYC CASE VIEW MODELS
-// =============================================================================
-
-#[derive(Debug, Clone)]
-pub(crate) struct CaseView {
-    pub case_id: Uuid,
-    pub cbu_id: Uuid,
-    pub status: String,
-    pub escalation_level: String,
-    pub risk_rating: Option<String>,
-    pub case_type: Option<String>,
-    pub sla_deadline: Option<chrono::DateTime<chrono::Utc>>,
-    pub opened_at: chrono::DateTime<chrono::Utc>,
-    pub closed_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct WorkstreamView {
-    pub workstream_id: Uuid,
-    pub case_id: Uuid,
-    pub entity_id: Uuid,
-    pub entity_name: String,
-    pub entity_type: String,
-    pub jurisdiction: Option<String>,
-    pub status: String,
-    pub risk_rating: Option<String>,
-    pub is_ubo: bool,
-    pub ownership_percentage: Option<f64>,
-    pub requires_enhanced_dd: bool,
-    pub discovery_reason: Option<String>,
-    pub discovery_depth: i32,
-    pub discovery_source_workstream_id: Option<Uuid>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct RedFlagView {
-    pub red_flag_id: Uuid,
-    pub case_id: Uuid,
-    pub workstream_id: Option<Uuid>,
-    pub flag_type: String,
-    pub severity: String,
-    pub status: String,
-    pub description: String,
-    pub source: Option<String>,
-    pub raised_at: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub(crate) struct DocStatsView {
-    pub pending: i64,
-    pub received: i64,
-    pub verified: i64,
-    pub rejected: i64,
-}
-
-#[derive(Debug, Clone, Default)]
-pub(crate) struct ScreeningStatsView {
-    pub clear: i64,
-    pub pending_review: i64,
-    pub confirmed_hits: i64,
 }
 
 // =============================================================================
@@ -623,60 +401,6 @@ impl VisualizationRepository {
         Ok(cbu)
     }
 
-
-    // =========================================================================
-    // ENTITY QUERIES
-    // =========================================================================
-
-    /// Get entity by ID with jurisdiction from type-specific table
-    pub(crate) async fn get_entity(&self, entity_id: Uuid) -> Result<EntityView> {
-        let row = sqlx::query!(
-            r#"SELECT e.entity_id, e.name,
-                      COALESCE(lc.jurisdiction, p.jurisdiction, t.jurisdiction) as jurisdiction,
-                      et.type_code as "entity_type!"
-               FROM "ob-poc".entities e
-               JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-               LEFT JOIN "ob-poc".entity_limited_companies lc ON e.entity_id = lc.entity_id
-               LEFT JOIN "ob-poc".entity_partnerships p ON e.entity_id = p.entity_id
-               LEFT JOIN "ob-poc".entity_trusts t ON e.entity_id = t.entity_id
-               WHERE e.entity_id = $1
-                 AND e.deleted_at IS NULL"#,
-            entity_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(EntityView {
-            entity_id: row.entity_id,
-            name: row.name,
-            jurisdiction: row.jurisdiction,
-            entity_type: row.entity_type,
-        })
-    }
-
-
-
-
-
-    // =========================================================================
-    // SHARE CLASS / HOLDING QUERIES
-    // =========================================================================
-
-    /// Get share classes for a CBU
-    pub(crate) async fn get_share_classes(&self, cbu_id: Uuid) -> Result<Vec<ShareClassView>> {
-        let classes = sqlx::query_as!(
-            ShareClassView,
-            r#"SELECT id, name, currency as "currency!", class_category, isin,
-                      nav_per_share::text as nav_per_share, fund_type
-               FROM "ob-poc".share_classes
-               WHERE cbu_id = $1
-               ORDER BY class_category DESC, name"#,
-            cbu_id
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(classes)
-    }
 
 
     // =========================================================================
@@ -1031,7 +755,6 @@ impl VisualizationRepository {
                 v.primary_role,
                 v.max_role_priority as role_priority,
                 v.primary_role_category,
-                v.primary_layout_category,
                 v.effective_ubo_treatment,
                 v.effective_kyc_obligation,
                 pp.person_state as "person_state?"
@@ -1046,14 +769,10 @@ impl VisualizationRepository {
         Ok(rows
             .into_iter()
             .map(|r| GraphEntityView {
-                // Generate a synthetic role ID since we're grouping by entity
-                cbu_entity_role_id: r.entity_id,
                 entity_id: r.entity_id,
                 entity_name: r.entity_name,
                 entity_type: r.entity_type,
                 entity_category: r.entity_category,
-                // Use primary_role as the main role_name
-                role_name: r.primary_role.clone().unwrap_or_default(),
                 jurisdiction: r.jurisdiction,
                 roles: r.roles.unwrap_or_default(),
                 role_categories: r.role_categories.unwrap_or_default(),
@@ -1061,7 +780,6 @@ impl VisualizationRepository {
                 role_priority: r.role_priority,
                 // Role Taxonomy V2 fields
                 primary_role_category: r.primary_role_category,
-                layout_category: r.primary_layout_category,
                 ubo_treatment: r.effective_ubo_treatment,
                 kyc_obligation: r.effective_kyc_obligation,
                 // Person state for ghost entity rendering (None for non-person entities)
@@ -1116,11 +834,8 @@ impl VisualizationRepository {
     pub(crate) async fn get_ssis(&self, cbu_id: Uuid) -> Result<Vec<SsiView>> {
         let rows = sqlx::query!(
             r#"SELECT s.ssi_id, s.ssi_name, s.ssi_type, s.status, s.cash_currency,
-                      s.safekeeping_account, s.safekeeping_bic, s.cash_account, s.cash_account_bic,
-                      s.market_id,
-                      m.mic as "mic?"
+                      s.safekeeping_account, s.safekeeping_bic
                FROM "ob-poc".cbu_ssi s
-               LEFT JOIN "ob-poc".markets m ON m.market_id = s.market_id
                WHERE s.cbu_id = $1"#,
             cbu_id
         )
@@ -1137,10 +852,6 @@ impl VisualizationRepository {
                 cash_currency: r.cash_currency,
                 safekeeping_account: r.safekeeping_account,
                 safekeeping_bic: r.safekeeping_bic,
-                cash_account: r.cash_account,
-                cash_account_bic: r.cash_account_bic,
-                market_id: r.market_id,
-                mic: r.mic,
             })
             .collect())
     }
@@ -1149,12 +860,10 @@ impl VisualizationRepository {
     pub(crate) async fn get_booking_rules(&self, cbu_id: Uuid) -> Result<Vec<BookingRuleView>> {
         let rows = sqlx::query!(
             r#"SELECT r.rule_id, r.rule_name, r.priority, r.ssi_id,
-                      r.instrument_class_id, r.market_id, r.currency, r.is_active,
-                      ic.name as "class_name?",
-                      m.mic as "mic?"
+                      r.instrument_class_id, r.is_active,
+                      ic.name as "class_name?"
                FROM "ob-poc".ssi_booking_rules r
                LEFT JOIN "ob-poc".instrument_classes ic ON ic.class_id = r.instrument_class_id
-               LEFT JOIN "ob-poc".markets m ON m.market_id = r.market_id
                WHERE r.cbu_id = $1
                ORDER BY r.priority"#,
             cbu_id
@@ -1170,11 +879,8 @@ impl VisualizationRepository {
                 priority: r.priority,
                 ssi_id: r.ssi_id,
                 instrument_class_id: r.instrument_class_id,
-                market_id: r.market_id,
-                currency: r.currency,
                 is_active: r.is_active,
                 class_name: r.class_name,
-                mic: r.mic,
             })
             .collect())
     }
@@ -1183,7 +889,7 @@ impl VisualizationRepository {
     pub(crate) async fn get_isdas(&self, cbu_id: Uuid) -> Result<Vec<IsdaView>> {
         let rows = sqlx::query!(
             r#"SELECT i.isda_id, i.counterparty_entity_id, i.governing_law,
-                      i.agreement_date, i.is_active,
+                      i.is_active,
                       e.name as "counterparty_name?"
                FROM "ob-poc".isda_agreements i
                LEFT JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id AND e.deleted_at IS NULL
@@ -1199,7 +905,6 @@ impl VisualizationRepository {
                 isda_id: r.isda_id,
                 counterparty_entity_id: r.counterparty_entity_id,
                 governing_law: r.governing_law,
-                agreement_date: r.agreement_date,
                 is_active: r.is_active,
                 counterparty_name: r.counterparty_name,
             })
@@ -1239,8 +944,7 @@ impl VisualizationRepository {
                 w.entity_id,
                 w.status as kyc_status,
                 w.risk_rating,
-                NULL::date as next_review_date,
-                e.name as "entity_name?"
+                NULL::date as next_review_date
                FROM "ob-poc".entity_workstreams w
                JOIN "ob-poc".cases c ON c.case_id = w.case_id
                JOIN "ob-poc".entities e ON e.entity_id = w.entity_id
@@ -1259,7 +963,6 @@ impl VisualizationRepository {
                 kyc_status: Some(r.kyc_status),
                 risk_rating: r.risk_rating,
                 next_review_date: r.next_review_date,
-                entity_name: r.entity_name,
             })
             .collect())
     }
@@ -1271,8 +974,7 @@ impl VisualizationRepository {
                 dr.request_id,
                 dr.doc_type as document_type,
                 dr.status,
-                w.entity_id as requested_from_entity_id,
-                e.name as "entity_name?"
+                w.entity_id as requested_from_entity_id
                FROM "ob-poc".doc_requests dr
                JOIN "ob-poc".entity_workstreams w ON w.workstream_id = dr.workstream_id
                JOIN "ob-poc".cases c ON c.case_id = w.case_id
@@ -1290,7 +992,6 @@ impl VisualizationRepository {
                 document_type: r.document_type,
                 status: Some(r.status),
                 requested_from_entity_id: Some(r.requested_from_entity_id),
-                entity_name: r.entity_name,
             })
             .collect())
     }
@@ -1306,7 +1007,6 @@ impl VisualizationRepository {
         let rows = sqlx::query!(
             r#"SELECT
                 r.relationship_id as edge_id,
-                v.cbu_id,
                 r.from_entity_id,
                 r.to_entity_id,
                 r.relationship_type as edge_type,
@@ -1341,7 +1041,6 @@ impl VisualizationRepository {
             .into_iter()
             .map(|r| UboEdgeView {
                 edge_id: r.edge_id,
-                cbu_id: r.cbu_id,
                 from_entity_id: r.from_entity_id,
                 to_entity_id: r.to_entity_id,
                 edge_type: r.edge_type,
@@ -1505,39 +1204,6 @@ impl VisualizationRepository {
             .collect())
     }
 
-    // =========================================================================
-    // KYC CASE QUERIES
-    // =========================================================================
-
-    /// Get a KYC case by ID
-    pub(crate) async fn get_case(&self, case_id: Uuid) -> Result<CaseView> {
-        let row = sqlx::query!(
-            r#"SELECT
-                case_id, cbu_id, status, escalation_level, risk_rating,
-                case_type, sla_deadline, opened_at, closed_at
-               FROM "ob-poc".cases
-               WHERE case_id = $1"#,
-            case_id
-        )
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(CaseView {
-            case_id: row.case_id,
-            cbu_id: row.cbu_id,
-            status: row.status,
-            escalation_level: row.escalation_level,
-            risk_rating: row.risk_rating,
-            case_type: row.case_type,
-            sla_deadline: row.sla_deadline,
-            opened_at: row.opened_at,
-            closed_at: row.closed_at,
-        })
-    }
-
-
-
-
     // =====================================================================
     // LAYOUT OVERRIDE PERSISTENCE
     // =====================================================================
@@ -1604,7 +1270,7 @@ impl VisualizationRepository {
         cbu_id: Uuid,
     ) -> Result<Option<TradingProfileView>> {
         let row = sqlx::query!(
-            r#"SELECT profile_id, version, status, activated_at
+            r#"SELECT profile_id, version, status
                FROM "ob-poc".cbu_trading_profiles
                WHERE cbu_id = $1 AND status = 'ACTIVE'
                ORDER BY version DESC
@@ -1618,7 +1284,6 @@ impl VisualizationRepository {
             profile_id: r.profile_id,
             version: r.version,
             status: r.status,
-            activated_at: r.activated_at,
         }))
     }
 
@@ -1635,7 +1300,7 @@ impl VisualizationRepository {
 
         // Fall back to most recent working version (DRAFT, VALIDATED, or PENDING_REVIEW)
         let row = sqlx::query!(
-            r#"SELECT profile_id, version, status, activated_at
+            r#"SELECT profile_id, version, status
                FROM "ob-poc".cbu_trading_profiles
                WHERE cbu_id = $1 AND status IN ('DRAFT', 'VALIDATED', 'PENDING_REVIEW')
                ORDER BY version DESC
@@ -1649,7 +1314,6 @@ impl VisualizationRepository {
             profile_id: r.profile_id,
             version: r.version,
             status: r.status,
-            activated_at: r.activated_at,
         }))
     }
 
@@ -1660,7 +1324,6 @@ impl VisualizationRepository {
     ) -> Result<Vec<UniverseEntryView>> {
         let rows = sqlx::query!(
             r#"SELECT
-                u.universe_id,
                 u.instrument_class_id,
                 ic.code as class_code,
                 ic.name as class_name,
@@ -1669,7 +1332,6 @@ impl VisualizationRepository {
                 m.name as "market_name?",
                 u.counterparty_entity_id as counterparty_id,
                 e.name as "counterparty_name?",
-                u.currencies,
                 COALESCE(ic.requires_isda, false) as "is_otc!"
                FROM "ob-poc".cbu_instrument_universe u
                JOIN "ob-poc".instrument_classes ic ON ic.class_id = u.instrument_class_id
@@ -1685,7 +1347,6 @@ impl VisualizationRepository {
         Ok(rows
             .into_iter()
             .map(|r| UniverseEntryView {
-                universe_id: r.universe_id,
                 instrument_class_id: r.instrument_class_id,
                 class_code: r.class_code,
                 class_name: r.class_name,
@@ -1694,7 +1355,6 @@ impl VisualizationRepository {
                 market_name: r.market_name,
                 counterparty_id: r.counterparty_id,
                 counterparty_name: r.counterparty_name,
-                currencies: r.currencies,
                 is_otc: r.is_otc,
             })
             .collect())
@@ -1762,7 +1422,6 @@ impl VisualizationRepository {
         let rows = sqlx::query!(
             r#"SELECT
                 e.entity_id,
-                e.name as entity_name,
                 r.name as role_name
                FROM "ob-poc".cbu_entity_roles cer
                JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
@@ -1780,11 +1439,6 @@ impl VisualizationRepository {
             .into_iter()
             .map(|r| InvestmentManagerView {
                 entity_id: r.entity_id,
-                entity_name: r.entity_name,
-                can_trade: true, // Default - could be enhanced with scope data
-                can_settle: true,
-                scope_mics: vec![],
-                scope_classes: vec![],
                 scope_description: r.role_name,
             })
             .collect())

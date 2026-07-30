@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.ssi_id, s.ssi_name, s.ssi_type, s.status, s.cash_currency,\n                      s.safekeeping_account, s.safekeeping_bic\n               FROM \"ob-poc\".cbu_ssi s\n               WHERE s.cbu_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ssi_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "ssi_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "ssi_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "cash_currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "safekeeping_account",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "safekeeping_bic",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "4f0bf64847acf390173c520b02ca24a3f32a2f7056aab692aa960f95458e7752"
+}

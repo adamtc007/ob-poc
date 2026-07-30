@@ -295,11 +295,6 @@ impl DiscoveredContext {
     pub(crate) fn empty() -> Self {
         Self::default()
     }
-
-    /// Check if any context was discovered
-    pub(crate) fn has_context(&self) -> bool {
-        self.cbu.is_some()
-    }
 }
 
 // ============================================================================
@@ -361,12 +356,6 @@ impl From<DiscoveredContext> for ob_poc_types::SessionContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_discovered_context_empty() {
-        let ctx = DiscoveredContext::empty();
-        assert!(!ctx.has_context());
-    }
 
     #[test]
     fn test_cbu_context_conversion() {
