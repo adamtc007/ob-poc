@@ -1,0 +1,44 @@
+[
+  {
+    "text": "run the onboarding workflow",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "bpmn.spawn-instance" },
+    "generation_rationale": "Direct invocation phrase declared on the verb."
+  },
+  {
+    "text": "spawn an instance of the client-onboarding template",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "bpmn.spawn-instance" },
+    "generation_rationale": "Explicit 'spawn an instance of' phrasing with a template reference."
+  },
+  {
+    "text": "start the client-review process from the published template",
+    "calibration_mode": "positive",
+    "negative_type": null,
+    "expected_outcome": { "type": "resolves_to", "value": "bpmn.spawn-instance" },
+    "generation_rationale": "Template-anchored phrasing should outrank bpmn.start, which has no template concept."
+  },
+  {
+    "text": "compile this bpmn model",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "bpmn.compile" },
+    "generation_rationale": "Type-B: compile, not spawn — must not be pulled toward the new verb by domain proximity."
+  },
+  {
+    "text": "cancel this workflow instance",
+    "calibration_mode": "negative",
+    "negative_type": "type_b",
+    "expected_outcome": { "type": "resolves_to", "value": "bpmn.cancel" },
+    "generation_rationale": "Type-B: cancel an existing instance, not spawn a new one."
+  },
+  {
+    "text": "spectral bpmn flux capacitor",
+    "calibration_mode": "negative",
+    "negative_type": "type_a",
+    "expected_outcome": { "type": "falls_to_sage" },
+    "generation_rationale": "Nonsense with bpmn-adjacent words."
+  }
+]

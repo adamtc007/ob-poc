@@ -462,6 +462,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     // (bridges to crate::bpmn_integration::client).
     registry.register(Arc::new(bpmn_lite_ops::BpmnCompile));
     registry.register(Arc::new(bpmn_lite_ops::BpmnStart));
+    registry.register(Arc::new(bpmn_lite_ops::BpmnSpawnInstance));
     registry.register(Arc::new(bpmn_lite_ops::BpmnSignal));
     registry.register(Arc::new(bpmn_lite_ops::BpmnCancel));
     registry.register(Arc::new(bpmn_lite_ops::BpmnInspect));

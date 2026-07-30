@@ -72,6 +72,46 @@ domains:
             - emitting
           consequence:
             baseline: reviewable
+      spawn-instance:
+        flavour: instance_adding
+        description: "Spawn a runnable instance from a Published bpmn-lite workflow template"
+        behavior: plugin
+        effect_class: read_modify_write
+        metadata:
+          tier: composite
+          source_of_truth: external
+          subject_kinds: [workflow]
+          phase_tags: [monitoring]
+          side_effects: state_write
+        invocation_phrases:
+          - "run the onboarding workflow"
+          - "spawn an instance of"
+          - "start the process from the published template"
+          - "spawn workflow instance from template"
+          - "run this template"
+        args:
+          - name: template-key
+            type: string
+            required: true
+            description: "Published template's key (name)"
+          - name: template-version
+            type: integer
+            required: false
+            description: "Specific published version; omit to resolve the latest published version"
+          - name: payload
+            type: string
+            required: false
+            description: "Domain payload as JSON string"
+        returns:
+          type: uuid
+          description: "Spawned process instance ID"
+
+        three_axis:
+          state_effect: preserving
+          external_effects:
+            - emitting
+          consequence:
+            baseline: reviewable
       signal:
         flavour: attribute_mutating
         description: "Send a signal to a running BPMN process instance"

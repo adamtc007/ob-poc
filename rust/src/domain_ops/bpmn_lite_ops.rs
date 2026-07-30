@@ -7,7 +7,7 @@
 //! in `ob-poc::domain_ops` because the client types live in
 //! `ob-poc::bpmn_integration` (not upstream of `sem_os_postgres`).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ob_poc_types::session_stack::SessionStackState;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -15,7 +15,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use dsl_runtime::TransactionScope;
-use dsl_runtime::{json_extract_string, json_extract_string_opt, json_get_required_uuid};
+use dsl_runtime::{
+    json_extract_int_opt, json_extract_string, json_extract_string_opt, json_get_required_uuid,
+};
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
 // =============================================================================
@@ -195,6 +197,125 @@ impl SemOsVerbOp for BpmnStart {
                     "bpmn.start: pre_fetch result missing \
                  (`_bpmn_start_instance_id` absent from args — dispatcher \
                  must have bypassed the pre_fetch hook)"
+                )
+            })?;
+        Ok(VerbExecutionOutcome::Uuid(instance_id))
+    }
+}
+
+// =============================================================================
+// bpmn.spawn-instance
+//
+// Phase B (bpmn-lite, 2026-07-30): spawn a runnable instance from a
+// Published workflow template. Unlike the other bpmn.* verbs above, this
+// does NOT go through the gRPC `BpmnLiteConnection` (production runner
+// service) — it targets the demo designer's new REST spawn endpoint, which
+// is where Published templates and their compiled programs actually live
+// in demo mode. Scope is demo-mode only, matching bpmn-lite's own Phase B
+// plan; production wiring (gRPC template-name resolution) is a separate,
+// future piece of work.
+// =============================================================================
+
+const ENV_BPMN_DESIGNER_URL: &str = "BPMN_LITE_DESIGNER_URL";
+const DEFAULT_BPMN_DESIGNER_URL: &str = "http://127.0.0.1:8080";
+
+/// `POST {designer_base}/bpmn/templates/{template_key}/spawn` — the demo
+/// designer's Published-only spawn endpoint. Plain HTTP, not the tonic
+/// gRPC client `bpmn_integration::client::BpmnLiteConnection` used by the
+/// other verbs in this file (that targets the production runner's gRPC
+/// service, out of scope here).
+async fn spawn_via_designer(
+    template_key: &str,
+    template_version: Option<i64>,
+    payload: Option<serde_json::Value>,
+) -> Result<Uuid> {
+    let base = std::env::var(ENV_BPMN_DESIGNER_URL)
+        .unwrap_or_else(|_| DEFAULT_BPMN_DESIGNER_URL.to_string());
+    let url = format!("{base}/bpmn/templates/{template_key}/spawn");
+
+    let body = serde_json::json!({
+        "version": template_version,
+        "payload": payload,
+    });
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .with_context(|| format!("bpmn.spawn-instance: request to {url} failed"))?;
+
+    let status = response.status();
+    let response_body: serde_json::Value = response
+        .json()
+        .await
+        .with_context(|| format!("bpmn.spawn-instance: non-JSON response from {url}"))?;
+
+    if !status.is_success() {
+        return Err(anyhow::anyhow!(
+            "bpmn.spawn-instance: designer rejected spawn ({status}): {response_body}"
+        ));
+    }
+
+    response_body
+        .get("instance_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "bpmn.spawn-instance: designer response missing instance_id: {response_body}"
+            )
+        })
+}
+
+pub(super) struct BpmnSpawnInstance;
+
+#[async_trait]
+impl SemOsVerbOp for BpmnSpawnInstance {
+    fn fqn(&self) -> &str {
+        "bpmn.spawn-instance"
+    }
+
+    /// Same pre_fetch-before-txn-open pattern as `BpmnStart` above (A1
+    /// invariant: no external I/O inside the inner txn). Non-idempotent —
+    /// the designer mints a fresh instance_id per call — same disclosed
+    /// orphan-on-rollback risk as `BpmnStart`.
+    async fn pre_fetch(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _pool: &sqlx::PgPool,
+    ) -> Result<Option<serde_json::Value>> {
+        let template_key = json_extract_string(args, "template-key")?;
+        let template_version = json_extract_int_opt(args, "template-version");
+        let payload = json_extract_string_opt(args, "payload")
+            .map(|p| serde_json::from_str(&p))
+            .transpose()
+            .context("bpmn.spawn-instance: payload is not valid JSON")?;
+
+        let instance_id = spawn_via_designer(&template_key, template_version, payload).await?;
+
+        Ok(Some(serde_json::json!({
+            "_bpmn_spawn_instance_id": instance_id.to_string()
+        })))
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        _ctx: &mut VerbExecutionContext,
+        _scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let instance_id = args
+            .get("_bpmn_spawn_instance_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "bpmn.spawn-instance: pre_fetch result missing \
+                     (`_bpmn_spawn_instance_id` absent from args — dispatcher \
+                     must have bypassed the pre_fetch hook)"
                 )
             })?;
         Ok(VerbExecutionOutcome::Uuid(instance_id))
