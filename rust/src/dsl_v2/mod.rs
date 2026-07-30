@@ -161,7 +161,11 @@ pub(crate) use applicability_rules::{ApplicabilityRules, AttributeApplicability,
 pub(crate) use batch_executor::{
     BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
 };
-pub(crate) use csg_linter::{CsgLinter, InferredContext, LintResult};
+pub(crate) use csg_linter::InferredContext;
+// `pub` (not `pub(crate)`): the `dsl_cli` binary (`src/bin/dsl_cli.rs`) is
+// a separate compilation unit and needs to name these across the crate
+// boundary.
+pub use csg_linter::{CsgLinter, LintResult};
 pub(crate) use display_nouns::{
     contains_forbidden_token, display_noun, display_noun_or_self, has_display_noun, pluralize,
     FORBIDDEN_UI_TOKENS,
@@ -184,9 +188,13 @@ pub(crate) use submission::{
     SubmissionLimits, SubmissionState, SymbolBinding,
 };
 pub(crate) use topo_sort::{
-    emit_dsl, topological_sort, topological_sort_with_lifecycle,
-    ExecutionPhase as TopoExecutionPhase, TopoSortError, TopoSortResult,
+    topological_sort_with_lifecycle, ExecutionPhase as TopoExecutionPhase, TopoSortError,
+    TopoSortResult,
 };
+// `emit_dsl`/`topological_sort` are `pub` (not `pub(crate)`): the `dsl_cli`
+// binary (`src/bin/dsl_cli.rs`) is a separate compilation unit and needs to
+// name them across the crate boundary.
+pub use topo_sort::{emit_dsl, topological_sort};
 
 pub(crate) use verb_taxonomy::{
     verb_taxonomy, DomainSummary, TaxonomyCategory, TaxonomyDomain, VerbLocation, VerbTaxonomy,
@@ -222,7 +230,17 @@ pub mod planning {
         EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
     };
     pub use super::execution_plan::{compile};
-pub(crate) use super::execution_plan::{compile_with_planning, BindingInfo as PlanningBindingInfo, CompileError, ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningContext, PlanningResult, SyntheticStep};
+    pub(crate) use super::execution_plan::{
+        CompileError, ExecutionPlan, ExecutionStep, Injection, PlannerDiagnostic, PlanningResult,
+        SyntheticStep,
+    };
+    // `compile_with_planning`/`PlanningBindingInfo`/`PlanningContext` are
+    // `pub` (not `pub(crate)`): the `dsl_cli` binary (`src/bin/dsl_cli.rs`)
+    // is a separate compilation unit and needs to name them across the
+    // crate boundary.
+    pub use super::execution_plan::{
+        compile_with_planning, BindingInfo as PlanningBindingInfo, PlanningContext,
+    };
     pub use super::planning_facade::{
         analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,
         PlanningOutput, SyntheticStep as FacadeSyntheticStep,

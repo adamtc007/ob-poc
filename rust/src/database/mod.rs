@@ -94,9 +94,13 @@ pub(crate) use visualization_repository::{
 };
 
 pub(crate) use session_repository::{
-    detect_domain, extract_domains, CbuDslState, DslSnapshot, EntityCreated, PersistedSession,
-    SessionEventType, SessionRepository, SessionStatus,
+    detect_domain, extract_domains, DslSnapshot, EntityCreated, PersistedSession,
+    SessionEventType, SessionStatus,
 };
+// `CbuDslState`/`SessionRepository` are `pub` (not `pub(crate)`): the
+// `dsl_cli` binary (`src/bin/dsl_cli.rs`) is a separate compilation unit
+// and needs to name them across the crate boundary.
+pub use session_repository::{CbuDslState, SessionRepository};
 
 pub(crate) use graph_repository::{DerivedBook, GraphRepository, PgGraphRepository};
 

@@ -71,4 +71,7 @@ pub(crate) use resolution::{
 pub(crate) use scope_resolution::{
     EntityMatch, ScopeCandidate, ScopeContext, ScopeResolutionOutcome, ScopeResolver,
 };
-pub(crate) use server::McpServer;
+// `pub` (not `pub(crate)`): the `dsl_mcp` binary (`src/bin/dsl_mcp.rs`) is
+// a separate compilation unit and needs to name it across the crate
+// boundary.
+pub use server::McpServer;

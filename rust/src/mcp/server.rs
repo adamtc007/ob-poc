@@ -19,7 +19,7 @@ use ob_poc_boundary::policy::ActorResolver;
 use sem_os_client::SemOsClient;
 
 /// MCP Server
-pub(crate) struct McpServer {
+pub struct McpServer {
     handlers: ToolHandlers,
     pool: PgPool,
     sem_os_client: Option<Arc<dyn SemOsClient>>,
@@ -30,7 +30,7 @@ impl McpServer {
     /// Create a new MCP server with database pool and embedder (REQUIRED)
     ///
     /// There is only ONE path - all MCP tools require the Candle embedder.
-    pub(crate) fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
+    pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
         Self {
             handlers: ToolHandlers::new(pool.clone(), embedder),
             pool,
@@ -59,7 +59,7 @@ impl McpServer {
     /// Install the canonical SemOS plugin op registry. Threaded into the
     /// handler's inner `DslExecutor` construction so plugin verbs dispatch
     /// correctly (post-Phase-5c-migrate slice #80).
-    pub(crate) fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
+    pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
         self.handlers = self.handlers.with_sem_os_ops(ops);
         self
     }
@@ -74,7 +74,7 @@ impl McpServer {
     }
 
     /// Run the server, reading from stdin and writing to stdout
-    pub(crate) async fn run(&self) -> anyhow::Result<()> {
+    pub async fn run(&self) -> anyhow::Result<()> {
         let stdin = std::io::stdin();
         let mut stdout = std::io::stdout();
 

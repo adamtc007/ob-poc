@@ -210,7 +210,7 @@ impl Embedder for CandleEmbedder {
 }
 
 /// Cached embedder wrapper for efficiency
-pub(crate) struct CachedEmbedder {
+pub struct CachedEmbedder {
     inner: Arc<dyn Embedder>,
     query_cache: RwLock<HashMap<String, Embedding>>,
     target_cache: RwLock<HashMap<String, Embedding>>,
@@ -219,7 +219,7 @@ pub(crate) struct CachedEmbedder {
 
 impl CachedEmbedder {
     /// Create cached wrapper around an embedder
-    pub(crate) fn new(inner: Arc<dyn Embedder>) -> Self {
+    pub fn new(inner: Arc<dyn Embedder>) -> Self {
         Self {
             inner,
             query_cache: RwLock::new(HashMap::new()),

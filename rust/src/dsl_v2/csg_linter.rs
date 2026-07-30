@@ -30,7 +30,7 @@ use sqlx::PgPool;
 
 /// Result of CSG linting
 #[derive(Debug)]
-pub(crate) struct LintResult {
+pub struct LintResult {
     /// The original AST (passed through)
     pub ast: Program,
     /// Diagnostics generated during linting
@@ -41,14 +41,14 @@ pub(crate) struct LintResult {
 
 impl LintResult {
     /// Returns true if there are any errors (invalid or incomplete DSL)
-    pub(crate) fn has_errors(&self) -> bool {
+    pub fn has_errors(&self) -> bool {
         self.diagnostics
             .iter()
             .any(|d| d.severity == Severity::Error)
     }
 
     /// Returns true if there are any warnings
-    pub(crate) fn has_warnings(&self) -> bool {
+    pub fn has_warnings(&self) -> bool {
         self.diagnostics
             .iter()
             .any(|d| d.severity == Severity::Warning)
@@ -135,7 +135,7 @@ pub(crate) struct DocumentCatalog {
 // CSG LINTER
 // =============================================================================
 
-pub(crate) struct CsgLinter {
+pub struct CsgLinter {
     #[cfg(feature = "database")]
     pool: PgPool,
     rules: ApplicabilityRules,
@@ -144,7 +144,7 @@ pub(crate) struct CsgLinter {
 
 impl CsgLinter {
     #[cfg(feature = "database")]
-    pub(crate) fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool) -> Self {
         Self {
             pool,
             rules: ApplicabilityRules::default(),
@@ -164,7 +164,7 @@ impl CsgLinter {
     /// Uses default/empty rules - no CSG database lookups will be performed
     /// Note: Already initialized - no need to call initialize()
     #[cfg(feature = "database")]
-    pub(crate) fn new_without_db() -> Self {
+    pub fn new_without_db() -> Self {
         // Use a valid URL format that won't panic on parse.
         // This pool should never actually be used - it's a placeholder for offline mode.
         let pool = sqlx::PgPool::connect_lazy("postgresql://localhost/nonexistent")
@@ -178,7 +178,7 @@ impl CsgLinter {
 
     /// Initialize linter by loading rules from database
     #[cfg(feature = "database")]
-    pub(crate) async fn initialize(&mut self) -> Result<(), String> {
+    pub async fn initialize(&mut self) -> Result<(), String> {
         // Skip if already initialized (e.g., from new_without_db)
         if self.initialized {
             return Ok(());
@@ -195,7 +195,7 @@ impl CsgLinter {
     }
 
     /// Main entry point: Lint a parsed AST
-    pub(crate) async fn lint(
+    pub async fn lint(
         &self,
         ast: Program,
         context: &ValidationContext,

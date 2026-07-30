@@ -21,7 +21,7 @@ use super::runtime_registry::{RuntimeVerb, RuntimeVerbRegistry};
 
 /// Errors from topological sort
 #[derive(Debug, Clone)]
-pub(crate) enum TopoSortError {
+pub enum TopoSortError {
     /// Circular dependency detected
     CyclicDependency {
         /// Statements involved in the cycle
@@ -43,7 +43,7 @@ impl std::error::Error for TopoSortError {}
 
 /// Result of topological sort
 #[derive(Debug)]
-pub(crate) struct TopoSortResult {
+pub struct TopoSortResult {
     /// The sorted program
     pub program: Program,
     /// Whether any reordering occurred
@@ -154,7 +154,7 @@ fn compute_depth_recursive(
 /// # Returns
 /// * `Ok(TopoSortResult)` - Sorted program with metadata
 /// * `Err(TopoSortError)` - If cyclic dependency detected
-pub(crate) fn topological_sort(
+pub fn topological_sort(
     pending: &Program,
     executed_context: &BindingContext,
     _registry: &RuntimeVerbRegistry,
@@ -779,7 +779,7 @@ fn collect_implicit_refs(
 /// Emit DSL source from a sorted program
 ///
 /// Reconstructs the DSL text from the AST, preserving formatting where possible.
-pub(crate) fn emit_dsl(program: &Program) -> String {
+pub fn emit_dsl(program: &Program) -> String {
     let mut lines = vec![];
 
     for stmt in &program.statements {

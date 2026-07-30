@@ -33,7 +33,7 @@ use crate::templates::{ExpansionContext, TemplateExpander};
 // =============================================================================
 
 #[derive(Debug, Clone)]
-pub(crate) struct TemplateInvokeResult {
+pub struct TemplateInvokeResult {
     pub template_id: String,
     pub statements_executed: usize,
     pub outputs: HashMap<String, Uuid>,
@@ -43,7 +43,7 @@ pub(crate) struct TemplateInvokeResult {
 use crate::dsl_v2::batch_executor::{BatchExecutor, BatchResultAccumulator, OnErrorMode};
 
 #[derive(Debug, Clone)]
-pub(crate) struct TemplateBatchResult {
+pub struct TemplateBatchResult {
     pub template_id: String,
     pub total_items: usize,
     pub success_count: usize,

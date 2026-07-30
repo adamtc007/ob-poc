@@ -44,7 +44,7 @@ use std::collections::{HashMap, HashSet};
 /// Both carry the same dependency information; `dag` is the typed authority,
 /// `steps` is the ordered execution sequence.
 #[derive(Debug, Clone)]
-pub(crate) struct ExecutionPlan {
+pub struct ExecutionPlan {
     pub steps: Vec<ExecutionStep>,
     /// Typed Populated Execution DAG — the load-bearing runtime structure (v0.5 §4.5).
     /// Populated from all `DagEdge` entries across every `ExecutionStep::dag_edges`.
@@ -87,7 +87,7 @@ impl ExecutionPlan {
 
 /// A single step in the execution plan
 #[derive(Debug, Clone)]
-pub(crate) struct ExecutionStep {
+pub struct ExecutionStep {
     /// The verb call to execute (with nested children removed)
     pub verb_call: VerbCall,
 
@@ -138,7 +138,7 @@ pub(crate) struct ExecutionStep {
 
 /// Instruction to inject a previous step's result into this step's arguments
 #[derive(Debug, Clone)]
-pub(crate) struct Injection {
+pub struct Injection {
     /// Index of the step that produces the value
     pub from_step: usize,
 
@@ -148,7 +148,7 @@ pub(crate) struct Injection {
 
 /// Compilation errors
 #[derive(Debug, Clone)]
-pub(crate) enum CompileError {
+pub enum CompileError {
     /// Verb not found in registry
     UnknownVerb {
         domain: String,
@@ -206,14 +206,14 @@ impl std::error::Error for CompileError {}
 
 /// Context for the planning pass - tracks available bindings from session/environment
 #[derive(Debug, Clone, Default)]
-pub(crate) struct PlanningContext {
+pub struct PlanningContext {
     /// Bindings available from session context (e.g., @last_cbu)
     available_bindings: HashMap<String, BindingInfo>,
 }
 
 /// Information about an available binding
 #[derive(Debug, Clone)]
-pub(crate) struct BindingInfo {
+pub struct BindingInfo {
     /// The type of entity this binding refers to
     pub entity_type: String,
     /// Optional subtype (for entities with subtypes)
@@ -224,7 +224,7 @@ pub(crate) struct BindingInfo {
 
 impl PlanningContext {
     /// Create empty context
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
@@ -241,7 +241,7 @@ impl PlanningContext {
     }
 
     /// Add a binding with full info
-    pub(crate) fn add_binding_info(&mut self, name: &str, info: BindingInfo) {
+    pub fn add_binding_info(&mut self, name: &str, info: BindingInfo) {
         self.available_bindings.insert(name.to_string(), info);
     }
 
@@ -258,7 +258,7 @@ impl PlanningContext {
 
 /// Result of compile_with_planning
 #[derive(Debug, Clone)]
-pub(crate) struct PlanningResult {
+pub struct PlanningResult {
     /// The compiled execution plan
     pub plan: ExecutionPlan,
     /// Synthetic steps that were injected
@@ -284,7 +284,7 @@ pub(crate) struct SyntheticStep {
 
 /// Diagnostic message from the planner
 #[derive(Debug, Clone)]
-pub(crate) enum PlannerDiagnostic {
+pub enum PlannerDiagnostic {
     /// A synthetic step was injected to create a missing binding
     SyntheticStepInjected {
         binding: String,
@@ -537,7 +537,7 @@ pub fn compile(program: &Program) -> Result<ExecutionPlan, CompileError> {
 ///
 /// # Returns
 /// * `PlanningResult` containing the plan, synthetic steps, and diagnostics
-pub(crate) fn compile_with_planning(
+pub fn compile_with_planning(
     program: &Program,
     context: &PlanningContext,
 ) -> Result<PlanningResult, CompileError> {

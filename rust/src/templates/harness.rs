@@ -24,7 +24,7 @@ use crate::dsl_v2::syntax::parse_program;
 
 /// Result of testing a single template
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TemplateTestResult {
+pub struct TemplateTestResult {
     pub template_id: String,
     pub template_name: String,
     /// Primary entity type for this template (cbu, kyc_case, onboarding_request)
@@ -53,7 +53,7 @@ pub(crate) struct TemplateTestResult {
 
 /// Result of running the full test harness
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct HarnessResult {
+pub struct HarnessResult {
     pub total_templates: usize,
     pub expansion_complete: usize,
     pub expansion_incomplete: usize,

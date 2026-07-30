@@ -23,7 +23,10 @@ pub use ob_templates::{
 // Keep harness module in main crate (has heavy dsl_v2 dependencies)
 pub mod harness;
 pub use harness::{run_harness_no_db};
-pub(crate) use harness::{HarnessResult};
+// `pub` (not `pub(crate)`): the `template_harness` binary
+// (`src/bin/template_harness.rs`) is a separate compilation unit and needs
+// to name it across the crate boundary.
+pub use harness::HarnessResult;
 
 // Extension trait for ExpansionContext integration with main crate session types
 mod context_ext;

@@ -651,7 +651,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
 /// - Slice 2.2 (F3) startup fail-fast check in `ob-poc-web::main`
 ///
 /// Exactly the same computation in both paths — no drift possible.
-pub(crate) fn find_missing_plugin_ops(
+pub fn find_missing_plugin_ops(
     registry: &sem_os_postgres::ops::SemOsVerbOpRegistry,
 ) -> Vec<String> {
     use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};

@@ -135,12 +135,12 @@ impl std::fmt::Display for SessionEventType {
 // ============================================================================
 
 /// Session persistence repository
-pub(crate) struct SessionRepository {
+pub struct SessionRepository {
     pool: PgPool,
 }
 
 impl SessionRepository {
-    pub(crate) fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -601,7 +601,7 @@ impl SessionRepository {
 
 
     /// Get CBU state summary (for loading into REPL/UI)
-    pub(crate) async fn get_cbu_state(&self, cbu_id: Uuid) -> Result<CbuDslState, sqlx::Error> {
+    pub async fn get_cbu_state(&self, cbu_id: Uuid) -> Result<CbuDslState, sqlx::Error> {
         let session = self.get_or_create_session_for_cbu(cbu_id).await?;
         let accumulated_dsl = self.get_accumulated_dsl_for_cbu(cbu_id).await?;
         let snapshots = self.get_snapshots(session.session_id).await?;
@@ -619,7 +619,7 @@ impl SessionRepository {
 
 /// CBU DSL state summary
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct CbuDslState {
+pub struct CbuDslState {
     pub cbu_id: Uuid,
     pub session_id: Uuid,
     pub executed_dsl: String,
