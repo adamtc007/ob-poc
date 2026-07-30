@@ -120,37 +120,6 @@ impl EntityGraph {
     }
 
 
-    /// Add an entity node to the graph
-    pub(crate) fn add_node(&mut self, node: GraphNode) {
-        self.nodes.insert(node.entity_id, node);
-    }
-
-    /// Add a CBU container node
-    pub(crate) fn add_cbu(&mut self, cbu: CbuNode) {
-        self.cbus.insert(cbu.cbu_id, cbu);
-    }
-
-    /// Get a node by ID
-    pub(crate) fn get_node(&self, entity_id: &Uuid) -> Option<&GraphNode> {
-        self.nodes.get(entity_id)
-    }
-
-
-    /// Get a CBU by ID
-    pub(crate) fn get_cbu(&self, cbu_id: &Uuid) -> Option<&CbuNode> {
-        self.cbus.get(cbu_id)
-    }
-
-    /// Check if a node exists
-    pub(crate) fn has_node(&self, entity_id: &Uuid) -> bool {
-        self.nodes.contains_key(entity_id)
-    }
-
-
-
-
-
-
     /// Compute statistics for the graph
     pub(crate) fn compute_stats(&mut self) {
         let total_edges = self.ownership_edges.len()
@@ -256,53 +225,6 @@ impl EntityGraph {
                 controller_node.controls.push(edge.controlled_id);
             }
         }
-    }
-
-    /// Load an EntityGraph from the database based on scope
-    ///
-    /// This is the main entry point for loading graphs. It delegates to the
-    /// GraphRepository based on the scope type and then performs post-processing:
-    /// - Rebuilds adjacency lists from edges
-    /// - Computes depths from termini
-    /// - Computes statistics
-    #[cfg(feature = "database")]
-    pub(crate) async fn load(
-        scope: GraphScope,
-        repo: &impl crate::database::GraphRepository,
-    ) -> anyhow::Result<Self> {
-        use chrono::Local;
-
-        let as_of = Local::now().date_naive();
-
-        let mut graph = match &scope {
-            GraphScope::SingleCbu { cbu_id, .. } => repo.load_cbu_graph(*cbu_id, as_of).await?,
-            GraphScope::Book { apex_entity_id, .. } => {
-                repo.load_book_graph(*apex_entity_id, as_of).await?
-            }
-            GraphScope::Jurisdiction { code } => repo.load_jurisdiction_graph(code, as_of).await?,
-            GraphScope::EntityNeighborhood { entity_id, hops } => {
-                repo.load_neighborhood_graph(*entity_id, *hops, as_of)
-                    .await?
-            }
-            GraphScope::Empty => return Ok(Self::new()),
-            GraphScope::Custom { .. } => {
-                return Err(anyhow::anyhow!("Custom scope requires explicit loading"))
-            }
-        };
-
-        // Set the scope on the loaded graph
-        graph.scope = scope;
-
-        // Rebuild adjacency lists from loaded edges
-        graph.rebuild_adjacency();
-
-        // Compute depths from termini
-        graph.compute_depths();
-
-        // Compute statistics
-        graph.compute_stats();
-
-        Ok(graph)
     }
 
     /// Load with a specific as-of date for temporal queries
@@ -937,13 +859,6 @@ impl OwnershipEdge {
             visible: true,
         }
     }
-
-    /// Check if this edge is effective as of a given date
-    pub(crate) fn is_effective_as_of(&self, date: NaiveDate) -> bool {
-        let from_ok = self.effective_from.is_none_or(|d| d <= date);
-        let to_ok = self.effective_to.is_none_or(|d| d >= date);
-        from_ok && to_ok
-    }
 }
 
 /// Control edge (non-ownership control relationship)
@@ -983,13 +898,6 @@ impl ControlEdge {
             effective_to: None,
             visible: true,
         }
-    }
-
-    /// Check if this edge is effective as of a given date
-    pub(crate) fn is_effective_as_of(&self, date: NaiveDate) -> bool {
-        let from_ok = self.effective_from.is_none_or(|d| d <= date);
-        let to_ok = self.effective_to.is_none_or(|d| d >= date);
-        from_ok && to_ok
     }
 }
 
@@ -1077,22 +985,6 @@ pub(crate) struct RoleAssignment {
     pub visible: bool,
 }
 
-impl RoleAssignment {
-    pub(crate) fn new(cbu_id: Uuid, entity_id: Uuid, role: String) -> Self {
-        Self {
-            id: Uuid::new_v4(),
-            cbu_id,
-            entity_id,
-            role,
-            role_category: None,
-            ownership_percentage: None,
-            effective_from: None,
-            effective_to: None,
-            visible: true,
-        }
-    }
-}
-
 // =============================================================================
 // ENUMS
 // =============================================================================
@@ -1153,117 +1045,6 @@ impl FromStr for EntityType {
             "RESOURCE" => Self::Resource,
             _ => Self::Unknown,
         })
-    }
-}
-
-impl EntityType {
-    /// Check if this is a natural person type
-    pub(crate) fn is_natural_person(&self) -> bool {
-        matches!(self, Self::ProperPerson)
-    }
-
-    /// Check if this is a fund type
-    pub(crate) fn is_fund(&self) -> bool {
-        matches!(
-            self,
-            Self::Fund
-                | Self::Sicav
-                | Self::Icav
-                | Self::Oeic
-                | Self::Vcc
-                | Self::UnitTrust
-                | Self::Fcp
-        )
-    }
-}
-
-// =============================================================================
-// ENTITY VERIFICATION STATE
-// =============================================================================
-
-/// Person/Entity verification state - progressive refinement from Ghost to Verified
-///
-/// Ghost entities allow the system to capture "we know someone exists" before
-/// we have full identifying attributes. This prevents blocking imports while
-/// maintaining explicit tracking of incomplete data.
-///
-/// Sources that create Ghost entities:
-/// - Document extraction ("John Smith mentioned as director")
-/// - Ownership chain discovery ("UBO identified but not yet contacted")
-/// - Client allegations ("Client says X is a shareholder")
-/// - GLEIF parent chains (natural person at terminus)
-///
-/// ```text
-/// Ghost → Identified → Verified
-///   │          │           │
-///   │          │           └── KYC complete, documents verified
-///   │          └── Has identifying attributes (DOB, nationality, etc.)
-///   └── Name only, discovered from document/relationship
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub(crate) enum PersonState {
-    /// Ghost - name only, minimal attributes
-    /// Discovered from document mention, ownership chain, or allegation
-    /// Cannot complete KYC until identified
-    #[default]
-    Ghost,
-    /// Identified - has identifying attributes (DOB, nationality, residence, ID docs)
-    /// Can proceed with KYC screening
-    Identified,
-    /// Verified - identity confirmed by official documents (passport, license, tax returns)
-    Verified,
-}
-
-impl FromStr for PersonState {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_uppercase().as_str() {
-            "GHOST" => Self::Ghost,
-            "IDENTIFIED" => Self::Identified,
-            "VERIFIED" => Self::Verified,
-            _ => Self::Ghost, // Default to Ghost for unknown values (safest assumption)
-        })
-    }
-}
-
-impl PersonState {
-    pub(crate) fn as_str(&self) -> &str {
-        match self {
-            Self::Ghost => "GHOST",
-            Self::Identified => "IDENTIFIED",
-            Self::Verified => "VERIFIED",
-        }
-    }
-
-    pub(crate) fn is_ghost(&self) -> bool {
-        matches!(self, Self::Ghost)
-    }
-
-    pub(crate) fn is_verified(&self) -> bool {
-        matches!(self, Self::Verified)
-    }
-
-    /// Can this entity proceed to KYC screening?
-    /// Ghost entities need identification first.
-    pub(crate) fn can_screen(&self) -> bool {
-        !self.is_ghost()
-    }
-
-    /// Can this entity complete KYC?
-    /// Only verified entities can complete.
-    pub(crate) fn can_complete_kyc(&self) -> bool {
-        self.is_verified()
-    }
-
-    /// Display label for UI
-    pub(crate) fn display_label(&self) -> &str {
-        match self {
-            Self::Ghost => "👻 Ghost",
-            Self::Identified => "Identified",
-            Self::Verified => "✓ Verified",
-        }
     }
 }
 
@@ -1534,17 +1315,6 @@ impl RoleCategory {
         }
     }
 
-    pub(crate) fn is_ownership_or_control(&self) -> bool {
-        matches!(
-            self,
-            Self::OwnershipChain
-                | Self::ControlChain
-                | Self::OwnershipControl
-                | Self::TrustRoles
-                | Self::Both
-        )
-    }
-
     // NOTE: is_ubo_relevant() and is_trading_relevant() removed - replaced by database-driven
     // visibility config in ob-poc.node_types and ob-poc.view_modes tables.
     // See ViewConfigService for the config-driven approach.
@@ -1770,60 +1540,6 @@ pub(crate) struct GraphStats {
     pub nodes_by_type: HashMap<String, usize>,
     pub cbu_count: usize,
     pub terminus_count: usize,
-}
-
-// =============================================================================
-// VIEW MODES
-// =============================================================================
-
-/// View mode for graph rendering
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub(crate) enum ViewMode {
-    /// CBU as container with entities inside
-    #[default]
-    CbuContainer,
-    /// UBO ownership pyramid with control overlay
-    UboForest,
-    /// Fund structure tree (umbrella → subfund)
-    FundStructure,
-    /// Service delivery view
-    ServiceDelivery,
-    /// Combined view
-    Combined,
-    // Legacy view modes for backward compatibility
-    KycUbo,
-    UboOnly,
-    ProductsOnly,
-    Trading,
-}
-
-impl FromStr for ViewMode {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_uppercase().as_str() {
-            "CBU_CONTAINER" => Self::CbuContainer,
-            "UBO_FOREST" => Self::UboForest,
-            "FUND_STRUCTURE" => Self::FundStructure,
-            "SERVICE_DELIVERY" => Self::ServiceDelivery,
-            "COMBINED" => Self::Combined,
-            "KYC_UBO" => Self::KycUbo,
-            "UBO_ONLY" => Self::UboOnly,
-            "PRODUCTS_ONLY" => Self::ProductsOnly,
-            "TRADING" => Self::Trading,
-            _ => Self::CbuContainer,
-        })
-    }
-}
-
-/// Canvas orientation
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub(crate) enum Orientation {
-    #[default]
-    Vertical,
-    Horizontal,
 }
 
 // =============================================================================
@@ -2378,19 +2094,6 @@ pub(crate) struct LegacyGraphStats {
 }
 
 impl LegacyCbuGraph {
-    pub(crate) fn new(cbu_id: Uuid, label: String) -> Self {
-        Self {
-            cbu_id,
-            label,
-            cbu_category: None,
-            jurisdiction: None,
-            nodes: Vec::new(),
-            edges: Vec::new(),
-            layers: Vec::new(),
-            stats: LegacyGraphStats::default(),
-        }
-    }
-
     pub(crate) fn with_metadata(
         cbu_id: Uuid,
         label: String,
@@ -2437,21 +2140,8 @@ impl LegacyCbuGraph {
         }
     }
 
-    pub(crate) fn filter_to_products_only(&mut self) {
-        let kept_node_ids: std::collections::HashSet<String> = self
-            .nodes
-            .iter()
-            .filter(|n| matches!(n.node_type, NodeType::Cbu | NodeType::Product))
-            .map(|n| n.id.clone())
-            .collect();
-
-        self.nodes
-            .retain(|n| matches!(n.node_type, NodeType::Cbu | NodeType::Product));
-        self.edges
-            .retain(|e| kept_node_ids.contains(&e.source) && kept_node_ids.contains(&e.target));
-    }
-
-    // NOTE: filter_to_ubo_only() and filter_to_trading_entities() removed.
+    // NOTE: filter_to_ubo_only(), filter_to_trading_entities(), and filter_to_products_only()
+    // removed.
     // Filtering is now done at query time by ConfigDrivenGraphBuilder using
     // view_modes.node_types and view_modes.edge_types from the database.
 

@@ -72,26 +72,14 @@ impl Default for LayoutConfigV2 {
 /// Edge configuration for layout purposes
 #[derive(Debug, Clone)]
 pub(crate) struct EdgeLayoutConfig {
-    /// Type code (e.g., "Owns", "HasRole")
-    pub type_code: String,
     /// Whether this edge defines parent-child hierarchy for layout
     pub is_hierarchical: bool,
-    /// Tier delta: how many tiers down should child be from parent
-    pub tier_delta: i32,
-    /// Layout direction hint
-    pub layout_direction: Option<String>,
-    /// Priority for routing/ordering
-    pub routing_priority: i32,
 }
 
 impl Default for EdgeLayoutConfig {
     fn default() -> Self {
         Self {
-            type_code: String::new(),
             is_hierarchical: false,
-            tier_delta: 1,
-            layout_direction: None,
-            routing_priority: 50,
         }
     }
 }
@@ -100,11 +88,7 @@ impl Default for EdgeLayoutConfig {
 impl From<&EdgeTypeConfig> for EdgeLayoutConfig {
     fn from(cfg: &EdgeTypeConfig) -> Self {
         Self {
-            type_code: cfg.edge_type_code.clone(),
             is_hierarchical: cfg.is_hierarchical,
-            tier_delta: cfg.tier_delta.unwrap_or(1),
-            layout_direction: cfg.layout_direction.clone(),
-            routing_priority: cfg.routing_priority.unwrap_or(50),
         }
     }
 }
@@ -174,15 +158,6 @@ impl LayoutEngineV2 {
         }
     }
 
-    /// Create with custom layout configuration
-    pub(crate) fn with_config(config: LayoutConfigV2) -> Self {
-        Self {
-            config,
-            edge_configs: Self::default_edge_configs(),
-            view_mode: "KYC_UBO".to_string(),
-        }
-    }
-
     /// Create from database configuration
     #[cfg(feature = "database")]
     pub(crate) async fn from_database(
@@ -215,13 +190,6 @@ impl LayoutEngineV2 {
         })
     }
 
-
-    /// Set horizontal layout mode
-    pub(crate) fn horizontal(mut self, horizontal: bool) -> Self {
-        self.config.horizontal = horizontal;
-        self
-    }
-
     /// Default edge configurations when database is not available
     fn default_edge_configs() -> HashMap<String, EdgeLayoutConfig> {
         let mut configs = HashMap::new();
@@ -230,22 +198,14 @@ impl LayoutEngineV2 {
         configs.insert(
             "Owns".to_string(),
             EdgeLayoutConfig {
-                type_code: "Owns".to_string(),
                 is_hierarchical: true,
-                tier_delta: 1,
-                layout_direction: Some("UP".to_string()),
-                routing_priority: 10,
             },
         );
 
         configs.insert(
             "Controls".to_string(),
             EdgeLayoutConfig {
-                type_code: "Controls".to_string(),
                 is_hierarchical: true,
-                tier_delta: 1,
-                layout_direction: Some("UP".to_string()),
-                routing_priority: 20,
             },
         );
 
@@ -253,11 +213,7 @@ impl LayoutEngineV2 {
         configs.insert(
             "HasRole".to_string(),
             EdgeLayoutConfig {
-                type_code: "HasRole".to_string(),
                 is_hierarchical: false,
-                tier_delta: 0,
-                layout_direction: None,
-                routing_priority: 50,
             },
         );
 
@@ -265,22 +221,14 @@ impl LayoutEngineV2 {
         configs.insert(
             "HasProduct".to_string(),
             EdgeLayoutConfig {
-                type_code: "HasProduct".to_string(),
                 is_hierarchical: true,
-                tier_delta: 1,
-                layout_direction: Some("DOWN".to_string()),
-                routing_priority: 30,
             },
         );
 
         configs.insert(
             "Delivers".to_string(),
             EdgeLayoutConfig {
-                type_code: "Delivers".to_string(),
                 is_hierarchical: true,
-                tier_delta: 1,
-                layout_direction: Some("DOWN".to_string()),
-                routing_priority: 40,
             },
         );
 
@@ -293,10 +241,7 @@ impl LayoutEngineV2 {
         self.edge_configs
             .get(&type_str)
             .cloned()
-            .unwrap_or_else(|| EdgeLayoutConfig {
-                type_code: type_str,
-                ..EdgeLayoutConfig::default()
-            })
+            .unwrap_or_default()
     }
 
     /// Apply layout to graph, computing x,y positions for all nodes

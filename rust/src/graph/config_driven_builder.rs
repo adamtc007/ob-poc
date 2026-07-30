@@ -24,7 +24,7 @@ use anyhow::Result;
 use uuid::Uuid;
 
 use crate::database::{
-    EdgeTypeConfig, NodeTypeConfig, ViewConfigService, ViewModeConfig, VisualizationRepository,
+    NodeTypeConfig, ViewConfigService, ViewModeConfig, VisualizationRepository,
 };
 use crate::graph::types::{
     CbuGraph, EdgeType, GraphEdge, LayerType, LegacyGraphNode, NodeStatus, NodeType,
@@ -43,8 +43,6 @@ pub(crate) struct ConfigDrivenGraphBuilder {
     _view_mode: String,
     /// Loaded node type configurations
     node_type_configs: HashMap<String, NodeTypeConfig>,
-    /// Loaded edge type configurations
-    edge_type_configs: HashMap<String, EdgeTypeConfig>,
     /// Stored for potential future use (e.g., layout parameters)
     _view_mode_config: Option<ViewModeConfig>,
     /// Set of node type codes visible in this view
@@ -75,13 +73,6 @@ impl ConfigDrivenGraphBuilder {
         let node_type_configs: HashMap<String, NodeTypeConfig> = node_types
             .into_iter()
             .map(|nt| (nt.node_type_code.clone(), nt))
-            .collect();
-
-        // Load all edge type configs
-        let edge_types = ViewConfigService::get_all_edge_types(pool).await?;
-        let edge_type_configs: HashMap<String, EdgeTypeConfig> = edge_types
-            .into_iter()
-            .map(|et| (et.edge_type_code.clone(), et))
             .collect();
 
         // Load view mode config
@@ -120,7 +111,6 @@ impl ConfigDrivenGraphBuilder {
             cbu_id,
             _view_mode: view_mode.to_string(),
             node_type_configs,
-            edge_type_configs,
             _view_mode_config: view_mode_config,
             visible_node_types,
             visible_edge_types,
@@ -144,18 +134,11 @@ impl ConfigDrivenGraphBuilder {
         self.node_type_configs.get(type_code).map(|config| {
             use bigdecimal::ToPrimitive;
             NodeRenderingHints {
-                icon: config.icon.clone(),
-                default_color: config.default_color.clone(),
-                default_shape: config.default_shape.clone(),
                 default_width: config.default_width.as_ref().and_then(|d| d.to_f32()),
                 default_height: config.default_height.as_ref().and_then(|d| d.to_f32()),
-                z_order: config.z_order,
             }
         })
     }
-
-
-
 
     /// Get the layers to include based on view mode config
     ///
@@ -1537,22 +1520,8 @@ impl ConfigDrivenGraphBuilder {
 /// Rendering hints for a node type from config
 #[derive(Debug, Clone)]
 pub(crate) struct NodeRenderingHints {
-    pub icon: Option<String>,
-    pub default_color: Option<String>,
-    pub default_shape: Option<String>,
     pub default_width: Option<f32>,
     pub default_height: Option<f32>,
-    pub z_order: Option<i32>,
-}
-
-/// Layout hints for an edge type from config
-#[derive(Debug, Clone)]
-pub(crate) struct EdgeLayoutHints {
-    pub tier_delta: Option<i32>,
-    pub is_hierarchical: bool,
-    pub layout_direction: Option<String>,
-    pub bundle_group: Option<String>,
-    pub routing_priority: Option<i32>,
 }
 
 // =============================================================================
@@ -1569,7 +1538,6 @@ mod tests {
             cbu_id: Uuid::new_v4(),
             _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
-            edge_type_configs: HashMap::new(),
             _view_mode_config: None,
             visible_node_types: HashSet::new(),
             visible_edge_types: HashSet::new(),
@@ -1589,7 +1557,6 @@ mod tests {
             cbu_id: Uuid::new_v4(),
             _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
-            edge_type_configs: HashMap::new(),
             _view_mode_config: None,
             visible_node_types: HashSet::new(),
             visible_edge_types: HashSet::new(),
@@ -1622,7 +1589,6 @@ mod tests {
             cbu_id: Uuid::new_v4(),
             _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
-            edge_type_configs: HashMap::new(),
             _view_mode_config: None,
             visible_node_types: visible_nodes,
             visible_edge_types: visible_edges,

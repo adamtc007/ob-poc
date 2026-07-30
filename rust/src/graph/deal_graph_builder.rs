@@ -96,33 +96,6 @@ impl DealGraphBuilder {
         })
     }
 
-
-
-    /// Get rate cards for a specific product
-    pub(crate) async fn get_product_rate_cards(
-        pool: &PgPool,
-        deal_id: Uuid,
-        product_id: Uuid,
-    ) -> Result<Vec<RateCardSummary>> {
-        DealRepository::get_product_rate_cards(pool, deal_id, product_id).await
-    }
-
-    /// Get participants for the deal
-    pub(crate) async fn get_participants(
-        pool: &PgPool,
-        deal_id: Uuid,
-    ) -> Result<Vec<DealParticipantSummary>> {
-        DealRepository::get_deal_participants(pool, deal_id).await
-    }
-
-
-    /// Get onboarding requests for the deal
-    pub(crate) async fn get_onboarding_requests(
-        pool: &PgPool,
-        deal_id: Uuid,
-    ) -> Result<Vec<OnboardingRequestSummary>> {
-        DealRepository::get_deal_onboarding_requests(pool, deal_id).await
-    }
 }
 
 #[cfg(test)]

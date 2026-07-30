@@ -20,7 +20,6 @@ pub mod config_driven_builder;
 #[cfg(feature = "database")]
 pub mod deal_graph_builder;
 pub mod filters;
-pub mod investor_register;
 pub mod layout_v2;
 #[cfg(feature = "database")]
 pub mod query_engine;
@@ -29,20 +28,15 @@ pub mod view_model;
 pub mod viewport;
 
 #[cfg(feature = "database")]
-pub(crate) use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
+pub(crate) use config_driven_builder::{ConfigDrivenGraphBuilder, NodeRenderingHints};
 #[cfg(feature = "database")]
 pub(crate) use deal_graph_builder::DealGraphBuilder;
 pub(crate) use filters::{FilterBuilder, GraphFilterOps};
-pub(crate) use investor_register::{
-    AggregateBreakdown, AggregateInvestorsNode, ControlHolderNode, InvestorFilters,
-    InvestorListItem, InvestorListQuery, InvestorListResponse, InvestorRegisterQuery,
-    InvestorRegisterView, IssuerSummary, PaginationInfo, ThresholdConfig,
-};
 pub(crate) use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 #[cfg(feature = "database")]
 pub(crate) use query_engine::GraphQueryEngine;
 pub use types::{CbuSummary, EdgeType, GraphEdge, GraphNode, NodeType};
-pub(crate) use types::{CbuGraph, CbuNode, CbuStatus, ControlEdge, ControlType, EntityGraph, EntityType, FundEdge, FundRelationshipType, GraphFilters, GraphScope, GraphStats, LayerInfo, LayerType, LayoutBehavior, LayoutOverride, LegacyCbuGraph, LegacyGraphEdge, LegacyGraphNode, LegacyGraphStats, NavigationHistory, NodeOffset, NodeSizeOverride, NodeStatus, Orientation, OwnershipEdge, OwnershipType, PersonState, ProngFilter, RoleAssignment, RoleCategory, ServiceEdge, ServiceRelationshipType, UboTreatment, VerificationStatus, ViewMode};
+pub(crate) use types::{CbuGraph, CbuNode, CbuStatus, ControlEdge, ControlType, EntityGraph, EntityType, FundEdge, FundRelationshipType, GraphFilters, GraphScope, GraphStats, LayerInfo, LayerType, LayoutBehavior, LayoutOverride, LegacyCbuGraph, LegacyGraphEdge, LegacyGraphNode, LegacyGraphStats, NavigationHistory, NodeOffset, NodeSizeOverride, NodeStatus, OwnershipEdge, OwnershipType, ProngFilter, RoleAssignment, RoleCategory, ServiceEdge, ServiceRelationshipType, UboTreatment, VerificationStatus};
 pub(crate) use view_model::{
     CanvasBounds, ComparisonSummary, FieldChange, GraphComparison, GraphFilter, GraphPath,
     GraphViewModel, GraphViewStats, LayoutOrientation, NodeChange, NodeGroup, ViewModeInfo,
