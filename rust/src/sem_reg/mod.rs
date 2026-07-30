@@ -64,10 +64,6 @@ pub mod security;
 pub mod derivation;
 pub mod derivation_spec;
 
-// Phase 6: Publish gates framework
-pub mod gates_governance;
-pub mod gates_technical;
-
 // Taxonomy + view seeds
 pub mod seeds;
 
@@ -88,7 +84,7 @@ pub mod stewardship;
 
 // Re-export core types at module boundary
 pub use gates::{evaluate_publish_gates};
-pub(crate) use gates::{check_evidence_proof_rule, GateResult, PublishGateResult};
+pub(crate) use gates::{GateResult, PublishGateResult};
 pub use sem_os_core::types::EvidenceGrade;
 pub use store::SnapshotStore;
 pub use types::{
@@ -118,29 +114,18 @@ pub use observation_def::ObservationDefBody;
 pub use policy_rule::PolicyRuleBody;
 pub use proof_obligation_def::{ProofObligationDefBody, ProofStrength};
 pub use requirement_profile_def::RequirementProfileDefBody;
-pub(crate) use security::{compute_inherited_label, validate_verb_security_compatibility};
+pub(crate) use security::compute_inherited_label;
 
-// Re-export Phase 5-6 types
+// Re-export Phase 5 types
 pub(crate) use derivation::{DerivationFunctionRegistry, DerivationResult};
-pub use gates::{GateMode, GateSeverity};
-pub(crate) use gates::{evaluate_all_publish_gates, ExtendedGateContext, ExtendedPublishGateResult, GateFailure, UnifiedPublishGateResult};
-pub(crate) use registry::PublishOutcome;
 
 // Re-export Phase 8 types
 pub use agent::{all_tool_specs, dispatch_tool};
 pub(crate) use agent::{AgentPlan, AgentPlanStatus, DecisionRecord, DecisionStore, PlanStep, PlanStepStatus, PlanStore, SemRegToolContext, SemRegToolResult};
 
-// Re-export onboarding pipeline types
-pub use onboarding::{StepResult};
-pub(crate) use onboarding::{OnboardingPipeline, OnboardingRequest, OnboardingResult};
-
 // Re-export evidence instance types
-pub(crate) use evidence_instances::{
-    ArchiveAction, DocumentInstance, DocumentInstanceStatus,
-    EvidenceGrade as EvidenceInstanceGrade, EvidenceInstanceStore, Observation, ProvenanceEdge,
-    ProvenanceEdgeClass, RetentionPolicy,
-};
+pub(crate) use evidence_instances::EvidenceInstanceStore;
 
 // Re-export Phase 9 types
 pub use projections::{CoverageReport, MetricsStore};
-pub(crate) use projections::{DerivationEdge, EmbeddingRecord, EmbeddingStore, LineageDirection, LineageStore, RunRecord, SemanticText, TierDistribution};
+pub(crate) use projections::{EmbeddingStore, LineageStore, TierDistribution};

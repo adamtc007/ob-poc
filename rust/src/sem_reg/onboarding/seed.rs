@@ -48,16 +48,6 @@ pub(crate) struct BootstrapReport {
     pub relationship_type_defs_skipped: usize,
 }
 
-impl BootstrapReport {
-    /// Total snapshots written across all object types.
-    pub(crate) fn total_written(&self) -> usize {
-        self.attribute_defs_written
-            + self.verb_contracts_written
-            + self.entity_type_defs_written
-            + self.relationship_type_defs_written
-    }
-}
-
 /// Apply the bootstrap seed from an onboarding manifest.
 ///
 /// # Guard
@@ -546,18 +536,4 @@ mod tests {
         assert_eq!(column_to_display_name("name"), "Name");
     }
 
-    #[test]
-    fn test_bootstrap_report_total() {
-        let report = BootstrapReport {
-            attribute_defs_written: 10,
-            attribute_defs_skipped: 5,
-            verb_contracts_written: 20,
-            verb_contracts_skipped: 3,
-            entity_type_defs_written: 8,
-            entity_type_defs_skipped: 2,
-            relationship_type_defs_written: 15,
-            relationship_type_defs_skipped: 1,
-        };
-        assert_eq!(report.total_written(), 53);
-    }
 }

@@ -67,35 +67,9 @@ pub(crate) fn evaluate_all_guardrails(
     results
 }
 
-/// Returns true if any guardrail result has Block severity.
-pub(crate) fn has_blocking_guardrails(results: &[GuardrailResult]) -> bool {
-    results
-        .iter()
-        .any(|r| r.severity == GuardrailSeverity::Block)
-}
-
-/// Returns true if any guardrail result has Warning severity (needs acknowledgement).
-pub(crate) fn has_warning_guardrails(results: &[GuardrailResult]) -> bool {
-    results
-        .iter()
-        .any(|r| r.severity == GuardrailSeverity::Warning)
-}
-
 // ═══════════════════════════════════════════════════════════════════
 //  Individual guardrail check functions
 // ═══════════════════════════════════════════════════════════════════
-
-#[cfg(test)]
-fn make_result(id: GuardrailId, message: &str, remediation: &str) -> GuardrailResult {
-    let severity = id.default_severity();
-    GuardrailResult {
-        guardrail_id: id,
-        severity,
-        message: message.to_string(),
-        remediation: remediation.to_string(),
-        context: serde_json::json!({}),
-    }
-}
 
 fn make_result_with_ctx(
     id: GuardrailId,
@@ -817,15 +791,8 @@ mod tests {
         )];
         let results = evaluate_all_guardrails(&changeset, &entries, &[], &[], &[], &[]);
         // No blocking issues expected for a simple valid entry
-        assert!(!has_blocking_guardrails(&results));
-    }
-
-    #[test]
-    fn test_has_blocking_guardrails() {
-        let results = vec![
-            make_result(GuardrailId::G02NamingConvention, "warning", "fix naming"),
-            make_result(GuardrailId::G03TypeConstraint, "block", "fix type"),
-        ];
-        assert!(has_blocking_guardrails(&results));
+        assert!(!results
+            .iter()
+            .any(|r| r.severity == GuardrailSeverity::Block));
     }
 }

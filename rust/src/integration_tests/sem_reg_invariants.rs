@@ -1,13 +1,12 @@
 //! Semantic Registry — Foundational Invariant Tests
 //!
-//! Six invariant tests documenting the non-negotiable properties of the Semantic OS:
+//! Five invariant tests documenting the non-negotiable properties of the Semantic OS:
 //!
 //! - INV-1: No in-place updates — immutability trigger rejects UPDATE/DELETE on snapshots
 //! - INV-2: Snapshot pinning — decision records must reference valid snapshot_ids
 //! - INV-3: Proof Rule — trust_class=Proof + governance_tier=Operational rejected by CHECK constraint
 //! - INV-4: ABAC both tiers — Governed and Operational snapshots both checked
 //! - INV-5: Operational auto-approve — no governance gate on Operational tier
-//! - INV-6: DerivationSpec required — derived attribute without spec triggers publish gate failure
 //!
 //! Run with:
 //! ```sh
@@ -506,73 +505,6 @@ mod invariants {
         );
 
         db.cleanup().await;
-        Ok(())
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // INV-6: DerivationSpec required for derived attributes
-    // ═══════════════════════════════════════════════════════════════════════
-
-    /// A derived attribute without a corresponding DerivationSpec should
-    /// trigger a publish gate failure.
-    ///
-    /// NOTE: This test documents the expected behavior. It will pass once
-    /// S6 wires the extended gate framework (check_derivation_type_compatibility)
-    /// into the aggregate publish gate pipeline.
-    #[tokio::test]
-    #[ignore]
-    async fn test_inv6_derivation_spec_required() -> Result<()> {
-        use crate::sem_reg::derivation_spec::*;
-        use crate::sem_reg::gates::{check_derivation_type_compatibility, GateSeverity};
-        use std::collections::HashSet;
-
-        // Create a derivation spec referencing an unknown output attribute
-        let spec = DerivationSpecBody {
-            fqn: "test.derived_attr".into(),
-            name: "Test Derived Attr".into(),
-            description: "A derived attribute for invariant testing".into(),
-            output_attribute_fqn: "attr.does_not_exist".into(),
-            inputs: vec![DerivationInput {
-                attribute_fqn: "attr.also_missing".into(),
-                role: "input".into(),
-                required: true,
-            }],
-            expression: DerivationExpression::FunctionRef {
-                ref_name: "sum".into(),
-            },
-            null_semantics: NullSemantics::Propagate,
-            freshness_rule: None,
-            security_inheritance: SecurityInheritanceMode::Strict,
-            evidence_grade: EvidenceGrade::Prohibited,
-            tests: vec![],
-        };
-
-        // With an empty known-attributes set, the gate should detect the missing types
-        let known_attrs: HashSet<String> = HashSet::new();
-        let failures = check_derivation_type_compatibility(&spec, &known_attrs);
-
-        assert!(
-            !failures.is_empty(),
-            "Derivation referencing unknown attributes should produce gate failures"
-        );
-
-        // Should have failures for both the output and input
-        let has_output_failure = failures
-            .iter()
-            .any(|f| f.message.contains("output attribute"));
-        let has_input_failure = failures
-            .iter()
-            .any(|f| f.message.contains("input attribute"));
-
-        assert!(has_output_failure, "Should flag missing output attribute");
-        assert!(has_input_failure, "Should flag missing input attribute");
-
-        // All failures should be error-severity
-        assert!(
-            failures.iter().all(|f| f.severity == GateSeverity::Error),
-            "Missing derivation references should be Error severity"
-        );
-
         Ok(())
     }
 }

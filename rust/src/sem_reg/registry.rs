@@ -15,7 +15,7 @@ use super::{
     entity_type_def::EntityTypeDefBody,
     evidence::EvidenceRequirementBody,
     evidence_strategy_def::EvidenceStrategyDefBody,
-    gates::{evaluate_publish_gates, ExtendedPublishGateResult, GateFailure, GateMode},
+    gates::evaluate_publish_gates,
     membership::MembershipRuleBody,
     observation_def::ObservationDefBody,
     policy_rule::PolicyRuleBody,
@@ -28,22 +28,6 @@ use super::{
     verb_contract::VerbContractBody,
     view_def::ViewDefBody,
 };
-
-// ── PublishOutcome ─────────────────────────────────────────────
-
-/// Outcome of a gated publish operation.
-#[derive(Debug)]
-pub(crate) enum PublishOutcome {
-    /// Snapshot published successfully (no gate failures).
-    Published(Uuid),
-    /// Publish blocked by gate failures (Enforce mode).
-    Blocked { failures: Vec<GateFailure> },
-    /// Published with non-blocking warnings (ReportOnly mode).
-    PublishedWithWarnings {
-        snapshot_id: Uuid,
-        warnings: Vec<GateFailure>,
-    },
-}
 
 /// Typed registry operations.
 pub struct RegistryService;
@@ -260,94 +244,6 @@ impl RegistryService {
         "a derivation spec"
     );
 
-    // ── Gated Publish (extended gates) ────────────────────────
-
-    /// Publish any typed body with the extended gate framework.
-    ///
-    /// Returns `PublishOutcome` which distinguishes between clean publish,
-    /// blocked (enforce mode errors), and published-with-warnings.
-    pub async fn publish_with_gates<T: Serialize>(
-        pool: &PgPool,
-        meta: &SnapshotMeta,
-        body: &T,
-        gate_mode: GateMode,
-        extended_gate_failures: Vec<GateFailure>,
-    ) -> Result<PublishOutcome> {
-        // Step 1: Run the standard publish gates (proof rule, security, approval, version)
-        let predecessor = if let Some(pred_id) = meta.predecessor_id {
-            let pg_row = sqlx::query_as::<_, PgSnapshotRow>(
-                r#"
-                SELECT
-                    snapshot_id,
-                    snapshot_set_id,
-                    object_type::text AS object_type,
-                    object_id,
-                    version_major,
-                    version_minor,
-                    status::text AS status,
-                    governance_tier::text AS governance_tier,
-                    trust_class::text AS trust_class,
-                    security_label,
-                    effective_from,
-                    effective_until,
-                    predecessor_id,
-                    change_type::text AS change_type,
-                    change_rationale,
-                    created_by,
-                    approved_by,
-                    definition,
-                    created_at
-                FROM sem_reg.snapshots
-                WHERE snapshot_id = $1
-                "#,
-            )
-            .bind(pred_id)
-            .fetch_optional(pool)
-            .await?;
-            pg_row.map(SnapshotRow::try_from).transpose()?
-        } else {
-            None
-        };
-
-        let standard_gates = evaluate_publish_gates(meta, predecessor.as_ref());
-        if !standard_gates.all_passed() {
-            // Standard gates always block (they are structural invariants)
-            return Ok(PublishOutcome::Blocked {
-                failures: standard_gates
-                    .failure_messages()
-                    .iter()
-                    .map(|msg| GateFailure::error("standard_publish_gate", "snapshot", msg.clone()))
-                    .collect(),
-            });
-        }
-
-        // Step 2: Evaluate extended gates with mode control
-        let extended_result = ExtendedPublishGateResult {
-            failures: extended_gate_failures,
-            mode: gate_mode,
-        };
-
-        if extended_result.should_block() {
-            return Ok(PublishOutcome::Blocked {
-                failures: extended_result.failures,
-            });
-        }
-
-        // Step 3: Publish the snapshot
-        let definition = serde_json::to_value(body)?;
-        let snapshot_id = SnapshotStore::publish_snapshot(pool, meta, &definition, None).await?;
-
-        // Step 4: Return with any warnings
-        if extended_result.has_warnings() || extended_result.has_errors() {
-            Ok(PublishOutcome::PublishedWithWarnings {
-                snapshot_id,
-                warnings: extended_result.failures,
-            })
-        } else {
-            Ok(PublishOutcome::Published(snapshot_id))
-        }
-    }
-
     // ── Generic typed helpers ─────────────────────────────────
 
     /// Publish a typed body with gate evaluation.
@@ -452,7 +348,6 @@ impl RegistryService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sem_reg::gates::GateSeverity;
     use crate::sem_reg::types::*;
 
     #[test]
@@ -474,53 +369,5 @@ mod tests {
         };
         let gate = evaluate_publish_gates(&meta, None);
         assert!(!gate.all_passed());
-    }
-
-    #[test]
-    fn test_publish_outcome_blocked_has_failures() {
-        let outcome = PublishOutcome::Blocked {
-            failures: vec![GateFailure::error(
-                "test_gate",
-                "test",
-                "blocked for reason",
-            )],
-        };
-        match outcome {
-            PublishOutcome::Blocked { failures } => {
-                assert_eq!(failures.len(), 1);
-                assert_eq!(failures[0].severity, GateSeverity::Error);
-            }
-            _ => panic!("Expected Blocked"),
-        }
-    }
-
-    #[test]
-    fn test_publish_outcome_published_variant() {
-        let id = Uuid::new_v4();
-        let outcome = PublishOutcome::Published(id);
-        match outcome {
-            PublishOutcome::Published(sid) => assert_eq!(sid, id),
-            _ => panic!("Expected Published"),
-        }
-    }
-
-    #[test]
-    fn test_publish_outcome_with_warnings() {
-        let id = Uuid::new_v4();
-        let outcome = PublishOutcome::PublishedWithWarnings {
-            snapshot_id: id,
-            warnings: vec![GateFailure::warning("test_gate", "test", "minor issue")],
-        };
-        match outcome {
-            PublishOutcome::PublishedWithWarnings {
-                snapshot_id,
-                warnings,
-            } => {
-                assert_eq!(snapshot_id, id);
-                assert_eq!(warnings.len(), 1);
-                assert_eq!(warnings[0].severity, GateSeverity::Warning);
-            }
-            _ => panic!("Expected PublishedWithWarnings"),
-        }
     }
 }

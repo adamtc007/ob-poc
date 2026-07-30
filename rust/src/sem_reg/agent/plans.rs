@@ -292,31 +292,6 @@ impl PlanStore {
         }
     }
 
-    /// List plans for a case, newest first.
-    pub(crate) async fn list_plans_for_case(
-        pool: &PgPool,
-        case_id: Uuid,
-        limit: i64,
-    ) -> Result<Vec<AgentPlan>> {
-        let rows = sqlx::query_as::<_, PlanRow>(
-            r#"
-            SELECT plan_id, case_id, goal, context_resolution_ref,
-                   steps, assumptions, risk_flags, security_clearance,
-                   status, created_by, created_at, updated_at
-            FROM sem_reg.agent_plans
-            WHERE case_id = $1
-            ORDER BY created_at DESC
-            LIMIT $2
-            "#,
-        )
-        .bind(case_id)
-        .bind(limit)
-        .fetch_all(pool)
-        .await?;
-
-        rows.into_iter().map(|r| r.into_plan()).collect()
-    }
-
     /// Load steps for a plan, ordered by sequence.
     pub(crate) async fn load_steps(pool: &PgPool, plan_id: Uuid) -> Result<Vec<PlanStep>> {
         let rows = sqlx::query_as::<_, StepRow>(

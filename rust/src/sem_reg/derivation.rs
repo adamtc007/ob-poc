@@ -43,8 +43,6 @@ pub(crate) enum DerivationError {
     NullRequiredInput { attribute_fqn: String },
     /// Function execution failed.
     ExecutionFailed { message: String },
-    /// Input data is stale (exceeds freshness rule).
-    StalenessViolation { max_age_seconds: u64 },
 }
 
 impl std::fmt::Display for DerivationError {
@@ -62,13 +60,6 @@ impl std::fmt::Display for DerivationError {
             }
             Self::ExecutionFailed { message } => {
                 write!(f, "Derivation execution failed: {}", message)
-            }
-            Self::StalenessViolation { max_age_seconds } => {
-                write!(
-                    f,
-                    "Input data exceeds freshness rule ({} seconds)",
-                    max_age_seconds
-                )
             }
         }
     }
@@ -114,11 +105,6 @@ impl DerivationFunctionRegistry {
     /// Register a named function.
     pub(crate) fn register(&mut self, name: &str, func: Arc<dyn DerivationFn>) {
         self.functions.insert(name.to_string(), func);
-    }
-
-    /// Look up a function by name.
-    pub(crate) fn get(&self, name: &str) -> Option<&Arc<dyn DerivationFn>> {
-        self.functions.get(name)
     }
 
     /// Evaluate a derivation spec against inputs.
@@ -357,20 +343,6 @@ mod tests {
             .inherited_label
             .handling_controls
             .contains(&HandlingControl::MaskByDefault));
-    }
-
-    #[test]
-    fn test_registry_default_is_empty() {
-        let registry = DerivationFunctionRegistry::default();
-        assert!(registry.get("anything").is_none());
-    }
-
-    #[test]
-    fn test_register_and_get() {
-        let mut registry = DerivationFunctionRegistry::new();
-        registry.register("sum", Arc::new(sum_function as fn(&serde_json::Value) -> _));
-        assert!(registry.get("sum").is_some());
-        assert!(registry.get("multiply").is_none());
     }
 
     #[test]

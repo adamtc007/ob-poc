@@ -7,9 +7,7 @@ pub mod embeddings;
 pub mod lineage;
 pub mod metrics;
 
-pub(crate) use embeddings::{
-    cosine_similarity, EmbeddingRecord, EmbeddingStore, SemanticText, SimilarityResult,
-};
-pub(crate) use lineage::{DerivationEdge, LineageDirection, LineageStore, RunRecord};
+pub(crate) use embeddings::{cosine_similarity, EmbeddingStore, SimilarityResult};
+pub(crate) use lineage::LineageStore;
 pub use metrics::{CoverageReport, MetricsStore};
 pub(crate) use metrics::{TierDistribution};

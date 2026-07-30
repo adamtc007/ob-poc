@@ -105,82 +105,9 @@ fn merge_payload(
     }
 }
 
-/// Validate that a template is self-consistent.
-pub(crate) fn validate_template(template: &StewardshipTemplate) -> Vec<String> {
-    let mut errors = Vec::new();
-
-    if template.fqn.is_empty() {
-        errors.push("Template FQN is empty".to_string());
-    }
-    if !template.fqn.contains('.') {
-        errors.push(format!(
-            "Template FQN '{}' should follow domain.name convention",
-            template.fqn
-        ));
-    }
-    if template.display_name.is_empty() {
-        errors.push("Template display_name is empty".to_string());
-    }
-    if template.items.is_empty() {
-        errors.push("Template has no items".to_string());
-    }
-    if template.domain.is_empty() {
-        errors.push("Template domain is empty".to_string());
-    }
-
-    // Check items
-    for (i, item) in template.items.iter().enumerate() {
-        if item.object_type.is_empty() {
-            errors.push(format!("Item[{}]: object_type is empty", i));
-        }
-        if item.fqn_pattern.is_empty() {
-            errors.push(format!("Item[{}]: fqn_pattern is empty", i));
-        }
-    }
-
-    errors
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn make_template() -> StewardshipTemplate {
-        StewardshipTemplate {
-            template_id: Uuid::new_v4(),
-            fqn: "kyc.standard_onboarding".to_string(),
-            display_name: "Standard KYC Onboarding".to_string(),
-            version: SemanticVersion {
-                major: 1,
-                minor: 0,
-                patch: 0,
-            },
-            domain: "kyc".to_string(),
-            scope: vec!["entity_type_def".to_string()],
-            items: vec![
-                TemplateItem {
-                    object_type: "attribute_def".to_string(),
-                    fqn_pattern: "kyc.{entity_type}.name".to_string(),
-                    action: ChangesetAction::Add,
-                    default_payload: Some(serde_json::json!({
-                        "data_type": "string",
-                        "required": true,
-                    })),
-                },
-                TemplateItem {
-                    object_type: "attribute_def".to_string(),
-                    fqn_pattern: "kyc.{entity_type}.jurisdiction".to_string(),
-                    action: ChangesetAction::Add,
-                    default_payload: None,
-                },
-            ],
-            steward: "test-steward".to_string(),
-            basis_ref: None,
-            status: TemplateStatus::Active,
-            created_by: "test".to_string(),
-            created_at: Utc::now(),
-        }
-    }
 
     #[test]
     fn test_apply_fqn_pattern() {
@@ -216,26 +143,4 @@ mod tests {
         assert_eq!(merged["description"], "only");
     }
 
-    #[test]
-    fn test_validate_template_valid() {
-        let template = make_template();
-        let errors = validate_template(&template);
-        assert!(errors.is_empty(), "Expected no errors, got: {:?}", errors);
-    }
-
-    #[test]
-    fn test_validate_template_empty_fqn() {
-        let mut template = make_template();
-        template.fqn = String::new();
-        let errors = validate_template(&template);
-        assert!(errors.iter().any(|e| e.contains("FQN is empty")));
-    }
-
-    #[test]
-    fn test_validate_template_no_items() {
-        let mut template = make_template();
-        template.items = vec![];
-        let errors = validate_template(&template);
-        assert!(errors.iter().any(|e| e.contains("no items")));
-    }
 }
