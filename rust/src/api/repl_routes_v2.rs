@@ -979,22 +979,6 @@ pub fn router() -> Router<ReplV2RouteState> {
         .route("/signal", post(signal_v2))
 }
 
-/// Create the session-scoped navigation router.
-///
-/// Mount this router at the application root so the routes resolve as:
-/// `/api/constellation/context`, `/api/session/push`, `/api/session/commit`, `/api/session/pop`.
-///
-/// # Examples
-/// ```rust,ignore
-/// let app = Router::new()
-///     .merge(repl_routes_v2::navigation_router().with_state(v2_state));
-/// ```
-pub(crate) fn navigation_router() -> Router<ReplV2RouteState> {
-    // Note: /api/constellation/context is registered by create_constellation_router().
-    // This router is now empty but retained for API compatibility.
-    Router::new()
-}
-
 /// Session-scoped routes that share the `/api/session/...` namespace with agent routes.
 ///
 /// These MUST be merged into the same router as agent routes to avoid

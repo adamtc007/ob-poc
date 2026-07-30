@@ -46,13 +46,7 @@ pub mod graph_routes;
 pub mod trading_matrix_routes;
 
 #[cfg(feature = "server")]
-pub mod capital_routes;
-
-#[cfg(feature = "server")]
 pub mod constellation_routes;
-
-#[cfg(feature = "server")]
-pub mod workflow_routes;
 
 // Phase 3 slice 2z (2026-05-13): display-noun translation table relocated to
 // ob-poc-boundary. Zero internal-crate deps; only serde_json/HashMap/LazyLock.
@@ -87,7 +81,6 @@ pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
 pub use entity_routes::{create_entity_router};
-pub(crate) use entity_routes::{create_scoped_entity_router};
 
 #[cfg(feature = "server")]
 pub use agent_state::{create_agent_router_with_semantic, AgentState};
@@ -110,19 +103,12 @@ pub(crate) use session_manager::{SessionManager, SessionSnapshot, SessionWatcher
 
 #[cfg(feature = "server")]
 pub use agent_service::{AgentCommand, AgentService, ChatRequest};
-pub(crate) use agent_service::{AgentChatResponse, ClientScope};
 
 #[cfg(feature = "server")]
 pub use trading_matrix_routes::create_trading_matrix_router;
 
 #[cfg(feature = "server")]
-pub(crate) use capital_routes::create_capital_router;
-
-#[cfg(feature = "server")]
 pub use constellation_routes::create_constellation_router;
-
-#[cfg(feature = "server")]
-pub(crate) use workflow_routes::{create_workflow_router, WorkflowState};
 
 #[cfg(feature = "server")]
 pub use display_nouns::{translate_json, translate_string, DisplayNounTranslator};
@@ -137,7 +123,7 @@ pub use deal_types::{
 
 #[cfg(feature = "server")]
 pub use deal_routes::{create_deal_router};
-pub(crate) use deal_routes::{create_deal_router_simple, DealState};
+pub(crate) use deal_routes::{DealState};
 
 pub use repl_routes_v2::{router as create_repl_v2_router};
-pub(crate) use repl_routes_v2::{navigation_router as create_repl_navigation_router, ReplV2RouteState};
+pub(crate) use repl_routes_v2::{ReplV2RouteState};

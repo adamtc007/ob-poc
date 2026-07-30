@@ -55,30 +55,6 @@ pub(crate) fn canonicalize_json(v: &JsonValue) -> JsonValue {
     }
 }
 
-/// Convert hash bytes to hex string for display/storage
-pub(crate) fn hash_to_hex(hash: &[u8; 32]) -> String {
-    hash.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
-/// Parse hex string back to hash bytes
-pub(crate) fn hex_to_hash(hex_str: &str) -> Option<[u8; 32]> {
-    if hex_str.len() != 64 {
-        return None;
-    }
-
-    let mut arr = [0u8; 32];
-    for (i, chunk) in hex_str.as_bytes().chunks(2).enumerate() {
-        let s = std::str::from_utf8(chunk).ok()?;
-        arr[i] = u8::from_str_radix(s, 16).ok()?;
-    }
-    Some(arr)
-}
-
-/// Compare two hashes for equality (constant-time for security, though not critical here)
-pub(crate) fn hashes_equal(a: &[u8; 32], b: &[u8; 32]) -> bool {
-    a == b
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,29 +107,6 @@ mod tests {
         let b = json!({"key": "value2"});
 
         assert_ne!(canonical_json_hash(&a), canonical_json_hash(&b));
-    }
-
-    #[test]
-    fn test_hash_to_hex_roundtrip() {
-        let original = json!({"test": "data"});
-        let hash = canonical_json_hash(&original);
-        let hex_str = hash_to_hex(&hash);
-        let recovered = hex_to_hash(&hex_str);
-
-        assert_eq!(Some(hash), recovered);
-    }
-
-    #[test]
-    fn test_hex_to_hash_invalid() {
-        // Too short
-        assert!(hex_to_hash("abcd").is_none());
-
-        // Invalid hex
-        assert!(hex_to_hash("zzzz").is_none());
-
-        // Wrong length (31 bytes)
-        let short = "a".repeat(62);
-        assert!(hex_to_hash(&short).is_none());
     }
 
     #[test]

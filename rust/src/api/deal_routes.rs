@@ -493,13 +493,3 @@ pub fn create_deal_router(pool: PgPool, sessions: SessionStore) -> Router {
         )
         .with_state(state)
 }
-
-/// Create deal router with just pool (no sessions) for simpler use cases
-pub(crate) fn create_deal_router_simple(pool: PgPool) -> Router {
-    use std::sync::Arc;
-    use tokio::sync::RwLock;
-
-    // Create empty sessions store
-    let sessions = Arc::new(RwLock::new(std::collections::HashMap::new()));
-    create_deal_router(pool, sessions)
-}

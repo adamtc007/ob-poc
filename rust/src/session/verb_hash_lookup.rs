@@ -10,13 +10,6 @@ use anyhow::Result;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-/// Cached verb hash for a specific verb
-#[derive(Debug, Clone)]
-pub(crate) struct VerbHashInfo {
-    pub verb_name: String,
-    pub compiled_hash: Option<Vec<u8>>,
-}
-
 /// Service for looking up verb hashes from the database
 #[cfg(feature = "database")]
 pub(crate) struct VerbHashLookupService {
@@ -61,23 +54,5 @@ impl VerbHashLookupService {
         }
 
         Ok(hash)
-    }
-
-
-
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_verb_hash_info() {
-        let info = VerbHashInfo {
-            verb_name: "cbu.ensure".to_string(),
-            compiled_hash: Some(vec![1, 2, 3, 4]),
-        };
-        assert_eq!(info.verb_name, "cbu.ensure");
-        assert!(info.compiled_hash.is_some());
     }
 }

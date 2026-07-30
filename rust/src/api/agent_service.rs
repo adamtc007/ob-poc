@@ -113,15 +113,11 @@
 
 use crate::agent::learning::embedder::CandleEmbedder;
 
-use crate::api::session::DisambiguationRequest;
-use crate::dsl_v2::gateway_resolver::gateway_addr;
 use crate::dsl_v2::macros::{load_macro_registry_from_dir, MacroRegistry};
-use crate::dsl_v2::Statement;
 use crate::mcp::macro_index::MacroIndex;
 use crate::mcp::scenario_index::ScenarioIndex;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::sage::SageEngine;
-use crate::session::{SessionState, UnresolvedRefInfo};
 // Phase2Service: removed with process_chat (TOCTOU recheck in REPL orchestrator)
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -131,16 +127,6 @@ use uuid::Uuid;
 // ============================================================================
 // Service Types
 // ============================================================================
-
-/// Lookup info extracted from LLM intent
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct EntityLookup {
-    pub search_text: String,
-    #[serde(default)]
-    pub entity_type: Option<String>,
-    #[serde(default)]
-    pub jurisdiction_hint: Option<String>,
-}
 
 #[cfg(test)]
 mod tests {
@@ -158,133 +144,8 @@ mod tests {
 // ChatRequest is now the SINGLE source of truth - imported from ob-poc-types
 pub use ob_poc_types::ChatRequest;
 
-/// Extended chat response that includes disambiguation status
-#[derive(Debug, Serialize)]
-pub(crate) struct AgentChatResponse {
-    /// Agent's response message
-    pub message: String,
-    /// Current session state
-    pub session_state: SessionState,
-    /// Whether the session can execute
-    pub can_execute: bool,
-    /// DSL source rendered from AST (for display in UI)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dsl_source: Option<String>,
-    /// The full AST for debugging
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ast: Option<Vec<Statement>>,
-    /// Disambiguation request if needed (LEGACY - use unresolved_refs instead)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disambiguation: Option<DisambiguationRequest>,
-    /// UI commands (show CBU, highlight entity, etc.)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub commands: Option<Vec<AgentCommand>>,
-    /// Unresolved entity references needing resolution (post-DSL parsing)
-    /// When present, UI should show resolution modal for each ref
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unresolved_refs: Option<Vec<UnresolvedRefInfo>>,
-    /// Index of current ref being resolved (if in resolution state)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub current_ref_index: Option<usize>,
-    /// Hash of current DSL for resolution commit verification (Issue K)
-    /// UI must pass this back to /resolve-by-ref-id to prevent stale commits
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub dsl_hash: Option<String>,
-    /// Verb disambiguation request (when multiple verbs match with similar confidence)
-    /// UI should render these as clickable buttons, not text
-    /// User selection triggers POST /api/session/:id/select-verb
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
-    /// Intent tier clarification request (when candidates span multiple intents)
-    /// Shown BEFORE verb disambiguation to reduce cognitive load
-    /// User selection triggers POST /api/session/:id/select-intent-tier
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub intent_tier: Option<ob_poc_types::IntentTierRequest>,
-    /// Unified decision packet (NEW - wraps all clarification types)
-    /// When present, UI should render a decision card with choices
-    /// User selection triggers POST /api/session/:id/decision/reply
-    /// This will eventually replace verb_disambiguation and intent_tier
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub decision: Option<ob_poc_types::DecisionPacket>,
-    /// Typed Sage explanation payload for UI rendering.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sage_explain: Option<ob_poc_types::chat::SageExplainPayload>,
-    /// Typed Drafter/REPL proposal payload for UI rendering.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub drafter_proposal: Option<ob_poc_types::chat::DraftProposalPayload>,
-    /// Typed Sem OS discovery/bootstrap payload for onboarding-stage sessions.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub discovery_bootstrap: Option<ob_poc_types::chat::DiscoveryBootstrapPayload>,
-    /// Typed parked-runbook payload for long-running or gated execution.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub parked_entries: Option<Vec<ob_poc_types::chat::ParkedEntryPayload>>,
-    /// Onboarding state view — "where am I + what can I do" contextual verb picker.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub onboarding_state: Option<ob_poc_types::onboarding_state::OnboardingStateView>,
-}
-
 // Re-export AgentCommand from ob_poc_types as the single source of truth
 pub use ob_poc_types::AgentCommand;
-
-/// Configuration for the agent service
-#[derive(Debug, Clone)]
-pub(crate) struct AgentServiceConfig {
-    /// Maximum retries for DSL generation with validation
-    pub max_retries: usize,
-    /// EntityGateway address
-    pub gateway_addr: String,
-    /// Enable pre-resolution: query EntityGateway before LLM to provide available entities
-    pub enable_pre_resolution: bool,
-    /// Maximum entities to pre-fetch per type for context injection
-    pub pre_resolution_limit: usize,
-}
-
-impl Default for AgentServiceConfig {
-    fn default() -> Self {
-        Self {
-            max_retries: 3,
-            gateway_addr: gateway_addr(),
-            enable_pre_resolution: true,
-            pre_resolution_limit: 20,
-        }
-    }
-}
-
-// ============================================================================
-// Client Scope (for client portal)
-// ============================================================================
-
-/// Client scope - restricts what a client can see and do
-#[derive(Debug, Clone)]
-pub(crate) struct ClientScope {
-    /// Client identity
-    pub client_id: Uuid,
-    /// CBUs this client has access to
-    pub accessible_cbus: Vec<Uuid>,
-    /// Client display name (for personalization)
-    pub client_name: Option<String>,
-}
-
-impl ClientScope {
-    /// Create a new client scope
-    pub(crate) fn new(client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
-        Self {
-            client_id,
-            accessible_cbus,
-            client_name: None,
-        }
-    }
-
-    /// Check if this client can access a specific CBU
-    pub(crate) fn can_access_cbu(&self, cbu_id: &Uuid) -> bool {
-        self.accessible_cbus.contains(cbu_id)
-    }
-
-    /// Get the default CBU for this client (first accessible)
-    pub(crate) fn default_cbu(&self) -> Option<Uuid> {
-        self.accessible_cbus.first().copied()
-    }
-}
 
 // ============================================================================
 // Agent Service

@@ -65,11 +65,6 @@ pub(crate) struct DslVersionSummary {
     pub created_at: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct ErrorResponse {
-    pub error: String,
-}
-
 // ============================================================================
 // Query Params
 // ============================================================================

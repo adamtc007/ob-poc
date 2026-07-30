@@ -25,7 +25,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::fs;
 use uuid::Uuid;
 
@@ -89,13 +89,6 @@ impl DslSessionFileManager {
         }
     }
 
-    /// Create with custom base directory (useful for testing)
-    pub(crate) fn with_base_dir(base_dir: impl AsRef<Path>) -> Self {
-        Self {
-            base_dir: base_dir.as_ref().to_path_buf(),
-        }
-    }
-
     /// Get the directory path for a session
     fn session_dir(&self, session_id: Uuid) -> PathBuf {
         self.base_dir.join(session_id.to_string())
@@ -116,47 +109,6 @@ impl DslSessionFileManager {
         self.session_dir(session_id).join("history")
     }
 
-    /// Create a new DSL session with empty file
-    pub(crate) async fn create_session(
-        &self,
-        session_id: Uuid,
-        domain_hint: Option<String>,
-    ) -> Result<DslSessionMetadata, std::io::Error> {
-        let session_dir = self.session_dir(session_id);
-        let history_dir = self.history_dir(session_id);
-
-        // Create directories
-        fs::create_dir_all(&session_dir).await?;
-        fs::create_dir_all(&history_dir).await?;
-
-        // Create empty main.dsl with header comment
-        let header = format!(
-            ";; DSL Session: {}\n;; Created: {}\n;; Domain: {}\n\n",
-            session_id,
-            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
-            domain_hint.as_deref().unwrap_or("general")
-        );
-        fs::write(self.main_dsl_path(session_id), &header).await?;
-
-        // Create metadata
-        let metadata = DslSessionMetadata {
-            session_id,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            statement_count: 0,
-            domain_hint,
-            bindings: HashMap::new(),
-            last_cbu_id: None,
-            last_entity_id: None,
-            history: Vec::new(),
-        };
-
-        // Save metadata
-        self.save_metadata(&metadata).await?;
-
-        Ok(metadata)
-    }
-
     /// Load session metadata
     pub(crate) async fn load_metadata(
         &self,
@@ -174,11 +126,6 @@ impl DslSessionFileManager {
         let content = serde_json::to_string_pretty(metadata)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         fs::write(path, content).await
-    }
-
-    /// Read the current DSL content
-    pub(crate) async fn read_dsl(&self, session_id: Uuid) -> Result<String, std::io::Error> {
-        fs::read_to_string(self.main_dsl_path(session_id)).await
     }
 
     /// Append DSL statements to the session file
@@ -237,131 +184,6 @@ impl DslSessionFileManager {
         Ok(metadata)
     }
 
-    /// Replace the entire DSL content (use sparingly - prefer append)
-    pub(crate) async fn write_dsl(
-        &self,
-        session_id: Uuid,
-        dsl: &str,
-        description: &str,
-    ) -> Result<DslSessionMetadata, std::io::Error> {
-        let mut metadata = self.load_metadata(session_id).await?;
-        let dsl_path = self.main_dsl_path(session_id);
-
-        // Count statements
-        let statement_count = dsl.lines().filter(|l| l.trim().starts_with('(')).count();
-
-        // Add header to DSL
-        let content = format!(
-            ";; DSL Session: {}\n;; Updated: {}\n;; Domain: {}\n\n{}",
-            session_id,
-            Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
-            metadata.domain_hint.as_deref().unwrap_or("general"),
-            dsl
-        );
-
-        // Write content
-        fs::write(&dsl_path, &content).await?;
-
-        // Create history snapshot
-        let version = metadata.history.len() as u32 + 1;
-        let snapshot_file = format!("{:03}_{}.dsl", version, sanitize_filename(description));
-        let snapshot_path = self.history_dir(session_id).join(&snapshot_file);
-        fs::write(snapshot_path, &content).await?;
-
-        // Update metadata
-        metadata.updated_at = Utc::now();
-        metadata.statement_count = statement_count;
-        metadata.history.push(DslHistoryEntry {
-            version,
-            timestamp: Utc::now(),
-            description: description.to_string(),
-            statements_added: statement_count,
-            snapshot_file,
-        });
-
-        self.save_metadata(&metadata).await?;
-
-        Ok(metadata)
-    }
-
-    /// Update bindings after execution
-    pub(crate) async fn update_bindings(
-        &self,
-        session_id: Uuid,
-        bindings: &HashMap<String, Uuid>,
-        last_cbu_id: Option<Uuid>,
-        last_entity_id: Option<Uuid>,
-    ) -> Result<(), std::io::Error> {
-        let mut metadata = self.load_metadata(session_id).await?;
-
-        // Merge bindings
-        for (name, id) in bindings {
-            metadata.bindings.insert(name.clone(), *id);
-        }
-
-        if let Some(id) = last_cbu_id {
-            metadata.last_cbu_id = Some(id);
-        }
-        if let Some(id) = last_entity_id {
-            metadata.last_entity_id = Some(id);
-        }
-
-        metadata.updated_at = Utc::now();
-        self.save_metadata(&metadata).await
-    }
-
-    /// Check if a session exists
-    pub(crate) async fn session_exists(&self, session_id: Uuid) -> bool {
-        self.session_dir(session_id).exists()
-    }
-
-    /// Delete a session and all its files
-    pub(crate) async fn delete_session(&self, session_id: Uuid) -> Result<(), std::io::Error> {
-        let session_dir = self.session_dir(session_id);
-        if session_dir.exists() {
-            fs::remove_dir_all(session_dir).await?;
-        }
-        Ok(())
-    }
-
-
-    /// Get a specific history version
-    pub(crate) async fn read_history_version(
-        &self,
-        session_id: Uuid,
-        version: u32,
-    ) -> Result<String, std::io::Error> {
-        let metadata = self.load_metadata(session_id).await?;
-
-        let entry = metadata
-            .history
-            .iter()
-            .find(|h| h.version == version)
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("History version {} not found", version),
-                )
-            })?;
-
-        let path = self.history_dir(session_id).join(&entry.snapshot_file);
-        fs::read_to_string(path).await
-    }
-
-    /// Revert to a previous version
-    pub(crate) async fn revert_to_version(
-        &self,
-        session_id: Uuid,
-        version: u32,
-    ) -> Result<DslSessionMetadata, std::io::Error> {
-        let historical_dsl = self.read_history_version(session_id, version).await?;
-        self.write_dsl(
-            session_id,
-            &historical_dsl,
-            &format!("Reverted to version {}", version),
-        )
-        .await
-    }
 }
 
 /// Sanitize a string for use as a filename
@@ -384,34 +206,47 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    async fn create_test_manager() -> (DslSessionFileManager, TempDir) {
+    /// Directly construct a manager pointed at a temp dir and seed the
+    /// on-disk state that `append_dsl` expects (empty main.dsl + metadata
+    /// file), bypassing the now-deleted `create_session`/`with_base_dir`
+    /// convenience wrappers.
+    async fn create_test_manager() -> (DslSessionFileManager, TempDir, Uuid) {
         let temp_dir = TempDir::new().unwrap();
-        let manager = DslSessionFileManager::with_base_dir(temp_dir.path());
-        (manager, temp_dir)
-    }
-
-    #[tokio::test]
-    async fn test_create_session() {
-        let (manager, _temp) = create_test_manager().await;
+        let manager = DslSessionFileManager {
+            base_dir: temp_dir.path().to_path_buf(),
+        };
         let session_id = Uuid::new_v4();
 
-        let metadata = manager
-            .create_session(session_id, Some("cbu".to_string()))
+        fs::create_dir_all(manager.session_dir(session_id))
+            .await
+            .unwrap();
+        fs::create_dir_all(manager.history_dir(session_id))
+            .await
+            .unwrap();
+        fs::write(manager.main_dsl_path(session_id), "")
+            .await
+            .unwrap();
+        manager
+            .save_metadata(&DslSessionMetadata {
+                session_id,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+                statement_count: 0,
+                domain_hint: None,
+                bindings: HashMap::new(),
+                last_cbu_id: None,
+                last_entity_id: None,
+                history: Vec::new(),
+            })
             .await
             .unwrap();
 
-        assert_eq!(metadata.session_id, session_id);
-        assert_eq!(metadata.domain_hint, Some("cbu".to_string()));
-        assert_eq!(metadata.statement_count, 0);
-        assert!(metadata.history.is_empty());
+        (manager, temp_dir, session_id)
     }
 
     #[tokio::test]
     async fn test_append_dsl() {
-        let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
-
-        manager.create_session(session_id, None).await.unwrap();
+        let (manager, _temp, session_id) = create_test_manager().await;
 
         // First append
         let metadata = manager
@@ -439,67 +274,12 @@ mod tests {
         assert_eq!(metadata.statement_count, 2);
         assert_eq!(metadata.history.len(), 2);
 
-        // Read DSL
-        let dsl = manager.read_dsl(session_id).await.unwrap();
+        // Verify file content directly (read_dsl was dead code, removed)
+        let dsl = fs::read_to_string(manager.main_dsl_path(session_id))
+            .await
+            .unwrap();
         assert!(dsl.contains("cbu.ensure"));
         assert!(dsl.contains("entity.create"));
-    }
-
-    #[tokio::test]
-    async fn test_history_and_revert() {
-        let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
-
-        manager.create_session(session_id, None).await.unwrap();
-
-        // Make some changes
-        manager
-            .append_dsl(session_id, "(cbu.ensure :name \"V1\")", "Version 1")
-            .await
-            .unwrap();
-
-        manager
-            .append_dsl(session_id, "(cbu.ensure :name \"V2\")", "Version 2")
-            .await
-            .unwrap();
-
-        // Read history version 1
-        let v1 = manager.read_history_version(session_id, 1).await.unwrap();
-        assert!(v1.contains("V1"));
-        assert!(!v1.contains("V2"));
-
-        // Revert to version 1
-        manager.revert_to_version(session_id, 1).await.unwrap();
-
-        let current = manager.read_dsl(session_id).await.unwrap();
-        // After revert, current should be based on v1
-        // (exact content depends on how revert writes)
-        assert!(current.contains("V1"));
-    }
-
-    #[tokio::test]
-    async fn test_bindings() {
-        let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
-
-        manager.create_session(session_id, None).await.unwrap();
-
-        let cbu_id = Uuid::new_v4();
-        let entity_id = Uuid::new_v4();
-
-        let mut bindings = HashMap::new();
-        bindings.insert("cbu".to_string(), cbu_id);
-        bindings.insert("person".to_string(), entity_id);
-
-        manager
-            .update_bindings(session_id, &bindings, Some(cbu_id), Some(entity_id))
-            .await
-            .unwrap();
-
-        let metadata = manager.load_metadata(session_id).await.unwrap();
-        assert_eq!(metadata.bindings.get("cbu"), Some(&cbu_id));
-        assert_eq!(metadata.bindings.get("person"), Some(&entity_id));
-        assert_eq!(metadata.last_cbu_id, Some(cbu_id));
     }
 
     #[test]

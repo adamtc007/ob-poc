@@ -58,11 +58,6 @@ impl std::fmt::Display for ResearchState {
 }
 
 impl ResearchContext {
-    /// Create a new empty research context
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
     /// Set pending research result (transitions to PendingReview)
     pub(crate) fn set_pending(&mut self, result: ResearchResult) {
         self.pending = Some(result);
@@ -110,21 +105,6 @@ impl ResearchContext {
         self.state = ResearchState::Idle;
     }
 
-    /// Mark verbs as executed (transitions to Executed)
-    pub(crate) fn mark_executed(&mut self) {
-        self.generated_verbs = None;
-        self.state = ResearchState::Executed;
-    }
-
-    /// Clear and return to idle state
-    pub(crate) fn clear(&mut self) {
-        self.pending = None;
-        self.generated_verbs = None;
-        self.state = ResearchState::Idle;
-    }
-
-
-
     /// Check if there's pending research
     pub(crate) fn has_pending(&self) -> bool {
         self.pending.is_some()
@@ -169,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_new_context_is_idle() {
-        let ctx = ResearchContext::new();
+        let ctx = ResearchContext::default();
         assert_eq!(ctx.state, ResearchState::Idle);
         assert!(!ctx.has_pending());
         assert!(!ctx.has_verbs_ready());
@@ -177,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_set_pending_transitions_to_pending_review() {
-        let mut ctx = ResearchContext::new();
+        let mut ctx = ResearchContext::default();
         let result = create_test_result();
 
         ctx.set_pending(result);
@@ -189,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_approve_transitions_to_verbs_ready() {
-        let mut ctx = ResearchContext::new();
+        let mut ctx = ResearchContext::default();
         ctx.set_pending(create_test_result());
 
         // Extract edits_made before dropping the borrow
@@ -207,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_approve_with_edits() {
-        let mut ctx = ResearchContext::new();
+        let mut ctx = ResearchContext::default();
         ctx.set_pending(create_test_result());
 
         let edits = serde_json::json!({"apex": {"name": "Edited Corp"}});
@@ -224,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_reject_transitions_to_idle() {
-        let mut ctx = ResearchContext::new();
+        let mut ctx = ResearchContext::default();
         ctx.set_pending(create_test_result());
 
         ctx.reject();
@@ -234,40 +214,13 @@ mod tests {
     }
 
     #[test]
-    fn test_mark_executed_transitions_to_executed() {
-        let mut ctx = ResearchContext::new();
-        ctx.set_pending(create_test_result());
-        ctx.approve(None).unwrap();
-
-        ctx.mark_executed();
-
-        assert_eq!(ctx.state, ResearchState::Executed);
-        assert!(!ctx.has_verbs_ready());
-    }
-
-    #[test]
     fn test_approve_without_pending_fails() {
-        let mut ctx = ResearchContext::new();
+        let mut ctx = ResearchContext::default();
 
         let result = ctx.approve(None);
 
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "No pending research to approve");
-    }
-
-    #[test]
-    fn test_clear_returns_to_idle() {
-        let mut ctx = ResearchContext::new();
-        ctx.set_pending(create_test_result());
-        ctx.approve(None).unwrap();
-
-        ctx.clear();
-
-        assert_eq!(ctx.state, ResearchState::Idle);
-        assert!(!ctx.has_pending());
-        assert!(!ctx.has_verbs_ready());
-        // Approved history is preserved
-        assert_eq!(ctx.approved_count(), 1);
     }
 
     #[test]

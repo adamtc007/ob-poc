@@ -462,17 +462,6 @@ pub fn create_entity_router() -> Router {
         .route("/api/entities/search", get(search_entities_legacy))
 }
 
-/// Create router for session-scoped entity endpoints (requires session state)
-pub(crate) fn create_scoped_entity_router(sessions: SessionStore) -> Router {
-    let state = ScopedEntitySearchState { sessions };
-    Router::new()
-        .route(
-            "/api/session/:session_id/entity/search",
-            get(search_entities_scoped),
-        )
-        .with_state(state)
-}
-
 // ============================================================================
 // Tests
 // ============================================================================

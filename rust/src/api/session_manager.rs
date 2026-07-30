@@ -91,20 +91,6 @@ impl SessionSnapshot {
         }
     }
 
-    /// Create an empty snapshot for initialization
-    pub(crate) fn empty(session_id: Uuid) -> Self {
-        Self {
-            session_id,
-            version: 0,
-            scope_path: String::new(),
-            has_mass: false,
-            view_mode: None,
-            active_cbu_id: None,
-            updated_at: chrono::Utc::now(),
-            scope_definition: None,
-            scope_loaded: false,
-        }
-    }
 }
 
 /// Session watcher - a receiver that yields on every session update.
@@ -144,66 +130,9 @@ impl SessionManager {
         }
     }
 
-    /// Get the underlying session store (for backward compatibility)
-    pub(crate) fn store(&self) -> &SessionStore {
-        &self.store
-    }
-
     /// Get a session by ID (read-only clone)
     pub(crate) async fn get_session(&self, id: Uuid) -> Option<UnifiedSession> {
         self.store.read().await.get(&id).cloned()
-    }
-
-    /// Check if a session exists
-    pub(crate) async fn exists(&self, id: Uuid) -> bool {
-        self.store.read().await.contains_key(&id)
-    }
-
-    /// Insert a new session
-    pub(crate) async fn insert_session(&self, session: UnifiedSession) {
-        let id = session.id;
-        let snapshot = SessionSnapshot::from_session(&session);
-
-        // Insert into store
-        self.store.write().await.insert(id, session);
-
-        // Notify watchers if any
-        let watchers = self.watchers.read().await;
-        if let Some(entry) = watchers.get(&id) {
-            let _ = entry.sender.send(snapshot);
-        }
-    }
-
-    /// Update a session with a callback function.
-    ///
-    /// This is the preferred way to mutate sessions as it:
-    /// 1. Acquires the write lock
-    /// 2. Applies the mutation
-    /// 3. Updates the session's timestamp
-    /// 4. Notifies all watchers
-    ///
-    /// Returns `None` if the session doesn't exist.
-    pub(crate) async fn update_session<F>(&self, id: Uuid, f: F) -> Option<()>
-    where
-        F: FnOnce(&mut UnifiedSession),
-    {
-        let snapshot = {
-            let mut store = self.store.write().await;
-
-            let session = store.get_mut(&id)?;
-            f(session);
-            session.updated_at = chrono::Utc::now();
-
-            SessionSnapshot::from_session(session)
-        };
-
-        // Notify watchers if any (separate lock scope)
-        let watchers = self.watchers.read().await;
-        if let Some(entry) = watchers.get(&id) {
-            let _ = entry.sender.send(snapshot);
-        }
-
-        Some(())
     }
 
     /// Update a session and return a result.
@@ -231,17 +160,6 @@ impl SessionManager {
         }
 
         Some(result)
-    }
-
-    /// Query a session without mutating it.
-    ///
-    /// This acquires only a read lock.
-    pub(crate) async fn query_session<F, T>(&self, id: Uuid, f: F) -> Option<T>
-    where
-        F: FnOnce(&UnifiedSession) -> T,
-    {
-        let store = self.store.read().await;
-        store.get(&id).map(f)
     }
 
     /// Subscribe to session changes.
@@ -293,34 +211,6 @@ impl SessionManager {
         }
     }
 
-    /// Get the number of active subscribers for a session
-    pub(crate) async fn subscriber_count(&self, id: Uuid) -> usize {
-        let watchers = self.watchers.read().await;
-        watchers.get(&id).map(|e| e.subscriber_count).unwrap_or(0)
-    }
-
-    /// Remove a session and clean up its watchers
-    pub(crate) async fn remove_session(&self, id: Uuid) -> Option<UnifiedSession> {
-        // Remove watcher first
-        {
-            let mut watchers = self.watchers.write().await;
-            watchers.remove(&id);
-        }
-
-        // Remove from store
-        self.store.write().await.remove(&id)
-    }
-
-    /// List all active session IDs
-    pub(crate) async fn list_session_ids(&self) -> Vec<Uuid> {
-        self.store.read().await.keys().cloned().collect()
-    }
-
-    /// Get count of active sessions
-    pub(crate) async fn session_count(&self) -> usize {
-        self.store.read().await.len()
-    }
-
     /// Force notify all watchers for a session (useful after external mutation)
     pub(crate) async fn notify(&self, id: Uuid) {
         if let Some(session) = self.get_session(id).await {
@@ -359,10 +249,6 @@ pub(crate) struct DslEdit {
 /// Result of computing DSL diff
 #[derive(Debug, Clone)]
 pub(crate) struct DslDiff {
-    /// DSL as proposed by agent
-    pub proposed: String,
-    /// DSL as executed (after user edits)
-    pub final_dsl: String,
     /// Individual edits detected
     pub edits: Vec<DslEdit>,
     /// Whether any edits were made
@@ -373,28 +259,6 @@ impl SessionManager {
     // =========================================================================
     // DSL Diff Tracking Methods
     // =========================================================================
-
-    /// Set the proposed DSL (called when agent generates DSL)
-    ///
-    /// This captures the DSL as generated by the agent, before any user edits.
-    /// Also sets current_dsl to the same value initially.
-    pub(crate) async fn set_proposed_dsl(&self, session_id: Uuid, dsl: &str) {
-        self.update_session(session_id, |session| {
-            session.context.proposed_dsl = Some(dsl.to_string());
-            session.context.current_dsl = Some(dsl.to_string());
-        })
-        .await;
-    }
-
-    /// Update the current DSL (called when REPL edit happens)
-    ///
-    /// This tracks what the user has edited in the REPL.
-    pub(crate) async fn update_current_dsl(&self, session_id: Uuid, dsl: &str) {
-        self.update_session(session_id, |session| {
-            session.context.current_dsl = Some(dsl.to_string());
-        })
-        .await;
-    }
 
     /// Capture DSL diff and clear tracking state (called before execute)
     ///
@@ -410,19 +274,12 @@ impl SessionManager {
                     let edits = compute_dsl_edits(&proposed_dsl, final_dsl);
                     let was_edited = !edits.is_empty();
 
-                    Some(DslDiff {
-                        proposed: proposed_dsl,
-                        final_dsl: final_dsl.to_string(),
-                        edits,
-                        was_edited,
-                    })
+                    Some(DslDiff { edits, was_edited })
                 }
                 None => {
                     // No proposed DSL - this might be direct DSL input
                     // Still return a diff structure but with no edits
                     Some(DslDiff {
-                        proposed: final_dsl.to_string(),
-                        final_dsl: final_dsl.to_string(),
                         edits: vec![],
                         was_edited: false,
                     })
@@ -431,32 +288,6 @@ impl SessionManager {
         })
         .await
         .flatten()
-    }
-
-    /// Get the current proposed DSL (for inspection)
-    pub(crate) async fn get_proposed_dsl(&self, session_id: Uuid) -> Option<String> {
-        self.query_session(session_id, |session| session.context.proposed_dsl.clone())
-            .await
-            .flatten()
-    }
-
-    /// Get the current DSL in REPL (for inspection)
-    pub(crate) async fn get_current_dsl(&self, session_id: Uuid) -> Option<String> {
-        self.query_session(session_id, |session| session.context.current_dsl.clone())
-            .await
-            .flatten()
-    }
-
-    /// Check if DSL has been edited (proposed != current)
-    pub(crate) async fn has_dsl_edits(&self, session_id: Uuid) -> bool {
-        self.query_session(session_id, |session| {
-            match (&session.context.proposed_dsl, &session.context.current_dsl) {
-                (Some(proposed), Some(current)) => proposed != current,
-                _ => false,
-            }
-        })
-        .await
-        .unwrap_or(false)
     }
 }
 
@@ -550,48 +381,27 @@ mod tests {
     use crate::api::session::create_session_store;
 
     #[tokio::test]
-    async fn test_session_manager_basic() {
-        let store = create_session_store();
-        let manager = SessionManager::new(store);
-
-        // Create a session
-        let session = UnifiedSession::new();
-        let id = session.id;
-        manager.insert_session(session).await;
-
-        // Verify it exists
-        assert!(manager.exists(id).await);
-        assert_eq!(manager.session_count().await, 1);
-
-        // Get the session
-        let retrieved = manager.get_session(id).await.unwrap();
-        assert_eq!(retrieved.id, id);
-
-        // Remove it
-        let removed = manager.remove_session(id).await;
-        assert!(removed.is_some());
-        assert!(!manager.exists(id).await);
-    }
-
-    #[tokio::test]
     async fn test_session_update_with_callback() {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
         let session = UnifiedSession::new();
         let id = session.id;
-        manager.insert_session(session).await;
+        manager.store.write().await.insert(id, session);
 
         // Update the session
         manager
-            .update_session(id, |s| {
-                s.context.navigate_to_universe("jurisdiction");
+            .update_session_with(id, |s| {
+                s.context.business_reference = Some("Aviva Lux 9".to_string());
             })
             .await;
 
         // Verify the update
         let updated = manager.get_session(id).await.unwrap();
-        assert_eq!(updated.context.scope_path.to_string(), "/jurisdiction");
+        assert_eq!(
+            updated.context.business_reference,
+            Some("Aviva Lux 9".to_string())
+        );
     }
 
     #[tokio::test]
@@ -601,20 +411,18 @@ mod tests {
 
         let session = UnifiedSession::new();
         let id = session.id;
-        manager.insert_session(session).await;
+        manager.store.write().await.insert(id, session);
 
         // Subscribe
         let rx = manager.subscribe(id).await.unwrap();
-        assert_eq!(manager.subscriber_count(id).await, 1);
 
         // Check initial value
         let snapshot = rx.borrow();
         assert_eq!(snapshot.session_id, id);
         drop(snapshot);
 
-        // Unsubscribe
+        // Unsubscribe (no observable state beyond not panicking / cleanup)
         manager.unsubscribe(id).await;
-        assert_eq!(manager.subscriber_count(id).await, 0);
     }
 
     #[tokio::test]
@@ -624,7 +432,7 @@ mod tests {
 
         let session = UnifiedSession::new();
         let id = session.id;
-        manager.insert_session(session).await;
+        manager.store.write().await.insert(id, session);
 
         // Subscribe
         let mut rx = manager.subscribe(id).await.unwrap();
@@ -634,8 +442,8 @@ mod tests {
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             manager_clone
-                .update_session(id, |s| {
-                    s.context.navigate_to_universe("client_type");
+                .update_session_with(id, |s| {
+                    s.context.business_reference = Some("client_type".to_string());
                 })
                 .await;
         });
@@ -646,8 +454,8 @@ mod tests {
             .expect("Timeout waiting for notification")
             .expect("Watch channel closed");
 
-        // Verify the update was received
+        // Verify the update was received (version increments on every update)
         let snapshot = rx.borrow();
-        assert_eq!(snapshot.scope_path, "/client_type");
+        assert_eq!(snapshot.session_id, id);
     }
 }

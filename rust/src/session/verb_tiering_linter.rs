@@ -201,13 +201,6 @@ impl LintReport {
     }
 }
 
-/// Lint a single verb configuration for tiering rule compliance
-///
-/// Uses default LintConfig (MINIMAL tier). For tier-specific linting, use `lint_verb_with_config`.
-pub(crate) fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> VerbLintResult {
-    lint_verb_with_config(domain, verb_name, config, &LintConfig::default())
-}
-
 /// Lint a single verb with explicit configuration
 pub(crate) fn lint_verb_with_config(
     domain: &str,
@@ -556,13 +549,6 @@ fn check_legacy_rules(
     }
 }
 
-/// Lint all verbs from a domain configuration map (uses default LintConfig)
-pub(crate) fn lint_all_verbs(
-    domains: &std::collections::HashMap<String, dsl_core::DomainConfig>,
-) -> LintReport {
-    lint_all_verbs_with_config(domains, &LintConfig::default())
-}
-
 /// Lint all verbs with explicit configuration
 pub fn lint_all_verbs_with_config(
     domains: &std::collections::HashMap<String, dsl_core::DomainConfig>,
@@ -806,7 +792,7 @@ mod tests {
     fn test_missing_metadata_warning() {
         let config = make_crud_select_config();
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(!result.has_errors());
         assert!(result.has_warnings());
         assert!(result
@@ -827,7 +813,7 @@ mod tests {
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(result.has_errors());
         assert!(result
             .diagnostics
@@ -847,7 +833,7 @@ mod tests {
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(result.has_errors());
         assert!(result
             .diagnostics
@@ -865,7 +851,7 @@ mod tests {
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(result.has_errors());
         assert!(result
             .diagnostics
@@ -886,7 +872,7 @@ mod tests {
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(!result.has_errors());
     }
 
@@ -900,7 +886,7 @@ mod tests {
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(!result.has_errors());
     }
 
@@ -913,7 +899,7 @@ mod tests {
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config);
+        let result = lint_verb_with_config("test", "verb", &config, &LintConfig::default());
         assert!(!result.has_errors());
     }
 }

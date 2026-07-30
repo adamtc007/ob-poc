@@ -246,24 +246,6 @@ pub(crate) enum ZoomLevel {
     Core,
 }
 
-impl ZoomLevel {
-    /// Returns true if this level is more zoomed in than other
-    pub(crate) fn is_deeper_than(&self, other: &ZoomLevel) -> bool {
-        self.depth() > other.depth()
-    }
-
-    fn depth(&self) -> u8 {
-        match self {
-            ZoomLevel::Universe => 0,
-            ZoomLevel::Galaxy => 1,
-            ZoomLevel::System => 2,
-            ZoomLevel::Planet => 3,
-            ZoomLevel::Surface => 4,
-            ZoomLevel::Core => 5,
-        }
-    }
-}
-
 /// Run sheet - DSL statement ledger
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub(crate) struct RunSheet {
@@ -273,86 +255,9 @@ pub(crate) struct RunSheet {
 
 impl RunSheet {
     /// Get entry at cursor
-    pub(crate) fn current(&self) -> Option<&RunSheetEntry> {
-        self.entries.get(self.cursor)
-    }
-
     /// Get mutable entry at cursor
     pub(crate) fn current_mut(&mut self) -> Option<&mut RunSheetEntry> {
         self.entries.get_mut(self.cursor)
-    }
-
-    /// Count entries by status
-    pub(crate) fn count_by_status(&self, status: EntryStatus) -> usize {
-        self.entries.iter().filter(|e| e.status == status).count()
-    }
-
-    /// Get all draft entries
-    pub(crate) fn drafts(&self) -> impl Iterator<Item = &RunSheetEntry> {
-        self.entries
-            .iter()
-            .filter(|e| e.status == EntryStatus::Draft)
-    }
-
-    /// Get all executed entries
-    pub(crate) fn executed(&self) -> impl Iterator<Item = &RunSheetEntry> {
-        self.entries
-            .iter()
-            .filter(|e| e.status == EntryStatus::Executed)
-    }
-
-    /// Get entries by DAG depth (phase)
-    pub(crate) fn by_phase(&self, depth: u32) -> impl Iterator<Item = &RunSheetEntry> {
-        self.entries.iter().filter(move |e| e.dag_depth == depth)
-    }
-
-    /// Get the maximum DAG depth in the run sheet
-    pub(crate) fn max_depth(&self) -> u32 {
-        self.entries.iter().map(|e| e.dag_depth).max().unwrap_or(0)
-    }
-
-    /// Get entries ready for execution (dependencies satisfied)
-    pub(crate) fn ready_for_execution(&self) -> Vec<&RunSheetEntry> {
-        let executed_ids: HashSet<_> = self
-            .entries
-            .iter()
-            .filter(|e| e.status == EntryStatus::Executed)
-            .map(|e| e.id)
-            .collect();
-
-        self.entries
-            .iter()
-            .filter(|e| {
-                e.status == EntryStatus::Ready
-                    && e.validation_errors.is_empty()
-                    && e.dependencies.iter().all(|dep| executed_ids.contains(dep))
-            })
-            .collect()
-    }
-
-
-    /// Mark all entries that depend on a failed entry as skipped
-    pub(crate) fn cascade_skip(&mut self, failed_id: Uuid) {
-        let mut to_skip: Vec<Uuid> = vec![failed_id];
-        let mut idx = 0;
-
-        while idx < to_skip.len() {
-            let skip_id = to_skip[idx];
-            for entry in &self.entries {
-                if entry.dependencies.contains(&skip_id) && !to_skip.contains(&entry.id) {
-                    to_skip.push(entry.id);
-                }
-            }
-            idx += 1;
-        }
-
-        // Skip all dependents (except the original failed entry)
-        for entry in &mut self.entries {
-            if to_skip.contains(&entry.id) && entry.id != failed_id {
-                entry.status = EntryStatus::Skipped;
-                entry.error = Some(format!("Skipped: dependency {} failed", failed_id));
-            }
-        }
     }
 
     /// Get combined DSL source from all entries
@@ -390,16 +295,6 @@ impl RunSheet {
         self.entries
             .iter()
             .any(|e| matches!(e.status, EntryStatus::Draft | EntryStatus::Ready))
-    }
-
-    /// Mark all draft/ready entries as executed
-    pub(crate) fn mark_all_executed(&mut self) {
-        for entry in &mut self.entries {
-            if matches!(entry.status, EntryStatus::Draft | EntryStatus::Ready) {
-                entry.status = EntryStatus::Executed;
-                entry.executed_at = Some(Utc::now());
-            }
-        }
     }
 
     /// Convert to API response format (ob_poc_types::RunSheet)
@@ -609,60 +504,6 @@ pub(crate) struct ResolutionState {
     pub current_index: usize,
     /// Resolutions made so far
     pub resolutions: HashMap<String, ResolvedRef>,
-}
-
-impl ResolutionState {
-    /// Get current ref being resolved
-    pub(crate) fn current(&self) -> Option<&UnresolvedRef> {
-        self.refs.get(self.current_index)
-    }
-
-    /// Move to next ref (returns true if moved, false if at end)
-    pub(crate) fn advance(&mut self) -> bool {
-        if self.current_index + 1 < self.refs.len() {
-            self.current_index += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Move to previous ref
-    pub(crate) fn prev(&mut self) -> bool {
-        if self.current_index > 0 {
-            self.current_index -= 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Check if all refs are resolved
-    pub(crate) fn is_complete(&self) -> bool {
-        self.refs
-            .iter()
-            .all(|r| self.resolutions.contains_key(&r.ref_id))
-    }
-
-    /// Get unresolved count
-    pub(crate) fn unresolved_count(&self) -> usize {
-        self.refs.len() - self.resolutions.len()
-    }
-
-    /// Resolve current ref
-    pub(crate) fn resolve_current(&mut self, resolved_key: String, display: String) {
-        if let Some(current) = self.current() {
-            let ref_id = current.ref_id.clone();
-            self.resolutions.insert(
-                ref_id.clone(),
-                ResolvedRef {
-                    ref_id,
-                    resolved_key,
-                    display,
-                },
-            );
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -891,18 +732,6 @@ pub(crate) enum Persona {
     Admin,
 }
 
-impl Persona {
-    /// Get mode tags this persona can access
-    pub(crate) fn mode_tags(&self) -> &'static [&'static str] {
-        match self {
-            Self::Ops => &["onboarding", "kyc", "trading"],
-            Self::Kyc => &["kyc", "onboarding"],
-            Self::Trading => &["trading"],
-            Self::Admin => &["onboarding", "kyc", "trading", "admin"],
-        }
-    }
-}
-
 // =============================================================================
 // DAG Navigation State
 // =============================================================================
@@ -926,6 +755,9 @@ impl DagState {
     }
 
     /// Check if a verb was completed
+    ///
+    /// Used by `PrereqCondition::is_satisfied` (see note there on why that
+    /// method itself is currently unreachable from any live caller).
     pub(crate) fn is_completed(&self, verb_fqn: &str) -> bool {
         self.completed.contains(verb_fqn)
     }
@@ -936,6 +768,8 @@ impl DagState {
     }
 
     /// Get a state flag (defaults to false)
+    ///
+    /// Used by `PrereqCondition::is_satisfied` (see note there).
     pub(crate) fn get_flag(&self, key: &str) -> bool {
         self.state_flags.get(key).copied().unwrap_or(false)
     }
@@ -946,15 +780,10 @@ impl DagState {
     }
 
     /// Get a fact predicate
+    ///
+    /// Used by `PrereqCondition::is_satisfied` (see note there).
     pub(crate) fn get_fact(&self, key: &str) -> Option<&serde_json::Value> {
         self.facts.get(key)
-    }
-
-    /// Clear all state (for session reset)
-    pub(crate) fn clear(&mut self) {
-        self.completed.clear();
-        self.state_flags.clear();
-        self.facts.clear();
     }
 }
 
@@ -965,13 +794,6 @@ pub(crate) struct SearchScope {
     pub client_id: Option<Uuid>,
     pub structure_type: Option<StructureType>,
     pub structure_id: Option<Uuid>,
-}
-
-impl SearchScope {
-    /// Check if scope has any constraints set
-    pub(crate) fn is_constrained(&self) -> bool {
-        self.client_id.is_some() || self.structure_type.is_some() || self.structure_id.is_some()
-    }
 }
 
 // =============================================================================
@@ -1062,25 +884,6 @@ impl ReplState {
         matches!(self, Self::Ready)
     }
 
-    /// Check if state is terminal
-    pub(crate) fn is_terminal(&self) -> bool {
-        matches!(self, Self::Executed { .. })
-    }
-
-    /// Get human-readable state name
-    pub(crate) fn name(&self) -> &'static str {
-        match self {
-            Self::Empty => "empty",
-            Self::Scoped => "scoped",
-            Self::Templated { .. } => "templated",
-            Self::Generated => "generated",
-            Self::Parsed => "parsed",
-            Self::Resolving { .. } => "resolving",
-            Self::Ready => "ready",
-            Self::Executing { .. } => "executing",
-            Self::Executed { .. } => "executed",
-        }
-    }
 }
 
 impl std::fmt::Display for ReplState {
@@ -1209,195 +1012,6 @@ pub(crate) struct EntityMatchInfo {
     pub detail: Option<String>,
     /// Match score as integer percentage (0-100)
     pub score_pct: u8,
-}
-
-impl ResolutionSubSession {
-    /// Create a new empty resolution sub-session
-    pub(crate) fn new() -> Self {
-        Self::default()
-    }
-
-    /// Create from AST statements - extracts unresolved entity refs
-    pub(crate) fn from_statements(statements: &[crate::dsl_v2::Statement]) -> Self {
-        use crate::dsl_v2::Statement;
-
-        let mut unresolved_refs = Vec::new();
-
-        for (stmt_idx, stmt) in statements.iter().enumerate() {
-            if let Statement::VerbCall(vc) = stmt {
-                for arg in &vc.arguments {
-                    Self::collect_entity_refs_from_node(
-                        &arg.value,
-                        stmt_idx,
-                        &arg.key,
-                        &mut unresolved_refs,
-                    );
-                }
-            }
-        }
-
-        Self {
-            unresolved_refs,
-            parent_dsl_index: 0,
-            current_ref_index: 0,
-            resolutions: HashMap::new(),
-        }
-    }
-
-    /// Recursively collect entity refs from AST node
-    fn collect_entity_refs_from_node(
-        node: &crate::dsl_v2::ast::AstNode,
-        stmt_idx: usize,
-        arg_name: &str,
-        refs: &mut Vec<UnresolvedRefInfo>,
-    ) {
-        use crate::dsl_v2::ast::AstNode;
-
-        match node {
-            AstNode::EntityRef {
-                entity_type,
-                value,
-                resolved_key,
-                ..
-            } => {
-                // Only add if not yet resolved
-                if resolved_key.is_none() {
-                    let ref_id = format!("{}:{}", stmt_idx, arg_name);
-                    refs.push(UnresolvedRefInfo {
-                        ref_id,
-                        entity_type: entity_type.clone(),
-                        search_value: value.clone(),
-                        context_line: format!(":{} <{}>", arg_name, value),
-                        initial_matches: vec![],
-                        resolved_key: None,
-                        resolved_display: None,
-                    });
-                }
-            }
-            AstNode::List { items, .. } => {
-                for (i, item) in items.iter().enumerate() {
-                    let list_arg_name = format!("{}[{}]", arg_name, i);
-                    Self::collect_entity_refs_from_node(item, stmt_idx, &list_arg_name, refs);
-                }
-            }
-            AstNode::Map { entries, .. } => {
-                for (key, val) in entries {
-                    let map_arg_name = format!("{}.{}", arg_name, key);
-                    Self::collect_entity_refs_from_node(val, stmt_idx, &map_arg_name, refs);
-                }
-            }
-            AstNode::Nested(vc) => {
-                for nested_arg in &vc.arguments {
-                    let nested_arg_name = format!("{}.{}", arg_name, nested_arg.key);
-                    Self::collect_entity_refs_from_node(
-                        &nested_arg.value,
-                        stmt_idx,
-                        &nested_arg_name,
-                        refs,
-                    );
-                }
-            }
-            AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
-        }
-    }
-
-    /// Get resolution progress as (resolved, total)
-    pub(crate) fn progress(&self) -> (usize, usize) {
-        let resolved = self.resolutions.len();
-        let total = self.unresolved_refs.len();
-        (resolved, total)
-    }
-
-    /// Select a resolution for a ref_id
-    pub(crate) fn select(&mut self, ref_id: &str, resolved_key: &str) -> Result<(), String> {
-        if !self.unresolved_refs.iter().any(|r| r.ref_id == ref_id) {
-            return Err(format!("Unknown ref_id: {}", ref_id));
-        }
-        self.resolutions
-            .insert(ref_id.to_string(), resolved_key.to_string());
-        Ok(())
-    }
-
-    /// Check if all refs have been resolved
-    pub(crate) fn is_complete(&self) -> bool {
-        self.unresolved_refs
-            .iter()
-            .all(|r| self.resolutions.contains_key(&r.ref_id))
-    }
-
-    /// Get the current unresolved ref being worked on
-    pub(crate) fn current_ref(&self) -> Option<&UnresolvedRefInfo> {
-        self.unresolved_refs.get(self.current_ref_index)
-    }
-
-    /// Move to next unresolved ref
-    pub(crate) fn next_ref(&mut self) -> bool {
-        if self.current_ref_index + 1 < self.unresolved_refs.len() {
-            self.current_ref_index += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Apply resolutions to AST statements
-    ///
-    /// For each resolution in self.resolutions, find the corresponding EntityRef
-    /// in the statements and set its resolved_key.
-    pub(crate) fn apply_to_statements(
-        &self,
-        statements: &mut [crate::dsl_v2::Statement],
-    ) -> Result<(), String> {
-        use crate::dsl_v2::Statement;
-
-        for (stmt_idx, stmt) in statements.iter_mut().enumerate() {
-            if let Statement::VerbCall(vc) = stmt {
-                for arg in &mut vc.arguments {
-                    self.apply_to_node(&mut arg.value, stmt_idx, &arg.key)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Recursively apply resolutions to an AST node
-    fn apply_to_node(
-        &self,
-        node: &mut crate::dsl_v2::ast::AstNode,
-        stmt_idx: usize,
-        arg_name: &str,
-    ) -> Result<(), String> {
-        use crate::dsl_v2::ast::AstNode;
-
-        match node {
-            AstNode::EntityRef { resolved_key, .. } => {
-                let ref_id = format!("{}:{}", stmt_idx, arg_name);
-                if let Some(resolved) = self.resolutions.get(&ref_id) {
-                    *resolved_key = Some(resolved.clone());
-                }
-            }
-            AstNode::List { items, .. } => {
-                for (i, item) in items.iter_mut().enumerate() {
-                    let list_arg_name = format!("{}[{}]", arg_name, i);
-                    self.apply_to_node(item, stmt_idx, &list_arg_name)?;
-                }
-            }
-            AstNode::Map { entries, .. } => {
-                for (key, val) in entries {
-                    let map_arg_name = format!("{}.{}", arg_name, key);
-                    self.apply_to_node(val, stmt_idx, &map_arg_name)?;
-                }
-            }
-            AstNode::Nested(vc) => {
-                for nested_arg in &mut vc.arguments {
-                    let nested_arg_name = format!("{}.{}", arg_name, nested_arg.key);
-                    self.apply_to_node(&mut nested_arg.value, stmt_idx, &nested_arg_name)?;
-                }
-            }
-            AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
-        }
-        Ok(())
-    }
 }
 
 /// Research sub-session state - GLEIF/UBO discovery
@@ -2667,73 +2281,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolution_state() {
-        let mut resolution = ResolutionState {
-            refs: vec![
-                UnresolvedRef {
-                    ref_id: "ref1".to_string(),
-                    entity_type: "company".to_string(),
-                    search_value: "Acme".to_string(),
-                    context_line: "create company Acme".to_string(),
-                    search_keys: vec![],
-                    discriminators: vec![],
-                    initial_matches: vec![],
-                },
-                UnresolvedRef {
-                    ref_id: "ref2".to_string(),
-                    entity_type: "person".to_string(),
-                    search_value: "Smith".to_string(),
-                    context_line: "assign director Smith".to_string(),
-                    search_keys: vec![],
-                    discriminators: vec![],
-                    initial_matches: vec![],
-                },
-            ],
-            current_index: 0,
-            resolutions: HashMap::new(),
-        };
-
-        assert_eq!(resolution.current().unwrap().ref_id, "ref1");
-        assert!(!resolution.is_complete());
-        assert_eq!(resolution.unresolved_count(), 2);
-
-        // Resolve first
-        resolution.resolve_current("acme-id".to_string(), "Acme Corp".to_string());
-        assert!(resolution.advance());
-        assert_eq!(resolution.current().unwrap().ref_id, "ref2");
-        assert_eq!(resolution.unresolved_count(), 1);
-
-        // Resolve second
-        resolution.resolve_current("smith-id".to_string(), "John Smith".to_string());
-        assert!(!resolution.advance()); // No more refs
-        assert!(resolution.is_complete());
-    }
-
-    #[test]
-    fn test_run_sheet() {
-        let mut session = UnifiedSession::new();
-
-        let id1 = session.add_dsl(
-            "(entity.create :name \"Acme\")".to_string(),
-            "Create Acme".to_string(),
-        );
-        let id2 = session.add_dsl(
-            "(entity.create :name \"Beta\")".to_string(),
-            "Create Beta".to_string(),
-        );
-
-        assert_eq!(session.run_sheet.entries.len(), 2);
-        assert_eq!(session.run_sheet.count_by_status(EntryStatus::Draft), 2);
-
-        session.mark_executed(id1, vec![]);
-        assert_eq!(session.run_sheet.count_by_status(EntryStatus::Draft), 1);
-        assert_eq!(session.run_sheet.count_by_status(EntryStatus::Executed), 1);
-
-        session.mark_failed(id2, "Test error".to_string());
-        assert_eq!(session.run_sheet.count_by_status(EntryStatus::Failed), 1);
-    }
-
-    #[test]
     fn test_runnable_dsl_excludes_executed() {
         let mut session = UnifiedSession::new();
         let id1 = session.add_dsl(
@@ -2778,52 +2325,6 @@ mod tests {
         session.mark_executed(id1, vec![]);
         assert!(session.run_sheet.runnable_dsl().is_none());
         assert!(!session.run_sheet.has_runnable());
-    }
-
-    #[test]
-    fn test_mark_all_executed_only_draft_ready() {
-        let mut session = UnifiedSession::new();
-        let id1 = session.add_dsl(
-            "(entity.create :name \"Acme\")".to_string(),
-            "Create Acme".to_string(),
-        );
-        let id2 = session.add_dsl(
-            "(kyc-case.create :entity \"Acme\")".to_string(),
-            "Open KYC".to_string(),
-        );
-
-        // Fail one entry
-        session.mark_failed(id1, "Test error".to_string());
-
-        // mark_all_executed should only mark Draft/Ready, not Failed
-        session.run_sheet.mark_all_executed();
-
-        // id1 stays Failed, id2 becomes Executed
-        let e1 = session
-            .run_sheet
-            .entries
-            .iter()
-            .find(|e| e.id == id1)
-            .unwrap();
-        assert_eq!(
-            e1.status,
-            EntryStatus::Failed,
-            "Failed entry should stay Failed"
-        );
-        let e2 = session
-            .run_sheet
-            .entries
-            .iter()
-            .find(|e| e.id == id2)
-            .unwrap();
-        assert_eq!(e2.status, EntryStatus::Executed);
-    }
-
-    #[test]
-    fn test_zoom_level_depth() {
-        assert!(ZoomLevel::Core.is_deeper_than(&ZoomLevel::Universe));
-        assert!(ZoomLevel::Planet.is_deeper_than(&ZoomLevel::Galaxy));
-        assert!(!ZoomLevel::Universe.is_deeper_than(&ZoomLevel::Core));
     }
 
     #[test]
@@ -2887,11 +2388,6 @@ mod tests {
         // Set flag
         dag.set_flag("structure.exists", true);
         assert!(dag.get_flag("structure.exists"));
-
-        // Clear
-        dag.clear();
-        assert!(!dag.is_completed("structure.setup"));
-        assert!(!dag.get_flag("structure.exists"));
     }
 
     #[test]
@@ -2929,310 +2425,6 @@ mod tests {
         assert!(!prereq.is_satisfied(&dag));
     }
 
-    #[test]
-    fn test_run_sheet_dag_operations() {
-        let mut session = UnifiedSession::new();
-
-        // Add entries with DAG metadata
-        let id1 = session.add_dsl_with_dag(
-            "(structure.setup :name \"Fund A\")".to_string(),
-            "Set up Fund A".to_string(),
-            0,
-            vec![],
-        );
-        let id2 = session.add_dsl_with_dag(
-            "(case.open :structure @fund)".to_string(),
-            "Open case".to_string(),
-            1,
-            vec![id1],
-        );
-
-        assert_eq!(session.run_sheet.max_depth(), 1);
-        assert_eq!(session.run_sheet.by_phase(0).count(), 1);
-        assert_eq!(session.run_sheet.by_phase(1).count(), 1);
-
-        // Mark first as ready, then executed
-        if let Some(entry) = session.run_sheet.entries.iter_mut().find(|e| e.id == id1) {
-            entry.status = EntryStatus::Ready;
-        }
-        session.mark_executed(id1, vec![]);
-
-        // Now second entry should be ready for execution (deps satisfied)
-        if let Some(entry) = session.run_sheet.entries.iter_mut().find(|e| e.id == id2) {
-            entry.status = EntryStatus::Ready;
-        }
-        let ready = session.run_sheet.ready_for_execution();
-        assert_eq!(ready.len(), 1);
-        assert_eq!(ready[0].id, id2);
-    }
-
-    #[test]
-    fn test_cascade_skip() {
-        let mut sheet = RunSheet::default();
-
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let id3 = Uuid::new_v4();
-
-        sheet.entries.push(RunSheetEntry {
-            id: id1,
-            dsl_source: "stmt1".to_string(),
-            display_dsl: "stmt1".to_string(),
-            status: EntryStatus::Failed,
-            created_at: Utc::now(),
-            executed_at: None,
-            affected_entities: vec![],
-            error: Some("test error".to_string()),
-            dag_depth: 0,
-            dependencies: vec![],
-            validation_errors: vec![],
-            labels: HashMap::new(),
-        });
-
-        sheet.entries.push(RunSheetEntry {
-            id: id2,
-            dsl_source: "stmt2".to_string(),
-            display_dsl: "stmt2".to_string(),
-            status: EntryStatus::Ready,
-            created_at: Utc::now(),
-            executed_at: None,
-            affected_entities: vec![],
-            error: None,
-            dag_depth: 1,
-            dependencies: vec![id1],
-            validation_errors: vec![],
-            labels: HashMap::new(),
-        });
-
-        sheet.entries.push(RunSheetEntry {
-            id: id3,
-            dsl_source: "stmt3".to_string(),
-            display_dsl: "stmt3".to_string(),
-            status: EntryStatus::Ready,
-            created_at: Utc::now(),
-            executed_at: None,
-            affected_entities: vec![],
-            error: None,
-            dag_depth: 2,
-            dependencies: vec![id2],
-            validation_errors: vec![],
-            labels: HashMap::new(),
-        });
-
-        // Cascade skip from id1
-        sheet.cascade_skip(id1);
-
-        // id2 and id3 should be skipped
-        assert_eq!(sheet.entries[1].status, EntryStatus::Skipped);
-        assert_eq!(sheet.entries[2].status, EntryStatus::Skipped);
-        // id1 should still be Failed (not changed to Skipped)
-        assert_eq!(sheet.entries[0].status, EntryStatus::Failed);
-    }
-
-    #[test]
-    fn test_persona_mode_tags() {
-        assert!(Persona::Ops.mode_tags().contains(&"onboarding"));
-        assert!(Persona::Ops.mode_tags().contains(&"kyc"));
-        assert!(!Persona::Kyc.mode_tags().contains(&"trading"));
-        assert!(Persona::Admin.mode_tags().contains(&"admin"));
-    }
-}
-
-// =============================================================================
-// SHEET EXECUTION TYPES
-// =============================================================================
-// These types support phased execution of RunSheet entries.
-// Migrated from dsl_sheet.rs to consolidate all sheet-related types here.
-
-/// Execution phase - a group of entries at the same DAG depth
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ExecutionPhase {
-    /// Phase depth (0 = first phase, no dependencies)
-    pub depth: u32,
-    /// Entry IDs in this phase
-    pub entry_ids: Vec<Uuid>,
-    /// Symbols produced by this phase
-    pub produces: Vec<String>,
-    /// Symbols consumed by this phase
-    pub consumes: Vec<String>,
-}
-
-impl ExecutionPhase {
-    /// Create a new empty phase
-    pub(crate) fn new(depth: u32) -> Self {
-        Self {
-            depth,
-            entry_ids: Vec::new(),
-            produces: Vec::new(),
-            consumes: Vec::new(),
-        }
-    }
-
-    /// Get count of entries in this phase
-    pub(crate) fn entry_count(&self) -> usize {
-        self.entry_ids.len()
-    }
-}
-
-/// Error codes for DSL execution
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) enum ErrorCode {
-    // Syntax errors
-    SyntaxError,
-    InvalidVerb,
-    InvalidArgument,
-    MissingRequired,
-
-    // Resolution errors
-    UnresolvedSymbol,
-    AmbiguousEntity,
-    EntityNotFound,
-    TypeMismatch,
-
-    // Execution errors
-    DbConstraint,
-    DbConnection,
-    Timeout,
-    PermissionDenied,
-
-    // Dependency errors
-    Blocked,
-    CyclicDependency,
-
-    // Internal errors
-    InternalError,
-}
-
-impl std::fmt::Display for ErrorCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::SyntaxError => write!(f, "SYNTAX_ERROR"),
-            Self::InvalidVerb => write!(f, "INVALID_VERB"),
-            Self::InvalidArgument => write!(f, "INVALID_ARGUMENT"),
-            Self::MissingRequired => write!(f, "MISSING_REQUIRED"),
-            Self::UnresolvedSymbol => write!(f, "UNRESOLVED_SYMBOL"),
-            Self::AmbiguousEntity => write!(f, "AMBIGUOUS_ENTITY"),
-            Self::EntityNotFound => write!(f, "ENTITY_NOT_FOUND"),
-            Self::TypeMismatch => write!(f, "TYPE_MISMATCH"),
-            Self::DbConstraint => write!(f, "DB_CONSTRAINT"),
-            Self::DbConnection => write!(f, "DB_CONNECTION"),
-            Self::Timeout => write!(f, "TIMEOUT"),
-            Self::PermissionDenied => write!(f, "PERMISSION_DENIED"),
-            Self::Blocked => write!(f, "BLOCKED"),
-            Self::CyclicDependency => write!(f, "CYCLIC_DEPENDENCY"),
-            Self::InternalError => write!(f, "INTERNAL_ERROR"),
-        }
-    }
-}
-
-/// Overall sheet execution status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) enum SheetStatus {
-    /// All entries executed successfully
-    Success,
-    /// At least one entry failed, transaction rolled back
-    Failed,
-    /// Execution was rolled back
-    RolledBack,
-}
-
-impl SheetStatus {
-    /// Get status as string for database storage
-    pub(crate) fn as_str(&self) -> &'static str {
-        match self {
-            Self::Success => "success",
-            Self::Failed => "failed",
-            Self::RolledBack => "rolled_back",
-        }
-    }
-}
-
-/// Detailed error for a single entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntryError {
-    /// Error code
-    pub code: ErrorCode,
-    /// Error message
-    pub message: String,
-    /// Additional detail
-    pub detail: Option<String>,
-    /// Source span for highlighting
-    pub span: Option<(usize, usize)>,
-    /// ID of entry that blocked this one (if Blocked)
-    pub blocked_by: Option<Uuid>,
-}
-
-/// Result of executing a single entry
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntryResult {
-    /// Entry ID
-    pub entry_id: Uuid,
-    /// DAG depth
-    pub dag_depth: u32,
-    /// Original source
-    pub source: String,
-    /// Resolved source (with UUIDs)
-    pub resolved_source: Option<String>,
-    /// Final status
-    pub status: EntryStatus,
-    /// Error details (if failed)
-    pub error: Option<EntryError>,
-    /// Returned primary key (if any)
-    pub returned_pk: Option<Uuid>,
-    /// Execution time in milliseconds
-    pub execution_time_ms: Option<u64>,
-}
-
-/// Result of executing a run sheet
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SheetExecutionResult {
-    /// Session ID
-    pub session_id: Uuid,
-    /// Overall status
-    pub overall_status: SheetStatus,
-    /// Phases completed before stopping
-    pub phases_completed: usize,
-    /// Total phases
-    pub phases_total: usize,
-    /// Per-entry results
-    pub entries: Vec<EntryResult>,
-    /// Execution start time
-    pub started_at: DateTime<Utc>,
-    /// Execution end time
-    pub completed_at: DateTime<Utc>,
-    /// Total execution time in milliseconds
-    pub duration_ms: u64,
-}
-
-impl SheetExecutionResult {
-    /// Get count of successful entries
-    pub(crate) fn success_count(&self) -> usize {
-        self.entries
-            .iter()
-            .filter(|e| e.status == EntryStatus::Executed)
-            .count()
-    }
-
-    /// Get count of failed entries
-    pub(crate) fn failed_count(&self) -> usize {
-        self.entries
-            .iter()
-            .filter(|e| e.status == EntryStatus::Failed)
-            .count()
-    }
-
-    /// Get count of skipped entries
-    pub(crate) fn skipped_count(&self) -> usize {
-        self.entries
-            .iter()
-            .filter(|e| e.status == EntryStatus::Skipped)
-            .count()
-    }
-
-    /// Check if execution was successful
-    pub(crate) fn is_success(&self) -> bool {
-        self.overall_status == SheetStatus::Success
-    }
 }
 
 // =============================================================================

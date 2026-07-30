@@ -598,24 +598,6 @@ impl ViewState {
     }
 }
 
-impl LayoutBounds {
-
-    /// Width of bounds
-    pub(crate) fn width(&self) -> f32 {
-        self.max_x - self.min_x
-    }
-
-    /// Height of bounds
-    pub(crate) fn height(&self) -> f32 {
-        self.max_y - self.min_y
-    }
-
-    /// Depth of bounds
-    pub(crate) fn depth(&self) -> f32 {
-        self.max_z - self.min_z
-    }
-}
-
 // =============================================================================
 // SERDE HELPERS FOR DURATION
 // =============================================================================

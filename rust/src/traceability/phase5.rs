@@ -380,19 +380,11 @@ fn repl_side_effects(results: &[crate::repl::response_v2::StepResult]) -> Vec<se
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "database")]
-    use super::{build_phase5_agent_payload, evaluate_phase5_agent};
     use super::{build_phase5_repl_payload, build_repl_execution_shape_kind, evaluate_phase5_repl};
-    #[cfg(feature = "database")]
-    use crate::api::agent_service::AgentChatResponse;
     use crate::repl::response_v2::{ReplResponseKindV2, ReplResponseV2, StepResult};
     use crate::repl::runbook::RunbookEntry;
     use crate::repl::session_v2::ReplSessionV2;
     use crate::repl::types_v2::{ExecutionProgress, ReplStateV2};
-    #[cfg(feature = "database")]
-    use crate::session::{SessionState, UnifiedSession};
-    #[cfg(feature = "database")]
-    use serde_json::json;
     use uuid::Uuid;
 
     #[test]
@@ -524,87 +516,4 @@ mod tests {
         assert_eq!(evaluation.payload()["status"], "available");
     }
 
-    #[cfg(feature = "database")]
-    #[test]
-    fn test_phase5_agent_payload_includes_runtime_rechecks() {
-        let mut session = UnifiedSession::new();
-        session.pending_execution_rechecks = vec![json!({
-            "verb": "cbu.create",
-            "status": "allowed"
-        })];
-        session.pending_execution_artifacts = vec![json!({
-            "runbook_id": "rb-1",
-            "step_id": Uuid::nil(),
-            "verb": "cbu.create",
-            "status": "completed",
-            "result": {"cbu_id": "abc"}
-        })];
-
-        let response = AgentChatResponse {
-            message: "done".to_string(),
-            session_state: SessionState::Executed,
-            can_execute: false,
-            dsl_source: Some("(cbu.create)".to_string()),
-            ast: None,
-            disambiguation: None,
-            commands: None,
-            unresolved_refs: None,
-            current_ref_index: None,
-            dsl_hash: None,
-            verb_disambiguation: None,
-            intent_tier: None,
-            decision: None,
-            sage_explain: None,
-            drafter_proposal: None,
-            discovery_bootstrap: None,
-            parked_entries: None,
-            onboarding_state: None,
-        };
-
-        let payload = build_phase5_agent_payload(&session, &response);
-        assert_eq!(payload["status"], "available");
-        assert_eq!(payload["runtime_rechecks"][0]["status"], "allowed");
-        assert_eq!(payload["runbook_id"], "rb-1");
-        assert_eq!(payload["execution_artifacts"][0]["status"], "completed");
-    }
-
-    #[cfg(feature = "database")]
-    #[test]
-    fn test_phase5_agent_evaluation_exposes_execution_shape() {
-        let mut session = UnifiedSession::new();
-        session.pending_execution_artifacts.push(serde_json::json!({
-            "runbook_id": "rb-1",
-            "step_id": "step-1",
-            "verb": "case.open",
-            "status": "completed",
-            "final_status": "executed",
-            "result": null,
-        }));
-
-        let response = AgentChatResponse {
-            message: "done".to_string(),
-            session_state: SessionState::Executed,
-            can_execute: false,
-            dsl_source: Some("(case.open)".to_string()),
-            ast: None,
-            disambiguation: None,
-            commands: None,
-            unresolved_refs: None,
-            current_ref_index: None,
-            dsl_hash: None,
-            verb_disambiguation: None,
-            intent_tier: None,
-            decision: None,
-            sage_explain: None,
-            drafter_proposal: None,
-            discovery_bootstrap: None,
-            parked_entries: None,
-            onboarding_state: None,
-        };
-
-        let evaluation = evaluate_phase5_agent(&session, &response);
-        assert_eq!(evaluation.execution_shape_kind(), Some("singleton"));
-        assert!(!evaluation.is_unavailable());
-        assert_eq!(evaluation.payload()["status"], "available");
-    }
 }

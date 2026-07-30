@@ -181,8 +181,6 @@ pub(crate) use operator_types::{OperatorRole, OperatorType};
 #[cfg(feature = "database")]
 pub use ref_resolver::RefResolver;
 pub(crate) use repl_session::{ExecutedBlock, ReplSession};
-#[cfg(feature = "database")]
-pub(crate) use sheet_executor::SheetExecutor;
 pub(crate) use submission::{
     DslSubmission, ExpandedSubmission, IterationKey, IterationStatements, SubmissionError,
     SubmissionLimits, SubmissionState, SymbolBinding,
