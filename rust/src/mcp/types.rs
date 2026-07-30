@@ -4,7 +4,6 @@
 //! formats optimized for agent consumption.
 
 use serde::Serialize;
-use std::collections::HashMap;
 
 // ============================================================================
 // dsl_validate enhanced types
@@ -59,39 +58,6 @@ pub(crate) struct SuggestedFix {
     pub dsl: String,
     /// Line number to insert at (if applicable)
     pub insert_at: Option<u32>,
-}
-
-// ============================================================================
-// dsl_execute enhanced types
-// ============================================================================
-
-
-/// Summary of a single execution step
-#[derive(Debug, Serialize)]
-pub(crate) struct StepResultSummary {
-    pub verb: String,
-    /// "created", "updated", "linked", "deleted", "skipped"
-    pub action: String,
-    pub entity_type: String,
-    pub entity_id: Option<String>,
-    pub entity_display: String,
-    pub binding: Option<String>,
-}
-
-// ============================================================================
-// entity_search types
-// ============================================================================
-
-
-/// A single entity match from search
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct EntityMatch {
-    pub id: String,
-    pub display: String,
-    pub entity_type: String,
-    pub score: f32,
-    /// Additional context for disambiguation
-    pub context: HashMap<String, String>,
 }
 
 // ============================================================================

@@ -241,6 +241,13 @@ impl VerbSearchResult {
 /// and ordinal `Tier`. Does not touch ranking — it is computed from the output
 /// of `search()`, never from inside it. This is how Intent Trace records the
 /// soft-stage flow without instrumenting (and risking) the search body.
+///
+/// Eval-harness-only: called from `integration_tests::intent_trace_eval`
+/// (`cargo test --test intent_trace_eval ... --ignored`). Production leaves
+/// `IntentTrace::soft_stage_flow` / the response field `None` unless a trace
+/// carried one in — see the comment at `orchestrator.rs`'s
+/// `soft_stage_flow: trace.soft_stage_flow...` call site.
+#[cfg(test)]
 pub(crate) fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
     let mut by_source: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
@@ -780,6 +787,7 @@ impl HybridVerbSearcher {
                                     verb = %fqn,
                                     score = m.score,
                                     tier = "Tier2A_ScenarioIndex",
+                                    signals = ?m.explain.matched_signals.iter().map(|s| &s.signal).collect::<Vec<_>>(),
                                     "ScenarioIndex: matched journey scenario"
                                 );
                                 seen_verbs.insert(fqn.clone());

@@ -153,7 +153,13 @@ pub(crate) struct IntentPipeline {
 }
 
 impl IntentPipeline {
-    /// Create pipeline with verb searcher (lazy LLM init)
+    /// Create pipeline with verb searcher (lazy LLM init).
+    ///
+    /// Test-only: production code must construct via `with_pool` in
+    /// `orchestrator.rs` (enforced by `policy_gate_tests::test_no_duplicate_pipeline_outside_orchestrator`).
+    /// This DB-free constructor exists so tests can exercise pipeline logic
+    /// without a real Postgres connection.
+    #[cfg(test)]
     pub(crate) fn new(verb_searcher: HybridVerbSearcher) -> Self {
         Self {
             verb_searcher,

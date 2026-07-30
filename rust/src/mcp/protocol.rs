@@ -8,7 +8,6 @@ use serde_json::Value;
 /// JSON-RPC request
 #[derive(Debug, Deserialize)]
 pub(crate) struct JsonRpcRequest {
-    pub jsonrpc: String,
     pub id: Option<Value>,
     pub method: String,
     #[serde(default)]

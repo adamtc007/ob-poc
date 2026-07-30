@@ -39,10 +39,7 @@ pub(crate) enum PrereqCheck {
     /// Prerequisite depends on runtime state that can't be evaluated statically.
     /// This is NOT a failure — it means the system should accept the sequence
     /// and check the prereq at execution time.
-    Deferred {
-        /// Description of what runtime information is needed.
-        reason: String,
-    },
+    Deferred,
 }
 
 /// Validation result for a single macro in the sequence.
@@ -50,20 +47,7 @@ pub(crate) enum PrereqCheck {
 pub(crate) struct MacroValidation {
     /// The macro FQN being validated.
     pub macro_fqn: String,
-    /// Position in the sequence (0-indexed).
-    pub position: usize,
     /// Overall check result for this macro.
-    pub check: PrereqCheck,
-    /// Individual prereq results (one per prereq on the macro).
-    pub prereq_details: Vec<PrereqDetail>,
-}
-
-/// Detail for a single prerequisite check.
-#[derive(Debug, Clone)]
-pub(crate) struct PrereqDetail {
-    /// Human-readable description of the prerequisite.
-    pub description: String,
-    /// Check result.
     pub check: PrereqCheck,
 }
 
@@ -189,32 +173,27 @@ pub(crate) fn validate_macro_sequence(
     let mut sim_state = SimulatedState::new(current_state_flags, completed_verbs);
     let mut validations = Vec::with_capacity(macros.len());
 
-    for (position, fqn) in macros.iter().enumerate() {
+    for fqn in macros.iter() {
         let validation = match registry.get(fqn) {
             Some(schema) => {
-                let (check, details) =
-                    validate_single_macro(fqn, schema, &sim_state, &producer_index);
+                let check = validate_single_macro(fqn, schema, &sim_state, &producer_index);
 
                 // If pass or deferred, apply effects optimistically
-                if matches!(check, PrereqCheck::Pass | PrereqCheck::Deferred { .. }) {
+                if matches!(check, PrereqCheck::Pass | PrereqCheck::Deferred) {
                     sim_state.apply_macro(fqn, schema);
                 }
 
                 MacroValidation {
                     macro_fqn: fqn.clone(),
-                    position,
                     check,
-                    prereq_details: details,
                 }
             }
             None => MacroValidation {
                 macro_fqn: fqn.clone(),
-                position,
                 check: PrereqCheck::Fail {
                     missing: format!("Macro '{}' not found in registry", fqn),
                     satisfied_by: vec![],
                 },
-                prereq_details: vec![],
             },
         };
 
@@ -232,7 +211,7 @@ pub(crate) fn validate_macro_sequence(
         .count();
     let deferred_count = validations
         .iter()
-        .filter(|v| matches!(v.check, PrereqCheck::Deferred { .. }))
+        .filter(|v| matches!(v.check, PrereqCheck::Deferred))
         .count();
 
     SequenceValidationResult {
@@ -250,41 +229,36 @@ fn validate_single_macro(
     schema: &MacroSchema,
     sim_state: &SimulatedState,
     producer_index: &ProducerIndex,
-) -> (PrereqCheck, Vec<PrereqDetail>) {
+) -> PrereqCheck {
     if schema.prereqs.is_empty() {
-        return (PrereqCheck::Pass, vec![]);
+        return PrereqCheck::Pass;
     }
 
-    let mut details = Vec::new();
+    let mut checks = Vec::new();
     let mut has_fail = false;
     let mut has_deferred = false;
 
     for prereq in &schema.prereqs {
-        let detail = check_prereq(prereq, sim_state, producer_index);
-        match &detail.check {
+        let check = check_prereq(prereq, sim_state, producer_index);
+        match &check {
             PrereqCheck::Fail { .. } => has_fail = true,
-            PrereqCheck::Deferred { .. } => has_deferred = true,
+            PrereqCheck::Deferred => has_deferred = true,
             PrereqCheck::Pass => {}
         }
-        details.push(detail);
+        checks.push(check);
     }
 
-    let overall = if has_fail {
+    if has_fail {
         // Find the first fail for the overall message
-        let first_fail = details
-            .iter()
-            .find(|d| matches!(d.check, PrereqCheck::Fail { .. }))
-            .unwrap();
-        first_fail.check.clone()
+        checks
+            .into_iter()
+            .find(|c| matches!(c, PrereqCheck::Fail { .. }))
+            .unwrap()
     } else if has_deferred {
-        PrereqCheck::Deferred {
-            reason: "Some prerequisites require runtime evaluation".to_string(),
-        }
+        PrereqCheck::Deferred
     } else {
         PrereqCheck::Pass
-    };
-
-    (overall, details)
+    }
 }
 
 /// Check a single prerequisite against the simulated state.
@@ -292,38 +266,26 @@ fn check_prereq(
     prereq: &MacroPrereq,
     sim_state: &SimulatedState,
     producer_index: &ProducerIndex,
-) -> PrereqDetail {
+) -> PrereqCheck {
     match prereq {
         MacroPrereq::StateExists { key } => {
             if sim_state.has_flag(key) {
-                PrereqDetail {
-                    description: format!("State '{}' exists", key),
-                    check: PrereqCheck::Pass,
-                }
+                PrereqCheck::Pass
             } else {
-                PrereqDetail {
-                    description: format!("State '{}' must exist", key),
-                    check: PrereqCheck::Fail {
-                        missing: format!("State '{}' not set", key),
-                        satisfied_by: producer_index.find_state_producers(key),
-                    },
+                PrereqCheck::Fail {
+                    missing: format!("State '{}' not set", key),
+                    satisfied_by: producer_index.find_state_producers(key),
                 }
             }
         }
 
         MacroPrereq::VerbCompleted { verb } => {
             if sim_state.has_completed(verb) {
-                PrereqDetail {
-                    description: format!("Verb '{}' completed", verb),
-                    check: PrereqCheck::Pass,
-                }
+                PrereqCheck::Pass
             } else {
-                PrereqDetail {
-                    description: format!("Verb '{}' must be completed", verb),
-                    check: PrereqCheck::Fail {
-                        missing: format!("Verb '{}' not completed", verb),
-                        satisfied_by: vec![verb.clone()],
-                    },
+                PrereqCheck::Fail {
+                    missing: format!("Verb '{}' not completed", verb),
+                    satisfied_by: vec![verb.clone()],
                 }
             }
         }
@@ -336,8 +298,8 @@ fn check_prereq(
             let mut has_deferred = false;
 
             for sub in conditions {
-                let sub_detail = check_prereq(sub, sim_state, producer_index);
-                match &sub_detail.check {
+                let sub_check = check_prereq(sub, sim_state, producer_index);
+                match &sub_check {
                     PrereqCheck::Pass => {
                         any_pass = true;
                         break;
@@ -349,51 +311,32 @@ fn check_prereq(
                         all_missing.push(missing.clone());
                         all_satisfied_by.extend(satisfied_by.iter().cloned());
                     }
-                    PrereqCheck::Deferred { .. } => {
+                    PrereqCheck::Deferred => {
                         has_deferred = true;
                     }
                 }
             }
 
             if any_pass {
-                PrereqDetail {
-                    description: "Any-of condition satisfied".to_string(),
-                    check: PrereqCheck::Pass,
-                }
+                PrereqCheck::Pass
             } else if has_deferred {
-                PrereqDetail {
-                    description: "Any-of condition requires runtime evaluation".to_string(),
-                    check: PrereqCheck::Deferred {
-                        reason: "Some alternatives require runtime evaluation".to_string(),
-                    },
-                }
+                PrereqCheck::Deferred
             } else {
                 // Deduplicate satisfied_by
                 let mut unique: Vec<String> = all_satisfied_by;
                 unique.sort();
                 unique.dedup();
 
-                PrereqDetail {
-                    description: "None of the alternative conditions are met".to_string(),
-                    check: PrereqCheck::Fail {
-                        missing: all_missing.join("; "),
-                        satisfied_by: unique,
-                    },
+                PrereqCheck::Fail {
+                    missing: all_missing.join("; "),
+                    satisfied_by: unique,
                 }
             }
         }
 
-        MacroPrereq::FactExists { predicate } => {
+        MacroPrereq::FactExists { .. } => {
             // Facts are runtime-evaluated — always defer
-            PrereqDetail {
-                description: format!("Fact '{}' must exist", predicate),
-                check: PrereqCheck::Deferred {
-                    reason: format!(
-                        "Fact '{}' requires runtime evaluation (depends on execution context)",
-                        predicate
-                    ),
-                },
-            }
+            PrereqCheck::Deferred
         }
     }
 }

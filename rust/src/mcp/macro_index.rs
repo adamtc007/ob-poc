@@ -101,18 +101,14 @@ fn tokenize(s: &str) -> Vec<String> {
 /// Entry in the macro index, derived from macro metadata at startup.
 #[derive(Debug, Clone)]
 pub(crate) struct MacroIndexEntry {
-    pub fqn: String,
     pub label: String,
     pub description: String,
     pub jurisdiction: Option<String>,
     pub structure_type: Option<String>,
     pub mode_tags: Vec<String>,
-    pub operates_on: Option<String>,
     pub produces: Option<String>,
     pub aliases: Vec<String>,
     pub noun_tokens: Vec<String>,
-    /// Number of verbs this macro expands to (for composite intent cues).
-    pub expansion_verb_count: usize,
 }
 
 /// Curated search overrides loaded from YAML (optional layer).
@@ -292,21 +288,15 @@ impl MacroIndex {
                     .push(canonical_fqn.clone());
             }
 
-            // Count expansion steps (if available)
-            let expansion_verb_count = schema.expands_to.len();
-
             let entry = MacroIndexEntry {
-                fqn: canonical_fqn.clone(),
                 label: schema.ui.label.clone(),
                 description: schema.ui.description.clone(),
                 jurisdiction,
                 structure_type,
                 mode_tags: schema.routing.mode_tags.clone(),
-                operates_on: Some(schema.target.operates_on.clone()),
                 produces: schema.target.produces.clone(),
                 aliases,
                 noun_tokens: unique_nouns,
-                expansion_verb_count,
             };
 
             entries.insert(canonical_fqn, entry);

@@ -4,7 +4,6 @@
 //! based on match quality and conversation context.
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use super::enrichment::EntityContext;
 
@@ -32,8 +31,6 @@ pub(crate) enum SuggestedAction {
     AskUser,
     /// Suggest creating a new entity
     SuggestCreate,
-    /// Need more information to search effectively
-    NeedMoreInfo { missing: Vec<String> },
 }
 
 /// Result of resolution analysis
@@ -71,9 +68,6 @@ pub(crate) struct ConversationContext {
     /// Jurisdiction mentioned
     #[serde(default)]
     pub mentioned_jurisdiction: Option<String>,
-    /// Currently active CBU in the session
-    #[serde(default)]
-    pub current_cbu_id: Option<Uuid>,
 }
 
 /// Resolution strategy analyzer

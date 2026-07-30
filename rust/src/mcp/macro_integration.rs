@@ -25,8 +25,6 @@ use crate::dsl_v2::macros::{
 };
 use crate::session::unified::{DagState, PrereqCondition, UnifiedSession};
 
-use super::intent_pipeline::{IntentArgValue, StructuredIntent};
-
 /// Global macro registry singleton
 static MACRO_REGISTRY: OnceLock<MacroRegistry> = OnceLock::new();
 
@@ -101,98 +99,6 @@ pub(crate) fn try_expand_macro(
             MacroAttemptResult::Failed(e)
         }
     }
-}
-
-/// Convert intent arguments to macro expansion args
-///
-/// Extracts string values from IntentArguments for macro expansion.
-/// Enum values use the UI key (macro expansion handles internal mapping).
-pub(crate) fn intent_args_to_macro_args(intent: &StructuredIntent) -> BTreeMap<String, String> {
-    let mut args = BTreeMap::new();
-
-    for arg in &intent.arguments {
-        if let Some(value) = extract_string_value(&arg.value) {
-            args.insert(arg.name.clone(), value);
-        }
-    }
-
-    args
-}
-
-/// Extract string value from IntentArgValue
-fn extract_string_value(value: &IntentArgValue) -> Option<String> {
-    match value {
-        IntentArgValue::String(s) => Some(s.clone()),
-        IntentArgValue::Number(n) => Some(n.to_string()),
-        IntentArgValue::Boolean(b) => Some(b.to_string()),
-        IntentArgValue::Uuid(u) => Some(u.clone()),
-        IntentArgValue::Reference(r) => Some(format!("@{}", r)),
-        IntentArgValue::Unresolved { value, .. } => Some(value.clone()),
-        IntentArgValue::Missing { .. } => None,
-        IntentArgValue::List(items) => {
-            // Join list items with commas
-            let values: Vec<String> = items.iter().filter_map(extract_string_value).collect();
-            if values.is_empty() {
-                None
-            } else {
-                Some(values.join(","))
-            }
-        }
-        IntentArgValue::Map(_) => None, // Maps not directly convertible
-    }
-}
-
-/// Get macro schema for a verb (for UI display)
-pub(crate) fn get_macro_schema(verb_fqn: &str) -> Option<&'static crate::dsl_v2::macros::MacroSchema> {
-    macro_registry().get(verb_fqn)
-}
-
-/// List all available macros
-pub(crate) fn list_macros() -> Vec<MacroInfo> {
-    macro_registry()
-        .all()
-        .map(|(fqn, schema)| MacroInfo {
-            fqn: fqn.clone(),
-            label: schema.ui.label.clone(),
-            description: schema.ui.description.clone(),
-            target_label: schema.ui.target_label.clone(),
-            mode_tags: schema.routing.mode_tags.clone(),
-            operator_domain: schema.routing.operator_domain.clone(),
-        })
-        .collect()
-}
-
-/// Macro information for UI display
-#[derive(Debug, Clone)]
-pub(crate) struct MacroInfo {
-    pub fqn: String,
-    pub label: String,
-    pub description: String,
-    pub target_label: String,
-    pub mode_tags: Vec<String>,
-    pub operator_domain: Option<String>,
-}
-
-/// Get macros filtered by mode tag
-pub(crate) fn macros_by_mode(mode_tag: &str) -> Vec<MacroInfo> {
-    macro_registry()
-        .by_mode_tag(mode_tag)
-        .into_iter()
-        .filter_map(|schema| {
-            // Find FQN by searching registry
-            macro_registry()
-                .all()
-                .find(|(_, s)| std::ptr::eq(*s, schema))
-                .map(|(fqn, s)| MacroInfo {
-                    fqn: fqn.clone(),
-                    label: s.ui.label.clone(),
-                    description: s.ui.description.clone(),
-                    target_label: s.ui.target_label.clone(),
-                    mode_tags: s.routing.mode_tags.clone(),
-                    operator_domain: s.routing.operator_domain.clone(),
-                })
-        })
-        .collect()
 }
 
 // =============================================================================
@@ -395,63 +301,3 @@ pub(crate) fn update_dag_after_execution(session: &mut UnifiedSession, verb_fqn:
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::mcp::intent_pipeline::IntentArgument;
-
-    #[test]
-    fn test_extract_string_values() {
-        assert_eq!(
-            extract_string_value(&IntentArgValue::String("test".to_string())),
-            Some("test".to_string())
-        );
-
-        assert_eq!(
-            extract_string_value(&IntentArgValue::Number(42.0)),
-            Some("42".to_string())
-        );
-
-        assert_eq!(
-            extract_string_value(&IntentArgValue::Boolean(true)),
-            Some("true".to_string())
-        );
-
-        assert_eq!(
-            extract_string_value(&IntentArgValue::Uuid("uuid-123".to_string())),
-            Some("uuid-123".to_string())
-        );
-
-        assert_eq!(
-            extract_string_value(&IntentArgValue::Missing {
-                arg_name: "x".to_string()
-            }),
-            None
-        );
-    }
-
-    #[test]
-    fn test_intent_args_conversion() {
-        let intent = StructuredIntent {
-            verb: "structure.setup".to_string(),
-            arguments: vec![
-                IntentArgument {
-                    name: "name".to_string(),
-                    value: IntentArgValue::String("Acme Fund".to_string()),
-                    resolved: false,
-                },
-                IntentArgument {
-                    name: "structure_type".to_string(),
-                    value: IntentArgValue::String("pe".to_string()),
-                    resolved: false,
-                },
-            ],
-            confidence: 0.9,
-            notes: vec![],
-        };
-
-        let args = intent_args_to_macro_args(&intent);
-        assert_eq!(args.get("name"), Some(&"Acme Fund".to_string()));
-        assert_eq!(args.get("structure_type"), Some(&"pe".to_string()));
-    }
-}

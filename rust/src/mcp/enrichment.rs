@@ -16,21 +16,6 @@ pub(crate) enum EntityType {
     Cbu,
 }
 
-impl EntityType {
-    /// Parse from string (case-insensitive)
-    pub(crate) fn parse(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "person" | "proper_person" | "properperson" => Some(Self::ProperPerson),
-            "company" | "legal_entity" | "legalentity" | "limited_company" => {
-                Some(Self::LegalEntity)
-            }
-            "cbu" => Some(Self::Cbu),
-            "entity" => Some(Self::ProperPerson), // Default to person for generic entity
-            _ => None,
-        }
-    }
-}
-
 /// Enriches entities with contextual information for disambiguation
 pub(crate) struct EntityEnricher {
     pool: PgPool,
@@ -396,19 +381,6 @@ impl EntityContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_entity_type_from_str() {
-        assert_eq!(EntityType::parse("person"), Some(EntityType::ProperPerson));
-        assert_eq!(EntityType::parse("PERSON"), Some(EntityType::ProperPerson));
-        assert_eq!(EntityType::parse("company"), Some(EntityType::LegalEntity));
-        assert_eq!(
-            EntityType::parse("legal_entity"),
-            Some(EntityType::LegalEntity)
-        );
-        assert_eq!(EntityType::parse("cbu"), Some(EntityType::Cbu));
-        assert_eq!(EntityType::parse("unknown"), None);
-    }
 
     #[test]
     fn test_disambiguation_label_person() {

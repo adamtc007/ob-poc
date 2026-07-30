@@ -8,8 +8,6 @@
 //! - ScenarioIndex (Tier -2A): gate G1 requires compound signals present
 //! - MacroIndex (Tier -2B): jurisdiction/structure hints improve scoring
 
-use std::collections::HashSet;
-
 // ─── Configuration ─────────────────────────────────────────────────────────
 
 /// Compound outcome verbs that signal multi-step intent.
@@ -692,14 +690,6 @@ fn contains_strict_word(haystack: &str, word: &str) -> bool {
         }
     }
     false
-}
-
-/// Return the set of known jurisdiction codes.
-pub(crate) fn known_jurisdiction_codes() -> HashSet<String> {
-    JURISDICTION_MAP
-        .iter()
-        .map(|(_, code)| code.to_string())
-        .collect()
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
