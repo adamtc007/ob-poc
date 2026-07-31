@@ -969,6 +969,16 @@ impl ToolHandlers {
 
         // =====================================================================
         // EXPANSION STAGE - Determine batch policy and derive locks
+        //
+        // NOTE (2026-07-31): currently a guaranteed passthrough. Inline
+        // template syntax is unimplemented (`parse_for_expansion` never
+        // emits TemplateInvocation), so the report is always empty locks +
+        // BestEffort and the Atomic branch below is unreachable from here.
+        // Production templates are pre-expanded to plain DSL upstream by
+        // TemplateExpander (MCP template_expand / batch_expand_current).
+        // If inline syntax lands, compile the plan from
+        // `expansion.expanded_dsl` instead of the original source (see
+        // ExpansionOutput::expanded_dsl doc in dsl_v2/expansion/engine.rs).
         // =====================================================================
         let templates = runtime_registry().templates();
         let expansion_result = expand_templates_simple(source, templates);

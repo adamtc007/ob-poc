@@ -26,19 +26,27 @@ use crate::templates::{TemplateDefinition, TemplateRegistry};
 pub(crate) struct ExpansionOutput {
     /// The expanded DSL source (all templates replaced with verb calls).
     ///
-    /// No production caller reads this -- both real call sites
-    /// (`mcp/handlers/core.rs`, `api/agent_routes.rs`) compile their
-    /// execution plan from the *original* DSL before expansion even runs,
-    /// then only consume `.report` afterward. `executor.rs`'s own doc
-    /// example for `execute_plan_atomic_with_locks` shows the intended
-    /// usage as `compile(&parse_program(&expansion.expanded_dsl)?)?` --
-    /// i.e. template-expanded DSL is documented as the thing that should
-    /// be compiled and executed, but nothing does that. Possible
-    /// correctness gap (templates may never actually get expanded into
-    /// executable form); flagged for the owner, not fixed here. Field
-    /// gated rather than deleted because it has real, substantial test
-    /// coverage in `integration_tests::expansion_determinism` (via the
-    /// sibling `expand_templates` function that shares this struct) --
+    /// No production caller reads this -- and, as researched for the
+    /// dead-code remediation follow-up (2026-07-31), none needs to today:
+    /// `parse_for_expansion` below never emits
+    /// `ParsedNode::TemplateInvocation` (inline `@template { args }`
+    /// syntax was never implemented), so `expanded_dsl` is always
+    /// byte-identical to the input and the report is always the
+    /// passthrough default (empty lock set, `BatchPolicy::BestEffort`).
+    /// Production templates are expanded to plain DSL text *upstream* by
+    /// `TemplateExpander` (ob-templates crate, via the MCP
+    /// `template_expand` / `batch_expand_current` tools) before any DSL
+    /// reaches the execute endpoints; hypothetical inline template syntax
+    /// would fail `parse_program` (dsl-core admits only comments and
+    /// `(domain.verb ...)` statements) before expansion runs -- the path
+    /// fails closed, not silently-wrong. If inline syntax is ever
+    /// implemented, the call sites (`mcp/handlers/core.rs`,
+    /// `api/agent_routes.rs`) must be reordered to compile from
+    /// `expanded_dsl` per the `execute_plan_atomic_with_locks` doc
+    /// example; today there is nothing to expand. Field gated rather
+    /// than deleted because it has real, substantial test coverage in
+    /// `integration_tests::expansion_determinism` (via the sibling
+    /// `expand_templates` function that shares this struct) --
     /// content-equality, whitespace-normalization, passthrough, and
     /// empty-input assertions, not a trivial roundtrip. See Phase 14
     /// dead-code remediation.
