@@ -609,13 +609,21 @@ pub(crate) async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> 
                     }
                 }
             }
-            if let Ok(packs) = load_packs_from_dir(&packs_dir) {
-                pack_errors =
-                    validate_pack_fqns(&declared_fqns, &macros, flatten_pack_entries(&packs));
-                three_axis_report
-                    .well_formedness
-                    .extend(pack_errors.clone());
-            }
+            // Fail closed: the packs dir exists, so an unloadable catalogue
+            // must fail the lint, not silently skip the V1.2-5 pack-hygiene
+            // check (the gate that doesn't run is not a gate). Matches
+            // reconcile.rs's `.context(...)?` idiom for the same load.
+            let packs = load_packs_from_dir(&packs_dir).with_context(|| {
+                format!(
+                    "loading {:?} for V1.2-5 pack-hygiene check — catalogue unloadable, \
+                     pack-hygiene gate cannot run (fail-closed)",
+                    packs_dir
+                )
+            })?;
+            pack_errors = validate_pack_fqns(&declared_fqns, &macros, flatten_pack_entries(&packs));
+            three_axis_report
+                .well_formedness
+                .extend(pack_errors.clone());
         }
 
         let declared = verbs_config

@@ -358,8 +358,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Err(e) => {
+                    // Fail closed: the packs dir exists but the catalogue is
+                    // unloadable (unreadable file / malformed YAML). Skipping
+                    // the pack-hygiene gate here would let a broken catalogue
+                    // through the P3 startup gate silently — the gate that
+                    // doesn't run is not a gate. Mirrors the verb-YAML load
+                    // failure above; honours the same documented
+                    // OBPOC_CATALOGUE_VALIDATOR_STRICT=false emergency bypass.
+                    let strict = std::env::var("OBPOC_CATALOGUE_VALIDATOR_STRICT")
+                        .map(|v| v.to_lowercase() != "false")
+                        .unwrap_or(true);
+                    if strict {
+                        tracing::error!(
+                            "Catalogue validator: pack catalogue load failed for {:?}: {} — \
+                             pack-hygiene gate cannot run; aborting startup (fail-closed). \
+                             Set OBPOC_CATALOGUE_VALIDATOR_STRICT=false to demote to a warning \
+                             (not recommended — P3 invariant is the gate).",
+                            packs_dir,
+                            e
+                        );
+                        return Err(
+                            format!("pack catalogue load failed pre-DB ({:?}): {}", packs_dir, e)
+                                .into(),
+                        );
+                    }
                     tracing::warn!(
-                        "Pack-hygiene check skipped — could not load packs dir {:?}: {}",
+                        "Pack-hygiene check skipped (strict=false) — could not load packs dir {:?}: {}",
                         packs_dir,
                         e
                     );

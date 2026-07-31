@@ -326,6 +326,57 @@ async fn try_route_supported_acp_prompt_with_draft_mode(
         effective_draft_mode,
         route_started_at,
     );
+    // Fail-closed guard (sibling of ob-poc-boundary acp_protocol.rs
+    // `try_session_prompt_dag_semantic`, commit 891c9614): the boundary
+    // agent signals hard resolution-machinery failure — pack catalogue
+    // unloadable, pack-projection provider missing, envelope verification
+    // failure — as a JSON-RPC INTERNAL_ERROR (-32603) response. That
+    // response carries no `result`, so the `result`-shape checks below
+    // would collapse "machinery broken" into "no ACP route" (`None`) and
+    // silently degrade governed DAG-semantic routing to generic REPL
+    // prose — the exact fail-open the boundary fix closed, reintroduced
+    // one layer up. Surface it as a structured refusal instead.
+    if let Some(internal_error) = acp_envelope_internal_error(&envelope) {
+        tracing::error!(
+            session_id = %session_id,
+            task = %task,
+            code = internal_error.code,
+            error = %internal_error.message,
+            "ACP session-input routing unavailable (fail-closed); refusing generic REPL fallback"
+        );
+        let mut bundle = acp_routing_unavailable_bundle(prompt_text, &internal_error);
+        bundle.resolution.route_metadata =
+            Some(ob_poc_boundary::acp_dag_semantic::AcpRouteMetadata {
+                route: "session_input".to_string(),
+                provider_task: task.clone(),
+                requested_draft_source: requested_draft_mode.as_str().to_string(),
+                effective_draft_source: value_string(
+                    &envelope,
+                    &["session_input", "effective_draft_source"],
+                )
+                .unwrap_or_else(|| effective_draft_mode.as_str().to_string()),
+                route_latency_us: value_u64(&envelope, &["session_input", "route_latency_us"])
+                    .unwrap_or(0),
+                route_latency_ms: value_u64(&envelope, &["session_input", "route_latency_ms"])
+                    .unwrap_or(0),
+            });
+        if let Err(error) = orchestrator
+            .record_external_chat_exchange(
+                session_id,
+                prompt_text.to_string(),
+                bundle.message.clone(),
+            )
+            .await
+        {
+            tracing::warn!(
+                session_id = %session_id,
+                task = %task,
+                error = %error,
+                "Failed to record fail-closed ACP chat exchange in REPL session history"
+            );
+        }
+        return Some(bundle);
+    }
     let result = envelope.get("result")?;
     let result_status = result.get("status").and_then(serde_json::Value::as_str)?;
     if !matches!(
@@ -528,6 +579,113 @@ fn acp_session_input_task_label(
         })
         .or_else(|| value_string(envelope, &["state_anchor_provider", "task"]))
         .unwrap_or_else(|| "dag.semantic".to_string())
+}
+
+/// JSON-RPC reserved code for internal errors. Matches the boundary
+/// crate's `acp_protocol::INTERNAL_ERROR` — the code
+/// `try_session_prompt_dag_semantic` uses to fail closed when the
+/// DAG-semantic resolution machinery itself is broken (commit 891c9614).
+const JSON_RPC_INTERNAL_ERROR: i64 = -32603;
+
+/// An INTERNAL_ERROR extracted from an ACP envelope's `outgoing` array.
+pub(crate) struct AcpEnvelopeInternalError {
+    pub code: i64,
+    pub message: String,
+}
+
+/// Detect a fail-closed INTERNAL_ERROR response in the ACP envelope's
+/// `outgoing` array.
+///
+/// `process_acp_prompt_deterministic_envelope` serializes the boundary
+/// agent's outgoing traffic verbatim; a JSON-RPC *error* response has no
+/// `result` member, so the envelope's `result` collapses to `{}` and
+/// every downstream `result`-shape check reads it as "no ACP route".
+/// This helper is the mechanism that keeps "resolution machinery broken"
+/// distinguishable from "no route": it fires only on the reserved
+/// internal-error code (-32603), never on in-band structured refusals
+/// (which are success *results*) or request-shape errors like
+/// INVALID_PARAMS.
+pub(crate) fn acp_envelope_internal_error(
+    envelope: &serde_json::Value,
+) -> Option<AcpEnvelopeInternalError> {
+    envelope
+        .get("outgoing")?
+        .as_array()?
+        .iter()
+        .find_map(|item| {
+            let error = item.get("error")?;
+            let code = error.get("code").and_then(serde_json::Value::as_i64)?;
+            if code != JSON_RPC_INTERNAL_ERROR {
+                return None;
+            }
+            Some(AcpEnvelopeInternalError {
+                code,
+                message: error
+                    .get("message")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or("unknown internal error")
+                    .to_string(),
+            })
+        })
+}
+
+/// Build the fail-closed bundle returned when the boundary agent reports
+/// that DAG-semantic routing is unavailable. Mirrors the boundary's
+/// `refused_resolution` shape (status `Refused`, read-only, no draft)
+/// with a localized diagnostic naming the failure, so the failure
+/// surfaces through the normal ACP chat-trace projection instead of
+/// degrading to generic REPL prose.
+pub(crate) fn acp_routing_unavailable_bundle(
+    utterance: &str,
+    error: &AcpEnvelopeInternalError,
+) -> AcpResolvedBundle {
+    use ob_poc_boundary::acp_dag_semantic::{
+        AcpDagSemanticDiagnostic, AcpDagSemanticResolution, AcpDagSemanticStatus,
+    };
+    let message = format!(
+        "DAG-semantic routing unavailable (fail-closed): {}",
+        error.message
+    );
+    let resolution = AcpDagSemanticResolution {
+        status: AcpDagSemanticStatus::Refused,
+        utterance: utterance.to_string(),
+        selected_dispatch: None,
+        selected_verb: None,
+        selected_domain: None,
+        selected_description: None,
+        pack: None,
+        selected_template: None,
+        top_candidates: Vec::new(),
+        rejected_candidates: Vec::new(),
+        draft_dsl: None,
+        workflow_plan: None,
+        missing_required_args: Vec::new(),
+        unresolved_refs: Vec::new(),
+        read_only: true,
+        mutation_allowed: false,
+        requires_hitl: false,
+        structured_outcome_supported: true,
+        registry_trace: None,
+        envelope_trace: None,
+        runtime_trace: None,
+        diagnostics: vec![AcpDagSemanticDiagnostic {
+            error_code: "dag_semantic_routing_unavailable".to_string(),
+            source: "acp_session_input_route".to_string(),
+            message: error.message.clone(),
+            expected: Vec::new(),
+            actual: Some(format!("json-rpc error {}", error.code)),
+        }],
+        route_metadata: None,
+        state_anchor_provider: None,
+        observability: None,
+        override_status: None,
+    };
+    AcpResolvedBundle {
+        resolution,
+        message,
+        dsl: None,
+        session_feedback: None,
+    }
 }
 
 fn annotate_acp_session_input_envelope(
@@ -3796,6 +3954,85 @@ mod tests {
         assert_eq!(trace["requested_draft_source"], "llm_tool_call");
         assert_eq!(trace["draft_source"], "deterministic_provider");
         assert_eq!(trace["transition_ref"], "deal.prospect-to-qualifying");
+    }
+
+    /// Reject fixture: an envelope carrying the boundary's fail-closed
+    /// INTERNAL_ERROR outgoing (the exact shape
+    /// `process_acp_prompt_deterministic_envelope` produces when
+    /// `try_session_prompt_dag_semantic` fails closed — commit 891c9614:
+    /// error response has no `result`, so `result` collapses to `{}`)
+    /// MUST be detected and turned into a structured refusal bundle, not
+    /// collapsed into the "no ACP route" `None` that silently degrades
+    /// governed routing to REPL prose.
+    #[test]
+    fn test_acp_envelope_internal_error_fails_closed_not_none() {
+        let envelope = serde_json::json!({
+            "status": "acp_session_input_processed",
+            "session_id": "11111111-1111-1111-1111-111111111111",
+            "result": {},
+            "outgoing": [{
+                "jsonrpc": "2.0",
+                "id": "session-input-acp",
+                "error": {
+                    "code": -32603,
+                    "message": "DAG-semantic routing unavailable (fail-closed): loading verified ACP pack context registry failed"
+                }
+            }]
+        });
+        let error = acp_envelope_internal_error(&envelope)
+            .expect("INTERNAL_ERROR outgoing must be detected, not swallowed into None");
+        assert_eq!(error.code, -32603);
+        assert!(error.message.contains("pack context registry failed"));
+
+        let bundle = acp_routing_unavailable_bundle("assign role to cbu", &error);
+        assert!(matches!(
+            bundle.resolution.status,
+            ob_poc_boundary::acp_dag_semantic::AcpDagSemanticStatus::Refused
+        ));
+        assert!(bundle
+            .message
+            .contains("DAG-semantic routing unavailable (fail-closed)"));
+        assert!(bundle.dsl.is_none(), "fail-closed bundle must carry no DSL");
+        let diagnostic = bundle
+            .resolution
+            .diagnostics
+            .first()
+            .expect("fail-closed bundle must carry a localized diagnostic");
+        assert_eq!(diagnostic.error_code, "dag_semantic_routing_unavailable");
+        assert!(diagnostic.message.contains("pack context registry failed"));
+    }
+
+    /// Admit fixture: healthy envelopes — notifications plus a success
+    /// response — and non-internal JSON-RPC errors (request-shape
+    /// INVALID_PARAMS) must NOT trip the fail-closed guard; those paths
+    /// keep their existing behaviour.
+    #[test]
+    fn test_acp_envelope_internal_error_admits_success_and_non_internal() {
+        let success = serde_json::json!({
+            "status": "acp_session_input_processed",
+            "result": {"status": "dag_semantic_proposal"},
+            "outgoing": [
+                {"jsonrpc": "2.0", "method": "session/update", "params": {}},
+                {"jsonrpc": "2.0", "id": "session-input-acp", "result": {"stopReason": "end_turn"}}
+            ]
+        });
+        assert!(
+            acp_envelope_internal_error(&success).is_none(),
+            "healthy envelopes must pass through untouched"
+        );
+
+        let invalid_params = serde_json::json!({
+            "result": {},
+            "outgoing": [{
+                "jsonrpc": "2.0",
+                "id": "session-input-acp",
+                "error": {"code": -32602, "message": "invalid params"}
+            }]
+        });
+        assert!(
+            acp_envelope_internal_error(&invalid_params).is_none(),
+            "non-internal JSON-RPC errors are not the resolution-machinery signal"
+        );
     }
 
     #[tokio::test]
