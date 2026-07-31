@@ -31,6 +31,7 @@ const PARSE_ERROR: i64 = -32700;
 const INVALID_REQUEST: i64 = -32600;
 const METHOD_NOT_FOUND: i64 = -32601;
 const INVALID_PARAMS: i64 = -32602;
+const INTERNAL_ERROR: i64 = -32603;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JsonRpcRequest {
@@ -740,7 +741,23 @@ impl AcpJsonRpcAgent {
             config_root,
         ) {
             Ok(Some(resolution)) => resolution,
-            Ok(None) | Err(_) => return None,
+            // Ok(None) is the resolver's "not a DAG-semantic prompt" answer
+            // (empty prompt, ACP control prompt, no scored candidates) —
+            // falling through to the generic session/prompt path is correct.
+            Ok(None) => return None,
+            // Err is a hard registry/config failure (pack-projection
+            // provider missing, pack catalogue unloadable, envelope
+            // verification failure). Fail closed: degrading to the generic
+            // prose acknowledgement would silently disable governed
+            // DAG-semantic routing for every prompt in the session.
+            Err(error) => {
+                return Some(self.error(
+                    id,
+                    INTERNAL_ERROR,
+                    format!("DAG-semantic routing unavailable (fail-closed): {error}"),
+                    None,
+                ));
+            }
         };
         let route_us = elapsed_us(route_started_at);
         Some(self.dag_semantic_outgoing(id, session_id, resolution, route_us))
