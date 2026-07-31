@@ -757,7 +757,7 @@ mod tests {
         let repo = SessionRepositoryV2::new(pool);
         let entity_id = Uuid::new_v4();
         let lookup = crate::lookup::LookupResult {
-            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
                 hash: "snapshot-hash".to_string(),
                 version: 1,
                 entity_count: 7,

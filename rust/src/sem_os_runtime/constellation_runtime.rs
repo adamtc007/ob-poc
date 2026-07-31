@@ -436,7 +436,6 @@ pub(crate) struct HydrationQueryPlan {
 #[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct QueryLevel {
-    pub depth: usize,
     pub queries: Vec<SlotQuery>,
 }
 
@@ -650,7 +649,7 @@ pub(crate) fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQu
     HydrationQueryPlan {
         levels: levels
             .into_iter()
-            .map(|(depth, queries)| QueryLevel { depth, queries })
+            .map(|(_depth, queries)| QueryLevel { queries })
             .collect(),
     }
 }

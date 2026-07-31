@@ -927,7 +927,7 @@ mod tests {
     fn test_phase2_artifacts_detect_ambiguous_entity() {
         let artifacts = Phase2Artifacts::new(
             Some(LookupResult {
-                entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+                entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
                     hash: "test".to_string(),
                     version: 1,
                     entity_count: 2,

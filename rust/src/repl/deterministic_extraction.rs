@@ -116,8 +116,6 @@ pub(crate) struct IntentSplit {
     pub first: String,
     /// The trailing portion (a new intent).
     pub second: String,
-    /// The conjunction that triggered the split.
-    pub conjunction: String,
 }
 
 // ============================================================================
@@ -587,7 +585,6 @@ pub(crate) fn detect_multi_intent(input: &str) -> Option<IntentSplit> {
                 return Some(IntentSplit {
                     first: first.to_string(),
                     second: second.to_string(),
-                    conjunction: conj.trim().to_string(),
                 });
             }
         }
@@ -973,15 +970,11 @@ mod tests {
         ctx.focus.case = Some(FocusRef {
             id: case_id,
             display_name: "KYC-001".to_string(),
-            entity_type: "kyc_case".to_string(),
-            set_at_turn: 1,
-        });
+            entity_type: "kyc_case".to_string(),        });
         ctx.focus.entity = Some(FocusRef {
             id: entity_id,
             display_name: "Allianz SE".to_string(),
-            entity_type: "company".to_string(),
-            set_at_turn: 1,
-        });
+            entity_type: "company".to_string(),        });
         let vc = simple_verb_config();
         // Input contains "it" which should trigger pronoun resolution.
         let result =
@@ -1000,9 +993,7 @@ mod tests {
         ctx.focus.cbu = Some(FocusRef {
             id: cbu_id,
             display_name: "Lifecycle CBU".to_string(),
-            entity_type: "cbu".to_string(),
-            set_at_turn: 1,
-        });
+            entity_type: "cbu".to_string(),        });
         let vc = simple_verb_config();
 
         let result = try_deterministic_extraction(
@@ -1025,9 +1016,7 @@ mod tests {
         ctx.focus.cbu = Some(FocusRef {
             id: cbu_id,
             display_name: "Lifecycle CBU".to_string(),
-            entity_type: "cbu".to_string(),
-            set_at_turn: 1,
-        });
+            entity_type: "cbu".to_string(),        });
         let mut vc = VerbConfigIndex::empty();
         vc.insert_test_entry(VerbIndexEntry {
             fqn: "cbu.add-product".to_string(),
@@ -1203,7 +1192,6 @@ mod tests {
             entity_id: Uuid::nil(),
             display_name: "Allianz SE".to_string(),
             entity_type: "company".to_string(),
-            mentioned_at_turn: 1,
         });
         let vc = simple_verb_config();
         let prompt =

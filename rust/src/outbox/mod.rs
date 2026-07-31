@@ -49,6 +49,11 @@ mod narrate;
 pub mod narration_emit;
 mod resource_owner;
 
+// Test-consumed only: the trait lives in the private `consumer` module; the lib
+// build has no external consumers of it, but `integration_tests` implements it.
+#[cfg(test)]
+pub(crate) use consumer::AsyncOutboxConsumer;
+
 pub use bpmn_signal::{BpmnCancelConsumer, BpmnSignalConsumer};
 pub use drainer::{OutboxDrainerConfig, OutboxDrainerImpl};
 pub use maintenance_spawn::MaintenanceSpawnConsumer;

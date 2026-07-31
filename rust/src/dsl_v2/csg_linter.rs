@@ -99,6 +99,13 @@ pub struct CsgLinter {
 }
 
 impl CsgLinter {
+    /// Test-consumed only: `integration_tests::csg_pipeline_integration`
+    /// inspects the loaded rules; the accessor has no production reader.
+    #[cfg(test)]
+    pub(crate) fn rules(&self) -> &ApplicabilityRules {
+        &self.rules
+    }
+
     #[cfg(feature = "database")]
     pub fn new(pool: PgPool) -> Self {
         Self {

@@ -676,7 +676,6 @@ mod tests {
         }
 
         let result = run_harness_no_db(&templates_path).await.unwrap();
-        result.print_summary();
 
         // All templates should parse and plan successfully
         assert!(
@@ -693,7 +692,6 @@ mod tests {
     async fn test_harness_from_registry() {
         // Test using templates loaded at startup with verbs
         let result = run_harness_from_registry().await.unwrap();
-        result.print_summary();
 
         assert!(
             result.total_templates > 0,
@@ -715,8 +713,10 @@ mod tests {
 
         // If all templates pass through to planning, check full success
         if result.plan_failed == 0 {
+            // Inlined body of the deleted `HarnessResult::all_passed` helper
+            // (dead-code Phase 9): plan_failed == 0 && parse_failed == 0.
             assert!(
-                result.all_passed(),
+                result.plan_failed == 0 && result.parse_failed == 0,
                 "Expected all templates to pass pipeline"
             );
         }

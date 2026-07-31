@@ -95,9 +95,11 @@ fn test_lock_key_sorting() {
     let mut keys = vec![
         LockKey::write("person", "uuid-3"),
         LockKey::write("cbu", "uuid-1"),
-        LockKey::read("person", "uuid-2"),
+        // `LockKey::read` convenience ctor was deleted as dead code (Phase 5);
+        // `LockAccess::Read` and the general ctor survive.
+        LockKey::new("person", "uuid-2", LockAccess::Read),
         LockKey::write("person", "uuid-2"),
-        LockKey::read("cbu", "uuid-1"),
+        LockKey::new("cbu", "uuid-1", LockAccess::Read),
     ];
 
     keys.sort();

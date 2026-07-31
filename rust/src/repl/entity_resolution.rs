@@ -28,26 +28,20 @@ pub(crate) enum EntityResolutionOutcome {
     /// Resolved to a single entity via focus/pronoun.
     ResolvedByFocus {
         entity_id: Uuid,
-        display_name: String,
         method: &'static str,
     },
 
     /// Resolved via accumulated answers from pack Q&A.
-    ResolvedByAnswer {
-        entity_id: Uuid,
-        display_name: String,
-        field: String,
-    },
+    ResolvedByAnswer { entity_id: Uuid, field: String },
 
     /// Candidate universe built — delegate to search.
     NeedsSearch {
         canonicalized_input: String,
         expected_kinds: Vec<String>,
-        candidate_universe: CandidateUniverse,
     },
 
     /// No candidates available — cannot resolve.
-    NoMatch { reason: String },
+    NoMatch,
 }
 
 // ---------------------------------------------------------------------------
@@ -72,9 +66,6 @@ pub(crate) struct CandidateUniverse {
 
     /// Excluded values (text-based).
     pub excluded_values: HashSet<String>,
-
-    /// Pack's dominant domain (for type preference).
-    pub pack_domain: Option<String>,
 
     /// Whether the universe is constrained (vs. open search).
     pub is_constrained: bool,
@@ -133,7 +124,6 @@ pub(crate) fn resolve_with_context(
         if expected_kinds.is_empty() || expected_kinds.iter().any(|k| k == &focus_ref.entity_type) {
             return EntityResolutionOutcome::ResolvedByFocus {
                 entity_id: focus_ref.id,
-                display_name: focus_ref.display_name.clone(),
                 method: "pronoun",
             };
         }
@@ -148,7 +138,6 @@ pub(crate) fn resolve_with_context(
             if let Ok(entity_id) = Uuid::parse_str(uuid_str) {
                 return EntityResolutionOutcome::ResolvedByAnswer {
                     entity_id,
-                    display_name: canonicalized.clone(),
                     field: canonicalized,
                 };
             }
@@ -163,7 +152,6 @@ pub(crate) fn resolve_with_context(
                 if let Ok(entity_id) = Uuid::parse_str(uuid_str) {
                     return EntityResolutionOutcome::ResolvedByAnswer {
                         entity_id,
-                        display_name: field.clone(),
                         field: field.clone(),
                     };
                 }
@@ -178,15 +166,13 @@ pub(crate) fn resolve_with_context(
         && universe.scope_cbu_ids.is_empty()
         && universe.expected_kinds.is_empty()
     {
-        return EntityResolutionOutcome::NoMatch {
-            reason: "No scope or type constraints available for entity resolution".to_string(),
-        };
+        // No scope or type constraints available for entity resolution.
+        return EntityResolutionOutcome::NoMatch;
     }
 
     EntityResolutionOutcome::NeedsSearch {
         canonicalized_input: canonicalized,
         expected_kinds: expected_kinds.to_vec(),
-        candidate_universe: universe,
     }
 }
 
@@ -210,10 +196,6 @@ pub(crate) fn build_candidate_universe(
         excluded_values.insert(exclusion.value.clone());
     }
 
-    let pack_domain = context
-        .active_pack()
-        .and_then(|p| p.dominant_domain.clone());
-
     let is_constrained = !expected_kinds_set.is_empty()
         || !scope_cbu_ids.is_empty()
         || !excluded_entity_ids.is_empty();
@@ -223,7 +205,6 @@ pub(crate) fn build_candidate_universe(
         scope_cbu_ids,
         excluded_entity_ids,
         excluded_values,
-        pack_domain,
         is_constrained,
     }
 }

@@ -23,11 +23,11 @@ mod invariants {
     use uuid::Uuid;
 
     use crate::sem_reg::attribute_def::AttributeDataType;
+    use crate::sem_reg::agent::{DecisionRecord, DecisionStore};
     use crate::sem_reg::{
         evaluate_abac, evaluate_publish_gates, AccessDecision, AccessPurpose, ActorContext,
-        AttributeDefBody, ChangeType, Classification, DecisionRecord, DecisionStore,
-        GovernanceTier, ObjectType, RegistryService, SecurityLabel, SnapshotMeta, SnapshotStatus,
-        TrustClass, VerbContractBody,
+        AttributeDefBody, ChangeType, Classification, GovernanceTier, ObjectType, RegistryService,
+        SecurityLabel, SnapshotMeta, SnapshotStatus, TrustClass, VerbContractBody,
     };
 
     // ── Test Infrastructure ──────────────────────────────────────────────────
@@ -248,13 +248,20 @@ mod invariants {
         };
         let decision_id = DecisionStore::insert(&db.pool, &decision).await?;
 
-        // Load and verify manifest integrity
-        let loaded = DecisionStore::load(&db.pool, decision_id)
-            .await?
-            .expect("Decision should be loadable");
+        // Load and verify manifest integrity.
+        // (`DecisionStore::load` was deleted in dead-code Phase 4 — the store
+        // is append-only with no production reader — so read the row directly.)
+        let manifest_json = sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT snapshot_manifest FROM sem_reg.decision_records WHERE decision_id = $1",
+        )
+        .bind(decision_id)
+        .fetch_one(&db.pool)
+        .await?;
+        let loaded_manifest: std::collections::BTreeMap<Uuid, Uuid> =
+            serde_json::from_value(manifest_json)?;
 
         // Every pinned snapshot must resolve to a real snapshot
-        for (object_id, snapshot_id) in &loaded.snapshot_manifest {
+        for (object_id, snapshot_id) in &loaded_manifest {
             let exists = sqlx::query_scalar::<_, bool>(
                 "SELECT EXISTS(SELECT 1 FROM sem_reg.snapshots WHERE snapshot_id = $1)",
             )
@@ -271,17 +278,17 @@ mod invariants {
 
         // Manifest size must match what we inserted
         assert_eq!(
-            loaded.snapshot_manifest.len(),
+            loaded_manifest.len(),
             2,
             "Manifest should contain exactly 2 entries"
         );
         assert_eq!(
-            loaded.snapshot_manifest.get(&attr_oid),
+            loaded_manifest.get(&attr_oid),
             Some(&attr_sid),
             "Attribute snapshot should be pinned"
         );
         assert_eq!(
-            loaded.snapshot_manifest.get(&verb_oid),
+            loaded_manifest.get(&verb_oid),
             Some(&verb_sid),
             "Verb snapshot should be pinned"
         );

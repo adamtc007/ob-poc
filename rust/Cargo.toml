@@ -176,7 +176,6 @@ ob-poc-control-plane = { path = "crates/ob-poc-control-plane", features = ["test
 # redirects to the local ~/dev/bpmn-lite/ checkout during development.
 bpmn-lite-engine.workspace = true
 bpmn-lite-store.workspace = true
-bpmn-lite-server.workspace = true
 ffi-catalogue.workspace = true
 dmn-lite-bridge.workspace = true
 bpmn-lite-ffi-http.workspace = true
@@ -411,7 +410,6 @@ sem_os_policy   = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" 
 # ~/dev/bpmn-lite/ for cross-repo editing.
 bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-bpmn-lite-server   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }

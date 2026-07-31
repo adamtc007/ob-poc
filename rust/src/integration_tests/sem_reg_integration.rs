@@ -38,15 +38,18 @@ mod integration {
 
     use crate::sem_reg::attribute_def::AttributeDataType;
     use crate::sem_reg::{
-        check_evidence_proof_rule, evaluate_abac, AccessDecision, AccessPurpose, ActorContext,
-        AgentPlan, AgentPlanStatus, AttributeDefBody, ChangeType, Classification, DecisionRecord,
-        DecisionStore, GovernanceTier, LineageStore, MetricsStore, ObjectType, PlanStep,
-        PlanStepStatus, PlanStore, RegistryService, SecurityLabel, SnapshotMeta, SnapshotRow,
-        SnapshotStatus, SnapshotStore, TrustClass, VerbContractBody,
+        evaluate_abac, AccessDecision, AccessPurpose, ActorContext, AttributeDefBody, ChangeType,
+        Classification, GovernanceTier, MetricsStore, ObjectType, RegistryService, SecurityLabel,
+        SnapshotMeta, SnapshotStore, TrustClass, VerbContractBody,
     };
 
     // Import types not re-exported at module boundary
     use crate::sem_reg::agent::decisions::AlternativeAction;
+    use crate::sem_reg::agent::{
+        AgentPlan, AgentPlanStatus, DecisionRecord, DecisionStore, PlanStep, PlanStepStatus,
+        PlanStore,
+    };
+    use crate::sem_reg::projections::LineageStore;
 
     // ── Test Infrastructure ──────────────────────────────────────────────────
 
@@ -397,12 +400,19 @@ mod integration {
         };
         let decision_id = DecisionStore::insert(&db.pool, &decision).await?;
 
-        // 7. Verify the decision can be loaded with correct manifest
-        let loaded = DecisionStore::load(&db.pool, decision_id)
-            .await?
-            .expect("Decision should be loadable");
+        // 7. Verify the persisted manifest pins the attribute snapshot.
+        // (`DecisionStore::load` was deleted in dead-code Phase 4 — the store
+        // is append-only with no production reader — so read the row directly.)
+        let manifest_json = sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT snapshot_manifest FROM sem_reg.decision_records WHERE decision_id = $1",
+        )
+        .bind(decision_id)
+        .fetch_one(&db.pool)
+        .await?;
+        let loaded_manifest: std::collections::BTreeMap<Uuid, Uuid> =
+            serde_json::from_value(manifest_json)?;
         assert_eq!(
-            loaded.snapshot_manifest.get(&attr_oid),
+            loaded_manifest.get(&attr_oid),
             Some(&attr_sid),
             "Snapshot manifest should pin attribute snapshot"
         );
@@ -530,16 +540,25 @@ mod integration {
             )
             .await?;
 
-        // Record a derivation edge: src1 + src2 → derived
-        let edge_id = LineageStore::record_derivation_edge(
-            &db.pool,
-            &[src_sid1, src_sid2],
-            derived_sid,
-            &db.fqn("attr.derive-composite"),
-            None,
+        // Record a derivation edge: src1 + src2 → derived.
+        // (`LineageStore::record_derivation_edge` was deleted in dead-code
+        // Phase 4 — no production writer — so seed the append-only row
+        // directly; the surviving query paths are what this test proves.)
+        let edge_id = Uuid::new_v4();
+        sqlx::query(
+            r#"
+            INSERT INTO sem_reg.derivation_edges
+                (edge_id, input_snapshot_ids, output_snapshot_id, verb_fqn, run_id)
+            VALUES ($1, $2, $3, $4, $5)
+            "#,
         )
+        .bind(edge_id)
+        .bind(vec![src_sid1, src_sid2])
+        .bind(derived_sid)
+        .bind(db.fqn("attr.derive-composite"))
+        .bind(Option::<Uuid>::None)
+        .execute(&db.pool)
         .await?;
-        assert_ne!(edge_id, Uuid::nil(), "Edge ID should be non-nil");
 
         // Forward impact from src1 should include derived
         let forward = LineageStore::query_forward_impact(&db.pool, src_sid1, 5).await?;
@@ -712,52 +731,13 @@ mod integration {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Scenario 6: Proof Rule Enforcement
+    // Scenario 6: Proof Rule Enforcement — DELETED
+    //
+    // The local `check_evidence_proof_rule` helper was removed in dead-code
+    // Phase 4 (a4265301): the gate framework migrated to the external
+    // `sem_os_policy::gates` crate, whose successor `check_proof_rule` is
+    // pub(crate) there and covered by that crate's own tests.
     // ═══════════════════════════════════════════════════════════════════════
-
-    /// A governed PolicyRule that references an operational attribute at
-    /// Convenience trust class should fail the proof rule check.
-    #[tokio::test]
-    #[ignore]
-    async fn test_scenario_6_proof_rule_enforcement() -> Result<()> {
-        // Proof rule is a pure function — no DB needed for this check,
-        // but we verify it end-to-end with published snapshots.
-
-        // Governed/Proof evidence should pass
-        let proof_check = check_evidence_proof_rule(GovernanceTier::Governed, TrustClass::Proof);
-        assert!(
-            proof_check.passed,
-            "Governed/Proof should pass proof rule. Got: {:?}",
-            proof_check
-        );
-
-        // Governed/DecisionSupport should pass
-        let ds_check =
-            check_evidence_proof_rule(GovernanceTier::Governed, TrustClass::DecisionSupport);
-        assert!(
-            ds_check.passed,
-            "Governed/DecisionSupport should pass proof rule. Got: {:?}",
-            ds_check
-        );
-
-        // Operational/Convenience should fail governed proof rule
-        let conv_check =
-            check_evidence_proof_rule(GovernanceTier::Operational, TrustClass::Convenience);
-        assert!(
-            !conv_check.passed,
-            "Operational/Convenience should fail proof rule check"
-        );
-
-        // Operational/Proof — cross-tier: operational tier with proof trust
-        let op_proof = check_evidence_proof_rule(GovernanceTier::Operational, TrustClass::Proof);
-        // Operational tier, even with proof trust class, should fail governed requirement
-        assert!(
-            !op_proof.passed,
-            "Operational tier should fail governed proof rule regardless of trust class"
-        );
-
-        Ok(())
-    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Scenario 7: Security / ABAC E2E

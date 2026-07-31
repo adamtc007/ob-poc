@@ -660,7 +660,10 @@ mod tests {
             vec![make_test_edge("e1", "cbu1", "entity1", EdgeType::Owns)],
         );
 
-        let engine = LayoutEngineV2::new().horizontal(true);
+        // The `horizontal(bool)` builder was deleted as dead code (Phase 7);
+        // the config flag itself survives — set it directly (same-module access).
+        let mut engine = LayoutEngineV2::new();
+        engine.config.horizontal = true;
         let _result = engine.layout(&mut graph);
 
         // Horizontal layout: x increases with tier

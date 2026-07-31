@@ -4,7 +4,7 @@
 //! invariants. They must be internal to the crate because they reference
 //! source files by relative path.
 
-use super::*;
+use crate::runbook::errors::CompilationErrorKind;
 
 // =============================================================================
 // INV-8, INV-10: Lock event logging in executor source

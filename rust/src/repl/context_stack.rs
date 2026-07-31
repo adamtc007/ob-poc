@@ -883,8 +883,6 @@ pub(crate) struct RecentMention {
     pub display_name: String,
     #[cfg(test)]
     pub entity_type: String,
-    #[cfg(test)]
-    pub mentioned_at_turn: u32,
 }
 
 const MAX_RECENT_MENTIONS: usize = 10;
@@ -926,8 +924,6 @@ fn derive_recent(runbook: &Runbook) -> RecentContext {
                     display_name: name,
                     #[cfg(test)]
                     entity_type: "entity".to_string(),
-                    #[cfg(test)]
-                    mentioned_at_turn: 0,
                 });
             }
         }
@@ -1172,12 +1168,8 @@ pub(crate) struct PackHandoffSuggestion {
 #[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct OutcomeRef {
-    /// The entry ID that produced this outcome.
-    pub entry_id: Uuid,
     /// The verb that produced the outcome.
     pub verb: String,
-    /// A human-readable label for the outcome.
-    pub label: String,
     /// Key result values (e.g., `{"case_id": "uuid-..."}`)
     pub values: HashMap<String, String>,
 }
@@ -1242,9 +1234,7 @@ impl ContextStack {
                     }
                 }
                 OutcomeRef {
-                    entry_id: e.id,
                     verb: e.verb.clone(),
-                    label: e.sentence.clone(),
                     values,
                 }
             })
@@ -1430,7 +1420,6 @@ pub(crate) enum ContextSource {
 #[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct ContextEntry {
-    pub value: String,
     pub source: ContextSource,
     pub set_at_turn: u32,
 }
@@ -1765,7 +1754,6 @@ mod tests {
     #[test]
     fn test_context_entry_weight_user_explicit_no_decay() {
         let entry = ContextEntry {
-            value: "test".to_string(),
             source: ContextSource::UserExplicit,
             set_at_turn: 0,
         };
@@ -1778,7 +1766,6 @@ mod tests {
     #[test]
     fn test_context_entry_weight_system_resolved() {
         let entry = ContextEntry {
-            value: "test".to_string(),
             source: ContextSource::SystemResolved,
             set_at_turn: 0,
         };
@@ -1790,7 +1777,6 @@ mod tests {
     #[test]
     fn test_context_entry_weight_carried_forward() {
         let entry = ContextEntry {
-            value: "test".to_string(),
             source: ContextSource::CarriedForward,
             set_at_turn: 0,
         };
@@ -1800,7 +1786,6 @@ mod tests {
     #[test]
     fn test_context_entry_weight_template_inferred() {
         let entry = ContextEntry {
-            value: "test".to_string(),
             source: ContextSource::TemplateInferred,
             set_at_turn: 0,
         };
@@ -1810,7 +1795,6 @@ mod tests {
     #[test]
     fn test_context_entry_weight_decay_over_turns() {
         let entry = ContextEntry {
-            value: "test".to_string(),
             source: ContextSource::SystemResolved,
             set_at_turn: 2,
         };
@@ -1830,13 +1814,11 @@ mod tests {
             entity_id: id,
             display_name: "First".to_string(),
             entity_type: "entity".to_string(),
-            mentioned_at_turn: 1,
         });
         recent.add(RecentMention {
             entity_id: id,
             display_name: "First (updated)".to_string(),
             entity_type: "entity".to_string(),
-            mentioned_at_turn: 2,
         });
 
         // Should have 1 entry (deduped by entity_id), with updated name.
@@ -1852,7 +1834,6 @@ mod tests {
                 entity_id: Uuid::new_v4(),
                 display_name: format!("Entity {}", i),
                 entity_type: "entity".to_string(),
-                mentioned_at_turn: i,
             });
         }
         assert_eq!(recent.mentions.len(), MAX_RECENT_MENTIONS);

@@ -1211,7 +1211,7 @@ required_context:
         canonical_name: &str,
     ) -> crate::lookup::LookupResult {
         crate::lookup::LookupResult {
-            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
                 hash: "snapshot-hash".to_string(),
                 version: 1,
                 entity_count: 7,
@@ -1247,7 +1247,7 @@ required_context:
 
     fn lookup_without_dominant() -> crate::lookup::LookupResult {
         crate::lookup::LookupResult {
-            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
                 hash: "snapshot-hash".to_string(),
                 version: 1,
                 entity_count: 7,
@@ -1329,7 +1329,7 @@ required_context:
     fn test_session_feedback_exposes_entity_resolution() {
         let entity_id = Uuid::new_v4();
         let lookup = crate::lookup::LookupResult {
-            entity_snapshot: crate::lookup::EntitySnapshotMetadata {
+            entity_snapshot: crate::lookup::service::EntitySnapshotMetadata {
                 hash: "snapshot-hash".to_string(),
                 version: 1,
                 entity_count: 7,
