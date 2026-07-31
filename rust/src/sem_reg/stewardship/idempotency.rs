@@ -20,7 +20,7 @@ pub(crate) enum IdempotencyCheck {
 
 /// Check whether a client_request_id has been processed before.
 /// Returns `New` if no prior result exists, or `Cached(result)` if it does.
-pub async fn check_idempotency(
+pub(crate) async fn check_idempotency(
     pool: &PgPool,
     client_request_id: Option<Uuid>,
 ) -> Result<IdempotencyCheck> {

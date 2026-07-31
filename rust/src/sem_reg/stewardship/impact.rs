@@ -78,7 +78,7 @@ pub(crate) enum RiskLevel {
 /// This performs real dependency traversal via JSONB queries against
 /// `sem_reg.snapshots` to find active objects that reference the
 /// changed FQNs.
-pub async fn compute_changeset_impact(
+pub(crate) async fn compute_changeset_impact(
     pool: &PgPool,
     changeset_id: Uuid,
     entries: &[ChangesetEntryRow],

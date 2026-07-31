@@ -36,7 +36,7 @@ pub struct VerbConfigIndex {
 
 /// Summary of a single verb's configuration.
 #[derive(Debug, Clone)]
-pub(crate) struct VerbIndexEntry {
+pub struct VerbIndexEntry {
     /// Fully-qualified verb name: "domain.action" (e.g. "cbu.assign-product").
     pub fqn: String,
     /// Human-readable description.
@@ -64,7 +64,7 @@ pub(crate) struct VerbIndexEntry {
 
 /// Compact argument summary for display and validation.
 #[derive(Debug, Clone)]
-pub(crate) struct ArgSummary {
+pub struct ArgSummary {
     pub name: String,
     pub arg_type: String,
     pub required: bool,
@@ -182,7 +182,7 @@ impl VerbConfigIndex {
     }
 
     /// Look up a verb by fully-qualified name.
-    pub fn get(&self, verb_fqn: &str) -> Option<&VerbIndexEntry> {
+    pub(crate) fn get(&self, verb_fqn: &str) -> Option<&VerbIndexEntry> {
         self.entries.get(verb_fqn)
     }
 
@@ -201,7 +201,7 @@ impl VerbConfigIndex {
     }
 
     /// Iterate over all verbs with their FQN keys.
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &VerbIndexEntry)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &VerbIndexEntry)> {
         self.entries.iter()
     }
 

@@ -113,7 +113,7 @@ pub use ob_poc_boundary::session::{AgentMode, SubjectKind, WorkspaceKind, Worksp
 
 /// A selectable workspace option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct WorkspaceOption {
+pub struct WorkspaceOption {
     pub workspace: WorkspaceKind,
     pub label: String,
     pub description: String,
@@ -121,7 +121,7 @@ pub(crate) struct WorkspaceOption {
 
 /// A selectable CBU structure constellation map.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct ConstellationMapOption {
+pub struct ConstellationMapOption {
     pub constellation_map: String,
     pub constellation_family: String,
     pub label: String,
@@ -552,7 +552,7 @@ pub(crate) enum ConversationMode {
 
 /// A candidate verb for clarification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VerbCandidate {
+pub struct VerbCandidate {
     pub verb_fqn: String,
     pub description: String,
     pub score: f32,
@@ -560,7 +560,7 @@ pub(crate) struct VerbCandidate {
 
 /// Progress of runbook execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ExecutionProgress {
+pub struct ExecutionProgress {
     pub total_steps: usize,
     pub completed_steps: usize,
     pub failed_steps: usize,

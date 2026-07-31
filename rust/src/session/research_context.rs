@@ -14,7 +14,7 @@ use crate::research::{ApprovedResearch, ResearchResult};
 
 /// Research state within a session
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct ResearchContext {
+pub struct ResearchContext {
     /// Current pending result awaiting review
     pub pending: Option<ResearchResult>,
 
@@ -31,7 +31,7 @@ pub(crate) struct ResearchContext {
 /// Research workflow state machine
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ResearchState {
+pub enum ResearchState {
     /// No active research
     #[default]
     Idle,

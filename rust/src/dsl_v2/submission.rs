@@ -25,7 +25,7 @@ use dsl_core::{Argument, AstNode, Literal, Span, Statement, VerbCall};
 /// - 1: Singleton execution
 /// - N: Batch expansion (N iterations)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct SymbolBinding {
+pub struct SymbolBinding {
     /// The bound UUIDs
     pub ids: Vec<Uuid>,
     /// Optional display names (parallel to ids)
@@ -111,7 +111,7 @@ impl SymbolBinding {
 
 /// A DSL submission with statements and symbol bindings
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DslSubmission {
+pub struct DslSubmission {
     /// The DSL statements to execute
     pub statements: Vec<Statement>,
     /// Symbol bindings: symbol name → bound UUIDs
@@ -138,7 +138,7 @@ pub(crate) enum SubmissionState {
 
 /// Limits for submission validation
 #[derive(Debug, Clone)]
-pub(crate) struct SubmissionLimits {
+pub struct SubmissionLimits {
     /// Warn if iterations exceed this
     pub warn_iterations: usize,
     /// Reject if iterations exceed this
@@ -162,7 +162,7 @@ impl Default for SubmissionLimits {
 
 /// Errors during submission processing
 #[derive(Debug, Clone, thiserror::Error)]
-pub(crate) enum SubmissionError {
+pub enum SubmissionError {
     #[error("Unresolved symbols: {0:?}")]
     UnresolvedSymbols(Vec<String>),
     #[error("Multiple iteration symbols not supported: {0:?}")]

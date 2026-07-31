@@ -23,6 +23,8 @@ use super::scoring::{apply_ambiguity_policy, apply_pack_scoring, AmbiguityOutcom
 /// - Swappable implementations (mock, cached, etc.)
 /// - Clear API contract
 #[async_trait]
+// `pub` (not `pub(crate)`): `ob-poc-web` (`crates/ob-poc-web/src/main.rs`) names
+// `dyn ob_poc::repl::IntentMatcher` across the crate boundary.
 pub trait IntentMatcher: Send + Sync {
     /// Match user intent from natural language
     ///

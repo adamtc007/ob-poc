@@ -914,7 +914,7 @@ impl ReplOrchestratorV2 {
     /// ```rust,ignore
     /// let _ = orchestrator.push_workspace_frame(session_id, frame).await?;
     /// ```
-    pub async fn push_workspace_frame(
+    pub(crate) async fn push_workspace_frame(
         &self,
         session_id: Uuid,
         frame: WorkspaceFrame,
@@ -933,7 +933,7 @@ impl ReplOrchestratorV2 {
     /// ```rust,ignore
     /// let popped = orchestrator.pop_workspace_frame(session_id).await?;
     /// ```
-    pub async fn pop_workspace_frame(
+    pub(crate) async fn pop_workspace_frame(
         &self,
         session_id: Uuid,
     ) -> anyhow::Result<Option<WorkspaceFrame>> {
@@ -965,7 +965,7 @@ impl ReplOrchestratorV2 {
     /// ```rust,ignore
     /// orchestrator.hydrate_tos(session_id, workspace_state).await?;
     /// ```
-    pub async fn hydrate_tos(
+    pub(crate) async fn hydrate_tos(
         &self,
         session_id: Uuid,
         state_view: crate::repl::types_v2::WorkspaceStateView,
@@ -984,7 +984,7 @@ impl ReplOrchestratorV2 {
     /// ```rust,ignore
     /// orchestrator.apply_root_context(session_id, &ctx).await?;
     /// ```
-    pub async fn apply_root_context(
+    pub(crate) async fn apply_root_context(
         &self,
         session_id: Uuid,
         context: &ConstellationContextRef,
@@ -1018,7 +1018,7 @@ impl ReplOrchestratorV2 {
     /// ```rust,ignore
     /// let feedback = orchestrator.session_feedback(session_id).await?;
     /// ```
-    pub async fn session_feedback(&self, session_id: Uuid) -> anyhow::Result<SessionFeedback> {
+    pub(crate) async fn session_feedback(&self, session_id: Uuid) -> anyhow::Result<SessionFeedback> {
         let sessions = self.sessions.read().await;
         let session = sessions
             .get(&session_id)
@@ -1050,7 +1050,7 @@ impl ReplOrchestratorV2 {
     ///
     /// Returns `Ok(Some(response))` when a session was found and resumed,
     /// `Ok(None)` when no session owns the key or the entry was already resumed.
-    pub async fn signal_completion(
+    pub(crate) async fn signal_completion(
         &self,
         correlation_key: &str,
         status: &str,
@@ -1170,7 +1170,7 @@ impl ReplOrchestratorV2 {
     /// requires that the resolver call site live in this module — this
     /// method (not `session_input`) is the single ingress for the ACP
     /// decision.
-    pub async fn process_with_acp(
+    pub(crate) async fn process_with_acp(
         self: &std::sync::Arc<Self>,
         session_id: Uuid,
         input: UserInputV2,
@@ -1259,7 +1259,7 @@ impl ReplOrchestratorV2 {
     /// ```ignore
     /// let result = orchestrator.process_intent_only(Some(session_id), "show Allianz").await;
     /// ```
-    pub async fn process_intent_only(
+    pub(crate) async fn process_intent_only(
         &self,
         session_id: Option<Uuid>,
         input: &str,
@@ -1312,7 +1312,7 @@ impl ReplOrchestratorV2 {
         Ok(outcome.pipeline_result)
     }
 
-    pub async fn process(
+    pub(crate) async fn process(
         &self,
         session_id: Uuid,
         input: UserInputV2,
@@ -8974,7 +8974,7 @@ impl ReplOrchestratorV2 {
     /// Continue execution after a parked entry resumes.
     ///
     /// Finds the index of the just-resumed entry and continues from the next entry.
-    pub async fn continue_execution(
+    pub(crate) async fn continue_execution(
         &self,
         session: &mut ReplSessionV2,
         resumed_entry_id: Uuid,

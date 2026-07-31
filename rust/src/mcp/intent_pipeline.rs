@@ -73,7 +73,7 @@ pub use ob_poc_types::intent::{IntentArgValue, IntentArgument, StructuredIntent}
 
 /// Pipeline outcome enum for clear status reporting
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) enum PipelineOutcome {
+pub enum PipelineOutcome {
     /// DSL ready for execution (may have unresolved refs)
     Ready,
     /// Missing required arguments - need user input
@@ -103,7 +103,7 @@ pub(crate) enum PipelineOutcome {
 
 /// Pipeline result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PipelineResult {
+pub struct PipelineResult {
     pub intent: StructuredIntent,
     pub verb_candidates: Vec<VerbSearchResult>,
     pub dsl: String,
@@ -126,7 +126,7 @@ pub(crate) struct PipelineResult {
 
 /// An unresolved entity reference that needs lookup
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct UnresolvedRef {
+pub struct UnresolvedRef {
     pub param_name: String,
     pub search_value: String,
     pub entity_type: Option<String>,

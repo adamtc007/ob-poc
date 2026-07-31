@@ -16,7 +16,7 @@ use crate::traceability::{UtteranceTraceRecord, UtteranceTraceRepository};
 /// Fixture set used by a calibration run.
 pub struct CalibrationFixtures {
     pub session: UnifiedSession,
-    pub entities: HashMap<String, FixtureEntity>,
+    pub(crate) entities: HashMap<String, FixtureEntity>,
 }
 
 /// One known fixture entity.

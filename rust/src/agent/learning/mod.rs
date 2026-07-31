@@ -31,8 +31,8 @@ pub mod inspector;
 pub mod warmup;
 
 pub use embedder::{CandleEmbedder, Embedder, Embedding};
-pub(crate) use inspector::{AgentLearningInspector, LearningCandidate, LearningStatus, LearningType};
+pub(crate) use inspector::{AgentLearningInspector, LearningStatus, LearningType};
 pub use warmup::{LearningWarmup};
-pub(crate) use warmup::{LearnedData, SharedLearnedData, WarmupStats};
 
-pub use background::{create_learning_status, spawn_learning_task, trigger_learning_cycle, LearningConfig};
+pub use background::{create_learning_status, spawn_learning_task, LearningConfig};
+pub(crate) use background::trigger_learning_cycle;

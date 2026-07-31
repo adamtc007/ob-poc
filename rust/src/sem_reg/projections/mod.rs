@@ -7,7 +7,6 @@ pub mod embeddings;
 pub mod lineage;
 pub mod metrics;
 
-pub(crate) use embeddings::EmbeddingStore;
+#[cfg(test)]
 pub(crate) use lineage::LineageStore;
 pub use metrics::{CoverageReport, MetricsStore};
-pub(crate) use metrics::{TierDistribution};

@@ -291,7 +291,7 @@ async fn check_embedding_coverage(
 }
 
 /// Manually trigger a learning cycle (for MCP tool)
-pub async fn trigger_learning_cycle(
+pub(crate) async fn trigger_learning_cycle(
     pool: &PgPool,
     days_back: i32,
     min_occurrences: i64,

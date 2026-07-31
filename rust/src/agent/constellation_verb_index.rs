@@ -56,7 +56,7 @@ pub(crate) struct IndexStats {
 
 /// The two-way index over a hydrated constellation's verb surface.
 #[derive(Debug, Clone)]
-pub(crate) struct ConstellationVerbIndex {
+pub struct ConstellationVerbIndex {
     /// (noun_key, action_stem) → matching verbs with slot context
     forward: HashMap<(String, String), Vec<VerbMatch>>,
     /// verb_fqn → slot contexts where it appears.

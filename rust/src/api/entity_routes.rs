@@ -30,7 +30,7 @@ use uuid::Uuid;
 
 /// Query params for entity search
 #[derive(Debug, Deserialize)]
-pub(crate) struct EntitySearchQuery {
+pub struct EntitySearchQuery {
     /// Entity type nickname: cbu, entity, person, company, product, role, jurisdiction, etc.
     #[serde(rename = "type")]
     pub entity_type: String,
@@ -80,7 +80,7 @@ use ob_poc_types::EntityMatch;
 
 /// Response from entity search
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct EntitySearchResponse {
+pub struct EntitySearchResponse {
     /// List of matches
     pub matches: Vec<EntityMatch>,
 
@@ -284,7 +284,7 @@ async fn search_entities_legacy(
 
 /// State for session-scoped entity search
 #[derive(Clone)]
-pub(crate) struct ScopedEntitySearchState {
+pub struct ScopedEntitySearchState {
     pub sessions: SessionStore,
 }
 

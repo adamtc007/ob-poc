@@ -74,22 +74,22 @@ pub(crate) struct EnvelopeCore {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReplayEnvelope {
     /// Deterministic core — feeds into content-addressed ID hash.
-    pub core: EnvelopeCore,
+    pub(crate) core: EnvelopeCore,
 
     /// Scoped binding resolutions finalised during compilation.
     ///
     /// These records explain how authoring aliases such as `@cbu` were
     /// converted into immutable UUID arguments in the frozen runbook DSL.
     #[serde(default)]
-    pub binding_resolution_audits: Vec<BindingResolutionAudit>,
+    pub(crate) binding_resolution_audits: Vec<BindingResolutionAudit>,
 
     /// External lookups performed during compilation (e.g., GLEIF, screening).
     /// Full records with timestamps for audit trail.
-    pub external_lookups: Vec<ExternalLookup>,
+    pub(crate) external_lookups: Vec<ExternalLookup>,
 
     /// Macro expansion audits — one per macro expanded during compilation.
     /// Full records with timestamps for audit trail.
-    pub macro_audits: Vec<MacroExpansionAudit>,
+    pub(crate) macro_audits: Vec<MacroExpansionAudit>,
 
     /// When this envelope was sealed (audit only, not hashed).
     pub sealed_at: DateTime<Utc>,

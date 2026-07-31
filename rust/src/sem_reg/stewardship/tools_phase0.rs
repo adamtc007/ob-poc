@@ -247,7 +247,7 @@ fn stewardship_query_specs() -> Vec<SemRegToolSpec> {
 
 /// Dispatch a stewardship Phase 0 tool call.
 /// Returns `None` if the tool name is not a stewardship tool.
-pub async fn dispatch_phase0_tool(
+pub(crate) async fn dispatch_phase0_tool(
     ctx: &SemRegToolContext<'_>,
     tool_name: &str,
     args: &serde_json::Value,

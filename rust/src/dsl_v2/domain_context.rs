@@ -14,7 +14,7 @@ use uuid::Uuid;
 /// The primary domain/entity type currently being operated on
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ActiveDomain {
+pub enum ActiveDomain {
     /// No specific domain active (initial state)
     #[default]
     None,
@@ -56,7 +56,7 @@ impl fmt::Display for ActiveDomain {
 /// Context for a single batch iteration
 /// Captures what we're iterating over and where to return
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct IterationContext {
+pub struct IterationContext {
     /// Index in the batch (0-based)
     pub index: usize,
 
@@ -82,7 +82,7 @@ pub(crate) struct IterationContext {
 /// This captures the active domain and associated entity IDs,
 /// supporting nested operations via a context stack.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct DomainContext {
+pub struct DomainContext {
     /// Currently active domain
     pub active_domain: ActiveDomain,
 

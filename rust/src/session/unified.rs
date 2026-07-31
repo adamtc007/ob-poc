@@ -44,31 +44,31 @@ pub struct UnifiedSession {
 
     // === Target Universe (anchor) ===
     /// Declared at session start, refined over time
-    pub target_universe: Option<TargetUniverse>,
+    pub(crate) target_universe: Option<TargetUniverse>,
 
     // === Entity Scope (current working set) ===
-    pub entity_scope: EntityScope,
+    pub(crate) entity_scope: EntityScope,
 
     // === Run Sheet (DSL ledger) ===
-    pub run_sheet: RunSheet,
+    pub(crate) run_sheet: RunSheet,
 
     // === View State (for viewport sync) ===
     pub view_state: ViewState,
 
     // === Resolution (inline, optional) ===
     /// When Some, UI should show resolution modal
-    pub resolution: Option<ResolutionState>,
+    pub(crate) resolution: Option<ResolutionState>,
 
     // === Verb Disambiguation (pending selection) ===
     /// When Some, user needs to pick from verb options
     /// Numeric input (e.g., "2") should be interpreted as selection
     #[serde(default)]
-    pub pending_verb_disambiguation: Option<PendingVerbDisambiguation>,
+    pub(crate) pending_verb_disambiguation: Option<PendingVerbDisambiguation>,
 
     /// When Some, user needs to pick an intent tier first
     /// This happens before verb disambiguation when candidates span multiple intents
     #[serde(default)]
-    pub pending_intent_tier: Option<PendingIntentTier>,
+    pub(crate) pending_intent_tier: Option<PendingIntentTier>,
 
     // === Unified Decision Packet (NEW - wraps verb/tier/group clarification) ===
     /// When Some, user needs to respond to a decision point
@@ -102,42 +102,42 @@ pub struct UnifiedSession {
     pub semtaxonomy_session: Option<ob_poc_semtaxonomy::SageSession>,
 
     // === Conversation ===
-    pub messages: Vec<ChatMessage>,
+    pub(crate) messages: Vec<ChatMessage>,
 
     // === Symbol Table ===
-    pub bindings: HashMap<String, BoundEntity>,
+    pub(crate) bindings: HashMap<String, BoundEntity>,
 
     // === Constraint Cascade Context ===
     /// Current client context (narrows entity search from 10,000 to ~500)
-    pub client: Option<ClientRef>,
+    pub(crate) client: Option<ClientRef>,
     /// Structure type filter (PE, SICAV, etc.) (narrows to ~50)
-    pub structure_type: Option<StructureType>,
+    pub(crate) structure_type: Option<StructureType>,
     /// Current structure being worked on
-    pub current_structure: Option<StructureRef>,
+    pub(crate) current_structure: Option<StructureRef>,
     /// Current KYC case being worked on
-    pub current_case: Option<CaseRef>,
+    pub(crate) current_case: Option<CaseRef>,
     /// Current mandate (trading profile) being worked on
-    pub current_mandate: Option<MandateRef>,
+    pub(crate) current_mandate: Option<MandateRef>,
 
     // === Persona (filters available verbs) ===
-    pub persona: Persona,
+    pub(crate) persona: Persona,
 
     // === DAG Navigation State ===
     /// Tracks verb completions and state flags for prereq checking
-    pub dag_state: DagState,
+    pub(crate) dag_state: DagState,
 
     // === CBU Undo/Redo History (migrated from CbuSession) ===
     /// Undo stack for CBU set changes
     #[serde(default)]
-    pub cbu_history: Vec<CbuSnapshot>,
+    pub(crate) cbu_history: Vec<CbuSnapshot>,
     /// Redo stack for CBU set changes
     #[serde(default)]
-    pub cbu_future: Vec<CbuSnapshot>,
+    pub(crate) cbu_future: Vec<CbuSnapshot>,
 
     // === REPL State Machine (migrated from CbuSession) ===
     /// Current state in the REPL pipeline
     #[serde(default)]
-    pub repl_state: ReplState,
+    pub(crate) repl_state: ReplState,
     /// DSL that defined the current scope (for audit/replay)
     #[serde(default)]
     pub scope_dsl: Vec<String>,
@@ -168,16 +168,16 @@ pub struct UnifiedSession {
     pub entity_id: Option<Uuid>,
     /// Current state in the session lifecycle (New, Scoped, PendingValidation, etc.)
     #[serde(default)]
-    pub state: SessionState,
+    pub(crate) state: SessionState,
     /// Parent session ID (None for root sessions)
     #[serde(default)]
     pub parent_session_id: Option<Uuid>,
     /// Sub-session type (determines behavior and scoped capabilities)
     #[serde(default)]
-    pub sub_session_type: SubSessionType,
+    pub(crate) sub_session_type: SubSessionType,
     /// Symbols inherited from parent session (pre-populated on creation)
     #[serde(default)]
-    pub inherited_symbols: HashMap<String, BoundEntity>,
+    pub(crate) inherited_symbols: HashMap<String, BoundEntity>,
     /// Domain hint for RAG context (duplicated in context for backward compat)
     #[serde(default)]
     pub domain_hint: Option<String>,
@@ -199,7 +199,7 @@ pub(crate) struct TargetUniverse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub(crate) enum UniverseDefinition {
+pub enum UniverseDefinition {
     /// All CBUs under an apex entity
     Galaxy {
         apex_entity_id: Uuid,
@@ -248,7 +248,7 @@ pub(crate) enum ZoomLevel {
 
 /// Run sheet - DSL statement ledger
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct RunSheet {
+pub struct RunSheet {
     pub entries: Vec<RunSheetEntry>,
     pub cursor: usize,
 }
@@ -335,7 +335,7 @@ impl RunSheet {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RunSheetEntry {
+pub struct RunSheetEntry {
     pub id: Uuid,
     pub dsl_source: String,
     pub display_dsl: String,
@@ -376,7 +376,7 @@ pub enum EntryStatus {
 
 /// Validation error for a run sheet entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ValidationError {
+pub struct ValidationError {
     pub code: String,
     pub message: String,
     pub span: Option<(usize, usize)>,
@@ -507,7 +507,7 @@ pub(crate) struct ResolutionState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct UnresolvedRef {
+pub struct UnresolvedRef {
     pub ref_id: String,
     pub entity_type: String,
     pub search_value: String,
@@ -518,7 +518,7 @@ pub(crate) struct UnresolvedRef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SearchKeyField {
+pub struct SearchKeyField {
     pub name: String,
     pub label: String,
     pub value: Option<String>,
@@ -528,7 +528,7 @@ pub(crate) struct SearchKeyField {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DiscriminatorField {
+pub struct DiscriminatorField {
     pub name: String,
     pub label: String,
     pub value: Option<String>,
@@ -538,7 +538,7 @@ pub(crate) struct DiscriminatorField {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum FieldType {
+pub enum FieldType {
     #[default]
     Text,
     Enum,
@@ -547,13 +547,13 @@ pub(crate) enum FieldType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EnumValue {
+pub struct EnumValue {
     pub code: String,
     pub display: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntityMatch {
+pub struct EntityMatch {
     pub id: String,
     pub display: String,
     pub score: f32,
@@ -562,7 +562,7 @@ pub(crate) struct EntityMatch {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ResolvedRef {
+pub struct ResolvedRef {
     pub ref_id: String,
     pub resolved_key: String,
     pub display: String,
@@ -605,7 +605,7 @@ pub(crate) enum MessageRole {
 
 /// Bound entity in symbol table
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BoundEntity {
+pub struct BoundEntity {
     pub id: Uuid,
     pub entity_type: String,
     pub display_name: String,
@@ -627,7 +627,7 @@ pub(crate) struct ClientRef {
 /// Internal: "private-equity", "sicav", "hedge"
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum StructureType {
+pub enum StructureType {
     #[default]
     Pe,
     Sicav,
@@ -724,7 +724,7 @@ pub(crate) struct MandateRef {
 /// Persona - filters available verbs by user role
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum Persona {
+pub enum Persona {
     #[default]
     Ops,
     Kyc,
@@ -780,7 +780,7 @@ impl DagState {
 /// Search scope derived from constraint cascade
 /// Used to narrow entity searches based on session context
 #[derive(Debug, Clone, Default)]
-pub(crate) struct SearchScope {
+pub struct SearchScope {
     pub client_id: Option<Uuid>,
     pub structure_type: Option<StructureType>,
     pub structure_id: Option<Uuid>,
@@ -959,7 +959,7 @@ pub(crate) enum SubSessionType {
 
 /// Resolution sub-session state - entity disambiguation
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub(crate) struct ResolutionSubSession {
+pub struct ResolutionSubSession {
     /// Unresolved refs to work through
     pub unresolved_refs: Vec<UnresolvedRefInfo>,
     /// Which DSL statement index triggered this (in parent)
@@ -972,7 +972,7 @@ pub(crate) struct ResolutionSubSession {
 
 /// Info about an unresolved entity reference (full metadata for resolution UI)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct UnresolvedRefInfo {
+pub struct UnresolvedRefInfo {
     /// Unique ID for this ref (stmt_idx:arg_name)
     pub ref_id: String,
     /// Entity type (e.g., "entity", "cbu", "person")
@@ -993,7 +993,7 @@ pub(crate) struct UnresolvedRefInfo {
 
 /// Entity match info for resolution UI
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct EntityMatchInfo {
+pub struct EntityMatchInfo {
     /// Primary key (UUID or code)
     pub value: String,
     /// Display name
@@ -1161,7 +1161,7 @@ impl UnifiedSession {
     }
 
     /// Create a sub-session inheriting context from parent
-    pub fn new_subsession(parent: &Self, sub_session_type: SubSessionType) -> Self {
+    pub(crate) fn new_subsession(parent: &Self, sub_session_type: SubSessionType) -> Self {
         let mut session = Self::new();
         session.user_id = parent.user_id;
         session.entity_type = parent.entity_type.clone();
@@ -1209,7 +1209,7 @@ impl UnifiedSession {
     }
 
     /// Transition session state based on an event (state machine)
-    pub fn transition(&mut self, event: SessionEvent) {
+    pub(crate) fn transition(&mut self, event: SessionEvent) {
         use SessionEvent::*;
         use SessionState::*;
 
@@ -1622,7 +1622,7 @@ impl UnifiedSession {
     }
 
     /// Set binding
-    pub fn set_binding(&mut self, name: &str, entity: BoundEntity) {
+    pub(crate) fn set_binding(&mut self, name: &str, entity: BoundEntity) {
         self.bindings.insert(name.to_string(), entity);
         self.updated_at = Utc::now();
     }
@@ -1673,7 +1673,7 @@ impl UnifiedSession {
     }
 
     /// Set current structure (constraint level 3)
-    pub fn set_current_structure(
+    pub(crate) fn set_current_structure(
         &mut self,
         structure_id: Uuid,
         display_name: String,
@@ -2207,7 +2207,7 @@ impl UnifiedSession {
     /// List recent sessions
     #[cfg(feature = "database")]
     #[allow(clippy::type_complexity)]
-    pub async fn list_recent(
+    pub(crate) async fn list_recent(
         user_id: Option<Uuid>,
         limit: i64,
         pool: &sqlx::PgPool,

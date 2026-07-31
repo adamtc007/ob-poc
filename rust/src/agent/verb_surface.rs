@@ -30,7 +30,7 @@ use crate::traceability::Phase2Service;
 /// Computed once via `compute_session_verb_surface()` and threaded through
 /// the entire pipeline (orchestrator, MCP, chat response, UI).
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct SessionVerbSurface {
+pub struct SessionVerbSurface {
     /// Verbs visible to the user after all governance layers.
     pub verbs: Vec<SurfaceVerb>,
     /// Macro/scenario FQNs owned by the composed workspace (by mode-tag
@@ -56,7 +56,7 @@ pub(crate) struct SessionVerbSurface {
 
 /// A verb that survived all governance layers and is visible to the user.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct SurfaceVerb {
+pub struct SurfaceVerb {
     pub fqn: String,
     pub domain: String,
     pub action: String,
@@ -69,7 +69,7 @@ pub(crate) struct SurfaceVerb {
 
 /// A verb that was excluded, with all reasons it was pruned.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct ExcludedVerb {
+pub struct ExcludedVerb {
     pub fqn: String,
     /// One or more reasons (SI-3: additive, not first-hit).
     pub reasons: Vec<SurfacePrune>,
@@ -77,7 +77,7 @@ pub(crate) struct ExcludedVerb {
 
 /// A single prune reason tagged with the governance layer that applied it.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct SurfacePrune {
+pub struct SurfacePrune {
     pub layer: PruneLayer,
     pub reason: String,
 }
@@ -85,7 +85,7 @@ pub(crate) struct SurfacePrune {
 /// Which governance layer excluded the verb.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum PruneLayer {
+pub enum PruneLayer {
     AgentMode,
     WorkflowPhase,
     GroupScope,
@@ -109,7 +109,7 @@ pub(crate) enum PruneLayer {
 /// Fail policy when SemReg is unavailable.
 #[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum VerbSurfaceFailPolicy {
+pub enum VerbSurfaceFailPolicy {
     /// Default: reduce to ~30 always-safe verbs.
     #[default]
     FailClosed,
@@ -121,7 +121,7 @@ pub(crate) enum VerbSurfaceFailPolicy {
 ///
 /// Format: `"vs1:<hex>"` (versioned, distinct from CCIR `"v1:<hex>"`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub(crate) struct SurfaceFingerprint(pub String);
+pub struct SurfaceFingerprint(pub String);
 
 impl std::fmt::Display for SurfaceFingerprint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -131,7 +131,7 @@ impl std::fmt::Display for SurfaceFingerprint {
 
 /// Progressive narrowing counts at each filter stage.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct FilterSummary {
+pub struct FilterSummary {
     pub total_registry: usize,
     pub after_agent_mode: usize,
     pub after_workflow: usize,

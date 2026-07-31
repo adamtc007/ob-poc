@@ -24,7 +24,7 @@ use super::composite_state::{CbuStateSummary, GroupCompositeState};
 ///
 /// Returns `None` if no CBUs are in scope.
 #[cfg(feature = "database")]
-pub async fn load_group_composite_state(
+pub(crate) async fn load_group_composite_state(
     pool: &PgPool,
     cbu_ids: &[Uuid],
 ) -> anyhow::Result<Option<GroupCompositeState>> {

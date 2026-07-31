@@ -15,7 +15,7 @@ use super::xref::{AttributeCandidate, ColumnClassification, XrefResult};
 
 /// Complete onboarding manifest produced by the extraction pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct OnboardingManifest {
+pub struct OnboardingManifest {
     /// When the manifest was generated
     pub extracted_at: DateTime<Utc>,
     /// Source database identifier

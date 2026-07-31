@@ -161,7 +161,7 @@ impl RequestStatus {
 
 /// Requester-side projection of a BPMN-backed durable request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RequestStateRecord {
+pub struct RequestStateRecord {
     /// Canonical logical request key. For now this matches `correlation_key`.
     pub request_key: String,
     /// Original correlation key used by the parked runbook entry.

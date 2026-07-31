@@ -84,7 +84,7 @@ fn proto_spec_to_mcp_tool(spec: &sem_os_core::proto::ToolSpec) -> Tool {
 
 /// Fetch tool specs via `SemOsClient` and convert to MCP `Tool` definitions.
 /// Falls back to direct `all_tool_specs()` if the client call fails.
-pub async fn sem_reg_tools_via_client(client: &dyn sem_os_client::SemOsClient) -> Vec<Tool> {
+pub(crate) async fn sem_reg_tools_via_client(client: &dyn sem_os_client::SemOsClient) -> Vec<Tool> {
     match client.list_tool_specs().await {
         Ok(resp) => resp.tools.iter().map(proto_spec_to_mcp_tool).collect(),
         Err(e) => {

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 /// Each field represents a weighted contribution to total mass.
 /// Weights are applied during calculation, not stored here.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub(crate) struct MassBreakdown {
+pub struct MassBreakdown {
     /// Number of CBUs in scope
     pub cbu_count: u32,
 
@@ -55,7 +55,7 @@ pub(crate) struct MassBreakdown {
 
 /// Computed mass with breakdown and configuration reference.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StructMass {
+pub struct StructMass {
     /// The computed total mass score
     pub total: f32,
 
@@ -69,7 +69,7 @@ pub(crate) struct StructMass {
 
 /// Individual weighted contributions to total mass.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct MassContributions {
+pub struct MassContributions {
     pub from_cbus: f32,
     pub from_entities: f32,
     pub from_relationships: f32,
@@ -82,7 +82,7 @@ pub(crate) struct MassContributions {
 /// View modes determined by mass thresholds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum MassViewMode {
+pub enum MassViewMode {
     /// Low mass: Show full detail (entity-level graph)
     Detail,
     /// Medium mass: Show clustered/aggregated view (solar system)

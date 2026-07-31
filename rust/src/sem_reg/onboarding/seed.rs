@@ -37,7 +37,7 @@ const BOOTSTRAP_CREATED_BY: &str = "bootstrap";
 
 /// Report of what the bootstrap seed wrote.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct BootstrapReport {
+pub struct BootstrapReport {
     pub attribute_defs_written: usize,
     pub attribute_defs_skipped: usize,
     pub verb_contracts_written: usize,

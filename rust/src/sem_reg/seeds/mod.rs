@@ -11,8 +11,8 @@ pub mod policy_seeds;
 pub mod taxonomy_seeds;
 pub mod view_seeds;
 
-pub use derivation_seeds::{seed_derivation_specs};
-pub use membership_rule_seeds::{seed_kyc_membership_rules};
-pub use policy_seeds::{seed_policies};
-pub use taxonomy_seeds::{seed_taxonomies};
-pub use view_seeds::{seed_views};
+pub(crate) use derivation_seeds::{seed_derivation_specs};
+pub(crate) use membership_rule_seeds::{seed_kyc_membership_rules};
+pub(crate) use policy_seeds::{seed_policies};
+pub(crate) use taxonomy_seeds::{seed_taxonomies};
+pub(crate) use view_seeds::{seed_views};

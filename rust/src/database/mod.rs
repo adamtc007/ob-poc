@@ -65,7 +65,7 @@ pub use session_repository::{CbuDslState, SessionRepository};
 
 pub(crate) use graph_repository::{GraphRepository, PgGraphRepository};
 
-pub use locks::{acquire_locks, advisory_xact_lock, lock_key, try_advisory_xact_lock};
+pub use locks::{advisory_xact_lock, lock_key, try_advisory_xact_lock};
 
 pub(crate) use expansion_audit::ExpansionAuditRepository;
 

@@ -40,7 +40,7 @@ pub struct Runbook {
 
     pub status: RunbookStatus,
     pub entries: Vec<RunbookEntry>,
-    pub audit: Vec<RunbookEvent>,
+    pub(crate) audit: Vec<RunbookEvent>,
 
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -104,14 +104,14 @@ pub struct RunbookEntry {
     pub slot_provenance: SlotProvenance,
 
     /// Optional audit of the LLM arg-extraction call.
-    pub arg_extraction_audit: Option<ArgExtractionAudit>,
+    pub(crate) arg_extraction_audit: Option<ArgExtractionAudit>,
 
     pub status: EntryStatus,
     pub execution_mode: ExecutionMode,
     pub confirm_policy: ConfirmPolicy,
 
     /// Entity references that still need resolution.
-    pub unresolved_refs: Vec<UnresolvedRef>,
+    pub(crate) unresolved_refs: Vec<UnresolvedRef>,
 
     /// Entry IDs this step depends on (must execute first).
     pub depends_on: Vec<Uuid>,
@@ -193,7 +193,7 @@ pub struct InvocationRecord {
     pub parked_at: DateTime<Utc>,
     pub timeout_at: Option<DateTime<Utc>>,
     pub resumed_at: Option<DateTime<Utc>>,
-    pub status: InvocationStatus,
+    pub(crate) status: InvocationStatus,
 }
 
 /// What kind of gate is blocking an entry.
@@ -258,7 +258,7 @@ impl InvocationRecord {
 /// Tracks where each argument value came from — essential for auditability.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SlotProvenance {
-    pub slots: HashMap<String, SlotSource>,
+    pub(crate) slots: HashMap<String, SlotSource>,
 }
 
 /// Origin of a single argument value.
@@ -930,7 +930,7 @@ impl Runbook {
     }
 
     /// Check execution readiness — returns a report with blocking issues.
-    pub fn readiness(&self) -> ReadinessReport {
+    pub(crate) fn readiness(&self) -> ReadinessReport {
         let mut issues = Vec::new();
 
         let enabled: Vec<_> = self
@@ -1155,7 +1155,7 @@ impl Runbook {
     /// stored separately — it's derived on demand from the runbook state.
     ///
     /// Returns entries in sequence order so the UI can show them as a queue.
-    pub fn derive_pending_questions(&self) -> Vec<PendingQuestion> {
+    pub(crate) fn derive_pending_questions(&self) -> Vec<PendingQuestion> {
         self.entries
             .iter()
             .filter(|e| {
@@ -1232,7 +1232,7 @@ impl Runbook {
     }
 
     /// Compute progress metrics for the runbook.
-    pub fn progress(&self) -> ProgressMetrics {
+    pub(crate) fn progress(&self) -> ProgressMetrics {
         let template_id = self.template_id.as_deref();
 
         let template_entries: Vec<&RunbookEntry> = match template_id {

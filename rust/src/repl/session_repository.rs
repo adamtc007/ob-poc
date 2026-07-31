@@ -21,7 +21,7 @@ pub struct SessionRepositoryV2 {
 ///
 /// REPL workbook snapshots are append-only, so normal session persistence no
 /// longer takes a database advisory lock. `release()` is intentionally a no-op.
-pub(crate) struct SessionRecordLock {}
+pub struct SessionRecordLock {}
 
 impl SessionRecordLock {
     /// Compatibility no-op.

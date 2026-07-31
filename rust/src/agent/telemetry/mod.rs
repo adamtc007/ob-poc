@@ -21,7 +21,7 @@ use uuid::Uuid;
 /// the current entity state. This is the counterfactual the Option A vs B fork
 /// is decided on.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct StateObservation {
+pub struct StateObservation {
     pub verb: String,
     pub state_reachable: bool,
     /// The lifecycle predicate that fails when `state_reachable == false`
@@ -37,7 +37,7 @@ pub(crate) struct StateObservation {
 /// so it observes search output without instrumenting (and risking) the search
 /// body itself.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub(crate) struct SoftStageFlow {
+pub struct SoftStageFlow {
     /// Surviving candidate count by `VerbSearchSource` label.
     pub by_source: BTreeMap<String, usize>,
     /// Surviving candidate count by ordinal `Tier` label.

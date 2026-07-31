@@ -20,7 +20,7 @@ use uuid::Uuid;
 /// Session mode - determines how the session processes user input
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum SessionMode {
+pub enum SessionMode {
     /// Normal chat mode - agent generates DSL from natural language
     #[default]
     Chat,
@@ -107,7 +107,7 @@ pub(crate) enum MessageRole {
 
 /// Information about a bound entity in the session
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BoundEntity {
+pub struct BoundEntity {
     /// The UUID of the entity
     pub id: Uuid,
     /// The entity type (e.g., "cbu", "entity", "case")
@@ -127,7 +127,7 @@ pub(crate) struct BoundEntity {
 /// Status of a batch item
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum BatchItemStatus {
+pub enum BatchItemStatus {
     /// Not yet processed
     #[default]
     Pending,
@@ -143,7 +143,7 @@ pub(crate) enum BatchItemStatus {
 
 /// A single item in the batch working set
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BatchItem {
+pub struct BatchItem {
     /// Source entity ID (e.g., fund entity that will become a CBU)
     pub source_id: Uuid,
     /// Display name for the item
@@ -171,7 +171,7 @@ pub(crate) struct BatchItem {
 /// A resolved entity reference for template expansion
 /// This is the LookupRef triplet: (entity_type, search_key, uuid)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ResolvedEntityRef {
+pub struct ResolvedEntityRef {
     /// Entity type (e.g., "fund", "limited_company")
     pub entity_type: String,
     /// Human-readable search key / display name
@@ -186,7 +186,7 @@ pub(crate) struct ResolvedEntityRef {
 /// Key set for a template parameter
 /// Captures what the agent has collected for a specific param
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct TemplateParamKeySet {
+pub struct TemplateParamKeySet {
     /// Parameter name from template (e.g., "fund_entity", "manco_entity")
     pub param_name: String,
     /// Entity type expected (e.g., "fund", "limited_company")
@@ -206,7 +206,7 @@ pub(crate) struct TemplateParamKeySet {
 /// Agent's working memory for template-driven batch execution
 /// This is what the agent reads/writes across conversation turns
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct TemplateExecutionContext {
+pub struct TemplateExecutionContext {
     /// Template being used
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template_id: Option<String>,
@@ -240,7 +240,7 @@ pub(crate) struct TemplateExecutionContext {
 /// Phase of template execution workflow
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum TemplatePhase {
+pub enum TemplatePhase {
     /// Agent is identifying which template to use
     #[default]
     SelectingTemplate,
@@ -258,7 +258,7 @@ pub(crate) enum TemplatePhase {
 
 /// Result from executing one batch item
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct BatchItemResult {
+pub struct BatchItemResult {
     /// Index in the batch
     pub index: usize,
     /// Source entity that was processed
@@ -336,7 +336,7 @@ impl TemplateExecutionContext {
 /// Batch context for bulk REPL operations
 /// Holds the "working set" of entities the agent and user are processing
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct BatchContext {
+pub struct BatchContext {
     /// Whether batch mode is active
     #[serde(default)]
     pub is_active: bool,
@@ -373,7 +373,7 @@ pub(crate) struct BatchContext {
 /// mention text so that subsequent utterances referencing the same name
 /// can reuse the UUID without re-resolution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ResolvedEntity {
+pub struct ResolvedEntity {
     /// The resolved entity UUID.
     pub entity_id: Uuid,
     /// Canonical display name from the entity snapshot.
@@ -389,7 +389,7 @@ pub(crate) struct ResolvedEntity {
 
 /// Context maintained across the session for reference resolution
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct SessionContext {
+pub struct SessionContext {
     /// Version of business_reference when loaded (for optimistic locking)
     /// When saving, this version must match the DB version or we get a conflict
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -600,7 +600,7 @@ pub(crate) struct SessionContext {
 
 /// Primary domain keys tracked across the session
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) struct PrimaryDomainKeys {
+pub struct PrimaryDomainKeys {
     /// Onboarding request ID (if applicable)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub onboarding_request_id: Option<Uuid>,
@@ -857,7 +857,7 @@ pub struct CreateSessionResponse {
     /// When the session was created
     pub created_at: DateTime<Utc>,
     /// Initial state (always AwaitingScope until client/CBU set selected)
-    pub state: SessionState,
+    pub(crate) state: SessionState,
     /// Welcome message from agent - asks for scope selection
     pub welcome_message: String,
     /// Decision packet for client group selection (populated on new sessions without initial_client)
@@ -916,7 +916,7 @@ pub struct ExecuteResponse {
     /// Any errors encountered
     pub errors: Vec<String>,
     /// New session state after execution
-    pub new_state: SessionState,
+    pub(crate) new_state: SessionState,
     /// All bindings created during execution (name -> UUID)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bindings: Option<std::collections::HashMap<String, uuid::Uuid>>,

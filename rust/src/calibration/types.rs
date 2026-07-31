@@ -16,7 +16,7 @@ pub enum CalibrationMode {
 /// Subtype for negative utterances.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum NegativeType {
+pub enum NegativeType {
     TypeA,
     TypeB,
 }
@@ -44,7 +44,7 @@ pub(crate) enum ConfusionRisk {
 /// Expected outcome for a calibration utterance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
-pub(crate) enum ExpectedOutcome {
+pub enum ExpectedOutcome {
     ResolvesTo(String),
     ResolvesToOneOf(Vec<String>),
     HaltsWithReason(ExpectedHaltReason),
@@ -56,7 +56,7 @@ pub(crate) enum ExpectedOutcome {
 /// Expected halt reason for negative / boundary calibration.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ExpectedHaltReason {
+pub enum ExpectedHaltReason {
     NoViableVerb,
     StateConflict,
     ConstellationBlock,
@@ -75,7 +75,7 @@ pub(crate) enum ExpectedHaltReason {
 /// Outcome verdict for one utterance executed against one scenario.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum CalibrationVerdict {
+pub enum CalibrationVerdict {
     Pass,
     WrongVerb {
         expected: String,
@@ -107,7 +107,7 @@ pub(crate) enum CalibrationVerdict {
 /// Embedding pre-screen classification band.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum PreScreenStratum {
+pub enum PreScreenStratum {
     ClearMatch {
         distance: f32,
     },
@@ -141,7 +141,7 @@ pub enum CalibrationExecutionShape {
 
 /// One node in a cross-entity plan.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct CalibrationPlanNode {
+pub struct CalibrationPlanNode {
     pub entity_type: String,
     pub entity_state: String,
     pub target_verb: String,
@@ -178,7 +178,7 @@ pub struct CalibrationScenario {
     pub scenario_id: Uuid,
     pub scenario_name: String,
     pub created_by: String,
-    pub governance_status: GovernanceStatus,
+    pub(crate) governance_status: GovernanceStatus,
     pub constellation_template_id: String,
     pub constellation_template_version: String,
     pub situation_signature: String,
@@ -190,17 +190,17 @@ pub struct CalibrationScenario {
     pub target_verb: String,
     pub legal_verb_set_snapshot: Vec<String>,
     pub verb_taxonomy_tag: String,
-    pub excluded_neighbours: Vec<ExcludedNeighbour>,
-    pub near_neighbour_verbs: Vec<NearNeighbourVerb>,
+    pub(crate) excluded_neighbours: Vec<ExcludedNeighbour>,
+    pub(crate) near_neighbour_verbs: Vec<NearNeighbourVerb>,
     pub expected_margin_threshold: f32,
     pub execution_shape: CalibrationExecutionShape,
-    pub gold_utterances: Vec<GoldUtterance>,
+    pub(crate) gold_utterances: Vec<GoldUtterance>,
     pub admitted_synthetic_set_id: Option<Uuid>,
 }
 
 /// Generated utterance candidate before execution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct GeneratedUtterance {
+pub struct GeneratedUtterance {
     pub text: String,
     pub calibration_mode: CalibrationMode,
     pub negative_type: Option<NegativeType>,
@@ -210,7 +210,7 @@ pub(crate) struct GeneratedUtterance {
 
 /// Embedding pre-screen output for one utterance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct EmbeddingPreScreen {
+pub struct EmbeddingPreScreen {
     pub utterance: String,
     pub target_verb_distance: f32,
     pub nearest_neighbour_distance: f32,
@@ -221,7 +221,7 @@ pub(crate) struct EmbeddingPreScreen {
 
 /// Classified outcome for one calibration utterance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct CalibrationOutcome {
+pub struct CalibrationOutcome {
     pub utterance_id: Uuid,
     pub utterance_text: String,
     pub calibration_mode: CalibrationMode,
@@ -244,7 +244,7 @@ pub(crate) struct CalibrationOutcome {
 
 /// One persisted fixture-state row captured after a calibration utterance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct FixtureStateSnapshot {
+pub struct FixtureStateSnapshot {
     pub binding_key: String,
     pub entity_id: Uuid,
     pub entity_type: String,
@@ -253,7 +253,7 @@ pub(crate) struct FixtureStateSnapshot {
 
 /// Aggregated metrics for one run.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub(crate) struct CalibrationMetrics {
+pub struct CalibrationMetrics {
     pub positive_hit_rate: f32,
     pub negative_type_a_rejection_rate: f32,
     pub negative_type_b_rejection_rate: f32,
@@ -304,10 +304,10 @@ pub struct CalibrationUtteranceReviewRow {
     pub scenario_id: Uuid,
     pub text: String,
     pub calibration_mode: CalibrationMode,
-    pub negative_type: Option<NegativeType>,
+    pub(crate) negative_type: Option<NegativeType>,
     pub lifecycle_status: String,
-    pub expected_outcome: ExpectedOutcome,
-    pub pre_screen: Option<EmbeddingPreScreen>,
+    pub(crate) expected_outcome: ExpectedOutcome,
+    pub(crate) pre_screen: Option<EmbeddingPreScreen>,
     pub generation_rationale: Option<String>,
     pub reviewed_by: Option<String>,
     pub admitted_at: Option<DateTime<Utc>>,
@@ -321,7 +321,7 @@ pub struct CalibrationPortfolioEntry {
     pub scenario_id: Uuid,
     pub scenario_name: String,
     pub target_verb: String,
-    pub governance_status: GovernanceStatus,
+    pub(crate) governance_status: GovernanceStatus,
     pub admitted_utterance_count: usize,
     pub last_run_id: Option<Uuid>,
     pub overall_accuracy: Option<f32>,
@@ -335,7 +335,7 @@ pub struct CalibrationPortfolioEntry {
 pub struct CalibrationFixtureTransition {
     pub utterance_id: Uuid,
     pub trace_id: Uuid,
-    pub fixture_state: Vec<FixtureStateSnapshot>,
+    pub(crate) fixture_state: Vec<FixtureStateSnapshot>,
 }
 
 /// Draft Loop 1 gap proposal derived from a failed calibration outcome.

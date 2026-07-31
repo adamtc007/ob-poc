@@ -583,7 +583,7 @@ pub struct GraphNode {
     pub name: String,
 
     /// Entity type (PROPER_PERSON, LIMITED_COMPANY, FUND, etc.)
-    pub entity_type: EntityType,
+    pub(crate) entity_type: EntityType,
 
     /// Jurisdiction code
     pub jurisdiction: Option<String>,
@@ -626,13 +626,13 @@ pub struct GraphNode {
     // CLASSIFICATION
     // =========================================================================
     /// Primary role category for layout (from taxonomy)
-    pub primary_role_category: Option<RoleCategory>,
+    pub(crate) primary_role_category: Option<RoleCategory>,
 
     /// Layout behavior hint (derived from role_category)
-    pub layout_behavior: Option<LayoutBehavior>,
+    pub(crate) layout_behavior: Option<LayoutBehavior>,
 
     /// UBO treatment code
-    pub ubo_treatment: Option<UboTreatment>,
+    pub(crate) ubo_treatment: Option<UboTreatment>,
 
     /// Is this a natural person? (always a terminus in ownership chains)
     pub is_natural_person: bool,
@@ -672,7 +672,7 @@ pub struct GraphNode {
     pub kyc_completion: Option<i32>,
 
     /// Verification status
-    pub verification_status: Option<VerificationStatus>,
+    pub(crate) verification_status: Option<VerificationStatus>,
 
     /// All roles for this entity across CBUs
     #[serde(default)]
@@ -680,7 +680,7 @@ pub struct GraphNode {
 
     /// Role categories for this entity
     #[serde(default)]
-    pub role_categories: Vec<RoleCategory>,
+    pub(crate) role_categories: Vec<RoleCategory>,
 
     /// Additional data for rendering
     #[serde(default)]
@@ -728,7 +728,7 @@ impl Default for GraphNode {
 
 impl GraphNode {
     /// Create a new node with minimal required fields
-    pub fn new(entity_id: Uuid, name: String, entity_type: EntityType) -> Self {
+    pub(crate) fn new(entity_id: Uuid, name: String, entity_type: EntityType) -> Self {
         Self {
             entity_id,
             name,
@@ -1425,7 +1425,7 @@ pub(crate) enum ProngFilter {
 /// Scope of the loaded graph
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub(crate) enum GraphScope {
+pub enum GraphScope {
     /// Empty graph (initial state)
     #[default]
     Empty,
@@ -2209,7 +2209,7 @@ pub struct CbuSummary {
 }
 
 // Backward compatibility alias
-pub type GraphEdge = LegacyGraphEdge;
+pub(crate) type GraphEdge = LegacyGraphEdge;
 
 // =============================================================================
 // TESTS

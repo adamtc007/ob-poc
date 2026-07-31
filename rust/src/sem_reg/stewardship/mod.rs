@@ -26,12 +26,11 @@ pub mod show_loop;
 pub mod tools_phase1;
 
 // Re-export core Phase 0 types
-pub use idempotency::{check_idempotency, record_idempotency, with_idempotency};
-pub use impact::{compute_changeset_impact};
+pub use idempotency::{record_idempotency, with_idempotency};
 pub use templates::{instantiate_template};
-pub use tools_phase0::{dispatch_phase0_tool};
+pub(crate) use tools_phase0::{dispatch_phase0_tool};
 pub(crate) use tools_phase0::{phase0_tool_specs};
-pub use tools_phase1::{dispatch_phase1_tool};
+pub(crate) use tools_phase1::{dispatch_phase1_tool};
 pub(crate) use tools_phase1::{phase1_tool_specs};
 pub use types::{
     BasisClaim, BasisKind, BasisRecord, ChangesetAction, ChangesetEntryRow, ChangesetRow,

@@ -311,7 +311,7 @@ fn review_cycle_policy() -> PolicyRuleBody {
 /// Seed core policy rules into the registry.
 ///
 /// Uses the same idempotent publish pattern as other seeds.
-pub async fn seed_policies(
+pub(crate) async fn seed_policies(
     pool: &PgPool,
     set_id: Uuid,
     dry_run: bool,

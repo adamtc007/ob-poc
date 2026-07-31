@@ -396,7 +396,7 @@ fn col(
 /// Seed core views into the registry.
 ///
 /// Uses the same idempotent publish pattern as the scanner.
-pub async fn seed_views(
+pub(crate) async fn seed_views(
     pool: &PgPool,
     set_id: Uuid,
     dry_run: bool,

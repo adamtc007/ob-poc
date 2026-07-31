@@ -150,7 +150,7 @@ impl PgTransactionScope {
     /// set; persistence failure never masks the commit/rollback outcome
     /// itself (attestation is audit trail, not the enforcement mechanism —
     /// the transaction boundary is).
-    pub async fn commit_attested(
+    pub(crate) async fn commit_attested(
         self,
         session_id: Option<Uuid>,
         verb_fqn: Option<&str>,

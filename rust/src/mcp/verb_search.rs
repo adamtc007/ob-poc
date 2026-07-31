@@ -60,7 +60,7 @@ pub type SharedLexicon = Arc<dyn LexiconService>;
 
 /// A unified verb search result
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct VerbSearchResult {
+pub struct VerbSearchResult {
     pub verb: String,
     pub score: f32,
     pub source: VerbSearchSource,
@@ -77,7 +77,7 @@ pub(crate) struct VerbSearchResult {
 /// Enables the orchestrator to expand macros deterministically instead of
 /// falling through to LLM-based arg extraction.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct JourneyMetadata {
+pub struct JourneyMetadata {
     /// Scenario ID if matched via ScenarioIndex (Tier -2A).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenario_id: Option<String>,
@@ -91,7 +91,7 @@ pub(crate) struct JourneyMetadata {
 /// Serializable resolved route for journey-level matches.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum JourneyRoute {
+pub enum JourneyRoute {
     /// Expand a single macro.
     Macro { macro_fqn: String },
     /// Expand a sequence of macros in order.
@@ -153,7 +153,7 @@ impl From<&ResolvedRoute> for JourneyRoute {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(PartialEq)]
-pub(crate) enum VerbSearchSource {
+pub enum VerbSearchSource {
     /// User-specific exact match (highest priority)
     UserLearnedExact,
     /// User-specific semantic match
@@ -667,7 +667,7 @@ impl HybridVerbSearcher {
     /// 7. Global semantic (cold start) - score fallback_threshold-0.95
     /// 8. Phonetic fallback (typo handling) - score 0.5-0.7
     #[allow(clippy::too_many_arguments)]
-    pub async fn search(
+    pub(crate) async fn search(
         &self,
         query: &str,
         user_id: Option<Uuid>,
@@ -1544,7 +1544,7 @@ impl HybridVerbSearcher {
     /// assert!(results.len() <= 5);
     /// # Ok::<(), anyhow::Error>(())
     /// ```
-    pub async fn search_embeddings_only(
+    pub(crate) async fn search_embeddings_only(
         &self,
         query: &str,
         limit: usize,
@@ -1780,7 +1780,7 @@ impl HybridVerbSearcher {
     /// clears `fallback_threshold`, or the best global hit is already inside
     /// `allowed_verbs` (in which case `search()` itself should have found it —
     /// this function has nothing new to say).
-    pub async fn find_out_of_scope_match(
+    pub(crate) async fn find_out_of_scope_match(
         &self,
         query: &str,
         allowed_verbs: &HashSet<String>,

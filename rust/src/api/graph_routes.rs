@@ -56,7 +56,7 @@ pub struct GraphQuery {
 /// in node_types, edge_types, and view_modes tables.
 ///
 /// Orientation determines flow direction: VERTICAL (top-to-bottom) or HORIZONTAL (left-to-right)
-pub async fn get_cbu_graph(
+pub(crate) async fn get_cbu_graph(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<GraphQuery>,
@@ -169,7 +169,7 @@ fn normalize_view_mode(view_mode: Option<String>) -> String {
 }
 
 /// GET /api/cbu/{cbu_id}/layout - fetch saved layout overrides
-pub async fn get_cbu_layout(
+pub(crate) async fn get_cbu_layout(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<LayoutQuery>,
@@ -214,7 +214,7 @@ pub async fn get_cbu_layout(
 }
 
 /// POST /api/cbu/{cbu_id}/layout - save layout overrides
-pub async fn save_cbu_layout(
+pub(crate) async fn save_cbu_layout(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
     Json(body): Json<LayoutSaveRequest>,
@@ -266,7 +266,7 @@ pub(crate) struct UnifiedGraphQuery {
 /// Returns unified EntityGraph for a single CBU.
 /// Uses the new GraphRepository instead of VisualizationRepository.
 /// Supports temporal queries via as_of parameter (defaults to today).
-pub async fn get_unified_cbu_graph(
+pub(crate) async fn get_unified_cbu_graph(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<UnifiedGraphQuery>,
@@ -301,7 +301,7 @@ pub async fn get_unified_cbu_graph(
 /// Returns unified EntityGraph for an ownership book (all CBUs under an apex).
 /// The apex entity is typically an ultimate holding company.
 /// Supports temporal queries via as_of parameter (defaults to today).
-pub async fn get_book_graph(
+pub(crate) async fn get_book_graph(
     State(pool): State<PgPool>,
     Path(apex_entity_id): Path<Uuid>,
     Query(params): Query<UnifiedGraphQuery>,
@@ -335,7 +335,7 @@ pub async fn get_book_graph(
 ///
 /// Returns unified EntityGraph for all entities in a jurisdiction.
 /// Supports temporal queries via as_of parameter (defaults to today).
-pub async fn get_jurisdiction_graph(
+pub(crate) async fn get_jurisdiction_graph(
     State(pool): State<PgPool>,
     Path(code): Path<String>,
     Query(params): Query<UnifiedGraphQuery>,
@@ -378,7 +378,7 @@ pub(crate) struct NeighborhoodQuery {
     pub as_of: Option<String>,
 }
 
-pub async fn get_entity_neighborhood_graph(
+pub(crate) async fn get_entity_neighborhood_graph(
     State(pool): State<PgPool>,
     Path(entity_id): Path<Uuid>,
     Query(params): Query<NeighborhoodQuery>,
@@ -428,7 +428,7 @@ pub(crate) struct RouteQuery {
 ///
 /// Calculate a navigation route through the taxonomy graph.
 /// Returns waypoints with positions for autopilot animation.
-pub async fn get_route(
+pub(crate) async fn get_route(
     State(pool): State<PgPool>,
     Query(params): Query<RouteQuery>,
 ) -> Result<Json<RouteResponse>, (StatusCode, String)> {
@@ -853,7 +853,7 @@ pub(crate) struct InspectorQuery {
 /// - `lod`: Level of detail (0=icon only, 1=short labels, 2=tags+summary, 3=full)
 /// - `max_depth`: Maximum tree depth to include (default 10)
 /// - `max_items`: Maximum items per paginated list (default 50)
-pub async fn get_cbu_inspector(
+pub(crate) async fn get_cbu_inspector(
     State(pool): State<PgPool>,
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<InspectorQuery>,

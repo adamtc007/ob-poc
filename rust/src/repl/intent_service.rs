@@ -117,7 +117,7 @@ impl IntentService {
     ///
     /// This is the primary verb matching path when a ContextStack is available.
     /// Falls back to raw matching semantics when no pack is active.
-    pub async fn match_verb_with_context(
+    pub(crate) async fn match_verb_with_context(
         &self,
         input: &str,
         ctx: &MatchContext,
@@ -267,7 +267,7 @@ impl IntentService {
     /// Uses `sentences.clarify` templates instead of raw arg names.
     /// Only checks args that have clarify prompts defined — this is a
     /// UX enhancement, not a validation gate.
-    pub fn check_clarification(
+    pub(crate) fn check_clarification(
         &self,
         verb: &str,
         provided_args: &HashMap<String, String>,

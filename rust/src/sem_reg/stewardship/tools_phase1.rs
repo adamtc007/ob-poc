@@ -160,7 +160,7 @@ pub(crate) fn phase1_tool_specs() -> Vec<SemRegToolSpec> {
 }
 
 /// Dispatch a Phase 1 tool call. Returns None if tool name not recognized.
-pub async fn dispatch_phase1_tool(
+pub(crate) async fn dispatch_phase1_tool(
     ctx: &SemRegToolContext<'_>,
     tool_name: &str,
     args: &serde_json::Value,

@@ -32,12 +32,12 @@ pub struct AgentState {
     pub pool: PgPool,
     pub dsl_v2_executor: Arc<DslExecutor>,
     pub sessions: SessionStore,
-    pub session_manager: crate::api::session_manager::SessionManager,
-    pub generation_log: Arc<GenerationLogRepository>,
+    pub(crate) session_manager: crate::api::session_manager::SessionManager,
+    pub(crate) generation_log: Arc<GenerationLogRepository>,
     pub session_repo: Arc<crate::database::SessionRepository>,
-    pub dsl_repo: Arc<crate::database::DslRepository>,
+    pub(crate) dsl_repo: Arc<crate::database::DslRepository>,
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
-    pub expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
+    pub(crate) expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
     /// Entity linking service for in-memory entity resolution
     pub entity_linker: Arc<dyn EntityLinkingService>,
     /// Server-side policy enforcement for single-pipeline invariants

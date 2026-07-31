@@ -158,13 +158,13 @@ fn is_crud_write_operation(op: &CrudOperation) -> bool {
 
 /// Result of linting a single verb
 #[derive(Debug, Clone)]
-pub(crate) struct VerbLintResult {
+pub struct VerbLintResult {
     pub full_name: String,
     pub diagnostics: VerbDiagnostics,
 }
 
 impl VerbLintResult {
-    pub(crate) fn has_errors(&self) -> bool {
+    pub fn has_errors(&self) -> bool {
         self.diagnostics.has_errors()
     }
 
@@ -176,7 +176,7 @@ impl VerbLintResult {
 /// Result of linting all verbs
 #[derive(Debug, Clone, Default)]
 pub struct LintReport {
-    pub results: Vec<VerbLintResult>,
+    pub(crate) results: Vec<VerbLintResult>,
     pub total_verbs: usize,
     pub verbs_with_errors: usize,
     pub verbs_with_warnings: usize,

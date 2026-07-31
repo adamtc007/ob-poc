@@ -23,7 +23,7 @@ use sem_os_policy::context_resolution::{
 /// Every orchestrator call produces one of these (or `unavailable()` if Sem OS
 /// is not configured).
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct SemOsContextEnvelope {
+pub struct SemOsContextEnvelope {
     /// Verbs explicitly allowed by ABAC + tier + preconditions.
     pub allowed_verbs: HashSet<String>,
     /// Summary of each allowed verb contract (for downstream consumers).
@@ -57,7 +57,7 @@ pub(crate) struct SemOsContextEnvelope {
 
 /// Summary of an allowed verb contract (lightweight projection).
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct VerbCandidateSummary {
+pub struct VerbCandidateSummary {
     pub fqn: String,
     pub description: String,
     pub governance_tier: String,
@@ -68,7 +68,7 @@ pub(crate) struct VerbCandidateSummary {
 
 /// A verb that was pruned from the allowed set with a structured reason.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct PrunedVerb {
+pub struct PrunedVerb {
     pub fqn: String,
     pub reason: PruneReason,
 }
@@ -76,7 +76,7 @@ pub(crate) struct PrunedVerb {
 /// Why a verb was pruned from the allowed set.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum PruneReason {
+pub enum PruneReason {
     /// ABAC denied access.
     AbacDenied {
         actor_role: String,
@@ -104,7 +104,7 @@ pub(crate) enum PruneReason {
 /// Deterministic: identical verb sets always produce the same fingerprint.
 /// Format: `"v1:<hex>"` (versioned for future algorithm changes).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub(crate) struct AllowedVerbSetFingerprint(pub String);
+pub struct AllowedVerbSetFingerprint(pub String);
 
 impl std::fmt::Display for AllowedVerbSetFingerprint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -134,7 +134,7 @@ impl AllowedVerbSetFingerprint {
 
 /// Governance signal summary (lightweight projection of GovernanceSignal).
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct GovernanceSignalSummary {
+pub struct GovernanceSignalSummary {
     pub kind: String,
     pub message: String,
     pub severity: String,

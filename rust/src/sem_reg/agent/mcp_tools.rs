@@ -171,7 +171,7 @@ pub struct SemRegToolSpec {
 
 /// A parameter for an MCP tool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ToolParameter {
+pub struct ToolParameter {
     pub name: String,
     pub description: String,
     pub param_type: String,
@@ -607,7 +607,7 @@ fn param(name: &str, description: &str, param_type: &str, required: bool) -> Too
 // ── Tool Dispatch ─────────────────────────────────────────────
 
 /// Dispatch an MCP tool call to its handler.
-pub async fn dispatch_tool(
+pub(crate) async fn dispatch_tool(
     ctx: &SemRegToolContext<'_>,
     tool_name: &str,
     args: &serde_json::Value,

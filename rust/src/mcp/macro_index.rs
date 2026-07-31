@@ -100,7 +100,7 @@ fn tokenize(s: &str) -> Vec<String> {
 
 /// Entry in the macro index, derived from macro metadata at startup.
 #[derive(Debug, Clone)]
-pub(crate) struct MacroIndexEntry {
+pub struct MacroIndexEntry {
     pub label: String,
     pub description: String,
     pub jurisdiction: Option<String>,
@@ -327,7 +327,7 @@ impl MacroIndex {
     }
 
     /// Look up an entry by canonical FQN.
-    pub fn get_entry(&self, fqn: &str) -> Option<&MacroIndexEntry> {
+    pub(crate) fn get_entry(&self, fqn: &str) -> Option<&MacroIndexEntry> {
         self.entries.get(fqn)
     }
 
@@ -337,7 +337,7 @@ impl MacroIndex {
     /// deterministic scoring with hard gates.
     /// `active_mode` optionally constrains by mode tag (e.g., "onboarding").
     /// `jurisdiction_hint` optionally provides a known jurisdiction context.
-    pub fn resolve(
+    pub(crate) fn resolve(
         &self,
         query: &str,
         active_mode: Option<&str>,

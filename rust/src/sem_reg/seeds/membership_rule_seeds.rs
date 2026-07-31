@@ -43,7 +43,7 @@ impl std::fmt::Display for MembershipRuleSeedReport {
     }
 }
 
-pub async fn seed_kyc_membership_rules(
+pub(crate) async fn seed_kyc_membership_rules(
     pool: &PgPool,
     set_id: Uuid,
     dry_run: bool,

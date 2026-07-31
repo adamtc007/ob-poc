@@ -45,13 +45,13 @@ pub struct ReplSessionV2 {
     #[serde(skip)]
     pub staged_pack_hash: Option<String>,
     pub runbook: Runbook,
-    pub messages: Vec<ChatMessage>,
+    pub(crate) messages: Vec<ChatMessage>,
     #[serde(skip)]
-    pub pending_arg_audit: Option<ArgExtractionAudit>,
+    pub(crate) pending_arg_audit: Option<ArgExtractionAudit>,
     #[serde(skip)]
-    pub pending_slot_provenance: Option<HashMap<String, SlotSource>>,
+    pub(crate) pending_slot_provenance: Option<HashMap<String, SlotSource>>,
     #[serde(skip)]
-    pub last_proposal_set: Option<ProposalSet>,
+    pub(crate) last_proposal_set: Option<ProposalSet>,
     #[serde(skip)]
     pub decision_log: SessionDecisionLog,
     #[serde(default)]
@@ -59,22 +59,22 @@ pub struct ReplSessionV2 {
     #[serde(default)]
     pub pending_trace_id: Option<Uuid>,
     #[serde(skip)]
-    pub pending_sem_os_envelope: Option<SemOsContextEnvelope>,
+    pub(crate) pending_sem_os_envelope: Option<SemOsContextEnvelope>,
     #[serde(skip)]
-    pub pending_lookup_result: Option<LookupResult>,
+    pub(crate) pending_lookup_result: Option<LookupResult>,
     /// Last entity-resolution projection produced by the Sage lookup service.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_entity_resolution: Option<SessionEntityResolutionFeedback>,
+    pub(crate) last_entity_resolution: Option<SessionEntityResolutionFeedback>,
     #[serde(skip)]
     pub pending_execution_rechecks: Vec<serde_json::Value>,
     #[serde(default)]
     pub active_workspace: Option<WorkspaceKind>,
     #[serde(default)]
-    pub workspace_stack: Vec<WorkspaceFrame>,
+    pub(crate) workspace_stack: Vec<WorkspaceFrame>,
     #[serde(default)]
-    pub pending_verb: Option<VerbRef>,
+    pub(crate) pending_verb: Option<VerbRef>,
     #[serde(default)]
-    pub conversation_mode: ConversationMode,
+    pub(crate) conversation_mode: ConversationMode,
     /// Current agent mode — determines permission gates for stack ops vs execution.
     #[serde(default)]
     pub agent_mode: AgentMode,
@@ -89,13 +89,13 @@ pub struct ReplSessionV2 {
     pub snapshot_policy: super::session_trace::SnapshotPolicy,
     /// Current runbook plan (multi-workspace orchestration).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub runbook_plan: Option<crate::runbook::plan_types::RunbookPlan>,
+    pub(crate) runbook_plan: Option<crate::runbook::plan_types::RunbookPlan>,
     /// Cursor within the runbook plan (which step to execute next).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runbook_plan_cursor: Option<usize>,
     /// Results of executed plan steps.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub execution_log: Vec<crate::runbook::plan_types::StepResult>,
+    pub(crate) execution_log: Vec<crate::runbook::plan_types::StepResult>,
     /// Symbol table for @reference resolution (`:as @myEntity` bindings).
     /// Session-scoped — persists across workspace switches.
     /// Synced from ExecutionContext.pending_session.bindings after verb execution.

@@ -120,7 +120,7 @@ pub(crate) struct ToolCallParams {
 /// Tool call result
 #[derive(Debug, Serialize)]
 pub struct ToolCallResult {
-    pub content: Vec<ToolContent>,
+    pub(crate) content: Vec<ToolContent>,
     #[serde(rename = "isError", skip_serializing_if = "Option::is_none")]
     pub is_error: Option<bool>,
 }

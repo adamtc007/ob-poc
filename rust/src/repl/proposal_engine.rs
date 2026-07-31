@@ -118,7 +118,7 @@ const MAX_VERB_PROPOSALS: usize = 5;
 /// Deterministic proposal engine composing IntentService + VerbConfigIndex.
 ///
 /// Stateless — pack context and runbook are passed as method arguments.
-pub(crate) struct ProposalEngine {
+pub struct ProposalEngine {
     intent_service: Arc<IntentService>,
     verb_config_index: Arc<VerbConfigIndex>,
     sentence_gen: SentenceGenerator,

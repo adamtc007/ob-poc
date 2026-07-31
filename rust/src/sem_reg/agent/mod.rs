@@ -16,7 +16,8 @@ pub mod mcp_tools;
 pub mod plans;
 
 // Re-export primary types
+#[cfg(test)]
 pub(crate) use decisions::{DecisionRecord, DecisionStore};
-pub use mcp_tools::{all_tool_specs, dispatch_tool};
-pub(crate) use mcp_tools::{SemRegToolContext, SemRegToolResult};
+pub use mcp_tools::all_tool_specs;
+#[cfg(test)]
 pub(crate) use plans::{AgentPlan, AgentPlanStatus, PlanStep, PlanStepStatus, PlanStore};

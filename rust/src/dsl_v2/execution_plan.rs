@@ -233,7 +233,7 @@ pub struct PlanningResult {
 
 /// A synthetic step that was injected by the planner
 #[derive(Debug, Clone)]
-pub(crate) struct SyntheticStep {
+pub struct SyntheticStep {
     /// Index in the final plan
     pub plan_index: usize,
 }

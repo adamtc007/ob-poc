@@ -25,9 +25,9 @@ pub struct ScenarioSuite {
     pub description: Option<String>,
     pub suite_id: String,
     #[serde(default)]
-    pub mode_expectations: ModeExpectations,
+    pub(crate) mode_expectations: ModeExpectations,
     #[serde(default)]
-    pub session_seed: SessionSeed,
+    pub(crate) session_seed: SessionSeed,
     pub scenarios: Vec<Scenario>,
 }
 
@@ -39,7 +39,7 @@ pub struct Scenario {
     pub description: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
-    pub steps: Vec<ScenarioStep>,
+    pub(crate) steps: Vec<ScenarioStep>,
 }
 
 /// One step in a multi-turn scenario.

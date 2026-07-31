@@ -127,4 +127,3 @@ pub use deal_types::{
 #[cfg(feature = "server")]
 pub use deal_routes::{create_deal_router};
 
-pub use repl_routes_v2::{router as create_repl_v2_router};

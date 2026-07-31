@@ -367,7 +367,7 @@ impl VerbSyncService {
     ///
     /// Returns compiled JSON, effective config, and any compilation diagnostics.
     /// Note: We manually build the JSON since RuntimeVerb doesn't derive Serialize.
-    pub fn compile_verb_contract(&self, verb: &RuntimeVerb) -> CompiledVerbContract {
+    pub(crate) fn compile_verb_contract(&self, verb: &RuntimeVerb) -> CompiledVerbContract {
         let mut diagnostics = VerbDiagnostics::default();
 
         // Manually build compiled_json since RuntimeVerb doesn't derive Serialize

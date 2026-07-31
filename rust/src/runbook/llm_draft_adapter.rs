@@ -51,7 +51,7 @@ pub(crate) enum LlmDraftLoopOutcome {
     },
 }
 
-pub async fn run_kyc_update_status_llm_draft_loop(
+pub(crate) async fn run_kyc_update_status_llm_draft_loop(
     manifest: &DomainPackManifest,
     pack: &SemOsLanguagePack,
     session_id: Uuid,
@@ -74,7 +74,7 @@ pub async fn run_kyc_update_status_llm_draft_loop(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn run_kyc_update_status_llm_draft_loop_with_prompt_pack(
+pub(crate) async fn run_kyc_update_status_llm_draft_loop_with_prompt_pack(
     manifest: &DomainPackManifest,
     prompt_pack: &SemOsLanguagePack,
     validation_pack: &SemOsLanguagePack,

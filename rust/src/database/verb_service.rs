@@ -26,7 +26,7 @@ pub(crate) struct UserLearnedExactMatch {
 
 /// A semantic match with similarity score
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SemanticMatch {
+pub struct SemanticMatch {
     pub phrase: String,
     pub verb: String,
     pub similarity: f64,
@@ -36,7 +36,7 @@ pub(crate) struct SemanticMatch {
 
 /// Verb description from dsl_verbs table
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub(crate) struct VerbDescription {
+pub struct VerbDescription {
     pub full_name: String,
     pub description: Option<String>,
 }
@@ -96,7 +96,7 @@ struct VerbCentroidRow {
 
 /// Centroid match result with score and phrase count
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VerbCentroidMatch {
+pub struct VerbCentroidMatch {
     pub verb_name: String,
     pub score: f64,
     pub phrase_count: i32,
@@ -127,7 +127,7 @@ impl VerbService {
     // ========================================================================
 
     /// Find user-learned phrase by exact match
-    pub async fn find_user_learned_exact(
+    pub(crate) async fn find_user_learned_exact(
         &self,
         user_id: Uuid,
         phrase: &str,
@@ -188,7 +188,7 @@ impl VerbService {
     }
 
     /// Find user-learned phrases by semantic similarity (top-k) - Issue D/J
-    pub async fn find_user_learned_semantic_topk(
+    pub(crate) async fn find_user_learned_semantic_topk(
         &self,
         user_id: Uuid,
         query_embedding: &[f32],
@@ -247,7 +247,7 @@ impl VerbService {
     ///     .find_exact_verb_patterns("show me products", None, 5)
     ///     .await?;
     /// ```
-    pub async fn find_exact_verb_patterns(
+    pub(crate) async fn find_exact_verb_patterns(
         &self,
         phrase: &str,
         allowed_verbs: Option<&[String]>,
@@ -325,7 +325,7 @@ impl VerbService {
     /// 2. Workspace-specific legacy/yaml phrases
     /// 3. Global governed phrases
     /// 4. Global legacy/yaml phrases
-    pub async fn find_phrase_bank_exact(
+    pub(crate) async fn find_phrase_bank_exact(
         &self,
         phrase: &str,
         workspace: Option<&str>,
@@ -441,7 +441,7 @@ impl VerbService {
     }
 
     /// Domain-scoped variant of learned phrase semantic search.
-    pub async fn find_global_learned_semantic_topk_scoped(
+    pub(crate) async fn find_global_learned_semantic_topk_scoped(
         &self,
         query_embedding: &[f32],
         threshold: f32,
@@ -521,7 +521,7 @@ impl VerbService {
     /// is narrowed to `WHERE verb_name LIKE 'document.%'`. This reduces the
     /// search space from ~23K patterns to the domain's ~50-200 patterns,
     /// dramatically improving precision.
-    pub async fn search_verb_patterns_semantic_scoped(
+    pub(crate) async fn search_verb_patterns_semantic_scoped(
         &self,
         query_embedding: &[f32],
         limit: usize,
@@ -602,7 +602,7 @@ impl VerbService {
     /// this narrows the pgvector query from ~23K patterns to only patterns belonging
     /// to the allowed verbs (~200-600 patterns for 30-80 verbs). This is the key
     /// architectural change for SemOS-scoped resolution.
-    pub async fn search_verb_patterns_semantic_constrained(
+    pub(crate) async fn search_verb_patterns_semantic_constrained(
         &self,
         query_embedding: &[f32],
         limit: usize,
@@ -666,7 +666,7 @@ impl VerbService {
     }
 
     /// Search learned phrases constrained to a specific set of verb FQNs.
-    pub async fn find_global_learned_semantic_topk_constrained(
+    pub(crate) async fn find_global_learned_semantic_topk_constrained(
         &self,
         query_embedding: &[f32],
         threshold: f32,
@@ -942,7 +942,7 @@ impl VerbService {
     ///
     /// The search generates phonetic codes for each word in the query and
     /// finds patterns that contain ANY of those codes.
-    pub async fn search_by_phonetic(
+    pub(crate) async fn search_by_phonetic(
         &self,
         query: &str,
         limit: i64,

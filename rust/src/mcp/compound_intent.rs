@@ -247,7 +247,7 @@ static VEHICLE_JURISDICTION_MAP: &[(&str, &str)] = &[
 /// or a multi-step journey request. The ScenarioIndex (Tier -2A) requires
 /// at least one compound signal present (gate G1).
 #[derive(Debug, Clone, Default)]
-pub(crate) struct CompoundSignals {
+pub struct CompoundSignals {
     /// Whether a compound action verb was detected ("onboard", "set up", etc.)
     pub has_compound_action: bool,
     /// The specific compound action matched, if any.

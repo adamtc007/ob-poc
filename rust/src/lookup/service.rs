@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 /// Result of unified lookup analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct LookupResult {
+pub struct LookupResult {
     /// Entity snapshot metadata used for this lookup pass.
     pub entity_snapshot: EntitySnapshotMetadata,
 
@@ -40,7 +40,7 @@ pub(crate) struct LookupResult {
 
 /// Metadata for the entity-linking snapshot used during lookup.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct EntitySnapshotMetadata {
+pub struct EntitySnapshotMetadata {
     pub hash: String,
     pub version: u32,
     pub entity_count: usize,
@@ -48,7 +48,7 @@ pub(crate) struct EntitySnapshotMetadata {
 
 /// The dominant entity from analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct DominantEntity {
+pub struct DominantEntity {
     pub entity_id: Uuid,
     pub canonical_name: String,
     pub entity_kind: String,
@@ -97,7 +97,7 @@ impl LookupService {
     /// 2. Search verbs with entity names masked from verb search noun extraction
     /// 3. Derive expected entity kinds from verb schema
     /// 4. Resolve entities with kind constraints
-    pub async fn analyze(&self, utterance: &str, limit: usize) -> LookupResult {
+    pub(crate) async fn analyze(&self, utterance: &str, limit: usize) -> LookupResult {
         // Step 0: Extract entity mention spans before verb search.
         // These spans tell verb search noun extraction to skip entity names
         // (e.g., "Goldman Sachs Group") so they don't pollute domain noun matching.

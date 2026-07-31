@@ -57,17 +57,17 @@ pub struct ViewState {
     pub context: TaxonomyContext,
 
     /// Active refinements ("except...", "plus...")
-    pub refinements: Vec<Refinement>,
+    pub(crate) refinements: Vec<Refinement>,
 
     /// Computed selection (the actual "those" after refinements)
     /// This is what operations target
     pub selection: Vec<Uuid>,
 
     /// Staged operation awaiting confirmation
-    pub pending: Option<PendingOperation>,
+    pub(crate) pending: Option<PendingOperation>,
 
     /// Layout result (computed positions for rendering)
-    pub layout: Option<LayoutResult>,
+    pub(crate) layout: Option<LayoutResult>,
 
     /// When this view was computed
     pub computed_at: DateTime<Utc>,
@@ -118,7 +118,7 @@ pub(crate) struct PendingOperation {
 
 /// Batch operations that can be applied to selection
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum BatchOperation {
+pub enum BatchOperation {
     /// Subscribe selection to a product
     Subscribe { product: String },
 
@@ -245,7 +245,7 @@ impl ViewState {
     }
 
     /// Apply a refinement, recomputing selection
-    pub fn refine(&mut self, refinement: Refinement) {
+    pub(crate) fn refine(&mut self, refinement: Refinement) {
         // Store the refinement
         self.refinements.push(refinement);
 

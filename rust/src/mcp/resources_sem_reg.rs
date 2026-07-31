@@ -100,7 +100,7 @@ pub(crate) fn resource_templates() -> Vec<ResourceTemplate> {
 
 /// Route a `sem_reg://` URI to the appropriate handler.
 /// Returns `ResourceReadResult` with JSON content or a not-found stub.
-pub async fn read_resource(uri: &str, pool: &PgPool, actor: &ActorContext) -> ResourceReadResult {
+pub(crate) async fn read_resource(uri: &str, pool: &PgPool, actor: &ActorContext) -> ResourceReadResult {
     match parse_uri(uri) {
         Some(("attributes", fqn)) => {
             read_by_fqn(uri, pool, actor, ObjectType::AttributeDef, fqn).await
@@ -134,7 +134,7 @@ pub async fn read_resource(uri: &str, pool: &PgPool, actor: &ActorContext) -> Re
 /// - Others → `sem_reg_describe_attribute` (generic describe)
 ///
 /// Falls back to direct `read_resource()` on client errors.
-pub async fn read_resource_via_client(
+pub(crate) async fn read_resource_via_client(
     uri: &str,
     client: &dyn sem_os_client::SemOsClient,
     pool: &PgPool,

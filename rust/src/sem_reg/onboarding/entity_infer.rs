@@ -11,7 +11,7 @@ use super::xref::{AttributeCandidate, ColumnClassification};
 
 /// A candidate entity type inferred from a database table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntityTypeCandidate {
+pub struct EntityTypeCandidate {
     /// Schema name
     pub schema: String,
     /// Table name (used as entity type name basis)
@@ -36,7 +36,7 @@ pub(crate) struct EntityTypeCandidate {
 
 /// A candidate relationship inferred from a foreign key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RelationshipCandidate {
+pub struct RelationshipCandidate {
     /// Inferred FQN (e.g. "relationship.cbus_to_entities")
     pub fqn: String,
     /// Human-readable name
@@ -64,7 +64,7 @@ pub(crate) struct RelationshipCandidate {
 /// Semantic classification of a FK relationship edge.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum EdgeClass {
+pub enum EdgeClass {
     /// FK to parent/owner (same domain) — e.g. cbus.apex_entity_id → entities.entity_id
     Structural,
     /// FK to document/evidence table
@@ -78,7 +78,7 @@ pub(crate) enum EdgeClass {
 /// Inferred cardinality from FK structure.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum InferredCardinality {
+pub enum InferredCardinality {
     OneToOne,
     OneToMany,
     ManyToMany,

@@ -54,7 +54,7 @@ pub struct StartProcessRequest {
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
     pub session_stack: SessionStackState,
-    pub orch_flags: HashMap<String, OrchestratorFlag>,
+    pub(crate) orch_flags: HashMap<String, OrchestratorFlag>,
     pub correlation_id: Uuid,
     pub entry_id: Uuid,
     pub runbook_id: Uuid,
@@ -86,7 +86,7 @@ pub(crate) enum OrchestratorFlag {
 /// (`bpmn.inspect`'s diagnostic projection in `domain_ops::bpmn_lite_ops`)
 /// reports counts, not per-fiber/per-wait detail.
 #[derive(Debug, Clone)]
-pub(crate) struct ProcessInspection {
+pub struct ProcessInspection {
     pub state: String,
     pub fiber_count: usize,
     pub wait_count: usize,
@@ -104,7 +104,7 @@ pub(crate) struct ProcessInspection {
 /// rather than threading the received ones through (see
 /// `Worker::process_job` in `bpmn_integration::worker`).
 #[derive(Debug, Clone)]
-pub(crate) struct JobActivation {
+pub struct JobActivation {
     pub job_key: String,
     pub process_instance_id: String,
     pub task_type: String,
@@ -123,7 +123,7 @@ pub struct CompleteJobRequest {
     pub job_key: String,
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
-    pub orch_flags: HashMap<String, OrchestratorFlag>,
+    pub(crate) orch_flags: HashMap<String, OrchestratorFlag>,
     pub worker_id: String,
     pub claim_token: String,
 }

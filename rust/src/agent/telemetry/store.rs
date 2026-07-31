@@ -9,7 +9,7 @@ use super::IntentEventRow;
 /// Insert an intent event row. Returns Ok(true) on success, Ok(false) on failure.
 /// Never returns Err — telemetry must not break the pipeline.
 #[cfg(feature = "database")]
-pub async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
+pub(crate) async fn insert_intent_event(pool: &PgPool, row: &IntentEventRow) -> bool {
     let result = sqlx::query(
         r#"
         INSERT INTO "ob-poc".intent_events (

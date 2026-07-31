@@ -35,7 +35,7 @@ impl RequestStateStore {
     /// ```ignore
     /// store.upsert_requested(&record).await?;
     /// ```
-    pub async fn upsert_requested(&self, record: &RequestStateRecord) -> Result<()> {
+    pub(crate) async fn upsert_requested(&self, record: &RequestStateRecord) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".bpmn_request_states

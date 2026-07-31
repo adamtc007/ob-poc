@@ -42,7 +42,7 @@ use crate::journey::router::PackRouter;
 
 /// Unified context for a REPL turn — built from runbook fold.
 #[derive(Debug, Clone)]
-pub(crate) struct ContextStack {
+pub struct ContextStack {
     /// Session scope derived from executed runbook entries.
     pub derived_scope: DerivedScope,
 
@@ -184,7 +184,7 @@ impl ContextStack {
 /// Session scope derived from executed runbook entries.
 /// Replaces the mutable `ClientContext` struct.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct DerivedScope {
+pub struct DerivedScope {
     pub client_group_id: Option<Uuid>,
     pub client_group_name: Option<String>,
     pub default_cbu: Option<Uuid>,
@@ -282,7 +282,7 @@ fn derive_session_state(runbook: &Runbook) -> DerivedScope {
 
 /// Pack context derived from the active pack manifest.
 #[derive(Debug, Clone)]
-pub(crate) struct PackContext {
+pub struct PackContext {
     pub pack_id: String,
     /// Read only by this module's own `#[cfg(test)]` suite
     /// (`test_active_pack_staged_over_executed`, `test_pack_select_...`);
@@ -428,7 +428,7 @@ fn derive_pack_context(runbook: &Runbook, pack_router: Option<&PackRouter>) -> O
 /// args from completed entries so the scoring layer can boost the expected
 /// verb and the arg extractor can pre-fill known values.
 #[derive(Debug, Clone)]
-pub(crate) struct TemplateStepHint {
+pub struct TemplateStepHint {
     /// Template identifier (matches `runbook.template_id`).
     ///
     /// Read only by this module's own `#[cfg(test)]` suite
@@ -568,7 +568,7 @@ fn result_value_object(
 ///
 /// "it", "that", "the manco", "the case" all resolve via this context.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct FocusContext {
+pub struct FocusContext {
     /// The most recently mentioned entity.
     pub entity: Option<FocusRef>,
     /// The most recently mentioned CBU.
@@ -579,7 +579,7 @@ pub(crate) struct FocusContext {
 
 /// A concrete reference that a pronoun resolves to.
 #[derive(Debug, Clone)]
-pub(crate) struct FocusRef {
+pub struct FocusRef {
     pub id: Uuid,
     pub display_name: String,
     /// Only read by `entity_resolution::resolve_with_context`'s expected-kind
@@ -866,14 +866,14 @@ pub(crate) fn derive_focus_mode(context: &ContextStack) -> FocusMode {
 
 /// Recent entity mentions for carry-forward and context.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct RecentContext {
+pub struct RecentContext {
     /// Last N entity mentions (most recent first).
     pub mentions: Vec<RecentMention>,
 }
 
 /// A recent entity mention.
 #[derive(Debug, Clone)]
-pub(crate) struct RecentMention {
+pub struct RecentMention {
     pub entity_id: Uuid,
     /// Read only by this module's and `deterministic_extraction`'s
     /// `#[cfg(test)]` suites (`test_closed_world_prompt_render` asserts on
@@ -939,13 +939,13 @@ fn derive_recent(runbook: &Runbook) -> RecentContext {
 /// Tracks rejected candidates so they are not re-proposed.
 /// Entries decay after 3 turns.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ExclusionSet {
+pub struct ExclusionSet {
     pub exclusions: Vec<Exclusion>,
 }
 
 /// A single exclusion.
 #[derive(Debug, Clone)]
-pub(crate) struct Exclusion {
+pub struct Exclusion {
     /// The rejected entity or value.
     pub value: String,
     /// Optional entity ID.
@@ -1052,7 +1052,7 @@ impl ExclusionSet {
 
 /// Registry of execution results for @N back-references.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct OutcomeRegistry {
+pub struct OutcomeRegistry {
     pub outcomes: HashMap<Uuid, serde_json::Value>,
 }
 

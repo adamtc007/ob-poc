@@ -24,7 +24,7 @@ use super::types::{
 
 /// Result of executing a compiled runbook through the gate.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct RunbookExecutionResult {
+pub struct RunbookExecutionResult {
     /// The runbook that was executed.
     pub runbook_id: CompiledRunbookId,
 
@@ -43,7 +43,7 @@ pub(crate) struct RunbookExecutionResult {
 
 /// Result of executing a single step.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct StepExecutionResult {
+pub struct StepExecutionResult {
     pub step_id: Uuid,
     pub verb: String,
     pub outcome: StepOutcome,
@@ -68,7 +68,7 @@ pub enum StepOutcome {
 
 /// Lock acquisition statistics.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub(crate) struct LockStats {
+pub struct LockStats {
     /// Number of locks acquired.
     pub locks_acquired: usize,
     /// Time spent waiting for locks (milliseconds).
@@ -81,7 +81,7 @@ pub(crate) struct LockStats {
 
 /// Errors that prevent execution from starting.
 #[derive(Debug, thiserror::Error)]
-pub(crate) enum ExecutionError {
+pub enum ExecutionError {
     #[error("Runbook {0} not found")]
     NotFound(CompiledRunbookId),
 
@@ -194,6 +194,8 @@ impl Default for RunbookStore {
 /// Both in-memory (dev/test) and Postgres (prod) backends implement this.
 /// The executor accepts `&dyn RunbookStoreBackend` — one path, one trait.
 #[async_trait::async_trait]
+// `pub` (not `pub(crate)`): implemented/called across the crate boundary by
+// integration tests (`tests/sequencer_cross_step_atomicity.rs`).
 pub trait RunbookStoreBackend: Send + Sync {
     /// Insert a compiled runbook. Content-addressed dedup: same ID = no-op.
     async fn insert(&self, runbook: &CompiledRunbook) -> Result<(), ExecutionError>;
@@ -286,7 +288,7 @@ impl RunbookStoreBackend for RunbookStore {
 ///
 /// Events are INSERT-only — status is derived from the latest status_change event.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub(crate) struct RunbookEvent {
+pub struct RunbookEvent {
     pub compiled_runbook_id: CompiledRunbookId,
     pub event_type: String,
     pub old_status: Option<String>,
@@ -832,7 +834,7 @@ pub async fn execute_runbook(
 /// opt-in to skip advisory-lock acquisition on a non-empty write_set. See
 /// [`UnlockedExecutionToken`].
 #[cfg(test)]
-pub async fn execute_runbook_unlocked_for_tests(
+pub(crate) async fn execute_runbook_unlocked_for_tests(
     store: &dyn RunbookStoreBackend,
     runbook_id: CompiledRunbookId,
     cursor: Option<StepCursor>,
@@ -1200,7 +1202,7 @@ async fn execute_runbook_with_pool_and_token(
 /// - `Err(ExecutionError::LockTimeout)` on contention. Caller is
 ///   responsible for rolling back the scope. Other concurrent sessions
 ///   holding the locks are identified via the store when possible.
-pub async fn acquire_advisory_locks_on_scope(
+pub(crate) async fn acquire_advisory_locks_on_scope(
     scope: &mut dyn dsl_runtime::TransactionScope,
     write_set: &BTreeSet<Uuid>,
     store: &dyn RunbookStoreBackend,
@@ -1488,7 +1490,7 @@ pub async fn execute_runbook_in_scope(
 /// on the full `DslExecutor` infrastructure. In production, this delegates
 /// to `DslExecutorV2`. In tests, a stub implementation can be used.
 #[async_trait::async_trait]
-pub(crate) trait StepExecutor: Send + Sync {
+pub trait StepExecutor: Send + Sync {
     /// Scope-aware step execution (Phase B.2b-δ, 2026-04-22).
     ///
     /// Routes dispatch through a caller-owned `TransactionScope` —

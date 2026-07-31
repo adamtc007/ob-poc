@@ -637,7 +637,7 @@ fn node(
 ///
 /// Uses the same idempotent publish pattern as the scanner:
 /// - Check by FQN, compare hash, publish/update/skip accordingly.
-pub async fn seed_taxonomies(
+pub(crate) async fn seed_taxonomies(
     pool: &PgPool,
     set_id: Uuid,
     dry_run: bool,

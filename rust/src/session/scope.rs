@@ -16,7 +16,7 @@ use crate::graph::types::GraphScope;
 
 /// Session scope with stats and windowing info
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SessionScope {
+pub struct SessionScope {
     /// How scope was defined
     pub definition: GraphScope,
 
@@ -29,7 +29,7 @@ pub(crate) struct SessionScope {
 
 /// Summary statistics for a loaded scope
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct ScopeSummary {
+pub struct ScopeSummary {
     /// Total number of entities in scope
     pub total_entities: usize,
 
@@ -54,7 +54,7 @@ pub(crate) struct ScopeSummary {
 
 /// Load status indicating how much data is in memory
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub(crate) enum LoadStatus {
+pub enum LoadStatus {
     /// All data loaded in memory
     #[default]
     Full,
@@ -78,7 +78,7 @@ pub(crate) enum LoadStatus {
 
 /// A node that can be expanded to load more data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ExpandableNode {
+pub struct ExpandableNode {
     /// Entity ID that can be expanded
     pub entity_id: Uuid,
 

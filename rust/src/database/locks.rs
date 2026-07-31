@@ -120,7 +120,7 @@ pub(crate) enum LockError {
 ///     Err(e) => return Err(e.into()),
 /// }
 /// ```
-pub async fn acquire_locks(
+pub(crate) async fn acquire_locks(
     tx: &mut Transaction<'_, Postgres>,
     locks: &[LockKey],
     mode: LockMode,

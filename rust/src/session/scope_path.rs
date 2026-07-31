@@ -79,7 +79,7 @@ impl fmt::Display for ScopeSegment {
 /// The path always starts with Universe and can extend to deeper levels.
 /// This is analogous to a file system path but for the taxonomy tree.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct ScopePath {
+pub struct ScopePath {
     /// Ordered list of segments from root (Universe) to current position
     segments: Vec<ScopeSegment>,
 }

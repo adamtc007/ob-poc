@@ -23,5 +23,5 @@ pub(crate) use config_driven_builder::ConfigDrivenGraphBuilder;
 #[cfg(feature = "database")]
 pub(crate) use deal_graph_builder::DealGraphBuilder;
 pub(crate) use layout_v2::LayoutEngineV2;
-pub use types::{CbuSummary, EdgeType, GraphEdge, GraphNode, NodeType};
+pub use types::{CbuSummary, EdgeType, GraphNode, NodeType};
 pub(crate) use types::{GraphScope, RoleCategory};

@@ -968,7 +968,7 @@ async fn signal_v2(
 ///     .nest("/api/repl/v2", repl_routes_v2::router().with_state(v2_state))
 ///     // ... other routes
 /// ```
-pub fn router() -> Router<ReplV2RouteState> {
+pub(crate) fn router() -> Router<ReplV2RouteState> {
     Router::new()
         .route("/session", post(create_session_v2))
         .route(

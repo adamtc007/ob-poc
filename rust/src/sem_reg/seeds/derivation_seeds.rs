@@ -258,7 +258,7 @@ fn aggregate_aum_derivation() -> DerivationSpecBody {
 /// Seed core derivation specs into the registry.
 ///
 /// Uses the same idempotent publish pattern as other seeds.
-pub async fn seed_derivation_specs(
+pub(crate) async fn seed_derivation_specs(
     pool: &PgPool,
     set_id: Uuid,
     dry_run: bool,

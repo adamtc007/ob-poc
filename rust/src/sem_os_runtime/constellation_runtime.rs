@@ -23,7 +23,7 @@ use uuid::Uuid;
 
 /// Constellation runtime error type.
 #[derive(Debug, Error)]
-pub(crate) enum ConstellationError {
+pub enum ConstellationError {
     #[error("validation error: {0}")]
     Validation(String),
     #[error("execution error: {0}")]
@@ -46,7 +46,7 @@ pub(crate) struct ConstellationMapDef {
 
 /// Raw slot definition loaded from YAML.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub(crate) struct SlotDef {
+pub struct SlotDef {
     #[serde(rename = "type")]
     pub slot_type: SlotType,
     #[serde(default)]
@@ -100,7 +100,7 @@ where
 /// Supported slot classes.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum SlotType {
+pub enum SlotType {
     Cbu,
     Entity,
     EntityGraph,
@@ -112,7 +112,7 @@ pub(crate) enum SlotType {
 /// Supported cardinality semantics.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum Cardinality {
+pub enum Cardinality {
     Root,
     Mandatory,
     Optional,
@@ -121,7 +121,7 @@ pub(crate) enum Cardinality {
 
 /// Join definition for non-root slots.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
-pub(crate) struct JoinDef {
+pub struct JoinDef {
     pub via: String,
     pub parent_fk: String,
     pub child_fk: String,
@@ -132,7 +132,7 @@ pub(crate) struct JoinDef {
 /// Dependency declaration for a slot.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub(crate) enum DependencyEntry {
+pub enum DependencyEntry {
     Simple(String),
     Explicit { slot: String, min_state: String },
 }
@@ -158,7 +158,7 @@ impl DependencyEntry {
 /// Verb palette entry in simple or gated form.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub(crate) enum VerbPaletteEntry {
+pub enum VerbPaletteEntry {
     Simple(String),
     Gated {
         verb: String,
@@ -188,7 +188,7 @@ impl VerbPaletteEntry {
 /// Availability expression for gated verbs.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub(crate) enum VerbAvailability {
+pub enum VerbAvailability {
     One(String),
     Many(Vec<String>),
 }
@@ -220,7 +220,7 @@ pub(crate) struct OwnershipSummary {
 
 /// Flattened slot with path and parent metadata.
 #[derive(Debug, Clone)]
-pub(crate) struct ResolvedSlot {
+pub struct ResolvedSlot {
     pub name: String,
     pub path: String,
     pub def: SlotDef,
@@ -234,7 +234,7 @@ pub(crate) struct ResolvedSlot {
 
 /// Runtime state-machine metadata retained on validated constellation maps.
 #[derive(Debug, Clone)]
-pub(crate) struct RuntimeStateMachine {
+pub struct RuntimeStateMachine {
     pub states: Vec<String>,
     pub initial: String,
     pub transitions: Vec<RuntimeStateTransition>,
@@ -248,7 +248,7 @@ pub(crate) struct RuntimeStateMachine {
 
 /// Runtime transition metadata needed for Sem OS grounding and diagnostics.
 #[derive(Debug, Clone)]
-pub(crate) struct RuntimeStateTransition {
+pub struct RuntimeStateTransition {
     pub from: String,
     pub to: String,
     pub verbs: Vec<String>,
@@ -281,7 +281,7 @@ pub(crate) struct RuntimeSlotReduceResult {
 
 /// Validated constellation map with flattened slot index.
 #[derive(Debug, Clone)]
-pub(crate) struct ValidatedConstellationMap {
+pub struct ValidatedConstellationMap {
     pub constellation: String,
     pub description: Option<String>,
     pub jurisdiction: String,
@@ -333,7 +333,7 @@ pub(crate) struct RawGraphEdge {
 
 /// Reducer-relevant slot context discovered from a constellation map.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ConstellationSlotContext {
+pub struct ConstellationSlotContext {
     pub slot_path: String,
     pub entity_id: Uuid,
     pub slot_type: String,
@@ -478,7 +478,7 @@ pub(crate) enum QueryType {
 /// let map = load_constellation_map(yaml).unwrap();
 /// assert_eq!(map.constellation, "demo");
 /// ```
-pub fn load_constellation_map(yaml: &str) -> ConstellationResult<ValidatedConstellationMap> {
+pub(crate) fn load_constellation_map(yaml: &str) -> ConstellationResult<ValidatedConstellationMap> {
     let definition: ConstellationMapDef =
         serde_yaml::from_str(yaml).map_err(|err| ConstellationError::Other(err.into()))?;
     let mut validated = validate_constellation_map(&definition)?;
@@ -794,7 +794,7 @@ pub(crate) fn compute_action_surface(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn handle_constellation_hydrate(
+pub(crate) async fn handle_constellation_hydrate(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,
@@ -825,7 +825,7 @@ pub async fn handle_constellation_hydrate(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn handle_constellation_summary(
+pub(crate) async fn handle_constellation_summary(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,
@@ -851,7 +851,7 @@ pub async fn handle_constellation_summary(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn hydrate_constellation(
+pub(crate) async fn hydrate_constellation(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,
@@ -873,7 +873,7 @@ pub async fn hydrate_constellation(
 /// # Ok(())
 /// # }
 /// ```
-pub async fn hydrate_constellation_summary(
+pub(crate) async fn hydrate_constellation_summary(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,

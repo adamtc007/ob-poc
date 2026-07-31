@@ -11,10 +11,13 @@ pub mod pre_screen;
 pub mod seed;
 pub mod types;
 
+// The calibration pipeline fns/types below are `pub`: driven across the crate
+// boundary by `xtask` (`xtask/src/calibration.rs`).
 pub use classifier::{classify_outcome};
 pub use db::CalibrationStore;
 pub use drift::compute_drift;
-pub use generator::{build_generation_prompt, parse_generated_utterances};
+pub use generator::{build_generation_prompt};
+pub use generator::parse_generated_utterances;
 pub use harness::{execute_calibration_utterance, load_trace, CalibrationFixtures};
 pub use integration::{generate_proposed_gaps, generate_suggested_clarifications};
 pub use metrics::compute_metrics;

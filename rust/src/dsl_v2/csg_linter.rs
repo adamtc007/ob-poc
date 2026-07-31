@@ -57,7 +57,7 @@ impl LintResult {
 
 /// Context inferred from AST analysis
 #[derive(Debug, Default)]
-pub(crate) struct InferredContext {
+pub struct InferredContext {
     /// Symbol bindings: name → type info
     pub symbols: HashMap<String, SymbolInfo>,
     /// Operations that reference entities
@@ -67,7 +67,7 @@ pub(crate) struct InferredContext {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SymbolInfo {
+pub struct SymbolInfo {
     pub entity_type: Option<String>, // e.g., "LIMITED_COMPANY_PRIVATE", "PROPER_PERSON_NATURAL"
     pub defined_at: SourceSpan,
 }
@@ -81,7 +81,7 @@ pub struct EntityRef {
 }
 
 #[derive(Debug)]
-pub(crate) struct DocumentCatalog {
+pub struct DocumentCatalog {
     pub document_type: String, // type_code from document_types
     pub entity_ref: Option<String>,
     pub span: SourceSpan,

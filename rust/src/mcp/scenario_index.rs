@@ -338,7 +338,7 @@ impl ScenarioIndex {
     ///
     /// `active_mode` optionally constrains by mode tag (e.g., "onboarding").
     /// `macro_index` optionally used for macro metadata match scoring.
-    pub fn resolve(
+    pub(crate) fn resolve(
         &self,
         utterance: &str,
         active_mode: Option<&str>,

@@ -12,7 +12,7 @@ use crate::session::unified::UnifiedSession;
 
 /// Result of running a single scenario.
 #[derive(Debug, Serialize)]
-pub(crate) struct ScenarioResult {
+pub struct ScenarioResult {
     pub scenario_name: String,
     pub suite_name: String,
     pub passed: bool,
@@ -29,7 +29,7 @@ pub struct StepResult {
     pub utterance: String,
     pub passed: bool,
     pub actual_outcome: String,
-    pub failures: Vec<AssertionFailure>,
+    pub(crate) failures: Vec<AssertionFailure>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_json: Option<String>,
 }
@@ -41,7 +41,7 @@ pub struct SuiteResult {
     pub scenarios_passed: usize,
     pub scenarios_failed: usize,
     pub scenarios_total: usize,
-    pub results: Vec<ScenarioResult>,
+    pub(crate) results: Vec<ScenarioResult>,
 }
 
 impl SuiteResult {

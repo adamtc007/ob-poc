@@ -12,7 +12,7 @@ use super::types::{
 
 /// Result of a single gate check.
 #[derive(Debug, Clone)]
-pub(crate) struct GateResult {
+pub struct GateResult {
     pub gate_name: &'static str,
     pub passed: bool,
     pub reason: Option<String>,
@@ -38,7 +38,7 @@ impl GateResult {
 
 /// Aggregated result of all publish gates.
 #[derive(Debug, Clone)]
-pub(crate) struct PublishGateResult {
+pub struct PublishGateResult {
     pub results: Vec<GateResult>,
 }
 
@@ -136,6 +136,8 @@ pub(crate) fn check_version_monotonicity(
 ///
 /// Returns a `PublishGateResult` containing the outcome of every gate.
 /// The caller should check `all_passed()` before persisting.
+// `pub` (not `pub(crate)`): called across the crate boundary by `xtask`
+// (`xtask/src/sem_reg.rs` imports `ob_poc::sem_reg::gates::evaluate_publish_gates`).
 pub fn evaluate_publish_gates(
     meta: &SnapshotMeta,
     predecessor: Option<&SnapshotRow>,

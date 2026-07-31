@@ -245,7 +245,7 @@ pub enum CompiledRunbookStatus {
 /// Why a compiled runbook was parked mid-execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ParkReason {
+pub enum ParkReason {
     /// Waiting for an external callback (e.g., BPMN task completion).
     AwaitingCallback { correlation_key: String },
     /// User explicitly paused execution.
@@ -262,7 +262,7 @@ pub(crate) enum ParkReason {
 
 /// Points to a specific step for resume or error reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct StepCursor {
+pub struct StepCursor {
     /// 0-based index into the step list.
     pub index: usize,
     /// Step ID for cross-reference.

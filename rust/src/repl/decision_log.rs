@@ -135,7 +135,7 @@ pub struct DecisionLog {
     pub extraction_decision: ExtractionDecision,
 
     /// Context summary at the time of this decision.
-    pub context_summary: ContextSummary,
+    pub(crate) context_summary: ContextSummary,
 
     /// Final DSL proposed (if any).
     pub proposed_dsl: Option<String>,
@@ -147,7 +147,7 @@ pub struct DecisionLog {
 /// What kind of interaction this turn represented.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum TurnType {
+pub enum TurnType {
     /// Normal user message → verb match → DSL.
     IntentMatch,
     /// User selected from disambiguation options.
@@ -170,7 +170,7 @@ pub(crate) enum TurnType {
 
 /// Full record of verb matching for this turn.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct VerbDecision {
+pub struct VerbDecision {
     /// Raw candidates from semantic search (before pack scoring).
     pub raw_candidates: Vec<VerbCandidateSnapshot>,
 
@@ -209,7 +209,7 @@ pub(crate) struct VerbDecision {
 
 /// Log entry for precondition filtering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PreconditionFilterLog {
+pub struct PreconditionFilterLog {
     /// Candidates before filtering.
     pub before_count: usize,
     /// Candidates after filtering.
@@ -220,7 +220,7 @@ pub(crate) struct PreconditionFilterLog {
 
 /// A verb removed by precondition filter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct PreconditionRemovedVerb {
+pub struct PreconditionRemovedVerb {
     pub verb_fqn: String,
     pub reasons: Vec<String>,
     pub suggested_verb: Option<String>,
@@ -259,7 +259,7 @@ impl Default for VerbDecision {
 
 /// Record of entity resolution for a single arg slot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntityDecision {
+pub struct EntityDecision {
     /// Arg name that needed entity resolution (e.g. "entity-id").
     pub arg_name: String,
 
@@ -282,7 +282,7 @@ pub(crate) struct EntityDecision {
 /// How an entity was resolved.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum EntityResolutionMethod {
+pub enum EntityResolutionMethod {
     /// Resolved via pronoun/focus (zero cost).
     Focus,
     /// Resolved via accumulated Q&A answers.
@@ -299,7 +299,7 @@ pub(crate) enum EntityResolutionMethod {
 
 /// Snapshot of an entity candidate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntityCandidateSnapshot {
+pub struct EntityCandidateSnapshot {
     pub entity_id: Uuid,
     pub display_name: String,
     pub entity_type: Option<String>,
@@ -312,7 +312,7 @@ pub(crate) struct EntityCandidateSnapshot {
 
 /// Record of how arguments were extracted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ExtractionDecision {
+pub struct ExtractionDecision {
     /// Method used for extraction.
     pub method: ExtractionMethod,
 
@@ -335,7 +335,7 @@ pub(crate) struct ExtractionDecision {
 /// How args were extracted.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ExtractionMethod {
+pub enum ExtractionMethod {
     /// All args filled deterministically (no LLM).
     Deterministic,
     /// LLM was used for arg extraction.
@@ -454,13 +454,13 @@ impl DecisionLog {
     }
 
     /// Set turn type.
-    pub fn with_turn_type(mut self, turn_type: TurnType) -> Self {
+    pub(crate) fn with_turn_type(mut self, turn_type: TurnType) -> Self {
         self.turn_type = turn_type;
         self
     }
 
     /// Set verb decision.
-    pub fn with_verb_decision(mut self, decision: VerbDecision) -> Self {
+    pub(crate) fn with_verb_decision(mut self, decision: VerbDecision) -> Self {
         self.verb_decision = decision;
         self
     }
@@ -472,13 +472,13 @@ impl DecisionLog {
     }
 
     /// Set extraction decision.
-    pub fn with_extraction_decision(mut self, decision: ExtractionDecision) -> Self {
+    pub(crate) fn with_extraction_decision(mut self, decision: ExtractionDecision) -> Self {
         self.extraction_decision = decision;
         self
     }
 
     /// Set context summary.
-    pub fn with_context_summary(mut self, summary: ContextSummary) -> Self {
+    pub(crate) fn with_context_summary(mut self, summary: ContextSummary) -> Self {
         self.context_summary = summary;
         self
     }
@@ -630,7 +630,7 @@ pub struct GoldenTestCase {
     pub expected_args: HashMap<String, String>,
 
     /// Optional: expected entity resolution.
-    pub expected_entities: Vec<GoldenEntityExpectation>,
+    pub(crate) expected_entities: Vec<GoldenEntityExpectation>,
 
     /// Tags for filtering (e.g. "pronoun", "multi-intent", "edge-case").
     pub tags: Vec<String>,

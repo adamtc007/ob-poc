@@ -402,12 +402,12 @@ pub struct ExecutionContext {
     /// the current scope but cannot directly access UnifiedSessionContext. Instead,
     /// they store the new GraphScope here. After execution completes, the caller
     /// should call `take_pending_scope_change()` and update the session scope.
-    pub pending_scope_change: Option<GraphScope>,
+    pub(crate) pending_scope_change: Option<GraphScope>,
     /// Source attribution for audit trail
     ///
     /// Tracks where the execution originated (api, cli, mcp, etc.),
     /// correlation ID for distributed tracing, and actor information.
-    pub source_attribution: super::idempotency::SourceAttribution,
+    pub(crate) source_attribution: super::idempotency::SourceAttribution,
     /// Session ID for view state audit linkage
     pub session_id: Option<Uuid>,
     /// Session's active CBU IDs (for reading during execution)
@@ -862,7 +862,7 @@ impl ExecutionContext {
     ///     session.set_scope(scope);
     /// }
     /// ```
-    pub fn take_pending_scope_change(&mut self) -> Option<GraphScope> {
+    pub(crate) fn take_pending_scope_change(&mut self) -> Option<GraphScope> {
         self.pending_scope_change.take()
     }
 
@@ -1080,7 +1080,7 @@ impl ExecutionContext {
 
     /// Create context from DomainContext (for submission execution)
     #[cfg(feature = "database")]
-    pub fn from_domain(domain_ctx: &DomainContext) -> Self {
+    pub(crate) fn from_domain(domain_ctx: &DomainContext) -> Self {
         let mut ctx = Self::new();
         // Pre-populate with active CBU if set
         if let Some(cbu_id) = domain_ctx.active_cbu_id {
@@ -1103,7 +1103,7 @@ impl ExecutionContext {
 /// Result of executing a DslSubmission
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, serde::Serialize)]
-pub(crate) struct SubmissionResult {
+pub struct SubmissionResult {
     /// Results for each iteration
     pub iterations: Vec<IterationResult>,
     /// Whether this was a batch execution (N > 1)
@@ -1115,7 +1115,7 @@ pub(crate) struct SubmissionResult {
 /// Result of a single iteration within a submission
 #[cfg(feature = "database")]
 #[derive(Debug, Clone, serde::Serialize)]
-pub(crate) struct IterationResult {
+pub struct IterationResult {
     /// Iteration index (0 for singleton)
     pub index: usize,
     /// Whether iteration succeeded
@@ -2816,7 +2816,7 @@ impl DslExecutor {
     ///     }
     /// }
     /// ```
-    pub async fn execute_plan_atomic_with_locks(
+    pub(crate) async fn execute_plan_atomic_with_locks(
         &self,
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
@@ -3161,7 +3161,7 @@ impl DslExecutor {
     ///     }
     /// }
     /// ```
-    pub async fn execute_plan_best_effort(
+    pub(crate) async fn execute_plan_best_effort(
         &self,
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,

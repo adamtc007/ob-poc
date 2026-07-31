@@ -83,7 +83,8 @@ pub mod projections;
 pub mod stewardship;
 
 // Re-export core types at module boundary
-pub use gates::{evaluate_publish_gates};
+#[cfg(test)]
+pub(crate) use gates::evaluate_publish_gates;
 pub use sem_os_core::types::EvidenceGrade;
 pub use store::SnapshotStore;
 pub use types::{
@@ -118,7 +119,7 @@ pub use requirement_profile_def::RequirementProfileDefBody;
 pub(crate) use derivation::DerivationFunctionRegistry;
 
 // Re-export Phase 8 types
-pub use agent::{all_tool_specs, dispatch_tool};
+pub use agent::all_tool_specs;
 
 // Re-export evidence instance types
 

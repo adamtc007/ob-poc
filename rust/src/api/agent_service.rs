@@ -490,7 +490,7 @@ impl AgentService {
     /// path as `process_chat()` / `handle_utterance()`, guaranteeing the returned
     /// `SemOsContextEnvelope` carries the identical verb set the agent pipeline would use.
     #[cfg(feature = "database")]
-    pub async fn resolve_options(
+    pub(crate) async fn resolve_options(
         &self,
         session: &crate::session::UnifiedSession,
         actor: crate::sem_reg::abac::ActorContext,

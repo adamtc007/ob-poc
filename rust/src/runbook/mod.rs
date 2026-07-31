@@ -69,8 +69,6 @@ pub use approval_token::{
     MutationApprovalToken, MutationApprovalTokenCore, MutationApprovalTokenStatus,
     ObservedMutationAnchors, RestrictedMutationApprovalCheck,
 };
-#[cfg(test)]
-pub(crate) use canonical::{canonical_bytes_for_envelope, canonical_bytes_for_step};
 pub(crate) use compiler::compile_verb;
 pub use dsl_drafter::{
     validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
@@ -78,8 +76,11 @@ pub use dsl_drafter::{
     DslDrafterValidationStepStatus,
 };
 pub use envelope::{ReplayEnvelope};
-pub use executor::{acquire_advisory_locks_on_scope, execute_runbook, execute_runbook_in_scope, RunbookStore, RunbookStoreBackend, StepOutcome};
-pub(crate) use executor::{ExecutionError, StepExecutor, UnlockedExecutionToken};
+// `execute_runbook`/`execute_runbook_in_scope`/`RunbookStoreBackend`/`ExecutionError`/
+// `RunbookExecutionResult` are `pub`: consumed across the crate boundary by
+// integration tests (`tests/sequencer_cross_step_atomicity.rs`).
+pub use executor::{execute_runbook, execute_runbook_in_scope, ExecutionError, RunbookExecutionResult, RunbookStore, RunbookStoreBackend, StepOutcome};
+pub(crate) use executor::{acquire_advisory_locks_on_scope, StepExecutor, UnlockedExecutionToken};
 // T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022): test-only bypass for
 // `execute_runbook` with a non-empty write_set and no pool. Re-exported
 // unconditionally (not `#[cfg(test)]`) because `mod.rs` itself has no test
@@ -87,7 +88,7 @@ pub(crate) use executor::{ExecutionError, StepExecutor, UnlockedExecutionToken};
 // where `executor::execute_runbook_unlocked_for_tests` is compiled, i.e.
 // under `#[cfg(test)]` in the defining module.
 #[cfg(test)]
-pub use executor::execute_runbook_unlocked_for_tests;
+pub(crate) use executor::execute_runbook_unlocked_for_tests;
 pub use kyc_dry_run::{
     build_kyc_update_status_dry_run, build_kyc_update_status_dry_run_with_manifest,
     KycUpdateStatusDryRunInput, KycUpdateStatusDryRunOutput, KycUpdateStatusDryRunRefusal,
@@ -100,8 +101,9 @@ pub use language_pack::{
     SemOsLanguagePack, TransitionEffect, TransitionLanguagePackReadiness,
     UpdateStatusLanguagePackRequest, UuidBindingRequirement,
 };
-pub use llm_draft_adapter::{run_kyc_update_status_llm_draft_loop, run_kyc_update_status_llm_draft_loop_with_prompt_pack};
-pub(crate) use llm_draft_adapter::LlmDraftLoopOutcome;
+pub(crate) use llm_draft_adapter::{run_kyc_update_status_llm_draft_loop, LlmDraftLoopOutcome};
+#[cfg(test)]
+pub(crate) use llm_draft_adapter::run_kyc_update_status_llm_draft_loop_with_prompt_pack;
 pub use mutation_preflight::{
     prepare_restricted_mutation_preflight, MutationExecutor, MutationSemanticDiff,
     RestrictedMutationPreflight, RestrictedMutationPreflightError,

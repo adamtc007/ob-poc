@@ -27,7 +27,7 @@ impl PendingDispatchStore {
 
     /// Insert a pending dispatch. Returns `false` if a pending dispatch
     /// with the same payload_hash already exists (idempotent).
-    pub async fn insert(&self, dispatch: &PendingDispatch) -> Result<bool> {
+    pub(crate) async fn insert(&self, dispatch: &PendingDispatch) -> Result<bool> {
         let session_stack = serde_json::to_value(&dispatch.session_stack)
             .context("Failed to serialize pending dispatch session_stack")?;
         let result = sqlx::query(
@@ -71,7 +71,7 @@ impl PendingDispatchStore {
     ///
     /// Uses `FOR UPDATE SKIP LOCKED` to allow concurrent workers (future-proof).
     /// Only returns rows where `last_attempted_at` is older than `backoff` or NULL.
-    pub async fn claim_pending(
+    pub(crate) async fn claim_pending(
         &self,
         limit: i32,
         backoff: Duration,

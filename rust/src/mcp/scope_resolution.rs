@@ -110,7 +110,7 @@ const MIN_SINGLE_TOKEN_CONFIDENCE: f64 = 0.85;
 /// Outcome of scope resolution - deterministic UX contract
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub(crate) enum ScopeResolutionOutcome {
+pub enum ScopeResolutionOutcome {
     /// Scope resolved unambiguously - set anchor silently, show "Client: X" chip
     Resolved {
         group_id: Uuid,
@@ -127,7 +127,7 @@ pub(crate) enum ScopeResolutionOutcome {
 
 /// A candidate for scope resolution (when ambiguous)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ScopeCandidate {
+pub struct ScopeCandidate {
     pub group_id: Uuid,
     pub group_name: String,
     pub matched_alias: String,
@@ -140,7 +140,7 @@ pub(crate) struct ScopeCandidate {
 
 /// Scope context for entity resolution
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct ScopeContext {
+pub struct ScopeContext {
     /// Active client group ID (if resolved)
     pub client_group_id: Option<Uuid>,
     /// Client group name (for display)
@@ -460,7 +460,7 @@ pub async fn search_entities_in_scope(
 
 /// An entity match from scoped search
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct EntityMatch {
+pub struct EntityMatch {
     pub entity_id: Uuid,
     pub entity_name: String,
     pub matched_tag: String,
@@ -475,7 +475,7 @@ pub(crate) struct EntityMatch {
 /// Unified scoped match result - works for CBU, entity, client_group, etc.
 /// Includes display metadata for disambiguation UI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ScopedMatch {
+pub struct ScopedMatch {
     pub id: Uuid,
     pub name: String,
     pub matched_tag: String,
