@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".cbu_trading_profiles\n        SET status = 'ACTIVE',\n            document = $2,\n            document_hash = $3,\n            activated_at = $4,\n            activated_by = $5\n        WHERE profile_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Text",
+        "Timestamptz",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2d75b2ec44966e50d8d6872b5ae745625d3c02ccaadc103f3f852d8b1877abe8"
+}

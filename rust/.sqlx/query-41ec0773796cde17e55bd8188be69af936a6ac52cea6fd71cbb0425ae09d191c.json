@@ -1,0 +1,120 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".audit_log (\n                failure_id, action, actor_type, actor_id,\n                details, evidence, evidence_hash,\n                previous_status, new_status\n            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        {
+          "Custom": {
+            "name": "\"ob-poc\".audit_action",
+            "kind": {
+              "Enum": [
+                "CAPTURED",
+                "CLASSIFIED",
+                "DEDUPLICATED",
+                "RUNTIME_ATTEMPT",
+                "RUNTIME_SUCCESS",
+                "RUNTIME_EXHAUSTED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED_FAILS",
+                "REPRO_VERIFICATION_FAILED",
+                "TODO_CREATED",
+                "TODO_ASSIGNED",
+                "FIX_COMMITTED",
+                "REPRO_VERIFIED_PASSES",
+                "DEPLOYED",
+                "SEMANTIC_REPLAY_PASSED",
+                "SEMANTIC_REPLAY_FAILED",
+                "RESOLVED",
+                "MARKED_WONT_FIX",
+                "MARKED_DUPLICATE",
+                "REOPENED",
+                "COMMENT_ADDED"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "\"ob-poc\".actor_type",
+            "kind": {
+              "Enum": [
+                "SYSTEM",
+                "MCP_AGENT",
+                "REPL_USER",
+                "EGUI_USER",
+                "CI_PIPELINE",
+                "CLAUDE_CODE",
+                "CRON_JOB"
+              ]
+            }
+          }
+        },
+        "Text",
+        "Jsonb",
+        "Text",
+        "Text",
+        {
+          "Custom": {
+            "name": "\"ob-poc\".issue_status",
+            "kind": {
+              "Enum": [
+                "NEW",
+                "RUNTIME_RESOLVED",
+                "RUNTIME_ESCALATED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED",
+                "TODO_CREATED",
+                "IN_PROGRESS",
+                "FIX_COMMITTED",
+                "FIX_VERIFIED",
+                "DEPLOYED_STAGING",
+                "DEPLOYED_PROD",
+                "RESOLVED",
+                "WONT_FIX",
+                "DUPLICATE",
+                "INVALID"
+              ]
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "\"ob-poc\".issue_status",
+            "kind": {
+              "Enum": [
+                "NEW",
+                "RUNTIME_RESOLVED",
+                "RUNTIME_ESCALATED",
+                "REPRO_GENERATED",
+                "REPRO_VERIFIED",
+                "TODO_CREATED",
+                "IN_PROGRESS",
+                "FIX_COMMITTED",
+                "FIX_VERIFIED",
+                "DEPLOYED_STAGING",
+                "DEPLOYED_PROD",
+                "RESOLVED",
+                "WONT_FIX",
+                "DUPLICATE",
+                "INVALID"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "41ec0773796cde17e55bd8188be69af936a6ac52cea6fd71cbb0425ae09d191c"
+}

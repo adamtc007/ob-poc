@@ -178,7 +178,9 @@ pub struct GatePipeline {
 /// Resolves a verb FQN to its v1.3 `transition_args` metadata. Caller
 /// implements this via a HashMap pre-populated from VerbsConfig at
 /// startup.
-pub(crate) trait VerbTransitionLookup: Send + Sync {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub trait VerbTransitionLookup: Send + Sync {
     fn lookup(&self, verb_fqn: &str) -> Option<dsl_core::TransitionArgs>;
 }
 

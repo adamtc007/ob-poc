@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".failures\n            SET occurrence_count = occurrence_count + 1,\n                last_seen_at = $2\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c9233117b83dc7cf5a53684ecc5f815d098095d5e197308bb99f5b67dd6aae1b"
+}

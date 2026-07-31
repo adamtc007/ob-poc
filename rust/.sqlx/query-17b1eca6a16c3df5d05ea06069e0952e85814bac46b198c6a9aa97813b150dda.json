@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT entity_id, token_norm\n        FROM \"ob-poc\".entity_feature\n        WHERE entity_id IN (SELECT entity_id FROM \"ob-poc\".entities)\n        ORDER BY entity_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "token_norm",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "17b1eca6a16c3df5d05ea06069e0952e85814bac46b198c6a9aa97813b150dda"
+}

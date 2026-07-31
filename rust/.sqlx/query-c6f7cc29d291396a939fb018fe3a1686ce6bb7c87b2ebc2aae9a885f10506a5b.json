@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT profile_id, version, document, document_hash\n        FROM \"ob-poc\".cbu_trading_profiles\n        WHERE cbu_id = $1 AND status = 'ACTIVE'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "profile_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "version",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "document",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "document_hash",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c6f7cc29d291396a939fb018fe3a1686ce6bb7c87b2ebc2aae9a885f10506a5b"
+}

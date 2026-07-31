@@ -19,7 +19,9 @@ use tracing::{error, info, warn};
 
 /// Status of the learning system
 #[derive(Debug, Clone, Default)]
-pub(crate) struct LearningStatus {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct LearningStatus {
     /// Last time analysis was run
     pub last_analysis: Option<chrono::DateTime<chrono::Utc>>,
     /// Patterns applied in last run

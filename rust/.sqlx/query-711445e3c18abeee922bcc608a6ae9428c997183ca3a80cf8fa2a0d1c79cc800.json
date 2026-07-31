@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE \"ob-poc\".cbu_trading_profiles\n        SET status = $1, submitted_at = $2, submitted_by = $3, notes = COALESCE($4, notes)\n        WHERE profile_id = $5\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "711445e3c18abeee922bcc608a6ae9428c997183ca3a80cf8fa2a0d1c79cc800"
+}

@@ -27,7 +27,9 @@ use crate::lookup::LookupResult;
 
 /// A v2 REPL session — the single source of truth for a user's work.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ReplSessionV2 {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct ReplSessionV2 {
     pub id: Uuid,
     pub state: ReplStateV2,
     /// Deprecated — retained as opaque JSON for deserialization of legacy sessions.

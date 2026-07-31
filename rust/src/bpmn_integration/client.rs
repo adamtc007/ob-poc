@@ -29,14 +29,18 @@ const ENV_GRPC_URL: &str = "BPMN_LITE_GRPC_URL";
 
 /// Result of compiling BPMN XML to bytecode.
 #[derive(Debug, Clone)]
-pub(crate) struct CompileResult {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct CompileResult {
     pub bytecode_version: Vec<u8>,
     pub diagnostics: Vec<CompileDiagnostic>,
 }
 
 /// Single diagnostic from compilation.
 #[derive(Debug, Clone)]
-pub(crate) struct CompileDiagnostic {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct CompileDiagnostic {
     pub severity: String,
     pub message: String,
     pub element_id: String,

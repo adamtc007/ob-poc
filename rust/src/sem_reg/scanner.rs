@@ -76,7 +76,9 @@ pub fn suggest_security_label(
 
 /// Summary report from a scan run.
 #[derive(Debug, Default)]
-pub(crate) struct ScanReport {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct ScanReport {
     pub verb_contracts_published: usize,
     pub verb_contracts_skipped: usize,
     pub verb_contracts_updated: usize,

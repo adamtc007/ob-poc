@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE \"ob-poc\".failures\n            SET repro_type = $2, repro_path = $3, status = 'REPRO_GENERATED'\n            WHERE fingerprint = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7c98f974052ec65a2f1118c97b4a31b12d9b432d948be7ffe00bb03e35e7f920"
+}

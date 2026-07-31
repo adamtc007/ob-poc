@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE \"ob-poc\".cbu_trading_profiles\n           SET document = $2,\n               document_hash = $3\n           WHERE profile_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "849bba4551e9b6475fe992105c06f562e9b9ae77ea61f0182a52da484bc3b73d"
+}

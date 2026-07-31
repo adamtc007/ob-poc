@@ -113,7 +113,9 @@ pub(crate) struct MacroIndexEntry {
 
 /// Curated search overrides loaded from YAML (optional layer).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub(crate) struct MacroSearchOverrides {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct MacroSearchOverrides {
     #[serde(default)]
     pub aliases: HashMap<String, Vec<String>>,
 }

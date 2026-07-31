@@ -77,7 +77,9 @@ pub(crate) struct CompiledVerbContract {
 
 /// Errors from verb sync operations
 #[derive(Debug, Error)]
-pub(crate) enum VerbSyncError {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub enum VerbSyncError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 

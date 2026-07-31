@@ -915,7 +915,9 @@ pub(crate) fn build_evaluation_context(
 /// would be exactly the "parallel, redundant tracking mechanism" the
 /// mission brief said not to build.
 #[derive(Debug, Clone)]
-pub(crate) struct ShadowDecisionRow {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct ShadowDecisionRow {
     pub session_id: Uuid,
     pub entry_id: Uuid,
     pub verb_fqn: String,

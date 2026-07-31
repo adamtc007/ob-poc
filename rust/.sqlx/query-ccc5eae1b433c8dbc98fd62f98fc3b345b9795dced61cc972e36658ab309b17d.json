@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT alias_norm, COUNT(DISTINCT entity_id) as cnt\n        FROM (\n            SELECT LOWER(TRIM(REGEXP_REPLACE(name, '[^a-zA-Z0-9 ]', ' ', 'g'))) as alias_norm, entity_id\n            FROM \"ob-poc\".entity_names\n            UNION ALL\n            SELECT LOWER(TRIM(REGEXP_REPLACE(alias, '[^a-zA-Z0-9 ]', ' ', 'g'))) as alias_norm, entity_id\n            FROM \"ob-poc\".entity_aliases WHERE entity_id IS NOT NULL\n        ) combined\n        GROUP BY alias_norm\n        HAVING COUNT(DISTINCT entity_id) > 1\n        ORDER BY cnt DESC\n        LIMIT 20",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "alias_norm",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "cnt",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "ccc5eae1b433c8dbc98fd62f98fc3b345b9795dced61cc972e36658ab309b17d"
+}

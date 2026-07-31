@@ -15,7 +15,9 @@ use super::inspector::AgentLearningInspector;
 
 /// Statistics from warmup process.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub(crate) struct WarmupStats {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct WarmupStats {
     /// Entity aliases loaded
     pub entity_aliases_loaded: usize,
     /// Lexicon tokens loaded
@@ -30,7 +32,9 @@ pub(crate) struct WarmupStats {
 
 /// In-memory learned data for fast lookup.
 #[derive(Debug, Default)]
-pub(crate) struct LearnedData {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct LearnedData {
     /// Entity aliases: lowercase alias → (canonical_name, entity_id)
     pub entity_aliases: HashMap<String, (String, Option<Uuid>)>,
     /// Lexicon tokens: lowercase token → (token_type, subtype)

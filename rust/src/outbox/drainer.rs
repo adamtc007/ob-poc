@@ -426,7 +426,9 @@ fn parse_effect_kind(raw: &str) -> Result<OutboxEffectKind> {
 
 /// Handle returned by [`OutboxDrainerImpl::spawn`] for graceful
 /// shutdown at process exit.
-pub(crate) struct OutboxDrainerHandle {
+/// `pub` (not `pub(crate)`): named across the crate boundary by the
+/// `ob-poc-web` binary crate (a separate compilation unit).
+pub struct OutboxDrainerHandle {
     /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): written by
     /// `spawn()` (live in production), read only by `shutdown()` below,
     /// which is itself only exercised by integration tests — production

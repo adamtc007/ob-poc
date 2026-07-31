@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT\n            entity_id,\n            name,\n            name_type\n        FROM \"ob-poc\".entity_names\n        WHERE entity_id IN (SELECT entity_id FROM \"ob-poc\".entities)\n        ORDER BY entity_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name_type",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "977471b232d369115a4be888300b5975543377b01c394514a2139df22945fa7d"
+}
