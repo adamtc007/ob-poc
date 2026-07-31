@@ -26,12 +26,8 @@ invocation_phrases:
 
 required_context: []
 optional_context: []
-# No workspace binding yet: `platform_admin` is not a `WorkspaceKind`
-# variant (rust/crates/ob-poc-types/src/session/kinds.rs), and an unknown
-# value here fails the entire pack-catalogue load. Empty workspaces =
-# internal pack (hidden from workspace listings) until a platform-admin
-# workspace home is decided.
-workspaces: []
+# Bound to WorkspaceKind::PlatformAdmin (rust/crates/ob-poc-types/src/session/kinds.rs).
+workspaces: [platform_admin]
 
 allowed_verbs:
   - access-review.attest

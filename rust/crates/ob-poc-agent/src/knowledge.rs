@@ -189,6 +189,7 @@ fn workspace_label(workspace: &ob_poc_types::session::kinds::WorkspaceKind) -> S
         WorkspaceKind::OnBoarding => "onboarding".to_string(),
         WorkspaceKind::Catalogue => "catalogue".to_string(),
         WorkspaceKind::Bpmn => "bpmn".to_string(),
+        WorkspaceKind::PlatformAdmin => "platform-admin".to_string(),
     }
 }
 

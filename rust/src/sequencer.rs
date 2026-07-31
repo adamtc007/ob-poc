@@ -2547,6 +2547,12 @@ impl ReplOrchestratorV2 {
         {
             return Some(WorkspaceKind::SemOsMaintenance);
         }
+        if lower.contains("platform admin")
+            || lower.contains("access review")
+            || lower.contains("team access")
+        {
+            return Some(WorkspaceKind::PlatformAdmin);
+        }
         if lower.contains("cbu")
             || lower.contains("client business")
             || lower.contains("structure")
@@ -4297,6 +4303,12 @@ impl ReplOrchestratorV2 {
                 workspace: WorkspaceKind::Bpmn,
                 label: WorkspaceKind::Bpmn.label().to_string(),
                 description: "Manage BPMN worker pools, process compilation, and workflow instances".to_string(),
+            },
+            WorkspaceOption {
+                workspace: WorkspaceKind::PlatformAdmin,
+                label: WorkspaceKind::PlatformAdmin.label().to_string(),
+                description: "Reference data (roles, regulators, identifiers) and access/entitlement administration"
+                    .to_string(),
             },
         ]
     }

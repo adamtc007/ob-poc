@@ -19,7 +19,9 @@
 
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+#[cfg(feature = "database")]
+use anyhow::anyhow;
 use async_trait::async_trait;
 use ob_poc_control_plane::entity_binding::EntityFacts;
 use uuid::Uuid;
@@ -56,6 +58,7 @@ pub trait EntityFactsSource: Send + Sync {
 /// columns match `toctou_recheck.rs::SqlRowVersionProvider::row_version`
 /// exactly — same 5 kinds, same columns, so a `row_version` read here and
 /// there can never silently diverge.
+#[cfg(feature = "database")]
 pub(crate) struct KindMapping {
     pub(crate) table: &'static str,
     pub(crate) pk: &'static str,
@@ -71,6 +74,13 @@ pub(crate) struct KindMapping {
 /// locked pin re-read, per the T9.2 design doc's "one mapping, two
 /// consumers" note — unlocked batched facts here at shadow-evaluation
 /// time (T9.1-pre), locked pin re-read at admission time (T9.2).
+///
+/// `#[cfg(feature = "database")]`: both consumers
+/// (`PgEntityFactsSource::entity_facts` below and
+/// `toctou_recheck::verify_pins_in_scope`) are database-gated, so the
+/// mapping carries the same gate — a no-feature build has no caller and
+/// would otherwise trip the crate's `dead_code = "deny"` lint.
+#[cfg(feature = "database")]
 pub(crate) fn kind_mapping(kind: &str) -> Result<KindMapping> {
     Ok(match kind {
         "cbu" => KindMapping {
@@ -227,7 +237,10 @@ impl<'a> EntityFactsSource for PgEntityFactsSource<'a> {
     }
 }
 
-#[cfg(test)]
+// Gated like `toctou_recheck.rs`'s DB tests: every test here exercises
+// `PgEntityFactsSource`, which only exists under the `database` feature —
+// a plain `#[cfg(test)]` cannot compile without it.
+#[cfg(all(test, feature = "database"))]
 mod tests {
     use super::*;
 

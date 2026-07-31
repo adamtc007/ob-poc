@@ -1030,6 +1030,7 @@ async fn create_session(
                 "semos" | "semos_maintenance" => {
                     Some(crate::repl::types_v2::WorkspaceKind::SemOsMaintenance)
                 }
+                "platform_admin" => Some(crate::repl::types_v2::WorkspaceKind::PlatformAdmin),
                 _ => None,
             };
 

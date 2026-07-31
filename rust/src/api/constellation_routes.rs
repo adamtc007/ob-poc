@@ -599,6 +599,7 @@ fn build_action_hints(workspace: &WorkspaceKind, verbs: &[VerbRef]) -> Vec<Actio
             WorkspaceKind::SemOsMaintenance => "Review registry governance",
             WorkspaceKind::LifecycleResources => "Review lifecycle resources",
             WorkspaceKind::Bpmn => "Review BPMN workflows",
+            WorkspaceKind::PlatformAdmin => "Review reference data and access reviews",
         };
         hints.push(ActionHint {
             label: label.to_string(),

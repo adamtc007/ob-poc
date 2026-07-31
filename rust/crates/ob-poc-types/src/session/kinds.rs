@@ -30,6 +30,7 @@ pub enum WorkspaceKind {
     SemOsMaintenance,
     LifecycleResources,
     Bpmn,
+    PlatformAdmin,
 }
 
 impl WorkspaceKind {
@@ -46,6 +47,7 @@ impl WorkspaceKind {
             Self::SemOsMaintenance => "SemOS Maintenance",
             Self::LifecycleResources => "Lifecycle Resources",
             Self::Bpmn => "BPMN",
+            Self::PlatformAdmin => "Platform Admin",
         }
     }
 
@@ -186,6 +188,21 @@ impl WorkspaceKind {
                 default_constellation_map: "bpmn.workspace",
                 supports_handoff_mode: false,
             },
+            // Housekeeping-tier admin workspace (config/packs/platform-admin.yaml):
+            // reference data + access/entitlement administration. Not tied to a
+            // client scope or business subject, so it mirrors the Catalogue /
+            // SemOsMaintenance governance shape: no subjects, registry_governance
+            // constellation, no handoff mode.
+            Self::PlatformAdmin => WorkspaceRegistryEntry {
+                workspace_id: self.clone(),
+                display_name: self.label(),
+                constellation_families: vec!["registry_governance"],
+                subject_kinds: vec![],
+                subject_required: false,
+                default_constellation_family: "registry_governance",
+                default_constellation_map: "registry.stewardship",
+                supports_handoff_mode: false,
+            },
         }
     }
 
@@ -202,6 +219,7 @@ impl WorkspaceKind {
             Self::SemOsMaintenance,
             Self::LifecycleResources,
             Self::Bpmn,
+            Self::PlatformAdmin,
         ]
     }
 
@@ -255,6 +273,12 @@ impl WorkspaceKind {
         }
         if msg.contains("bpmn") || msg.contains("workflow") || msg.contains("orchestration") {
             return Some(Self::Bpmn);
+        }
+        if msg.contains("platform admin")
+            || msg.contains("access review")
+            || msg.contains("team access")
+        {
+            return Some(Self::PlatformAdmin);
         }
         None
     }

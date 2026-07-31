@@ -1109,6 +1109,7 @@ fn workspace_kind_to_shared(
         WorkspaceKind::SemOsMaintenance => SessionWorkspaceKind::SemOsMaintenance,
         WorkspaceKind::LifecycleResources => SessionWorkspaceKind::LifecycleResources,
         WorkspaceKind::Bpmn => SessionWorkspaceKind::Bpmn,
+        WorkspaceKind::PlatformAdmin => SessionWorkspaceKind::PlatformAdmin,
     }
 }
 

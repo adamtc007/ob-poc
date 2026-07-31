@@ -416,5 +416,20 @@ templates:
         assert!(!packs.is_empty());
         assert!(packs.iter().any(|(pack, _)| pack.id == "cbu-maintenance"));
         assert!(packs.iter().any(|(pack, _)| pack.id == "catalogue"));
+
+        // Receipt for the 891c9614 fail-open: platform-admin declared
+        // `workspaces: [platform_admin]` before the WorkspaceKind variant
+        // existed, which failed the ENTIRE pack-catalogue load. The pack
+        // must both load and resolve to the first-class variant — not be
+        // hidden behind an empty `workspaces: []` interim fix.
+        let (platform_admin, _) = packs
+            .iter()
+            .find(|(pack, _)| pack.id == "platform-admin")
+            .expect("platform-admin pack loads");
+        assert_eq!(
+            platform_admin.workspaces,
+            vec![ob_poc_types::session::kinds::WorkspaceKind::PlatformAdmin],
+            "platform-admin pack must bind to WorkspaceKind::PlatformAdmin"
+        );
     }
 }

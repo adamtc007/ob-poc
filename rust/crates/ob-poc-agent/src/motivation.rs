@@ -145,6 +145,7 @@ fn render_system_prompt(index: &SessionIndex) -> String {
             ob_poc_types::session::kinds::WorkspaceKind::OnBoarding => "onboarding",
             ob_poc_types::session::kinds::WorkspaceKind::SemOsMaintenance => "semos_maintenance",
             ob_poc_types::session::kinds::WorkspaceKind::Bpmn => "bpmn",
+            ob_poc_types::session::kinds::WorkspaceKind::PlatformAdmin => "platform_admin",
         },
         description = index.pack.description,
         allowed = index.allowed_verbs().join(", "),
