@@ -755,9 +755,6 @@ impl DagState {
     }
 
     /// Check if a verb was completed
-    ///
-    /// Used by `PrereqCondition::is_satisfied` (see note there on why that
-    /// method itself is currently unreachable from any live caller).
     pub(crate) fn is_completed(&self, verb_fqn: &str) -> bool {
         self.completed.contains(verb_fqn)
     }
@@ -768,8 +765,6 @@ impl DagState {
     }
 
     /// Get a state flag (defaults to false)
-    ///
-    /// Used by `PrereqCondition::is_satisfied` (see note there).
     pub(crate) fn get_flag(&self, key: &str) -> bool {
         self.state_flags.get(key).copied().unwrap_or(false)
     }
@@ -780,8 +775,6 @@ impl DagState {
     }
 
     /// Get a fact predicate
-    ///
-    /// Used by `PrereqCondition::is_satisfied` (see note there).
     pub(crate) fn get_fact(&self, key: &str) -> Option<&serde_json::Value> {
         self.facts.get(key)
     }
@@ -1053,32 +1046,6 @@ pub(crate) struct CorrectionSubSession {
     pub hit_id: Option<Uuid>,
     /// Correction type being applied
     pub correction_type: Option<String>,
-}
-
-/// Prereq condition for DAG navigation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub(crate) enum PrereqCondition {
-    /// A specific verb must have been completed
-    VerbCompleted { verb: String },
-    /// Any of the listed verbs must have been completed
-    AnyOf { verbs: Vec<String> },
-    /// A state flag must exist (and be true)
-    StateExists { key: String },
-    /// A fact predicate must exist
-    FactExists { predicate: String },
-}
-
-impl PrereqCondition {
-    /// Check if this prereq is satisfied
-    pub(crate) fn is_satisfied(&self, dag_state: &DagState) -> bool {
-        match self {
-            Self::VerbCompleted { verb } => dag_state.is_completed(verb),
-            Self::AnyOf { verbs } => verbs.iter().any(|v| dag_state.is_completed(v)),
-            Self::StateExists { key } => dag_state.get_flag(key),
-            Self::FactExists { predicate } => dag_state.get_fact(predicate).is_some(),
-        }
-    }
 }
 
 /// Canonical prereq/state keys (enforced by lint)
@@ -2388,41 +2355,6 @@ mod tests {
         // Set flag
         dag.set_flag("structure.exists", true);
         assert!(dag.get_flag("structure.exists"));
-    }
-
-    #[test]
-    fn test_prereq_conditions() {
-        let mut dag = DagState::default();
-        dag.mark_completed("structure.setup");
-        dag.set_flag("structure.exists", true);
-
-        // VerbCompleted
-        let prereq = PrereqCondition::VerbCompleted {
-            verb: "structure.setup".to_string(),
-        };
-        assert!(prereq.is_satisfied(&dag));
-
-        let prereq = PrereqCondition::VerbCompleted {
-            verb: "case.open".to_string(),
-        };
-        assert!(!prereq.is_satisfied(&dag));
-
-        // AnyOf
-        let prereq = PrereqCondition::AnyOf {
-            verbs: vec!["structure.setup".to_string(), "case.open".to_string()],
-        };
-        assert!(prereq.is_satisfied(&dag));
-
-        // StateExists
-        let prereq = PrereqCondition::StateExists {
-            key: "structure.exists".to_string(),
-        };
-        assert!(prereq.is_satisfied(&dag));
-
-        let prereq = PrereqCondition::StateExists {
-            key: "case.exists".to_string(),
-        };
-        assert!(!prereq.is_satisfied(&dag));
     }
 
 }

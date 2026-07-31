@@ -23,7 +23,6 @@ pub struct McpServer {
     handlers: ToolHandlers,
     pool: PgPool,
     sem_os_client: Option<Arc<dyn SemOsClient>>,
-    sem_os_service: Option<Arc<dyn sem_os_policy::service::CoreService>>,
 }
 
 impl McpServer {
@@ -35,25 +34,7 @@ impl McpServer {
             handlers: ToolHandlers::new(pool.clone(), embedder),
             pool,
             sem_os_client: None,
-            sem_os_service: None,
         }
-    }
-
-    /// Set the Semantic OS client for sem_reg resource reads and tool dispatch.
-    pub(crate) fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
-        self.sem_os_client = Some(client.clone());
-        self.handlers = self.handlers.with_sem_os_client(client);
-        self
-    }
-
-    /// Set the pre-built CoreService shared across all MCP tool calls.
-    pub(crate) fn with_sem_os_service(
-        mut self,
-        service: Arc<dyn sem_os_policy::service::CoreService>,
-    ) -> Self {
-        self.sem_os_service = Some(service.clone());
-        self.handlers = self.handlers.with_sem_os_service(service);
-        self
     }
 
     /// Install the canonical SemOS plugin op registry. Threaded into the
@@ -61,15 +42,6 @@ impl McpServer {
     /// correctly (post-Phase-5c-migrate slice #80).
     pub fn with_sem_os_ops(mut self, ops: Arc<sem_os_postgres::ops::SemOsVerbOpRegistry>) -> Self {
         self.handlers = self.handlers.with_sem_os_ops(ops);
-        self
-    }
-
-    /// Set the REPL V2 Orchestrator.
-    pub(crate) fn with_orchestrator(
-        mut self,
-        orchestrator: Arc<crate::sequencer::ReplOrchestratorV2>,
-    ) -> Self {
-        self.handlers = self.handlers.with_orchestrator(orchestrator);
         self
     }
 

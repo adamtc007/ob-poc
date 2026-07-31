@@ -266,55 +266,6 @@ impl ToolHandlers {
         }
     }
 
-    /// Set the REPL V2 Orchestrator.
-    pub(crate) fn with_orchestrator(
-        mut self,
-        orchestrator: Arc<crate::sequencer::ReplOrchestratorV2>,
-    ) -> Self {
-        self.orchestrator = Some(orchestrator);
-        self
-    }
-
-
-    /// Set the lexicon service for fast in-memory lexical verb search
-    pub(crate) fn with_lexicon(mut self, lexicon: crate::mcp::verb_search::SharedLexicon) -> Self {
-        self.lexicon = Some(lexicon);
-        self
-    }
-
-    /// Set the macro index for deterministic Tier -2B macro search
-    pub(crate) fn with_macro_index(
-        mut self,
-        macro_index: Arc<crate::mcp::macro_index::MacroIndex>,
-    ) -> Self {
-        self.macro_index = Some(macro_index);
-        self
-    }
-
-    /// Set the scenario index for journey-level Tier -2A resolution
-    pub(crate) fn with_scenario_index(
-        mut self,
-        scenario_index: Arc<crate::mcp::scenario_index::ScenarioIndex>,
-    ) -> Self {
-        self.scenario_index = Some(scenario_index);
-        self
-    }
-
-    /// Set the Semantic OS client for sem_reg_* tool dispatch
-    pub(crate) fn with_sem_os_client(mut self, client: Arc<dyn SemOsClient>) -> Self {
-        self.sem_os_client = Some(client);
-        self
-    }
-
-    /// Set the pre-built CoreService shared across all MCP tool calls.
-    pub(crate) fn with_sem_os_service(
-        mut self,
-        service: Arc<dyn sem_os_policy::service::CoreService>,
-    ) -> Self {
-        self.sem_os_service = Some(service);
-        self
-    }
-
     /// Install the canonical SemOS plugin op registry. Threaded into every
     /// inner `DslExecutor` these handlers construct so plugin verbs dispatch
     /// correctly (post-Phase-5c-migrate slice #80).

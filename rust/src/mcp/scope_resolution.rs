@@ -405,43 +405,6 @@ impl ScopeResolver {
         Ok(ScopeResolutionOutcome::NotScopePhrase)
     }
 
-    /// Record a user's scope selection (flywheel)
-    ///
-    /// When user picks a candidate from the list, reinforce that alias
-    #[cfg(feature = "database")]
-    pub(crate) async fn record_selection(
-        pool: &PgPool,
-        group_id: Uuid,
-        alias_used: &str,
-        _session_id: &str,
-    ) -> Result<()> {
-        let alias_norm = alias_used.to_lowercase().trim().to_string();
-
-        // Reinforce the alias that worked (or create if new)
-        sqlx::query!(
-            r#"
-            INSERT INTO "ob-poc".client_group_alias
-                (group_id, alias, alias_norm, confidence, source)
-            VALUES ($1, $2, $3, 0.9, 'user_confirmed')
-            ON CONFLICT (group_id, alias_norm) DO UPDATE SET
-                confidence = LEAST(client_group_alias.confidence + 0.05, 1.0),
-                source = 'user_confirmed'
-            "#,
-            group_id,
-            alias_used,
-            alias_norm
-        )
-        .execute(pool)
-        .await?;
-
-        tracing::info!(
-            group_id = %group_id,
-            alias = alias_used,
-            "Recorded scope selection (flywheel)"
-        );
-
-        Ok(())
-    }
 }
 
 // =============================================================================

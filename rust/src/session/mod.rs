@@ -28,7 +28,7 @@ pub(crate) use unified::{
     BoundEntity, CaseRef, CbuSnapshot, ChatMessage, ClientRef, CorrectionSubSession, DagState,
     DiscriminatorField, EntityMatch, EntityMatchInfo, EntityScope,
     EnumValue, FieldType,
-    MessageRole, Persona, PrereqCondition, ReplState, ResearchSubSession, ResolutionState,
+    MessageRole, Persona, ReplState, ResearchSubSession, ResolutionState,
     ResolutionSubSession, ResolvedRef, ReviewStatus, ReviewSubSession, RunSheet, RunSheetEntry,
     SearchKeyField, SearchScope, SessionEvent, SessionListItem, SessionState,
     StructureRef, StructureType, SubSessionType, TargetUniverse, UniverseDefinition,
