@@ -108,7 +108,6 @@ pub mod csg_linter;
 // Macro expansion (operator vocabulary layer)
 pub mod domain_context;
 pub mod enrichment;
-pub(crate) mod entity_deps;
 pub mod errors;
 pub(crate) mod execution_plan;
 pub mod execution_result;
@@ -119,8 +118,6 @@ pub(crate) use dsl_analysis::gateway_resolver;
 #[cfg(feature = "database")]
 pub(crate) mod generic_executor;
 #[cfg(feature = "database")]
-pub mod graph_executor;
-#[cfg(feature = "database")]
 pub mod idempotency;
 // §9 item 9 slice 6 (2026-05-13): lsp_validator relocated to dsl-runtime.
 pub(crate) use dsl_analysis::lsp_validator;
@@ -129,7 +126,6 @@ pub(crate) mod macros;
 pub(crate) use dsl_analysis::planning_facade;
 // §9 item 9 slice 6 (2026-05-13): ref_resolver relocated to dsl-runtime.
 pub use dsl_analysis::ref_resolver;
-pub mod repl_session;
 // §9 item 9 slice 1 (2026-05-13): runtime_registry relocated to
 // dsl-runtime. Compat re-export keeps `super::runtime_registry::*`
 // paths (used by the tooling + execution submodules below) and
@@ -147,7 +143,6 @@ pub(crate) use dsl_analysis::validation;
 // Compat re-export preserves `super::verb_registry::*` (used by the
 // tooling submodule) and `crate::dsl_v2::verb_registry::*` callers.
 pub use dsl_analysis::verb_registry;
-pub mod verb_taxonomy;
 
 // Re-export local module types
 // `pub` (not `pub(crate)`): the `dsl_cli` binary (`src/bin/dsl_cli.rs`) is
@@ -163,10 +158,6 @@ pub(crate) use submission::{DslSubmission, SubmissionLimits, SubmissionState, Sy
 // binary (`src/bin/dsl_cli.rs`) is a separate compilation unit and needs to
 // name them across the crate boundary.
 pub use topo_sort::{emit_dsl, topological_sort};
-
-pub(crate) use verb_taxonomy::{
-    verb_taxonomy, DomainSummary, TaxonomyCategory, TaxonomyDomain, VerbLocation, VerbTaxonomy,
-};
 
 // Re-export expansion module types (consumed externally)
 #[allow(unused_imports)]
@@ -189,10 +180,6 @@ pub mod syntax {
 
 /// Planning-facing DSL seam: compile, analyse, and inspect dependency/planning output.
 pub mod planning {
-    pub(crate) use super::entity_deps::{
-        entity_deps, topological_sort_unified, DependencyKind, EntityDep, EntityDependencyRegistry,
-        EntityInstance, EntityTypeKey, TopoSortUnifiedError, TopoSortUnifiedResult,
-    };
     pub use super::execution_plan::{compile};
     pub(crate) use super::execution_plan::ExecutionPlan;
     // `compile_with_planning`/`PlanningBindingInfo`/`PlanningContext` are

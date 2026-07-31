@@ -9,9 +9,6 @@
 //!
 //! - `types`: Core graph types (EntityGraph, GraphNode, typed edges, etc.)
 //! - `filters`: Filter logic for visibility computation
-//! - `viewport`: Viewport state (zoom, pan, visible/off-screen tracking)
-//! - `view_model`: GraphViewModel - output of graph.* DSL verbs
-//! - `query_engine`: GraphQueryEngine for executing graph.* verbs
 //! - `config_driven_builder`: ConfigDrivenGraphBuilder for constructing graphs from DB config
 //! - `layout_v2`: LayoutEngineV2 for computing node positions from DB config
 
@@ -21,11 +18,7 @@ pub mod config_driven_builder;
 pub mod deal_graph_builder;
 pub mod filters;
 pub mod layout_v2;
-#[cfg(feature = "database")]
-pub mod query_engine;
 pub mod types;
-pub mod view_model;
-pub mod viewport;
 
 #[cfg(feature = "database")]
 pub(crate) use config_driven_builder::{ConfigDrivenGraphBuilder, NodeRenderingHints};
@@ -33,15 +26,5 @@ pub(crate) use config_driven_builder::{ConfigDrivenGraphBuilder, NodeRenderingHi
 pub(crate) use deal_graph_builder::DealGraphBuilder;
 pub(crate) use filters::{FilterBuilder, GraphFilterOps};
 pub(crate) use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
-#[cfg(feature = "database")]
-pub(crate) use query_engine::GraphQueryEngine;
 pub use types::{CbuSummary, EdgeType, GraphEdge, GraphNode, NodeType};
 pub(crate) use types::{CbuGraph, CbuNode, CbuStatus, ControlEdge, ControlType, EntityGraph, EntityType, FundEdge, FundRelationshipType, GraphFilters, GraphScope, GraphStats, LayerInfo, LayerType, LayoutBehavior, LayoutOverride, LegacyCbuGraph, LegacyGraphEdge, LegacyGraphNode, LegacyGraphStats, NavigationHistory, NodeOffset, NodeSizeOverride, NodeStatus, OwnershipEdge, OwnershipType, ProngFilter, RoleAssignment, RoleCategory, ServiceEdge, ServiceRelationshipType, UboTreatment, VerificationStatus};
-pub(crate) use view_model::{
-    CanvasBounds, ComparisonSummary, FieldChange, GraphComparison, GraphFilter, GraphPath,
-    GraphViewModel, GraphViewStats, LayoutOrientation, NodeChange, NodeGroup, ViewModeInfo,
-};
-pub(crate) use viewport::{
-    Breakpoint, DisplayConfig, LayoutHint, OffScreenSummary, PanDirection, ViewportContext,
-    ZoomName,
-};

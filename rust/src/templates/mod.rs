@@ -27,7 +27,3 @@ pub use harness::{run_harness_no_db};
 // (`src/bin/template_harness.rs`) is a separate compilation unit and needs
 // to name it across the crate boundary.
 pub use harness::HarnessResult;
-
-// Extension trait for ExpansionContext integration with main crate session types
-mod context_ext;
-pub(crate) use context_ext::ExpansionContextExt;

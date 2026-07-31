@@ -26,8 +26,9 @@ mod discovery_ops_integration;
 // dead sage::clash_matrix module (build_clash_matrix/render_clash_reports/
 // ClashRow had zero production callers) — these two `mod` declarations
 // were left dangling, breaking `cargo test --features database`.
-#[cfg(test)]
-mod entity_deps_integration;
+// entity_deps_integration removed 2026-07-31 (Phase 11): only tested
+// src/dsl_v2/entity_deps.rs, which had zero production callers and was
+// deleted alongside it.
 #[cfg(test)]
 mod expansion_determinism;
 #[cfg(test)]
