@@ -17,9 +17,9 @@ use tokio::sync::Barrier;
 use uuid::Uuid;
 
 use crate::database::locks::{
-    acquire_locks, advisory_xact_lock, lock_key, try_advisory_xact_lock, LockError,
+    acquire_locks, advisory_xact_lock, lock_key, try_advisory_xact_lock, LockError, LockKey,
+    LockMode,
 };
-use crate::dsl_v2::{LockKey, LockMode};
 
 /// Helper to get test database pool
 async fn get_test_pool() -> PgPool {
@@ -111,7 +111,7 @@ async fn test_acquire_locks_sorted_prevents_deadlock() {
     let mut tx = pool.begin().await.expect("Failed to begin transaction");
 
     // acquire_locks should sort internally and acquire in order
-    let result = acquire_locks(&mut tx, &locks, LockMode::Try)
+    let result = acquire_locks(&mut tx, &locks, LockMode::Timeout(Duration::from_secs(1)))
         .await
         .expect("Failed to acquire locks");
 
@@ -137,7 +137,7 @@ async fn test_acquire_locks_deduplicates() {
 
     let mut tx = pool.begin().await.expect("Failed to begin transaction");
 
-    let result = acquire_locks(&mut tx, &locks, LockMode::Try)
+    let result = acquire_locks(&mut tx, &locks, LockMode::Timeout(Duration::from_secs(1)))
         .await
         .expect("Failed to acquire locks");
 
@@ -171,7 +171,9 @@ async fn test_acquire_locks_contention_returns_partial() {
 
     let mut tx_b = pool.begin().await.expect("Failed to begin tx_b");
 
-    let result = acquire_locks(&mut tx_b, &locks, LockMode::Try).await;
+    // Short timeout: the held lock converts to a Contention error once the
+    // statement_timeout fires (LockMode::Try was deleted with the atomic path).
+    let result = acquire_locks(&mut tx_b, &locks, LockMode::Timeout(Duration::from_millis(200))).await;
 
     match result {
         Err(LockError::Contention {
@@ -210,7 +212,7 @@ async fn test_concurrent_sessions_with_locking() {
     let session_a = tokio::spawn(async move {
         let mut tx = pool_a.begin().await.expect("Failed to begin tx_a");
 
-        let result = acquire_locks(&mut tx, &locks_a, LockMode::Try).await;
+        let result = acquire_locks(&mut tx, &locks_a, LockMode::Timeout(Duration::from_secs(1))).await;
         assert!(result.is_ok(), "Session A should acquire lock");
 
         // Signal that we have the lock
@@ -238,7 +240,9 @@ async fn test_concurrent_sessions_with_locking() {
 
         let mut tx = pool_b.begin().await.expect("Failed to begin tx_b");
 
-        let result = acquire_locks(&mut tx, &locks_b, LockMode::Try).await;
+        // Timeout (50ms) expires well before Session A releases (~200ms hold),
+        // so this deterministically reports contention.
+        let result = acquire_locks(&mut tx, &locks_b, LockMode::Timeout(Duration::from_millis(50))).await;
 
         // Should fail due to contention
         match result {

@@ -5,7 +5,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::dsl_v2::execution::{AtomicExecutionResult, BestEffortExecutionResult};
 use crate::session::{
     MessageRole, SessionState, SubSessionType, UnifiedSession, UnresolvedRefInfo,
 };
@@ -104,18 +103,6 @@ impl WatchResponse {
             scope_loaded: snapshot.scope_loaded,
         }
     }
-}
-
-/// Outcome of DSL execution - either atomic (all-or-nothing) or best-effort (partial success)
-///
-/// This enum captures the execution strategy result, allowing the caller to handle
-/// different outcomes appropriately (e.g., rollback vs partial success).
-#[derive(Debug)]
-pub(crate) enum ExecutionOutcome {
-    /// Atomic execution result (all steps in single transaction)
-    Atomic(AtomicExecutionResult),
-    /// Best-effort execution result (continues on failure)
-    BestEffort(BestEffortExecutionResult),
 }
 
 // ============================================================================

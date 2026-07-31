@@ -37,7 +37,6 @@ pub struct AgentState {
     pub session_repo: Arc<crate::database::SessionRepository>,
     pub(crate) dsl_repo: Arc<crate::database::DslRepository>,
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
-    pub(crate) expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
     /// Entity linking service for in-memory entity resolution
     pub entity_linker: Arc<dyn EntityLinkingService>,
     /// Server-side policy enforcement for single-pipeline invariants
@@ -362,9 +361,6 @@ impl AgentState {
             tracing::info!("AgentService wired with SemOsClient");
         }
 
-        let expansion_audit =
-            Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
-
         Self {
             pool,
             dsl_v2_executor,
@@ -374,7 +370,6 @@ impl AgentState {
             session_repo,
             dsl_repo,
             agent_service: Arc::new(agent_service),
-            expansion_audit,
             entity_linker,
             policy_gate,
             sem_os_client,

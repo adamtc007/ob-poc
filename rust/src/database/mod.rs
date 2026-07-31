@@ -18,7 +18,6 @@ pub mod context_discovery_service;
 // relocated to `dsl-runtime::document_requirements::{policy, governed}`.
 pub mod dsl_repository;
 pub mod entity_service;
-pub mod expansion_audit;
 pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
@@ -66,8 +65,6 @@ pub use session_repository::{CbuDslState, SessionRepository};
 pub(crate) use graph_repository::{GraphRepository, PgGraphRepository};
 
 pub use locks::{advisory_xact_lock, lock_key, try_advisory_xact_lock};
-
-pub(crate) use expansion_audit::ExpansionAuditRepository;
 
 pub(crate) use context_discovery_service::ContextDiscoveryService;
 

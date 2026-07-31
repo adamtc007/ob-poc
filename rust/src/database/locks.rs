@@ -33,16 +33,97 @@
 use sqlx::{Postgres, Transaction};
 use thiserror::Error;
 
-// Lock type definitions (LockKey, LockMode, LockAccess) live in the
-// expansion tier — they're tied to verb policy expansion. The typeless
+// Lock type definitions (LockKey, LockMode, LockAccess) live here.
+// They previously lived in dsl_v2::expansion; when the template-expansion
+// stage was deleted (atomic-path removal, 2026-07-31) the types were
+// relocated because their surviving consumers (acquire_locks below, the
+// runbook executor) are all in the database/runbook tier. The typeless
 // SQL primitives (lock_key, advisory_xact_lock, try_advisory_xact_lock)
 // were lifted to ob-poc-boundary in Phase 3 slice 2p so the boundary
 // tier can call them directly without re-entering src/.
-#[allow(unused_imports)]
-pub(crate) use crate::dsl_v2::expansion::{LockAccess, LockKey, LockMode};
 pub use ob_poc_derived_attributes::advisory_lock::{
     advisory_xact_lock, lock_key, try_advisory_xact_lock,
 };
+
+/// Lock access type
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum LockAccess {
+    /// Read lock - allows concurrent readers, blocks writers
+    Read,
+    /// Write lock - exclusive access
+    Write,
+}
+
+/// Lock acquisition mode
+///
+/// The non-blocking `Try` variant was deleted with the atomic execution
+/// path (2026-07-31) — its only production constructor. All surviving
+/// callers (runbook executor) acquire with a bounded blocking wait.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LockMode {
+    /// Blocking with timeout: wait up to `duration`, then fail with contention error.
+    ///
+    /// Implementation: `SET LOCAL statement_timeout = '<ms>'` before
+    /// `pg_advisory_xact_lock()`, then `RESET statement_timeout` after.
+    /// `SET LOCAL` scopes the timeout to the current transaction only —
+    /// it does NOT leak to the connection pool. If the lock is not acquired
+    /// within the duration, PostgreSQL raises error 57014 (query_canceled),
+    /// which is caught and converted to `LockError::Contention`.
+    Timeout(std::time::Duration),
+}
+
+/// A concrete lock key for an entity
+///
+/// Lock keys are sorted before acquisition to prevent deadlocks.
+/// The sort order is: (entity_type, entity_id, access).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub(crate) struct LockKey {
+    /// Entity type (e.g., "person", "entity", "cbu")
+    pub entity_type: String,
+    /// Entity UUID as string
+    pub entity_id: String,
+    /// Access type
+    pub access: LockAccess,
+}
+
+impl LockKey {
+    /// Create a new lock key
+    pub(crate) fn new(
+        entity_type: impl Into<String>,
+        entity_id: impl Into<String>,
+        access: LockAccess,
+    ) -> Self {
+        Self {
+            entity_type: entity_type.into(),
+            entity_id: entity_id.into(),
+            access,
+        }
+    }
+
+    /// Create a write lock key
+    pub(crate) fn write(entity_type: impl Into<String>, entity_id: impl Into<String>) -> Self {
+        Self::new(entity_type, entity_id, LockAccess::Write)
+    }
+}
+
+impl PartialOrd for LockKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LockKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (&self.entity_type, &self.entity_id, &self.access).cmp(&(
+            &other.entity_type,
+            &other.entity_id,
+            &other.access,
+        ))
+    }
+}
 
 // =============================================================================
 // LOCK KEY DERIVATION (struct overload)
@@ -62,8 +143,6 @@ pub(crate) fn lock_key_from_struct(lock: &LockKey) -> i64 {
 pub(crate) struct LockAcquisitionResult {
     /// Locks successfully acquired
     pub acquired: Vec<LockKey>,
-    /// Time spent waiting for locks (in milliseconds)
-    pub wait_time_ms: u64,
 }
 
 /// Error during lock acquisition
@@ -97,11 +176,11 @@ pub(crate) enum LockError {
 /// # Arguments
 /// * `tx` - Active transaction
 /// * `locks` - Lock keys to acquire
-/// * `mode` - Acquisition mode (Try = fail fast, Block = wait)
+/// * `mode` - Acquisition mode (bounded blocking wait)
 ///
 /// # Returns
 /// * `Ok(LockAcquisitionResult)` - All locks acquired successfully
-/// * `Err(LockError::Contention)` - Lock held by another session (only with `LockMode::Try`)
+/// * `Err(LockError::Contention)` - Lock held by another session past the timeout
 /// * `Err(LockError::Database)` - Database error
 ///
 /// # Example
@@ -110,9 +189,9 @@ pub(crate) enum LockError {
 ///     LockKey::write("person", &person_id),
 ///     LockKey::write("entity", &entity_id),
 /// ];
-/// match acquire_locks(&mut tx, &locks, LockMode::Try).await {
+/// match acquire_locks(&mut tx, &locks, LockMode::Timeout(Duration::from_secs(30))).await {
 ///     Ok(result) => {
-///         println!("Acquired {} locks in {}ms", result.acquired.len(), result.wait_time_ms);
+///         println!("Acquired {} locks", result.acquired.len());
 ///     }
 ///     Err(LockError::Contention { entity_type, entity_id, .. }) => {
 ///         println!("Lock contention on {}:{}", entity_type, entity_id);
@@ -136,34 +215,31 @@ pub(crate) async fn acquire_locks(
     // Deduplicate - same lock shouldn't be acquired twice
     sorted_locks.dedup();
 
-    // For Timeout mode, set a transaction-local statement_timeout BEFORE
-    // acquiring locks. `SET LOCAL` scopes it to this transaction only —
-    // it does NOT leak to the connection pool. On timeout, PostgreSQL raises
-    // error 57014 (query_canceled) which we catch below.
-    if let LockMode::Timeout(duration) = mode {
-        let ms = duration.as_millis() as i64;
-        sqlx::query(&format!("SET LOCAL statement_timeout = '{ms}'"))
-            .execute(&mut **tx)
-            .await?;
-    }
+    // Set a transaction-local statement_timeout BEFORE acquiring locks.
+    // `SET LOCAL` scopes it to this transaction only — it does NOT leak to
+    // the connection pool. On timeout, PostgreSQL raises error 57014
+    // (query_canceled) which we catch below.
+    let LockMode::Timeout(duration) = mode;
+    let ms = duration.as_millis() as i64;
+    sqlx::query(&format!("SET LOCAL statement_timeout = '{ms}'"))
+        .execute(&mut **tx)
+        .await?;
 
     for lock in &sorted_locks {
         let key = lock_key_from_struct(lock);
 
-        let lock_result = match mode {
-            LockMode::Try => {
-                // Non-blocking — fail fast if lock unavailable
-                try_advisory_xact_lock(tx, key).await
+        // Blocking — wait for lock, bounded by statement_timeout.
+        // On timeout (57014), sqlx returns Err(sqlx::Error::Database(..)).
+        match advisory_xact_lock(tx, key).await {
+            Ok(()) => {
+                acquired.push(lock.clone());
+                tracing::debug!(
+                    entity_type = %lock.entity_type,
+                    entity_id = %lock.entity_id,
+                    access = ?lock.access,
+                    "Acquired advisory lock"
+                );
             }
-            LockMode::Timeout(_) => {
-                // Blocking — wait for lock (with optional statement_timeout).
-                // On timeout (57014), sqlx returns Err(sqlx::Error::Database(..)).
-                advisory_xact_lock(tx, key).await.map(|()| true)
-            }
-        };
-
-        let lock_acquired = match lock_result {
-            Ok(acquired) => acquired,
             Err(e) => {
                 // Check for PostgreSQL error 57014 (query_canceled / statement_timeout).
                 let is_timeout = e
@@ -172,7 +248,7 @@ pub(crate) async fn acquire_locks(
                     .unwrap_or(false);
 
                 if is_timeout {
-                    // Timeout mode: convert to contention error.
+                    // Timed out waiting: convert to contention error.
                     tracing::warn!(
                         entity_type = %lock.entity_type,
                         entity_id = %lock.entity_id,
@@ -187,50 +263,21 @@ pub(crate) async fn acquire_locks(
                 }
                 return Err(LockError::Database(e));
             }
-        };
-
-        if lock_acquired {
-            acquired.push(lock.clone());
-            tracing::debug!(
-                entity_type = %lock.entity_type,
-                entity_id = %lock.entity_id,
-                access = ?lock.access,
-                "Acquired advisory lock"
-            );
-        } else {
-            tracing::warn!(
-                entity_type = %lock.entity_type,
-                entity_id = %lock.entity_id,
-                access = ?lock.access,
-                "Lock contention detected"
-            );
-            return Err(LockError::Contention {
-                entity_type: lock.entity_type.clone(),
-                entity_id: lock.entity_id.clone(),
-                acquired_so_far: acquired,
-                holder_runbook_id: None, // Populated by caller via event store lookup
-            });
         }
     }
 
-    // Reset statement_timeout after all locks acquired (Timeout mode only).
-    if matches!(mode, LockMode::Timeout(_)) {
-        sqlx::query("RESET statement_timeout")
-            .execute(&mut **tx)
-            .await?;
-    }
+    // Reset statement_timeout after all locks acquired.
+    sqlx::query("RESET statement_timeout")
+        .execute(&mut **tx)
+        .await?;
 
-    let wait_time_ms = start.elapsed().as_millis() as u64;
     tracing::debug!(
         lock_count = acquired.len(),
-        wait_time_ms = wait_time_ms,
+        wait_time_ms = start.elapsed().as_millis() as u64,
         "All locks acquired"
     );
 
-    Ok(LockAcquisitionResult {
-        acquired,
-        wait_time_ms,
-    })
+    Ok(LockAcquisitionResult { acquired })
 }
 
 // =============================================================================
@@ -243,7 +290,7 @@ mod tests {
 
     // lock_key determinism + collision tests live in
     // ob-poc-boundary::advisory_lock — this test covers the LockKey
-    // struct overload that stays in src/ because LockKey lives in dsl_v2.
+    // struct overload that stays in src/.
     #[test]
     fn test_lock_key_from_struct() {
         let lock = LockKey::write("person", "550e8400-e29b-41d4-a716-446655440000");
@@ -251,5 +298,48 @@ mod tests {
         let key2 = lock_key("person", "550e8400-e29b-41d4-a716-446655440000");
 
         assert_eq!(key1, key2, "Struct and direct call should produce same key");
+    }
+
+    #[test]
+    fn test_lock_key_ordering() {
+        let mut keys = [
+            LockKey::write("person", "uuid-3"),
+            LockKey::write("cbu", "uuid-1"),
+            LockKey::new("person", "uuid-2", LockAccess::Read),
+            LockKey::write("person", "uuid-2"),
+        ];
+
+        keys.sort();
+
+        // Should be sorted by (entity_type, entity_id, access); Read < Write
+        assert_eq!(keys[0].entity_type, "cbu");
+        assert_eq!(keys[1].entity_type, "person");
+        assert_eq!(keys[1].entity_id, "uuid-2");
+        assert_eq!(keys[1].access, LockAccess::Read);
+        assert_eq!(keys[2].entity_type, "person");
+        assert_eq!(keys[2].entity_id, "uuid-2");
+        assert_eq!(keys[2].access, LockAccess::Write);
+        assert_eq!(keys[3].entity_type, "person");
+        assert_eq!(keys[3].entity_id, "uuid-3");
+    }
+
+    #[test]
+    fn test_lock_key_deduplication() {
+        let mut keys = vec![
+            LockKey::write("person", "uuid-1"),
+            LockKey::write("person", "uuid-1"),
+            LockKey::write("person", "uuid-1"),
+        ];
+
+        keys.sort();
+        keys.dedup();
+
+        assert_eq!(keys.len(), 1);
+    }
+
+    #[test]
+    fn test_lock_key_constructors() {
+        let write_key = LockKey::write("person", "uuid-123");
+        assert_eq!(write_key.access, LockAccess::Write);
     }
 }

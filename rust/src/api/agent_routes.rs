@@ -33,13 +33,10 @@ use crate::database::derive_semantic_state;
 use crate::database::generation_log_repository::{
     CompileResult, ExecutionStatus, GenerationAttempt, LintResult, ParseResult,
 };
-use crate::dsl_v2::execution::{
-    runtime_registry, AtomicExecutionResult, ExecutionContext, ExecutionResult as DslV2Result,
-};
+use crate::dsl_v2::execution::{ExecutionContext, ExecutionResult as DslV2Result};
 use crate::dsl_v2::planning::compile;
 use crate::dsl_v2::syntax::parse_program;
 use crate::dsl_v2::tooling::SemanticValidator;
-use crate::dsl_v2::{expand_templates_simple, BatchPolicy};
 use ob_poc_ontology::SemanticStageRegistry;
 use ob_poc_types::{DslState, SessionInputRequest, SessionInputResponse};
 use std::time::Instant;
@@ -54,7 +51,6 @@ use axum::{
 use uuid::Uuid;
 
 // Re-export all request/response types from agent_types
-pub(crate) use crate::api::agent_types::ExecutionOutcome;
 pub use crate::api::agent_types::{VerbInfo};
 pub(crate) use crate::api::agent_types::{CompleteSubSessionRequest, CompleteSubSessionResponse, CreateSubSessionRequest, CreateSubSessionResponse, CreateSubSessionType, ExecuteDslRequest, SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse, SubSessionStateResponse, VerbSurfaceQuery, WatchQuery, WatchResponse};
 
@@ -2410,63 +2406,6 @@ async fn execute_session_dsl_raw(
         }
     };
 
-    // =========================================================================
-    // EXPANSION STAGE - Determine batch policy and derive locks
-    //
-    // NOTE (2026-07-31): currently a guaranteed passthrough. Inline template
-    // syntax is unimplemented (`parse_for_expansion` never emits
-    // TemplateInvocation), so the report is always empty locks + BestEffort
-    // and the Atomic branch below is unreachable from here. Production
-    // templates are pre-expanded to plain DSL upstream by TemplateExpander
-    // (MCP template_expand / batch_expand_current). If inline syntax lands,
-    // compile the plan from `expansion.expanded_dsl` instead of the original
-    // source (see ExpansionOutput::expanded_dsl doc in
-    // dsl_v2/expansion/engine.rs).
-    // =========================================================================
-    let templates = runtime_registry().templates();
-    let expansion_result = expand_templates_simple(&dsl, templates);
-
-    let expansion_report = match expansion_result {
-        Ok(output) => {
-            tracing::debug!(
-                "[EXEC] Expansion complete: batch_policy={:?}, locks={}, statements={}",
-                output.report.batch_policy,
-                output.report.derived_lock_set.len(),
-                output.report.expanded_statement_count
-            );
-            Some(output.report)
-        }
-        Err(e) => {
-            tracing::warn!(
-                "[EXEC] Expansion failed (continuing with best-effort): {}",
-                e
-            );
-            None
-        }
-    };
-
-    // Persist expansion report for audit trail (async, non-blocking)
-    if let Some(ref report) = expansion_report {
-        let expansion_audit = state.expansion_audit.clone();
-        let report_clone = report.clone();
-        tokio::spawn(async move {
-            if let Err(e) = expansion_audit.save(session_id, &report_clone).await {
-                tracing::error!(
-                    session_id = %session_id,
-                    expansion_id = %report_clone.expansion_id,
-                    "Failed to persist expansion report: {}",
-                    e
-                );
-            }
-        });
-    }
-
-    // Determine batch policy from expansion report (default: BestEffort)
-    let batch_policy = expansion_report
-        .as_ref()
-        .map(|r| r.batch_policy)
-        .unwrap_or(BatchPolicy::BestEffort);
-
     // T9.3 (EOP-PLAN-CONTROLPLANE-001 Addendum B): admit every verb in the
     // plan before dispatch. This route constructs `state.dsl_v2_executor`
     // directly (`agent_state.rs`), bypassing the bus/runbook admission
@@ -2484,7 +2423,7 @@ async fn execute_session_dsl_raw(
     }
 
     // =========================================================================
-    // EXECUTE - Route based on batch policy
+    // EXECUTE
     // =========================================================================
 
     // Mark execution as started (ReadyToExecute -> Executing). Sessions staged
@@ -2503,101 +2442,25 @@ async fn execute_session_dsl_raw(
     let mut all_success = true;
     let mut errors = Vec::new();
 
-    // Execute based on batch policy
-    let execution_outcome = match batch_policy {
-        BatchPolicy::Atomic => {
-            tracing::info!(
-                "[EXEC] Using atomic execution with locks (policy=atomic, locks={})",
-                expansion_report
-                    .as_ref()
-                    .map(|r| r.derived_lock_set.len())
-                    .unwrap_or(0)
-            );
-            state
-                .dsl_v2_executor
-                .execute_plan_atomic_with_locks(&plan, &mut exec_ctx, expansion_report.as_ref())
-                .await
-                .map(ExecutionOutcome::Atomic)
-        }
-        BatchPolicy::BestEffort => {
-            tracing::info!("[EXEC] Using best-effort execution (policy=best_effort)");
-            state
-                .dsl_v2_executor
-                .execute_plan_best_effort(&plan, &mut exec_ctx)
-                .await
-                .map(ExecutionOutcome::BestEffort)
-        }
-    };
+    tracing::info!("[EXEC] Using best-effort execution");
+    let execution_outcome = state
+        .dsl_v2_executor
+        .execute_plan_best_effort(&plan, &mut exec_ctx)
+        .await;
 
     match execution_outcome {
-        Ok(outcome) => {
-            // Extract results based on outcome type
-            let exec_results: Vec<DslV2Result> = match &outcome {
-                ExecutionOutcome::Atomic(atomic) => match atomic {
-                    AtomicExecutionResult::Committed { step_results, .. } => step_results.clone(),
-                    AtomicExecutionResult::RolledBack {
-                        failed_at_step,
-                        error,
-                        ..
-                    } => {
-                        all_success = false;
-                        errors.push(format!(
-                            "Atomic execution rolled back at step {}: {}",
-                            failed_at_step, error
-                        ));
-                        Vec::new()
-                    }
-                    AtomicExecutionResult::LockContention {
-                        entity_type,
-                        entity_id,
-                        ..
-                    } => {
-                        all_success = false;
-                        errors.push(format!(
-                            "Lock contention on {}:{} - another session is modifying this entity",
-                            entity_type, entity_id
-                        ));
-                        Vec::new()
-                    }
-                    AtomicExecutionResult::IdempotentReplayReturned { prior_result } => {
-                        prior_result.clone()
-                    }
-                    AtomicExecutionResult::OptimisticConflict { constraint_name } => {
-                        all_success = false;
-                        errors.push(format!(
-                            "Optimistic conflict on constraint '{}' — retry with fresh read",
-                            constraint_name
-                        ));
-                        Vec::new()
-                    }
-                    AtomicExecutionResult::TimedOut { stage, elapsed } => {
-                        all_success = false;
-                        errors.push(format!(
-                            "Execution timed out at stage '{}' after {:.1?}",
-                            stage, elapsed
-                        ));
-                        Vec::new()
-                    }
-                    AtomicExecutionResult::PanicRecovered { stage, panic_info } => {
-                        all_success = false;
-                        errors.push(format!("Panic at stage '{}': {}", stage, panic_info));
-                        Vec::new()
-                    }
-                },
-                ExecutionOutcome::BestEffort(best_effort) => {
-                    // Check for partial failures
-                    if !best_effort.errors.is_empty() {
-                        all_success = false;
-                        errors.push(best_effort.errors.summary());
-                    }
-                    // Convert Option<ExecutionResult> to ExecutionResult, filtering None
-                    best_effort
-                        .verb_results
-                        .iter()
-                        .filter_map(|r| r.clone())
-                        .collect()
-                }
-            };
+        Ok(best_effort) => {
+            // Check for partial failures
+            if !best_effort.errors.is_empty() {
+                all_success = false;
+                errors.push(best_effort.errors.summary());
+            }
+            // Convert Option<ExecutionResult> to ExecutionResult, filtering None
+            let exec_results: Vec<DslV2Result> = best_effort
+                .verb_results
+                .iter()
+                .filter_map(|r| r.clone())
+                .collect();
 
             for (idx, exec_result) in exec_results.iter().enumerate() {
                 let mut entity_id: Option<Uuid> = None;

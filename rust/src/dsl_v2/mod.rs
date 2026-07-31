@@ -112,7 +112,6 @@ pub mod errors;
 pub(crate) mod execution_plan;
 pub mod execution_result;
 pub(crate) mod executor;
-pub(crate) mod expansion;
 // §9 item 9 slice 6 (2026-05-13): gateway_resolver relocated to dsl-runtime.
 pub(crate) use dsl_analysis::gateway_resolver;
 #[cfg(feature = "database")]
@@ -159,13 +158,6 @@ pub(crate) use submission::{DslSubmission, SubmissionLimits, SubmissionState, Sy
 // name them across the crate boundary.
 pub use topo_sort::{emit_dsl, topological_sort};
 
-// Re-export expansion module types (consumed externally)
-#[allow(unused_imports)]
-pub(crate) use expansion::{
-    expand_templates, expand_templates_simple, BatchPolicy, ExpansionReport, LockAccess, LockKey,
-    LockMode,
-};
-
 
 // Re-export macro expansion types (consumed externally)
 pub use macros::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
@@ -199,7 +191,6 @@ pub mod planning {
 pub mod execution {
     #[cfg(feature = "database")]
     pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
-    pub(crate) use super::executor::{AtomicExecutionResult, BestEffortExecutionResult};
     #[cfg(not(feature = "database"))]
     pub use super::executor::{DslExecutor, ExecutionContext, ExecutionResult};
 

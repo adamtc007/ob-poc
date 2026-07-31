@@ -30,8 +30,6 @@ mod discovery_ops_integration;
 // src/dsl_v2/entity_deps.rs, which had zero production callers and was
 // deleted alongside it.
 #[cfg(test)]
-mod expansion_determinism;
-#[cfg(test)]
 mod generic_lifecycle_guard_db;
 #[cfg(test)]
 mod gleif_parse_test;
