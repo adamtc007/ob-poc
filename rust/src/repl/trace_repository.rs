@@ -13,6 +13,18 @@ pub(crate) struct SessionTraceRepository;
 
 impl SessionTraceRepository {
     /// Append a batch of trace entries to the database.
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): this is the ONLY
+    /// writer to the `session_traces` table, yet nothing in the crate calls
+    /// it. Real, live readers exist — `load_trace`/`load_entry` back a
+    /// production HTTP handler (`GET /api/session/:id/trace` in
+    /// `api/repl_routes_v2.rs`) and session-rehydration in
+    /// `session_repository.rs` — so in a live deployment this table is
+    /// permanently empty and every read path silently falls back to empty
+    /// rather than erroring. Missing-caller gap, not unused representation.
+    /// Do not delete without resolving the gap; see dead-code Phase 15's
+    /// commit for the full investigation.
+    #[allow(dead_code)]
     #[cfg(feature = "database")]
     pub(crate) async fn append_batch(pool: &sqlx::PgPool, entries: &[TraceEntry]) -> Result<()> {
         for entry in entries {

@@ -175,7 +175,7 @@ impl VerbLintResult {
 
 /// Result of linting all verbs
 #[derive(Debug, Clone, Default)]
-pub(crate) struct LintReport {
+pub struct LintReport {
     pub results: Vec<VerbLintResult>,
     pub total_verbs: usize,
     pub verbs_with_errors: usize,
@@ -184,12 +184,15 @@ pub(crate) struct LintReport {
 }
 
 impl LintReport {
-    pub(crate) fn has_errors(&self) -> bool {
+    /// `pub` (not `pub(crate)`): `xtask`'s `cargo x verbs check` (a separate
+    /// compilation unit) calls this on the `LintReport` returned by
+    /// `lint_all_verbs_with_config`.
+    pub fn has_errors(&self) -> bool {
         self.verbs_with_errors > 0
     }
 
     /// Get only verbs with issues
-    pub(crate) fn issues_only(&self) -> Vec<&VerbLintResult> {
+    pub fn issues_only(&self) -> Vec<&VerbLintResult> {
         self.results
             .iter()
             .filter(|r| r.has_errors() || r.has_warnings())

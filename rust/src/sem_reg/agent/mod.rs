@@ -17,7 +17,6 @@ pub mod plans;
 
 // Re-export primary types
 pub(crate) use decisions::{DecisionRecord, DecisionStore};
-pub(crate) use escalation::{AgentDisambiguationPrompt, AgentEscalationRecord, EscalationStore};
 pub use mcp_tools::{all_tool_specs, dispatch_tool};
-pub(crate) use mcp_tools::{GroundingContext, SemRegToolContext, SemRegToolResult};
+pub(crate) use mcp_tools::{SemRegToolContext, SemRegToolResult};
 pub(crate) use plans::{AgentPlan, AgentPlanStatus, PlanStep, PlanStepStatus, PlanStore};

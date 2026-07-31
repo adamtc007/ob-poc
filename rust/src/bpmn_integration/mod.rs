@@ -37,9 +37,7 @@ pub(crate) mod types;
 pub(crate) mod worker;
 
 pub use canonical::{canonical_json_with_hash, validate_payload_hash};
-pub(crate) use canonical::{blake3_bytes};
 pub use client::{BpmnLifecycleEvent, BpmnLiteConnection, CompleteJobRequest, StartProcessRequest};
-pub(crate) use client::{CompileDiagnostic, CompileResult, JobActivation, OrchestratorFlag, ProcessInspection};
 pub use config::{WorkflowConfig, WorkflowConfigIndex};
 pub use correlation::CorrelationStore;
 pub use dispatcher::WorkflowDispatcher;
@@ -51,5 +49,4 @@ pub use pending_dispatches::PendingDispatchStore;
 pub use request_state::RequestStateStore;
 pub use signal_relay::SignalRelay;
 pub use types::{CorrelationRecord, CorrelationStatus, ExecutionRoute, JobFrame, JobFrameStatus, OutcomeEvent, ParkedToken, ParkedTokenStatus, RequestStatus, TaskBinding, WorkflowBinding};
-pub(crate) use types::{PendingDispatch, PendingDispatchStatus, RequestStateRecord};
 pub use worker::JobWorker;

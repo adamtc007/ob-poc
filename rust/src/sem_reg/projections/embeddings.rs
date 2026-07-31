@@ -6,7 +6,6 @@
 //! so staleness can be detected by comparing `version_hash` against the current
 //! snapshot.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

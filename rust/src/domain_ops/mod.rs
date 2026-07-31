@@ -679,6 +679,7 @@ pub fn find_missing_plugin_ops(
 ///
 /// Produced by [`rehydrate`]. The op registry can be used to construct
 /// a `DslExecutor` for the rehydration test (CR DoD).
+#[cfg(test)]
 pub(crate) struct RehydrateResult {
     /// Flat verb manifest built from the current YAML packs.
     pub manifest: dsl_core::VerbManifest,
@@ -700,6 +701,7 @@ pub(crate) struct RehydrateResult {
 /// 3. Run `wiring_check` — compare YAML declarations against registrations
 ///
 /// The returned `wiring` report has zero mismatches when Phase 3 is complete.
+#[cfg(test)]
 pub(crate) fn rehydrate() -> RehydrateResult {
     use dsl_core::{wiring_check, ConfigLoader};
 

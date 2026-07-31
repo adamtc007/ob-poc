@@ -35,4 +35,4 @@ pub mod verb_surface;
 pub mod workspace_mode_tags;
 
 pub use learning::{LearningWarmup};
-pub(crate) use learning::{AgentLearningInspector, LearnedData, LearningCandidate, LearningStatus, LearningType, SharedLearnedData, WarmupStats};
+pub(crate) use learning::{AgentLearningInspector, LearningStatus, LearningType};

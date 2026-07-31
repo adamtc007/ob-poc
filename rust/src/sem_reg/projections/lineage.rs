@@ -8,7 +8,6 @@
 //!   - `query_forward_impact()`: "if this snapshot changes, what is affected?"
 //!   - `query_reverse_provenance()`: "where did this value come from?"
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

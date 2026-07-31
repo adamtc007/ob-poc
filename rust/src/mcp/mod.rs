@@ -61,16 +61,8 @@ pub mod verb_search;
 pub mod verb_search_factory;
 pub mod verb_search_intent_matcher;
 
-pub(crate) use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
 pub use macro_integration::{init_macro_registry, is_macro, macro_registry};
 pub(crate) use macro_integration::update_dag_after_execution;
-pub(crate) use resolution::{
-    ConversationContext, EnrichedMatch, ResolutionConfidence, ResolutionResult, ResolutionStrategy,
-    SuggestedAction,
-};
-pub(crate) use scope_resolution::{
-    EntityMatch, ScopeCandidate, ScopeContext, ScopeResolutionOutcome, ScopeResolver,
-};
 // `pub` (not `pub(crate)`): the `dsl_mcp` binary (`src/bin/dsl_mcp.rs`) is
 // a separate compilation unit and needs to name it across the crate
 // boundary.

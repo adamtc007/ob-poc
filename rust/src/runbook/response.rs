@@ -44,6 +44,7 @@ pub(crate) enum OrchestratorResponse {
 
 impl OrchestratorResponse {
     /// Convenience: is this a successful compilation?
+    #[cfg(test)]
     pub(crate) fn is_compiled(&self) -> bool {
         matches!(self, Self::Compiled(_))
     }

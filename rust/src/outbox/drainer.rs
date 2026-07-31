@@ -427,12 +427,20 @@ fn parse_effect_kind(raw: &str) -> Result<OutboxEffectKind> {
 /// Handle returned by [`OutboxDrainerImpl::spawn`] for graceful
 /// shutdown at process exit.
 pub(crate) struct OutboxDrainerHandle {
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): written by
+    /// `spawn()` (live in production), read only by `shutdown()` below,
+    /// which is itself only exercised by integration tests — production
+    /// (`ob-poc-web/main.rs`) deliberately drops the handle instead, per
+    /// an inline comment there.
+    #[allow(dead_code)]
     cancel: Arc<Notify>,
+    #[allow(dead_code)]
     task: JoinHandle<()>,
 }
 
 impl OutboxDrainerHandle {
     /// Signal the drainer loop to exit and wait for it to finish.
+    #[cfg(test)]
     pub(crate) async fn shutdown(self) {
         self.cancel.notify_waiters();
         if let Err(e) = self.task.await {

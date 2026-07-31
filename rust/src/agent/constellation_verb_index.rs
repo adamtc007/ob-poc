@@ -59,13 +59,25 @@ pub(crate) struct IndexStats {
 pub(crate) struct ConstellationVerbIndex {
     /// (noun_key, action_stem) → matching verbs with slot context
     forward: HashMap<(String, String), Vec<VerbMatch>>,
-    /// verb_fqn → slot contexts where it appears
+    /// verb_fqn → slot contexts where it appears.
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): diagnostic/
+    /// inspection index, populated in the same `build()` pass as the live
+    /// `forward` field. Read only by this file's own 10 unit tests
+    /// (`slot_contexts`/`all_verbs`/`all_nouns`/`stats`/`dump` below).
+    /// Kept as a genuine field-of-record rather than cfg(test)-gated,
+    /// since gating would require splitting `build()`'s shared population
+    /// loop.
+    #[allow(dead_code)]
     reverse: HashMap<String, Vec<SlotContext>>,
     /// noun_key → all available verbs on matching slots
+    #[allow(dead_code)]
     by_noun: HashMap<String, Vec<String>>,
     /// action_stem → all available verbs matching this action
+    #[allow(dead_code)]
     by_action: HashMap<String, Vec<String>>,
     /// Stats
+    #[allow(dead_code)]
     stats: IndexStats,
 }
 
@@ -190,6 +202,7 @@ impl ConstellationVerbIndex {
     }
 
     /// Look up verbs matching a noun (any action).
+    #[allow(dead_code)]
     pub(crate) fn lookup_by_noun(&self, noun: &str) -> &[String] {
         self.by_noun
             .get(&normalize(noun))
@@ -197,6 +210,7 @@ impl ConstellationVerbIndex {
     }
 
     /// Look up verbs matching an action stem (any noun).
+    #[allow(dead_code)]
     pub(crate) fn lookup_by_action(&self, action: &str) -> &[String] {
         self.by_action
             .get(&normalize_action(action))
@@ -204,6 +218,7 @@ impl ConstellationVerbIndex {
     }
 
     /// Reverse: given a verb FQN, where does it live in the constellation?
+    #[allow(dead_code)]
     pub(crate) fn slot_contexts(&self, verb_fqn: &str) -> &[SlotContext] {
         self.reverse
             .get(verb_fqn)
@@ -211,21 +226,25 @@ impl ConstellationVerbIndex {
     }
 
     /// All verb FQNs currently available in the constellation.
+    #[allow(dead_code)]
     pub(crate) fn all_verbs(&self) -> Vec<&str> {
         self.reverse.keys().map(|s| s.as_str()).collect()
     }
 
     /// All noun keys present in the index.
+    #[allow(dead_code)]
     pub(crate) fn all_nouns(&self) -> Vec<&str> {
         self.by_noun.keys().map(|s| s.as_str()).collect()
     }
 
     /// Diagnostic statistics.
+    #[allow(dead_code)]
     pub(crate) fn stats(&self) -> &IndexStats {
         &self.stats
     }
 
     /// Produce a human-readable dump for inspection.
+    #[allow(dead_code)]
     pub(crate) fn dump(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!(

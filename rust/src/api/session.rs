@@ -4,7 +4,7 @@
 //! Sessions accumulate AST statements, validate them, and track execution.
 //! The AST is the source of truth - DSL source is generated from it for display.
 
-use crate::dsl_v2::ast::{Program, Statement};
+use crate::dsl_v2::ast::Statement;
 use crate::mcp::scope_resolution::ScopeContext;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

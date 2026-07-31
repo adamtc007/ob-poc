@@ -73,6 +73,7 @@ impl TemplateBatchResult {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn cbu_ids(&self) -> &[Uuid] {
         &self.primary_entity_ids
     }

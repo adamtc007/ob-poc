@@ -32,4 +32,4 @@
 pub mod service;
 
 pub use service::{LookupService};
-pub(crate) use service::{EntitySnapshotMetadata, LookupResult};
+pub(crate) use service::LookupResult;

@@ -149,6 +149,7 @@ pub(crate) fn json_extract_uuid_opt(
 }
 
 /// Simple UUID extraction from JSON args without context.
+#[cfg(test)]
 pub(crate) fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -> Result<Uuid> {
     args.get(arg_name)
         .and_then(|v| v.as_str())
@@ -157,21 +158,25 @@ pub(crate) fn json_get_required_uuid(args: &serde_json::Value, arg_name: &str) -
 }
 
 /// Extract an optional boolean from JSON args.
+#[cfg(test)]
 pub(crate) fn json_extract_bool_opt(args: &serde_json::Value, arg_name: &str) -> Option<bool> {
     args.get(arg_name).and_then(|v| v.as_bool())
 }
 
 /// Extract an optional integer from JSON args.
+#[cfg(test)]
 pub(crate) fn json_extract_int_opt(args: &serde_json::Value, arg_name: &str) -> Option<i64> {
     args.get(arg_name).and_then(|v| v.as_i64())
 }
 
 /// Extract a required integer from JSON args.
+#[cfg(test)]
 pub(crate) fn json_extract_int(args: &serde_json::Value, arg_name: &str) -> Result<i64> {
     json_extract_int_opt(args, arg_name).ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
 /// Extract an optional string list from JSON args.
+#[cfg(test)]
 pub(crate) fn json_extract_string_list_opt(
     args: &serde_json::Value,
     arg_name: &str,
@@ -184,6 +189,7 @@ pub(crate) fn json_extract_string_list_opt(
 }
 
 /// Extract a required string list from JSON args.
+#[cfg(test)]
 pub(crate) fn json_extract_string_list(args: &serde_json::Value, arg_name: &str) -> Result<Vec<String>> {
     json_extract_string_list_opt(args, arg_name)
         .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
@@ -194,6 +200,7 @@ pub(crate) fn json_extract_string_list(args: &serde_json::Value, arg_name: &str)
 /// Common pattern where the canonical form is e.g. `"cbu-id"` but the legacy
 /// short form `"cbu"` is also accepted. Generic across domains. The longer
 /// key is tried first; the shorter is the fallback.
+#[cfg(test)]
 pub(crate) fn json_extract_uuid_aliased(
     args: &serde_json::Value,
     ctx: &dsl_runtime::VerbExecutionContext,

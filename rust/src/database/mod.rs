@@ -41,29 +41,22 @@ pub mod visualization_repository;
 
 // Re-export for convenience
 pub use cbu_service::{CbuRow, CbuService};
-pub(crate) use cbu_service::{NewCbuFields};
-pub(crate) use dsl_repository::{DslRepository, DslSaveResult};
+pub(crate) use dsl_repository::DslRepository;
 pub use entity_service::{EntityRow, EntityService};
-pub(crate) use entity_service::{CbuEntityRoleRow, LimitedCompanyRow, NewEntityFields, NewLimitedCompanyFields, NewPartnershipFields, NewProperPersonFields, NewTrustFields, PartnershipRow, TrustRow};
 pub use ob_poc_bods::{
     BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
     GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,
     PersonPepStatus, UboInterest,
 };
 
-pub(crate) use generation_log_repository::{
-    CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
-};
 pub(crate) use visualization_repository::{
-    CbuBasicView, CbuDocumentView, CbuEntityView, CbuRoleView, CbuScreeningView, CbuSummaryView,
-    DocumentTypeView, EntityAttributeView,
-    EntityBasicView, EntityCbuView, EntityRoleView, EntityScreeningView, EntityTypeView,
-    LayoutOverrideView, RoleView, VisualizationRepository,
+    CbuBasicView,
+    LayoutOverrideView, VisualizationRepository,
 };
 
 pub(crate) use session_repository::{
-    detect_domain, extract_domains, DslSnapshot, EntityCreated, PersistedSession,
-    SessionEventType, SessionStatus,
+    detect_domain, extract_domains,
+    SessionEventType,
 };
 // `CbuDslState`/`SessionRepository` are `pub` (not `pub(crate)`): the
 // `dsl_cli` binary (`src/bin/dsl_cli.rs`) is a separate compilation unit
@@ -73,16 +66,12 @@ pub use session_repository::{CbuDslState, SessionRepository};
 pub(crate) use graph_repository::{GraphRepository, PgGraphRepository};
 
 pub use locks::{acquire_locks, advisory_xact_lock, lock_key, try_advisory_xact_lock};
-pub(crate) use locks::{lock_key_from_struct, LockAcquisitionResult, LockError};
 
 pub(crate) use expansion_audit::ExpansionAuditRepository;
 
-pub(crate) use context_discovery_service::{
-    CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,
-};
+pub(crate) use context_discovery_service::ContextDiscoveryService;
 
 pub use verb_service::{VerbService};
-pub(crate) use verb_service::{SemanticMatch, UserLearnedExactMatch, VerbDescription};
 
 pub use view_config_service::{
     EdgeTypeConfig, LayoutCacheEntry, LayoutConfigEntry, NodeLayoutOverride, NodeTypeConfig,

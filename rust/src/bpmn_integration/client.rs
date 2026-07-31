@@ -57,10 +57,22 @@ pub struct StartProcessRequest {
 }
 
 /// Typed orchestrator flag value (maps to ProtoValue oneof).
+///
+/// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): a Phase 9 finding —
+/// trimming `JobActivation.orch_flags` removed the only production
+/// construction site (`from_proto_flags` below); only
+/// `test_orch_flag_roundtrip` constructs/round-trips these variants now.
+/// The enum type itself can't be `#[cfg(test)]`-gated: the encode
+/// direction, `to_proto_flags` below, is genuinely live (called by real
+/// send paths, always with currently-empty maps today) and matches on
+/// these variants, so the type must exist in every build.
 #[derive(Debug, Clone)]
 pub(crate) enum OrchestratorFlag {
+    #[allow(dead_code)]
     Bool(bool),
+    #[allow(dead_code)]
     Int(i64),
+    #[allow(dead_code)]
     Str(String),
 }
 
@@ -466,6 +478,7 @@ fn to_proto_flags(flags: &HashMap<String, OrchestratorFlag>) -> HashMap<String, 
         .collect()
 }
 
+#[cfg(test)]
 fn from_proto_flags(
     flags: HashMap<String, proto::ProtoValue>,
 ) -> HashMap<String, OrchestratorFlag> {

@@ -755,6 +755,7 @@ impl DagState {
     }
 
     /// Check if a verb was completed
+    #[cfg(test)]
     pub(crate) fn is_completed(&self, verb_fqn: &str) -> bool {
         self.completed.contains(verb_fqn)
     }
@@ -765,6 +766,7 @@ impl DagState {
     }
 
     /// Get a state flag (defaults to false)
+    #[cfg(test)]
     pub(crate) fn get_flag(&self, key: &str) -> bool {
         self.state_flags.get(key).copied().unwrap_or(false)
     }
@@ -772,11 +774,6 @@ impl DagState {
     /// Set a fact predicate
     pub(crate) fn set_fact(&mut self, key: &str, value: serde_json::Value) {
         self.facts.insert(key.to_string(), value);
-    }
-
-    /// Get a fact predicate
-    pub(crate) fn get_fact(&self, key: &str) -> Option<&serde_json::Value> {
-        self.facts.get(key)
     }
 }
 
@@ -925,17 +922,39 @@ pub(crate) enum SessionState {
 pub(crate) enum SessionEvent {
     /// Scope has been set (CBUs loaded via session.load-*)
     ScopeSet,
-    /// DSL is pending validation (unresolved refs, needs user input)
+    /// DSL is pending validation (unresolved refs, needs user input).
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): `transition()`'s
+    /// match arm for this event computes a real target state
+    /// (`SessionState::PendingValidation`), and that state is read as
+    /// meaningful elsewhere in production (`api/agent_types.rs`'s display
+    /// mapping, `traceability/phase5.rs`'s `Executed | Executing` branch).
+    /// Nothing in the crate currently constructs this variant to drive a
+    /// session there — a likely missing-caller gap, not unused
+    /// representation. Do not delete without resolving the gap; see
+    /// dead-code Phase 13's commit for the full investigation.
+    #[allow(dead_code)]
     DslPendingValidation,
     /// DSL is validated and ready to execute
     DslReady,
-    /// Execution started
+    /// Execution started.
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): same shape as
+    /// `DslPendingValidation` above — `transition()`'s arm computes
+    /// `SessionState::Executing`, a state read as meaningful in
+    /// production, but nothing constructs this variant.
+    #[allow(dead_code)]
     ExecutionStarted,
     /// Execution completed (success or failure)
     ExecutionCompleted,
     /// User cancelled pending operation
     Cancelled,
-    /// Session closed
+    /// Session closed.
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): same shape —
+    /// `transition()`'s arm computes `SessionState::Closed`, a state read
+    /// as meaningful in production, but nothing constructs this variant.
+    #[allow(dead_code)]
     Close,
 }
 

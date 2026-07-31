@@ -51,7 +51,10 @@ pub(crate) struct VerbIndexEntry {
     pub args: Vec<ArgSummary>,
     /// CRUD key column for this verb (from YAML `crud.key`).
     /// Used by contract-driven write_set derivation (INV-8) to identify the
-    /// primary key arg for update/delete verbs.
+    /// primary key arg for update/delete verbs. Only read under the
+    /// `write-set-contract` feature; the `cfg_attr` below keeps a default
+    /// (feature-off) build from flagging it as dead.
+    #[cfg_attr(not(feature = "write-set-contract"), allow(dead_code))]
     pub crud_key: Option<String>,
     /// Confirm policy for this verb.
     pub confirm_policy: ConfirmPolicy,
@@ -78,6 +81,7 @@ pub(crate) struct ArgSummary {
     /// the `write-set-contract` Cargo feature (off in this phase's `--lib
     /// --features database` check, hence flagged). Left untouched -- see
     /// Phase 15 dead-code remediation STOP finding.
+    #[cfg_attr(not(feature = "write-set-contract"), allow(dead_code))]
     pub maps_to: Option<String>,
     /// Lookup config indicating this arg references an entity table.
     /// Args with lookup config are entity references (potential write targets).

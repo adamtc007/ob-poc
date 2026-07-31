@@ -84,7 +84,6 @@ pub mod stewardship;
 
 // Re-export core types at module boundary
 pub use gates::{evaluate_publish_gates};
-pub(crate) use gates::{GateResult, PublishGateResult};
 pub use sem_os_core::types::EvidenceGrade;
 pub use store::SnapshotStore;
 pub use types::{
@@ -114,18 +113,14 @@ pub use observation_def::ObservationDefBody;
 pub use policy_rule::PolicyRuleBody;
 pub use proof_obligation_def::{ProofObligationDefBody, ProofStrength};
 pub use requirement_profile_def::RequirementProfileDefBody;
-pub(crate) use security::compute_inherited_label;
 
 // Re-export Phase 5 types
-pub(crate) use derivation::{DerivationFunctionRegistry, DerivationResult};
+pub(crate) use derivation::DerivationFunctionRegistry;
 
 // Re-export Phase 8 types
 pub use agent::{all_tool_specs, dispatch_tool};
-pub(crate) use agent::{AgentPlan, AgentPlanStatus, DecisionRecord, DecisionStore, PlanStep, PlanStepStatus, PlanStore, SemRegToolContext, SemRegToolResult};
 
 // Re-export evidence instance types
-pub(crate) use evidence_instances::EvidenceInstanceStore;
 
 // Re-export Phase 9 types
 pub use projections::{CoverageReport, MetricsStore};
-pub(crate) use projections::{EmbeddingStore, LineageStore, TierDistribution};

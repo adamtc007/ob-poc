@@ -88,6 +88,12 @@ pub(crate) enum PruneReason {
         subject_kind: String,
     },
     /// AgentMode blocked the verb.
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): never constructed,
+    /// but matched in a live, non-test exhaustive match
+    /// (`agent::verb_surface::format_prune_reason`) — the type must exist
+    /// in every build.
+    #[allow(dead_code)]
     AgentModeBlocked { mode: String },
     /// Policy rule denied the verb.
     PolicyDenied { policy_fqn: String, reason: String },
@@ -267,6 +273,7 @@ impl SemOsContextEnvelope {
     }
 
     /// Create a "deny all" envelope (resolution succeeded, zero verbs allowed).
+    #[cfg(test)]
     pub(crate) fn deny_all() -> Self {
         SemOsContextEnvelope {
             allowed_verbs: HashSet::new(),

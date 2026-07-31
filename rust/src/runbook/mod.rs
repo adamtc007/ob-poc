@@ -69,24 +69,17 @@ pub use approval_token::{
     MutationApprovalToken, MutationApprovalTokenCore, MutationApprovalTokenStatus,
     ObservedMutationAnchors, RestrictedMutationApprovalCheck,
 };
-pub(crate) use canonical::{
-    canonical_bytes_for_envelope, canonical_bytes_for_envelope_core, canonical_bytes_for_step,
-    canonical_bytes_for_steps, content_addressed_id, full_sha256,
-};
+#[cfg(test)]
+pub(crate) use canonical::{canonical_bytes_for_envelope, canonical_bytes_for_step};
 pub(crate) use compiler::compile_verb;
-pub(crate) use constraint_gate::check_pack_constraints;
 pub use dsl_drafter::{
     validate_workbook_for_dry_run, DslDrafterDryRunResult, DslDrafterExecutionMode,
     DslDrafterRefusalCode, DslDrafterValidationError, DslDrafterValidationStep,
     DslDrafterValidationStepStatus,
 };
 pub use envelope::{ReplayEnvelope};
-pub(crate) use envelope::{EnvelopeCore};
-pub(crate) use errors::{CompilationError, CompilationErrorKind};
-#[cfg(feature = "database")]
-pub(crate) use executor::PostgresRunbookStore;
 pub use executor::{acquire_advisory_locks_on_scope, execute_runbook, execute_runbook_in_scope, RunbookStore, RunbookStoreBackend, StepOutcome};
-pub(crate) use executor::{compute_write_set, ExecutionError, LockStats, RunbookEvent, RunbookExecutionResult, StepExecutionResult, StepExecutor, UnlockedExecutionToken};
+pub(crate) use executor::{ExecutionError, StepExecutor, UnlockedExecutionToken};
 // T0.3 (EOP-PLAN-CONTROLPLANE-001, closes C-022): test-only bypass for
 // `execute_runbook` with a non-empty write_set and no pool. Re-exported
 // unconditionally (not `#[cfg(test)]`) because `mod.rs` itself has no test
@@ -108,26 +101,19 @@ pub use language_pack::{
     UpdateStatusLanguagePackRequest, UuidBindingRequirement,
 };
 pub use llm_draft_adapter::{run_kyc_update_status_llm_draft_loop, run_kyc_update_status_llm_draft_loop_with_prompt_pack};
-pub(crate) use llm_draft_adapter::{LlmDraftAdapterRefusal, LlmDraftLoopOutcome, KYC_UPDATE_STATUS_LLM_DRAFT_PROMPT_TEMPLATE_VERSION};
+pub(crate) use llm_draft_adapter::LlmDraftLoopOutcome;
 pub use mutation_preflight::{
     prepare_restricted_mutation_preflight, MutationExecutor, MutationSemanticDiff,
     RestrictedMutationPreflight, RestrictedMutationPreflightError,
 };
-pub(crate) use response::{
-    ClarificationContext, ClarificationRequest, CompiledRunbookSummary, ConstraintViolationDetail,
-    MissingField, OrchestratorResponse, Remediation, StepPreview,
-};
+pub(crate) use response::OrchestratorResponse;
 pub(crate) use restricted_mutation::{
-    compile_restricted_mutation_preflight, record_restricted_mutation_execution_receipt,
-    RestrictedMutationExecutionReceipt, RestrictedMutationRunbookCompilation,
+    compile_restricted_mutation_preflight, record_restricted_mutation_execution_receipt, RestrictedMutationRunbookCompilation,
     RestrictedMutationRunbookCompilationError,
 };
-pub(crate) use sem_os_filter::{filter_verbs_against_allowed_set, SemOsDeniedVerb, SemOsFilterResult};
 pub use step_executor_bridge::{DslStepExecutor, GatePipeline, HashMapVerbTransitionLookup};
-pub(crate) use step_executor_bridge::{DslExecutorV2StepExecutor, VerbExecutionPortStepExecutor, VerbTransitionLookup};
 pub use types::{CompiledRunbook, CompiledRunbookId, CompiledRunbookStatus, CompiledStep, ExecutionMode};
-pub(crate) use types::{ParkReason, StepCursor};
-pub(crate) use verb_classifier::{classify_verb, VerbClassification};
+pub(crate) use verb_classifier::classify_verb;
 pub use workbook::{
     compute_workbook_id, EvidenceRef, ExecutionWorkbook, ExecutionWorkbookCore,
     ExecutionWorkbookId, ExecutionWorkbookValidationError, LlmTraceRef, StaleWorkbookPolicy,
@@ -143,7 +129,7 @@ pub use workbook_revision::{
     StructuredWorkbookRefusal, WorkbookDraftAttempt, WorkbookRevisionOutcome,
     MAX_WORKBOOK_REVISIONS,
 };
-pub(crate) use write_set::{derive_write_set, derive_write_set_heuristic};
+pub(crate) use write_set::derive_write_set;
 
 // Re-export compile_invocation (defined below)
 // Callers: `use crate::runbook::compile_invocation;`
@@ -176,6 +162,7 @@ pub(crate) use write_set::{derive_write_set, derive_write_set_heuristic};
 /// * `constraints` — effective constraints from active pack
 /// * `runbook_version` — monotonic version within the session
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 pub(crate) fn compile_invocation(
     session_id: uuid::Uuid,
     verb_fqn: &str,

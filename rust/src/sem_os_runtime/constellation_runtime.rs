@@ -224,6 +224,10 @@ pub(crate) struct ResolvedSlot {
     pub name: String,
     pub path: String,
     pub def: SlotDef,
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): written at
+    /// construction (used by the now-`#[cfg(test)]`-gated query-plan
+    /// compiler), never read outside that test-only cluster.
+    #[allow(dead_code)]
     pub depth: usize,
     pub parent: Option<String>,
 }
@@ -413,12 +417,23 @@ pub(crate) struct HydratedSlot {
 }
 
 /// Batch hydration plan grouped by slot depth.
+///
+/// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): this typed
+/// query-plan-compiler cluster (`HydrationQueryPlan`/`QueryLevel`/
+/// `SlotQuery`/`QueryType` + `compile_query_plan`/`compile_slot_sql`/
+/// `query_type_for_slot`/`compile_overlay_sql`/`compile_role_batch_query`/
+/// `normalize_slots` below) has no production caller — exercised only by
+/// `integration_tests/constellation_{map,action,hydration}_tests.rs`.
+/// `#[cfg(test)]`-gated as a unit rather than deleted since it's real,
+/// substantial test infrastructure, not cruft.
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct HydrationQueryPlan {
     pub levels: Vec<QueryLevel>,
 }
 
 /// Queries to execute for a specific depth.
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct QueryLevel {
     pub depth: usize,
@@ -426,6 +441,7 @@ pub(crate) struct QueryLevel {
 }
 
 /// Single compiled query for a slot.
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct SlotQuery {
     pub slot_name: String,
@@ -434,6 +450,7 @@ pub(crate) struct SlotQuery {
 }
 
 /// Query shape used to hydrate a slot.
+#[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum QueryType {
     FetchOne,
@@ -605,6 +622,7 @@ pub(crate) fn validate_constellation_map(
 /// let plan = compile_query_plan(&map);
 /// assert!(!plan.levels.is_empty());
 /// ```
+#[cfg(test)]
 pub(crate) fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQueryPlan {
     let mut levels = BTreeMap::<usize, Vec<SlotQuery>>::new();
     let role_batch = compile_role_batch_query(map);
@@ -648,6 +666,7 @@ pub(crate) fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQu
 /// let normalized = normalize_slots(&map, Uuid::nil(), None, RawHydrationData::default());
 /// assert_eq!(normalized.constellation, "struct.lux.ucits.sicav");
 /// ```
+#[cfg(test)]
 pub(crate) fn normalize_slots(
     map: &ValidatedConstellationMap,
     cbu_id: Uuid,
@@ -1417,6 +1436,7 @@ fn core_slot_def_from_public(
     }
 }
 
+#[cfg(test)]
 fn compile_slot_sql(slot: &ResolvedSlot) -> String {
     match slot.def.cardinality {
         Cardinality::Root => format!(
@@ -1452,6 +1472,7 @@ fn compile_slot_sql(slot: &ResolvedSlot) -> String {
     }
 }
 
+#[cfg(test)]
 fn query_type_for_slot(slot: &ResolvedSlot) -> QueryType {
     match slot.def.cardinality {
         Cardinality::Root => QueryType::FetchOne,
@@ -1468,6 +1489,7 @@ fn query_type_for_slot(slot: &ResolvedSlot) -> QueryType {
     }
 }
 
+#[cfg(test)]
 fn compile_overlay_sql(slot: &ResolvedSlot) -> String {
     let mut sources = slot.def.overlays.clone();
     if !slot.def.edge_overlays.is_empty() {
@@ -1485,6 +1507,7 @@ fn compile_overlay_sql(slot: &ResolvedSlot) -> String {
     )
 }
 
+#[cfg(test)]
 fn compile_role_batch_query(map: &ValidatedConstellationMap) -> BTreeMap<String, String> {
     let role_join_slots = map
         .slots_ordered

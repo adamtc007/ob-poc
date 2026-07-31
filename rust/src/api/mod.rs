@@ -103,8 +103,6 @@ pub use graph_routes::{create_graph_router, create_session_graph_router};
 pub use session::{create_session_store};
 pub(crate) use session::{SessionStore};
 
-#[cfg(feature = "server")]
-pub(crate) use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
 
 #[cfg(feature = "server")]
 pub use agent_service::{AgentCommand, AgentService, ChatRequest};
@@ -128,7 +126,5 @@ pub use deal_types::{
 
 #[cfg(feature = "server")]
 pub use deal_routes::{create_deal_router};
-pub(crate) use deal_routes::{DealState};
 
 pub use repl_routes_v2::{router as create_repl_v2_router};
-pub(crate) use repl_routes_v2::{ReplV2RouteState};

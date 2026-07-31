@@ -57,8 +57,7 @@ pub(crate) use dsl_analysis::macros::{conditions, registry, schema, variable};
 // Re-exported further at `dsl_v2::mod.rs` for external consumers (ob-poc-web).
 pub use dsl_analysis::macros::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 pub(crate) use expander::{
-    expand_macro, expand_macro_fixpoint, ExpansionLimits, MacroExpansionError,
-    MacroExpansionOutput, EXPANSION_LIMITS,
+    expand_macro_fixpoint, ExpansionLimits, MacroExpansionError, EXPANSION_LIMITS,
 };
 // ACP visibility parity types (v0.5 §7.2 / §7.7).
 #[allow(unused_imports)]

@@ -15,8 +15,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::api::deal_types::{
-    DealContractSummary, DealGraphResponse, DealParticipantSummary, DealProductSummary,
-    DealSummary, DealViewMode, OnboardingRequestSummary, RateCardSummary,
+    DealGraphResponse, DealViewMode,
 };
 use crate::database::DealRepository;
 

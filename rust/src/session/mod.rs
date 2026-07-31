@@ -18,25 +18,18 @@ pub mod verb_tiering_linter;
 pub mod view_state;
 
 pub use canonical_hash::{sha256};
-pub(crate) use canonical_hash::canonical_json_hash;
 pub(crate) use research_context::{ResearchContext, ResearchState};
-pub(crate) use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
+pub(crate) use scope::{LoadStatus, ScopeSummary, SessionScope};
 pub(crate) use scope_path::ScopePath;
 pub(crate) use struct_mass::{MassBreakdown, MassViewMode, StructMass};
 pub use unified::{EntryStatus, UnifiedSession, ViewState as UnifiedViewState};
 pub(crate) use unified::{
-    BoundEntity, CaseRef, CbuSnapshot, ChatMessage, ClientRef, CorrectionSubSession, DagState,
-    DiscriminatorField, EntityMatch, EntityMatchInfo, EntityScope,
-    EnumValue, FieldType,
-    MessageRole, Persona, ReplState, ResearchSubSession, ResolutionState,
-    ResolutionSubSession, ResolvedRef, ReviewStatus, ReviewSubSession, RunSheet, RunSheetEntry,
-    SearchKeyField, SearchScope, SessionEvent, SessionListItem, SessionState,
-    StructureRef, StructureType, SubSessionType, TargetUniverse, UniverseDefinition,
-    UnresolvedRef, UnresolvedRefInfo, ValidationError as UnifiedValidationError, ZoomLevel,
+    BoundEntity, EntityMatchInfo,
+    MessageRole, ResearchSubSession,
+    ResolutionSubSession, ReviewStatus, ReviewSubSession, SessionState, SubSessionType, UnresolvedRefInfo,
 };
 pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostics};
-pub(crate) use verb_contract::{VerbDiagnostic};
 pub use verb_sync::{VerbSyncService};
 pub use verb_tiering_linter::{lint_all_verbs_with_config, LintConfig, LintTier};
 pub use view_state::{ViewState};
-pub(crate) use view_state::{BatchOperation, Refinement};
+pub(crate) use view_state::Refinement;

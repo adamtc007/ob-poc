@@ -58,11 +58,13 @@ pub(crate) fn canonical_bytes_for_envelope_core(core: &EnvelopeCore) -> Vec<u8> 
 ///
 /// Used for storage/integrity checks, NOT for content-addressed ID hashing.
 /// For ID hashing, use `canonical_bytes_for_envelope_core()`.
+#[cfg(test)]
 pub(crate) fn canonical_bytes_for_envelope(envelope: &ReplayEnvelope) -> Vec<u8> {
     bincode::serialize(envelope).expect("bincode serialization of ReplayEnvelope is infallible")
 }
 
 /// Serialize a single compiled step to deterministic bincode bytes.
+#[cfg(test)]
 pub(crate) fn canonical_bytes_for_step(step: &CompiledStep) -> Vec<u8> {
     // SAFETY: all fields are primitives, BTreeMaps, Vecs, and Strings.
     bincode::serialize(step).expect("bincode serialization of CompiledStep is infallible")

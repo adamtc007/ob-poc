@@ -119,10 +119,8 @@ use crate::mcp::scenario_index::ScenarioIndex;
 use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::sage::SageEngine;
 // Phase2Service: removed with process_chat (TOCTOU recheck in REPL orchestrator)
-use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
-use uuid::Uuid;
 
 // ============================================================================
 // Service Types

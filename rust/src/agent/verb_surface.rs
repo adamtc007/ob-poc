@@ -90,7 +90,18 @@ pub(crate) enum PruneLayer {
     WorkflowPhase,
     GroupScope,
     SemRegCcir,
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): part of the
+    /// documented canonical 7-layer C-009 prune taxonomy
+    /// (AgentMode/WorkflowPhase/GroupScope/SemRegCcir/LifecycleState/
+    /// ActorGating/FailPolicy), cross-referenced by name (not a live
+    /// cross-crate type reference) from `ob-poc-control-plane`'s
+    /// `intent_admission.rs`. Not currently produced by any prune-layer
+    /// check, but named/specified as part of the taxonomy's wire format.
+    #[allow(dead_code)]
     LifecycleState,
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): see
+    /// `LifecycleState` above — same taxonomy, same reasoning.
+    #[allow(dead_code)]
     ActorGating,
     FailPolicy,
 }
@@ -616,6 +627,7 @@ pub(crate) fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> Sess
 ///
 /// With `entity_state == None`, lifecycle cannot be checked, so every verb is
 /// reported reachable.
+#[cfg(test)]
 pub(crate) fn observe_state_reachability(
     fqns: &[String],
     entity_state: Option<&str>,
@@ -747,6 +759,7 @@ impl SessionVerbSurface {
     }
 
     /// Get unique domain names in the surface (sorted).
+    #[cfg(test)]
     pub(crate) fn domains(&self) -> Vec<&str> {
         let mut domains: Vec<&str> = self
             .verbs
@@ -760,6 +773,7 @@ impl SessionVerbSurface {
     }
 
     /// Check if a specific verb FQN is in the surface.
+    #[cfg(test)]
     pub(crate) fn contains(&self, fqn: &str) -> bool {
         self.verbs.iter().any(|v| v.fqn == fqn)
     }
@@ -781,6 +795,7 @@ impl SessionVerbSurface {
     }
 
     /// True if the surface is in safe-harbor mode (FailClosed, SemReg unavailable).
+    #[cfg(test)]
     pub(crate) fn is_safe_harbor(&self) -> bool {
         self.fail_policy_applied == VerbSurfaceFailPolicy::FailClosed
             && self.semreg_fingerprint.is_none()

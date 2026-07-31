@@ -12,7 +12,6 @@
 //! - `sem_reg.provenance_edges` — INSERT-only provenance graph
 //! - `sem_reg.retention_policies` — document lifecycle rules
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

@@ -262,6 +262,17 @@ pub(crate) enum AtomicExecutionResult {
     },
     /// A prior execution with the same idempotency key already committed.
     /// The prior result is returned without re-executing (v0.5 §9.1, §9.4).
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): never constructed —
+    /// `execute_plan_atomic_with_locks`, the sole constructor of this enum,
+    /// doesn't implement the replay short-circuit this doc comment claims is
+    /// implemented. But `mcp/handlers/core.rs` and `api/agent_routes.rs` both
+    /// have real, non-stub match arms extracting `prior_result` as the
+    /// effective step results — production code was written expecting this
+    /// outcome. Missing-implementation gap, not unused representation. Do
+    /// not delete without resolving the gap; see dead-code Phase 14's commit
+    /// for the full investigation.
+    #[allow(dead_code)]
     IdempotentReplayReturned {
         /// The results from the prior committed execution.
         prior_result: Vec<ExecutionResult>,
@@ -292,6 +303,14 @@ pub(crate) enum AtomicExecutionResult {
     ///
     /// Phase 5: variant declared; panic-recovery wiring (`catch_unwind`) is
     /// Phase 6 (requires async-safe panic unwinding infrastructure).
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): self-documented gap
+    /// per the note above — `mcp/handlers/core.rs` and `api/agent_routes.rs`
+    /// both have real, non-stub match arms formatting a panic-recovery error
+    /// for this variant, but nothing constructs it yet. Do not delete
+    /// without resolving the gap; see dead-code Phase 14's commit for the
+    /// full investigation.
+    #[allow(dead_code)]
     PanicRecovered {
         /// The stage in which the panic occurred.
         stage: String,

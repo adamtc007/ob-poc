@@ -75,12 +75,14 @@ pub(crate) struct BindingTable {
 
 impl BindingTable {
     /// Number of named bindings.
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the binding table has no entries.
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn is_empty(&self) -> bool {
         self.entries.is_empty()
@@ -90,6 +92,7 @@ impl BindingTable {
     ///
     /// Literal bindings always resolve. Forward refs resolve only after the
     /// source step has executed and populated `resolved`.
+    #[cfg(test)]
     pub(crate) fn resolve(&self, name: &str) -> Option<Uuid> {
         match self.entries.get(name)? {
             EntityBinding::Literal { id } => Some(*id),

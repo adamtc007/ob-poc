@@ -28,12 +28,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub(crate) struct SemOsFilterResult {
     /// Verbs that Sem OS allows.
+    ///
+    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): written at every
+    /// construction site, read only by this file's own tests.
+    #[allow(dead_code)]
     pub allowed: Vec<String>,
 
     /// Verbs denied with reasons (empty if all allowed).
     pub denied_with_reasons: Vec<SemOsDeniedVerb>,
 
     /// Whether Sem OS was actually consulted (false if unavailable/skipped).
+    #[allow(dead_code)]
     pub sem_os_consulted: bool,
 }
 
@@ -49,6 +54,7 @@ pub(crate) struct SemOsDeniedVerb {
 
 impl SemOsFilterResult {
     /// All verbs allowed when the caller chooses to bypass filtering.
+    #[cfg(test)]
     pub(crate) fn allow_all(verbs: &[String]) -> Self {
         Self {
             allowed: verbs.to_vec(),

@@ -93,7 +93,7 @@ pub(crate) enum VerbSyncError {
 /// `ob-poc-web`'s startup sync, which only reads the four fields below) —
 /// so they aren't duplicated here.
 #[derive(Debug, Clone)]
-pub(crate) struct SyncResult {
+pub struct SyncResult {
     pub verbs_added: i32,
     pub verbs_updated: i32,
     pub verbs_unchanged: i32,

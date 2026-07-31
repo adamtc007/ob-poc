@@ -56,7 +56,7 @@ use uuid::Uuid;
 // Re-export all request/response types from agent_types
 pub(crate) use crate::api::agent_types::ExecutionOutcome;
 pub use crate::api::agent_types::{VerbInfo};
-pub(crate) use crate::api::agent_types::{CompleteSubSessionRequest, CompleteSubSessionResponse, CreateSubSessionRequest, CreateSubSessionResponse, CreateSubSessionType, ExecuteDslRequest, ResolutionState, SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse, SubSessionMessage, SubSessionStateResponse, VerbSurfaceQuery, WatchQuery, WatchResponse};
+pub(crate) use crate::api::agent_types::{CompleteSubSessionRequest, CompleteSubSessionResponse, CreateSubSessionRequest, CreateSubSessionResponse, CreateSubSessionType, ExecuteDslRequest, SetBindingRequest, SetBindingResponse, SetFocusRequest, SetFocusResponse, SubSessionStateResponse, VerbSurfaceQuery, WatchQuery, WatchResponse};
 
 // ============================================================================
 // State — see agent_state.rs for AgentState and create_agent_router_with_semantic()
