@@ -26,19 +26,12 @@ pub(crate) struct UserLearnedExactMatch {
 
 /// A semantic match with similarity score
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SemanticMatch {
+pub(crate) struct SemanticMatch {
     pub phrase: String,
     pub verb: String,
     pub similarity: f64,
     pub confidence: Option<f32>,
     pub category: Option<String>,
-}
-
-/// Verb description from dsl_verbs table
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct VerbDescription {
-    pub full_name: String,
-    pub description: Option<String>,
 }
 
 // ============================================================================
@@ -86,22 +79,6 @@ struct VerbPatternSemanticRow {
     category: Option<String>,
 }
 
-/// Row struct for centroid query results
-#[derive(Debug, sqlx::FromRow)]
-struct VerbCentroidRow {
-    verb_name: String,
-    similarity: f64,
-    phrase_count: i32,
-}
-
-/// Centroid match result with score and phrase count
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerbCentroidMatch {
-    pub verb_name: String,
-    pub score: f64,
-    pub phrase_count: i32,
-}
-
 // ============================================================================
 // Service
 // ============================================================================
@@ -115,11 +92,6 @@ impl VerbService {
     /// Create a new verb service
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
-    }
-
-    /// Get the pool reference
-    pub fn pool(&self) -> &PgPool {
-        &self.pool
     }
 
     // ========================================================================
@@ -149,42 +121,6 @@ impl VerbService {
             verb: r.verb,
             confidence: r.confidence,
         }))
-    }
-
-    /// Find user-learned phrase by semantic similarity
-    pub async fn find_user_learned_semantic(
-        &self,
-        user_id: Uuid,
-        query_embedding: &[f32],
-        threshold: f32,
-    ) -> Result<Option<SemanticMatch>, sqlx::Error> {
-        let embedding_vec = Vector::from(query_embedding.to_vec());
-
-        let row = sqlx::query_as::<_, UserLearnedSemanticRow>(
-            r#"
-            SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
-            FROM "ob-poc".user_learned_phrases
-            WHERE user_id = $2
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> $1::vector
-            LIMIT 1
-            "#,
-        )
-        .bind(&embedding_vec)
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match row {
-            Some(r) if r.similarity as f32 > threshold => Ok(Some(SemanticMatch {
-                phrase: r.phrase,
-                verb: r.verb,
-                similarity: r.similarity,
-                confidence: Some(r.confidence),
-                category: None,
-            })),
-            _ => Ok(None),
-        }
     }
 
     /// Find user-learned phrases by semantic similarity (top-k) - Issue D/J
@@ -396,50 +332,6 @@ impl VerbService {
         }))
     }
 
-    /// Find global learned phrase by semantic similarity
-    pub async fn find_global_learned_semantic(
-        &self,
-        query_embedding: &[f32],
-        threshold: f32,
-    ) -> Result<Option<SemanticMatch>, sqlx::Error> {
-        let embedding_vec = Vector::from(query_embedding.to_vec());
-
-        let row = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
-            r#"
-            SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
-            FROM "ob-poc".invocation_phrases
-            WHERE embedding IS NOT NULL
-            ORDER BY embedding <=> $1::vector
-            LIMIT 1
-            "#,
-        )
-        .bind(&embedding_vec)
-        .fetch_optional(&self.pool)
-        .await?;
-
-        match row {
-            Some(r) if r.similarity as f32 > threshold => Ok(Some(SemanticMatch {
-                phrase: r.phrase,
-                verb: r.verb,
-                similarity: r.similarity,
-                confidence: None,
-                category: None,
-            })),
-            _ => Ok(None),
-        }
-    }
-
-    /// Find global learned phrases by semantic similarity (top-k) - Issue D/J
-    pub async fn find_global_learned_semantic_topk(
-        &self,
-        query_embedding: &[f32],
-        threshold: f32,
-        limit: usize,
-    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
-        self.find_global_learned_semantic_topk_scoped(query_embedding, threshold, limit, None)
-            .await
-    }
-
     /// Domain-scoped variant of learned phrase semantic search.
     pub(crate) async fn find_global_learned_semantic_topk_scoped(
         &self,
@@ -502,18 +394,6 @@ impl VerbService {
     // ========================================================================
     // Verb Pattern Embeddings (Cold Start)
     // ========================================================================
-
-    /// Search verb pattern embeddings by semantic similarity
-    /// This is the primary semantic lookup for cold start
-    pub async fn search_verb_patterns_semantic(
-        &self,
-        query_embedding: &[f32],
-        limit: usize,
-        min_similarity: f32,
-    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
-        self.search_verb_patterns_semantic_scoped(query_embedding, limit, min_similarity, None)
-            .await
-    }
 
     /// Search verb pattern embeddings with optional domain scoping.
     ///
@@ -787,153 +667,9 @@ impl VerbService {
         Ok(row.flatten())
     }
 
-    /// Get multiple verb descriptions at once
-    pub async fn get_verb_descriptions(
-        &self,
-        full_names: &[String],
-    ) -> Result<Vec<VerbDescription>, sqlx::Error> {
-        if full_names.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        sqlx::query_as::<_, VerbDescription>(
-            r#"
-            SELECT full_name, description
-            FROM "ob-poc".dsl_verbs
-            WHERE full_name = ANY($1)
-            "#,
-        )
-        .bind(full_names)
-        .fetch_all(&self.pool)
-        .await
-    }
-
     // ========================================================================
     // Verb Centroids (Two-Stage Semantic Search)
     // ========================================================================
-
-    /// Query verb centroids for semantic shortlist
-    ///
-    /// Returns top-K verbs by centroid similarity.
-    /// Use this to get a candidate set, then refine with pattern-level matches.
-    pub async fn query_centroids(
-        &self,
-        query_embedding: &[f32],
-        limit: i32,
-    ) -> Result<Vec<VerbCentroidMatch>, sqlx::Error> {
-        let embedding_vec = Vector::from(query_embedding.to_vec());
-
-        let rows = sqlx::query_as::<_, VerbCentroidRow>(
-            r#"
-            SELECT
-                verb_name,
-                1 - (embedding <=> $1::vector) as similarity,
-                phrase_count
-            FROM "ob-poc".verb_centroids
-            ORDER BY embedding <=> $1::vector
-            LIMIT $2
-            "#,
-        )
-        .bind(&embedding_vec)
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| VerbCentroidMatch {
-                verb_name: r.verb_name,
-                score: r.similarity,
-                phrase_count: r.phrase_count,
-            })
-            .collect())
-    }
-
-    /// Query verb centroids with minimum score threshold
-    pub async fn query_centroids_with_threshold(
-        &self,
-        query_embedding: &[f32],
-        limit: i32,
-        min_score: f32,
-    ) -> Result<Vec<VerbCentroidMatch>, sqlx::Error> {
-        let embedding_vec = Vector::from(query_embedding.to_vec());
-
-        let rows = sqlx::query_as::<_, VerbCentroidRow>(
-            r#"
-            SELECT
-                verb_name,
-                1 - (embedding <=> $1::vector) as similarity,
-                phrase_count
-            FROM "ob-poc".verb_centroids
-            WHERE 1 - (embedding <=> $1::vector) >= $3
-            ORDER BY embedding <=> $1::vector
-            LIMIT $2
-            "#,
-        )
-        .bind(&embedding_vec)
-        .bind(limit)
-        .bind(min_score)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| VerbCentroidMatch {
-                verb_name: r.verb_name,
-                score: r.similarity,
-                phrase_count: r.phrase_count,
-            })
-            .collect())
-    }
-
-    /// Search patterns only for specific verbs (for centroid refinement)
-    ///
-    /// After getting a centroid shortlist, use this to get pattern-level
-    /// evidence for only the shortlisted verbs.
-    pub async fn search_patterns_for_verbs(
-        &self,
-        query_embedding: &[f32],
-        verb_names: &[&str],
-        limit: i32,
-    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
-        if verb_names.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let embedding_vec = Vector::from(query_embedding.to_vec());
-        let verb_names_owned: Vec<String> = verb_names.iter().map(|s| s.to_string()).collect();
-
-        let rows = sqlx::query_as::<_, VerbPatternSemanticRow>(
-            r#"
-            SELECT
-                pattern_phrase,
-                verb_name,
-                1 - (embedding <=> $1::vector) as similarity,
-                category
-            FROM "ob-poc".verb_pattern_embeddings
-            WHERE verb_name = ANY($2)
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> $1::vector
-            LIMIT $3
-            "#,
-        )
-        .bind(&embedding_vec)
-        .bind(&verb_names_owned)
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|r| SemanticMatch {
-                phrase: r.pattern_phrase,
-                verb: r.verb_name,
-                similarity: r.similarity,
-                confidence: None,
-                category: r.category,
-            })
-            .collect())
-    }
 
     /// Search verb patterns by phonetic (dmetaphone) matching
     ///

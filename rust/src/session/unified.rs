@@ -382,33 +382,6 @@ pub struct ValidationError {
     pub span: Option<(usize, usize)>,
 }
 
-impl EntryStatus {
-    pub fn is_terminal(&self) -> bool {
-        matches!(
-            self,
-            EntryStatus::Executed
-                | EntryStatus::Cancelled
-                | EntryStatus::Failed
-                | EntryStatus::Skipped
-        )
-    }
-
-    pub fn is_pending(&self) -> bool {
-        matches!(
-            self,
-            EntryStatus::Draft | EntryStatus::Ready | EntryStatus::Executing
-        )
-    }
-
-    pub fn is_success(&self) -> bool {
-        matches!(self, EntryStatus::Executed)
-    }
-
-    pub fn is_failure(&self) -> bool {
-        matches!(self, EntryStatus::Failed | EntryStatus::Skipped)
-    }
-}
-
 /// View state for viewport sync
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ViewState {
@@ -848,33 +821,6 @@ pub(crate) enum ReplState {
     Executed { success: bool },
 }
 
-impl ReplState {
-    /// Check if state allows setting scope
-    pub(crate) fn can_set_scope(&self) -> bool {
-        matches!(self, Self::Empty | Self::Scoped | Self::Executed { .. })
-    }
-
-    /// Check if state allows setting template
-    pub(crate) fn can_set_template(&self) -> bool {
-        matches!(self, Self::Scoped)
-    }
-
-    /// Check if state allows confirming intent
-    pub(crate) fn can_confirm_intent(&self) -> bool {
-        matches!(self, Self::Templated { confirmed: false })
-    }
-
-    /// Check if state allows generating sheet
-    pub(crate) fn can_generate(&self) -> bool {
-        matches!(self, Self::Templated { confirmed: true })
-    }
-
-    /// Check if state allows execution
-    pub(crate) fn can_execute(&self) -> bool {
-        matches!(self, Self::Ready)
-    }
-
-}
 
 impl std::fmt::Display for ReplState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1135,13 +1081,7 @@ impl UnifiedSession {
         }
     }
 
-    /// Create with specific user
-    pub fn for_user(user_id: Uuid) -> Self {
-        let mut session = Self::new();
-        session.user_id = user_id;
-        session
-    }
-
+    /// Create a sub-session inheriting context from parent
     /// Create a new session for an entity (AgentSession compatibility)
     pub fn new_for_entity(
         user_id: Option<Uuid>,
@@ -1160,7 +1100,6 @@ impl UnifiedSession {
         session
     }
 
-    /// Create a sub-session inheriting context from parent
     pub(crate) fn new_subsession(parent: &Self, sub_session_type: SubSessionType) -> Self {
         let mut session = Self::new();
         session.user_id = parent.user_id;
@@ -1178,27 +1117,6 @@ impl UnifiedSession {
         session.current_case = parent.current_case.clone();
         session.current_mandate = parent.current_mandate.clone();
         session
-    }
-
-    /// Check if this is a sub-session
-    pub fn is_subsession(&self) -> bool {
-        self.parent_session_id.is_some()
-    }
-
-    /// Get the sub-session type if this is a resolution session
-    pub fn as_resolution(&self) -> Option<&ResolutionSubSession> {
-        match &self.sub_session_type {
-            SubSessionType::Resolution(r) => Some(r),
-            _ => None,
-        }
-    }
-
-    /// Get mutable resolution sub-session state
-    pub fn as_resolution_mut(&mut self) -> Option<&mut ResolutionSubSession> {
-        match &mut self.sub_session_type {
-            SubSessionType::Resolution(r) => Some(r),
-            _ => None,
-        }
     }
 
     /// Set entity ID after creation (e.g., after cbu.ensure executes)
@@ -1272,20 +1190,8 @@ impl UnifiedSession {
     }
 
     /// Check if session has scope set (CBUs loaded)
-    pub fn has_scope_set(&self) -> bool {
+    pub(crate) fn has_scope_set(&self) -> bool {
         !self.entity_scope.cbu_ids.is_empty()
-    }
-
-    /// Get all known symbols for validation (own bindings + inherited from parent)
-    pub fn all_known_symbols(&self) -> HashMap<String, Uuid> {
-        let mut symbols = HashMap::new();
-        for (name, bound) in &self.inherited_symbols {
-            symbols.insert(name.clone(), bound.id);
-        }
-        for (name, bound) in &self.bindings {
-            symbols.insert(name.clone(), bound.id);
-        }
-        symbols
     }
 
     // =========================================================================
@@ -1310,7 +1216,7 @@ impl UnifiedSession {
     }
 
     /// Set pending DSL with provenance labels (journey/scenario metadata).
-    pub fn set_pending_dsl_with_labels(
+    pub(crate) fn set_pending_dsl_with_labels(
         &mut self,
         source: String,
         ast: Vec<crate::dsl_v2::ast::Statement>,
@@ -1331,23 +1237,8 @@ impl UnifiedSession {
         self.transition(SessionEvent::DslReady);
     }
 
-    /// Cancel pending DSL (user declined)
-    pub fn cancel_pending(&mut self) {
-        self.pending_mutation = None;
-        // Remove last draft entry from run sheet
-        if let Some(idx) = self
-            .run_sheet
-            .entries
-            .iter()
-            .rposition(|e| e.status == EntryStatus::Draft)
-        {
-            self.run_sheet.entries.remove(idx);
-        }
-        self.transition(SessionEvent::Cancelled);
-    }
-
     /// Check if there's runnable DSL
-    pub fn has_pending(&self) -> bool {
+    pub(crate) fn has_pending(&self) -> bool {
         self.run_sheet
             .entries
             .iter()
@@ -1357,16 +1248,6 @@ impl UnifiedSession {
     /// Check if session can execute
     pub fn can_execute(&self) -> bool {
         self.state == SessionState::ReadyToExecute && self.has_pending()
-    }
-
-    /// Get combined DSL source (for backward compat)
-    pub fn combined_dsl(&self) -> String {
-        self.run_sheet
-            .entries
-            .iter()
-            .map(|e| e.dsl_source.as_str())
-            .collect::<Vec<_>>()
-            .join("\n")
     }
 
     /// Mark execution as started (`ReadyToExecute` -> `Executing`).
@@ -1414,40 +1295,15 @@ impl UnifiedSession {
         self.updated_at = Utc::now();
     }
 
-    /// Set target universe (first user declaration)
-    pub fn set_target_universe(&mut self, definition: UniverseDefinition, description: String) {
-        self.target_universe = Some(TargetUniverse {
-            description,
-            definition,
-            declared_at: Utc::now(),
-        });
-        self.updated_at = Utc::now();
-    }
-
     /// Add CBU to scope
     pub fn add_cbu(&mut self, cbu_id: Uuid) {
         self.entity_scope.cbu_ids.insert(cbu_id);
         self.updated_at = Utc::now();
     }
 
-    /// Remove CBU from scope
-    pub fn remove_cbu(&mut self, cbu_id: &Uuid) -> bool {
-        let removed = self.entity_scope.cbu_ids.remove(cbu_id);
-        if removed {
-            self.updated_at = Utc::now();
-        }
-        removed
-    }
-
-    /// Clear all CBUs from scope
-    pub fn clear_cbus(&mut self) {
-        self.entity_scope.cbu_ids.clear();
-        self.updated_at = Utc::now();
-    }
-
     /// Set zoom level
     /// Add DSL entry to run sheet
-    pub fn add_dsl(&mut self, dsl_source: String, display_dsl: String) -> Uuid {
+    pub(crate) fn add_dsl(&mut self, dsl_source: String, display_dsl: String) -> Uuid {
         let id = Uuid::new_v4();
         self.run_sheet.entries.push(RunSheetEntry {
             id,
@@ -1466,59 +1322,6 @@ impl UnifiedSession {
         self.run_sheet.cursor = self.run_sheet.entries.len() - 1;
         self.updated_at = Utc::now();
         id
-    }
-
-    /// Add DSL entry with DAG metadata
-    pub fn add_dsl_with_dag(
-        &mut self,
-        dsl_source: String,
-        display_dsl: String,
-        dag_depth: u32,
-        dependencies: Vec<Uuid>,
-    ) -> Uuid {
-        let id = Uuid::new_v4();
-        self.run_sheet.entries.push(RunSheetEntry {
-            id,
-            dsl_source,
-            display_dsl,
-            status: EntryStatus::Draft,
-            created_at: Utc::now(),
-            executed_at: None,
-            affected_entities: Vec::new(),
-            error: None,
-            dag_depth,
-            dependencies,
-            validation_errors: Vec::new(),
-            labels: HashMap::new(),
-        });
-        self.run_sheet.cursor = self.run_sheet.entries.len() - 1;
-        self.updated_at = Utc::now();
-        id
-    }
-
-    /// Mark run sheet entry as executed
-    pub fn mark_executed(&mut self, entry_id: Uuid, affected: Vec<Uuid>) -> bool {
-        if let Some(entry) = self.run_sheet.entries.iter_mut().find(|e| e.id == entry_id) {
-            entry.status = EntryStatus::Executed;
-            entry.executed_at = Some(Utc::now());
-            entry.affected_entities = affected;
-            self.updated_at = Utc::now();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Mark run sheet entry as failed
-    pub fn mark_failed(&mut self, entry_id: Uuid, error: String) -> bool {
-        if let Some(entry) = self.run_sheet.entries.iter_mut().find(|e| e.id == entry_id) {
-            entry.status = EntryStatus::Failed;
-            entry.error = Some(error);
-            self.updated_at = Utc::now();
-            true
-        } else {
-            false
-        }
     }
 
     // Push current state to history
@@ -1543,6 +1346,12 @@ impl UnifiedSession {
     }
 
     /// Complete resolution and return the resolutions map
+    ///
+    /// KEEP (2026-07-31 dead-but-pub audit): no route consumer yet, but this is
+    /// the completing transition of the resolution sub-state machine whose
+    /// entry points (`start_resolution` / `cancel_resolution`) are live; it is
+    /// cemented by `test_start_resolution_enters_pending_validation`. Deleting
+    /// it would leave the machine unable to complete.
     pub fn complete_resolution(&mut self) -> Option<HashMap<String, ResolvedRef>> {
         self.resolution.take().map(|r| {
             self.updated_at = Utc::now();
@@ -1560,124 +1369,15 @@ impl UnifiedSession {
         }
     }
 
-    /// Check if resolution is active
-    pub fn has_active_resolution(&self) -> bool {
-        self.resolution.is_some()
-    }
-
-    /// Add user message
-    pub fn add_user_message(&mut self, content: String) -> Uuid {
-        let id = Uuid::new_v4();
-        self.messages.push(ChatMessage {
-            id,
-            role: MessageRole::User,
-            content,
-            timestamp: Utc::now(),
-            intents: None,
-            dsl: None,
-            sage_explain: None,
-            drafter_proposal: None,
-            discovery_bootstrap: None,
-            parked_entries: None,
-        });
-        self.updated_at = Utc::now();
-        id
-    }
-
-    /// Add agent message with optional intents and DSL
-    /// This matches AgentSession.add_agent_message signature for backward compatibility
-    pub fn add_agent_message(
-        &mut self,
-        content: String,
-        _intents: Option<()>,
-        dsl: Option<String>,
-    ) -> Uuid {
-        let id = Uuid::new_v4();
-        self.messages.push(ChatMessage {
-            id,
-            role: MessageRole::Agent,
-            content,
-            timestamp: Utc::now(),
-            intents: None,
-            dsl,
-            sage_explain: None,
-            drafter_proposal: None,
-            discovery_bootstrap: None,
-            parked_entries: None,
-        });
-        self.updated_at = Utc::now();
-        id
-    }
-
-    /// Add system message
-    pub fn add_system_message(&mut self, content: String) -> Uuid {
-        let id = Uuid::new_v4();
-        self.messages.push(ChatMessage {
-            id,
-            role: MessageRole::System,
-            content,
-            timestamp: Utc::now(),
-            intents: None,
-            dsl: None,
-            sage_explain: None,
-            drafter_proposal: None,
-            discovery_bootstrap: None,
-            parked_entries: None,
-        });
-        self.updated_at = Utc::now();
-        id
-    }
-
     /// Set binding
     pub(crate) fn set_binding(&mut self, name: &str, entity: BoundEntity) {
         self.bindings.insert(name.to_string(), entity);
         self.updated_at = Utc::now();
     }
 
-    /// Get binding
-    pub fn get_binding(&self, name: &str) -> Option<&BoundEntity> {
-        self.bindings.get(name)
-    }
-
-    /// Remove binding
-    pub fn remove_binding(&mut self, name: &str) -> Option<BoundEntity> {
-        let removed = self.bindings.remove(name);
-        if removed.is_some() {
-            self.updated_at = Utc::now();
-        }
-        removed
-    }
-
     // =========================================================================
     // Constraint Cascade Methods
     // =========================================================================
-
-    /// Set client context (constraint level 1)
-    pub fn set_client(&mut self, client_id: Uuid, display_name: String) {
-        self.client = Some(ClientRef {
-            client_id,
-            display_name,
-        });
-        self.updated_at = Utc::now();
-    }
-
-    /// Clear client context (resets entire cascade)
-    pub fn clear_client(&mut self) {
-        self.client = None;
-        self.structure_type = None;
-        self.current_structure = None;
-        self.current_case = None;
-        self.updated_at = Utc::now();
-    }
-
-    /// Set structure type (constraint level 2)
-    pub fn set_structure_type(&mut self, structure_type: StructureType) {
-        self.structure_type = Some(structure_type);
-        // Clearing structure type should clear deeper levels
-        self.current_structure = None;
-        self.current_case = None;
-        self.updated_at = Utc::now();
-    }
 
     /// Set current structure (constraint level 3)
     pub(crate) fn set_current_structure(
@@ -1707,14 +1407,6 @@ impl UnifiedSession {
         self.updated_at = Utc::now();
     }
 
-    /// Clear current case
-    pub fn clear_current_case(&mut self) {
-        if self.current_case.is_some() {
-            self.current_case = None;
-            self.updated_at = Utc::now();
-        }
-    }
-
     /// Set current mandate (trading profile)
     pub fn set_current_mandate(&mut self, mandate_id: Uuid, display_name: String) {
         self.current_mandate = Some(MandateRef {
@@ -1722,29 +1414,6 @@ impl UnifiedSession {
             display_name,
         });
         self.updated_at = Utc::now();
-    }
-
-    /// Clear current mandate
-    pub fn clear_current_mandate(&mut self) {
-        if self.current_mandate.is_some() {
-            self.current_mandate = None;
-            self.updated_at = Utc::now();
-        }
-    }
-
-    /// Set persona
-    pub fn set_persona(&mut self, persona: Persona) {
-        self.persona = persona;
-        self.updated_at = Utc::now();
-    }
-
-    /// Get search scope derived from cascade context
-    pub fn derive_search_scope(&self) -> SearchScope {
-        SearchScope {
-            client_id: self.client.as_ref().map(|c| c.client_id),
-            structure_type: self.structure_type,
-            structure_id: self.current_structure.as_ref().map(|s| s.structure_id),
-        }
     }
 
     // DELETED: mark_verb_completed, check_prereqs, reset_dag_state (0 callers)
@@ -1859,16 +1528,6 @@ impl UnifiedSession {
         }
     }
 
-    /// Check if undo is available
-    pub fn can_undo_cbu(&self) -> bool {
-        !self.cbu_history.is_empty()
-    }
-
-    /// Check if redo is available
-    pub fn can_redo_cbu(&self) -> bool {
-        !self.cbu_future.is_empty()
-    }
-
     /// Get CBU history depth
     pub fn cbu_history_depth(&self) -> usize {
         self.cbu_history.len()
@@ -1884,332 +1543,14 @@ impl UnifiedSession {
         self.entity_scope.cbu_ids.len()
     }
 
-    /// Check if a CBU is loaded
-    pub fn contains_cbu(&self, cbu_id: &Uuid) -> bool {
-        self.entity_scope.cbu_ids.contains(cbu_id)
-    }
-
     /// Get all CBU IDs as Vec (for SQL queries)
     pub fn cbu_ids_vec(&self) -> Vec<Uuid> {
         self.entity_scope.cbu_ids.iter().copied().collect()
     }
 
     // =========================================================================
-    // REPL STATE MACHINE (migrated from CbuSession)
-    // =========================================================================
-
-    /// Set scope from DSL commands (transition: Empty/Scoped/Executed → Scoped)
-    pub fn set_repl_scope(&mut self, scope_dsl: Vec<String>) -> Result<(), String> {
-        if !self.repl_state.can_set_scope() {
-            return Err(format!(
-                "Cannot set scope in state '{}'. Must be Empty, Scoped, or Executed.",
-                self.repl_state
-            ));
-        }
-        self.scope_dsl = scope_dsl;
-        self.repl_state = ReplState::Scoped;
-        // Clear downstream state
-        self.template_dsl = None;
-        self.target_entity_type = None;
-        self.intent_confirmed = false;
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Set template DSL (transition: Scoped → Templated)
-    pub fn set_repl_template(
-        &mut self,
-        template_dsl: String,
-        target_type: String,
-    ) -> Result<(), String> {
-        if !self.repl_state.can_set_template() {
-            return Err(format!(
-                "Cannot set template in state '{}'. Must be Scoped.",
-                self.repl_state
-            ));
-        }
-        self.template_dsl = Some(template_dsl);
-        self.target_entity_type = Some(target_type);
-        self.intent_confirmed = false;
-        self.repl_state = ReplState::Templated { confirmed: false };
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Confirm the intent (transition: Templated(unconfirmed) → Templated(confirmed))
-    pub fn confirm_repl_intent(&mut self) -> Result<(), String> {
-        if !self.repl_state.can_confirm_intent() {
-            return Err(format!(
-                "Cannot confirm intent in state '{}'. Must be Templated(unconfirmed).",
-                self.repl_state
-            ));
-        }
-        self.intent_confirmed = true;
-        self.repl_state = ReplState::Templated { confirmed: true };
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Set generated sheet (transition: Templated(confirmed) → Generated)
-    pub fn set_repl_generated(&mut self, sheet: RunSheet) -> Result<(), String> {
-        if !self.repl_state.can_generate() {
-            return Err(format!(
-                "Cannot set generated sheet in state '{}'. Must be Templated(confirmed).",
-                self.repl_state
-            ));
-        }
-        self.run_sheet = sheet;
-        self.repl_state = ReplState::Generated;
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Mark sheet as parsed (transition: Generated → Parsed/Resolving/Ready)
-    pub fn set_repl_parsed(&mut self, unresolved_count: usize) -> Result<(), String> {
-        if !matches!(self.repl_state, ReplState::Generated) {
-            return Err(format!(
-                "Cannot set parsed in state '{}'. Must be Generated.",
-                self.repl_state
-            ));
-        }
-        self.repl_state = if unresolved_count > 0 {
-            ReplState::Resolving {
-                remaining: unresolved_count,
-            }
-        } else {
-            ReplState::Ready
-        };
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Resolve a reference (decrements remaining count)
-    pub fn resolve_repl_ref(&mut self, remaining: usize) -> Result<(), String> {
-        if !matches!(self.repl_state, ReplState::Resolving { .. }) {
-            return Err(format!(
-                "Cannot resolve ref in state '{}'. Must be Resolving.",
-                self.repl_state
-            ));
-        }
-        self.repl_state = if remaining > 0 {
-            ReplState::Resolving { remaining }
-        } else {
-            ReplState::Ready
-        };
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Mark ready for execution
-    pub fn set_repl_ready(&mut self) -> Result<(), String> {
-        match &self.repl_state {
-            ReplState::Resolving { remaining: 0 } | ReplState::Parsed => {
-                self.repl_state = ReplState::Ready;
-                self.dirty = true;
-                self.updated_at = Utc::now();
-                Ok(())
-            }
-            _ => Err(format!(
-                "Cannot set ready in state '{}'. Must be Resolving(0) or Parsed.",
-                self.repl_state
-            )),
-        }
-    }
-
-    /// Start execution (transition: Ready → Executing)
-    pub fn set_repl_executing(&mut self, total: usize) -> Result<(), String> {
-        if !self.repl_state.can_execute() {
-            return Err(format!(
-                "Cannot execute in state '{}'. Must be Ready.",
-                self.repl_state
-            ));
-        }
-        self.repl_state = ReplState::Executing {
-            completed: 0,
-            total,
-        };
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Update execution progress
-    pub fn update_repl_progress(&mut self, completed: usize, total: usize) {
-        if matches!(self.repl_state, ReplState::Executing { .. }) {
-            self.repl_state = ReplState::Executing { completed, total };
-            // Don't mark dirty for every progress update
-        }
-    }
-
-    /// Mark execution complete (transition: Executing → Executed)
-    pub fn mark_repl_executed(&mut self, success: bool) -> Result<(), String> {
-        if !matches!(self.repl_state, ReplState::Executing { .. }) {
-            return Err(format!(
-                "Cannot mark executed in state '{}'. Must be Executing.",
-                self.repl_state
-            ));
-        }
-        self.repl_state = ReplState::Executed { success };
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Reset to scoped state (for retry or new intent)
-    pub fn reset_repl_to_scoped(&mut self) -> Result<(), String> {
-        if self.scope_dsl.is_empty() {
-            return Err("Cannot reset to scoped - no scope defined".to_string());
-        }
-        self.template_dsl = None;
-        self.target_entity_type = None;
-        self.intent_confirmed = false;
-        self.run_sheet = RunSheet::default();
-        self.repl_state = ReplState::Scoped;
-        self.dirty = true;
-        self.updated_at = Utc::now();
-        Ok(())
-    }
-
-    /// Reset to empty state (full reset)
-    pub fn reset_repl_to_empty(&mut self) {
-        self.scope_dsl.clear();
-        self.template_dsl = None;
-        self.target_entity_type = None;
-        self.intent_confirmed = false;
-        self.run_sheet = RunSheet::default();
-        self.repl_state = ReplState::Empty;
-        self.dirty = true;
-        self.updated_at = Utc::now();
-    }
-
-    /// Check if session is ready for execution
-    pub fn is_repl_ready(&self) -> bool {
-        self.repl_state.can_execute()
-    }
-
-    /// Check if session has unsaved changes
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
-    }
-
-    /// Mark session as clean (after save)
-    pub fn mark_clean(&mut self) {
-        self.dirty = false;
-    }
-
-    // =========================================================================
     // PERSISTENCE (migrated from CbuSession)
     // =========================================================================
-
-    /// Save session to database
-    #[cfg(feature = "database")]
-    pub async fn save(&mut self, pool: &sqlx::PgPool) -> Result<(), sqlx::Error> {
-        let cbu_ids: Vec<Uuid> = self.entity_scope.cbu_ids.iter().copied().collect();
-        let history_json = serde_json::to_value(&self.cbu_history).unwrap_or_default();
-        let future_json = serde_json::to_value(&self.cbu_future).unwrap_or_default();
-
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".client_portal_sessions (id, user_id, name, cbu_ids, history, future)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (id) DO UPDATE SET
-                user_id = EXCLUDED.user_id,
-                name = EXCLUDED.name,
-                cbu_ids = EXCLUDED.cbu_ids,
-                history = EXCLUDED.history,
-                future = EXCLUDED.future,
-                updated_at = NOW()
-            "#,
-        )
-        .bind(self.id)
-        .bind(if self.user_id.is_nil() {
-            None
-        } else {
-            Some(self.user_id)
-        })
-        .bind(&self.name)
-        .bind(&cbu_ids)
-        .bind(&history_json)
-        .bind(&future_json)
-        .execute(pool)
-        .await?;
-
-        self.dirty = false;
-        Ok(())
-    }
-
-    /// Load session from database
-    #[cfg(feature = "database")]
-    #[allow(clippy::type_complexity)]
-    pub async fn load(id: Uuid, pool: &sqlx::PgPool) -> Result<Option<Self>, sqlx::Error> {
-        let row: Option<(
-            Uuid,
-            Option<Uuid>,
-            Option<String>,
-            Vec<Uuid>,
-            serde_json::Value,
-            serde_json::Value,
-        )> = sqlx::query_as(
-            r#"
-            SELECT id, user_id, name, cbu_ids, history, future
-            FROM "ob-poc".client_portal_sessions
-            WHERE id = $1 AND expires_at > NOW()
-            "#,
-        )
-        .bind(id)
-        .fetch_optional(pool)
-        .await?;
-
-        Ok(row.map(|(id, user_id, name, cbu_ids, history, future)| {
-            let cbu_history: Vec<CbuSnapshot> = serde_json::from_value(history).unwrap_or_default();
-            let cbu_future: Vec<CbuSnapshot> = serde_json::from_value(future).unwrap_or_default();
-
-            let mut session = Self::new();
-            session.id = id;
-            session.user_id = user_id.unwrap_or(Uuid::nil());
-            session.name = name;
-            session.entity_scope.cbu_ids = cbu_ids.into_iter().collect();
-            session.cbu_history = cbu_history;
-            session.cbu_future = cbu_future;
-            session.dirty = false;
-            session
-        }))
-    }
-
-    /// Load session or create new if not found
-    #[cfg(feature = "database")]
-    pub async fn load_or_new(id: Option<Uuid>, pool: &sqlx::PgPool) -> Self {
-        if let Some(id) = id {
-            match tokio::time::timeout(std::time::Duration::from_secs(2), Self::load(id, pool))
-                .await
-            {
-                Ok(Ok(Some(session))) => {
-                    tracing::debug!("Session {} loaded from DB", id);
-                    return session;
-                }
-                Ok(Ok(None)) => tracing::debug!("Session {} not found, creating new", id),
-                Ok(Err(e)) => tracing::warn!("Session load failed (non-fatal): {}", e),
-                Err(_) => tracing::warn!("Session load timed out (non-fatal)"),
-            }
-        }
-        Self::new()
-    }
-
-    /// Delete session from database
-    #[cfg(feature = "database")]
-    pub async fn delete(id: Uuid, pool: &sqlx::PgPool) -> Result<bool, sqlx::Error> {
-        let result = sqlx::query(r#"DELETE FROM "ob-poc".client_portal_sessions WHERE id = $1"#)
-            .bind(id)
-            .execute(pool)
-            .await?;
-        Ok(result.rows_affected() > 0)
-    }
 
     /// List recent sessions
     #[cfg(feature = "database")]
@@ -2297,8 +1638,14 @@ mod tests {
         assert!(dsl.contains("entity.create"));
         assert!(dsl.contains("kyc-case.create"));
 
-        // Mark first as executed
-        session.mark_executed(id1, vec![]);
+        // Mark first as executed (direct status mutation, as the execute route does)
+        let entry = session
+            .run_sheet
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id1)
+            .unwrap();
+        entry.status = EntryStatus::Executed;
 
         // Now runnable_dsl only returns the second
         let dsl2 = session.run_sheet.runnable_dsl().unwrap();
@@ -2322,43 +1669,37 @@ mod tests {
             "Create Acme".to_string(),
         );
 
-        session.mark_executed(id1, vec![]);
+        let entry = session
+            .run_sheet
+            .entries
+            .iter_mut()
+            .find(|e| e.id == id1)
+            .unwrap();
+        entry.status = EntryStatus::Executed;
         assert!(session.run_sheet.runnable_dsl().is_none());
         assert!(!session.run_sheet.has_runnable());
     }
 
     #[test]
-    fn test_constraint_cascade() {
+    fn test_set_current_structure() {
+        // 2026-07-31 dead-but-pub audit: the former test_constraint_cascade
+        // exercised set_client/set_structure_type/clear_client, which had no
+        // non-test consumers and were deleted (production sets those fields
+        // directly). set_current_structure is live via session_service_impl;
+        // its behavior stays cemented here.
         let mut session = UnifiedSession::new();
+        assert!(session.current_structure.is_none());
 
-        // Initially empty
-        assert!(session.client.is_none());
-        assert!(session.structure_type.is_none());
-
-        // Set client (level 1)
-        let client_id = Uuid::new_v4();
-        session.set_client(client_id, "Allianz".to_string());
-        assert!(session.client.is_some());
-        assert_eq!(session.client.as_ref().unwrap().display_name, "Allianz");
-
-        // Set structure type (level 2)
-        session.set_structure_type(StructureType::Sicav);
-        assert_eq!(session.structure_type, Some(StructureType::Sicav));
-
-        // Set current structure (level 3)
         let structure_id = Uuid::new_v4();
         session.set_current_structure(
             structure_id,
             "Allianz SICAV 1".to_string(),
             StructureType::Sicav,
         );
-        assert!(session.current_structure.is_some());
-
-        // Clear client should clear entire cascade
-        session.clear_client();
-        assert!(session.client.is_none());
-        assert!(session.structure_type.is_none());
-        assert!(session.current_structure.is_none());
+        let current = session.current_structure.as_ref().unwrap();
+        assert_eq!(current.structure_id, structure_id);
+        assert_eq!(current.display_name, "Allianz SICAV 1");
+        assert_eq!(current.structure_type, StructureType::Sicav);
     }
 
     #[test]
