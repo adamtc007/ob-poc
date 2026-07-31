@@ -922,39 +922,17 @@ pub(crate) enum SessionState {
 pub(crate) enum SessionEvent {
     /// Scope has been set (CBUs loaded via session.load-*)
     ScopeSet,
-    /// DSL is pending validation (unresolved refs, needs user input).
-    ///
-    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): `transition()`'s
-    /// match arm for this event computes a real target state
-    /// (`SessionState::PendingValidation`), and that state is read as
-    /// meaningful elsewhere in production (`api/agent_types.rs`'s display
-    /// mapping, `traceability/phase5.rs`'s `Executed | Executing` branch).
-    /// Nothing in the crate currently constructs this variant to drive a
-    /// session there — a likely missing-caller gap, not unused
-    /// representation. Do not delete without resolving the gap; see
-    /// dead-code Phase 13's commit for the full investigation.
-    #[allow(dead_code)]
+    /// DSL is pending validation (unresolved refs, needs user input)
     DslPendingValidation,
     /// DSL is validated and ready to execute
     DslReady,
-    /// Execution started.
-    ///
-    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): same shape as
-    /// `DslPendingValidation` above — `transition()`'s arm computes
-    /// `SessionState::Executing`, a state read as meaningful in
-    /// production, but nothing constructs this variant.
-    #[allow(dead_code)]
+    /// Execution started
     ExecutionStarted,
     /// Execution completed (success or failure)
     ExecutionCompleted,
     /// User cancelled pending operation
     Cancelled,
-    /// Session closed.
-    ///
-    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): same shape —
-    /// `transition()`'s arm computes `SessionState::Closed`, a state read
-    /// as meaningful in production, but nothing constructs this variant.
-    #[allow(dead_code)]
+    /// Session closed
     Close,
 }
 
@@ -1386,6 +1364,25 @@ impl UnifiedSession {
             .join("\n")
     }
 
+    /// Mark execution as started (`ReadyToExecute` -> `Executing`).
+    ///
+    /// Fired by the execute route once the plan is admitted, immediately
+    /// before the executor runs. Paired with `record_execution`, which
+    /// fires `ExecutionCompleted` (`Executing` -> `Executed`/`Scoped`).
+    /// From any other state the event hits the invalid-transition guard
+    /// and the state is unchanged.
+    pub fn begin_execution(&mut self) {
+        self.transition(SessionEvent::ExecutionStarted);
+    }
+
+    /// Close the session (terminal: any state -> `Closed`).
+    ///
+    /// Fired at end-of-life moments: the DELETE session endpoint and
+    /// sub-session complete/cancel, just before the session is dropped.
+    pub fn close(&mut self) {
+        self.transition(SessionEvent::Close);
+    }
+
     /// Record execution results and update context
     pub fn record_execution(&mut self, results: Vec<crate::api::session::ExecutionResult>) {
         // Update context with created entities
@@ -1522,12 +1519,19 @@ impl UnifiedSession {
     // — 0 callers outside unified.rs (state_stack navigation replaced by ReplStateV2)
 
     /// Start resolution workflow
+    ///
+    /// The proposed DSL has unresolved refs and needs user input before it
+    /// can become ready — this is the `DslPendingValidation` moment. The
+    /// workflow ends via `complete_resolution` (caller re-stages DSL via
+    /// `set_pending_dsl`, firing `DslReady`) or `cancel_resolution`
+    /// (firing `Cancelled`, returning to the idle state).
     pub fn start_resolution(&mut self, refs: Vec<UnresolvedRef>) {
         self.resolution = Some(ResolutionState {
             refs,
             current_index: 0,
             resolutions: HashMap::new(),
         });
+        self.transition(SessionEvent::DslPendingValidation);
         self.updated_at = Utc::now();
     }
 
@@ -1542,6 +1546,9 @@ impl UnifiedSession {
     /// Cancel resolution
     pub fn cancel_resolution(&mut self) {
         if self.resolution.take().is_some() {
+            // Leave PendingValidation (entered via start_resolution) for the
+            // idle state; no-op for states where Cancelled is not valid.
+            self.transition(SessionEvent::Cancelled);
             self.updated_at = Utc::now();
         }
     }
@@ -2376,6 +2383,124 @@ mod tests {
         assert!(dag.get_flag("structure.exists"));
     }
 
+    // =========================================================================
+    // Session state machine transitions (wired lifecycle events)
+    // =========================================================================
+
+    #[test]
+    fn test_start_resolution_enters_pending_validation() {
+        let mut session = UnifiedSession::new();
+        assert_eq!(session.state, SessionState::New);
+
+        // DSL arrived with unresolved refs — needs user input
+        session.start_resolution(vec![]);
+        assert_eq!(session.state, SessionState::PendingValidation);
+        assert!(session.resolution.is_some());
+
+        // After resolution, DSL is re-staged and becomes ready
+        let _ = session.complete_resolution();
+        session.set_pending_dsl("(entity.create :name \"Acme\")".to_string(), vec![], None, false);
+        assert_eq!(session.state, SessionState::ReadyToExecute);
+    }
+
+    #[test]
+    fn test_cancel_resolution_returns_to_idle_state() {
+        // Without scope: PendingValidation -> New
+        let mut session = UnifiedSession::new();
+        session.start_resolution(vec![]);
+        assert_eq!(session.state, SessionState::PendingValidation);
+        session.cancel_resolution();
+        assert_eq!(session.state, SessionState::New);
+
+        // With scope: PendingValidation -> Scoped
+        let mut scoped = UnifiedSession::new();
+        scoped.add_cbu(Uuid::new_v4());
+        scoped.transition(SessionEvent::ScopeSet);
+        assert_eq!(scoped.state, SessionState::Scoped);
+        scoped.start_resolution(vec![]);
+        assert_eq!(scoped.state, SessionState::PendingValidation);
+        scoped.cancel_resolution();
+        assert_eq!(scoped.state, SessionState::Scoped);
+    }
+
+    #[test]
+    fn test_execution_lifecycle_ready_executing_executed() {
+        let mut session = UnifiedSession::new();
+
+        // Stage DSL -> ReadyToExecute
+        session.set_pending_dsl("(entity.create :name \"Acme\")".to_string(), vec![], None, false);
+        assert_eq!(session.state, SessionState::ReadyToExecute);
+
+        // Execution begins -> Executing
+        session.begin_execution();
+        assert_eq!(session.state, SessionState::Executing);
+
+        // Execution completes -> Executed (no scope set)
+        session.record_execution(vec![]);
+        assert_eq!(session.state, SessionState::Executed);
+    }
+
+    #[test]
+    fn test_execution_completed_lands_scoped_when_scope_set() {
+        let mut session = UnifiedSession::new();
+        session.add_cbu(Uuid::new_v4());
+        session.set_pending_dsl("(entity.create :name \"Acme\")".to_string(), vec![], None, false);
+        session.begin_execution();
+        assert_eq!(session.state, SessionState::Executing);
+
+        // compute_post_execution_state: scope set -> Scoped
+        session.record_execution(vec![]);
+        assert_eq!(session.state, SessionState::Scoped);
+    }
+
+    #[test]
+    fn test_execution_started_rejected_from_new() {
+        // Invalid transition: ExecutionStarted from New hits the guard arm
+        // and leaves the state unchanged.
+        let mut session = UnifiedSession::new();
+        session.begin_execution();
+        assert_eq!(session.state, SessionState::New);
+    }
+
+    #[test]
+    fn test_execution_completed_without_started_is_rejected() {
+        // Cements the guard behavior this wiring fixed: before ExecutionStarted
+        // was wired, record_execution fired ExecutionCompleted from
+        // ReadyToExecute, hit the invalid-transition arm, and the session
+        // never reached Executed/Scoped.
+        let mut session = UnifiedSession::new();
+        session.set_pending_dsl("(entity.create :name \"Acme\")".to_string(), vec![], None, false);
+        assert_eq!(session.state, SessionState::ReadyToExecute);
+
+        session.record_execution(vec![]);
+        assert_eq!(
+            session.state,
+            SessionState::ReadyToExecute,
+            "ExecutionCompleted without ExecutionStarted must hit the invalid-transition guard"
+        );
+    }
+
+    #[test]
+    fn test_close_is_terminal_from_any_state() {
+        // From New
+        let mut session = UnifiedSession::new();
+        session.close();
+        assert_eq!(session.state, SessionState::Closed);
+
+        // From Executing
+        let mut executing = UnifiedSession::new();
+        executing.set_pending_dsl("(entity.create :name \"Acme\")".to_string(), vec![], None, false);
+        executing.begin_execution();
+        assert_eq!(executing.state, SessionState::Executing);
+        executing.close();
+        assert_eq!(executing.state, SessionState::Closed);
+
+        // Closed is terminal: no event leaves it except Close itself
+        executing.transition(SessionEvent::ScopeSet);
+        assert_eq!(executing.state, SessionState::Closed);
+        executing.begin_execution();
+        assert_eq!(executing.state, SessionState::Closed);
+    }
 }
 
 // =============================================================================

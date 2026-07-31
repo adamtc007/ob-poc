@@ -1642,7 +1642,10 @@ async fn delete_session(
     Path(session_id): Path<Uuid>,
 ) -> StatusCode {
     let mut sessions = state.sessions.write().await;
-    sessions.remove(&session_id);
+    if let Some(mut session) = sessions.remove(&session_id) {
+        // Terminal state machine transition before the session is dropped.
+        session.close();
+    }
     StatusCode::NO_CONTENT
 }
 
@@ -1835,7 +1838,7 @@ async fn complete_subsession(
     tracing::info!("Completing sub-session: {} (apply={})", child_id, req.apply);
 
     // Get child session
-    let child = {
+    let mut child = {
         let mut sessions = state.sessions.write().await;
         sessions.remove(&child_id)
     }
@@ -1852,6 +1855,9 @@ async fn complete_subsession(
             "Invalid parent-child relationship".to_string(),
         ));
     }
+
+    // Sub-session end-of-life: terminal transition before it is dropped.
+    child.close();
 
     // Extract resolution data if this is a Resolution sub-session
     let (resolutions_count, bound_entities) =
@@ -1925,7 +1931,7 @@ async fn cancel_subsession(
     tracing::info!("Cancelling sub-session: {}", child_id);
 
     // Remove child session
-    let child = {
+    let mut child = {
         let mut sessions = state.sessions.write().await;
         sessions.remove(&child_id)
     }
@@ -1942,6 +1948,9 @@ async fn cancel_subsession(
             "Invalid parent-child relationship".to_string(),
         ));
     }
+
+    // Sub-session end-of-life: terminal transition before it is dropped.
+    child.close();
 
     Ok(Json(CompleteSubSessionResponse {
         success: true,
@@ -2466,6 +2475,19 @@ async fn execute_session_dsl_raw(
     // =========================================================================
     // EXECUTE - Route based on batch policy
     // =========================================================================
+
+    // Mark execution as started (ReadyToExecute -> Executing). Sessions staged
+    // via set_pending_dsl are in ReadyToExecute; from any other state the
+    // event hits the invalid-transition guard and the state is unchanged.
+    // There are no early returns between here and record_execution below, so
+    // ExecutionCompleted always follows and the session cannot stay Executing.
+    {
+        let mut sessions = state.sessions.write().await;
+        if let Some(session) = sessions.get_mut(&session_id) {
+            session.begin_execution();
+        }
+    }
+
     let mut results = Vec::new();
     let mut all_success = true;
     let mut errors = Vec::new();
