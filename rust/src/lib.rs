@@ -56,10 +56,6 @@ pub mod graph;
 // module with only `dsl_core::ConfigLoader` as a non-std dep —
 // dsl_core is already a dsl-runtime dependency.
 
-// Navigation module - Nom-based parser for graph navigation commands
-#[cfg(feature = "database")]
-pub mod navigation;
-
 // Session module - unified session context for REPL + Graph + Viewport
 #[cfg(feature = "database")]
 pub mod session;

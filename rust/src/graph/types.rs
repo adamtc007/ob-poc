@@ -1474,57 +1474,6 @@ impl NavigationHistory {
             max_size: 50,
         }
     }
-
-    /// Push current location before navigating away
-    pub(crate) fn push(&mut self, entity_id: Uuid) {
-        self.back_stack.push(entity_id);
-        self.forward_stack.clear(); // Forward stack clears on new navigation
-
-        // Limit size
-        while self.back_stack.len() > self.max_size {
-            self.back_stack.remove(0);
-        }
-    }
-
-    /// Go back to previous location
-    pub(crate) fn go_back(&mut self, current: Option<Uuid>) -> Option<Uuid> {
-        if let Some(prev) = self.back_stack.pop() {
-            if let Some(curr) = current {
-                self.forward_stack.push(curr);
-            }
-            Some(prev)
-        } else {
-            None
-        }
-    }
-
-    /// Go forward
-    pub(crate) fn go_forward(&mut self, current: Option<Uuid>) -> Option<Uuid> {
-        if let Some(next) = self.forward_stack.pop() {
-            if let Some(curr) = current {
-                self.back_stack.push(curr);
-            }
-            Some(next)
-        } else {
-            None
-        }
-    }
-
-    /// Clear all history
-    pub(crate) fn clear(&mut self) {
-        self.back_stack.clear();
-        self.forward_stack.clear();
-    }
-
-    /// Check if we can go back
-    pub(crate) fn can_go_back(&self) -> bool {
-        !self.back_stack.is_empty()
-    }
-
-    /// Check if we can go forward
-    pub(crate) fn can_go_forward(&self) -> bool {
-        !self.forward_stack.is_empty()
-    }
 }
 
 // =============================================================================
@@ -2269,45 +2218,6 @@ pub type GraphEdge = LegacyGraphEdge;
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_navigation_history_push_and_back() {
-        let mut history = NavigationHistory::new();
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let id3 = Uuid::new_v4();
-
-        // Push locations to back_stack
-        history.push(id1);
-        history.push(id2);
-        history.push(id3);
-
-        assert!(history.can_go_back());
-        assert!(!history.can_go_forward());
-
-        // go_back pops from back_stack (returns id3, the last pushed)
-        // and pushes current to forward_stack
-        let back = history.go_back(Some(Uuid::new_v4())); // current position
-        assert_eq!(back, Some(id3));
-        assert!(history.can_go_forward());
-
-        // go_forward pops from forward_stack (returns the current we just pushed)
-        // Note: This tests the mechanism works, not specific values
-        let forward = history.go_forward(Some(id3));
-        assert!(forward.is_some());
-    }
-
-    #[test]
-    fn test_navigation_history_clear() {
-        let mut history = NavigationHistory::new();
-        history.push(Uuid::new_v4());
-        history.push(Uuid::new_v4());
-
-        history.clear();
-
-        assert!(!history.can_go_back());
-        assert!(!history.can_go_forward());
-    }
 
     #[test]
     fn test_layout_behavior_from_str() {
