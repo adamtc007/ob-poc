@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT market_id FROM \"ob-poc\".markets WHERE mic = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "market_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9346e986dc3aa84c9eff3177d662161d138544c2292c4a085ea08d54ea724bc1"
+}

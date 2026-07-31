@@ -221,7 +221,7 @@ async fn b3_03_full_happy_path() {
     let inspection = client.inspect(instance_id).await.expect("Inspect failed");
     assert_eq!(inspection.state, "RUNNING");
     assert!(
-        !inspection.waits.is_empty(),
+        inspection.wait_count > 0,
         "Expected at least 1 wait (message wait)"
     );
 
@@ -488,8 +488,8 @@ async fn b3_07_crash_recovery() {
         "Crash recovery baseline: instance {} state={}, fibers={}, waits={}",
         instance_id,
         inspection.state,
-        inspection.fibers.len(),
-        inspection.waits.len()
+        inspection.fiber_count,
+        inspection.wait_count
     );
     eprintln!("To fully test crash recovery: restart bpmn-lite service,");
     eprintln!(

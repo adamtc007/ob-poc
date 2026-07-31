@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".cbu_instrument_universe\n                (cbu_id, instrument_class_id, market_id, currencies, settlement_types)\n            VALUES ($1, $2, $3, ARRAY['USD'], ARRAY['DVP'])\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "45c76fbf21be8fffa724cef3ca7e8c694994b324e60b6e3ed15d756378a8fa47"
+}

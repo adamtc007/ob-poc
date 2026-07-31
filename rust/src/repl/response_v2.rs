@@ -20,7 +20,7 @@ use super::types_v2::{
 
 /// The top-level response from the v2 REPL orchestrator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ReplResponseV2 {
+pub struct ReplResponseV2 {
     /// Current state of the REPL after processing the input.
     pub state: ReplStateV2,
 
@@ -89,7 +89,7 @@ pub(crate) struct ReplResponseV2 {
 /// The type of response — determines how the UI renders it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum ReplResponseKindV2 {
+pub enum ReplResponseKindV2 {
     /// User needs to select a scope (client group / CBU set).
     ScopeRequired { prompt: String },
 
@@ -178,14 +178,14 @@ pub(crate) enum ReplResponseKindV2 {
 
 /// A chapter in a runbook summary — groups related steps.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ChapterView {
+pub struct ChapterView {
     pub chapter: String,
     pub steps: Vec<(i32, String)>, // (sequence, sentence)
 }
 
 /// Result of executing a single step.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StepResult {
+pub struct StepResult {
     pub entry_id: Uuid,
     pub sequence: i32,
     pub sentence: String,
@@ -196,7 +196,7 @@ pub(crate) struct StepResult {
 
 /// Information about a parked runbook entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ParkedEntryInfo {
+pub struct ParkedEntryInfo {
     pub entry_id: Uuid,
     pub sequence: i32,
     pub sentence: String,

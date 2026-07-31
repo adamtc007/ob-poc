@@ -37,7 +37,7 @@ use crate::journey::template::instantiate_template;
 /// Source of a proposal.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub(crate) enum ProposalSource {
+pub enum ProposalSource {
     /// From a pack template (fast path).
     Template { template_id: String },
     /// From verb search (fallback).
@@ -48,7 +48,7 @@ pub(crate) enum ProposalSource {
 
 /// Evidence explaining why a proposal was generated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ProposalEvidence {
+pub struct ProposalEvidence {
     /// Where this proposal came from.
     pub source: ProposalSource,
     /// Confidence score (0.0 to 1.0).
@@ -65,7 +65,7 @@ pub(crate) struct ProposalEvidence {
 
 /// A single proposed step (never executed, only proposed).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StepProposal {
+pub struct StepProposal {
     /// Unique proposal ID (for selection tracking).
     pub id: Uuid,
     /// Fully-qualified verb name.

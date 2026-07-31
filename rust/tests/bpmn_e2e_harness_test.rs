@@ -31,8 +31,8 @@ use uuid::Uuid;
 use bpmn_lite_engine::BpmnLiteEngine;
 use bpmn_lite_ffi_grpc::GrpcFfiOwner;
 use bpmn_lite_ffi_http::HttpFfiOwner;
-use bpmn_lite_server::grpc::proto::bpmn_lite_server::BpmnLiteServer;
-use bpmn_lite_server::grpc::BpmnLiteService;
+use bpmn_lite_server_runner::grpc::proto::bpmn_lite_server::BpmnLiteServer;
+use bpmn_lite_server_runner::grpc::BpmnLiteService;
 use bpmn_lite_store::MemoryStore;
 use dmn_lite_bridge::DmnLiteOwner;
 use ffi_catalogue::{FfiCatalogue, MemoryFfiTemplateStore};
@@ -121,12 +121,12 @@ impl BpmnTestRig {
         let ffi_catalogue = Arc::new(FfiCatalogue::new(ffi_store.clone()));
         let service = BpmnLiteService {
             engine: engine.clone(),
-            event_fanout: std::sync::Arc::new(bpmn_lite_server::event_fanout::EventFanout::new(
+            event_fanout: std::sync::Arc::new(bpmn_lite_server_runner::event_fanout::EventFanout::new(
                 engine.clone(),
                 std::time::Duration::from_millis(50),
             )),
-            limits: bpmn_lite_server::grpc::RequestLimits::default(),
-            metrics: std::sync::Arc::new(bpmn_lite_server::grpc::ServerMetrics::default()),
+            limits: bpmn_lite_server_runner::grpc::RequestLimits::default(),
+            metrics: std::sync::Arc::new(bpmn_lite_server_runner::grpc::ServerMetrics::default()),
             subscription_limiter: std::sync::Arc::new(tokio::sync::Semaphore::new(64)),
             ffi_owner: Arc::new(DmnLiteOwner::new()),
             http_ffi_owner: Arc::new(HttpFfiOwner::new()),

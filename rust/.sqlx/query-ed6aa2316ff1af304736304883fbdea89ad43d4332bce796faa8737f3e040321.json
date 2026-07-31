@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT risk_band, COUNT(*) as screening_count\n           FROM \"ob-poc\".screening_requirements\n           WHERE is_required = true\n           GROUP BY risk_band",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "risk_band",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "screening_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "ed6aa2316ff1af304736304883fbdea89ad43d4332bce796faa8737f3e040321"
+}

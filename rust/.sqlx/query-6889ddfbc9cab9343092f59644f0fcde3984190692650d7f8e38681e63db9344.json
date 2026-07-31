@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE \"ob-poc\".doc_requests SET status = 'REQUESTED', requested_at = NOW() WHERE request_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6889ddfbc9cab9343092f59644f0fcde3984190692650d7f8e38681e63db9344"
+}

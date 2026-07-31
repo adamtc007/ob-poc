@@ -54,7 +54,7 @@ pub struct StartProcessRequest {
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
     pub session_stack: SessionStackState,
-    pub(crate) orch_flags: HashMap<String, OrchestratorFlag>,
+    pub orch_flags: HashMap<String, OrchestratorFlag>,
     pub correlation_id: Uuid,
     pub entry_id: Uuid,
     pub runbook_id: Uuid,
@@ -71,7 +71,7 @@ pub struct StartProcessRequest {
 /// send paths, always with currently-empty maps today) and matches on
 /// these variants, so the type must exist in every build.
 #[derive(Debug, Clone)]
-pub(crate) enum OrchestratorFlag {
+pub enum OrchestratorFlag {
     #[allow(dead_code)]
     Bool(bool),
     #[allow(dead_code)]
@@ -123,7 +123,7 @@ pub struct CompleteJobRequest {
     pub job_key: String,
     pub domain_payload: String,
     pub domain_payload_hash: Vec<u8>,
-    pub(crate) orch_flags: HashMap<String, OrchestratorFlag>,
+    pub orch_flags: HashMap<String, OrchestratorFlag>,
     pub worker_id: String,
     pub claim_token: String,
 }

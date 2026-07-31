@@ -1312,7 +1312,7 @@ impl ReplOrchestratorV2 {
         Ok(outcome.pipeline_result)
     }
 
-    pub(crate) async fn process(
+    pub async fn process(
         &self,
         session_id: Uuid,
         input: UserInputV2,
@@ -10068,7 +10068,7 @@ fn build_arg_extraction_audit(
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
-pub(crate) enum OrchestratorError {
+pub enum OrchestratorError {
     SessionNotFound(Uuid),
     /// A required persistence operation failed (e.g., parking checkpoint).
     PersistenceFailed(String),

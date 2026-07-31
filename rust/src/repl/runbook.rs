@@ -104,14 +104,14 @@ pub struct RunbookEntry {
     pub slot_provenance: SlotProvenance,
 
     /// Optional audit of the LLM arg-extraction call.
-    pub(crate) arg_extraction_audit: Option<ArgExtractionAudit>,
+    pub arg_extraction_audit: Option<ArgExtractionAudit>,
 
     pub status: EntryStatus,
     pub execution_mode: ExecutionMode,
     pub confirm_policy: ConfirmPolicy,
 
     /// Entity references that still need resolution.
-    pub(crate) unresolved_refs: Vec<UnresolvedRef>,
+    pub unresolved_refs: Vec<UnresolvedRef>,
 
     /// Entry IDs this step depends on (must execute first).
     pub depends_on: Vec<Uuid>,
@@ -258,13 +258,13 @@ impl InvocationRecord {
 /// Tracks where each argument value came from — essential for auditability.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SlotProvenance {
-    pub(crate) slots: HashMap<String, SlotSource>,
+    pub slots: HashMap<String, SlotSource>,
 }
 
 /// Origin of a single argument value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum SlotSource {
+pub enum SlotSource {
     /// User typed it in conversation.
     UserProvided,
     /// Came from the pack template default.
@@ -281,7 +281,7 @@ pub(crate) enum SlotSource {
 
 /// Audit record for an LLM-based argument extraction call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ArgExtractionAudit {
+pub struct ArgExtractionAudit {
     pub model_id: String,
     pub prompt_hash: String,
     pub user_input: String,
@@ -296,7 +296,7 @@ pub(crate) struct ArgExtractionAudit {
 
 /// An entity reference that has not yet been resolved to a UUID.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct UnresolvedRef {
+pub struct UnresolvedRef {
     pub ref_id: String,
     pub display_text: String,
     pub entity_type: Option<String>,

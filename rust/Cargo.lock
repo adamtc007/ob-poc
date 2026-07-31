@@ -490,6 +490,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "bpmn-lite-analysis"
+version = "0.1.0"
+dependencies = [
+ "bpmn-lite-types",
+ "serde",
+]
+
+[[package]]
+name = "bpmn-lite-bus-handler"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "bpmn-lite-compiler",
+ "bpmn-lite-engine",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
+ "dsl-bus-protocol",
+ "dsl-bus-server",
+ "dsl-manifest",
+ "hex",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "bpmn-lite-compiler"
 version = "0.1.0"
 dependencies = [
@@ -573,6 +602,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "bpmn-lite-server-runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "axum",
+ "blake3",
+ "bpmn-lite-analysis",
+ "bpmn-lite-bus-handler",
+ "bpmn-lite-compiler",
+ "bpmn-lite-engine",
+ "bpmn-lite-ffi-grpc",
+ "bpmn-lite-ffi-http",
+ "bpmn-lite-store",
+ "bpmn-lite-store-postgres",
+ "bpmn-lite-types",
+ "bpmn-lite-vm",
+ "chrono",
+ "dmn-lite-bridge",
+ "dmn-lite-compiler",
+ "dmn-lite-parser",
+ "dmn-lite-types",
+ "dsl-bus-client",
+ "dsl-bus-protocol",
+ "dsl-bus-server",
+ "dsl-bus-storage",
+ "dsl-manifest",
+ "ffi-catalogue",
+ "ffi-dispatcher",
+ "ffi-types",
+ "futures",
+ "hex",
+ "prost",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tonic-build",
+ "tonic-health",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "bpmn-lite-store"
 version = "0.1.0"
 dependencies = [
@@ -584,6 +660,24 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "bpmn-lite-store-postgres"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
+ "chrono",
+ "ffi-catalogue",
+ "ffi-types",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tracing",
  "uuid",
 ]
 
@@ -1324,11 +1418,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "dmn-lite-compiler"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "dmn-lite-parser",
+ "dmn-lite-types",
+ "serde",
+ "thiserror 2.0.18",
+ "toml 0.8.23",
+ "uuid",
+]
+
+[[package]]
 name = "dmn-lite-engine"
 version = "0.1.0"
 dependencies = [
  "dmn-lite-types",
  "smallvec",
+]
+
+[[package]]
+name = "dmn-lite-parser"
+version = "0.1.0"
+dependencies = [
+ "dmn-lite-types",
 ]
 
 [[package]]
@@ -4013,6 +4127,7 @@ dependencies = [
  "bpmn-lite-engine",
  "bpmn-lite-ffi-grpc",
  "bpmn-lite-ffi-http",
+ "bpmn-lite-server-runner",
  "bpmn-lite-store",
  "chrono",
  "clap",
@@ -7479,6 +7594,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-health"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1eaf34ddb812120f5c601162d5429933c9b527d901ab0e7f930d3147e33a09b2"
+dependencies = [
+ "async-stream",
+ "prost",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8863,25 +8991,5 @@ dependencies = [
 ]
 
 [[patch.unused]]
-name = "bpmn-lite-analysis"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "bpmn-lite-bus-handler"
-version = "0.1.0"
-
-[[patch.unused]]
 name = "bpmn-lite-server-designer"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "bpmn-lite-server-runner"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "dmn-lite-compiler"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "dmn-lite-parser"
 version = "0.1.0"

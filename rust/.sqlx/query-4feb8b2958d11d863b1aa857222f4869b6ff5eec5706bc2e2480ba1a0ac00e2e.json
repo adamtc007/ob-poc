@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO \"ob-poc\".ssi_booking_rules (\n                cbu_id, ssi_id, rule_name, priority,\n                instrument_class_id, market_id, currency\n            )\n            VALUES ($1, $2, 'XLON Specific', 10, $3, $4, 'GBP')\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4feb8b2958d11d863b1aa857222f4869b6ff5eec5706bc2e2480ba1a0ac00e2e"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".doc_requests (workstream_id, doc_type, status, is_mandatory)\n           VALUES ($1, 'BANK_STATEMENT', 'WAIVED', false)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ed141a0fe2fc0a1af1edd69e2ee72eaef238058d26a0839db896553f4f296eba"
+}

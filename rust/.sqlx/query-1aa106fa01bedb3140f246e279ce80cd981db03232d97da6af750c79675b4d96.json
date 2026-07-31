@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".cbus (cbu_id, name, commercial_client_entity_id)\n        VALUES ($1, $2, $3)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1aa106fa01bedb3140f246e279ce80cd981db03232d97da6af750c79675b4d96"
+}

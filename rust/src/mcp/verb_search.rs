@@ -667,7 +667,7 @@ impl HybridVerbSearcher {
     /// 7. Global semantic (cold start) - score fallback_threshold-0.95
     /// 8. Phonetic fallback (typo handling) - score 0.5-0.7
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn search(
+    pub async fn search(
         &self,
         query: &str,
         user_id: Option<Uuid>,
@@ -1780,7 +1780,7 @@ impl HybridVerbSearcher {
     /// clears `fallback_threshold`, or the best global hit is already inside
     /// `allowed_verbs` (in which case `search()` itself should have found it —
     /// this function has nothing new to say).
-    pub(crate) async fn find_out_of_scope_match(
+    pub async fn find_out_of_scope_match(
         &self,
         query: &str,
         allowed_verbs: &HashSet<String>,

@@ -169,14 +169,14 @@ pub(crate) struct HandoffContext {
 
 /// A scoped verb reference returned in hydrated workspace views.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct VerbRef {
+pub struct VerbRef {
     pub verb_fqn: String,
     pub display_name: String,
 }
 
 /// Progress summary for the current constellation context.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct ProgressSummary {
+pub struct ProgressSummary {
     pub total_slots: usize,
     pub completion_pct: u8,
     pub blocking_slots: usize,
@@ -184,7 +184,7 @@ pub(crate) struct ProgressSummary {
 
 /// A suggested action derived from the current scoped verb surface.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct ActionHint {
+pub struct ActionHint {
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verb_fqn: Option<String>,
@@ -193,7 +193,7 @@ pub(crate) struct ActionHint {
 
 /// A workspace available to the user for navigation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct WorkspaceHint {
+pub struct WorkspaceHint {
     pub workspace: WorkspaceKind,
     pub label: String,
     pub default_constellation_family: String,
@@ -202,7 +202,7 @@ pub(crate) struct WorkspaceHint {
 
 /// Self-contained view of the hydrated working surface for one frame.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct WorkspaceStateView {
+pub struct WorkspaceStateView {
     pub workspace: WorkspaceKind,
     pub constellation_family: String,
     pub constellation_map: String,
@@ -410,7 +410,7 @@ pub(crate) struct ResolvedConstellationContext {
 
 /// Feedback returned with session-scoped navigation responses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct SessionFeedback {
+pub struct SessionFeedback {
     pub stack_depth: usize,
     pub tos: WorkspaceStateView,
     pub tos_is_peek: bool,
@@ -434,7 +434,7 @@ pub(crate) struct SessionFeedback {
 
 /// Entity-resolution evidence visible on Sage session feedback.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct SessionEntityResolutionFeedback {
+pub struct SessionEntityResolutionFeedback {
     pub snapshot_hash: String,
     pub snapshot_version: u32,
     pub entity_count: usize,
@@ -449,7 +449,7 @@ pub(crate) struct SessionEntityResolutionFeedback {
 
 /// One mention resolved by the Sage entity-linking service.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct SessionEntityMentionFeedback {
+pub struct SessionEntityMentionFeedback {
     pub span: (usize, usize),
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -461,7 +461,7 @@ pub(crate) struct SessionEntityMentionFeedback {
 
 /// One candidate considered during entity resolution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct SessionEntityCandidateFeedback {
+pub struct SessionEntityCandidateFeedback {
     pub entity_id: Uuid,
     pub entity_kind: String,
     pub canonical_name: String,
@@ -535,7 +535,7 @@ impl From<&ob_poc_entity_linking::EntityCandidate> for SessionEntityCandidateFee
 /// High-level conversational mode used to select stack operations.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ConversationMode {
+pub enum ConversationMode {
     #[default]
     Inspect,
     Navigate,

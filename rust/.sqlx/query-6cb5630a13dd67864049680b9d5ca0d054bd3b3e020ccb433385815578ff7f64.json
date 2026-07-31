@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".cbu_ssi (\n            cbu_id, ssi_name, ssi_type,\n            safekeeping_account, safekeeping_bic,\n            pset_bic, status, effective_date\n        )\n        VALUES ($1, 'Coverage SSI', 'SECURITIES',\n                'SAFE-008', 'CITIUS33',\n                'DTCYUS33', 'ACTIVE', CURRENT_DATE)\n        RETURNING ssi_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ssi_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6cb5630a13dd67864049680b9d5ca0d054bd3b3e020ccb433385815578ff7f64"
+}

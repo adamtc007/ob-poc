@@ -256,13 +256,13 @@ pub struct RuntimeStateTransition {
 
 /// Runtime block reason surfaced from grounded or reducer-backed legality.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct RuntimeBlockReason {
+pub struct RuntimeBlockReason {
     pub message: String,
 }
 
 /// Runtime blocked-verb payload stored on hydrated slots.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct RuntimeBlockedVerb {
+pub struct RuntimeBlockedVerb {
     pub verb: String,
     pub reasons: Vec<RuntimeBlockReason>,
 }
@@ -315,7 +315,7 @@ pub(crate) struct RawSlotRow {
 
 /// Raw overlay row before reducer binding.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct RawOverlayRow {
+pub struct RawOverlayRow {
     pub entity_id: Option<Uuid>,
     pub source_name: String,
     pub fields: serde_json::Value,
@@ -342,7 +342,7 @@ pub struct ConstellationSlotContext {
 
 /// Hydrated constellation payload returned by the runtime.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct HydratedConstellation {
+pub struct HydratedConstellation {
     pub constellation: String,
     pub description: Option<String>,
     pub jurisdiction: String,
@@ -354,7 +354,7 @@ pub(crate) struct HydratedConstellation {
 
 /// Hydrated ownership graph node used by entity-graph slots.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct HydratedGraphNode {
+pub struct HydratedGraphNode {
     pub entity_id: Uuid,
     pub name: Option<String>,
     pub entity_type: Option<String>,
@@ -362,7 +362,7 @@ pub(crate) struct HydratedGraphNode {
 
 /// Hydrated ownership graph edge used by entity-graph slots.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct HydratedGraphEdge {
+pub struct HydratedGraphEdge {
     pub from_entity_id: Uuid,
     pub to_entity_id: Uuid,
     pub percentage: Option<f64>,
@@ -373,7 +373,7 @@ pub(crate) struct HydratedGraphEdge {
 /// Hydrated slot-type classification exposed by the public runtime.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum HydratedSlotType {
+pub enum HydratedSlotType {
     Cbu,
     Entity,
     EntityGraph,
@@ -385,7 +385,7 @@ pub(crate) enum HydratedSlotType {
 /// Hydrated cardinality classification exposed by the public runtime.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum HydratedCardinality {
+pub enum HydratedCardinality {
     Root,
     Mandatory,
     Optional,
@@ -394,7 +394,7 @@ pub(crate) enum HydratedCardinality {
 
 /// Hydrated slot in normalized tree form.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct HydratedSlot {
+pub struct HydratedSlot {
     pub name: String,
     pub path: String,
     pub slot_type: HydratedSlotType,
@@ -478,7 +478,7 @@ pub(crate) enum QueryType {
 /// let map = load_constellation_map(yaml).unwrap();
 /// assert_eq!(map.constellation, "demo");
 /// ```
-pub(crate) fn load_constellation_map(yaml: &str) -> ConstellationResult<ValidatedConstellationMap> {
+pub fn load_constellation_map(yaml: &str) -> ConstellationResult<ValidatedConstellationMap> {
     let definition: ConstellationMapDef =
         serde_yaml::from_str(yaml).map_err(|err| ConstellationError::Other(err.into()))?;
     let mut validated = validate_constellation_map(&definition)?;
@@ -851,7 +851,7 @@ pub(crate) async fn handle_constellation_summary(
 /// # Ok(())
 /// # }
 /// ```
-pub(crate) async fn hydrate_constellation(
+pub async fn hydrate_constellation(
     pool: &PgPool,
     cbu_id: Uuid,
     case_id: Option<Uuid>,

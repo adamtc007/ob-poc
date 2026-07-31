@@ -277,7 +277,7 @@ impl ReplSessionV2 {
     /// session.set_state(ReplStateV2::RunbookEditing);
     /// assert!(matches!(session.state, ReplStateV2::RunbookEditing));
     /// ```
-    pub(crate) fn set_state(&mut self, new_state: ReplStateV2) {
+    pub fn set_state(&mut self, new_state: ReplStateV2) {
         let from = format!("{:?}", self.state);
         let to = format!("{:?}", new_state);
         self.state = new_state;

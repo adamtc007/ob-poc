@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT row_to_json(s) as \"data!\"\n        FROM \"ob-poc\".dsl_snapshots s\n        WHERE session_id = $1\n        ORDER BY version ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "data!",
+        "type_info": "Json"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "9a12f9e36764b5d460d80394b9f15573f3cb18a753059183de2e19928942f0b7"
+}

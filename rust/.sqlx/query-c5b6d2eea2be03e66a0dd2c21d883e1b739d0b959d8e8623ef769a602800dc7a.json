@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".holdings (share_class_id, investor_entity_id, units, usage_type, status)\n        VALUES ($1, $2, 30.0, 'TA', 'active')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c5b6d2eea2be03e66a0dd2c21d883e1b739d0b959d8e8623ef769a602800dc7a"
+}

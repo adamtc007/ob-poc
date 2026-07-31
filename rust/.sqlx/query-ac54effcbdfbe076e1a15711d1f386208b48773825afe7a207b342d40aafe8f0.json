@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO \"ob-poc\".cases (cbu_id, case_type, status)\n           VALUES ($1, 'NEW_CLIENT', 'INTAKE')\n           RETURNING case_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "case_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ac54effcbdfbe076e1a15711d1f386208b48773825afe7a207b342d40aafe8f0"
+}

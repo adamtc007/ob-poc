@@ -176,6 +176,7 @@ ob-poc-control-plane = { path = "crates/ob-poc-control-plane", features = ["test
 # redirects to the local ~/dev/bpmn-lite/ checkout during development.
 bpmn-lite-engine.workspace = true
 bpmn-lite-store.workspace = true
+bpmn-lite-server-runner.workspace = true
 ffi-catalogue.workspace = true
 dmn-lite-bridge.workspace = true
 bpmn-lite-ffi-http.workspace = true
@@ -419,6 +420,14 @@ dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0
 dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
 dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
+# bpmn-lite-server-runner exists only post-split (the v0.2.0 tag still carries
+# the unsplit bpmn-lite-server), so it cannot pin to the tag; exact rev pin to
+# the pushed split commit instead. Locally the ~/.cargo [patch] closure
+# redirects it to ~/dev/bpmn-lite/ like every other bpmn-lite crate. Dev-dep
+# only (tests/bpmn_e2e_harness_test.rs); a cold clone mixes this rev's
+# subgraph with the v0.2.0 crates, so cold-clone `cargo check --tests` stays
+# broken for that one target until bpmn-lite re-tags and all pins move.
+bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "f9e48161855e57bcf6e34534c7ef6d2db6d80486" }
 
 [lints.rust]
 dead_code = "deny"

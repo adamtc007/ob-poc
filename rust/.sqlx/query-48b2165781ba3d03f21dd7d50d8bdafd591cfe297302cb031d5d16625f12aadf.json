@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT COUNT(*) as \"count!\" FROM \"ob-poc\".fn_compute_economic_exposure(\n            '00000000-0000-0000-0000-000000000000'::uuid,\n            CURRENT_DATE,\n            2,      -- max_depth = 2 (shallow)\n            0.0001,\n            200,\n            true,\n            true\n        )\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "48b2165781ba3d03f21dd7d50d8bdafd591cfe297302cb031d5d16625f12aadf"
+}

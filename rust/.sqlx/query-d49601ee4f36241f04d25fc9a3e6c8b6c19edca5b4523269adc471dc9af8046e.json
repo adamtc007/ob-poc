@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO \"ob-poc\".ssi_booking_rules (\n            cbu_id, ssi_id, rule_name, priority,\n            currency\n        )\n        VALUES ($1, $2, 'USD Fallback', 50, 'USD')\n        RETURNING rule_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d49601ee4f36241f04d25fc9a3e6c8b6c19edca5b4523269adc471dc9af8046e"
+}
