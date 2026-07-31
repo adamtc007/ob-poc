@@ -335,7 +335,7 @@ pub struct CalibrationPortfolioEntry {
 pub struct CalibrationFixtureTransition {
     pub utterance_id: Uuid,
     pub trace_id: Uuid,
-    pub(crate) fixture_state: Vec<FixtureStateSnapshot>,
+    pub fixture_state: Vec<FixtureStateSnapshot>,
 }
 
 /// Draft Loop 1 gap proposal derived from a failed calibration outcome.

@@ -630,7 +630,7 @@ pub struct GoldenTestCase {
     pub expected_args: HashMap<String, String>,
 
     /// Optional: expected entity resolution.
-    pub(crate) expected_entities: Vec<GoldenEntityExpectation>,
+    pub expected_entities: Vec<GoldenEntityExpectation>,
 
     /// Tags for filtering (e.g. "pronoun", "multi-intent", "edge-case").
     pub tags: Vec<String>,
@@ -650,7 +650,7 @@ pub enum GoldenMatchMode {
 
 /// Expected entity resolution for a golden test case.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct GoldenEntityExpectation {
+pub struct GoldenEntityExpectation {
     pub arg_name: String,
     pub expected_method: EntityResolutionMethod,
     pub expected_value: Option<String>,

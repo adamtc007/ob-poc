@@ -41,7 +41,7 @@ pub struct SuiteResult {
     pub scenarios_passed: usize,
     pub scenarios_failed: usize,
     pub scenarios_total: usize,
-    pub(crate) results: Vec<ScenarioResult>,
+    pub results: Vec<ScenarioResult>,
 }
 
 impl SuiteResult {

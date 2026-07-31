@@ -1144,13 +1144,10 @@ enum SemRegAction {
         dry_run: bool,
     },
 
-    /// Run publish gates against all active snapshots
-    Validate {
-        /// Fail with non-zero exit on errors (default: report-only)
-        #[arg(long)]
-        enforce: bool,
-    },
-
+    // RETIRED: `Validate` (publish-gate runner) — gate checks migrated to
+    // sem_os_policy::gates; local duplicates (ob_poc::sem_reg::gates evaluate_publish_gates /
+    // GateMode / GateSeverity, gates_technical::check_security_label_presence) deleted in
+    // dead-code Phase 4; subcommand retired 2026-07-31 per owner ruling.
     /// List available Semantic Registry MCP tools (Phase 8)
     AgentTools,
 
@@ -1646,7 +1643,6 @@ fn main() -> Result<()> {
                 SemRegAction::BackfillLabels { dry_run } => {
                     rt.block_on(sem_reg::backfill_labels(dry_run))
                 }
-                SemRegAction::Validate { enforce } => rt.block_on(sem_reg::validate(enforce)),
                 SemRegAction::AgentTools => rt.block_on(sem_reg::agent_tools()),
                 SemRegAction::CtxResolve {
                     subject,

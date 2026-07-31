@@ -560,95 +560,9 @@ pub(crate) async fn backfill_labels(dry_run: bool) -> Result<()> {
     Ok(())
 }
 
-/// Run all publish gates against active snapshots and report results.
-pub(crate) async fn validate(enforce: bool) -> Result<()> {
-    use ob_poc::sem_reg::gates::{evaluate_publish_gates, GateMode};
-    use ob_poc::sem_reg::gates_technical::check_security_label_presence;
-
-    let pool = connect().await?;
-    let mode = if enforce {
-        GateMode::Enforce
-    } else {
-        GateMode::ReportOnly
-    };
-
-    let pg_rows = sqlx::query_as::<_, PgSnapshotRow>(
-        "SELECT * FROM sem_reg.snapshots \
-         WHERE status = 'active' AND effective_until IS NULL \
-         ORDER BY object_type, definition->>'fqn'",
-    )
-    .fetch_all(&pool)
-    .await?;
-    let rows: Vec<SnapshotRow> =
-        pg_rows_to_snapshot_rows(pg_rows).context("Failed to parse snapshot rows")?;
-
-    if rows.is_empty() {
-        println!("No active snapshots found.");
-        return Ok(());
-    }
-
-    println!(
-        "Validating {} active snapshots (mode: {:?})\n",
-        rows.len(),
-        mode
-    );
-
-    let mut total_errors = 0;
-    let mut total_warnings = 0;
-
-    for row in &rows {
-        let fqn = row
-            .definition
-            .get("fqn")
-            .and_then(|v| v.as_str())
-            .unwrap_or("?");
-
-        // Standard publish gates (using a synthetic SnapshotMeta from the row)
-        let meta = ob_poc::sem_reg::SnapshotMeta {
-            object_type: row.object_type,
-            object_id: row.object_id,
-            version_major: row.version_major,
-            version_minor: row.version_minor,
-            status: row.status,
-            governance_tier: row.governance_tier,
-            trust_class: row.trust_class,
-            security_label: row.parse_security_label().unwrap_or_default(),
-            change_type: row.change_type,
-            change_rationale: row.change_rationale.clone(),
-            created_by: row.created_by.clone(),
-            approved_by: row.approved_by.clone(),
-            predecessor_id: row.predecessor_id,
-        };
-        let standard = evaluate_publish_gates(&meta, None);
-        if !standard.all_passed() {
-            for msg in standard.failure_messages() {
-                println!("  ERROR  {}: {}", fqn, msg);
-                total_errors += 1;
-            }
-        }
-
-        // Security label presence check
-        let label_failures = check_security_label_presence(row);
-        for f in &label_failures {
-            println!("  {:?}  {}: {}", f.severity, fqn, f.message);
-            match f.severity {
-                ob_poc::sem_reg::gates::GateSeverity::Error => total_errors += 1,
-                ob_poc::sem_reg::gates::GateSeverity::Warning => total_warnings += 1,
-            }
-        }
-    }
-
-    println!("\nValidation complete:");
-    println!("  {} snapshots checked", rows.len());
-    println!("  {} errors", total_errors);
-    println!("  {} warnings", total_warnings);
-
-    if enforce && total_errors > 0 {
-        anyhow::bail!("{} gate errors in enforce mode", total_errors);
-    }
-
-    Ok(())
-}
+// RETIRED: `validate` (publish-gate runner for `cargo x sem-reg validate`) — gate checks
+// migrated to sem_os_policy::gates; local duplicates deleted in dead-code Phase 4;
+// subcommand retired 2026-07-31 per owner ruling.
 
 /// Resolve context for a subject using the 12-step pipeline.
 pub(crate) async fn ctx_resolve(
@@ -1300,12 +1214,15 @@ pub(crate) async fn onboard_apply(manifest_path: Option<&str>) -> Result<()> {
         "  RelationshipTypeDefs skipped:   {}",
         report.relationship_type_defs_skipped
     );
-    println!(
-        "  Total snapshots:                {}",
-        report.total_written()
-    );
+    // BootstrapReport::total_written() was deleted in dead-code Phase 4; recompute
+    // the same total from the surviving per-kind counters.
+    let total_written = report.attribute_defs_written
+        + report.verb_contracts_written
+        + report.entity_type_defs_written
+        + report.relationship_type_defs_written;
+    println!("  Total snapshots:                {}", total_written);
 
-    if report.total_written() == 0 {
+    if total_written == 0 {
         println!("\n  ℹ No new snapshots written — bootstrap may have already been applied.");
     }
 

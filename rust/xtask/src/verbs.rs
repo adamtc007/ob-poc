@@ -111,7 +111,6 @@ pub(crate) async fn verbs_compile(verbose: bool) -> Result<()> {
     println!("  Added:     {}", result.verbs_added);
     println!("  Updated:   {}", result.verbs_updated);
     println!("  Unchanged: {}", result.verbs_unchanged);
-    println!("  Removed:   {}", result.verbs_removed);
 
     // Query for diagnostics summary
     let diag_stats: (i64, i64) = sqlx::query_as(
