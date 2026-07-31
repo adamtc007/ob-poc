@@ -65,8 +65,6 @@ pub(crate) struct PreconditionResult {
 /// Reason a precondition was not met.
 #[derive(Debug, Clone)]
 pub(crate) struct UnmetReason {
-    /// The precondition that failed (e.g., `"requires_scope:cbu"`).
-    pub precondition: String,
     /// Human-readable explanation.
     pub explanation: String,
     /// Suggested verb to satisfy the precondition (if known).
@@ -147,7 +145,6 @@ pub(crate) fn preconditions_met(
         };
         if !met {
             unmet.push(UnmetReason {
-                precondition: format!("requires_scope:{}", scope_req),
                 explanation: format!("No {} in scope", scope_req),
                 suggested_verb: suggest_verb_for_scope(scope_req),
             });
@@ -159,7 +156,6 @@ pub(crate) fn preconditions_met(
     for prior_req in &preconditions.requires_prior {
         if !executed_verbs.contains(prior_req.as_str()) {
             unmet.push(UnmetReason {
-                precondition: format!("requires_prior:{}", prior_req),
                 explanation: format!("Verb '{}' has not been executed yet", prior_req),
                 suggested_verb: Some(prior_req.clone()),
             });
@@ -177,7 +173,6 @@ pub(crate) fn preconditions_met(
         };
         if !met {
             unmet.push(UnmetReason {
-                precondition: format!("requires_entities:{}", entity_req),
                 explanation: format!("No {} entities in scope", entity_req),
                 suggested_verb: None,
             });
@@ -188,7 +183,6 @@ pub(crate) fn preconditions_met(
     for forbid_req in &preconditions.forbids_prior {
         if executed_verbs.contains(forbid_req.as_str()) {
             unmet.push(UnmetReason {
-                precondition: format!("forbids_prior:{}", forbid_req),
                 explanation: format!(
                     "Verb '{}' has already been executed (forbidden)",
                     forbid_req
@@ -329,7 +323,6 @@ mod tests {
             accumulated_answers: HashMap::new(),
             executed_verbs: HashSet::new(),
             staged_verbs: HashSet::new(),
-            turn: 0,
             is_test_session: false,
         }
     }

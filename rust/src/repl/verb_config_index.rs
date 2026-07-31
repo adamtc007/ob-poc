@@ -65,9 +65,19 @@ pub(crate) struct ArgSummary {
     pub name: String,
     pub arg_type: String,
     pub required: bool,
+    /// Read only by this module's own `#[cfg(test)]` suite
+    /// (`test_arg_summary` asserts real content); no production reader
+    /// today. See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub description: Option<String>,
     /// Column this arg maps to in the target table (from YAML `maps_to`).
     /// Used by contract-driven write_set derivation (INV-8).
+    ///
+    /// NOT dead code: real consumer is
+    /// `runbook::write_set::derive_write_set_from_contract`, gated behind
+    /// the `write-set-contract` Cargo feature (off in this phase's `--lib
+    /// --features database` check, hence flagged). Left untouched -- see
+    /// Phase 15 dead-code remediation STOP finding.
     pub maps_to: Option<String>,
     /// Lookup config indicating this arg references an entity table.
     /// Args with lookup config are entity references (potential write targets).
@@ -133,6 +143,7 @@ impl VerbConfigIndex {
                         name: a.name.clone(),
                         arg_type: format!("{:?}", a.arg_type),
                         required: a.required,
+                        #[cfg(test)]
                         description: a.description.clone(),
                         maps_to: a.maps_to.clone(),
                         lookup_entity_type: a.lookup.as_ref().and_then(|l| l.entity_type.clone()),

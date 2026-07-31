@@ -12,8 +12,6 @@
 //! - Proposal generation via `proposal_engine`
 //! - Runbook editing + execution via `runbook`
 
-#![allow(dead_code)]
-
 // ============================================================================
 // Shared Intent Matching (used by V2)
 // ============================================================================

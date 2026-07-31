@@ -406,6 +406,7 @@ pub(crate) fn format_disambiguation(candidates: &[BootstrapCandidate], input: &s
 }
 
 /// Format the "ready" message after successful scope resolution.
+#[cfg(test)]
 pub(crate) fn format_ready_message(group_name: &str, examples: &[String]) -> String {
     let mut msg = format!("Scope set to {}.", group_name);
     if !examples.is_empty() {
@@ -418,6 +419,7 @@ pub(crate) fn format_ready_message(group_name: &str, examples: &[String]) -> Str
 }
 
 /// Default example phrases when no verb config is available.
+#[cfg(test)]
 pub(crate) fn default_example_phrases() -> Vec<String> {
     vec![
         "Set up a new fund structure".to_string(),

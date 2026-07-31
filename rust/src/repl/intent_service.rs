@@ -70,6 +70,12 @@ pub(crate) enum ClarificationOutcome {
     Complete,
     /// Missing args — return conversational prompts.
     NeedsClarification {
+        /// Read only by this module's own `#[cfg(test)]` suite
+        /// (`test_check_clarification_missing_required_arg` asserts real
+        /// content); the sole production consumer (`sequencer.rs`) matches
+        /// with `{ prompts, .. }`, discarding this field. See Phase 15
+        /// dead-code remediation.
+        #[cfg(test)]
         missing_args: Vec<String>,
         /// (arg_name, clarify_prompt) pairs.
         prompts: Vec<(String, String)>,
@@ -292,6 +298,7 @@ impl IntentService {
             ClarificationOutcome::Complete
         } else {
             ClarificationOutcome::NeedsClarification {
+                #[cfg(test)]
                 missing_args,
                 prompts,
             }

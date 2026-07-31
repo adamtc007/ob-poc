@@ -391,12 +391,8 @@ mod tests {
     fn test_candidate_universe_excludes_rejected() {
         let mut ctx = empty_context();
         let excluded_id = Uuid::new_v4();
-        ctx.exclusions.add_from_rejection(
-            "Goldman Sachs".to_string(),
-            Some(excluded_id),
-            0,
-            "wrong entity".to_string(),
-        );
+        ctx.exclusions
+            .add_from_rejection("Goldman Sachs".to_string(), Some(excluded_id), 0);
 
         let universe = build_candidate_universe(&[], &ctx);
 
@@ -438,12 +434,8 @@ mod tests {
     fn test_candidate_universe_rejects_excluded_entity() {
         let mut ctx = empty_context();
         let excluded_id = Uuid::new_v4();
-        ctx.exclusions.add_from_rejection(
-            "Bad Corp".to_string(),
-            Some(excluded_id),
-            0,
-            "rejected".to_string(),
-        );
+        ctx.exclusions
+            .add_from_rejection("Bad Corp".to_string(), Some(excluded_id), 0);
 
         let universe = build_candidate_universe(&[], &ctx);
 
@@ -461,12 +453,8 @@ mod tests {
     fn test_candidate_universe_filter_batch() {
         let mut ctx = empty_context();
         let excluded_id = Uuid::new_v4();
-        ctx.exclusions.add_from_rejection(
-            "Excluded".to_string(),
-            Some(excluded_id),
-            0,
-            "rejected".to_string(),
-        );
+        ctx.exclusions
+            .add_from_rejection("Excluded".to_string(), Some(excluded_id), 0);
 
         let universe = build_candidate_universe(&["company".to_string()], &ctx);
 
@@ -503,12 +491,8 @@ mod tests {
         let mut ctx = empty_context();
         let excluded_id = Uuid::new_v4();
         let good_id = Uuid::new_v4();
-        ctx.exclusions.add_from_rejection(
-            "Bad Entity".to_string(),
-            Some(excluded_id),
-            0,
-            "rejected".to_string(),
-        );
+        ctx.exclusions
+            .add_from_rejection("Bad Entity".to_string(), Some(excluded_id), 0);
 
         let mut refs = vec![UnresolvedRef {
             ref_id: "ref-1".to_string(),

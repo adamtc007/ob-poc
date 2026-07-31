@@ -125,6 +125,17 @@ pub(crate) struct ProposalEngine {
 }
 
 impl ProposalEngine {
+    /// Construct a `ProposalEngine`.
+    ///
+    /// No production caller today -- `sequencer.rs`'s `proposal_engine`
+    /// field (`Option<Arc<ProposalEngine>>`) is only ever populated via
+    /// `with_proposal_engine` from `#[cfg(test)]`-gated integration tests;
+    /// `propose_for_input`'s doc comment explicitly documents the `None`
+    /// case as a supported fallback to `match_verb_for_input`, not a gap.
+    /// Substantial test coverage (12+ call sites across 5 integration-test
+    /// files exercising real proposal logic) -- gated rather than deleted.
+    /// See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn new(
         intent_service: Arc<IntentService>,
         verb_config_index: Arc<VerbConfigIndex>,

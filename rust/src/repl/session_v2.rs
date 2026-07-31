@@ -657,13 +657,6 @@ impl ReplSessionV2 {
         }
     }
 
-    /// Current focus slot path from TOS.
-    pub(crate) fn tos_focus_slot_path(&self) -> Option<&str> {
-        self.workspace_stack
-            .last()
-            .and_then(|f| f.focus_slot_path.as_deref())
-    }
-
     /// Set the focus slot path on TOS.
     pub(crate) fn set_tos_focus_slot(&mut self, path: Option<String>) {
         if let Some(tos) = self.workspace_stack.last_mut() {

@@ -264,8 +264,6 @@ mod tests {
             allowed_verbs: allowed.into_iter().map(|s| s.to_string()).collect(),
             forbidden_verbs: forbidden.into_iter().map(|s| s.to_string()).collect(),
             dominant_domain: domain.map(|s| s.to_string()),
-            template_ids: vec![],
-            invocation_phrases: vec![],
         });
         ctx
     }
@@ -329,7 +327,6 @@ mod tests {
             step_index: 1,
             total_steps: 5,
             expected_verb: "kyc.add-entity".to_string(),
-            next_entry_id: Uuid::new_v4(),
             section: None,
             section_progress: None,
             carry_forward_args: HashMap::new(),
@@ -395,12 +392,8 @@ mod tests {
     #[test]
     fn test_exclusion_filtering() {
         let mut ctx = empty_context();
-        ctx.exclusions.add_from_rejection(
-            "cbu.delete".to_string(),
-            None,
-            0,
-            "user rejected".to_string(),
-        );
+        ctx.exclusions
+            .add_from_rejection("cbu.delete".to_string(), None, 0);
 
         let mut candidates = vec![
             make_candidate("cbu.create", 0.80),

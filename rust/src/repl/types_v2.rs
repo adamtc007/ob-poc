@@ -137,25 +137,6 @@ pub(crate) struct SessionScope {
     pub client_group_name: Option<String>,
 }
 
-impl SessionScope {
-    /// Sentinel UUID for infrastructure-only sessions (no client group).
-    pub(crate) fn infrastructure_scope_id() -> Uuid {
-        Uuid::nil()
-    }
-
-    /// Whether this scope represents an infrastructure session.
-    pub(crate) fn is_infrastructure(&self) -> bool {
-        self.client_group_id == Uuid::nil()
-    }
-
-    /// Create an infrastructure scope (no client group).
-    pub(crate) fn infrastructure() -> Self {
-        Self {
-            client_group_id: Uuid::nil(),
-            client_group_name: Some("SemOS Infrastructure".to_string()),
-        }
-    }
-}
 
 // AgentMode + SubjectKind relocated to ob-poc-boundary::session (see top-of-file note).
 
@@ -551,42 +532,6 @@ impl From<&ob_poc_entity_linking::EntityCandidate> for SessionEntityCandidateFee
     }
 }
 
-/// Semantic IR frame used before deterministic or probabilistic resolution.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct UtteranceFrame {
-    pub action_phrase: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_workspace_hint: Option<WorkspaceKind>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub subject_hint: Option<String>,
-    pub conversation_mode: ConversationMode,
-    pub scope_cue: ScopeCue,
-    pub temporal_cue: TemporalCue,
-}
-
-impl UtteranceFrame {
-    /// Build a deterministic utterance frame from free text cues.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::repl::types_v2::{ConversationMode, UtteranceFrame};
-    ///
-    /// let frame = UtteranceFrame::from_message("show me the current KYC case");
-    /// assert_eq!(frame.conversation_mode, ConversationMode::Inspect);
-    /// ```
-    pub(crate) fn from_message(message: &str) -> Self {
-        let normalized = message.trim().to_lowercase();
-        Self {
-            action_phrase: normalized.clone(),
-            target_workspace_hint: WorkspaceKind::from_hint(&normalized),
-            subject_hint: extract_subject_hint(&normalized),
-            conversation_mode: ConversationMode::classify(&normalized),
-            scope_cue: ScopeCue::classify(&normalized),
-            temporal_cue: TemporalCue::classify(&normalized),
-        }
-    }
-}
-
 /// High-level conversational mode used to select stack operations.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -601,136 +546,7 @@ pub(crate) enum ConversationMode {
     Return,
 }
 
-impl ConversationMode {
-    /// Classify a conversational mode from simple lexical cues.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::repl::types_v2::ConversationMode;
-    ///
-    /// assert_eq!(ConversationMode::classify("compare this cbu with that one"), ConversationMode::Compare);
-    /// ```
-    pub(crate) fn classify(message: &str) -> Self {
-        let msg = message.trim().to_lowercase();
-        if matches!(msg.as_str(), "yes" | "confirm" | "approved" | "do it") {
-            return Self::Confirm;
-        }
-        if msg.contains("go back") || msg.contains("return") || msg == "back" {
-            return Self::Return;
-        }
-        if msg.contains("compare") || msg.contains("versus") {
-            return Self::Compare;
-        }
-        if msg.contains("switch to")
-            || msg.contains("go to ")
-            || msg.contains("open the ")
-            || msg.contains("take me to")
-        {
-            return Self::Navigate;
-        }
-        if msg.contains("would")
-            || msg.contains("could")
-            || msg.contains("can you")
-            || msg.ends_with('?')
-        {
-            return Self::Prepare;
-        }
-        if msg.starts_with("create ")
-            || msg.starts_with("add ")
-            || msg.starts_with("update ")
-            || msg.starts_with("remove ")
-            || msg.starts_with("delete ")
-            || msg.starts_with("activate ")
-            || msg.starts_with("provision ")
-        {
-            return Self::Mutate;
-        }
-        Self::Inspect
-    }
-}
-
-/// Scope cue used in utterance decomposition.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum ScopeCue {
-    Here,
-    There,
-    Across,
-    Unspecified,
-}
-
-impl ScopeCue {
-    /// Classify a scope cue from lexical markers.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::repl::types_v2::ScopeCue;
-    ///
-    /// assert_eq!(ScopeCue::classify("show me this cbu"), ScopeCue::Here);
-    /// ```
-    pub(crate) fn classify(message: &str) -> Self {
-        let msg = message.to_lowercase();
-        if msg.contains("across") || msg.contains("compare") {
-            return Self::Across;
-        }
-        if msg.contains("that ") || msg.contains("there") || msg.contains("other workspace") {
-            return Self::There;
-        }
-        if msg.contains("this ") || msg.contains("current") || msg.contains("here") {
-            return Self::Here;
-        }
-        Self::Unspecified
-    }
-}
-
-/// Temporal cue used in utterance decomposition.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum TemporalCue {
-    Now,
-    Before,
-    Back,
-    Unspecified,
-}
-
-impl TemporalCue {
-    /// Classify a temporal cue from lexical markers.
-    ///
-    /// # Examples
-    /// ```rust
-    /// use ob_poc::repl::types_v2::TemporalCue;
-    ///
-    /// assert_eq!(TemporalCue::classify("go back to the deal"), TemporalCue::Back);
-    /// ```
-    pub(crate) fn classify(message: &str) -> Self {
-        let msg = message.to_lowercase();
-        if msg.contains("go back") || msg == "back" || msg.contains("return") {
-            return Self::Back;
-        }
-        if msg.contains("before") || msg.contains("previous") {
-            return Self::Before;
-        }
-        if msg.contains("now") || msg.contains("current") {
-            return Self::Now;
-        }
-        Self::Unspecified
-    }
-}
-
 // `WorkspaceKind::from_hint` relocated to ob-poc-boundary::session (see top-of-file note).
-
-fn extract_subject_hint(message: &str) -> Option<String> {
-    let subject_markers = [" for ", " on ", " about ", " regarding "];
-    for marker in subject_markers {
-        if let Some((_, tail)) = message.split_once(marker) {
-            let trimmed = tail.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.to_string());
-            }
-        }
-    }
-    None
-}
 
 // WorkspaceRegistryEntry relocated to ob-poc-boundary::session (see top-of-file note).
 

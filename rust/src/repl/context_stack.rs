@@ -74,9 +74,6 @@ pub(crate) struct ContextStack {
     /// Verbs that are staged (Proposed/Confirmed/Resolved) but not yet executed.
     pub staged_verbs: HashSet<String>,
 
-    /// Current turn number (for exclusion decay).
-    pub turn: u32,
-
     /// Whether this context stack belongs to a test session.
     pub is_test_session: bool,
 }
@@ -134,7 +131,6 @@ impl ContextStack {
             accumulated_answers,
             executed_verbs,
             staged_verbs,
-            turn,
             is_test_session: false,
         }
     }
@@ -146,6 +142,12 @@ impl ContextStack {
 
     /// Whether a verb is allowed by the active pack.
     /// If no pack is active, all verbs are allowed.
+    ///
+    /// Only called from this module's own `#[cfg(test)]` suite today
+    /// (`AgentMode::is_verb_allowed` in `agent/verb_surface.rs` is an
+    /// unrelated, distinctly-typed method despite the identical name --
+    /// verified by qualified path). See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn is_verb_allowed(&self, verb: &str) -> bool {
         match self.active_pack() {
             Some(pack) => !pack.forbidden_verbs.contains(verb),
@@ -155,6 +157,10 @@ impl ContextStack {
 
     /// Whether a verb is in the active pack's allowed set.
     /// If no pack is active, returns false (no boost).
+    ///
+    /// Only called from this module's own `#[cfg(test)]` suite today. See
+    /// Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn is_verb_in_pack(&self, verb: &str) -> bool {
         match self.active_pack() {
             Some(pack) => pack.allowed_verbs.contains(verb),
@@ -278,12 +284,14 @@ fn derive_session_state(runbook: &Runbook) -> DerivedScope {
 #[derive(Debug, Clone)]
 pub(crate) struct PackContext {
     pub pack_id: String,
+    /// Read only by this module's own `#[cfg(test)]` suite
+    /// (`test_active_pack_staged_over_executed`, `test_pack_select_...`);
+    /// no production reader today. See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub pack_version: String,
     pub allowed_verbs: HashSet<String>,
     pub forbidden_verbs: HashSet<String>,
     pub dominant_domain: Option<String>,
-    pub template_ids: Vec<String>,
-    pub invocation_phrases: Vec<String>,
 }
 
 impl PackContext {
@@ -295,20 +303,13 @@ impl PackContext {
         // Derive dominant domain from allowed verbs.
         let dominant_domain = derive_dominant_domain(&allowed);
 
-        let template_ids = manifest
-            .templates
-            .iter()
-            .map(|t| t.template_id.clone())
-            .collect();
-
         Self {
             pack_id: manifest.id.clone(),
+            #[cfg(test)]
             pack_version: manifest.version.clone(),
             allowed_verbs: allowed,
             forbidden_verbs: forbidden,
             dominant_domain,
-            template_ids,
-            invocation_phrases: manifest.invocation_phrases.clone(),
         }
     }
 }
@@ -367,6 +368,7 @@ fn derive_pack_context(runbook: &Runbook, pack_router: Option<&PackRouter>) -> O
         }
 
         // No router or manifest not found — build minimal context.
+        #[cfg(test)]
         let pack_version = entry.args.get("pack-version").cloned().unwrap_or_default();
 
         let used_verbs: HashSet<String> = runbook
@@ -378,17 +380,17 @@ fn derive_pack_context(runbook: &Runbook, pack_router: Option<&PackRouter>) -> O
 
         return Some(PackContext {
             pack_id,
+            #[cfg(test)]
             pack_version,
             allowed_verbs: used_verbs,
             forbidden_verbs: HashSet::new(),
             dominant_domain: None,
-            template_ids: Vec::new(),
-            invocation_phrases: Vec::new(),
         });
     }
 
     // Legacy fallback: use runbook metadata if no pack.select entry found.
     let pack_id = runbook.pack_id.as_ref()?;
+    #[cfg(test)]
     let pack_version = runbook.pack_version.clone().unwrap_or_default();
 
     // Try router by pack_id from runbook metadata.
@@ -407,12 +409,11 @@ fn derive_pack_context(runbook: &Runbook, pack_router: Option<&PackRouter>) -> O
 
     Some(PackContext {
         pack_id: pack_id.clone(),
+        #[cfg(test)]
         pack_version,
         allowed_verbs: used_verbs,
         forbidden_verbs: HashSet::new(),
         dominant_domain: None,
-        template_ids: Vec::new(),
-        invocation_phrases: Vec::new(),
     })
 }
 
@@ -429,6 +430,11 @@ fn derive_pack_context(runbook: &Runbook, pack_router: Option<&PackRouter>) -> O
 #[derive(Debug, Clone)]
 pub(crate) struct TemplateStepHint {
     /// Template identifier (matches `runbook.template_id`).
+    ///
+    /// Read only by this module's own `#[cfg(test)]` suite
+    /// (`test_from_runbook_template_hint`); no production reader today. See
+    /// Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub template_id: String,
     /// 0-based index of the next step to execute.
     pub step_index: usize,
@@ -436,8 +442,6 @@ pub(crate) struct TemplateStepHint {
     pub total_steps: usize,
     /// FQN of the expected next verb.
     pub expected_verb: String,
-    /// Entry ID of the next pending entry (for direct reference).
-    pub next_entry_id: Uuid,
     /// Section label from entry labels, if present (e.g. "entities", "products").
     pub section: Option<String>,
     /// (completed_in_section, total_in_section) if section is known.
@@ -507,11 +511,11 @@ fn derive_template_hint(runbook: &Runbook) -> Option<TemplateStepHint> {
     let carry_forward = build_carry_forward(runbook);
 
     Some(TemplateStepHint {
+        #[cfg(test)]
         template_id: template_id.clone(),
         step_index: completed_count,
         total_steps,
         expected_verb: next_entry.verb.clone(),
-        next_entry_id: next_entry.id,
         section,
         section_progress,
         carry_forward_args: carry_forward,
@@ -578,8 +582,11 @@ pub(crate) struct FocusContext {
 pub(crate) struct FocusRef {
     pub id: Uuid,
     pub display_name: String,
+    /// Only read by `entity_resolution::resolve_with_context`'s expected-kind
+    /// filtering (`#[cfg(test)]`-gated module; see Phase 15 dead-code
+    /// remediation) -- no production reader today.
+    #[cfg(test)]
     pub entity_type: String,
-    pub set_at_turn: u32,
 }
 
 /// Role synonyms for shorthand resolution.
@@ -644,6 +651,11 @@ impl FocusContext {
     }
 
     /// Resolve a role synonym to its canonical form.
+    ///
+    /// Only exercised by this module's and `entity_resolution`'s
+    /// `#[cfg(test)]` suites today -- no production caller. See Phase 15
+    /// dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn resolve_role(input: &str) -> Option<&'static str> {
         let lower = input.to_lowercase();
         let trimmed = lower.trim();
@@ -656,32 +668,37 @@ impl FocusContext {
     }
 
     /// Update entity focus.
-    pub(crate) fn set_entity(&mut self, id: Uuid, name: String, entity_type: String, turn: u32) {
+    ///
+    /// Only called from `#[cfg(test)]` suites (`entity_resolution.rs`'s
+    /// resolution tests and this module's pronoun tests) -- production
+    /// focus is derived from the runbook via `derive_focus`. See Phase 15
+    /// dead-code remediation.
+    #[cfg(test)]
+    pub(crate) fn set_entity(&mut self, id: Uuid, name: String, entity_type: String, _turn: u32) {
         self.entity = Some(FocusRef {
             id,
             display_name: name,
             entity_type,
-            set_at_turn: turn,
         });
     }
 
-    /// Update CBU focus.
-    pub(crate) fn set_cbu(&mut self, id: Uuid, name: String, turn: u32) {
+    /// Update CBU focus. See `set_entity` doc comment -- test-only.
+    #[cfg(test)]
+    pub(crate) fn set_cbu(&mut self, id: Uuid, name: String, _turn: u32) {
         self.cbu = Some(FocusRef {
             id,
             display_name: name,
             entity_type: "cbu".to_string(),
-            set_at_turn: turn,
         });
     }
 
-    /// Update case focus.
-    pub(crate) fn set_case(&mut self, id: Uuid, name: String, turn: u32) {
+    /// Update case focus. See `set_entity` doc comment -- test-only.
+    #[cfg(test)]
+    pub(crate) fn set_case(&mut self, id: Uuid, name: String, _turn: u32) {
         self.case = Some(FocusRef {
             id,
             display_name: name,
             entity_type: "kyc_case".to_string(),
-            set_at_turn: turn,
         });
     }
 }
@@ -721,8 +738,8 @@ fn derive_focus(runbook: &Runbook) -> FocusContext {
                 focus.cbu = Some(FocusRef {
                     id: cbu_id,
                     display_name: name,
+                    #[cfg(test)]
                     entity_type: "cbu".to_string(),
-                    set_at_turn: 0,
                 });
             }
         }
@@ -744,8 +761,8 @@ fn derive_focus(runbook: &Runbook) -> FocusContext {
                 focus.entity = Some(FocusRef {
                     id: entity_id,
                     display_name: name,
+                    #[cfg(test)]
                     entity_type: "entity".to_string(),
-                    set_at_turn: 0,
                 });
             }
         }
@@ -762,8 +779,8 @@ fn derive_focus(runbook: &Runbook) -> FocusContext {
                 focus.case = Some(FocusRef {
                     id: case_id,
                     display_name: name,
+                    #[cfg(test)]
                     entity_type: "kyc_case".to_string(),
-                    set_at_turn: 0,
                 });
             }
         }
@@ -858,8 +875,15 @@ pub(crate) struct RecentContext {
 #[derive(Debug, Clone)]
 pub(crate) struct RecentMention {
     pub entity_id: Uuid,
+    /// Read only by this module's and `deterministic_extraction`'s
+    /// `#[cfg(test)]` suites (`test_closed_world_prompt_render` asserts on
+    /// rendered content, not a trivial roundtrip); no production reader
+    /// today. See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub display_name: String,
+    #[cfg(test)]
     pub entity_type: String,
+    #[cfg(test)]
     pub mentioned_at_turn: u32,
 }
 
@@ -889,6 +913,7 @@ fn derive_recent(runbook: &Runbook) -> RecentContext {
         // Look for entity-id args.
         if let Some(id_str) = entry.args.get("entity-id").or(entry.args.get("entity_id")) {
             if let Ok(id) = Uuid::parse_str(id_str) {
+                #[cfg(test)]
                 let name = entry
                     .args
                     .get("entity-name")
@@ -897,8 +922,11 @@ fn derive_recent(runbook: &Runbook) -> RecentContext {
                     .unwrap_or_default();
                 recent.add(RecentMention {
                     entity_id: id,
+                    #[cfg(test)]
                     display_name: name,
+                    #[cfg(test)]
                     entity_type: "entity".to_string(),
+                    #[cfg(test)]
                     mentioned_at_turn: 0,
                 });
             }
@@ -928,8 +956,6 @@ pub(crate) struct Exclusion {
     pub entity_id: Option<Uuid>,
     /// Turn when the rejection happened.
     pub rejected_at_turn: u32,
-    /// Reason for rejection.
-    pub reason: String,
 }
 
 /// Number of turns before an exclusion expires.
@@ -953,12 +979,11 @@ fn derive_exclusions(runbook: &Runbook, _current_turn: u32) -> ExclusionSet {
             .args
             .get("entity-id")
             .and_then(|s| Uuid::parse_str(s).ok());
-        let reason = entry.args.get("reason").cloned().unwrap_or_default();
 
         // Use sequence as a proxy for turn number.
         let turn = entry.sequence as u32;
 
-        set.add_from_rejection(value, entity_id, turn, reason);
+        set.add_from_rejection(value, entity_id, turn);
     }
 
     set
@@ -966,13 +991,7 @@ fn derive_exclusions(runbook: &Runbook, _current_turn: u32) -> ExclusionSet {
 
 impl ExclusionSet {
     /// Add an exclusion from a user rejection.
-    pub(crate) fn add_from_rejection(
-        &mut self,
-        value: String,
-        entity_id: Option<Uuid>,
-        turn: u32,
-        reason: String,
-    ) {
+    pub(crate) fn add_from_rejection(&mut self, value: String, entity_id: Option<Uuid>, turn: u32) {
         // Don't duplicate.
         if self
             .exclusions
@@ -985,7 +1004,6 @@ impl ExclusionSet {
             value,
             entity_id,
             rejected_at_turn: turn,
-            reason,
         });
     }
 
@@ -1003,6 +1021,10 @@ impl ExclusionSet {
     }
 
     /// Check if an entity ID is excluded.
+    ///
+    /// Only exercised by this module's `#[cfg(test)]` suite today. See
+    /// Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn is_entity_excluded(&self, entity_id: Uuid) -> bool {
         self.exclusions
             .iter()
@@ -1010,11 +1032,19 @@ impl ExclusionSet {
     }
 
     /// Whether the set has no exclusions.
+    ///
+    /// Sole caller is `build_pack_enriched_prompt`, which is itself
+    /// `#[cfg(test)]`-gated. See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn is_empty(&self) -> bool {
         self.exclusions.is_empty()
     }
 
     /// Return all active (non-pruned) exclusions.
+    ///
+    /// Sole caller is `build_pack_enriched_prompt`, which is itself
+    /// `#[cfg(test)]`-gated. See Phase 15 dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn active(&self) -> &[Exclusion] {
         &self.exclusions
     }
@@ -1032,6 +1062,13 @@ pub(crate) struct OutcomeRegistry {
 
 impl OutcomeRegistry {
     /// Get an outcome by entry ID.
+    ///
+    /// No production caller today -- the documented `@N` back-reference
+    /// feature this exists for was never wired up elsewhere in the crate.
+    /// Kept `#[cfg(test)]`: `test_outcome_registry` asserts on real
+    /// `derive_outcomes` output (not a trivial roundtrip). See Phase 15
+    /// dead-code remediation.
+    #[cfg(test)]
     pub(crate) fn get(&self, entry_id: Uuid) -> Option<&serde_json::Value> {
         self.outcomes.get(&entry_id)
     }
@@ -1128,6 +1165,11 @@ pub(crate) struct PackHandoffSuggestion {
 }
 
 /// An outcome reference that carries forward across packs.
+///
+/// Only constructed by the `#[cfg(test)]`-gated `check_pack_handoff`; see
+/// Phase 15 dead-code remediation (matches the existing
+/// `PackHandoffSuggestion` gate directly above).
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct OutcomeRef {
     /// The entry ID that produced this outcome.
@@ -1364,6 +1406,14 @@ pub(crate) fn canonicalize_mention(input: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// Source of a context value.
+///
+/// `ContextSource`/`ContextEntry`/`ContextEntry::weight` are a self-contained
+/// weighted-decay model with no production constructor anywhere in the
+/// crate today -- only exercised by this module's own `#[cfg(test)]` decay
+/// suite (`test_context_entry_weight_*`), which asserts real decay math, not
+/// a trivial roundtrip. Gated rather than deleted; see Phase 15 dead-code
+/// remediation.
+#[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ContextSource {
     /// User explicitly said this.
@@ -1377,6 +1427,7 @@ pub(crate) enum ContextSource {
 }
 
 /// A context entry with weighted decay.
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct ContextEntry {
     pub value: String,
@@ -1384,6 +1435,7 @@ pub(crate) struct ContextEntry {
     pub set_at_turn: u32,
 }
 
+#[cfg(test)]
 impl ContextEntry {
     /// Compute the current weight of this entry.
     ///
@@ -1637,12 +1689,7 @@ mod tests {
     fn test_exclusion_add_and_check() {
         let mut exclusions = ExclusionSet::default();
         let id = Uuid::new_v4();
-        exclusions.add_from_rejection(
-            "Goldman Sachs".to_string(),
-            Some(id),
-            5,
-            "wrong entity".to_string(),
-        );
+        exclusions.add_from_rejection("Goldman Sachs".to_string(), Some(id), 5);
 
         assert!(exclusions.is_excluded("Goldman Sachs", Some(id)));
         assert!(exclusions.is_entity_excluded(id));
@@ -1652,8 +1699,8 @@ mod tests {
     #[test]
     fn test_exclusion_decay() {
         let mut exclusions = ExclusionSet::default();
-        exclusions.add_from_rejection("old reject".to_string(), None, 1, "rejected".to_string());
-        exclusions.add_from_rejection("recent reject".to_string(), None, 4, "rejected".to_string());
+        exclusions.add_from_rejection("old reject".to_string(), None, 1);
+        exclusions.add_from_rejection("recent reject".to_string(), None, 4);
 
         // At turn 4, "old reject" (turn 1) has age 3 → expired.
         exclusions.prune(4);
@@ -1665,8 +1712,8 @@ mod tests {
     fn test_exclusion_no_duplicates() {
         let mut exclusions = ExclusionSet::default();
         let id = Uuid::new_v4();
-        exclusions.add_from_rejection("X".to_string(), Some(id), 1, "r".to_string());
-        exclusions.add_from_rejection("X".to_string(), Some(id), 2, "r".to_string());
+        exclusions.add_from_rejection("X".to_string(), Some(id), 1);
+        exclusions.add_from_rejection("X".to_string(), Some(id), 2);
 
         assert_eq!(exclusions.exclusions.len(), 1);
     }
@@ -2238,7 +2285,6 @@ mod tests {
             step_index: 2,
             total_steps: 8,
             expected_verb: "cbu.create".to_string(),
-            next_entry_id: Uuid::new_v4(),
             section: Some("products".to_string()),
             section_progress: Some((1, 3)),
             carry_forward_args: HashMap::new(),
@@ -2254,7 +2300,6 @@ mod tests {
             step_index: 0,
             total_steps: 5,
             expected_verb: "cbu.create".to_string(),
-            next_entry_id: Uuid::new_v4(),
             section: None,
             section_progress: None,
             carry_forward_args: HashMap::new(),

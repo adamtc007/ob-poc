@@ -668,7 +668,7 @@ pub(crate) fn build_pack_enriched_prompt(context: &ContextStack) -> String {
     if !context.exclusions.is_empty() {
         lines.push("Excluded (do not suggest):".to_string());
         for excl in context.exclusions.active() {
-            lines.push(format!("  - {} (reason: {})", excl.value, excl.reason));
+            lines.push(format!("  - {}", excl.value));
         }
     }
 
@@ -779,7 +779,6 @@ mod tests {
             accumulated_answers: HashMap::new(),
             executed_verbs: HashSet::new(),
             staged_verbs: HashSet::new(),
-            turn: 0,
             is_test_session: false,
         }
     }
@@ -924,7 +923,6 @@ mod tests {
             step_index: 1,
             total_steps: 5,
             expected_verb: "cbu.create".to_string(),
-            next_entry_id: Uuid::new_v4(),
             section: None,
             section_progress: None,
             carry_forward_args: HashMap::from([
@@ -1082,7 +1080,6 @@ mod tests {
             step_index: 1,
             total_steps: 2,
             expected_verb: "cbu.add-product".to_string(),
-            next_entry_id: Uuid::new_v4(),
             section: None,
             section_progress: None,
             carry_forward_args: HashMap::from([("cbu_id".to_string(), cbu_id.to_string())]),
@@ -1132,7 +1129,6 @@ mod tests {
             step_index: 0,
             total_steps: 1,
             expected_verb: "cbu.create".to_string(),
-            next_entry_id: Uuid::new_v4(),
             section: None,
             section_progress: None,
             carry_forward_args: HashMap::from([
@@ -1231,8 +1227,6 @@ mod tests {
             dominant_domain: Some("kyc".to_string()),
             allowed_verbs: HashSet::from(["kyc.add-entity".to_string()]),
             forbidden_verbs: HashSet::new(),
-            template_ids: vec![],
-            invocation_phrases: vec![],
         });
         let prompt = build_pack_enriched_prompt(&ctx);
         assert!(prompt.contains("Client: Aviva"));

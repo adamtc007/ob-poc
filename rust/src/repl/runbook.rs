@@ -575,6 +575,16 @@ pub mod provenance {
 /// Stamp journey provenance labels on a RunbookEntry.
 ///
 /// Call this when creating entries from Tier -2 journey matches.
+///
+/// No production caller today (Tier -2 journey-match entry creation never
+/// wired this in); substantial test coverage in this module's own
+/// `#[cfg(test)]` suite (`test_stamp_journey_provenance_*`,
+/// `test_narrate_*`) asserting real label/narration content. Note:
+/// `Runbook::narrate_progress(&self)` below (a distinctly-typed method,
+/// verified by qualified path) is unrelated and IS live -- do not confuse
+/// with this free function of the same name. Gated rather than deleted.
+/// See Phase 15 dead-code remediation.
+#[cfg(test)]
 pub(crate) fn stamp_journey_provenance(
     entry: &mut RunbookEntry,
     macro_fqn: &str,
@@ -609,6 +619,11 @@ pub(crate) fn stamp_journey_provenance(
 ///
 /// Returns e.g. "Step 3 of 13: Lux UCITS SICAV Setup" when the entry
 /// has an `origin_title` label, or `None` for regular entries.
+///
+/// No production caller today; see `stamp_journey_provenance`'s doc
+/// comment above (unrelated to the live `Runbook::narrate_progress(&self)`
+/// method of the same name). Gated per Phase 15 dead-code remediation.
+#[cfg(test)]
 pub(crate) fn narrate_progress(entry: &RunbookEntry, total_entries: usize) -> Option<String> {
     let title = entry.labels.get(provenance::ORIGIN_TITLE)?;
     Some(format!(
@@ -621,6 +636,10 @@ pub(crate) fn narrate_progress(entry: &RunbookEntry, total_entries: usize) -> Op
 ///
 /// Returns e.g. "Lux UCITS SICAV Setup — 13 steps" when at least one
 /// entry carries an `origin_title` label, or `None` otherwise.
+///
+/// No production caller today; see `stamp_journey_provenance`'s doc
+/// comment above. Gated per Phase 15 dead-code remediation.
+#[cfg(test)]
 pub(crate) fn narrate_runbook_summary(entries: &[RunbookEntry]) -> Option<String> {
     // Find the first entry with a title label
     let title = entries

@@ -4789,7 +4789,10 @@ mod tests {
         let session = sessions_write.get_mut(&session_id).expect("session");
         let mut frame = WorkspaceFrame::new(
             WorkspaceKind::Kyc,
-            crate::repl::types_v2::SessionScope::infrastructure(),
+            crate::repl::types_v2::SessionScope {
+                client_group_id: uuid::Uuid::nil(),
+                client_group_name: Some("SemOS Infrastructure".to_string()),
+            },
         );
         frame.subject_kind = Some(crate::repl::types_v2::SubjectKind::Case);
         frame.subject_id = Some(test_case_id());
