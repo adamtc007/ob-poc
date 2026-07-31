@@ -170,20 +170,6 @@ impl LearningWarmup {
 }
 
 impl LearnedData {
-    /// Look up entity alias.
-    pub(crate) fn resolve_entity_alias(&self, query: &str) -> Option<(&str, Option<Uuid>)> {
-        self.entity_aliases
-            .get(&query.to_lowercase())
-            .map(|(canonical, entity_id)| (canonical.as_str(), *entity_id))
-    }
-
-    /// Look up lexicon token.
-    pub(crate) fn resolve_token(&self, token: &str) -> Option<(&str, Option<&str>)> {
-        self.lexicon_tokens
-            .get(&token.to_lowercase())
-            .map(|(token_type, subtype)| (token_type.as_str(), subtype.as_deref()))
-    }
-
     /// Look up invocation phrase.
     pub(crate) fn resolve_phrase(&self, phrase: &str) -> Option<&str> {
         self.invocation_phrases
@@ -211,13 +197,7 @@ mod tests {
         data.invocation_phrases
             .insert("set up isda".to_string(), "isda.create".to_string());
 
-        // Case-insensitive lookups
-        assert!(data.resolve_entity_alias("Barclays").is_some());
-        assert!(data.resolve_entity_alias("BARCLAYS").is_some());
-        assert!(data.resolve_token("Counterparty").is_some());
+        // Case-insensitive lookup
         assert!(data.resolve_phrase("Set Up ISDA").is_some());
-
-        // Non-existent
-        assert!(data.resolve_entity_alias("unknown").is_none());
     }
 }

@@ -62,27 +62,6 @@ impl ExecutionPlan {
         }
         Self { steps, dag }
     }
-
-    /// Produce a `BindingFrameSchema` from this plan's producer steps (T10).
-    ///
-    /// Each step that declares `bind_as` with a known `produces_entity_type`
-    /// contributes a typed `BindingSlot`. Steps that produce bindings without
-    /// a declared entity type contribute an untyped slot (entity_type: None).
-    pub(crate) fn binding_frame_schema(&self) -> dsl_core::BindingFrameSchema {
-        use dsl_core::BindingSlotId;
-        use dsl_core::{BindingFrameSchema, BindingSlot};
-        let slots = self
-            .steps
-            .iter()
-            .filter_map(|s| {
-                s.bind_as.as_ref().map(|name| BindingSlot {
-                    name: BindingSlotId::new(name),
-                    entity_type: s.produces_entity_type.clone(),
-                })
-            })
-            .collect();
-        BindingFrameSchema { slots }
-    }
 }
 
 /// A single step in the execution plan

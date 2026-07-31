@@ -45,7 +45,6 @@ impl OrchestratorContext {
             source: match self.source {
                 UtteranceSource::Chat => AgentUtteranceSource::Chat,
                 UtteranceSource::Mcp => AgentUtteranceSource::Mcp,
-                UtteranceSource::Repl => AgentUtteranceSource::Repl,
             },
             sage_engine: self.sage_engine.clone(),
             nlci_compiler: self.nlci_compiler.clone(),

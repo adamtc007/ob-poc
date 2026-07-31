@@ -119,7 +119,6 @@ pub(crate) struct OrchestratorContext {
 pub(crate) enum UtteranceSource {
     Chat,
     Mcp,
-    Repl,
 }
 
 /// Full outcome of orchestrator processing.
@@ -135,9 +134,6 @@ pub(crate) struct OrchestratorOutcome {
     pub surface: Option<SessionVerbSurface>,
     pub lookup_result: Option<crate::lookup::LookupResult>,
     pub trace: IntentTrace,
-    /// DecisionPacket for journey-level disambiguation (e.g., macro_selector needs
-    /// user to pick jurisdiction before resolving the macro).
-    pub journey_decision: Option<ob_poc_types::DecisionPacket>,
     /// Pending mutation awaiting chat-layer confirmation.
     pub pending_mutation: Option<PendingMutation>,
     /// Whether chat should auto-execute the resulting DSL instead of staging it.
@@ -476,7 +472,6 @@ async fn build_sage_serve_outcome(
         surface: Some(prepared.surface),
         lookup_result: prepared.lookup_result,
         trace,
-        journey_decision: None,
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(&drafter_result.verb_fqn),
         sage_intent: Some(intent.clone()),
@@ -553,7 +548,6 @@ async fn build_semos_discovery_outcome(
         surface: Some(prepared.surface),
         lookup_result: prepared.lookup_result,
         trace,
-        journey_decision: None,
         pending_mutation: None,
         auto_execute: false,
         sage_intent,
@@ -596,7 +590,6 @@ async fn build_semos_unavailable_outcome(
         surface: Some(prepared.surface),
         lookup_result: prepared.lookup_result,
         trace,
-        journey_decision: None,
         pending_mutation: None,
         auto_execute: false,
         sage_intent,
@@ -1038,7 +1031,6 @@ pub(crate) async fn handle_utterance(
                 surface: Some(prepared.surface),
                 lookup_result: prepared.lookup_result,
                 trace,
-                journey_decision: None,
                 pending_mutation: None,
                 auto_execute: false,
                 sage_intent: Some(intent.clone()),
@@ -1544,7 +1536,6 @@ pub(crate) async fn legacy_handle_utterance(
                     surface: Some(surface),
                     lookup_result,
                     trace,
-                    journey_decision: None,
                     pending_mutation: None,
                     auto_execute: false,
                     sage_intent: Some(si.clone()),
@@ -1738,7 +1729,6 @@ pub(crate) async fn legacy_handle_utterance(
             surface: Some(surface),
             lookup_result,
             trace,
-            journey_decision: None,
             pending_mutation: None,
             auto_execute: false,
             sage_intent: sage_intent.clone(),
@@ -1812,7 +1802,6 @@ pub(crate) async fn legacy_handle_utterance(
 
     // -- Stage B: Select verb + generate DSL --
     let mut journey_used: Option<JourneyMetadata> = None;
-    let mut journey_decision_out: Option<ob_poc_types::DecisionPacket> = None;
 
     let mut result = if sem_reg_denied_all || semreg_unavailable {
         PipelineResult {
@@ -1852,7 +1841,7 @@ pub(crate) async fn legacy_handle_utterance(
                 "Stage B: Tier -2 journey match — bypassing LLM, constructing macro DSL"
             );
             journey_used = Some(journey.clone());
-            let (journey_result, j_decision) = build_journey_pipeline_result(
+            let (journey_result, _journey_decision) = build_journey_pipeline_result(
                 &top,
                 journey,
                 &filtered_candidates,
@@ -1861,7 +1850,6 @@ pub(crate) async fn legacy_handle_utterance(
                 ctx.session_id,
                 utterance,
             );
-            journey_decision_out = j_decision;
             journey_result
         } else {
             // Standard path: discovery reuse or LLM arg extraction.
@@ -2071,7 +2059,6 @@ pub(crate) async fn legacy_handle_utterance(
         surface: Some(surface),
         lookup_result,
         trace,
-        journey_decision: journey_decision_out,
         pending_mutation: None,
         auto_execute: false,
         sage_intent: sage_intent.clone(),
@@ -2901,7 +2888,6 @@ pub async fn handle_utterance_with_forced_verb(
             surface: None,
             lookup_result,
             trace,
-            journey_decision: None,
             pending_mutation: None,
             auto_execute: false,
             sage_intent: None,
@@ -2986,7 +2972,6 @@ pub async fn handle_utterance_with_forced_verb(
         surface: None,
         lookup_result,
         trace,
-        journey_decision: None,
         pending_mutation: None,
         auto_execute: can_auto_execute_serve_result(forced_verb_fqn),
         sage_intent: None,
@@ -3382,10 +3367,6 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&UtteranceSource::Mcp).unwrap(),
             "\"mcp\""
-        );
-        assert_eq!(
-            serde_json::to_string(&UtteranceSource::Repl).unwrap(),
-            "\"repl\""
         );
     }
 

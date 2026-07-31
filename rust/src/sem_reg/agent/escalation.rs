@@ -5,8 +5,13 @@
 //! When a decision requires human intervention, an `EscalationRecord`
 //! is created with context and required actions.
 //!
-//! Disambiguation prompts are INSERT-only (immutable).
-//! Escalation records are INSERT + UPDATE on resolved_at/resolution fields.
+//! Both are INSERT-only from this module's application-level API --
+//! `mcp_tools.rs`'s `sem_reg_record_escalation` / `sem_reg_record_disambiguation`
+//! MCP tools are the only production callers, both write-only. The read/update
+//! CRUD half (answer/resolve/load/list) was removed as dead code (zero callers,
+//! including tests) in Phase 14 dead-code remediation; the `resolved_at`/
+//! `resolution` columns remain UPDATE-able directly in SQL if that surface is
+//! ever needed again.
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -145,79 +150,6 @@ impl EscalationStore {
         Ok(prompt_id)
     }
 
-    /// Record the answer to a disambiguation prompt.
-    pub(crate) async fn answer_prompt(
-        pool: &PgPool,
-        prompt_id: Uuid,
-        chosen_option: &str,
-        answered_by: &str,
-    ) -> Result<u64> {
-        let result = sqlx::query(
-            r#"
-            UPDATE sem_reg.disambiguation_prompts
-            SET answered = true,
-                chosen_option = $2,
-                answered_by = $3,
-                answered_at = now()
-            WHERE prompt_id = $1
-            "#,
-        )
-        .bind(prompt_id)
-        .bind(chosen_option)
-        .bind(answered_by)
-        .execute(pool)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
-    /// Load a disambiguation prompt by ID.
-    pub(crate) async fn load_prompt(
-        pool: &PgPool,
-        prompt_id: Uuid,
-    ) -> Result<Option<AgentDisambiguationPrompt>> {
-        let row = sqlx::query_as::<_, PromptRow>(
-            r#"
-            SELECT prompt_id, decision_id, plan_id,
-                   question, options, context_snapshot,
-                   answered, chosen_option, answered_by, answered_at,
-                   created_at
-            FROM sem_reg.disambiguation_prompts
-            WHERE prompt_id = $1
-            "#,
-        )
-        .bind(prompt_id)
-        .fetch_optional(pool)
-        .await?;
-
-        match row {
-            Some(r) => Ok(Some(r.into_prompt()?)),
-            None => Ok(None),
-        }
-    }
-
-    /// List unanswered disambiguation prompts for a plan.
-    pub(crate) async fn list_unanswered_for_plan(
-        pool: &PgPool,
-        plan_id: Uuid,
-    ) -> Result<Vec<AgentDisambiguationPrompt>> {
-        let rows = sqlx::query_as::<_, PromptRow>(
-            r#"
-            SELECT prompt_id, decision_id, plan_id,
-                   question, options, context_snapshot,
-                   answered, chosen_option, answered_by, answered_at,
-                   created_at
-            FROM sem_reg.disambiguation_prompts
-            WHERE plan_id = $1 AND answered = false
-            ORDER BY created_at
-            "#,
-        )
-        .bind(plan_id)
-        .fetch_all(pool)
-        .await?;
-
-        rows.into_iter().map(|r| r.into_prompt()).collect()
-    }
-
     // ── Escalation Records ────────────────────────────────────
 
     /// Insert a new escalation record.
@@ -250,142 +182,6 @@ impl EscalationStore {
         Ok(escalation_id)
     }
 
-    /// Resolve an escalation record (UPDATE resolved_at + resolution).
-    pub(crate) async fn resolve_escalation(
-        pool: &PgPool,
-        escalation_id: Uuid,
-        resolution: &str,
-    ) -> Result<u64> {
-        let result = sqlx::query(
-            r#"
-            UPDATE sem_reg.escalation_records
-            SET resolved_at = now(),
-                resolution = $2
-            WHERE escalation_id = $1
-              AND resolved_at IS NULL
-            "#,
-        )
-        .bind(escalation_id)
-        .bind(resolution)
-        .execute(pool)
-        .await?;
-        Ok(result.rows_affected())
-    }
-
-    /// Load an escalation record by ID.
-    pub(crate) async fn load_escalation(
-        pool: &PgPool,
-        escalation_id: Uuid,
-    ) -> Result<Option<AgentEscalationRecord>> {
-        let row = sqlx::query_as::<_, EscalationRow>(
-            r#"
-            SELECT escalation_id, decision_id, reason, severity,
-                   context_snapshot, required_human_action,
-                   assigned_to, resolved_at, resolution,
-                   created_by, created_at
-            FROM sem_reg.escalation_records
-            WHERE escalation_id = $1
-            "#,
-        )
-        .bind(escalation_id)
-        .fetch_optional(pool)
-        .await?;
-
-        match row {
-            Some(r) => Ok(Some(r.into_escalation())),
-            None => Ok(None),
-        }
-    }
-
-    /// List unresolved escalation records, newest first.
-    pub(crate) async fn list_unresolved(pool: &PgPool, limit: i64) -> Result<Vec<AgentEscalationRecord>> {
-        let rows = sqlx::query_as::<_, EscalationRow>(
-            r#"
-            SELECT escalation_id, decision_id, reason, severity,
-                   context_snapshot, required_human_action,
-                   assigned_to, resolved_at, resolution,
-                   created_by, created_at
-            FROM sem_reg.escalation_records
-            WHERE resolved_at IS NULL
-            ORDER BY created_at DESC
-            LIMIT $1
-            "#,
-        )
-        .bind(limit)
-        .fetch_all(pool)
-        .await?;
-
-        Ok(rows.into_iter().map(|r| r.into_escalation()).collect())
-    }
-}
-
-// ── Internal DB row types ─────────────────────────────────────
-
-#[derive(Debug, sqlx::FromRow)]
-struct PromptRow {
-    prompt_id: Uuid,
-    decision_id: Option<Uuid>,
-    plan_id: Option<Uuid>,
-    question: String,
-    options: serde_json::Value,
-    context_snapshot: Option<serde_json::Value>,
-    answered: bool,
-    chosen_option: Option<String>,
-    answered_by: Option<String>,
-    answered_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-}
-
-impl PromptRow {
-    fn into_prompt(self) -> Result<AgentDisambiguationPrompt> {
-        let options: Vec<PromptOption> = serde_json::from_value(self.options)?;
-        Ok(AgentDisambiguationPrompt {
-            prompt_id: self.prompt_id,
-            decision_id: self.decision_id,
-            plan_id: self.plan_id,
-            question: self.question,
-            options,
-            context_snapshot: self.context_snapshot,
-            answered: self.answered,
-            chosen_option: self.chosen_option,
-            answered_by: self.answered_by,
-            answered_at: self.answered_at,
-            created_at: self.created_at,
-        })
-    }
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct EscalationRow {
-    escalation_id: Uuid,
-    decision_id: Option<Uuid>,
-    reason: String,
-    severity: String,
-    context_snapshot: Option<serde_json::Value>,
-    required_human_action: String,
-    assigned_to: Option<String>,
-    resolved_at: Option<DateTime<Utc>>,
-    resolution: Option<String>,
-    created_by: String,
-    created_at: DateTime<Utc>,
-}
-
-impl EscalationRow {
-    fn into_escalation(self) -> AgentEscalationRecord {
-        AgentEscalationRecord {
-            escalation_id: self.escalation_id,
-            decision_id: self.decision_id,
-            reason: self.reason,
-            severity: self.severity,
-            context_snapshot: self.context_snapshot,
-            required_human_action: self.required_human_action,
-            assigned_to: self.assigned_to,
-            resolved_at: self.resolved_at,
-            resolution: self.resolution,
-            created_by: self.created_by,
-            created_at: self.created_at,
-        }
-    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────

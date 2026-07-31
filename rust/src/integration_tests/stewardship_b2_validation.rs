@@ -19,7 +19,6 @@ mod b2_validation {
     use crate::sem_reg::abac::ActorContext;
     use crate::sem_reg::agent::mcp_tools::{SemRegToolContext, SemRegToolResult};
     use crate::sem_reg::onboarding::seed::BOOTSTRAP_SET_ID;
-    use crate::sem_reg::stewardship::focus::FocusStore;
     use crate::sem_reg::stewardship::tools_phase0::dispatch_phase0_tool;
     use crate::sem_reg::stewardship::tools_phase1::dispatch_phase1_tool;
 
@@ -110,7 +109,11 @@ mod b2_validation {
 
     /// Clean up focus state for a session.
     async fn cleanup_focus(pool: &PgPool, session_id: Uuid) -> Result<()> {
-        FocusStore::delete(pool, session_id).await.ok();
+        sqlx::query("DELETE FROM sem_reg.focus_states WHERE session_id = $1")
+            .bind(session_id)
+            .execute(pool)
+            .await
+            .ok();
         Ok(())
     }
 

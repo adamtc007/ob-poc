@@ -32,7 +32,6 @@ pub mod verb_service;
 // ob-poc-domain split v1 Slice C2 (2026-05-14): view_config_service now
 // lives in `ob-poc-taxonomy` (paired with taxonomy::rules which imports it).
 pub use ob_poc_taxonomy::view_config_service;
-pub mod view_state_audit;
 pub mod visualization_repository;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
@@ -80,10 +79,6 @@ pub(crate) use expansion_audit::ExpansionAuditRepository;
 
 pub(crate) use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,
-};
-
-pub(crate) use view_state_audit::{
-    RecordViewStateChange, SessionViewHistoryEntry, ViewStateAuditRepository, ViewStateChange,
 };
 
 pub use verb_service::{VerbService};

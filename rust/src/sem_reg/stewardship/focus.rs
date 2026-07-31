@@ -107,14 +107,6 @@ impl FocusStore {
         Ok(())
     }
 
-    /// Delete focus state for a session.
-    pub(crate) async fn delete(pool: &PgPool, session_id: Uuid) -> Result<()> {
-        sqlx::query("DELETE FROM sem_reg.focus_states WHERE session_id = $1")
-            .bind(session_id)
-            .execute(pool)
-            .await?;
-        Ok(())
-    }
 }
 
 // ─── Internal row types ─────────────────────────────────────────

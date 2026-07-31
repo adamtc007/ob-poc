@@ -71,6 +71,11 @@ pub mod observatory_routes;
 #[cfg(feature = "server")]
 pub mod catalogue_routes;
 
+/// Read-only ACP coverage inventory: real, working DAG-coverage tooling,
+/// but its only consumer anywhere in the crate is
+/// `integration_tests::acp_dsl_dag_coverage` (also `#[cfg(test)]`-gated).
+/// Gated rather than deleted -- see Phase 14 dead-code remediation.
+#[cfg(test)]
 pub mod acp_dsl_dag_coverage;
 pub mod agent_enrichment;
 pub mod repl_routes_v2;

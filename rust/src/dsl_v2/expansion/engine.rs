@@ -24,7 +24,25 @@ use crate::templates::{TemplateDefinition, TemplateRegistry};
 /// Output from template expansion
 #[derive(Debug)]
 pub(crate) struct ExpansionOutput {
-    /// The expanded DSL source (all templates replaced with verb calls)
+    /// The expanded DSL source (all templates replaced with verb calls).
+    ///
+    /// No production caller reads this -- both real call sites
+    /// (`mcp/handlers/core.rs`, `api/agent_routes.rs`) compile their
+    /// execution plan from the *original* DSL before expansion even runs,
+    /// then only consume `.report` afterward. `executor.rs`'s own doc
+    /// example for `execute_plan_atomic_with_locks` shows the intended
+    /// usage as `compile(&parse_program(&expansion.expanded_dsl)?)?` --
+    /// i.e. template-expanded DSL is documented as the thing that should
+    /// be compiled and executed, but nothing does that. Possible
+    /// correctness gap (templates may never actually get expanded into
+    /// executable form); flagged for the owner, not fixed here. Field
+    /// gated rather than deleted because it has real, substantial test
+    /// coverage in `integration_tests::expansion_determinism` (via the
+    /// sibling `expand_templates` function that shares this struct) --
+    /// content-equality, whitespace-normalization, passthrough, and
+    /// empty-input assertions, not a trivial roundtrip. See Phase 14
+    /// dead-code remediation.
+    #[cfg(test)]
     pub expanded_dsl: String,
     /// Audit report with full expansion details
     pub report: ExpansionReport,
@@ -175,6 +193,7 @@ pub(crate) fn expand_templates(
     let expanded_dsl_digest = hash_canonical(&expanded_dsl);
 
     Ok(ExpansionOutput {
+        #[cfg(test)]
         expanded_dsl,
         report: ExpansionReport {
             expansion_id,

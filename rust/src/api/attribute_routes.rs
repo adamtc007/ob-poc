@@ -22,10 +22,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct UploadDocumentRequest {
-    pub cbu_id: Uuid,
-    pub file_name: String,
     pub content_base64: String,
-    pub document_type: String,
 }
 
 #[derive(Debug, Serialize)]

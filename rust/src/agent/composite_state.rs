@@ -357,19 +357,6 @@ impl GroupCompositeState {
         }
     }
 
-    /// Returns true if domain work is impossible given current state.
-    ///
-    /// Used for wildcard blocking: `domain.*` patterns.
-    pub(crate) fn is_domain_blocked(&self, verb_fqn: &str) -> bool {
-        self.blocked_verbs.iter().any(|b| {
-            if b.verb_fqn.ends_with(".*") {
-                let prefix = &b.verb_fqn[..b.verb_fqn.len() - 2];
-                verb_fqn.starts_with(prefix)
-            } else {
-                b.verb_fqn == verb_fqn
-            }
-        })
-    }
 }
 
 #[cfg(test)]
@@ -386,10 +373,6 @@ mod tests {
             boost > 0.0,
             "cbu.create should be boosted when no CBUs exist"
         );
-
-        // Domain verbs should be blocked
-        assert!(state.is_domain_blocked("kyc-case.create"));
-        assert!(state.is_domain_blocked("screening.run"));
     }
 
     #[test]

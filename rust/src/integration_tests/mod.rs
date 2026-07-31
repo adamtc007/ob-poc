@@ -105,8 +105,6 @@ mod utterance_api_coverage;
 #[cfg(test)]
 mod verb_search_integration;
 #[cfg(test)]
-mod view_state_audit_integration;
-#[cfg(test)]
 mod workflow_acp_prompt_language_loop_harness;
 #[cfg(test)]
 mod workflow_acp_prompt_multiverb_confusion_harness;
