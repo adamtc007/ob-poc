@@ -1294,6 +1294,11 @@ impl UnifiedSession {
 
     /// Set pending DSL (parsed, validated, and planned - ready for user confirmation)
     /// This mirrors AgentSession.set_pending_dsl for backward compatibility
+    ///
+    /// Canonical staging entry point: appends the DSL to the run sheet as a
+    /// draft entry and fires `DslReady` (-> `ReadyToExecute`). The execute
+    /// route (`execute_session_dsl_raw`) gates on `can_execute()` and refuses
+    /// to run DSL that did not pass through here.
     pub fn set_pending_dsl(
         &mut self,
         source: String,
@@ -1367,8 +1372,10 @@ impl UnifiedSession {
     /// Mark execution as started (`ReadyToExecute` -> `Executing`).
     ///
     /// Fired by the execute route once the plan is admitted, immediately
-    /// before the executor runs. Paired with `record_execution`, which
-    /// fires `ExecutionCompleted` (`Executing` -> `Executed`/`Scoped`).
+    /// before the executor runs. The route gates on `can_execute()` first,
+    /// so in the wired flow this always fires from `ReadyToExecute` — the
+    /// state `set_pending_dsl` establishes. Paired with `record_execution`,
+    /// which fires `ExecutionCompleted` (`Executing` -> `Executed`/`Scoped`).
     /// From any other state the event hits the invalid-transition guard
     /// and the state is unchanged.
     pub fn begin_execution(&mut self) {
@@ -2478,6 +2485,109 @@ mod tests {
             SessionState::ReadyToExecute,
             "ExecutionCompleted without ExecutionStarted must hit the invalid-transition guard"
         );
+    }
+
+    #[test]
+    fn test_canonical_route_lifecycle_scope_staged_ready_executing_completed() {
+        // Cements the canonical sequence the execute route now enforces:
+        // scope -> staged/ready (set_pending_dsl) -> can_execute() gate ->
+        // executing (begin_execution) -> completed (record_execution),
+        // using the same calls the route makes.
+        let mut session = UnifiedSession::new();
+        session.add_cbu(Uuid::new_v4());
+        session.transition(SessionEvent::ScopeSet);
+        assert_eq!(session.state, SessionState::Scoped);
+
+        // Route gate: an unstaged session must be refused.
+        assert!(!session.can_execute());
+
+        // Stage validated DSL through the designed surface.
+        session.set_pending_dsl(
+            "(entity.create :name \"Acme\")".to_string(),
+            vec![],
+            None,
+            false,
+        );
+        assert_eq!(session.state, SessionState::ReadyToExecute);
+        assert_eq!(
+            session.run_sheet.runnable_dsl().as_deref(),
+            Some("(entity.create :name \"Acme\")"),
+            "executed DSL flows from the staging surface"
+        );
+        assert!(session.can_execute());
+
+        session.begin_execution();
+        assert_eq!(session.state, SessionState::Executing);
+
+        session.record_execution(vec![]);
+        assert_eq!(session.state, SessionState::Scoped, "scope set -> Scoped");
+
+        // Mark the staged entry executed exactly as the route does post-run.
+        if let Some(entry) = session.run_sheet.current_mut() {
+            entry.status = EntryStatus::Executed;
+        }
+        assert!(!session.run_sheet.has_runnable());
+
+        // Re-execution on the same session: stage again, run again.
+        session.set_pending_dsl(
+            "(kyc-case.create :entity \"Acme\")".to_string(),
+            vec![],
+            None,
+            false,
+        );
+        assert_eq!(session.state, SessionState::ReadyToExecute);
+        assert_eq!(
+            session.run_sheet.runnable_dsl().as_deref(),
+            Some("(kyc-case.create :entity \"Acme\")"),
+            "only the newly staged DSL is runnable on re-execution"
+        );
+        assert!(session.can_execute());
+        session.begin_execution();
+        assert_eq!(session.state, SessionState::Executing);
+        session.record_execution(vec![]);
+        assert_eq!(session.state, SessionState::Scoped);
+    }
+
+    #[test]
+    fn test_unstaged_dsl_cannot_execute() {
+        // The illegal shortcut, refused: drafts that bypass the staging
+        // surface (raw add_dsl, no DslReady) leave the session inexecutable.
+        // The route's can_execute() gate rejects, and ExecutionStarted from a
+        // non-ready state hits the invalid-transition guard.
+        let mut session = UnifiedSession::new();
+        session.add_cbu(Uuid::new_v4());
+        session.transition(SessionEvent::ScopeSet);
+
+        session.add_dsl(
+            "(entity.create :name \"Acme\")".to_string(),
+            String::new(),
+        );
+        assert!(session.run_sheet.has_runnable(), "draft entry exists");
+        assert!(session.has_pending());
+        assert_ne!(session.state, SessionState::ReadyToExecute);
+        assert!(
+            !session.can_execute(),
+            "unstaged DSL must be refused by the route gate"
+        );
+
+        // Even if ExecutionStarted were fired anyway, transition() rejects it.
+        session.begin_execution();
+        assert_eq!(session.state, SessionState::Scoped);
+    }
+
+    #[test]
+    fn test_restaging_after_execution_without_scope() {
+        // ExecutionCompleted without scope lands Executed; DslReady is legal
+        // from Executed, so a completed session can stage and run again.
+        let mut session = UnifiedSession::new();
+        session.set_pending_dsl("(entity.create :name \"A\")".to_string(), vec![], None, false);
+        session.begin_execution();
+        session.record_execution(vec![]);
+        assert_eq!(session.state, SessionState::Executed);
+
+        session.set_pending_dsl("(entity.create :name \"B\")".to_string(), vec![], None, false);
+        assert_eq!(session.state, SessionState::ReadyToExecute);
+        assert!(session.can_execute());
     }
 
     #[test]

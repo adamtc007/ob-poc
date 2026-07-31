@@ -2426,16 +2426,43 @@ async fn execute_session_dsl_raw(
     // EXECUTE
     // =========================================================================
 
-    // Mark execution as started (ReadyToExecute -> Executing). Sessions staged
-    // via set_pending_dsl are in ReadyToExecute; from any other state the
-    // event hits the invalid-transition guard and the state is unchanged.
-    // There are no early returns between here and record_execution below, so
-    // ExecutionCompleted always follows and the session cannot stay Executing.
+    // Staging surface is canonical (owner ruling, Gap-1 follow-up): the only
+    // DSL this route executes is the session's staged run-sheet content (raw
+    // request DSL is rejected above per Slice 3.1), and the only designed
+    // producer of runnable entries is `set_pending_dsl`, which fires
+    // `DslReady` (-> ReadyToExecute). A session may reach the executor only
+    // through that lifecycle: DSL staged/ready -> ExecutionStarted ->
+    // ExecutionCompleted. If runnable drafts exist but the staging transition
+    // never fired (state != ReadyToExecute), fail closed here — reject rather
+    // than execute DSL the state machine never admitted.
+    //
+    // There are no early returns between begin_execution() and
+    // record_execution below, so ExecutionCompleted always follows and the
+    // session cannot stay Executing.
     {
         let mut sessions = state.sessions.write().await;
-        if let Some(session) = sessions.get_mut(&session_id) {
-            session.begin_execution();
+        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+        if !session.can_execute() {
+            let unstaged_state = session.state.clone();
+            tracing::warn!(
+                session = %session_id,
+                state = ?unstaged_state,
+                "execute_session_dsl: refusing to execute DSL that was never \
+                 staged via set_pending_dsl (session not ReadyToExecute)"
+            );
+            return Ok(Json(ExecuteResponse {
+                success: false,
+                results: Vec::new(),
+                errors: vec![format!(
+                    "Session DSL was never staged for execution (state: {:?}, expected ReadyToExecute). \
+                     Stage it via the session staging surface (set_pending_dsl) before executing.",
+                    unstaged_state
+                )],
+                new_state: unstaged_state.into(),
+                bindings: None,
+            }));
         }
+        session.begin_execution();
     }
 
     let mut results = Vec::new();
