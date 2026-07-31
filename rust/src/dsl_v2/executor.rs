@@ -260,18 +260,37 @@ pub(crate) enum AtomicExecutionResult {
         /// Entity ID that caused contention
         entity_id: String,
     },
-    /// A prior execution with the same idempotency key already committed.
-    /// The prior result is returned without re-executing (v0.5 §9.1, §9.4).
+    /// A prior execution with the same idempotency key already committed;
+    /// the prior result would be returned without re-executing (v0.5 §9.1,
+    /// §9.4). NOT YET PRODUCIBLE — see below.
     ///
-    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): never constructed —
-    /// `execute_plan_atomic_with_locks`, the sole constructor of this enum,
-    /// doesn't implement the replay short-circuit this doc comment claims is
-    /// implemented. But `mcp/handlers/core.rs` and `api/agent_routes.rs` both
-    /// have real, non-stub match arms extracting `prior_result` as the
-    /// effective step results — production code was written expecting this
-    /// outcome. Missing-implementation gap, not unused representation. Do
-    /// not delete without resolving the gap; see dead-code Phase 14's commit
-    /// for the full investigation.
+    /// KEEP, JUSTIFIED (2026-07-31, functional-gap research): still never
+    /// constructed — and cannot yet be constructed *correctly*:
+    ///
+    /// 1. The per-plan idempotency store this variant needs does not exist.
+    ///    The introducing commit (88b9acbf, P5-T13) says so explicitly:
+    ///    "Not yet produced (full per-plan idempotency DB table is
+    ///    T13b/Phase 6)". The only live store is `"ob-poc".dsl_idempotency`
+    ///    — per-STATEMENT, keyed SHA256(execution_id, statement_index,
+    ///    verb, args) (`dsl_v2/idempotency.rs::compute_idempotency_key`).
+    /// 2. No caller-supplied key reaches this path: neither call site
+    ///    (`mcp/handlers/core.rs`, `api/agent_routes.rs`) sets
+    ///    `ctx.execution_id`; it is `Uuid::new_v4()` per request, so a
+    ///    retry can never match a stored key. Plumbing one would mean
+    ///    inventing a key-generation scheme — a design fork, not a fix.
+    /// 3. `execute_plan_atomic_with_locks` records no idempotency rows
+    ///    (only the non-atomic `execute_plan` does, via
+    ///    `record_with_view_state_in_tx`), so a lookup here has nothing
+    ///    to hit.
+    /// 4. Replay reconstruction is lossy: `CachedResult::to_execution_result`
+    ///    maps `entity_query`/`template_invoked`/`template_batch`/
+    ///    `batch_control` result types to `Void` — replaying a plan with
+    ///    such steps would silently return wrong prior results. Fail closed.
+    ///
+    /// Wiring this is T13b as designed: per-plan idempotency table +
+    /// caller-supplied key + lossless result storage. Until then the
+    /// variant stays declared (both consumers already have real match
+    /// arms) but unconstructed. Do not delete; do not wire without T13b.
     #[allow(dead_code)]
     IdempotentReplayReturned {
         /// The results from the prior committed execution.
@@ -298,25 +317,34 @@ pub(crate) enum AtomicExecutionResult {
         /// How long was waited before timing out.
         elapsed: std::time::Duration,
     },
-    /// A stack-set worker panicked; the transaction was rolled back and the
-    /// runtime recovered (v0.5 §9.1). Caller treats this as a failed execution.
-    ///
-    /// Phase 5: variant declared; panic-recovery wiring (`catch_unwind`) is
-    /// Phase 6 (requires async-safe panic unwinding infrastructure).
-    ///
-    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): self-documented gap
-    /// per the note above — `mcp/handlers/core.rs` and `api/agent_routes.rs`
-    /// both have real, non-stub match arms formatting a panic-recovery error
-    /// for this variant, but nothing constructs it yet. Do not delete
-    /// without resolving the gap; see dead-code Phase 14's commit for the
-    /// full investigation.
-    #[allow(dead_code)]
+    /// A step panicked mid-execution; the panic was caught
+    /// (`futures::FutureExt::catch_unwind` around the per-step dispatch in
+    /// `execute_plan_atomic_with_locks`), the transaction was rolled back
+    /// (releasing the xact-scoped advisory locks with it), and the runtime
+    /// recovered (v0.5 §9.1). Caller treats this as a failed execution.
     PanicRecovered {
         /// The stage in which the panic occurred.
         stage: String,
         /// Stringified panic info (message, if available).
         panic_info: String,
     },
+}
+
+/// Extract a human-readable message from a caught panic payload.
+///
+/// `panic!("literal")` and `std::panic::panic_any(&'static str)` carry
+/// `&str`; `panic!("with {}", args)` carries `String`. Anything else
+/// (custom `panic_any` payloads) degrades to a fixed marker rather than
+/// being dropped silently.
+#[cfg(feature = "database")]
+fn panic_payload_to_string(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "panic payload of unknown type (not &str/String)".to_string()
+    }
 }
 
 /// Execution context holding state during DSL execution
@@ -2914,8 +2942,66 @@ impl DslExecutor {
                 }
             }
 
-            // Execute the verb call within the transaction
-            let result = match self.execute_verb_in_tx(&vc, ctx, &mut tx).await {
+            // Execute the verb call within the transaction, catching panics
+            // (v0.5 §9.1: PanicRecovered — a panicking step must not poison
+            // the runtime or leak locks).
+            //
+            // `AssertUnwindSafe` justification (the assertion is load-bearing;
+            // do not weaken it without re-deriving each point):
+            // - `tx`: rolled back immediately on the panic arm below. The
+            //   advisory locks are `pg_advisory_xact_lock` (transaction-
+            //   scoped, `ob_poc_derived_attributes::advisory_lock`) —
+            //   Postgres releases them at rollback or connection close.
+            //   Nothing can have committed: the sole commit point is after
+            //   all steps complete.
+            // - `ctx`: plain-data maps; a panic can leave at most the same
+            //   partial bindings the existing RolledBack error path leaves,
+            //   and both consumers (mcp/handlers/core.rs,
+            //   api/agent_routes.rs) abandon context state on failure.
+            // - `&self`: no `std::sync::Mutex` anywhere on this path (no
+            //   poisoning). The only interior mutability reachable via
+            //   `execute_verb_in_tx` is `GenericCrudExecutor`'s
+            //   `tokio::sync::Mutex<Option<EntityGatewayClient>>`, whose
+            //   guard drops during unwind and which holds no invariant
+            //   spanning the guarded region.
+            let step_execution = {
+                use futures::FutureExt;
+                std::panic::AssertUnwindSafe(self.execute_verb_in_tx(&vc, ctx, &mut tx))
+                    .catch_unwind()
+                    .await
+            };
+            let step_execution = match step_execution {
+                Ok(inner) => inner,
+                Err(payload) => {
+                    let panic_info = panic_payload_to_string(payload.as_ref());
+                    tracing::error!(
+                        "execute_plan_atomic_with_locks: step {} ({}.{}) PANICKED: {}. \
+                         Rolling back.",
+                        step_index,
+                        vc.domain,
+                        vc.verb,
+                        panic_info
+                    );
+                    // Best-effort rollback. If the cancelled step future left
+                    // the connection mid-query, rollback may fail — log it;
+                    // sqlx discards the broken connection and Postgres aborts
+                    // the transaction server-side (releasing the xact-scoped
+                    // advisory locks) either way. Fail closed: no commit path
+                    // exists from here.
+                    if let Err(rb_err) = tx.rollback().await {
+                        tracing::error!(
+                            "execute_plan_atomic_with_locks: rollback after panic failed \
+                             (connection will be discarded; tx aborts server-side): {}",
+                            rb_err
+                        );
+                    }
+                    return Ok(AtomicExecutionResult::PanicRecovered {
+                        stage: format!("plan_execution:step_{}", step_index),
+                        panic_info,
+                    });
+                }
+            };
+            let result = match step_execution {
                 Ok(r) => r,
                 Err(e) => {
                     let error_msg = e.to_string();
@@ -3247,6 +3333,157 @@ mod tests {
         ctx.bind("test", id);
         assert_eq!(ctx.resolve("test"), Some(id));
         assert_eq!(ctx.resolve("nonexistent"), None);
+    }
+
+    // ── PanicRecovered wiring (v0.5 §9.1, functional-gap fix 2026-07-31) ────
+    //
+    // `execute_plan_atomic_with_locks` wraps each step's dispatch in
+    // `AssertUnwindSafe(..).catch_unwind()` and maps a caught panic to
+    // `AtomicExecutionResult::PanicRecovered { stage, panic_info }` after
+    // rolling the transaction back. These tests pin (a) the exact wrapping +
+    // payload-extraction shape used in production, and (b) the cleanup claim
+    // the recovery rests on: rollback after a caught panic releases the
+    // xact-scoped advisory locks and leaves the pool serviceable.
+    //
+    // Full end-to-end (a registered verb that panics) is not injectable:
+    // `runtime_registry()` is a YAML-loaded `OnceLock` with no test hook, so
+    // the receipt is at the wrapper seam — which is byte-identical to the
+    // production wrapping.
+    #[cfg(feature = "database")]
+    mod panic_recovery_tests {
+        use super::*;
+        use futures::FutureExt;
+
+        /// Mirror of the production wrapping in
+        /// `execute_plan_atomic_with_locks` (AssertUnwindSafe + catch_unwind
+        /// + `panic_payload_to_string`).
+        async fn catch_as_production_does<T, F>(fut: F) -> Result<T, String>
+        where
+            F: std::future::Future<Output = T>,
+        {
+            std::panic::AssertUnwindSafe(fut)
+                .catch_unwind()
+                .await
+                .map_err(|payload| panic_payload_to_string(payload.as_ref()))
+        }
+
+        #[tokio::test]
+        async fn panic_message_extracted_from_formatted_string_payload() {
+            // `panic!` with format args carries a `String` payload.
+            let out = catch_as_production_does::<(), _>(async {
+                panic!("boom at step {}", 3);
+            })
+            .await;
+            assert_eq!(out.unwrap_err(), "boom at step 3");
+        }
+
+        #[tokio::test]
+        async fn panic_message_extracted_from_static_str_payload() {
+            // `panic_any(&'static str)` carries a `&str` payload.
+            let out = catch_as_production_does::<(), _>(async {
+                std::panic::panic_any("static-boom");
+            })
+            .await;
+            assert_eq!(out.unwrap_err(), "static-boom");
+        }
+
+        #[tokio::test]
+        async fn panic_payload_of_unknown_type_degrades_to_marker() {
+            // Custom payloads must not vanish silently (fail closed).
+            let out = catch_as_production_does::<(), _>(async {
+                std::panic::panic_any(42_u64);
+            })
+            .await;
+            assert_eq!(
+                out.unwrap_err(),
+                "panic payload of unknown type (not &str/String)"
+            );
+        }
+
+        #[tokio::test]
+        async fn non_panicking_future_passes_through_untouched() {
+            let out = catch_as_production_does(async { 7_i32 }).await;
+            assert_eq!(out.unwrap(), 7);
+        }
+
+        /// The cleanup receipt: a panic caught mid-step, followed by the
+        /// production rollback, must (1) release the xact-scoped advisory
+        /// lock — proven red→green from a SECOND session (advisory locks are
+        /// re-entrant within a session, so the probe must be cross-session) —
+        /// and (2) leave the pool serviceable for subsequent execution.
+        ///
+        /// Run: `DATABASE_URL=… cargo test --features database -p ob-poc \
+        ///   --lib -- dsl_v2::executor::tests::panic_recovery_tests --ignored --nocapture`
+        #[tokio::test]
+        #[ignore = "requires DATABASE_URL (dev DB)"]
+        async fn panic_mid_step_rolls_back_and_releases_xact_locks() {
+            use crate::database::locks::{lock_key, try_advisory_xact_lock};
+
+            let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+            let pool = sqlx::PgPool::connect(&url).await.expect("connect pool 1");
+            // Second pool = guaranteed distinct session for the lock probe.
+            let probe_pool = sqlx::PgPool::connect(&url).await.expect("connect pool 2");
+
+            let key = lock_key("panic-recovery-test", &Uuid::new_v4().to_string());
+
+            // 1. Session A: begin tx, take the xact advisory lock (as
+            //    acquire_locks does before the step loop).
+            let mut tx = pool.begin().await.expect("begin tx");
+            assert!(
+                try_advisory_xact_lock(&mut tx, key)
+                    .await
+                    .expect("lock acquire query"),
+                "fresh key must be acquirable"
+            );
+
+            // 2. RED: session B cannot take the lock while A holds it.
+            let mut probe = probe_pool.begin().await.expect("begin probe tx");
+            assert!(
+                !try_advisory_xact_lock(&mut probe, key)
+                    .await
+                    .expect("probe lock query"),
+                "lock must be HELD by session A before the panic — probe must fail"
+            );
+            probe.rollback().await.expect("probe rollback");
+
+            // 3. A step future that uses the tx, then panics — wrapped
+            //    exactly as production wraps the per-step dispatch.
+            let caught = std::panic::AssertUnwindSafe(async {
+                sqlx::query("SELECT 1")
+                    .execute(tx.as_mut())
+                    .await
+                    .expect("in-tx query before panic");
+                panic!("simulated handler panic");
+            })
+            .catch_unwind()
+            .await;
+            let payload = caught.expect_err("step future must panic");
+            assert_eq!(
+                panic_payload_to_string(payload.as_ref()),
+                "simulated handler panic"
+            );
+
+            // 4. The production panic arm: roll the transaction back.
+            tx.rollback().await.expect("rollback after caught panic");
+
+            // 5. GREEN: session B can now take the lock (released by the
+            //    rollback), and session A's pool still serves queries —
+            //    subsequent execution succeeds.
+            let mut probe2 = probe_pool.begin().await.expect("begin probe tx 2");
+            assert!(
+                try_advisory_xact_lock(&mut probe2, key)
+                    .await
+                    .expect("probe reacquire query"),
+                "advisory xact lock must be RELEASED by rollback after panic"
+            );
+            probe2.rollback().await.expect("probe 2 rollback");
+
+            let one: i32 = sqlx::query_scalar("SELECT 1")
+                .fetch_one(&pool)
+                .await
+                .expect("pool must remain serviceable after panic recovery");
+            assert_eq!(one, 1);
+        }
     }
 
     // ── T0.2 (EOP-PLAN-CONTROLPLANE-001, closes C-027 divergence) ──────────
