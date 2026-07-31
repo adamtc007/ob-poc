@@ -12,19 +12,38 @@ use super::session_trace::TraceEntry;
 pub(crate) struct SessionTraceRepository;
 
 impl SessionTraceRepository {
-    /// Append a batch of trace entries to the database.
+    /// Append only the trace entries not yet persisted for `session_id`.
     ///
-    /// KEEP, JUSTIFIED (2026-07-31, dead-code Phase 16): this is the ONLY
-    /// writer to the `session_traces` table, yet nothing in the crate calls
-    /// it. Real, live readers exist — `load_trace`/`load_entry` back a
-    /// production HTTP handler (`GET /api/session/:id/trace` in
-    /// `api/repl_routes_v2.rs`) and session-rehydration in
-    /// `session_repository.rs` — so in a live deployment this table is
-    /// permanently empty and every read path silently falls back to empty
-    /// rather than erroring. Missing-caller gap, not unused representation.
-    /// Do not delete without resolving the gap; see dead-code Phase 15's
-    /// commit for the full investigation.
-    #[allow(dead_code)]
+    /// Reads the persisted high-water mark (`MAX(sequence)`) and inserts only
+    /// entries above it, so a save path that passes the session's full
+    /// in-memory trace on every checkpoint writes each entry exactly once.
+    /// `append_batch`'s `ON CONFLICT DO NOTHING` (backed by the table's
+    /// `(session_id, sequence)` primary key) remains the backstop against
+    /// concurrent checkpoints racing past the high-water read.
+    #[cfg(feature = "database")]
+    pub(crate) async fn append_new(
+        pool: &sqlx::PgPool,
+        session_id: Uuid,
+        entries: &[TraceEntry],
+    ) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let persisted_max: Option<i64> = sqlx::query_scalar(
+            r#"SELECT MAX(sequence) FROM "ob-poc".session_traces WHERE session_id = $1"#,
+        )
+        .bind(session_id)
+        .fetch_one(pool)
+        .await
+        .context("Failed to read persisted trace high-water mark")?;
+        let persisted_max = u64::try_from(persisted_max.unwrap_or(0)).unwrap_or(0);
+
+        // Entries are appended in ascending sequence order.
+        let start = entries.partition_point(|e| e.sequence <= persisted_max);
+        Self::append_batch(pool, &entries[start..]).await
+    }
+
+    /// Append a batch of trace entries to the database.
     #[cfg(feature = "database")]
     pub(crate) async fn append_batch(pool: &sqlx::PgPool, entries: &[TraceEntry]) -> Result<()> {
         for entry in entries {

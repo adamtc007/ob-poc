@@ -227,6 +227,25 @@ impl SessionRepositoryV2 {
             .await
             .context("Failed to commit session save transaction")?;
 
+        // Persist any trace entries not yet written — the write-side mirror of
+        // the trace restore in `load_session` below. Best-effort by design,
+        // matching the load side: a missing/failed `session_traces` table must
+        // not fail the session checkpoint (cemented by sequencer's
+        // `test_session_checkpoint_survives_missing_trace_table`).
+        if let Err(error) = crate::repl::trace_repository::SessionTraceRepository::append_new(
+            &self.pool,
+            session.id,
+            &session.trace,
+        )
+        .await
+        {
+            tracing::warn!(
+                session_id = %session.id,
+                error = %error,
+                "Failed to persist session trace batch with session checkpoint"
+            );
+        }
+
         Ok(new_version)
     }
 
@@ -571,6 +590,98 @@ fn runbook_plan_status_name(
 #[cfg(all(test, feature = "database"))]
 mod tests {
     use super::*;
+
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_save_persists_trace_and_load_restores_it(pool: PgPool) {
+        let repo = SessionRepositoryV2::new(pool.clone());
+        let mut session = ReplSessionV2::new();
+        let step_id = Uuid::new_v4();
+
+        session.append_trace(crate::repl::session_trace::TraceOp::Input {
+            utterance_hash: "hash-1".into(),
+        });
+        session.append_trace_enriched(
+            crate::repl::session_trace::TraceOp::VerbExecuted {
+                verb_fqn: "cbu.create".into(),
+                step_id,
+            },
+            Some("cbu.create".into()),
+            Some(serde_json::json!({"status": "ok"})),
+        );
+        assert_eq!(session.trace.len(), 2);
+
+        repo.save_session(&session, 0).await.unwrap();
+
+        let (loaded, _) = repo.load_session(session.id).await.unwrap().unwrap();
+        assert_eq!(loaded.trace.len(), 2);
+        assert_eq!(loaded.trace[0].sequence, 1);
+        assert_eq!(loaded.trace[1].sequence, 2);
+        assert!(matches!(
+            &loaded.trace[0].op,
+            crate::repl::session_trace::TraceOp::Input { utterance_hash } if utterance_hash == "hash-1"
+        ));
+        assert!(matches!(
+            &loaded.trace[1].op,
+            crate::repl::session_trace::TraceOp::VerbExecuted { verb_fqn, step_id: s }
+                if verb_fqn == "cbu.create" && *s == step_id
+        ));
+        assert_eq!(loaded.trace[1].verb_resolved.as_deref(), Some("cbu.create"));
+        assert_eq!(
+            loaded.trace[1].execution_result,
+            Some(serde_json::json!({"status": "ok"}))
+        );
+        assert_eq!(loaded.trace_sequence, 2);
+    }
+
+    #[sqlx::test(migrations = "./test-migrations/session_repository")]
+    async fn test_trace_persistence_is_idempotent_across_repeated_saves(pool: PgPool) {
+        let repo = SessionRepositoryV2::new(pool.clone());
+        let mut session = ReplSessionV2::new();
+
+        session.append_trace(crate::repl::session_trace::TraceOp::Input {
+            utterance_hash: "hash-1".into(),
+        });
+        session.append_trace(crate::repl::session_trace::TraceOp::StackCommit);
+
+        // Save twice with the same in-memory trace — the second save must not
+        // duplicate rows (the delta filter skips already-persisted sequences).
+        repo.save_session(&session, 0).await.unwrap();
+        repo.save_session(&session, 1).await.unwrap();
+
+        let count: i64 =
+            sqlx::query_scalar(r#"SELECT COUNT(*) FROM "ob-poc".session_traces WHERE session_id = $1"#)
+                .bind(session.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 2);
+
+        // A rehydrated session carries the restored trace; saving it again must
+        // also not duplicate, while NEW entries appended after rehydration must
+        // be persisted.
+        let (mut loaded, version) = repo.load_session(session.id).await.unwrap().unwrap();
+        loaded.append_trace(crate::repl::session_trace::TraceOp::Input {
+            utterance_hash: "hash-2".into(),
+        });
+        assert_eq!(loaded.trace.len(), 3);
+        repo.save_session(&loaded, version).await.unwrap();
+
+        let count: i64 =
+            sqlx::query_scalar(r#"SELECT COUNT(*) FROM "ob-poc".session_traces WHERE session_id = $1"#)
+                .bind(session.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 3);
+
+        let (reloaded, _) = repo.load_session(session.id).await.unwrap().unwrap();
+        assert_eq!(reloaded.trace.len(), 3);
+        assert_eq!(reloaded.trace[2].sequence, 3);
+        assert!(matches!(
+            &reloaded.trace[2].op,
+            crate::repl::session_trace::TraceOp::Input { utterance_hash } if utterance_hash == "hash-2"
+        ));
+    }
 
     #[sqlx::test(migrations = "./test-migrations/session_repository")]
     async fn test_save_load_preserves_bindings_cbu_ids_name(pool: PgPool) {
