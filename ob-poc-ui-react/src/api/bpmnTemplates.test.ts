@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { seedStartKey, uuidV5, SEED_START_NAMESPACE } from "./bpmnTemplates";
+import {
+  missingArgumentNames,
+  seedStartKey,
+  uuidV5,
+  SEED_START_NAMESPACE,
+} from "./bpmnTemplates";
 
 // Expected values computed independently with Python:
 //   uuid.uuid5(UUID("b13f1a02-d299-4a71-9c3e-7a215c0e8b44"), UUID(sid).bytes)
@@ -24,5 +29,27 @@ describe("seedStartKey (RFC-4122 v5 over session id bytes)", () => {
     );
     expect(out[14]).toBe("5");
     expect(["8", "9", "a", "b"]).toContain(out[19]);
+  });
+});
+
+describe("missingArgumentNames (DIR-002 MissingArguments disposition)", () => {
+  it("extracts names from an array payload", () => {
+    expect(missingArgumentNames({ MissingArguments: ["task_name", "anchor"] })).toEqual([
+      "task_name",
+      "anchor",
+    ]);
+  });
+
+  it("extracts names nested inside an object payload", () => {
+    expect(
+      missingArgumentNames({ MissingArguments: { missing: ["condition"] } }),
+    ).toEqual(["condition"]);
+  });
+
+  it("returns [] for non-MissingArguments dispositions and non-objects", () => {
+    expect(missingArgumentNames({ Resolved: { verb: "x" } })).toEqual([]);
+    expect(missingArgumentNames("ok")).toEqual([]);
+    expect(missingArgumentNames(null)).toEqual([]);
+    expect(missingArgumentNames(undefined)).toEqual([]);
   });
 });

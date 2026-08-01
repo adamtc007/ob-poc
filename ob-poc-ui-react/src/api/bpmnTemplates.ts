@@ -206,12 +206,43 @@ export interface SessionGraph {
   source_hash: string;
 }
 
+/** DIR-002 dry-staged pending proposal — the graph is NOT yet changed. */
+export interface PendingProposal {
+  proposal_id: string;
+  operations: unknown;
+  description: string;
+}
+
 export interface UtteranceResponse {
   seq: number;
   message: string;
   disposition: unknown;
   capture: string;
   dev_capture: string;
+  /** DIR-002: staged proposal awaiting human ratify/reject (null when none). */
+  proposal?: PendingProposal | null;
+  proposal_refusal?: string | null;
+}
+
+/**
+ * Extract missing-binding names from a MissingArguments disposition.
+ * Dispositions are externally tagged serde enums; the MissingArguments
+ * payload names the bindings that could not be derived from the utterance.
+ * Tolerant of payload shape (string array, or object whose values contain
+ * the names) — returns [] when the disposition is anything else.
+ */
+export function missingArgumentNames(disposition: unknown): string[] {
+  if (typeof disposition !== "object" || disposition === null) return [];
+  const payload = (disposition as Record<string, unknown>)["MissingArguments"];
+  if (payload === undefined) return [];
+  const names: string[] = [];
+  const walk = (v: unknown) => {
+    if (typeof v === "string") names.push(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (typeof v === "object" && v !== null) Object.values(v).forEach(walk);
+  };
+  walk(payload);
+  return names;
 }
 
 // ── Fetch plumbing — every failure carries the server's error body ───────
@@ -228,7 +259,7 @@ async function jsonFetch<T>(path: string, options?: RequestInit): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-// ── The seven endpoints ──────────────────────────────────────────────────
+// ── The endpoints ──────────────────────────────────────────────────
 
 export const bpmnTemplatesApi = {
   createSession: (name: string) =>
@@ -252,12 +283,34 @@ export const bpmnTemplatesApi = {
   sessionGraph: (sessionId: string) =>
     jsonFetch<SessionGraph>(`/api/dsl/sessions/${sessionId}/graph`),
 
-  /** Sage utterance against a design session (shadow disposition pipeline). */
-  sessionUtterance: (sessionId: string, text: string) =>
+  /** Sage utterance against a design session (shadow disposition pipeline).
+   *  `anchor` is the BPMN id of the graph node the utterance is issued
+   *  from — binding rule R1 takes ONLY explicit anchors (never inferred),
+   *  so positional proposals require one; without it the board has no
+   *  position and the utterance typically lands OutOfScope. */
+  sessionUtterance: (sessionId: string, text: string, anchor?: string) =>
     jsonFetch<UtteranceResponse>(`/api/dsl/sessions/${sessionId}/utterance`, {
       method: "POST",
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(anchor ? { text, anchor } : { text }),
     }),
+
+  /** Ratify a staged DIR-002 proposal — 200 applies the graph-edit;
+   *  409 = graph drifted since staging (proposal consumed); 404 unknown.
+   *  Errors carry the server body via jsonFetch. */
+  ratifyProposal: (sessionId: string, proposalId: string) =>
+    jsonFetch<Record<string, unknown>>(
+      `/api/dsl/sessions/${sessionId}/proposals/${proposalId}/ratify`,
+      { method: "POST" }
+    ),
+
+  rejectProposal: (sessionId: string, proposalId: string) =>
+    jsonFetch<Record<string, unknown>>(
+      `/api/dsl/sessions/${sessionId}/proposals/${proposalId}/reject`,
+      { method: "POST" }
+    ),
+
+  listProposals: (sessionId: string) =>
+    jsonFetch<PendingProposal[]>(`/api/dsl/sessions/${sessionId}/proposals`),
 
   listPublished: () =>
     jsonFetch<PublishedTemplate[]>("/bpmn/templates/published"),

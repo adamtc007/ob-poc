@@ -25,9 +25,19 @@ interface Props {
   graph: SessionGraph;
   activeNodeIds?: string[];
   completed?: boolean;
+  /** Click-to-select: the anchor node for Sage utterances (binding rule
+   *  R1 takes only explicit anchors). Selected node gets a blue ring. */
+  selectedNodeId?: string | null;
+  onSelectNode?: (nodeId: string) => void;
 }
 
-export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false }: Props) {
+export function WorkflowGraphView({
+  graph,
+  activeNodeIds = [],
+  completed = false,
+  selectedNodeId = null,
+  onSelectNode,
+}: Props) {
   if (!graph.compiles || !graph.graph || !graph.layout) {
     return (
       <div className="text-xs text-red-300 bg-red-950 border border-red-800 rounded p-2 font-mono whitespace-pre-wrap">
@@ -79,8 +89,14 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
   const strokeFor = (id: string) => {
     if (completed) return "#4ade80"; // green-400
     if (activeNodeIds.includes(id)) return "#fbbf24"; // amber-400
+    if (id === selectedNodeId) return "#60a5fa"; // blue-400 — anchor
     return "#9ca3af"; // gray-400
   };
+  const groupProps = (id: string) => ({
+    "data-node-id": id,
+    onClick: onSelectNode ? () => onSelectNode(id) : undefined,
+    style: onSelectNode ? ({ cursor: "pointer" } as const) : undefined,
+  });
 
   return (
     <svg
@@ -114,7 +130,7 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
           // Gateway diamond, Camunda style; glyph from the mode label.
           const glyph = n.label.includes("XOR") ? "×" : n.label.includes("(OR)") ? "○" : "+";
           return (
-            <g key={n.id} data-node-id={n.id}>
+            <g key={n.id} {...groupProps(n.id)}>
               <path
                 d={`M ${cx} ${cy - GATEWAY_R} L ${cx + GATEWAY_R} ${cy} L ${cx} ${cy + GATEWAY_R} L ${cx - GATEWAY_R} ${cy} Z`}
                 fill="#111827"
@@ -132,7 +148,7 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
         }
         if (n.kind === "start" || n.kind === "end") {
           return (
-            <g key={n.id} data-node-id={n.id}>
+            <g key={n.id} {...groupProps(n.id)}>
               <circle
                 cx={cx}
                 cy={cy}
@@ -148,7 +164,7 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
           );
         }
         return (
-          <g key={n.id} data-node-id={n.id}>
+          <g key={n.id} {...groupProps(n.id)}>
             <rect
               x={cx - NODE_W / 2}
               y={cy - NODE_H / 2}

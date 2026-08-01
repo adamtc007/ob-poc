@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   bpmnTemplatesApi,
   buildBranchedWorkflowOps,
+  missingArgumentNames,
   seedStartKey,
   waitingJobNodeId,
   type InstanceStatus,
+  type PendingProposal,
   type SessionGraph,
   type UtteranceResponse,
 } from "@/api/bpmnTemplates";
@@ -18,12 +20,13 @@ import { WorkflowGraphView } from "./WorkflowGraphView";
  * renders the COMPILED workflow via WorkflowGraphView so the user can
  * see their intention as the compiler understood it, Camunda-style.
  *
- * Utterances go to the designer's Sage shadow-disposition pipeline
- * (/utterance) and its response is shown; graph MUTATION from utterances
- * lands with the DIR-002 SLM/AstMutator pipeline — until then the seed
- * button authors the demo branched workflow (2-way parallel split and
- * merge, 8 tasks) via graph-edit, and save/spawn/advance close the
- * round trip against the real engine.
+ * The DIR-002 propose→ratify→apply loop is now live end-to-end: an
+ * utterance may return a dry-staged proposal (graph NOT yet changed),
+ * rendered as a card with Ratify/Reject; ratifying appends the
+ * GraphEdit and the compiled workflow re-fetch makes the mutation
+ * visible. The seed button remains for the demo branched workflow
+ * (2-way parallel split and merge, 8 tasks) via direct graph-edit,
+ * and save/spawn/advance close the round trip against the real engine.
  */
 
 interface Props {
@@ -38,7 +41,17 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
   const [designSessionId, setDesignSessionId] = useState<string | null>(null);
   const [graph, setGraph] = useState<SessionGraph | null>(null);
   const [utterance, setUtterance] = useState("");
+  // The anchor node for utterances — binding rule R1 takes only explicit
+  // anchors, so positional proposals need one; set by clicking a graph node.
+  const [anchorNodeId, setAnchorNodeId] = useState<string | null>(null);
   const [sageReply, setSageReply] = useState<UtteranceResponse | null>(null);
+  const [pendingProposal, setPendingProposal] = useState<PendingProposal | null>(null);
+  // Outcome note shown in place of / inside the proposal card:
+  // green "applied" after a 200 ratify, red drift message after a 409.
+  const [proposalNote, setProposalNote] = useState<
+    { kind: "applied" | "drift"; text: string } | null
+  >(null);
+  const [showOps, setShowOps] = useState(false);
   const [templateName, setTemplateName] = useState("template1");
   const [saveInfo, setSaveInfo] = useState<string | null>(null);
   const [instanceId, setInstanceId] = useState<string | null>(null);
@@ -98,9 +111,65 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
     setBusy(true);
     setError(null);
     try {
-      setSageReply(await bpmnTemplatesApi.sessionUtterance(designSessionId, utterance.trim()));
+      const reply = await bpmnTemplatesApi.sessionUtterance(
+        designSessionId,
+        utterance.trim(),
+        anchorNodeId ?? undefined
+      );
+      setSageReply(reply);
+      // One card at a time: a new utterance's proposal replaces the card.
+      // The replaced proposal stays pending server-side, so fire-and-forget
+      // reject it to keep the server's pending list in step with the UI —
+      // its failure is logged, not surfaced (the card it belonged to is gone).
+      if (pendingProposal && reply.proposal && reply.proposal.proposal_id !== pendingProposal.proposal_id) {
+        bpmnTemplatesApi
+          .rejectProposal(designSessionId, pendingProposal.proposal_id)
+          .catch((e) => console.warn("reject of replaced proposal failed:", e));
+      }
+      setPendingProposal(reply.proposal ?? null);
+      setProposalNote(null);
+      setShowOps(false);
       setUtterance("");
       await refreshGraph(designSessionId);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRatify = async () => {
+    if (!designSessionId || !pendingProposal) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await bpmnTemplatesApi.ratifyProposal(designSessionId, pendingProposal.proposal_id);
+      setPendingProposal(null);
+      setProposalNote({ kind: "applied", text: "Proposal applied — graph updated." });
+      // The GraphEdit landed: re-fetch so the compiled workflow shows the mutation.
+      await refreshGraph(designSessionId);
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("-> 409")) {
+        // Graph drifted since staging; the proposal is consumed server-side.
+        setPendingProposal(null);
+        setProposalNote({ kind: "drift", text: msg });
+      } else {
+        setError(msg);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!designSessionId || !pendingProposal) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await bpmnTemplatesApi.rejectProposal(designSessionId, pendingProposal.proposal_id);
+      setPendingProposal(null);
+      setProposalNote(null);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -197,7 +266,11 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
           value={utterance}
           onChange={(e) => setUtterance(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleUtterance()}
-          placeholder="tell Sage about this workflow…"
+          placeholder={
+            anchorNodeId
+              ? `tell Sage what to do at '${anchorNodeId}'…`
+              : "click a graph node to anchor, then tell Sage…"
+          }
           className="flex-1 text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 font-mono text-gray-200"
         />
         <button
@@ -211,6 +284,62 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
       {sageReply && (
         <div className="text-xs font-mono text-gray-400 bg-gray-900 border border-gray-800 rounded p-2 whitespace-pre-wrap">
           {sageReply.message}
+          {missingArgumentNames(sageReply.disposition).length > 0 && (
+            <div className="mt-1 text-amber-300">
+              missing bindings: {missingArgumentNames(sageReply.disposition).join(", ")} — add them
+              to the utterance.
+            </div>
+          )}
+          {sageReply.proposal_refusal && (
+            <div className="mt-1 text-red-300">proposal refused: {sageReply.proposal_refusal}</div>
+          )}
+        </div>
+      )}
+
+      {/* DIR-002 proposal card — dry-staged; graph mutates only on Ratify */}
+      {pendingProposal && (
+        <div className="text-xs font-mono bg-gray-900 border border-blue-900 rounded p-2 flex flex-col gap-2">
+          <div className="text-gray-200">
+            <span className="text-blue-300">proposal</span> {pendingProposal.description}
+          </div>
+          <button
+            onClick={() => setShowOps((s) => !s)}
+            className="self-start text-gray-500 hover:text-gray-300"
+          >
+            {showOps ? "▾ operations" : "▸ operations"}
+          </button>
+          {showOps && (
+            <pre className="text-[10px] text-gray-400 bg-gray-950 border border-gray-800 rounded p-2 overflow-x-auto max-h-40 overflow-y-auto">
+              {JSON.stringify(pendingProposal.operations, null, 2)}
+            </pre>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={handleRatify}
+              disabled={busy}
+              className="text-xs bg-green-900 hover:bg-green-800 disabled:opacity-50 px-3 py-1 rounded"
+            >
+              Ratify
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={busy}
+              className="text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-50 px-3 py-1 rounded"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+      {proposalNote && (
+        <div
+          className={`text-xs font-mono rounded p-2 border whitespace-pre-wrap break-all ${
+            proposalNote.kind === "applied"
+              ? "text-green-300 bg-green-950 border-green-800"
+              : "text-red-300 bg-red-950 border-red-800"
+          }`}
+        >
+          {proposalNote.text}
         </div>
       )}
 
@@ -232,6 +361,8 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
               graph={graph}
               activeNodeIds={status?.waiting_jobs.map(waitingJobNodeId) ?? []}
               completed={status?.state === "Completed"}
+              selectedNodeId={anchorNodeId}
+              onSelectNode={(id) => setAnchorNodeId((cur) => (cur === id ? null : id))}
             />
           ) : (
             <div className="text-xs font-mono text-gray-500 p-2">
