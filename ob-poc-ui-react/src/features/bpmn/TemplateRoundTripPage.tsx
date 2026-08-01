@@ -6,7 +6,9 @@ import {
   type Operation,
   type PublishedTemplate,
   type SaveSessionResponse,
+  type SessionGraph,
 } from "@/api/bpmnTemplates";
+import { WorkflowGraphView } from "./WorkflowGraphView";
 
 /**
  * Template round-trip harness against the designer service (:8080):
@@ -19,6 +21,7 @@ type Banner = { kind: "success" | "error"; text: string } | null;
 export function TemplateRoundTripPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [opsResult, setOpsResult] = useState<string | null>(null);
+  const [sessionGraph, setSessionGraph] = useState<SessionGraph | null>(null);
   const [creating, setCreating] = useState(false);
 
   const [templateName, setTemplateName] = useState("template1");
@@ -85,6 +88,9 @@ export function TemplateRoundTripPage() {
       });
       const result = await bpmnTemplatesApi.graphEdit(session_id, ops, "build 4-step chain");
       setOpsResult(JSON.stringify(result));
+      // The compiled-workflow graph, straight from the DAG the server
+      // admitted — what the user sees IS what an instance will execute.
+      setSessionGraph(await bpmnTemplatesApi.sessionGraph(session_id));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -198,6 +204,27 @@ export function TemplateRoundTripPage() {
             <div className="mt-1 text-xs font-mono text-gray-500 break-all">ops result: {opsResult}</div>
           )}
         </section>
+
+        {/* Compiled workflow graph — Camunda-style flow view in execution order */}
+        {sessionGraph && (
+          <section className="border border-gray-800 rounded p-3">
+            <div className="text-xs font-semibold text-gray-300 mb-2">
+              Workflow graph (compiled
+              {sessionGraph.graph ? ` — ${sessionGraph.graph.workflow_id}` : ""})
+              {status && !["Completed"].includes(status.state) && (
+                <span className="ml-2 text-amber-400">● token at {status.waiting_jobs.map((j) => j.node_id).join(", ") || "—"}</span>
+              )}
+              {status?.state === "Completed" && (
+                <span className="ml-2 text-green-400">✓ completed</span>
+              )}
+            </div>
+            <WorkflowGraphView
+              graph={sessionGraph}
+              activeNodeIds={status?.waiting_jobs.map((j) => j.node_id) ?? []}
+              completed={status?.state === "Completed"}
+            />
+          </section>
+        )}
 
         {/* Step 2: save as template */}
         <section className="border border-gray-800 rounded p-3">

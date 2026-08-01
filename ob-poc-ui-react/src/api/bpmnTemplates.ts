@@ -112,6 +112,38 @@ export interface InstanceStatus {
   wait_count: number;
 }
 
+// ── Session graph (the COMPILED workflow, server-laid-out) ───────────────
+//
+// GET /api/dsl/sessions/:id/graph — for graph-backed sessions the server
+// runs the same admitted DAG -> to_ir -> project_ir chain the save/spawn
+// path uses, so this graph IS what an instance executes. layout maps
+// node id -> {x, y} with x = execution depth (left-to-right flow order).
+
+export interface VisualNode {
+  id: string;
+  label: string;
+  kind: string; // "start" | "end" | "task" | gateway kinds
+  plug: string | null;
+}
+
+export interface VisualEdge {
+  from: string;
+  to: string;
+  condition: string | null;
+}
+
+export interface SessionGraph {
+  compiles: boolean;
+  diagnostics: string[];
+  graph: {
+    workflow_id: string;
+    nodes: VisualNode[];
+    edges: VisualEdge[];
+  } | null;
+  layout: Record<string, { x: number; y: number }> | null;
+  source_hash: string;
+}
+
 // ── Fetch plumbing — every failure carries the server's error body ───────
 
 async function jsonFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -146,6 +178,9 @@ export const bpmnTemplatesApi = {
       method: "POST",
       body: JSON.stringify({ template_name: templateName }),
     }),
+
+  sessionGraph: (sessionId: string) =>
+    jsonFetch<SessionGraph>(`/api/dsl/sessions/${sessionId}/graph`),
 
   listPublished: () =>
     jsonFetch<PublishedTemplate[]>("/bpmn/templates/published"),
