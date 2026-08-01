@@ -1,0 +1,14 @@
+digraph composition {
+  rankdir=LR;
+  "cbu.create" -> "cbu.assign-role";
+  "cbu.create" -> "client-group.link-cbu";
+  "cbu.create" -> "cbu.assign-role";
+  "cbu.add-product" -> "delivery.record";
+  "cbu.add-product" -> "service-intent.create";
+  "cbu.add-product" -> "discovery.run";
+  "cbu.delete-cascade" -> "client-group.unlink-cbu";
+  "cbu.delete-cascade" -> "cbu-group.remove-member";
+  "cbu.delete-cascade" -> "cbu.unlink-structure";
+  "cbu.delete-cascade" -> "entity.deactivate";
+  "cbu.delete-cascade" -> "cbu-role.terminate";
+}
