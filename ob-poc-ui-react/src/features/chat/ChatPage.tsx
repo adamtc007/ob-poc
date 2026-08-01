@@ -675,7 +675,7 @@ export function ChatPage() {
         <div className="flex-1 min-h-0">
           {sessionId ? (
             latestSessionFeedback?.tos?.workspace === "bpmn" ? (
-              <BpmnDemoPage />
+              <BpmnDemoPage chatSessionId={sessionId} />
             ) : (
               <ConstellationCanvas
                 graphScene={graphScene ?? null}

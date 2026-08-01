@@ -61,9 +61,71 @@ export type IRNode =
   | { End: { id: string; terminate: boolean } };
 
 /** designer_graph::ops::Operation — externally tagged serde enum (subset used here). */
-export type Operation = {
-  AppendNode: { anchor: string; key: string; node: IRNode; edge_id: string };
-};
+export type Operation =
+  | { AppendNode: { anchor: string; key: string; node: IRNode; edge_id: string } }
+  | { InsertAfter: { anchor: string; key: string; node: IRNode; edge_id: string } }
+  | {
+      CreateParallelRegion: {
+        anchor: string;
+        fork_key: string;
+        fork_node_id: string;
+        join_key: string;
+        join_node_id: string;
+        entry_edge_id: string;
+        branches: {
+          key: string;
+          node: IRNode;
+          in_edge_id: string;
+          out_edge_id: string;
+          condition: null;
+        }[];
+      };
+    };
+
+/**
+ * The demo seed: a SESE parallel block with a 2-way branch and merge —
+ * start → t1 → split ⇉ (t2a→t3a | t2b→t3b) ⇉ join → t4 → t5 → end.
+ * CreateParallelRegion inserts fork+join CLOSED in one op (SESE by
+ * construction); InsertAfter extends each branch. One graph-edit call
+ * carries all 7 ops; admit() runs once over the staged sequence.
+ */
+export function buildBranchedWorkflowOps(startKey: string): Operation[] {
+  const [t1, fork, join, t2a, t2b, t3a, t3b, t4, t5, end] = Array.from(
+    { length: 10 },
+    () => crypto.randomUUID()
+  );
+  const task = (id: string): IRNode => ({
+    ServiceTask: { id, name: id, task_type: "noop" },
+  });
+  return [
+    { AppendNode: { anchor: startKey, key: t1, node: task("t1"), edge_id: "f1" } },
+    {
+      CreateParallelRegion: {
+        anchor: t1,
+        fork_key: fork,
+        fork_node_id: "split",
+        join_key: join,
+        join_node_id: "join",
+        entry_edge_id: "f2",
+        branches: [
+          { key: t2a, node: task("t2a"), in_edge_id: "f3a", out_edge_id: "f4a", condition: null },
+          { key: t2b, node: task("t2b"), in_edge_id: "f3b", out_edge_id: "f4b", condition: null },
+        ],
+      },
+    },
+    { InsertAfter: { anchor: t2a, key: t3a, node: task("t3a"), edge_id: "f5a" } },
+    { InsertAfter: { anchor: t2b, key: t3b, node: task("t3b"), edge_id: "f5b" } },
+    { AppendNode: { anchor: join, key: t4, node: task("t4"), edge_id: "f6" } },
+    { AppendNode: { anchor: t4, key: t5, node: task("t5"), edge_id: "f7" } },
+    { AppendNode: { anchor: t5, key: end, node: { End: { id: "end", terminate: false } }, edge_id: "f8" } },
+  ];
+}
+
+/** Node id for a waiting job: multi-fiber rounds report node_id as "" —
+ *  derive it from the job key's `instance:node:seq:idx` shape instead. */
+export function waitingJobNodeId(job: WaitingJob): string {
+  return job.node_id || job.job_key.split(":")[1] || "";
+}
 
 export interface CreateSessionResponse {
   session_id: string;
@@ -144,6 +206,14 @@ export interface SessionGraph {
   source_hash: string;
 }
 
+export interface UtteranceResponse {
+  seq: number;
+  message: string;
+  disposition: unknown;
+  capture: string;
+  dev_capture: string;
+}
+
 // ── Fetch plumbing — every failure carries the server's error body ───────
 
 async function jsonFetch<T>(path: string, options?: RequestInit): Promise<T> {
@@ -181,6 +251,13 @@ export const bpmnTemplatesApi = {
 
   sessionGraph: (sessionId: string) =>
     jsonFetch<SessionGraph>(`/api/dsl/sessions/${sessionId}/graph`),
+
+  /** Sage utterance against a design session (shadow disposition pipeline). */
+  sessionUtterance: (sessionId: string, text: string) =>
+    jsonFetch<UtteranceResponse>(`/api/dsl/sessions/${sessionId}/utterance`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
 
   listPublished: () =>
     jsonFetch<PublishedTemplate[]>("/bpmn/templates/published"),

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   bpmnTemplatesApi,
+  buildBranchedWorkflowOps,
   seedStartKey,
+  waitingJobNodeId,
   type InstanceStatus,
-  type Operation,
   type PublishedTemplate,
   type SaveSessionResponse,
   type SessionGraph,
@@ -12,7 +13,7 @@ import { WorkflowGraphView } from "./WorkflowGraphView";
 
 /**
  * Template round-trip harness against the designer service (:8080):
- * build a 4-step workflow via graph-edit, publish it as a template,
+ * build a branched workflow (2-way split/merge) via graph-edit, publish it as a template,
  * spawn an instance, and drive it to completion via status/advance.
  */
 
@@ -68,25 +69,8 @@ export function TemplateRoundTripPage() {
       setSessionId(session_id);
 
       const startKey = await seedStartKey(session_id);
-      const keys = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
-      const endKey = crypto.randomUUID();
-      const ops: Operation[] = keys.map((key, i) => ({
-        AppendNode: {
-          anchor: i === 0 ? startKey : keys[i - 1],
-          key,
-          node: { ServiceTask: { id: `t${i + 1}`, name: `t${i + 1}`, task_type: "noop" } },
-          edge_id: `f${i + 1}`,
-        },
-      }));
-      ops.push({
-        AppendNode: {
-          anchor: keys[3],
-          key: endKey,
-          node: { End: { id: "end", terminate: false } },
-          edge_id: "f5",
-        },
-      });
-      const result = await bpmnTemplatesApi.graphEdit(session_id, ops, "build 4-step chain");
+      const ops = buildBranchedWorkflowOps(startKey);
+      const result = await bpmnTemplatesApi.graphEdit(session_id, ops, "build branched workflow");
       setOpsResult(JSON.stringify(result));
       // The compiled-workflow graph, straight from the DAG the server
       // admitted — what the user sees IS what an instance will execute.
@@ -193,7 +177,7 @@ export function TemplateRoundTripPage() {
             disabled={creating}
             className="text-xs bg-gray-800 hover:bg-gray-700 disabled:opacity-50 px-3 py-1.5 rounded font-mono transition-colors"
           >
-            {creating ? "Creating…" : "Create 4-step workflow"}
+            {creating ? "Creating…" : "Create branched workflow"}
           </button>
           {sessionId && (
             <div className="mt-2 text-xs font-mono text-gray-400">
@@ -212,7 +196,7 @@ export function TemplateRoundTripPage() {
               Workflow graph (compiled
               {sessionGraph.graph ? ` — ${sessionGraph.graph.workflow_id}` : ""})
               {status && !["Completed"].includes(status.state) && (
-                <span className="ml-2 text-amber-400">● token at {status.waiting_jobs.map((j) => j.node_id).join(", ") || "—"}</span>
+                <span className="ml-2 text-amber-400">● token at {status.waiting_jobs.map(waitingJobNodeId).join(", ") || "—"}</span>
               )}
               {status?.state === "Completed" && (
                 <span className="ml-2 text-green-400">✓ completed</span>
@@ -220,7 +204,7 @@ export function TemplateRoundTripPage() {
             </div>
             <WorkflowGraphView
               graph={sessionGraph}
-              activeNodeIds={status?.waiting_jobs.map((j) => j.node_id) ?? []}
+              activeNodeIds={status?.waiting_jobs.map(waitingJobNodeId) ?? []}
               completed={status?.state === "Completed"}
             />
           </section>

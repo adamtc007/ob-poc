@@ -4,15 +4,22 @@ import type { SageReasoningRecord, WorkflowInstanceSummary } from "@/api/bpmn";
 import { WorkflowPanel } from "./WorkflowPanel";
 import { SagePanel } from "./SagePanel";
 import { PlanFeedPanel } from "./PlanFeedPanel";
+import { WorkflowDesignerPanel } from "./WorkflowDesignerPanel";
 
 type CbuType = "fund" | "corporate" | "trust";
-type Panel = "workflow" | "sage" | "feed";
+type Panel = "designer" | "workflow" | "sage" | "feed";
 
-export function BpmnDemoPage() {
+interface Props {
+  /** Chat/REPL session id — when present, the Designer tab binds a
+   *  bpmn-lite design session to it (Sage REPL workflow designer). */
+  chatSessionId?: string;
+}
+
+export function BpmnDemoPage({ chatSessionId }: Props) {
   const [instances, setInstances] = useState<WorkflowInstanceSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sageRecords, setSageRecords] = useState<SageReasoningRecord[]>([]);
-  const [activePanel, setActivePanel] = useState<Panel>("workflow");
+  const [activePanel, setActivePanel] = useState<Panel>(chatSessionId ? "designer" : "workflow");
   const [starting, setStarting] = useState(false);
   const [serverOk, setServerOk] = useState<boolean | null>(null);
 
@@ -58,6 +65,18 @@ export function BpmnDemoPage() {
   };
 
   if (serverOk === false) {
+    // The runner's /bpmn/health is absent when the DESIGNER is the
+    // process behind :8080 — the designer tab must not die with it.
+    if (chatSessionId) {
+      return (
+        <div className="flex flex-col h-full bg-gray-950 text-gray-100">
+          <div className="text-xs text-yellow-500 bg-gray-900 border-b border-gray-800 px-3 py-1.5 font-mono">
+            runner /bpmn/health unreachable — designer-only mode
+          </div>
+          <WorkflowDesignerPanel chatSessionId={chatSessionId} />
+        </div>
+      );
+    }
     return (
       <div className="flex items-center justify-center h-full text-sm text-red-400">
         bpmn-lite REST server not reachable at /bpmn — start with{" "}
@@ -133,45 +152,58 @@ export function BpmnDemoPage() {
 
       {/* Main panel area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {!selectedId ? (
-          <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
-            Select an instance or start a new demo run.
-          </div>
-        ) : (
-          <>
-            {/* Panel tabs */}
-            <div className="flex border-b border-gray-800 px-4">
-              {(
-                [
-                  { id: "workflow", label: "Workflow" },
-                  { id: "sage", label: `Sage (${sageRecords.length})` },
-                  { id: "feed", label: "Plan Feed" },
-                ] as { id: Panel; label: string }[]
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActivePanel(tab.id)}
-                  className={`text-xs px-4 py-2 font-mono transition-colors border-b-2 ${
-                    activePanel === tab.id
-                      ? "border-blue-500 text-blue-300"
-                      : "border-transparent text-gray-500 hover:text-gray-300"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+        {(() => {
+          const tabs: { id: Panel; label: string }[] = [
+            ...(chatSessionId ? [{ id: "designer" as Panel, label: "Designer" }] : []),
+            ...(selectedId
+              ? [
+                  { id: "workflow" as Panel, label: "Workflow" },
+                  { id: "sage" as Panel, label: `Sage (${sageRecords.length})` },
+                  { id: "feed" as Panel, label: "Plan Feed" },
+                ]
+              : []),
+          ];
+          if (tabs.length === 0) {
+            return (
+              <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
+                Select an instance or start a new demo run.
+              </div>
+            );
+          }
+          const active = tabs.some((t) => t.id === activePanel) ? activePanel : tabs[0].id;
+          return (
+            <>
+              {/* Panel tabs */}
+              <div className="flex border-b border-gray-800 px-4">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActivePanel(tab.id)}
+                    className={`text-xs px-4 py-2 font-mono transition-colors border-b-2 ${
+                      active === tab.id
+                        ? "border-blue-500 text-blue-300"
+                        : "border-transparent text-gray-500 hover:text-gray-300"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Active panel */}
-            <div className="flex-1 overflow-y-auto">
-              {activePanel === "workflow" && (
-                <WorkflowPanel instanceId={selectedId} onRefresh={refresh} />
-              )}
-              {activePanel === "sage" && <SagePanel records={sageRecords} />}
-              {activePanel === "feed" && <PlanFeedPanel instanceId={selectedId} />}
-            </div>
-          </>
-        )}
+              {/* Active panel */}
+              <div className="flex-1 overflow-y-auto">
+                {active === "designer" && chatSessionId && (
+                  <WorkflowDesignerPanel chatSessionId={chatSessionId} />
+                )}
+                {active === "workflow" && selectedId && (
+                  <WorkflowPanel instanceId={selectedId} onRefresh={refresh} />
+                )}
+                {active === "sage" && <SagePanel records={sageRecords} />}
+                {active === "feed" && selectedId && <PlanFeedPanel instanceId={selectedId} />}
+              </div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

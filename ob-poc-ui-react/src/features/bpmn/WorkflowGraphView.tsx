@@ -17,6 +17,7 @@ import type { SessionGraph } from "../../api/bpmnTemplates";
 const NODE_W = 130;
 const NODE_H = 56;
 const EVENT_R = 22;
+const GATEWAY_R = 24; // half-diagonal of the gateway diamond
 const MARGIN_X = 40;
 const MARGIN_Y = 40;
 
@@ -50,8 +51,14 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
     const p = layout[id] ?? { x: 0, y: 0 };
     return { cx: p.x + MARGIN_X + NODE_W / 2, cy: p.y + MARGIN_Y + NODE_H / 2 };
   };
-  const isEvent = (kind: string) => kind === "start" || kind === "end";
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  // Horizontal half-extent per shape kind, for edge endpoint routing.
+  const shapeHalf = (kind: string) =>
+    kind === "start" || kind === "end"
+      ? EVENT_R
+      : kind === "split" || kind === "join"
+        ? GATEWAY_R
+        : NODE_W / 2;
 
   // Edge endpoints: leave from the right edge of the source shape,
   // arrive at the left edge of the target shape (flow order is layout
@@ -59,8 +66,8 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
   const edgePath = (from: string, to: string) => {
     const a = center(from);
     const b = center(to);
-    const aHalf = isEvent(nodeById.get(from)?.kind ?? "") ? EVENT_R : NODE_W / 2;
-    const bHalf = isEvent(nodeById.get(to)?.kind ?? "") ? EVENT_R : NODE_W / 2;
+    const aHalf = shapeHalf(nodeById.get(from)?.kind ?? "");
+    const bHalf = shapeHalf(nodeById.get(to)?.kind ?? "");
     const x1 = a.cx + aHalf;
     const x2 = b.cx - bHalf;
     if (a.cy === b.cy) return `M ${x1} ${a.cy} L ${x2} ${b.cy}`;
@@ -103,6 +110,26 @@ export function WorkflowGraphView({ graph, activeNodeIds = [], completed = false
         const { cx, cy } = center(n.id);
         const stroke = strokeFor(n.id);
         const active = !completed && activeNodeIds.includes(n.id);
+        if (n.kind === "split" || n.kind === "join") {
+          // Gateway diamond, Camunda style; glyph from the mode label.
+          const glyph = n.label.includes("XOR") ? "×" : n.label.includes("(OR)") ? "○" : "+";
+          return (
+            <g key={n.id} data-node-id={n.id}>
+              <path
+                d={`M ${cx} ${cy - GATEWAY_R} L ${cx + GATEWAY_R} ${cy} L ${cx} ${cy + GATEWAY_R} L ${cx - GATEWAY_R} ${cy} Z`}
+                fill="#111827"
+                stroke={stroke}
+                strokeWidth={2}
+              />
+              <text x={cx} y={cy + 6} textAnchor="middle" fontSize="16" fill="#e5e7eb" fontFamily="monospace">
+                {glyph}
+              </text>
+              <text x={cx} y={cy + GATEWAY_R + 14} textAnchor="middle" fontSize="9" fill="#6b7280" fontFamily="monospace">
+                {n.id}
+              </text>
+            </g>
+          );
+        }
         if (n.kind === "start" || n.kind === "end") {
           return (
             <g key={n.id} data-node-id={n.id}>
