@@ -14,6 +14,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // Designer service. MUST precede "/api": Vite matches proxy contexts
+      // in insertion order (first prefix match wins), not longest-prefix.
+      "/api/dsl": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,

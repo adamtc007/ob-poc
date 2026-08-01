@@ -8,7 +8,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { ViewportPage } from "./features/viewport/ViewportPage";
 import { ObservatoryPage } from "./features/observatory/ObservatoryPage";
 import { CataloguePage } from "./features/catalogue/CataloguePage";
-import { BpmnDemoPage } from "./features/bpmn";
+import { BpmnDemoPage, TemplateRoundTripPage } from "./features/bpmn";
 
 function App() {
   return (
@@ -60,6 +60,16 @@ function App() {
               element={
                 <ErrorBoundary>
                   <BpmnDemoPage />
+                </ErrorBoundary>
+              }
+            />
+
+            {/* BPMN template round-trip harness — full-screen, no AppShell */}
+            <Route
+              path="bpmn-templates"
+              element={
+                <ErrorBoundary>
+                  <TemplateRoundTripPage />
                 </ErrorBoundary>
               }
             />
