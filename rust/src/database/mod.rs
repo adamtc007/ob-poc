@@ -17,7 +17,6 @@ pub mod context_discovery_service;
 // Phase 4 Slice B — document_policy_service + governed_document_requirements_service
 // relocated to `dsl-runtime::document_requirements::{policy, governed}`.
 pub mod dsl_repository;
-pub mod entity_service;
 pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
@@ -41,7 +40,6 @@ pub mod visualization_repository;
 // Re-export for convenience
 pub use cbu_service::{CbuRow, CbuService};
 pub(crate) use dsl_repository::DslRepository;
-pub use entity_service::{EntityRow, EntityService};
 pub use ob_poc_bods::{
     BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
     GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,

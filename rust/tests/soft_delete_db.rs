@@ -3,7 +3,7 @@ mod tests {
     use std::collections::HashMap;
 
     use anyhow::Result;
-    use ob_poc::database::{CbuService, EntityService};
+    use ob_poc::database::CbuService;
     use ob_poc::dsl_v2::execution::{
         runtime_registry, DslExecutor, ExecutionContext, GenericCrudExecutor,
         GenericExecutionResult,
@@ -81,7 +81,6 @@ mod tests {
     async fn entity_delete_sets_deleted_at_and_hides_row() -> Result<()> {
         let pool = test_pool().await?;
         let executor = GenericCrudExecutor::new(pool.clone());
-        let entity_service = EntityService::new(pool.clone());
 
         let entity_id = Uuid::new_v4();
         let entity_type_id: Uuid = sqlx::query_scalar(
@@ -117,7 +116,16 @@ mod tests {
         .fetch_one(&pool)
         .await?;
         assert!(deleted_at_set);
-        assert!(entity_service.get_entity_by_id(entity_id).await?.is_none());
+
+        let hidden_from_live_reads: bool = sqlx::query_scalar(
+            r#"SELECT NOT EXISTS(
+                SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL
+            )"#,
+        )
+        .bind(entity_id)
+        .fetch_one(&pool)
+        .await?;
+        assert!(hidden_from_live_reads);
 
         sqlx::query(r#"DELETE FROM "ob-poc".entities WHERE entity_id = $1"#)
             .bind(entity_id)
