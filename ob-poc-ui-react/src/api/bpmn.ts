@@ -35,7 +35,17 @@ export interface NodeInfo {
   fqn: string | null;
   /** Target domain e.g. "ob-poc" or "dmn-lite" — present on cross-domain callouts. */
   target_domain: string | null;
-  kind: "start" | "end" | "gateway" | "service_task" | "business_rule_task";
+  // "join"/"loop" were already emitted by the server but missing here;
+  // "wait" added WS-D D4 (timer-wait nodes on the plan path).
+  kind:
+    | "start"
+    | "end"
+    | "gateway"
+    | "join"
+    | "loop"
+    | "wait"
+    | "service_task"
+    | "business_rule_task";
 }
 
 export interface WorkflowInstanceDetail {
@@ -131,7 +141,7 @@ export const bpmnApi = {
 export interface VisualNodeDto {
   id: string;
   label: string;
-  kind: "start" | "end" | "task" | "split" | "join" | "loop";
+  kind: "start" | "end" | "task" | "split" | "join" | "loop" | "wait";
   plug: string | null;
   span: {
     start_offset: number;
