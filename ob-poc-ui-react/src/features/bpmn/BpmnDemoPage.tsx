@@ -21,14 +21,28 @@ export function BpmnDemoPage({ chatSessionId }: Props) {
   const [sageRecords, setSageRecords] = useState<SageReasoningRecord[]>([]);
   const [activePanel, setActivePanel] = useState<Panel>(chatSessionId ? "designer" : "workflow");
   const [starting, setStarting] = useState(false);
-  const [serverOk, setServerOk] = useState<boolean | null>(null);
+  // Service-identity health contract: both the runner and the designer
+  // answer /bpmn/health with {status, service}; we dispatch on `service`
+  // to pick the surface. The old check treated a 404 as "server down",
+  // so the NORMAL designer deployment permanently showed an alarming
+  // "runner unreachable" banner — mode detection by absence.
+  const [serverMode, setServerMode] = useState<
+    "runner" | "designer" | "down" | null
+  >(null);
+  const [tier1Bundle, setTier1Bundle] = useState<string | null>(null);
 
-  // Check server health
   useEffect(() => {
     bpmnApi
       .health()
-      .then(() => setServerOk(true))
-      .catch(() => setServerOk(false));
+      .then((h) => {
+        if (h.service === "bpmn-lite-designer") {
+          setServerMode("designer");
+          setTier1Bundle(h.tier1_bundle ?? null);
+        } else {
+          setServerMode("runner");
+        }
+      })
+      .catch(() => setServerMode("down"));
   }, []);
 
   const refresh = useCallback(() => {
@@ -39,10 +53,13 @@ export function BpmnDemoPage({ chatSessionId }: Props) {
   }, [selectedId]);
 
   useEffect(() => {
+    // The instance-list poll targets the RUNNER's demo endpoints; against
+    // the designer (or nothing) it would just 404 every two seconds.
+    if (serverMode !== "runner") return;
     refresh();
     const id = setInterval(refresh, 2000);
     return () => clearInterval(id);
-  }, [refresh]);
+  }, [refresh, serverMode]);
 
   const handleStart = async (cbuType: CbuType) => {
     setStarting(true);
@@ -64,14 +81,33 @@ export function BpmnDemoPage({ chatSessionId }: Props) {
     setSageRecords([]);
   };
 
-  if (serverOk === false) {
-    // The runner's /bpmn/health is absent when the DESIGNER is the
-    // process behind :8080 — the designer tab must not die with it.
+  // The designer service IS the expected deployment for this workspace —
+  // a calm identity line, not an alarm. The runner demo surface (fund/
+  // corporate/trust instances below) only renders against the runner.
+  if (serverMode === "designer" && chatSessionId) {
+    return (
+      <div className="flex flex-col h-full bg-gray-950 text-gray-100">
+        <div className="text-xs text-gray-500 bg-gray-900 border-b border-gray-800 px-3 py-1.5 font-mono">
+          <span className="text-emerald-500">●</span> designer service
+          {tier1Bundle ? (
+            <span className="ml-2 text-gray-600">
+              tier-1 SLM {tier1Bundle.slice(0, 40)}…
+            </span>
+          ) : (
+            <span className="ml-2 text-amber-600">tier-0 serving (no SLM bundle loaded)</span>
+          )}
+        </div>
+        <WorkflowDesignerPanel chatSessionId={chatSessionId} />
+      </div>
+    );
+  }
+  if (serverMode === "down") {
+    // Genuinely nothing behind /bpmn — this one IS an error.
     if (chatSessionId) {
       return (
         <div className="flex flex-col h-full bg-gray-950 text-gray-100">
-          <div className="text-xs text-yellow-500 bg-gray-900 border-b border-gray-800 px-3 py-1.5 font-mono">
-            runner /bpmn/health unreachable — designer-only mode
+          <div className="text-xs text-red-400 bg-gray-900 border-b border-gray-800 px-3 py-1.5 font-mono">
+            no bpmn service reachable at /bpmn — designer calls will fail until one is started
           </div>
           <WorkflowDesignerPanel chatSessionId={chatSessionId} />
         </div>

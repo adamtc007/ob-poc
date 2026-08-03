@@ -62,7 +62,14 @@ async function bpmnFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const bpmnApi = {
-  health: () => bpmnFetch<{ status: string }>("/health"),
+  /** Service-identity health: the runner answers service="bpmn-lite-demo",
+   *  the designer answers service="bpmn-lite-designer" (+ tier1_bundle =
+   *  served SLM identity, null when degraded to tier-0). The UI dispatches
+   *  its surface on `service`, never on reachability alone. */
+  health: () =>
+    bpmnFetch<{ status: string; service?: string; tier1_bundle?: string | null }>(
+      "/health"
+    ),
 
   listInstances: () =>
     bpmnFetch<WorkflowInstanceSummary[]>("/instances"),
