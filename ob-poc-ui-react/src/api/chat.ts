@@ -69,6 +69,10 @@ interface BackendSession {
   messages?: BackendMessage[];
   // Legacy field name
   chat_history?: BackendMessage[];
+  // Universe root state (workspace options + bootstrap verbs), recomputed
+  // fresh by GET /session/:id — the reload-time counterpart to the
+  // create/send-message responses' own session_feedback field.
+  session_feedback?: Record<string, unknown>;
 }
 
 /** Convert backend session to our chat session format */
@@ -93,6 +97,8 @@ function mapBackendSession(backend: BackendSession): ChatSession {
       discovery_bootstrap: msg.discovery_bootstrap,
       session_feedback: msg.session_feedback,
     })),
+    initial_session_feedback:
+      backend.session_feedback as unknown as ChatSession["initial_session_feedback"],
   };
 }
 

@@ -904,6 +904,13 @@ pub(crate) struct SessionStateResponse {
     /// Symbol bindings in this session
     #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
     pub bindings: std::collections::HashMap<String, ob_poc_types::BoundEntityInfo>,
+    /// Session feedback (universe root state — workspace options + bootstrap
+    /// verbs). Recomputed fresh on every GET, the same way the send-message
+    /// path derives it — this is what lets the UI (e.g. the BPMN workspace
+    /// viewport switch) rehydrate correctly on page reload instead of
+    /// resetting to its default view.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_feedback: Option<serde_json::Value>,
 }
 
 /// Response from executing DSL

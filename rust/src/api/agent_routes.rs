@@ -1735,6 +1735,20 @@ async fn get_session(
             session.messages.iter().cloned().map(|m| m.into()).collect()
         };
 
+    // Recomputed fresh, the same way the send-message path derives it
+    // (agent_routes.rs, `session_feedback` above `annotate_acp_session_input_envelope`)
+    // — a page reload must see the same universe-root state a live turn
+    // would, not a resurrected-but-feedback-less session.
+    let session_feedback = if let Some(orchestrator) = state.repl_v2_orchestrator.as_ref() {
+        orchestrator
+            .session_feedback(session_id)
+            .await
+            .ok()
+            .and_then(|feedback| serde_json::to_value(feedback).ok())
+    } else {
+        None
+    };
+
     Json(SessionStateResponse {
         session_id,
         entity_type: session.entity_type.clone(),
@@ -1747,6 +1761,7 @@ async fn get_session(
         can_execute: session.run_sheet.has_runnable(),
         version: Some(session.updated_at.to_rfc3339()),
         run_sheet: Some(session.run_sheet.to_api()),
+        session_feedback,
         bindings: session
             .context
             .bindings
@@ -3310,6 +3325,16 @@ async fn clear_session_dsl(
             Vec::new()
         };
 
+    let session_feedback = if let Some(orchestrator) = state.repl_v2_orchestrator.as_ref() {
+        orchestrator
+            .session_feedback(session_id)
+            .await
+            .ok()
+            .and_then(|feedback| serde_json::to_value(feedback).ok())
+    } else {
+        None
+    };
+
     Ok(Json(SessionStateResponse {
         session_id,
         entity_type,
@@ -3322,6 +3347,7 @@ async fn clear_session_dsl(
         can_execute: false,
         version: Some(updated_at.to_rfc3339()),
         run_sheet: Some(run_sheet),
+        session_feedback,
         bindings,
     }))
 }
