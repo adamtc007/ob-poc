@@ -59,6 +59,12 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
   const [banner, setBanner] = useState<Banner>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Distinct from `busy`: true only while the SLM's own utterance call is
+  // in flight (release-build inference is ~1-3s, not instant) — drives a
+  // visible "thinking" indicator so the wait doesn't read as an
+  // unresponsive UI. Separate from `busy` because ratify/reject/save are
+  // near-instant graph-edit applies, not model inference.
+  const [utterancePending, setUtterancePending] = useState(false);
   const cancelled = useRef(false);
 
   useEffect(() => {
@@ -107,8 +113,15 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
   }, [chatSessionId]);
 
   const handleUtterance = async () => {
-    if (!designSessionId || !utterance.trim()) return;
+    // Reentrancy guard: the submit button's `disabled` prop blocks a
+    // second mouse click, but the input's Enter-key handler calls this
+    // directly with no DOM-disabled check — without this guard, rapid
+    // Enter presses during the SLM's ~1-3s inference fire concurrent
+    // requests, and whichever resolves last (not necessarily last-sent)
+    // wins the displayed reply — a real response-race, not hypothetical.
+    if (busy || !designSessionId || !utterance.trim()) return;
     setBusy(true);
+    setUtterancePending(true);
     setError(null);
     try {
       const reply = await bpmnTemplatesApi.sessionUtterance(
@@ -135,6 +148,7 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
       setError(String(e));
     } finally {
       setBusy(false);
+      setUtterancePending(false);
     }
   };
 
@@ -266,12 +280,13 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
           value={utterance}
           onChange={(e) => setUtterance(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleUtterance()}
+          disabled={busy}
           placeholder={
             anchorNodeId
               ? `tell Sage what to do at '${anchorNodeId}'…`
               : "click a graph node to anchor, then tell Sage…"
           }
-          className="flex-1 text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 font-mono text-gray-200"
+          className="flex-1 text-xs bg-gray-900 border border-gray-700 rounded px-2 py-1.5 font-mono text-gray-200 disabled:opacity-50"
         />
         <button
           onClick={handleUtterance}
@@ -281,6 +296,12 @@ export function WorkflowDesignerPanel({ chatSessionId }: Props) {
           Utter
         </button>
       </div>
+      {utterancePending && (
+        <div className="text-xs font-mono text-amber-400 flex items-center gap-1.5">
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+          Sage is thinking…
+        </div>
+      )}
       {sageReply && (
         <div className="text-xs font-mono text-gray-400 bg-gray-900 border border-gray-800 rounded p-2 whitespace-pre-wrap">
           {sageReply.message}
