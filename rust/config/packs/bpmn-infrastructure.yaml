@@ -1,0 +1,34 @@
+id: bpmn-infrastructure
+name: BPMN Infrastructure Operations
+version: "1.0"
+description: Provision, deprovision, and inspect bpmn-lite worker pools.
+
+invocation_phrases:
+  - "bpmn worker pool infrastructure"
+  - "manage workflow workers"
+
+required_context: []
+optional_context: []
+workspaces: [lifecycle_resources]
+
+allowed_verbs:
+  - loader.provision-pool
+  - loader.deprovision-pool
+  - loader.pool-status
+  - loader.list-pools
+
+forbidden_verbs: []
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 2
+
+section_layout:
+  - title: "BPMN Worker Pools"
+    verb_prefixes: ["loader."]
+
+definition_of_done:
+  - "Worker pool state is explicit and healthy"
+
+progress_signals:
+  - signal: pools_provisioned
+    description: "Worker pools provisioned"

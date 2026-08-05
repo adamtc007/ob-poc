@@ -1,6 +1,7 @@
 # BPMN Workspace — DAG Taxonomy (2026-06-03)
 #
-# Governs orchestration of BPMN worker pools and process flows.
+# Stateless operations-menu projection. This is not a Designer authoring graph
+# and does not claim BPMN instance lifecycle authority.
 
 version: "1.0"
 workspace: bpmn
@@ -13,15 +14,6 @@ dsl_verb_reconciliation:
     - bpmn.signal
     - bpmn.cancel
     - bpmn.inspect
-    - bpmn.timer-wait
-    - bpmn.message-wait
-    - bpmn.boundary-timer
-    - bpmn.boundary-error
-  loader_surface:
-    - loader.provision-pool
-    - loader.deprovision-pool
-    - loader.pool-status
-    - loader.list-pools
   controller_surface:
     - bpmn-controller.start-instance
     - bpmn-controller.instance-status
@@ -31,4 +23,4 @@ dsl_verb_reconciliation:
 slots:
   - id: workspace_root
     stateless: true
-    rationale: "Aggregation root for BPMN orchestration operations."
+    rationale: "Stateless menu for real definition and instance operations; structural authoring and infrastructure are excluded."
