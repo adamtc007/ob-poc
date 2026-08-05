@@ -57,7 +57,10 @@ LABEL org.opencontainers.image.title="ob-poc" \
 
 ENV OB_POC_BUILD_REVISION="${APP_REVISION}" \
     OB_POC_SHARED_DSL_REVISION="${SHARED_DSL_REVISION}" \
-    OB_POC_BPMN_LITE_REVISION="${BPMN_LITE_REVISION}"
+    OB_POC_BPMN_LITE_REVISION="${BPMN_LITE_REVISION}" \
+    OBPOC_PACKS_DIR="/app/config/packs" \
+    OBPOC_MACROS_DIR="/app/config/verb_schemas/macros" \
+    ENTITY_SNAPSHOT_PATH="/app/assets/entity.snapshot.bin"
 
 WORKDIR /app
 
@@ -65,6 +68,8 @@ COPY --from=builder /build/out/ob-poc-web /usr/local/bin/
 
 # Copy ob-poc config (verbs, packs, seeds — required at runtime).
 COPY --chown=nonroot:nonroot rust/config/ /app/config/
+COPY --chown=nonroot:nonroot rust/assets/entity.snapshot.bin /app/assets/entity.snapshot.bin
+COPY --chown=nonroot:nonroot rust/assets/lexicon.snapshot.bin /app/assets/lexicon.snapshot.bin
 
 EXPOSE 3000 50061
 

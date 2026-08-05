@@ -1476,10 +1476,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use ob_poc::journey::router::PackRouter;
         use ob_poc::sequencer::ReplOrchestratorV2;
 
-        // Load journey packs from config dir (if available), otherwise empty router.
+        // Load journey packs from the configured runtime directory (if available),
+        // otherwise use the source-tree default for local development.
         let pack_router = {
-            let config_dir =
-                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
+            let config_dir = std::env::var("OBPOC_PACKS_DIR")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|_| {
+                    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs")
+                });
             match PackRouter::load(&config_dir) {
                 Ok(router) => {
                     tracing::info!(
