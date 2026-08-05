@@ -404,6 +404,7 @@ sem_os_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" 
 sem_os_core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
 sem_os_ontology = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
 sem_os_policy   = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "5ac7da7a513744e907ca110484c3a6a9472ae985", features = ["huggingface-download"] }
 
 # bpmn-lite published as github.com/adamtc007/bpmn-lite v0.2.0 (T1 + T2:
 # dsl-manifest, dsl-bus-*, dmn-lite-server, bpmn-lite plan-walker bus

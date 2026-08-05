@@ -1,346 +1,175 @@
-//! Sentence embedding using Candle and BGE-small-en-v1.5
+//! Application facade over the host-neutral semantic embedder.
 //!
-//! This module loads the BAAI/bge-small-en-v1.5 model and computes
-//! 384-dimensional embeddings for text inputs.
-//!
-//! BGE is a **retrieval-optimized** model (query→target) vs MiniLM's
-//! similarity model (paraphrase detection). This aligns with our
-//! intent→verb lookup use case.
-//!
-//! Key differences from MiniLM:
-//! - CLS token pooling (not mean pooling)
-//! - Query instruction prefix for asymmetric retrieval
-//! - Higher confidence scores (threshold adjustment required)
+//! This module deliberately retains ob-poc's local fine-tuned bundle search.
+//! Model parsing and inference live in `semantic-embedder`; PostgreSQL,
+//! pgvector, feedback, centroids, and population remain in this application
+//! crate.
 
-use anyhow::{Context, Result};
-use candle_core::{DType, Device, Tensor};
-use candle_nn::VarBuilder;
-use candle_transformers::models::bert::{BertModel, Config, DTYPE};
-use hf_hub::{api::sync::Api, Repo, RepoType};
-use tokenizers::Tokenizer;
-use tracing::{debug, info};
+use anyhow::Result;
+use semantic_embedder::{
+    CandleEmbedder, DEFAULT_EMBEDDING_DIMENSION, DEFAULT_MODEL_REPOSITORY, DEFAULT_MODEL_REVISION,
+};
+use tracing::info;
 
-/// BGE retrieval instruction prefix - apply to QUERIES ONLY, never targets
-///
-/// This tells the model we're doing retrieval search, which activates
-/// instruction-following behavior that bridges informal queries to formal targets.
-const QUERY_PREFIX: &str = "Represent this sentence for searching relevant passages: ";
+/// Embedding dimension of the current ob-poc compatibility model.
+pub const EMBEDDING_DIM: usize = DEFAULT_EMBEDDING_DIMENSION;
 
-/// Model repository on HuggingFace Hub
-const MODEL_REPO: &str = "BAAI/bge-small-en-v1.5";
-
-/// Pinned revision (commit SHA) for reproducible builds
-/// Using commit hash ensures immutability - branch/tag names can move
-/// SHA from: https://huggingface.co/BAAI/bge-small-en-v1.5/commits/main (2023-09-11)
-const MODEL_REVISION: &str = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a";
-
-/// Embedding dimension (same as MiniLM - no pgvector schema changes needed)
-pub const EMBEDDING_DIM: usize = 384;
-
-/// Sentence embedder using BGE-small-en-v1.5
-///
-/// This model produces 384-dimensional embeddings optimized for retrieval tasks.
-/// It uses CLS token pooling (not mean pooling like MiniLM) and supports
-/// instruction prefixes for asymmetric query/target embedding.
+/// ob-poc compatibility facade for BGE query and target embeddings.
 pub struct Embedder {
-    model: BertModel,
-    tokenizer: Tokenizer,
-    device: Device,
+    inner: CandleEmbedder,
 }
 
 impl Embedder {
-    /// Create a new embedder, downloading the model if needed
+    /// Load the first configured local fine-tuned bundle, then fall back to
+    /// the exact upstream model revision.
     ///
-    /// The model is cached in the HuggingFace cache directory (~/.cache/huggingface).
-    /// First download is ~130MB.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::new()?;
+    /// assert_eq!(embedder.embedding_dim(), 384);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn new() -> Result<Self> {
         let paths = [
             "assets/bge-small-en-v1.5-finetuned",
             "../assets/bge-small-en-v1.5-finetuned",
             "rust/assets/bge-small-en-v1.5-finetuned",
         ];
-        for path in &paths {
+        for path in paths {
             if std::path::Path::new(path).is_dir() {
-                info!("Found local fine-tuned model at {}, loading...", path);
+                info!(path, "found local fine-tuned semantic model");
                 return Self::with_model(path);
             }
         }
-        Self::with_model(MODEL_REPO)
+        Self::with_model(DEFAULT_MODEL_REPOSITORY)
     }
 
-    /// Create an embedder with a specific model name
+    /// Load a local model directory or the named Hugging Face repository at
+    /// the compatibility revision.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::with_model(
+    ///     "BAAI/bge-small-en-v1.5",
+    /// )?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn with_model(model_name: &str) -> Result<Self> {
-        Self::with_model_and_revision(model_name, MODEL_REVISION)
+        Self::with_model_and_revision(model_name, DEFAULT_MODEL_REVISION)
     }
 
-    /// Create an embedder with a specific model name and revision
+    /// Load a local model directory or an exact remote model revision.
     ///
-    /// Pinning the revision avoids surprise re-downloads when HF updates the model.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::with_model_and_revision(
+    ///     "BAAI/bge-small-en-v1.5",
+    ///     semantic_embedder::DEFAULT_MODEL_REVISION,
+    /// )?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn with_model_and_revision(model_name: &str, revision: &str) -> Result<Self> {
-        info!(
-            "Loading embedding model: {} (revision: {})",
-            model_name, revision
-        );
-        let start = std::time::Instant::now();
-
-        let device = Device::Cpu; // Use CPU for portability; GPU can be added later
-
-        let (config_path, tokenizer_path, weights_path) =
-            if std::path::Path::new(model_name).is_dir() {
-                let dir = std::path::Path::new(model_name);
-                (
-                    dir.join("config.json"),
-                    dir.join("tokenizer.json"),
-                    dir.join("model.safetensors"),
-                )
-            } else {
-                // Download model files from HuggingFace Hub with pinned revision
-                let api = Api::new().context("Failed to create HuggingFace API client")?;
-                let repo = api.repo(Repo::with_revision(
-                    model_name.to_string(),
-                    RepoType::Model,
-                    revision.to_string(),
-                ));
-
-                let config_path = repo
-                    .get("config.json")
-                    .context("Failed to download config.json")?;
-                let tokenizer_path = repo
-                    .get("tokenizer.json")
-                    .context("Failed to download tokenizer.json")?;
-                let weights_path = repo
-                    .get("model.safetensors")
-                    .context("Failed to download model.safetensors")?;
-                (config_path, tokenizer_path, weights_path)
-            };
-
-        debug!("Model files resolved in {}ms", start.elapsed().as_millis());
-
-        // Load config
-        let config: Config = serde_json::from_str(
-            &std::fs::read_to_string(&config_path).context("Failed to read config.json")?,
-        )
-        .context("Failed to parse config.json")?;
-
-        debug!("Model config: hidden_size={}", config.hidden_size);
-
-        // Load tokenizer
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
-            .map_err(|e| anyhow::anyhow!("Failed to load tokenizer: {}", e))?;
-
-        debug!("Tokenizer loaded");
-
-        // Load model weights (mmap for fast loading)
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(&[weights_path], DTYPE, &device)
-                .context("Failed to load model weights")?
-        };
-
-        let model = BertModel::load(vb, &config).context("Failed to build BERT model")?;
-
-        let load_ms = start.elapsed().as_millis();
-        info!("Model loaded in {}ms, running warmup...", load_ms);
-
-        let embedder = Self {
-            model,
-            tokenizer,
-            device,
-        };
-
-        // Warmup: forward pass with representative-length text to trigger lazy initialization
-        // (page faults for mmap, CPU cache warming, kernel activation, etc.)
-        // Using ~30 tokens to exercise typical code paths
-        let warmup_start = std::time::Instant::now();
-        let warmup_text = "This is a warmup sentence to initialize the embedding model and trigger \
-                           any lazy loading of weights and computation kernels for optimal performance.";
-        let _ = embedder.forward(warmup_text)?;
-        debug!(
-            "Warmup completed in {}ms",
-            warmup_start.elapsed().as_millis()
-        );
-
-        // Log embedder metadata for debugging/regression tracking
-        info!(
-            "Embedder ready: model={} revision={} dim={} pooling=CLS normalize=L2 init_ms={}",
-            MODEL_REPO,
-            &MODEL_REVISION[..8], // First 8 chars of SHA for brevity
-            EMBEDDING_DIM,
-            start.elapsed().as_millis()
-        );
-
-        Ok(embedder)
+        Ok(Self {
+            inner: CandleEmbedder::with_model_and_revision(model_name, revision)?,
+        })
     }
 
-    /// Internal: run forward pass and extract CLS embedding
+    /// Embed a user query with the retrieval instruction.
     ///
-    /// BGE uses CLS token pooling (position 0), NOT mean pooling.
-    /// Output is L2 normalized for cosine similarity.
-    fn forward(&self, text: &str) -> Result<Vec<f32>> {
-        let embeddings = self.forward_batch(&[text])?;
-        Ok(embeddings.into_iter().next().unwrap())
-    }
-
-    /// Internal: batch forward pass with CLS extraction
-    fn forward_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        if texts.is_empty() {
-            return Ok(vec![]);
-        }
-
-        // Tokenize all texts
-        let encodings = self
-            .tokenizer
-            .encode_batch(texts.to_vec(), true)
-            .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
-
-        // Find max length for padding, clamped to model's max position embeddings (512)
-        // User prompts could exceed 512 tokens; this prevents index-out-of-bounds
-        let max_len = encodings
-            .iter()
-            .map(|e| e.get_ids().len())
-            .max()
-            .unwrap_or(0)
-            .min(512);
-
-        // Prepare input tensors
-        let mut all_input_ids = Vec::new();
-        let mut all_attention_mask = Vec::new();
-        let mut all_token_type_ids = Vec::new();
-
-        for encoding in &encodings {
-            let ids = encoding.get_ids();
-            let attention = encoding.get_attention_mask();
-            let type_ids = encoding.get_type_ids();
-
-            // Truncate to max_len if needed (for inputs exceeding 512 tokens)
-            let len = ids.len().min(max_len);
-            let mut padded_ids: Vec<u32> = ids[..len].to_vec();
-            let mut padded_attention: Vec<u32> = attention[..len].to_vec();
-            let mut padded_type_ids: Vec<u32> = type_ids[..len].to_vec();
-
-            // Pad to max length
-            padded_ids.resize(max_len, 0);
-            padded_attention.resize(max_len, 0);
-            padded_type_ids.resize(max_len, 0);
-
-            all_input_ids.extend(padded_ids);
-            all_attention_mask.extend(padded_attention);
-            all_token_type_ids.extend(padded_type_ids);
-        }
-
-        let batch_size = texts.len();
-
-        // Create tensors
-        let input_ids = Tensor::from_vec(all_input_ids, (batch_size, max_len), &self.device)?;
-        let attention_mask =
-            Tensor::from_vec(all_attention_mask, (batch_size, max_len), &self.device)?;
-        let token_type_ids =
-            Tensor::from_vec(all_token_type_ids, (batch_size, max_len), &self.device)?;
-
-        // Convert to appropriate types
-        let input_ids = input_ids.to_dtype(DType::U32)?;
-        let token_type_ids = token_type_ids.to_dtype(DType::U32)?;
-
-        // Forward pass
-        let output = self
-            .model
-            .forward(&input_ids, &token_type_ids, Some(&attention_mask))?;
-
-        // CLS token extraction: take position 0 from each sequence
-        // output shape: (batch_size, seq_len, hidden_size)
-        // We want: (batch_size, hidden_size) by taking [:, 0, :]
-        let cls_embeddings = output.narrow(1, 0, 1)?.squeeze(1)?;
-
-        // L2 normalize for cosine similarity (pgvector expects unit vectors)
-        let normalized = Self::l2_normalize(&cls_embeddings)?;
-
-        // Convert to Vec<Vec<f32>>
-        let embeddings_2d = normalized.to_vec2::<f32>()?;
-
-        Ok(embeddings_2d)
-    }
-
-    /// L2 normalize embeddings for cosine similarity
-    fn l2_normalize(tensor: &Tensor) -> Result<Tensor> {
-        let norm = tensor
-            .sqr()?
-            .sum_keepdim(1)?
-            .sqrt()?
-            .clamp(1e-12, f64::MAX)?;
-        let normalized = tensor.broadcast_div(&norm)?;
-        Ok(normalized)
-    }
-
-    // ========== PUBLIC API ==========
-
-    /// Embed a user query (WITH retrieval instruction prefix)
+    /// # Examples
     ///
-    /// Use this for search queries from user input. The instruction prefix
-    /// tells BGE to optimize for retrieval, bridging informal queries to
-    /// formal verb patterns.
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::new()?;
+    /// let vector = embedder.embed_query("find a process")?;
+    /// assert_eq!(vector.len(), embedder.embedding_dim());
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn embed_query(&self, text: &str) -> Result<Vec<f32>> {
-        let prefixed = format!("{}{}", QUERY_PREFIX, text);
-        self.forward(&prefixed)
+        Ok(self.inner.embed_query(text)?)
     }
 
-    /// Embed a verb pattern/target (NO prefix)
+    /// Embed a retrieval target without the query instruction.
     ///
-    /// Use this for verb patterns stored in the database. No prefix needed
-    /// because these are the targets being searched, not queries.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::new()?;
+    /// let vector = embedder.embed_target("create process")?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn embed_target(&self, text: &str) -> Result<Vec<f32>> {
-        self.forward(text)
+        Ok(self.inner.embed_target(text)?)
     }
 
-    /// Batch embed targets (for populate_embeddings)
+    /// Batch-embed targets while preserving input order.
     ///
-    /// Efficient batch embedding of verb patterns. No prefix applied.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::new()?;
+    /// let vectors = embedder.embed_batch_targets(&["one", "two"])?;
+    /// assert_eq!(vectors.len(), 2);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn embed_batch_targets(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        self.forward_batch(texts)
+        Ok(self.inner.embed_batch_targets(texts)?)
     }
 
-    /// Batch embed queries
+    /// Batch-embed queries while preserving input order.
     ///
-    /// Efficient batch embedding of user queries. Instruction prefix applied.
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let embedder = ob_semantic_matcher::Embedder::new()?;
+    /// let vectors = embedder.embed_batch_queries(&["one", "two"])?;
+    /// assert_eq!(vectors.len(), 2);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn embed_batch_queries(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        let prefixed: Vec<String> = texts
-            .iter()
-            .map(|t| format!("{}{}", QUERY_PREFIX, t))
-            .collect();
-        let refs: Vec<&str> = prefixed.iter().map(|s| s.as_str()).collect();
-        self.forward_batch(&refs)
+        Ok(self.inner.embed_batch_queries(texts)?)
     }
 
-    // ========== LEGACY API (for backward compatibility) ==========
-
-    /// Legacy: embed without query/target distinction
+    /// Legacy target embedding retained for application compatibility.
     ///
-    /// Defaults to target embedding (no prefix). Use embed_query or embed_target
-    /// for explicit control.
-    #[deprecated(
-        note = "Use embed_query() or embed_target() for explicit query/target distinction"
-    )]
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # #[allow(deprecated)]
+    /// let vector = ob_semantic_matcher::Embedder::new()?.embed("target")?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    #[deprecated(note = "use embed_target for explicit query/target semantics")]
     pub fn embed(&self, text: &str) -> Result<Vec<f32>> {
         self.embed_target(text)
     }
 
-    /// Legacy: batch embed without query/target distinction
+    /// Legacy target batch embedding retained for application compatibility.
     ///
-    /// Defaults to target embedding (no prefix). Use embed_batch_queries or
-    /// embed_batch_targets for explicit control.
-    #[deprecated(
-        note = "Use embed_batch_queries() or embed_batch_targets() for explicit query/target distinction"
-    )]
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # #[allow(deprecated)]
+    /// let vectors = ob_semantic_matcher::Embedder::new()?.embed_batch(&["target"])?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    #[deprecated(note = "use embed_batch_targets for explicit query/target semantics")]
     pub fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
         self.embed_batch_targets(texts)
     }
 
-    /// Get the embedding dimension (384 for BGE-small-en-v1.5)
-    pub fn embedding_dim(&self) -> usize {
+    /// Return the fixed model output dimension.
+    #[must_use]
+    pub const fn embedding_dim(&self) -> usize {
         EMBEDDING_DIM
     }
 
-    /// Get the model name
-    pub fn model_name(&self) -> &str {
-        MODEL_REPO
+    /// Return the compatibility model repository identity.
+    #[must_use]
+    pub const fn model_name(&self) -> &str {
+        DEFAULT_MODEL_REPOSITORY
     }
 }
 
@@ -349,137 +178,11 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // Requires model download
-    fn test_embed_single() {
-        let embedder = Embedder::new().expect("Failed to load embedder");
-        let embedding = embedder
-            .embed_target("follow the white rabbit")
-            .expect("Failed to embed");
-
-        assert_eq!(embedding.len(), EMBEDDING_DIM);
-
-        // Check that it's normalized (L2 norm ≈ 1.0)
-        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.01);
-    }
-
-    #[test]
-    #[ignore] // Requires model download
-    fn test_embed_query_vs_target() {
-        let embedder = Embedder::new().expect("Failed to load embedder");
-
-        // Query embedding should be different from target (due to prefix)
-        let query_emb = embedder.embed_query("load the cbu").unwrap();
-        let target_emb = embedder.embed_target("load the cbu").unwrap();
-
-        // They should be different
-        let diff: f32 = query_emb
-            .iter()
-            .zip(&target_emb)
-            .map(|(a, b)| (a - b).abs())
-            .sum();
-        assert!(diff > 0.1, "Query and target embeddings should differ");
-    }
-
-    fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
-        let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        dot / (norm_a * norm_b)
-    }
-
-    #[test]
-    #[ignore] // Requires model download
-    fn test_query_target_cosine_similarity() {
-        let embedder = Embedder::new().expect("Failed to load embedder");
-
-        let cases = [
-            (
-                "check attribute gaps",
-                "check attribute gaps for service resources",
-            ),
-            (
-                "bootstrap attribute registry",
-                "bootstrap attribute registry",
-            ),
-            ("reconcile semos", "reconcile the registry"),
-            ("bridge attributes", "bridge ungoverned attributes to semos"),
-            ("load the cbu", "session.load-cbu"),
-        ];
-
-        for (query, target) in &cases {
-            let q = embedder.embed_query(query).unwrap();
-            let t = embedder.embed_target(target).unwrap();
-            let sim = cosine_sim(&q, &t);
-            eprintln!("query={:40} target={:50} sim={:.4}", query, target, sim);
-            assert!(
-                sim > 0.40,
-                "Query '{}' should have > 0.40 similarity with target '{}', got {}",
-                query,
-                target,
-                sim
-            );
-        }
-
-        // Determinism: same input twice must produce identical embeddings
-        let t1 = embedder
-            .embed_target("check attribute gaps for service resources")
-            .unwrap();
-        let t2 = embedder
-            .embed_target("check attribute gaps for service resources")
-            .unwrap();
-        let det_sim = cosine_sim(&t1, &t2);
-        eprintln!("determinism (target-target same text): {:.6}", det_sim);
-        assert!(
-            (det_sim - 1.0).abs() < 0.0001,
-            "Same text must produce identical embeddings"
+    fn facade_constants_match_the_shared_model_contract() {
+        assert_eq!(
+            EMBEDDING_DIM,
+            semantic_embedder::DEFAULT_EMBEDDING_DIMENSION
         );
-
-        // Print first 5 values for comparison with DB
-        eprintln!("first 5 target values: {:?}", &t1[..5]);
-        // DB has: [-0.0760501,-0.04121938,0.021460311,-0.069761164,0.06453907]
-    }
-
-    #[test]
-    #[ignore] // Requires model download
-    fn test_embed_batch() {
-        let embedder = Embedder::new().expect("Failed to load embedder");
-        let texts = vec!["follow the rabbit", "zoom in", "show ownership"];
-
-        let embeddings = embedder
-            .embed_batch_targets(&texts)
-            .expect("Failed to embed batch");
-
-        assert_eq!(embeddings.len(), 3);
-        for emb in &embeddings {
-            assert_eq!(emb.len(), EMBEDDING_DIM);
-        }
-    }
-
-    #[test]
-    #[ignore] // Requires model download
-    fn test_retrieval_similarity() {
-        let embedder = Embedder::new().expect("Failed to load embedder");
-
-        // Query: informal user input
-        let query = embedder.embed_query("who owns this company").unwrap();
-
-        // Targets: formal verb patterns
-        let target_good = embedder
-            .embed_target("discover ownership structure")
-            .unwrap();
-        let target_bad = embedder.embed_target("zoom in on graph").unwrap();
-
-        // Cosine similarity (embeddings are normalized)
-        let sim_good: f32 = query.iter().zip(&target_good).map(|(a, b)| a * b).sum();
-        let sim_bad: f32 = query.iter().zip(&target_bad).map(|(a, b)| a * b).sum();
-
-        // Query should be more similar to ownership target
-        assert!(
-            sim_good > sim_bad,
-            "Expected sim_good ({}) > sim_bad ({})",
-            sim_good,
-            sim_bad
-        );
+        assert_eq!(DEFAULT_MODEL_REPOSITORY, "BAAI/bge-small-en-v1.5");
     }
 }
