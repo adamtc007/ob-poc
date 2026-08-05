@@ -5,6 +5,7 @@ edition = "2021"
 description = "Semantic OS test harness — golden/invariant tests against SemOsClient."
 
 [dependencies]
+ob-poc-semantic-policy = { path = "../ob-poc-semantic-policy" }
 sem_os_core.workspace = true
 sem_os_policy.workspace = true
 sem_os_ontology.workspace = true

@@ -13,6 +13,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 
+use ob_poc_semantic_policy::{
+    evaluate_context, evaluate_mode, policy_context_exists, policy_context_has_attribute,
+};
+use sem_os_policy::pack_policy::PrincipalContext;
 use sem_os_types::agent_mode::AgentMode;
 
 use crate::agent::composite_state::GroupCompositeState;
@@ -143,34 +147,14 @@ pub struct FilterSummary {
 
 // ── Safe-harbor verbs (FailClosed fallback) ─────────────────────
 
-/// Domain prefixes that are always safe (navigation, help, session management).
-const SAFE_HARBOR_DOMAINS: &[&str] = &[
-    "agent", "audit", "focus", "registry", "schema", "session", "view",
-];
-
 pub(crate) fn is_safe_harbor_verb(fqn: &str) -> bool {
-    SAFE_HARBOR_DOMAINS
-        .iter()
-        .any(|domain| fqn.starts_with(&format!("{domain}.")))
+    evaluate_context(
+        "scope.fail-closed",
+        &PrincipalContext::default(),
+        fqn,
+    )
+    .is_ok_and(|decision| decision.allowed)
 }
-
-// ── Bootstrap domains (no group in scope) ────────────────────────
-//
-// When no client group is set, only these domains are available.
-// This forces the user to select a group before doing domain work.
-// Exception: new group onboarding (client-group.create, gleif.import-tree).
-const NO_GROUP_ALLOWED_DOMAINS: &[&str] = &[
-    "agent",
-    "audit",
-    "client-group",
-    "focus",
-    "gleif",
-    "onboarding",
-    "registry",
-    "schema",
-    "session",
-    "view",
-];
 
 /// Validate that every fail-closed safe-harbor verb is read-only.
 ///
@@ -210,86 +194,6 @@ pub fn validate_fail_closed_safe_harbor_harm_class() -> anyhow::Result<()> {
         "FailClosed safe-harbor contains non-read-only verbs: {}",
         violations.join(", ")
     );
-}
-
-// ── Workflow phase → domain allowlists ──────────────────────────
-
-/// Returns an optional set of allowed domain prefixes for a given stage_focus.
-///
-/// When `None`, no workflow constraint is applied (all domains pass).
-fn workflow_allowed_domains(stage_focus: &str) -> Option<HashSet<&'static str>> {
-    match stage_focus {
-        "semos-onboarding" => Some(
-            [
-                "cbu",
-                "entity",
-                "session",
-                "view",
-                "agent",
-                "contract",
-                "deal",
-                "billing",
-                "trading-profile",
-                "custody",
-                "onboarding",
-                "gleif",
-                "research",
-            ]
-            .into_iter()
-            .collect(),
-        ),
-        "semos-kyc" => Some(
-            [
-                "kyc",
-                "screening",
-                "document",
-                "requirement",
-                "ubo",
-                "session",
-                "view",
-                "agent",
-                "entity",
-            ]
-            .into_iter()
-            .collect(),
-        ),
-        "semos-data" | "semos-data-management" => Some(
-            [
-                "registry",
-                "changeset",
-                "governance",
-                "schema",
-                "authoring",
-                "deal",
-                "cbu",
-                "document",
-                "product",
-                "session",
-                "view",
-                "agent",
-                "audit",
-            ]
-            .into_iter()
-            .collect(),
-        ),
-        "semos-stewardship" => Some(
-            [
-                "focus",
-                "changeset",
-                "governance",
-                "audit",
-                "maintenance",
-                "registry",
-                "schema",
-                "session",
-                "view",
-                "agent",
-            ]
-            .into_iter()
-            .collect(),
-        ),
-        _ => None, // No workflow constraint
-    }
 }
 
 // ── Computation context ─────────────────────────────────────────
@@ -349,7 +253,7 @@ pub(crate) fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> Sess
     let after_mode: Vec<(&str, &RuntimeVerb)> = all_verbs
         .into_iter()
         .filter(|(fqn, _)| {
-            if ctx.agent_mode.is_verb_allowed(fqn) {
+            if evaluate_mode(ctx.agent_mode, fqn).is_ok_and(|decision| decision.allowed) {
                 true
             } else {
                 exclusions
@@ -370,17 +274,18 @@ pub(crate) fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> Sess
     //   1. No group → only bootstrap domains (session, view, agent, gleif, etc.)
     //   2. Group set + workflow focus → workflow-specific domains
     //   3. Group set + no workflow → all domains pass through
-    let scope_domains: Option<HashSet<&str>> = if ctx.is_infrastructure_scope {
+    let scope_context = if ctx.is_infrastructure_scope {
         // Infrastructure scope → all domains available (SemOS maintenance)
         None
     } else if !ctx.has_group_scope {
         // No group → bootstrap domains only
-        Some(NO_GROUP_ALLOWED_DOMAINS.iter().copied().collect())
+        Some("scope.no-group".to_string())
     } else {
-        // Group set → workflow domains (if any)
-        ctx.stage_focus.and_then(workflow_allowed_domains)
+        // Group set → declared workflow context (if any)
+        ctx.stage_focus
+            .map(|focus| format!("workflow.{focus}"))
+            .filter(|context| policy_context_exists(context).unwrap_or(false))
     };
-    let allowed_domains = scope_domains.clone();
 
     let prune_layer = if !ctx.has_group_scope {
         PruneLayer::GroupScope
@@ -393,11 +298,13 @@ pub(crate) fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> Sess
         ctx.stage_focus.unwrap_or("unknown workflow")
     };
 
-    let after_wf: Vec<(&str, &RuntimeVerb)> = if let Some(ref domains) = scope_domains {
+    let after_wf: Vec<(&str, &RuntimeVerb)> = if let Some(ref context) = scope_context {
         after_mode
             .into_iter()
             .filter(|(fqn, rv)| {
-                if domains.contains(rv.domain.as_str()) {
+                if evaluate_context(context, &PrincipalContext::default(), fqn)
+                    .is_ok_and(|decision| decision.allowed)
+                {
                     true
                 } else {
                     exclusions
@@ -531,7 +438,7 @@ pub(crate) fn compute_session_verb_surface(ctx: &VerbSurfaceContext<'_>) -> Sess
                 })
                 .unwrap_or(true);
 
-            let mut rank_boost = compute_rank_boost(rv, ctx.stage_focus, &allowed_domains);
+            let mut rank_boost = compute_rank_boost(rv, scope_context.as_deref());
 
             // State-to-intent bias: boost/penalize based on composite state
             if let Some(composite) = ctx.composite_state {
@@ -663,30 +570,17 @@ pub(crate) fn observe_state_reachability(
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-fn compute_rank_boost(
-    rv: &RuntimeVerb,
-    stage_focus: Option<&str>,
-    allowed_domains: &Option<HashSet<&str>>,
-) -> f64 {
-    if let Some(ref domains) = allowed_domains {
-        if domains.contains(rv.domain.as_str()) {
-            // Extra boost if verb domain matches the first (primary) domain
-            if let Some(focus) = stage_focus {
-                let primary_domain = match focus {
-                    "semos-kyc" => "kyc",
-                    "semos-onboarding" => "cbu",
-                    "semos-data" | "semos-data-management" => "registry",
-                    "semos-stewardship" => "focus",
-                    _ => "",
-                };
-                if rv.domain == primary_domain {
-                    return 0.15;
-                }
-            }
-            return 0.05;
-        }
+fn compute_rank_boost(rv: &RuntimeVerb, policy_context: Option<&str>) -> f64 {
+    let Some(context) = policy_context else {
+        return 0.0;
+    };
+    if policy_context_has_attribute(context, &format!("rank.primary-domain.{}", rv.domain))
+        .unwrap_or(false)
+    {
+        0.15
+    } else {
+        0.05
     }
-    0.0
 }
 
 fn compute_surface_fingerprint(

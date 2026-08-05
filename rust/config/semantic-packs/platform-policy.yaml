@@ -1,0 +1,212 @@
+schema_version: 1
+pack:
+  id: ob-poc.platform-policy
+  version: 1.0.0
+  domain: ob-poc
+  identity_namespace: ob-poc.semantic-registry.v1
+  identity_namespace_uuid: 7a3b9f42-e1d4-5a8b-910c-4f2d6e8a1b3c
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/platform-policy.yaml
+    revision: standalone-policy-v1
+declarations:
+  domain_types: []
+  slot_kinds: []
+  focus_kinds: []
+capabilities:
+  - id: semantic.change.add
+    adapter_binding: ob-poc.semantic.change.add
+    title: Add semantic object
+    intent_summary: Add an object through a governed changeset.
+    action_class: create
+    applicability: A changeset is approved for promotion.
+    effect: A semantic object is added.
+    arguments: []
+    phrases: []
+    positive_examples: []
+    negative_contrasts: []
+    risk: reversible
+  - id: semantic.change.modify
+    adapter_binding: ob-poc.semantic.change.modify
+    title: Modify semantic object
+    intent_summary: Modify an object through a governed changeset.
+    action_class: update
+    applicability: A changeset is approved for promotion.
+    effect: A semantic object is modified.
+    arguments: []
+    phrases: []
+    positive_examples: []
+    negative_contrasts: []
+    risk: reversible
+  - id: semantic.change.remove
+    adapter_binding: ob-poc.semantic.change.remove
+    title: Remove semantic object
+    intent_summary: Retire an object through a governed changeset.
+    action_class: delete
+    applicability: A changeset is approved for promotion.
+    effect: A semantic object is retired.
+    arguments: []
+    phrases: []
+    positive_examples: []
+    negative_contrasts: []
+    risk: destructive
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles:
+    - role: admin
+      capabilities:
+        - semantic.change.add
+        - semantic.change.modify
+        - semantic.change.remove
+    - role: steward
+      capabilities:
+        - semantic.change.add
+        - semantic.change.modify
+  eligibility:
+    - context: mode.research
+      default: allow
+      deny:
+        - { kind: exact, value: authoring.publish }
+        - { kind: exact, value: authoring.publish-batch }
+        - { kind: prefix, value: governance. }
+        - { kind: prefix, value: maintenance. }
+      attributes:
+        - feature.authoring
+        - feature.full-introspection
+    - context: mode.governed
+      default: allow
+      deny:
+        - { kind: exact, value: authoring.propose }
+        - { kind: exact, value: authoring.validate }
+        - { kind: exact, value: authoring.dry-run }
+        - { kind: exact, value: authoring.plan }
+        - { kind: exact, value: authoring.diff }
+        - { kind: prefix, value: changeset. }
+      attributes:
+        - feature.business-verbs
+        - feature.maintenance
+    - context: mode.maintenance
+      default: allow
+      deny:
+        - { kind: prefix, value: cbu. }
+        - { kind: prefix, value: entity. }
+        - { kind: prefix, value: trading-profile. }
+        - { kind: prefix, value: investor. }
+        - { kind: prefix, value: custody. }
+        - { kind: prefix, value: deal. }
+        - { kind: prefix, value: billing. }
+        - { kind: prefix, value: contract. }
+        - { kind: prefix, value: document. }
+        - { kind: prefix, value: kyc. }
+        - { kind: prefix, value: screening. }
+        - { kind: prefix, value: screening-ops. }
+        - { kind: prefix, value: ownership. }
+      attributes:
+        - feature.authoring
+        - feature.full-introspection
+        - feature.maintenance
+    - context: scope.fail-closed
+      default: deny
+      allow:
+        - { kind: prefix, value: agent. }
+        - { kind: prefix, value: audit. }
+        - { kind: prefix, value: focus. }
+        - { kind: prefix, value: registry. }
+        - { kind: prefix, value: schema. }
+        - { kind: prefix, value: session. }
+        - { kind: prefix, value: view. }
+    - context: scope.no-group
+      default: deny
+      allow:
+        - { kind: prefix, value: agent. }
+        - { kind: prefix, value: audit. }
+        - { kind: prefix, value: client-group. }
+        - { kind: prefix, value: focus. }
+        - { kind: prefix, value: gleif. }
+        - { kind: prefix, value: onboarding. }
+        - { kind: prefix, value: registry. }
+        - { kind: prefix, value: schema. }
+        - { kind: prefix, value: session. }
+        - { kind: prefix, value: view. }
+    - context: workflow.semos-onboarding
+      default: deny
+      attributes:
+        - rank.primary-domain.cbu
+      allow:
+        - { kind: prefix, value: cbu. }
+        - { kind: prefix, value: entity. }
+        - { kind: prefix, value: session. }
+        - { kind: prefix, value: view. }
+        - { kind: prefix, value: agent. }
+        - { kind: prefix, value: contract. }
+        - { kind: prefix, value: deal. }
+        - { kind: prefix, value: billing. }
+        - { kind: prefix, value: trading-profile. }
+        - { kind: prefix, value: custody. }
+        - { kind: prefix, value: onboarding. }
+        - { kind: prefix, value: gleif. }
+        - { kind: prefix, value: research. }
+    - context: workflow.semos-kyc
+      default: deny
+      attributes:
+        - rank.primary-domain.kyc
+      allow:
+        - { kind: prefix, value: kyc. }
+        - { kind: prefix, value: screening. }
+        - { kind: prefix, value: document. }
+        - { kind: prefix, value: requirement. }
+        - { kind: prefix, value: ubo. }
+        - { kind: prefix, value: session. }
+        - { kind: prefix, value: view. }
+        - { kind: prefix, value: agent. }
+        - { kind: prefix, value: entity. }
+    - context: workflow.semos-data
+      default: deny
+      attributes:
+        - rank.primary-domain.registry
+      allow: &data_workflow
+        - { kind: prefix, value: registry. }
+        - { kind: prefix, value: changeset. }
+        - { kind: prefix, value: governance. }
+        - { kind: prefix, value: schema. }
+        - { kind: prefix, value: authoring. }
+        - { kind: prefix, value: deal. }
+        - { kind: prefix, value: cbu. }
+        - { kind: prefix, value: document. }
+        - { kind: prefix, value: product. }
+        - { kind: prefix, value: session. }
+        - { kind: prefix, value: view. }
+        - { kind: prefix, value: agent. }
+        - { kind: prefix, value: audit. }
+    - context: workflow.semos-data-management
+      default: deny
+      allow: *data_workflow
+      attributes:
+        - rank.primary-domain.registry
+    - context: workflow.semos-stewardship
+      default: deny
+      attributes:
+        - rank.primary-domain.focus
+      allow:
+        - { kind: prefix, value: focus. }
+        - { kind: prefix, value: changeset. }
+        - { kind: prefix, value: governance. }
+        - { kind: prefix, value: audit. }
+        - { kind: prefix, value: maintenance. }
+        - { kind: prefix, value: registry. }
+        - { kind: prefix, value: schema. }
+        - { kind: prefix, value: session. }
+        - { kind: prefix, value: view. }
+        - { kind: prefix, value: agent. }
+  privileges:
+    - privilege: evidence.review
+      roles:
+        - { kind: contains, value: steward }
+        - { kind: exact, value: compliance_officer }
+        - { kind: exact, value: compliance-manager }
+        - { kind: exact, value: regulatory_officer }
+extensions: {}

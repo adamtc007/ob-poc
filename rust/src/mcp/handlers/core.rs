@@ -1985,7 +1985,11 @@ impl ToolHandlers {
         let include_fks = args["include_fks"].as_bool().unwrap_or(true);
 
         // Governed mode restricts to single-table introspection only
-        if !self.agent_mode.allows_full_introspect() && table_filter.is_none() {
+        if !ob_poc_semantic_policy::mode_has_attribute(
+            self.agent_mode,
+            "feature.full-introspection",
+        )? && table_filter.is_none()
+        {
             return Err(anyhow!(
                 "db_introspect: full schema enumeration is not available in {} mode. \
                  Provide table_name to describe a specific table.",

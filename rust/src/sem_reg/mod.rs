@@ -105,6 +105,7 @@ pub use view_def::ViewDefBody;
 // Re-export Phase 3 types
 pub use abac::{
     evaluate_abac, evaluate_abac_with_evidence_grade, AccessDecision, AccessPurpose, ActorContext,
+    EvidencePrivilege,
 };
 pub use derivation_spec::DerivationSpecBody;
 pub use document_type_def::DocumentTypeDefBody;

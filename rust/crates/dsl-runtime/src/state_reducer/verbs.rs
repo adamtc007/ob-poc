@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
-use sem_os_ontology::constellation_map_def::{ConstellationMapDefBody, SlotDef, SlotType};
+use sem_os_ontology::constellation_map_def::{ConstellationMapDefBody, SlotDef};
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -666,9 +666,9 @@ async fn sem_os_slot_contexts_for_slot(
     qualified_slot: &str,
     slot: &SlotDef,
 ) -> Result<Vec<SlotContext>> {
-    match slot.slot_type {
-        SlotType::Entity => sem_os_entity_slot_contexts(pool, cbu_id, qualified_slot, slot).await,
-        SlotType::Case => {
+    match slot.slot_type.as_str() {
+        "entity" => sem_os_entity_slot_contexts(pool, cbu_id, qualified_slot, slot).await,
+        "case" => {
             if let Some(case_id) = case_id {
                 Ok(vec![SlotContext {
                     entity_id: case_id,

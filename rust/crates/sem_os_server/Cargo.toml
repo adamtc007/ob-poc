@@ -5,6 +5,7 @@ edition = "2021"
 description = "Semantic OS REST server — axum with JWT auth."
 
 [dependencies]
+ob-poc-semantic-policy = { path = "../ob-poc-semantic-policy" }
 sem_os_core.workspace = true
 sem_os_types.workspace = true
 sem_os_ontology.workspace = true

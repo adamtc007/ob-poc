@@ -887,6 +887,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let stores = PgStores::new(pool.clone());
             let core_service = CoreServiceImpl::new(
+                ob_poc_semantic_policy::snapshot_owned()?,
                 Arc::new(stores.snapshots),
                 Arc::new(stores.objects),
                 Arc::new(stores.changesets),

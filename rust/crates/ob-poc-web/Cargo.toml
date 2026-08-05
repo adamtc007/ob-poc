@@ -5,6 +5,7 @@ edition = "2021"
 description = "Hybrid web server for OB-POC: HTML/TS panels + WASM graph"
 
 [dependencies]
+ob-poc-semantic-policy = { path = "../ob-poc-semantic-policy" }
 # Web framework
 axum = { version = "0.7", features = ["ws"] }
 tokio = { version = "1", features = ["full"] }

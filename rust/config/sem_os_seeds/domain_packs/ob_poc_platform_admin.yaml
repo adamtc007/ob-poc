@@ -17,13 +17,10 @@ owned_verb_prefixes:
   - team.
   - user.
   - access-review.
-owned_entity_kinds:
-  - identifier
-  - role
-  - team
-  - access_review
+owned_entity_kinds: []
 business_crates: []
-owned_constellations: []
+owned_constellations:
+  - registry.stewardship
 allowed_transitions: []
 discovery_probes: []
 projection_catalog: []

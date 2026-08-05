@@ -38,7 +38,18 @@ fn every_journey_manifest_has_one_admitted_semantic_pack_without_drift() {
         })
         .collect::<Vec<_>>();
     semantic_paths.sort();
-    assert_eq!(semantic_paths.len(), 14);
+    semantic_paths.retain(|path| journey_dir.join(path.file_name().unwrap()).is_file());
+    let journey_pack_count = fs::read_dir(&journey_dir)
+        .unwrap()
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension == "yaml")
+        })
+        .count();
+    assert_eq!(semantic_paths.len(), journey_pack_count);
 
     for semantic_path in semantic_paths {
         let journey_path = journey_dir.join(semantic_path.file_name().unwrap());
@@ -85,7 +96,7 @@ fn checked_in_semantic_pack_receipts_match_compilation() {
     let lock: LockFile =
         serde_yaml::from_slice(&fs::read(config.join("semantic-packs.lock")).unwrap()).unwrap();
     assert_eq!(lock.lock_schema_version, 1);
-    assert_eq!(lock.packs.len(), 14);
+    assert_eq!(lock.packs.len(), 15);
 
     for expected in lock.packs {
         let pack = load_semantic_pack_from_file(

@@ -1,0 +1,14 @@
+[package]
+name = "ob-poc-semantic-policy"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+license = "MIT"
+description = "ob-poc semantic policy composition over standalone DSL and SemOS APIs"
+
+[dependencies]
+sem_os_policy.workspace = true
+sem_os_types.workspace = true
+semantic-pack.workspace = true
+thiserror = "1"
+uuid = "1"

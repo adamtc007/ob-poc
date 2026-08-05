@@ -1,0 +1,298 @@
+use std::{collections::HashSet, fs, path::Path};
+
+use chrono::Utc;
+use dsl_core::{
+    green_when_coverage_for_dags, green_when_coverage_summary, load_dags_from_dir,
+    parse_green_when, validate_verbs_config, ConfigLoader, SlotStateMachine, ValidationContext,
+    VerbFlavour,
+};
+use sem_os_policy::domain_pack::{
+    refresh_domain_pack_taxonomy_with_index, reload_domain_pack_taxonomy_from_yaml,
+    reload_index_entry_from_reload, DomainPackManifest, DomainPackRefreshAction,
+    DomainPackReloadStatus,
+};
+
+fn config_root() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config")
+}
+
+fn yaml_values(dir: &Path) -> Vec<serde_yaml::Value> {
+    let mut paths = fs::read_dir(dir)
+        .unwrap_or_else(|error| panic!("read {}: {error}", dir.display()))
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            matches!(
+                path.extension().and_then(|value| value.to_str()),
+                Some("yaml" | "yml")
+            )
+        })
+        .collect::<Vec<_>>();
+    paths.sort();
+    paths
+        .into_iter()
+        .map(|path| {
+            serde_yaml::from_str(
+                &fs::read_to_string(&path)
+                    .unwrap_or_else(|error| panic!("read {}: {error}", path.display())),
+            )
+            .unwrap_or_else(|error| panic!("parse {}: {error}", path.display()))
+        })
+        .collect()
+}
+
+#[test]
+fn application_domain_pack_manifests_parse_and_validate() {
+    for (file, expected_id) in [
+        ("ob_poc_kyc.yaml", "ob-poc.kyc"),
+        ("ob_poc_cbu.yaml", "ob-poc.cbu"),
+    ] {
+        let path = config_root().join("sem_os_seeds/domain_packs").join(file);
+        let manifest: DomainPackManifest =
+            serde_yaml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        let report = manifest.validate();
+        assert!(report.valid, "{}: {:?}", path.display(), report.diagnostics);
+        assert_eq!(manifest.pack_id, expected_id);
+    }
+}
+
+#[test]
+fn cbu_taxonomy_reload_is_idempotent() {
+    let root = config_root();
+    let first = reload_domain_pack_taxonomy_from_yaml(&root, "ob-poc.cbu").unwrap();
+    let second = reload_domain_pack_taxonomy_from_yaml(&root, "ob-poc.cbu").unwrap();
+    assert_eq!(first, second);
+    assert!(first.surfaces.contains_key("dag:cbu_dag"));
+    assert!(first.surfaces.contains_key("pack:cbu-maintenance"));
+}
+
+#[test]
+fn unchanged_source_skips_refresh() {
+    let root = config_root();
+    let now = Utc::now();
+    let reload = reload_domain_pack_taxonomy_from_yaml(&root, "ob-poc.cbu").unwrap();
+    let index = reload_index_entry_from_reload(&root, &reload, now, DomainPackReloadStatus::Loaded)
+        .unwrap();
+    let plan =
+        refresh_domain_pack_taxonomy_with_index(&root, "ob-poc.cbu", Some(&index), false, now)
+            .unwrap();
+    assert_eq!(plan.action, DomainPackRefreshAction::Skip);
+    assert!(plan.reload.is_none());
+}
+
+#[test]
+fn changed_fingerprint_with_same_surface_updates_only_index() {
+    let root = config_root();
+    let now = Utc::now();
+    let reload = reload_domain_pack_taxonomy_from_yaml(&root, "ob-poc.cbu").unwrap();
+    let mut index =
+        reload_index_entry_from_reload(&root, &reload, now, DomainPackReloadStatus::Loaded)
+            .unwrap();
+    index.source_fingerprints[0].size_bytes += 1;
+    let plan =
+        refresh_domain_pack_taxonomy_with_index(&root, "ob-poc.cbu", Some(&index), false, now)
+            .unwrap();
+    assert_eq!(plan.action, DomainPackRefreshAction::IndexOnly);
+    assert!(plan.reload.is_some());
+}
+
+#[test]
+fn missing_index_requires_publish() {
+    let plan = refresh_domain_pack_taxonomy_with_index(
+        &config_root(),
+        "ob-poc.cbu",
+        None,
+        false,
+        Utc::now(),
+    )
+    .unwrap();
+    assert_eq!(plan.action, DomainPackRefreshAction::PublishRequired);
+    assert_eq!(
+        plan.index_entry.status,
+        DomainPackReloadStatus::PublishRequired
+    );
+}
+
+#[test]
+fn every_dsl_pack_and_dag_has_domain_pack_ownership() {
+    let root = config_root();
+    let reloads = yaml_values(&root.join("sem_os_seeds/domain_packs"))
+        .into_iter()
+        .map(|yaml| {
+            let pack_id = yaml
+                .get("pack_id")
+                .and_then(serde_yaml::Value::as_str)
+                .expect("domain pack declares pack_id")
+                .to_owned();
+            let reload = reload_domain_pack_taxonomy_from_yaml(&root, &pack_id)
+                .unwrap_or_else(|error| panic!("reload {pack_id}: {error:#}"));
+            (pack_id, reload)
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let mut owned_packs = HashSet::new();
+    let mut owned_dags = HashSet::new();
+    for reload in reloads.values() {
+        owned_packs.extend(reload.manifest.owned_packs.iter().cloned());
+        owned_dags.extend(reload.manifest.owned_dags.iter().cloned());
+    }
+
+    let actual_packs = yaml_values(&root.join("packs"))
+        .into_iter()
+        .filter_map(|yaml| {
+            yaml.get("id")
+                .and_then(serde_yaml::Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect::<HashSet<_>>();
+    let actual_dags = yaml_values(&root.join("sem_os_seeds/dag_taxonomies"))
+        .into_iter()
+        .filter_map(|yaml| {
+            yaml.get("dag_id")
+                .and_then(serde_yaml::Value::as_str)
+                .map(str::to_owned)
+        })
+        .collect::<HashSet<_>>();
+
+    assert_eq!(
+        actual_packs.difference(&owned_packs).collect::<Vec<_>>(),
+        Vec::<&String>::new()
+    );
+    assert_eq!(
+        actual_dags.difference(&owned_dags).collect::<Vec<_>>(),
+        Vec::<&String>::new()
+    );
+}
+
+#[test]
+fn application_verb_catalogue_is_complete_and_well_formed() {
+    let config = ConfigLoader::new(config_root().to_string_lossy())
+        .load_verbs()
+        .expect("application verb catalogue loads through public DSL API");
+    let total = config
+        .domains
+        .values()
+        .map(|domain| domain.verbs.len())
+        .sum::<usize>();
+    assert!(
+        total >= 1_250,
+        "verb count regressed below baseline: {total}"
+    );
+
+    let report = validate_verbs_config(
+        &config,
+        &ValidationContext {
+            require_flavour: true,
+            ..ValidationContext::default()
+        },
+    );
+    assert!(
+        report.well_formedness.is_empty(),
+        "application catalogue validation errors: {:#?}",
+        report.well_formedness
+    );
+
+    let mut discretionary = 0;
+    for (domain_name, domain) in &config.domains {
+        for (verb_name, verb) in &domain.verbs {
+            let fqn = format!("{domain_name}.{verb_name}");
+            assert!(verb.flavour.is_some(), "{fqn} is missing flavour");
+            if verb.flavour == Some(VerbFlavour::Discretionary) {
+                discretionary += 1;
+                let role_guard = verb
+                    .role_guard
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{fqn} is missing role_guard"));
+                assert!(
+                    !role_guard.any_of.is_empty() || !role_guard.all_of.is_empty(),
+                    "{fqn} has an empty role_guard"
+                );
+                assert!(
+                    verb.audit_class
+                        .as_ref()
+                        .is_some_and(|value| !value.is_empty()),
+                    "{fqn} is missing audit_class"
+                );
+            }
+            if verb.flavour == Some(VerbFlavour::Tollgate) {
+                assert!(
+                    verb.crud.is_none()
+                        && verb.handler.is_none()
+                        && verb.graph_query.is_none()
+                        && verb.durable.is_none(),
+                    "{fqn} has tollgate flavour with a non-empty executable body"
+                );
+            }
+        }
+    }
+    assert!(
+        discretionary >= 150,
+        "discretionary verb count regressed below baseline: {discretionary}"
+    );
+}
+
+#[test]
+fn application_dag_predicates_and_green_when_coverage_are_qualified() {
+    let loaded = load_dags_from_dir(&config_root().join("sem_os_seeds/dag_taxonomies"))
+        .expect("application DAG taxonomies load through public DSL API");
+    let dags = loaded
+        .iter()
+        .map(|(workspace, loaded)| (workspace.clone(), loaded.dag.clone()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let verbs = ConfigLoader::new(config_root().to_string_lossy())
+        .load_verbs()
+        .expect("application verb catalogue loads");
+    let discretionary = verbs
+        .domains
+        .iter()
+        .flat_map(|(domain_name, domain)| {
+            domain
+                .verbs
+                .iter()
+                .filter(|(_, verb)| verb.flavour == Some(VerbFlavour::Discretionary))
+                .map(move |(verb_name, _)| format!("{domain_name}.{verb_name}"))
+        })
+        .collect::<HashSet<_>>();
+
+    let rows = green_when_coverage_for_dags(&dags, &discretionary);
+    let summary = green_when_coverage_summary(&rows);
+    assert!(
+        summary.total_states >= 332,
+        "state count regressed: {summary:?}"
+    );
+    assert!(
+        summary.candidate_states >= 196,
+        "candidate count regressed: {summary:?}"
+    );
+    assert!(
+        summary.covered_candidate_states >= 6,
+        "green_when coverage regressed: {summary:?}"
+    );
+
+    let mut predicate_count = 0;
+    for loaded in loaded.values() {
+        for slot in &loaded.dag.slots {
+            let Some(SlotStateMachine::Structured(machine)) = &slot.state_machine else {
+                continue;
+            };
+            for state in &machine.states {
+                let Some(predicate) = state.green_when.as_deref() else {
+                    continue;
+                };
+                if predicate.trim().is_empty() {
+                    continue;
+                }
+                parse_green_when(predicate).unwrap_or_else(|error| {
+                    panic!(
+                        "{} / {} / {} has invalid green_when `{predicate}`: {error}",
+                        loaded.dag.dag_id, slot.id, state.id
+                    )
+                });
+                predicate_count += 1;
+            }
+        }
+    }
+    assert!(
+        predicate_count >= 12,
+        "green_when predicate count regressed: {predicate_count}"
+    );
+}

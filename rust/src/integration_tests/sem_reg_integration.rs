@@ -203,6 +203,8 @@ mod integration {
         let stores = PgStores::new(pool.clone());
         Arc::new(
             CoreServiceImpl::new(
+                ob_poc_semantic_policy::snapshot_owned()
+                    .expect("embedded ob-poc semantic policy is admitted"),
                 Arc::new(stores.snapshots),
                 Arc::new(stores.objects),
                 Arc::new(stores.changesets),

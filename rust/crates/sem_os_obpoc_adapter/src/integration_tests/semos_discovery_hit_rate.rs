@@ -358,6 +358,8 @@ fn build_service() -> CoreServiceImpl {
     }
 
     CoreServiceImpl::new(
+        ob_poc_semantic_policy::snapshot_owned()
+            .expect("embedded ob-poc semantic policy is admitted"),
         Arc::new(StaticSnapshotStore { active }),
         Arc::new(NoopObjectStore),
         Arc::new(NoopChangesetStore),
@@ -378,7 +380,12 @@ fn snapshot_row(
         snapshot_id: Uuid::new_v4(),
         snapshot_set_id: None,
         object_type,
-        object_id: object_id_for(object_type, fqn),
+        object_id: object_id_for(
+            ob_poc_semantic_policy::identity_namespace()
+                .expect("embedded ob-poc semantic policy declares its identity namespace"),
+            object_type,
+            fqn,
+        ),
         version_major: 1,
         version_minor: 0,
         status: SnapshotStatus::Active,

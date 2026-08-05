@@ -738,14 +738,15 @@ fn to_core_constellation_map(map: ConstellationMapDef) -> ConstellationMapDefBod
 #[cfg(test)]
 fn to_core_slot(slot: RuntimeSlotDef) -> CoreSlotDef {
     CoreSlotDef {
-        slot_type: match slot.slot_type {
-            RuntimeSlotType::Cbu => CoreSlotType::Cbu,
-            RuntimeSlotType::Entity => CoreSlotType::Entity,
-            RuntimeSlotType::EntityGraph => CoreSlotType::EntityGraph,
-            RuntimeSlotType::Case => CoreSlotType::Case,
-            RuntimeSlotType::Tollgate => CoreSlotType::Tollgate,
-            RuntimeSlotType::Mandate => CoreSlotType::Mandate,
-        },
+        slot_type: CoreSlotType::new(match slot.slot_type {
+            RuntimeSlotType::Cbu => "cbu",
+            RuntimeSlotType::Entity => "entity",
+            RuntimeSlotType::EntityGraph => "entity_graph",
+            RuntimeSlotType::Case => "case",
+            RuntimeSlotType::Tollgate => "tollgate",
+            RuntimeSlotType::Mandate => "mandate",
+        })
+        .expect("application slot kind identifiers are valid"),
         entity_kinds: slot.entity_kinds,
         table: slot.table,
         pk: slot.pk,

@@ -237,14 +237,19 @@ fn derive_focus_from_tos(
     tos: Option<&crate::repl::types_v2::WorkspaceFrame>,
     constellation: Option<&crate::sem_os_runtime::constellation_runtime::HydratedConstellation>,
 ) -> (FocusKind, FocusIdentity) {
+    let focus_kind = |value: &str| {
+        FocusKind::new(value).expect("application focus kind identifiers are valid")
+    };
     if let Some(frame) = tos {
         let kind = match &frame.workspace {
-            crate::repl::types_v2::WorkspaceKind::Cbu => FocusKind::Cbu,
-            crate::repl::types_v2::WorkspaceKind::Kyc => FocusKind::Case,
-            crate::repl::types_v2::WorkspaceKind::Deal => FocusKind::Other("deal".into()),
-            crate::repl::types_v2::WorkspaceKind::SemOsMaintenance => FocusKind::Constellation,
-            crate::repl::types_v2::WorkspaceKind::Bpmn => FocusKind::Constellation,
-            _ => FocusKind::Constellation,
+            crate::repl::types_v2::WorkspaceKind::Cbu => focus_kind("cbu"),
+            crate::repl::types_v2::WorkspaceKind::Kyc => focus_kind("case"),
+            crate::repl::types_v2::WorkspaceKind::Deal => focus_kind("deal"),
+            crate::repl::types_v2::WorkspaceKind::SemOsMaintenance => {
+                focus_kind("constellation")
+            }
+            crate::repl::types_v2::WorkspaceKind::Bpmn => focus_kind("constellation"),
+            _ => focus_kind("constellation"),
         };
 
         let label = constellation
@@ -271,7 +276,7 @@ fn derive_focus_from_tos(
     } else {
         // No workspace selected — session-level focus
         (
-            FocusKind::Constellation,
+            focus_kind("constellation"),
             FocusIdentity {
                 canonical_id: "session".into(),
                 business_label: "Session".into(),

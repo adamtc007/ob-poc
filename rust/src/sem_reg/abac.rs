@@ -2,4 +2,5 @@
 
 pub use sem_os_policy::abac::{
     evaluate_abac, evaluate_abac_with_evidence_grade, AccessDecision, AccessPurpose, ActorContext,
+    EvidencePrivilege,
 };

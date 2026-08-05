@@ -9,6 +9,7 @@ sem_os_core.workspace = true
 sem_os_policy.workspace = true
 sem_os_ontology.workspace = true
 sem_os_types.workspace = true
+ob-poc-semantic-policy = { path = "../ob-poc-semantic-policy" }
 dsl-runtime = { path = "../dsl-runtime" }
 # dsl-runtime-split v1 Phase 11 (2026-05-14): ops::{discovery, verify}
 # reach `dsl_analysis::{entity_kind, stategraph, verification}` directly.

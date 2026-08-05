@@ -36,6 +36,17 @@ mod integration {
     use sem_os_policy::authoring::ports::AuthoringStore;
     use sem_os_types::agent_mode::AgentMode;
 
+    fn mode_allows(mode: AgentMode, capability: &str) -> bool {
+        ob_poc_semantic_policy::evaluate_mode(mode, capability)
+            .expect("embedded policy evaluates")
+            .allowed
+    }
+
+    fn mode_attribute(mode: AgentMode, attribute: &str) -> bool {
+        ob_poc_semantic_policy::mode_has_attribute(mode, attribute)
+            .expect("embedded policy evaluates")
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────
 
     async fn get_pool() -> PgPool {
@@ -230,27 +241,24 @@ artifacts:
     async fn test_e2e_agent_mode_switching() {
         // Research mode: authoring verbs allowed, publish blocked
         let research = AgentMode::Research;
-        assert!(research.is_verb_allowed("authoring.propose"));
-        assert!(research.is_verb_allowed("authoring.validate"));
-        assert!(research.is_verb_allowed("authoring.dry-run"));
-        assert!(!research.is_verb_allowed("authoring.publish"));
-        assert!(!research.is_verb_allowed("authoring.publish-batch"));
+        assert!(mode_allows(research, "authoring.propose"));
+        assert!(mode_allows(research, "authoring.validate"));
+        assert!(mode_allows(research, "authoring.dry-run"));
+        assert!(!mode_allows(research, "authoring.publish"));
+        assert!(!mode_allows(research, "authoring.publish-batch"));
 
         // Governed mode: authoring verbs blocked, publish allowed
         let governed = AgentMode::Governed;
-        assert!(!governed.is_verb_allowed("authoring.propose"));
-        assert!(!governed.is_verb_allowed("authoring.validate"));
-        assert!(!governed.is_verb_allowed("authoring.dry-run"));
-        assert!(!governed.is_verb_allowed("authoring.diff"));
-        assert!(governed.is_verb_allowed("authoring.publish"));
-        assert!(governed.is_verb_allowed("authoring.publish-batch"));
+        assert!(!mode_allows(governed, "authoring.propose"));
+        assert!(!mode_allows(governed, "authoring.validate"));
+        assert!(!mode_allows(governed, "authoring.dry-run"));
+        assert!(!mode_allows(governed, "authoring.diff"));
+        assert!(mode_allows(governed, "authoring.publish"));
+        assert!(mode_allows(governed, "authoring.publish-batch"));
 
         // Introspect subcommands differ
-        let research_cmds = research.allowed_introspect_subcommands();
-        let governed_cmds = governed.allowed_introspect_subcommands();
-        assert!(research_cmds.len() > governed_cmds.len());
-        println!("  Research introspect: {} commands", research_cmds.len());
-        println!("  Governed introspect: {} commands", governed_cmds.len());
+        assert!(mode_attribute(research, "feature.full-introspection"));
+        assert!(!mode_attribute(governed, "feature.full-introspection"));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -598,16 +606,16 @@ artifacts:
         let mode = AgentMode::Research;
 
         // Authoring verbs allowed
-        assert!(mode.allows_authoring());
-        assert!(mode.is_verb_allowed("authoring.propose"));
-        assert!(mode.is_verb_allowed("authoring.validate"));
-        assert!(mode.is_verb_allowed("authoring.dry-run"));
+        assert!(mode_attribute(mode, "feature.authoring"));
+        assert!(mode_allows(mode, "authoring.propose"));
+        assert!(mode_allows(mode, "authoring.validate"));
+        assert!(mode_allows(mode, "authoring.dry-run"));
 
         // Full introspect allowed
-        assert!(mode.allows_full_introspect());
+        assert!(mode_attribute(mode, "feature.full-introspection"));
 
         // Business verbs blocked
-        assert!(!mode.allows_business_verbs());
+        assert!(!mode_attribute(mode, "feature.business-verbs"));
 
         println!("  Research mode gating verified");
     }
@@ -619,23 +627,20 @@ artifacts:
         let mode = AgentMode::Governed;
 
         // Authoring verbs blocked
-        assert!(!mode.allows_authoring());
-        assert!(!mode.is_verb_allowed("authoring.propose"));
-        assert!(!mode.is_verb_allowed("authoring.validate"));
-        assert!(!mode.is_verb_allowed("authoring.dry-run"));
+        assert!(!mode_attribute(mode, "feature.authoring"));
+        assert!(!mode_allows(mode, "authoring.propose"));
+        assert!(!mode_allows(mode, "authoring.validate"));
+        assert!(!mode_allows(mode, "authoring.dry-run"));
 
         // Publish allowed
-        assert!(mode.is_verb_allowed("authoring.publish"));
-        assert!(mode.is_verb_allowed("authoring.publish-batch"));
+        assert!(mode_allows(mode, "authoring.publish"));
+        assert!(mode_allows(mode, "authoring.publish-batch"));
 
         // Business verbs allowed
-        assert!(mode.allows_business_verbs());
+        assert!(mode_attribute(mode, "feature.business-verbs"));
 
         // Limited introspect
-        assert!(!mode.allows_full_introspect());
-        let cmds = mode.allowed_introspect_subcommands();
-        assert!(cmds.contains(&"verify_table_exists"));
-        assert!(cmds.contains(&"describe_table"));
+        assert!(!mode_attribute(mode, "feature.full-introspection"));
 
         println!("  Governed mode gating verified");
     }
@@ -646,8 +651,8 @@ artifacts:
     async fn test_mode_default_is_governed() {
         let mode = AgentMode::default();
         assert_eq!(mode, AgentMode::Governed);
-        assert!(!mode.allows_authoring());
-        assert!(mode.allows_business_verbs());
+        assert!(!mode_attribute(mode, "feature.authoring"));
+        assert!(mode_attribute(mode, "feature.business-verbs"));
     }
 
     // ═══════════════════════════════════════════════════════════════════

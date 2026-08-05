@@ -23,6 +23,7 @@ ob-poc-types = { path = "crates/ob-poc-types" }
 ob-poc-diagnostics = { path = "crates/ob-poc-diagnostics" }
 ob-poc-boundary = { path = "crates/ob-poc-boundary" }
 ob-poc-control-plane = { path = "crates/ob-poc-control-plane" }
+ob-poc-semantic-policy = { path = "crates/ob-poc-semantic-policy" }
 # bpmn-controller: pool lifecycle (K8s Deployment + HPA) and instance
 # kick-off via direct writes to bpmn-lite's Postgres schema.
 # Reached from loader.* and bpmn-controller.* DSL verbs via Pattern B ops.
@@ -317,6 +318,7 @@ members = [
     "crates/ob-poc-diagnostics",
     "crates/ob-poc-boundary",
     "crates/ob-poc-control-plane",
+    "crates/ob-poc-semantic-policy",
     "crates/ob-poc-sage",
     "crates/ob-poc-journey",
     # ob-poc-domain split v1 — 9 per-business-capability crates carved out of
@@ -395,14 +397,14 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl",    tag = "v0.1.5" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
 semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "5ac7da7a513744e907ca110484c3a6a9472ae985", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "c65f01d514c99bf087673ce366ed3b7549217c1d" }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "0d448088c4ad090e0e2b745b2b9e84d387752660" }
 
 # bpmn-lite published as github.com/adamtc007/bpmn-lite v0.2.0 (T1 + T2:
 # dsl-manifest, dsl-bus-*, dmn-lite-server, bpmn-lite plan-walker bus

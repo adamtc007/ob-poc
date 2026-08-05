@@ -121,6 +121,19 @@ packs:
   adapter_bindings:
   - ob-poc.journey.platform-admin
   artifact_sha256: 173f513bb81662ca60985965bf96fb9ec771153d79fb82d7321847acb0c3909a
+- source: rust/config/semantic-packs/platform-policy.yaml
+  source_sha256: 0197f2b79bff5115f2e64aa537c429f4fcb266f614fe170d1f0f5aa02c5bf2fc
+  pack_id: ob-poc.platform-policy
+  pack_version: 1.0.0
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.semantic.change.add
+  - ob-poc.semantic.change.modify
+  - ob-poc.semantic.change.remove
+  artifact_sha256: 27c21684ca0cf3d52e0d7160647452f771f5c47545c36076a8796ee633517cd9
 - source: rust/config/semantic-packs/product-service-taxonomy.yaml
   source_sha256: 7b5c4b72e35becd843f2a5c884514d85dbf940c4a731d1fd6eea0d661bb43329
   pack_id: ob-poc.journey.product-service-taxonomy

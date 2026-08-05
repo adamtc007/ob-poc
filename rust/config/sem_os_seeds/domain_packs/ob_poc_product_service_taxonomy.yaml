@@ -28,9 +28,7 @@ owned_verb_prefixes:
 owned_entity_kinds:
   - product
   - service
-  - product_service
   - resource_type
-  - service_resource_capability
   - service_resource_def
   - resource_owner_principal
 business_crates: []

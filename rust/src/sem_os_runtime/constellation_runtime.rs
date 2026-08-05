@@ -1383,14 +1383,15 @@ fn core_slot_def_from_public(
     children: BTreeMap<String, core_map::SlotDef>,
 ) -> core_map::SlotDef {
     core_map::SlotDef {
-        slot_type: match definition.slot_type {
-            SlotType::Cbu => core_map::SlotType::Cbu,
-            SlotType::Entity => core_map::SlotType::Entity,
-            SlotType::EntityGraph => core_map::SlotType::EntityGraph,
-            SlotType::Case => core_map::SlotType::Case,
-            SlotType::Tollgate => core_map::SlotType::Tollgate,
-            SlotType::Mandate => core_map::SlotType::Mandate,
-        },
+        slot_type: core_map::SlotType::new(match definition.slot_type {
+            SlotType::Cbu => "cbu",
+            SlotType::Entity => "entity",
+            SlotType::EntityGraph => "entity_graph",
+            SlotType::Case => "case",
+            SlotType::Tollgate => "tollgate",
+            SlotType::Mandate => "mandate",
+        })
+        .expect("application slot kind identifiers are valid"),
         entity_kinds: definition.entity_kinds.clone(),
         table: definition.table.clone(),
         pk: definition.pk.clone(),

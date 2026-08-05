@@ -194,7 +194,9 @@ fn parse_uuid(s: &str) -> Result<Uuid, AppError> {
 /// Research mode agents cannot publish. Non-admin users cannot publish.
 fn require_publish_permission(principal: &Principal) -> Result<(), AppError> {
     let mode = principal.agent_mode();
-    if !matches!(mode, sem_os_types::agent_mode::AgentMode::Governed) {
+    let decision = ob_poc_semantic_policy::evaluate_mode(mode, "authoring.publish")
+        .map_err(|error| sem_os_core::error::SemOsError::Internal(anyhow::anyhow!(error)))?;
+    if !decision.allowed {
         return Err(AppError::from(
             sem_os_core::error::SemOsError::Unauthorized(format!(
                 "blocked by AgentMode: {} cannot publish",

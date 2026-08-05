@@ -650,6 +650,8 @@ mod tests {
         let projections = Arc::new(PgProjectionWriter::new(pool));
 
         let service = Arc::new(CoreServiceImpl::new(
+            ob_poc_semantic_policy::snapshot_owned()
+                .expect("embedded ob-poc semantic policy is admitted"),
             snapshots,
             objects,
             changesets,

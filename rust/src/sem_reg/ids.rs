@@ -1,27 +1,16 @@
-//! Deterministic identity generation for Semantic Registry objects.
-//!
-//! Uses UUID v5 (SHA-1 based, deterministic) to ensure the same
-//! `(object_type, fqn)` pair always produces the same `object_id`,
-//! regardless of which machine or scan run produces it.
+//! Compatibility identity helpers backed by the application semantic pack.
 
-use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use super::types::ObjectType;
 
-/// UUID v5 namespace for Semantic Registry object IDs.
-///
-/// Generated once, never changed. All SemReg object IDs derive from this namespace.
-/// Value: UUID v5 of "semantic-os:ob-poc:sem_reg" under the DNS namespace.
-const SEM_REG_NAMESPACE: Uuid = Uuid::from_bytes([
-    0x7a, 0x3b, 0x9f, 0x42, 0xe1, 0xd4, 0x5a, 0x8b, 0x91, 0x0c, 0x4f, 0x2d, 0x6e, 0x8a, 0x1b, 0x3c,
-]);
+fn identity_namespace() -> Uuid {
+    ob_poc_semantic_policy::identity_namespace()
+        .expect("embedded ob-poc semantic policy declares its v1 identity namespace")
+}
 
-/// Compute a deterministic `object_id` for a Semantic Registry object.
-///
-/// The identity is derived from `"{object_type}:{fqn}"` using UUID v5.
-/// This means the same verb/attribute/entity scanned on any machine
-/// will always produce the same `object_id`.
+/// Compute a deterministic object identifier using the namespace declared by
+/// the admitted application pack.
 ///
 /// # Examples
 ///
@@ -29,48 +18,18 @@ const SEM_REG_NAMESPACE: Uuid = Uuid::from_bytes([
 /// use ob_poc::sem_reg::ids::object_id_for;
 /// use ob_poc::sem_reg::types::ObjectType;
 ///
-/// let id1 = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
-/// let id2 = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
-/// assert_eq!(id1, id2); // deterministic
-///
-/// let id3 = object_id_for(ObjectType::AttributeDef, "kyc.resolve_ubo");
-/// assert_ne!(id1, id3); // different object_type → different id
+/// let first = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
+/// let second = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
+/// assert_eq!(first, second);
 /// ```
 pub fn object_id_for(object_type: ObjectType, fqn: &str) -> Uuid {
-    let input = format!("{}:{}", object_type, fqn);
-    Uuid::new_v5(&SEM_REG_NAMESPACE, input.as_bytes())
+    sem_os_core::ids::object_id_for(identity_namespace(), object_type, fqn)
 }
 
-/// Compute a stable content hash for a definition JSON value.
-///
-/// Uses canonical JSON serialization (sorted keys) followed by SHA-256.
-/// This detects definition drift even when field order changes.
+/// Compute a stable canonical definition fingerprint using the namespace
+/// declared by the admitted application pack.
 pub(crate) fn definition_hash(definition: &serde_json::Value) -> String {
-    // Canonicalize by round-tripping through BTreeMap (sorted keys)
-    let canonical = canonicalize_json(definition);
-    let bytes = serde_json::to_vec(&canonical).unwrap_or_default();
-
-    // Use the first 16 bytes of the UUID v5 hash as a stable content fingerprint.
-    // This is NOT cryptographic — it's a change-detection hash.
-    let hash_uuid = Uuid::new_v5(&SEM_REG_NAMESPACE, &bytes);
-    hash_uuid.to_string()
-}
-
-/// Recursively sort JSON object keys for canonical serialization.
-fn canonicalize_json(value: &serde_json::Value) -> serde_json::Value {
-    match value {
-        serde_json::Value::Object(map) => {
-            let sorted: BTreeMap<String, serde_json::Value> = map
-                .iter()
-                .map(|(k, v)| (k.clone(), canonicalize_json(v)))
-                .collect();
-            serde_json::to_value(sorted).unwrap_or(serde_json::Value::Null)
-        }
-        serde_json::Value::Array(arr) => {
-            serde_json::Value::Array(arr.iter().map(canonicalize_json).collect())
-        }
-        other => other.clone(),
-    }
+    sem_os_core::ids::definition_hash(identity_namespace(), definition)
 }
 
 #[cfg(test)]
@@ -78,45 +37,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_deterministic_same_input() {
-        let id1 = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
-        let id2 = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
-        assert_eq!(id1, id2);
+    fn identity_remains_deterministic_and_type_scoped() {
+        let verb = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
+        assert_eq!(
+            verb,
+            Uuid::parse_str("0058fae8-e8bf-51b5-bef5-f9db54637fdd").unwrap(),
+            "the persisted v1 identity must remain byte-for-byte compatible"
+        );
+        assert_eq!(
+            verb,
+            object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo")
+        );
+        assert_ne!(
+            verb,
+            object_id_for(ObjectType::AttributeDef, "kyc.resolve_ubo")
+        );
     }
 
     #[test]
-    fn test_different_object_type_different_id() {
-        let verb_id = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
-        let attr_id = object_id_for(ObjectType::AttributeDef, "kyc.resolve_ubo");
-        assert_ne!(verb_id, attr_id);
-    }
-
-    #[test]
-    fn test_different_fqn_different_id() {
-        let id1 = object_id_for(ObjectType::VerbContract, "kyc.resolve_ubo");
-        let id2 = object_id_for(ObjectType::VerbContract, "kyc.check_sanctions");
-        assert_ne!(id1, id2);
-    }
-
-    #[test]
-    fn test_definition_hash_stable() {
-        let def = serde_json::json!({"fqn": "test.verb", "name": "Test", "domain": "test"});
-        let h1 = definition_hash(&def);
-        let h2 = definition_hash(&def);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn test_definition_hash_key_order_independent() {
-        let def1 = serde_json::json!({"a": 1, "b": 2});
-        let def2 = serde_json::json!({"b": 2, "a": 1});
-        assert_eq!(definition_hash(&def1), definition_hash(&def2));
-    }
-
-    #[test]
-    fn test_definition_hash_different_content() {
-        let def1 = serde_json::json!({"fqn": "v1"});
-        let def2 = serde_json::json!({"fqn": "v2"});
-        assert_ne!(definition_hash(&def1), definition_hash(&def2));
+    fn definition_hash_is_key_order_independent() {
+        let first = serde_json::json!({"a": 1, "b": 2});
+        let second = serde_json::json!({"b": 2, "a": 1});
+        assert_eq!(definition_hash(&first), definition_hash(&second));
+        assert_eq!(
+            definition_hash(&first),
+            "ebe76008-f2c0-5048-b9dc-0417d6ac3b74",
+            "the persisted v1 definition fingerprint must remain byte-for-byte compatible"
+        );
     }
 }

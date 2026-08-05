@@ -611,8 +611,14 @@ impl SemOsVerbOp for SetAuthoringMode {
 
         Ok(VerbExecutionOutcome::Record(json!({
             "mode": mode.to_string(),
-            "allows_authoring": mode.allows_authoring(),
-            "allows_full_introspect": mode.allows_full_introspect(),
+            "allows_authoring": ob_poc_semantic_policy::mode_has_attribute(
+                mode,
+                "feature.authoring",
+            )?,
+            "allows_full_introspect": ob_poc_semantic_policy::mode_has_attribute(
+                mode,
+                "feature.full-introspection",
+            )?,
             "message": format!("Authoring mode set to {}", mode)
         })))
     }
@@ -920,9 +926,18 @@ impl SemOsVerbOp for ReadMode {
         let parsed = sem_os_types::agent_mode::AgentMode::parse(&mode).unwrap_or_default();
         Ok(VerbExecutionOutcome::Record(json!({
             "mode": parsed.to_string(),
-            "allows_authoring": parsed.allows_authoring(),
-            "allows_full_introspect": parsed.allows_full_introspect(),
-            "allows_business_verbs": parsed.allows_business_verbs(),
+            "allows_authoring": ob_poc_semantic_policy::mode_has_attribute(
+                parsed,
+                "feature.authoring",
+            )?,
+            "allows_full_introspect": ob_poc_semantic_policy::mode_has_attribute(
+                parsed,
+                "feature.full-introspection",
+            )?,
+            "allows_business_verbs": ob_poc_semantic_policy::mode_has_attribute(
+                parsed,
+                "feature.business-verbs",
+            )?,
             "message": format!("Current agent mode: {}", parsed)
         })))
     }
