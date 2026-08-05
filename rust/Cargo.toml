@@ -398,14 +398,14 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
-semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "586431f81e2bb9101578af5167b8a35335f5a09e" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058", features = ["huggingface-download"] }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
 
 # BPMN integration family: one exact immutable revision. Keeping the bus,
 # manifest, engine, FFI and runner crates on one commit prevents duplicate wire

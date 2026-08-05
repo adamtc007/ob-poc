@@ -154,10 +154,8 @@ fn tokenize_macro_call(tokens: proc_macro2::TokenStream) -> (Option<String>, Vec
     let mut lits = Vec::new();
     for tt in tokens {
         match tt {
-            proc_macro2::TokenTree::Ident(i) => {
-                if ident.is_none() {
-                    ident = Some(i.to_string());
-                }
+            proc_macro2::TokenTree::Ident(i) if ident.is_none() => {
+                ident = Some(i.to_string());
             }
             proc_macro2::TokenTree::Literal(l) => {
                 if let Some(s) = literal_string(&l.to_string()) {
