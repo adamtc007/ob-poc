@@ -1,0 +1,76 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.catalogue
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/catalogue.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.catalogue
+  adapter_binding: ob-poc.journey.catalogue
+  title: Catalogue Authoring
+  intent_summary: Govern verb catalogue proposals. Stage verb declaration changes,
+    review pending proposals, commit approved declarations, and roll back staged work.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Catalogue Authoring
+    journey.
+  effect: Activates the Catalogue Authoring journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: catalogue authoring
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: catalogue workspace
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: verb catalogue
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: propose verb change
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: list catalogue proposals
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: commit verb change
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - catalogue authoring
+  - catalogue workspace
+  - verb catalogue
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - catalogue.propose-verb-declaration
+    - catalogue.commit-verb-declaration
+    - catalogue.rollback-verb-declaration
+    - catalogue.list-proposals
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: catalogue

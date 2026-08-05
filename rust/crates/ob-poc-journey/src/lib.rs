@@ -33,8 +33,9 @@
 //!
 //! ## Dependency discipline
 //!
-//! Must depend only on `ob-poc-types` and primitives (`chrono`, `serde`,
-//! `serde_yaml`, `sha2`/`hex` for content hashing, `uuid`, `thiserror`).
+//! Must depend only on `ob-poc-types`, the host-neutral `semantic-pack`
+//! compiler and primitives (`chrono`, `serde`, `serde_yaml`, `sha2`/`hex`
+//! for content hashing, `uuid`, `thiserror`).
 //! Must NOT depend on `dsl-core`, `dsl-runtime`, `sem_os_*`,
 //! `ob-poc-boundary`, `ob-poc-sage`, or any execution-tier surface.
 //!

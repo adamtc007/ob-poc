@@ -1,0 +1,127 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.platform-admin
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/platform-admin.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.platform-admin
+  adapter_binding: ob-poc.journey.platform-admin
+  title: Platform Admin
+  intent_summary: Reference-data vocabulary (roles, regulators, identifiers) and access/entitlement
+    administration (teams, users, access-review campaigns). Scaffold — review naming
+    and verb split before treating as final.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Platform Admin journey.
+  effect: Activates the Platform Admin journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: manage roles
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: manage team access
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: run access review
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - manage roles
+  - manage team access
+  - run access review
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - access-review.attest
+    - access-review.audit-report
+    - access-review.bulk-confirm
+    - access-review.campaign-status
+    - access-review.confirm-access
+    - access-review.confirm-all-clean
+    - access-review.create-campaign
+    - access-review.escalate-item
+    - access-review.extend-access
+    - access-review.launch-campaign
+    - access-review.list-flagged
+    - access-review.list-items
+    - access-review.my-pending
+    - access-review.populate-campaign
+    - access-review.process-deadline
+    - access-review.revoke-access
+    - access-review.send-reminders
+    - admin.regulators.create
+    - admin.regulators.deactivate
+    - admin.regulators.list
+    - admin.regulators.read
+    - admin.regulators.update
+    - admin.role-types.create
+    - admin.role-types.deactivate
+    - admin.role-types.list
+    - admin.role-types.read
+    - admin.role-types.update
+    - identifier.attach
+    - identifier.attach-clearstream
+    - identifier.attach-lei
+    - identifier.find-by-clearstream
+    - identifier.find-by-isin
+    - identifier.find-by-lei
+    - identifier.invalidate
+    - identifier.list-by-entity
+    - identifier.remove
+    - identifier.update-lei-status
+    - identifier.validate
+    - refdata.deactivate
+    - refdata.ensure
+    - refdata.list
+    - refdata.load-all
+    - refdata.load-instrument-classes
+    - refdata.load-markets
+    - refdata.load-sla-templates
+    - refdata.load-subcustodians
+    - refdata.read
+    - role.delete
+    - role.ensure
+    - role.list
+    - role.read
+    - team.add-cbu-access
+    - team.add-governance-member
+    - team.add-member
+    - team.archive
+    - team.create
+    - team.grant-service
+    - team.read
+    - team.remove-cbu-access
+    - team.remove-member
+    - team.revoke-service
+    - team.transfer-member
+    - team.update-member
+    - user.create
+    - user.offboard
+    - user.reactivate
+    - user.suspend
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: platform-admin

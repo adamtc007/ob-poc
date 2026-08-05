@@ -1,0 +1,96 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.deal-lifecycle
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/deal-lifecycle.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.deal-lifecycle
+  adapter_binding: ob-poc.journey.deal-lifecycle
+  title: Deal Lifecycle
+  intent_summary: Create and manage commercial deals including rate card negotiation,
+    contract generation, fee billing setup, and deal activation. Supports new deal
+    creation and deal amendment workflows.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Deal Lifecycle journey.
+  effect: Activates the Deal Lifecycle journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: create a deal
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: new deal
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: deal setup
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: start a deal
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: negotiate deal
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: deal lifecycle
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: commercial agreement
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - create a deal
+  - new deal
+  - deal setup
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - deal.create
+    - deal.read
+    - deal.list-contracts
+    - deal.set-stage
+    - deal.list
+    - contract.create
+    - billing.create-profile
+    - billing.activate-profile
+    - billing.approve-period
+    - billing.calculate-period
+    - billing.close-profile
+    - billing.create-period
+    - billing.dispute-period
+    - billing.generate-invoice
+    - billing.get-profile
+    - billing.list-profiles
+    - billing.period-summary
+    - billing.revenue-summary
+    - billing.review-period
+    - billing.suspend-profile
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: deal-lifecycle

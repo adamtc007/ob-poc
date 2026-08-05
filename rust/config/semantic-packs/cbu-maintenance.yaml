@@ -1,0 +1,196 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.cbu-maintenance
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/cbu-maintenance.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.cbu-maintenance
+  adapter_binding: ob-poc.journey.cbu-maintenance
+  title: CBU Maintenance
+  intent_summary: Create and manage Client Business Units. Add entities and assign
+    roles (depositary, transfer agent, auditor), attach products and services, configure
+    instruction matrix rules, and manage CBU lifecycle state.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the CBU Maintenance journey.
+  effect: Activates the CBU Maintenance journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: create a CBU
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: new CBU
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: manage CBU
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: CBU maintenance
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: add entity to CBU
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: assign role
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: attach product
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: attach product to CBU
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: product onboarding for CBU
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: CBU product onboarding
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: configure CBU
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: CBU setup
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - create a CBU
+  - new CBU
+  - manage CBU
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - cbu.submit-for-validation
+    - cbu.create
+    - cbu.create-from-client-group
+    - cbu.ensure
+    - cbu.read
+    - cbu.list
+    - cbu.update
+    - cbu.rename
+    - cbu.inspect
+    - cbu.assign-role
+    - cbu.link-structure
+    - cbu.remove-role
+    - cbu.parties
+    - cbu.add-product
+    - cbu.remove-product
+    - cbu.list-subscriptions
+    - cbu.bind-service-options
+    - cbu.override-option-binding
+    - cbu.validate-option-coverage
+    - cbu.dirty-flag-bindings
+    - cbu.recompute-bindings
+    - cbu.compute-resource-fanout
+    - entity.create
+    - entity.read
+    - entity.list
+    - entity.update
+    - trading-profile.read
+    - batch.abort
+    - batch.add-products
+    - batch.continue
+    - batch.pause
+    - batch.resume
+    - batch.skip
+    - batch.status
+    - cbu-group.remove-member
+    - cbu-role.terminate
+    - entity-relationship.upsert
+    - fund.add-investment
+    - fund.add-share-class
+    - fund.add-to-umbrella
+    - fund.create
+    - fund.delete-compartment
+    - fund.delete-vehicle
+    - fund.end-investment
+    - fund.ensure
+    - fund.link-feeder
+    - fund.list-by-manager
+    - fund.list-by-vehicle-type
+    - fund.list-compartments-by-umbrella
+    - fund.list-feeders
+    - fund.list-investments
+    - fund.list-investors
+    - fund.list-share-classes
+    - fund.list-subfunds
+    - fund.read-compartment
+    - fund.read-vehicle
+    - fund.update-investment
+    - fund.upsert-compartment
+    - fund.upsert-vehicle
+    - service-intent.cancel
+    - service-intent.create
+    - service-intent.list
+    - service-intent.resume
+    - service-intent.supersede
+    - service-intent.suspend
+    - sla.escalate-breach
+    - sla.list-measurements
+    - sla.list-open-breaches
+    - sla.record-measurement
+    - sla.report-breach
+    - sla.resolve-breach
+    - sla.suspend-commitment
+    - sla.update-remediation
+    - regulatory.registration.add
+    - regulatory.registration.list
+    - regulatory.registration.remove
+    - regulatory.registration.verify
+    - regulatory.status.check
+    - structure.product-suite-custody-fa-ta
+    - structure.product-suite-full
+    - structure.remove-all-products
+    - struct.hedge.cross-border
+    - struct.ie.aif.icav
+    - struct.ie.hedge.icav
+    - struct.ie.ucits.icav
+    - struct.lux.aif.raif
+    - struct.lux.pe.scsp
+    - struct.lux.ucits.sicav
+    - struct.pe.cross-border
+    - struct.uk.authorised.acs
+    - struct.uk.authorised.aut
+    - struct.uk.authorised.ltaf
+    - struct.uk.authorised.oeic
+    - struct.uk.manager.llp
+    - struct.uk.private-equity.lp
+    - struct.us.40act.closed-end
+    - struct.us.40act.open-end
+    - struct.us.etf.40act
+    - struct.us.private-fund.delaware-lp
+    ob-poc.forbidden_verbs:
+    - cbu.delete
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: cbu-maintenance

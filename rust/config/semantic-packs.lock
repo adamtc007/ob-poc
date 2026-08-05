@@ -1,0 +1,156 @@
+lock_schema_version: 1
+packs:
+- source: rust/config/semantic-packs/book-setup.yaml
+  source_sha256: cb1a24b2cf58d51987bee47cfbc0cb838c78e4fdab6f57a43f46e859407ef707
+  pack_id: ob-poc.journey.book-setup
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.book-setup
+  artifact_sha256: 673502c051d70dd52b329b20c7f3623dbefb86b0b8e0e9e1630a1f564a0ab1d0
+- source: rust/config/semantic-packs/bpmn-infrastructure.yaml
+  source_sha256: 700e60c8197bfc1ddabb4abedd8f95ac103f828ae4d841c19cc141fe5a1b4d17
+  pack_id: ob-poc.journey.bpmn-infrastructure
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.bpmn-infrastructure
+  artifact_sha256: 5f9703f96048b680695e3afd9ac73dd0c0b2a9c81e902730e728e39b77a6546d
+- source: rust/config/semantic-packs/bpmn-ops.yaml
+  source_sha256: b75fb1517b735e63316c0d6187a04924bfb781015553ae4532d45ecf5313acd4
+  pack_id: ob-poc.journey.bpmn-ops
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.bpmn-ops
+  artifact_sha256: 5551496c14aaa78691f23dd16525ef1cafa9e917b964562d6db623b32f48a0b5
+- source: rust/config/semantic-packs/catalogue.yaml
+  source_sha256: 59112b29041be8c38cf7e6c23fa03e751b403a2c985b88ad711bddad8c38a161
+  pack_id: ob-poc.journey.catalogue
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.catalogue
+  artifact_sha256: a42a7e68fb866fe8be0624f35386b6748cc7d86d4c5e86160e3e4cafa5b85fc6
+- source: rust/config/semantic-packs/cbu-maintenance.yaml
+  source_sha256: 439a3aee8747e76be8bb5f5e0f6b6173938a43952c2c883ce92e2355038e976e
+  pack_id: ob-poc.journey.cbu-maintenance
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.cbu-maintenance
+  artifact_sha256: c0ea2137892cc43f0bbc33cdbdb16936f68f6de93e2257983a021f1a82f9f307
+- source: rust/config/semantic-packs/deal-lifecycle.yaml
+  source_sha256: 25713e49a7f07738049c7c90aeeb123d85ef33b54cdeabe0984ae4ca47630836
+  pack_id: ob-poc.journey.deal-lifecycle
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.deal-lifecycle
+  artifact_sha256: d83c1c2ace131e4e486da659f395949d6f27cd5be213915a083a6a7257487ccb
+- source: rust/config/semantic-packs/instrument-matrix.yaml
+  source_sha256: 4a360028cf118c70e79222bee863dcc6c22ea8497630e18972e716c6d6e603af
+  pack_id: ob-poc.journey.instrument-matrix
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.instrument-matrix
+  artifact_sha256: cac657b6c917185881376e5d31bdcd4384bea256af80578cfc4c64ff3539b3d7
+- source: rust/config/semantic-packs/kyc-case.yaml
+  source_sha256: 6850ffb84273a27b2969a9abb7d80e8f8616884d65e513c574036267e107aef5
+  pack_id: ob-poc.journey.kyc-case
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.kyc-case
+  artifact_sha256: 8392f339e8b8dc043b809cfa0f1be559529f0cab5f394a0a994be5fcd5b92995
+- source: rust/config/semantic-packs/lifecycle-resources.yaml
+  source_sha256: ae92927f2bdae1f9866834bf81024a1b885b5e8f73fe4ca8e96e43322b7daf1f
+  pack_id: ob-poc.journey.lifecycle-resources
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.lifecycle-resources
+  artifact_sha256: e39fbbf1857b5c5b228b89d04c47bb4e58b911085747e1d856fd933495ed92b3
+- source: rust/config/semantic-packs/onboarding-request.yaml
+  source_sha256: 15cbcc69d188204a7b9eb7fee3c759a902aa1697dd35dd912f871508e46f2ebe
+  pack_id: ob-poc.journey.onboarding-request
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.onboarding-request
+  artifact_sha256: 207c405e538749412e0b325f19b8620be19e25b247ad17511a4abb471829ffc8
+- source: rust/config/semantic-packs/platform-admin.yaml
+  source_sha256: 815f1e57c5cac32415bd006e25baff218604b09b3e2d02163a52b1d9de543f96
+  pack_id: ob-poc.journey.platform-admin
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.platform-admin
+  artifact_sha256: 173f513bb81662ca60985965bf96fb9ec771153d79fb82d7321847acb0c3909a
+- source: rust/config/semantic-packs/product-service-taxonomy.yaml
+  source_sha256: 7b5c4b72e35becd843f2a5c884514d85dbf940c4a731d1fd6eea0d661bb43329
+  pack_id: ob-poc.journey.product-service-taxonomy
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.product-service-taxonomy
+  artifact_sha256: 18d44e921445937d29cc9caf35715d27324c2bd05150ac2a536db4594952b35e
+- source: rust/config/semantic-packs/semos-maintenance.yaml
+  source_sha256: bb6ac4eaa0223f71c5b785e0eeef100cabeabaaaa853d97b4f7f5a904de941ae
+  pack_id: ob-poc.journey.semos-maintenance
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.semos-maintenance
+  artifact_sha256: 9ada9e6164d4ed180ff6a1b544669d7f16ea4becaaae56e8f87eb6246bfab2c9
+- source: rust/config/semantic-packs/session-bootstrap.yaml
+  source_sha256: 32d5aa7185eb949591899a6e3d51d67a13796aab3211f18d713d468a9d36737c
+  pack_id: ob-poc.journey.session-bootstrap
+  pack_version: '1.0'
+  schema_version: 1
+  canonicalization_version: 1
+  compiler_version: semantic-pack/0.2.0
+  dependencies: []
+  adapter_bindings:
+  - ob-poc.journey.session-bootstrap
+  artifact_sha256: 199508dccf1fee4cf4dace37647e1c072ecfd30bdbdc1d9f968c8580fa58af2d

@@ -1837,7 +1837,7 @@ source = "git+https://github.com/adamtc007/dsl?tag=v0.1.5#fe053e3e5e2efe109ebc98
 dependencies = [
  "anyhow",
  "chrono",
- "dsl_types",
+ "dsl_types 0.1.0",
  "hex",
  "nom",
  "nom_locate",
@@ -1993,7 +1993,7 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "dsl-core",
- "dsl_types",
+ "dsl_types 0.1.0",
  "futures",
  "hex",
  "nom",
@@ -2035,6 +2035,17 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+]
+
+[[package]]
+name = "dsl_types"
+version = "0.2.0"
+source = "git+https://github.com/adamtc007/dsl?rev=7da4b10cee570d7146cef3a0dac5ae388cb4fc9e#7da4b10cee570d7146cef3a0dac5ae388cb4fc9e"
+dependencies = [
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -4716,6 +4727,7 @@ dependencies = [
  "chrono",
  "hex",
  "ob-poc-types",
+ "semantic-pack",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -6406,7 +6418,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dsl-core",
- "dsl_types",
+ "dsl_types 0.1.0",
  "hex",
  "prost",
  "prost-build",
@@ -6490,7 +6502,7 @@ source = "git+https://github.com/adamtc007/dsl?tag=v0.1.5#fe053e3e5e2efe109ebc98
 dependencies = [
  "anyhow",
  "chrono",
- "dsl_types",
+ "dsl_types 0.1.0",
  "hex",
  "sem_os_types",
  "serde",
@@ -6593,6 +6605,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "semantic-decision-contracts"
+version = "0.2.0"
+source = "git+https://github.com/adamtc007/dsl?rev=7da4b10cee570d7146cef3a0dac5ae388cb4fc9e#7da4b10cee570d7146cef3a0dac5ae388cb4fc9e"
+dependencies = [
+ "hex",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "semantic-embedder"
 version = "0.2.0"
 source = "git+https://github.com/adamtc007/dsl?rev=5ac7da7a513744e907ca110484c3a6a9472ae985#5ac7da7a513744e907ca110484c3a6a9472ae985"
@@ -6605,6 +6628,22 @@ dependencies = [
  "thiserror 1.0.69",
  "tokenizers",
  "tracing",
+]
+
+[[package]]
+name = "semantic-pack"
+version = "0.2.0"
+source = "git+https://github.com/adamtc007/dsl?rev=7da4b10cee570d7146cef3a0dac5ae388cb4fc9e#7da4b10cee570d7146cef3a0dac5ae388cb4fc9e"
+dependencies = [
+ "dsl_types 0.2.0",
+ "hex",
+ "semantic-decision-contracts",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

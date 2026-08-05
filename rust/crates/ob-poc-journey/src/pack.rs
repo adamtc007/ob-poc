@@ -27,6 +27,8 @@ use std::path::Path;
 
 use sha2::{Digest, Sha256};
 
+pub use semantic_pack::{CompiledPack, PackReceipt};
+
 // Re-export the hoisted types so existing
 // `crate::journey::pack::{PackManifest, ...}` import sites continue to work
 // during the Phase 3 transition.
@@ -111,6 +113,45 @@ pub fn load_packs_from_dir(dir: &Path) -> Result<Vec<(PackManifest, String)>, Pa
     Ok(packs)
 }
 
+/// Admit a host-owned semantic pack from exact YAML bytes.
+///
+/// This is the application adapter around the shared compiler. It performs no
+/// activation; callers may inspect the returned immutable artifact first.
+///
+/// # Examples
+///
+/// ```
+/// use ob_poc_journey::pack::admit_semantic_pack_from_bytes;
+/// let yaml = include_bytes!("../../../config/semantic-packs/session-bootstrap.yaml");
+/// let pack = admit_semantic_pack_from_bytes("session-bootstrap.yaml", yaml).unwrap();
+/// assert_eq!(pack.identity().id.as_str(), "ob-poc.journey.session-bootstrap");
+/// ```
+pub fn admit_semantic_pack_from_bytes(
+    source_name: impl Into<String>,
+    raw_bytes: impl Into<Vec<u8>>,
+) -> Result<CompiledPack, SemanticPackLoadError> {
+    semantic_pack::admit_pack(semantic_pack::PackBytes::new(source_name, raw_bytes))
+        .map_err(SemanticPackLoadError::Admission)
+}
+
+/// Load and admit one semantic pack through the filesystem adapter.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use ob_poc_journey::pack::load_semantic_pack_from_file;
+/// let pack = load_semantic_pack_from_file(Path::new("config/semantic-packs/catalogue.yaml"))?;
+/// # Ok::<(), ob_poc_journey::pack::SemanticPackLoadError>(())
+/// ```
+pub fn load_semantic_pack_from_file(path: &Path) -> Result<CompiledPack, SemanticPackLoadError> {
+    let raw_bytes = std::fs::read(path).map_err(|source| SemanticPackLoadError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    admit_semantic_pack_from_bytes(path.display().to_string(), raw_bytes)
+}
+
 // ---------------------------------------------------------------------------
 // Error types
 // ---------------------------------------------------------------------------
@@ -146,6 +187,19 @@ impl std::error::Error for PackLoadError {
             Self::Parse { source, .. } => Some(source),
         }
     }
+}
+
+/// Failure from the application semantic-pack filesystem/admission adapter.
+#[derive(Debug, thiserror::Error)]
+pub enum SemanticPackLoadError {
+    #[error("IO error loading semantic pack `{path}`: {source}")]
+    Io {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error(transparent)]
+    Admission(#[from] semantic_pack::PackAdmissionError),
 }
 
 // ---------------------------------------------------------------------------

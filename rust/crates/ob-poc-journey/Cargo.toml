@@ -16,6 +16,7 @@ description = "Pack-guided workflow definitions — pack manifests (YAML schema 
 
 [dependencies]
 ob-poc-types = { path = "../ob-poc-types" }
+semantic-pack.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"

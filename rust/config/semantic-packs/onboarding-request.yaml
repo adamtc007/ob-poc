@@ -1,0 +1,155 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.onboarding-request
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/onboarding-request.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.onboarding-request
+  adapter_binding: ob-poc.journey.onboarding-request
+  title: Onboarding Request
+  intent_summary: Create a post-clearance onboarding handoff from a contracted deal
+    into an existing CBU and product target. Guides the user through deal selection,
+    contract validation, existing CBU confirmation, and handoff creation.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Onboarding Request
+    journey.
+  effect: Activates the Onboarding Request journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: onboarding request
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: request onboarding for this deal
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: submit onboarding handoff
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: handoff this deal to ops
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: product onboarding
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: deal onboarding
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: start onboarding
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: ops handoff
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: compile onboarding data request
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: onboarding data dictionary
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: product onboarding resource dictionary
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: resource dictionary for product onboarding
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: resource data requirements
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: cbu resource requirements
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: consolidate resource requirements
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: resource owner data request
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: complete product onboarding requirements
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - onboarding request
+  - request onboarding for this deal
+  - submit onboarding handoff
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - deal.read
+    - deal.list-contracts
+    - deal.list-products
+    - deal.request-onboarding
+    - deal.request-onboarding-batch
+    - cbu.read
+    - semantic.next-actionable
+    - onboarding.status
+    - billing.add-account-target
+    - billing.list-account-targets
+    - billing.remove-account-target
+    - onboarding.auto-complete
+    - provisioning.run
+    - provisioning.status
+    - readiness.compute
+    - readiness.explain
+    - semantic.get-state
+    - semantic.list-stages
+    - semantic.missing-entities
+    - semantic.next-actions
+    - semantic.prompt-context
+    - semantic.stages-for-product
+    - sla.bind
+    - sla.commit
+    - sla.list-commitments
+    - onboarding.compile-data-request
+    - onboarding.dispatch-ready-slices
+    - onboarding.cancel-data-request
+    - onboarding.cancel-slice
+    - onboarding.get-data-request
+    - onboarding.list-data-requests
+    - onboarding.list-slices
+    - onboarding.get-slice
+    - onboarding.get-slice-attrs
+    - service-resource.confirm-provisioning-result
+    - service-resource.get-provisioning-status
+    ob-poc.forbidden_verbs:
+    - cbu.delete
+    - cbu.create
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: onboarding-request

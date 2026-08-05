@@ -1,0 +1,135 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.product-service-taxonomy
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/product-service-taxonomy.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.product-service-taxonomy
+  adapter_binding: ob-poc.journey.product-service-taxonomy
+  title: Product Service Taxonomy
+  intent_summary: Explore and maintain the governed product, service, servicing-resource,
+    resource-owner, and dictionary catalogue. Guides catalog discovery so product
+    onboarding and activation can resolve products into services, resources, and attribute
+    dictionaries without crossing into instance provisioning.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Product Service Taxonomy
+    journey.
+  effect: Activates the Product Service Taxonomy journey and constrains its governed
+    operation surface.
+  arguments: []
+  phrases:
+  - text: product service taxonomy
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: product maintenance
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: show me product taxonomy
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: browse product services
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: show service resource map
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: resource dictionary
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: catalog maintenance
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - product service taxonomy
+  - product maintenance
+  - show me product taxonomy
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - sla.list-templates
+    - sla.read-template
+    - product.list
+    - product.read
+    - product.define
+    - product.amend
+    - product.retire
+    - service.list
+    - service.read
+    - service.list-by-product
+    - service.list-versions
+    - service.show
+    - service.define
+    - service.propose-revision
+    - service.deprecate
+    - service.retire
+    - service-option.list-by-service
+    - service-option.read
+    - service.declare-option
+    - service.constrain-option-values
+    - service.bind-option-source
+    - service.deprecate-option
+    - product-service.override-option
+    - product-service.link
+    - product-service.amend
+    - product-service.unlink
+    - service-resource.list
+    - service-resource.read
+    - service-resource.list-by-service
+    - service-resource.list-attributes
+    - service-resource.define-type
+    - service-resource.amend-type
+    - service-resource.retire-type
+    - service-resource.add-capability
+    - service-resource.amend-capability
+    - service-resource.remove-capability
+    - service-resource.declare-eligibility
+    - service-resource.declare-fanout-rule
+    - service-resource.sync-definitions
+    - resource-owner.assign
+    - resource-owner.amend
+    - resource-owner.unassign
+    - attribute.list
+    - attribute.read
+    - attribute.define
+    - attribute.define-derived
+    - attribute.define-internal
+    - service-version.draft
+    - service-version.submit-for-review
+    - service-version.publish
+    - service-version.retire
+    - service-version.update
+    - service-version.compare
+    ob-poc.forbidden_verbs:
+    - service-resource.provision
+    - service-resource.activate
+    - service-resource.set-attr
+    - cbu.create
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: product-service-taxonomy

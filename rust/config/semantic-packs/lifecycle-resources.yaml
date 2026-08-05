@@ -1,0 +1,91 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.lifecycle-resources
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/lifecycle-resources.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.lifecycle-resources
+  adapter_binding: ob-poc.journey.lifecycle-resources
+  title: Lifecycle Resources
+  intent_summary: 'Layer 4 platform workspace. Govern BNY application registry entries,
+    application instances (per-environment lifecycle: PROVISIONED → ACTIVE → MAINTENANCE_WINDOW
+    / DEGRADED / OFFLINE → DECOMMISSIONED), and capability bindings tying instances
+    to product services (DRAFT → PILOT → LIVE → DEPRECATED → RETIRED). Closes the
+    gap between generic capability (Layer 3) and concrete BNY system (Layer 4).'
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Lifecycle Resources
+    journey.
+  effect: Activates the Lifecycle Resources journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: lifecycle resources
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: manage application instances
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: manage capability bindings
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: platform resources
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: BNY application catalogue
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: application instance lifecycle
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - lifecycle resources
+  - manage application instances
+  - manage capability bindings
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - application.register
+    - application.update
+    - application.decommission
+    - application-instance.provision
+    - application-instance.activate
+    - application-instance.enter-maintenance
+    - application-instance.exit-maintenance
+    - application-instance.take-offline
+    - application-instance.bring-online
+    - application-instance.decommission
+    - capability-binding.draft
+    - capability-binding.start-pilot
+    - capability-binding.promote-live
+    - capability-binding.abort-pilot
+    - capability-binding.deprecate
+    - capability-binding.retire
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: lifecycle-resources

@@ -1,0 +1,66 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.session-bootstrap
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/session-bootstrap.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.session-bootstrap
+  adapter_binding: ob-poc.journey.session-bootstrap
+  title: Session Bootstrap
+  intent_summary: Establish session scope by loading a client group into the working
+    set. This is the first pack activated in every session. It resolves the client
+    group name to a group ID and loads the associated CBUs.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Session Bootstrap journey.
+  effect: Activates the Session Bootstrap journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: load a client
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: start a session
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: set scope
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: select client
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - load a client
+  - start a session
+  - set scope
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - session.load-cluster
+    - session.load-galaxy
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: session-bootstrap

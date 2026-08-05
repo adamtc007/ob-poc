@@ -1,0 +1,77 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.bpmn-ops
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/bpmn-ops.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.bpmn-ops
+  adapter_binding: ob-poc.journey.bpmn-ops
+  title: BPMN Operations
+  intent_summary: Compile BPMN definitions and control workflow instances. Infrastructure
+    pool lifecycle is intentionally exposed through the lifecycle-resources workspace,
+    not this ordinary BPMN operations board.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the BPMN Operations journey.
+  effect: Activates the BPMN Operations journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: bpmn operations
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: manage bpmn
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: workflow management
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: bpmn pool setup
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: bpmn instance query
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - bpmn operations
+  - manage bpmn
+  - workflow management
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - bpmn.compile
+    - bpmn.start
+    - bpmn.signal
+    - bpmn.cancel
+    - bpmn.inspect
+    - workflow.start-process
+    - bpmn-controller.start-instance
+    - bpmn-controller.instance-status
+    - bpmn-controller.list-instances
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: bpmn-ops

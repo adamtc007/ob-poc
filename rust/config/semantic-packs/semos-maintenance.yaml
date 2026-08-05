@@ -1,0 +1,217 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.semos-maintenance
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/semos-maintenance.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.semos-maintenance
+  adapter_binding: ob-poc.journey.semos-maintenance
+  title: SemOS Maintenance
+  intent_summary: Govern the SemOS registry. Author changesets for attributes, verbs,
+    schemas, and constellations. Submit for review, validate, dry-run, and publish.
+    Bridge ungoverned attributes. Recompute derived values.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the SemOS Maintenance journey.
+  effect: Activates the SemOS Maintenance journey and constrains its governed operation
+    surface.
+  arguments: []
+  phrases:
+  - text: semos maintenance
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: registry governance
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: manage the registry
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: semantic os maintenance
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: attribute governance
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: stewardship workspace
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - semos maintenance
+  - registry governance
+  - manage the registry
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - changeset.compose
+    - changeset.add-item
+    - changeset.remove-item
+    - changeset.refine-item
+    - changeset.suggest
+    - changeset.apply-template
+    - changeset.attach-basis
+    - changeset.validate-edit
+    - changeset.cross-reference
+    - changeset.impact-analysis
+    - changeset.resolve-conflict
+    - changeset.list
+    - changeset.get
+    - changeset.diff
+    - governance.gate-precheck
+    - governance.submit-for-review
+    - governance.record-review
+    - governance.validate
+    - governance.dry-run
+    - governance.plan-publish
+    - governance.publish
+    - governance.publish-batch
+    - governance.rollback
+    - registry.describe-object
+    - registry.search
+    - attribute.define
+    - attribute.define-derived
+    - attribute.define-internal
+    - attribute.update-internal
+    - attribute.inspect
+    - attribute.classify
+    - attribute.set-evidence-grade
+    - attribute.deprecate
+    - attribute.bridge-to-semos
+    - attribute.read
+    - attribute.list
+    - typed-attribute.record
+    - typed-attribute.get
+    - typed-attribute.list-for-entity
+    - derivation.recompute-stale
+    - service-resource.check-attribute-gaps
+    - service-resource.sync-definitions
+    - phrase.observe-misses
+    - phrase.coverage-report
+    - phrase.check-collisions
+    - phrase.propose
+    - phrase.batch-propose
+    - phrase.review-proposals
+    - phrase.approve
+    - phrase.reject
+    - phrase.defer
+    - constellation.hydrate
+    - constellation.summary
+    - delegation.add
+    - delegation.end
+    - delegation.list-delegates
+    - delegation.list-delegations-received
+    - discovery.available-actions
+    - discovery.cascade-research
+    - discovery.entity-context
+    - discovery.entity-relationships
+    - discovery.explain
+    - discovery.graph-walk
+    - discovery.inspect-data
+    - discovery.run
+    - discovery.search-data
+    - discovery.search-entities
+    - discovery.valid-transitions
+    - discovery.verb-detail
+    - focus.capture-manifest
+    - focus.diff
+    - focus.get
+    - focus.render
+    - focus.set
+    - focus.viewport
+    - graph.ancestors
+    - graph.compare
+    - graph.descendants
+    - graph.filter
+    - graph.find-connected
+    - graph.focus
+    - graph.group-by
+    - graph.path
+    - graph.validate
+    - graph.view
+    - maintenance.bootstrap-seeds
+    - maintenance.cleanup
+    - maintenance.drain-outbox
+    - maintenance.health-pending
+    - maintenance.health-stale-dryruns
+    - maintenance.reindex-embeddings
+    - maintenance.validate-schema-sync
+    - schema.cross-reference
+    - schema.domain.describe
+    - schema.entity.describe
+    - schema.entity.list-fields
+    - schema.entity.list-relationships
+    - schema.entity.list-verbs
+    - schema.extract-attributes
+    - schema.extract-entities
+    - schema.extract-verbs
+    - schema.generate-discovery-map
+    - schema.generate-erd
+    - schema.generate-verb-flow
+    - schema.introspect
+    - state.blocked-why
+    - state.check-consistency
+    - state.derive
+    - state.derive-all
+    - state.diagnose
+    - state.list-overrides
+    - state.override
+    - state.revoke-override
+    - template.batch
+    - template.invoke
+    - audit.add-plan-step
+    - audit.create-plan
+    - audit.execute-plan-step
+    - audit.record-decision
+    - audit.record-disambiguation
+    - audit.record-escalation
+    - audit.record-observation
+    - audit.validate-plan
+    - attribute.seed-derived
+    - attribute.seed-domain
+    - shared-atom.register
+    - shared-atom.activate
+    - shared-atom.deprecate
+    - shared-atom.retire
+    - shared-atom.list
+    - shared-atom.list-consumers
+    - shared-atom.replay-constellation
+    - shared-atom.acknowledge-shared-update
+    - remediation.list-open
+    - remediation.defer
+    - remediation.revoke-deferral
+    - remediation.confirm-external-correction
+    - shared-atom.register-and-activate
+    - shared-atom.full-consistency-check
+    - shared-atom.deprecate-and-retire
+    - remediation.defer-with-audit-trail
+    - remediation.resolve-with-confirmation
+    - shared-atom.detect-and-remediate
+    - shared-atom.batch-replay
+    - shared-atom.acknowledge-batch
+    ob-poc.forbidden_verbs: []
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: semos-maintenance

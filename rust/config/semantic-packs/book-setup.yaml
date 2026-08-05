@@ -1,0 +1,182 @@
+schema_version: 1
+pack:
+  id: ob-poc.journey.book-setup
+  version: '1.0'
+  domain: ob-poc.journey
+  identity_namespace: ob-poc.journey.semantic
+  canonicalization_version: 1
+  dependencies: []
+  provenance:
+    source: rust/config/semantic-packs/book-setup.yaml
+    revision: journey-pack-v1
+declarations:
+  domain_types:
+  - journey.pack
+  slot_kinds: []
+  focus_kinds:
+  - journey.session
+capabilities:
+- id: journey.book-setup
+  adapter_binding: ob-poc.journey.book-setup
+  title: Book Setup
+  intent_summary: Set up a client book — a collection of CBUs under a single apex
+    entity. Supports Luxembourg SICAV and UK OEIC structures with jurisdiction-specific
+    templates for fund creation, product assignment, and custody configuration.
+  action_class: execute
+  applicability: Use when the requested outcome belongs to the Book Setup journey.
+  effect: Activates the Book Setup journey and constrains its governed operation surface.
+  arguments: []
+  phrases:
+  - text: set up a book
+    locale: en-GB
+    role: canonical
+    provenance: ob-poc.journey-pack.v1
+  - text: configure client book
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: book setup
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: create a fund book
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: new book for client
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  - text: set up funds
+    locale: en-GB
+    role: paraphrase
+    provenance: ob-poc.journey-pack.v1
+  positive_examples:
+  - set up a book
+  - configure client book
+  - book setup
+  negative_contrasts: []
+  risk: reversible
+  aliases: []
+  extensions:
+    ob-poc.allowed_verbs:
+    - cbu.create
+    - cbu.list
+    - cbu.update
+    - cbu.set-category
+    - cbu.add-product
+    - cbu.remove-product
+    - cbu.assign-role
+    - cbu.link-structure
+    - cbu.parties
+    - cbu.list-subscriptions
+    - session.load-galaxy
+    - entity.create
+    - bods.discover-ubos
+    - bods.find-by-lei
+    - bods.get-statement
+    - bods.import
+    - bods.link-entity
+    - bods.list-by-entity
+    - bods.list-ownership
+    - bods.list-persons
+    - bods.sync-from-gleif
+    - gleif.enrich
+    - gleif.import-managed-funds
+    - gleif.import-to-client-group
+    - gleif.import-tree
+    - gleif.lookup
+    - gleif.refresh
+    - gleif.resolve-successor
+    - gleif.search
+    - gleif.trace-ownership
+    - research.companies-house.fetch-company
+    - research.companies-house.fetch-officers
+    - research.companies-house.fetch-psc
+    - research.companies-house.import-company
+    - research.companies-house.search
+    - research.generic.normalize
+    - research.import-run.begin
+    - research.import-run.complete
+    - research.import-run.supersede
+    - research.outreach.close-request
+    - research.outreach.create-request
+    - research.outreach.get-request
+    - research.outreach.list-overdue
+    - research.outreach.list-pending
+    - research.outreach.mark-sent
+    - research.outreach.plan-generate
+    - research.outreach.record-response
+    - research.outreach.send-reminder
+    - research.sec-edgar.fetch-beneficial-owners
+    - research.sec-edgar.fetch-company
+    - research.sec-edgar.fetch-filings
+    - research.sec-edgar.import-company
+    - research.sec-edgar.search
+    - research.sources.fetch
+    - research.sources.find-for-jurisdiction
+    - research.sources.info
+    - research.sources.list
+    - research.sources.search
+    - research.workflow.audit-trail
+    - research.workflow.confirm-decision
+    - research.workflow.pending-decisions
+    - research.workflow.record-action
+    - research.workflow.record-anomaly
+    - research.workflow.record-correction
+    - research.workflow.record-decision
+    - research.workflow.reject-decision
+    - research.workflow.resolve-anomaly
+    - research.workflow.supersession-trail
+    - structure.product-suite-custody-fa-ta
+    - structure.product-suite-full
+    - structure.remove-all-products
+    - mandate.list
+    - mandate.add-product
+    - mandate.set-instruments
+    - mandate.set-markets
+    - mandate.select
+    - mandate.details
+    - party.add
+    - party.add-company
+    - party.add-person
+    - party.assign-identifier
+    - party.details
+    - party.list
+    - party.search
+    - party.set-address
+    - party.update
+    - struct.hedge.cross-border
+    - struct.ie.aif.icav
+    - struct.ie.hedge.icav
+    - struct.ie.ucits.icav
+    - struct.lux.aif.raif
+    - struct.lux.pe.scsp
+    - struct.lux.ucits.sicav
+    - struct.pe.cross-border
+    - struct.uk.authorised.acs
+    - struct.uk.authorised.aut
+    - struct.uk.authorised.ltaf
+    - struct.uk.authorised.oeic
+    - struct.uk.manager.llp
+    - struct.uk.private-equity.lp
+    - struct.us.40act.closed-end
+    - struct.us.40act.open-end
+    - struct.us.etf.40act
+    - struct.us.private-fund.delaware-lp
+    - structure.assign-role
+    - structure.list
+    - structure.roles
+    - structure.select
+    - structure.setup
+    ob-poc.forbidden_verbs:
+    - cbu.delete
+    - session.clear
+policy:
+  phrase_ambiguity: reject
+  abstention:
+    enabled: true
+    candidate_id: abstain.none_of_the_above
+  roles: []
+extensions:
+  ob-poc.journey_manifest_id: book-setup
