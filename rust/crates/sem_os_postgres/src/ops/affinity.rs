@@ -19,13 +19,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use sem_os_core::principal::Principal;
-use sem_os_core::types::Classification;
 use sem_os_ontology::verb_contract::VerbContractBody;
 use sem_os_policy::abac::ActorContext;
 use sem_os_policy::affinity::{discover_dsl, AffinityKind, DataRef, TableRef};
 use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
 };
+use sem_os_types::Classification;
 
 use dsl_runtime::load_affinity_graph_cached;
 use dsl_runtime::SemOsContextResolver;

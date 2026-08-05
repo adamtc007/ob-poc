@@ -1,6 +1,6 @@
 //! Core types for the Semantic Registry.
 //!
-//! Canonical types live in `sem_os_core::types` (no sqlx dependency).
+//! Canonical types live in `sem_os_types` (no sqlx dependency).
 //! This module re-exports them and provides `PgSnapshotRow` — an sqlx-aware
 //! adapter that decodes PostgreSQL enum columns as text and converts to the
 //! canonical enum types.
@@ -9,8 +9,8 @@ use anyhow::anyhow;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-// ── Re-exports from sem_os_core (canonical, no sqlx) ──────────
-pub use sem_os_core::types::{
+// ── Re-exports from sem_os_types (canonical, no sqlx) ─────────
+pub use sem_os_types::{
     ChangeType, Classification, GovernanceTier, HandlingControl, ObjectType, SecurityLabel,
     SnapshotMeta, SnapshotRow, SnapshotStatus, TrustClass,
 };

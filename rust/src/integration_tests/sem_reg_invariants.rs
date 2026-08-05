@@ -18,12 +18,12 @@
 mod invariants {
     use anyhow::Result;
     use chrono::Utc;
-    use sem_os_core::types::EvidenceGrade;
+    use sem_os_types::EvidenceGrade;
     use sqlx::PgPool;
     use uuid::Uuid;
 
-    use crate::sem_reg::attribute_def::AttributeDataType;
     use crate::sem_reg::agent::{DecisionRecord, DecisionStore};
+    use crate::sem_reg::attribute_def::AttributeDataType;
     use crate::sem_reg::{
         evaluate_abac, evaluate_publish_gates, AccessDecision, AccessPurpose, ActorContext,
         AttributeDefBody, ChangeType, Classification, GovernanceTier, ObjectType, RegistryService,
@@ -473,7 +473,7 @@ mod invariants {
             description: "Test operational auto-approval".into(),
             domain: "inv_test".into(),
             data_type: AttributeDataType::String,
-            evidence_grade: sem_os_core::types::EvidenceGrade::None,
+            evidence_grade: sem_os_types::EvidenceGrade::None,
             source: None,
             constraints: None,
             sinks: vec![],

@@ -21,7 +21,7 @@
 // Phase 5a composite-blocker #24 — affinity_graph_cache relocated to
 // `dsl-runtime::domain_ops::affinity_graph_cache`. Inlined the
 // `PgSnapshotRow` Postgres-row decode + conversion to
-// `sem_os_core::types::SnapshotRow` to drop the `crate::sem_reg::types`
+// `sem_os_types::SnapshotRow` to drop the `crate::sem_reg::types`
 // dep (61 LOC → ~140 LOC after inlining; trade-off accepted vs
 // relocating the whole sem_reg::types module).
 // Phase 5a composite-blocker #24 — affinity_ops relocated to

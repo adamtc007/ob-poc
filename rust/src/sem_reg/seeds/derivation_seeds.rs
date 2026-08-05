@@ -20,7 +20,7 @@ use crate::sem_reg::{
     store::SnapshotStore,
     types::{ChangeType, ObjectType, SnapshotMeta},
 };
-use sem_os_core::types::EvidenceGrade;
+use sem_os_types::EvidenceGrade;
 
 /// Report from derivation spec seeding.
 #[derive(Debug, Default)]

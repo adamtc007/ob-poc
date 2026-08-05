@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use sem_os_ontology::constellation_map_def as core_map;
+use dsl_types as core_map;
 use sem_os_ontology::state_machine_def as core_sm;
 use sem_os_policy::grounding::{compute_slot_action_surface, ConstellationModel};
 
@@ -182,7 +182,6 @@ impl VerbPaletteEntry {
             Self::Gated { verb, .. } => verb,
         }
     }
-
 }
 
 /// Availability expression for gated verbs.

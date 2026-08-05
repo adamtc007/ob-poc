@@ -12,6 +12,7 @@ rust-version = "1.95"
 [dependencies]
 # Workspace crates
 dsl-core.workspace = true
+dsl_types.workspace = true
 ob-poc-compiler = { path = "crates/ob-poc-compiler" }
 inspector-projection = { path = "crates/inspector-projection" }
 ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }

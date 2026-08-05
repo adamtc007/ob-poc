@@ -6,7 +6,7 @@
 //! relocation): the original lived in `ob_poc::sem_reg::types`, but
 //! that whole module is too big to relocate alongside, and the Postgres
 //! row decode is the only sem_reg surface this file touches. The
-//! conversion to `sem_os_core::types::SnapshotRow` (which IS in a
+//! conversion to `sem_os_types::SnapshotRow` (which IS in a
 //! boundary crate) is also inlined.
 
 use anyhow::{anyhow, Result};
@@ -14,10 +14,10 @@ use std::sync::OnceLock;
 use tokio::sync::RwLock;
 
 use chrono::{DateTime, Utc};
-use sem_os_core::types::{
+use sem_os_policy::affinity::AffinityGraph;
+use sem_os_types::{
     ChangeType, GovernanceTier, ObjectType, SnapshotRow, SnapshotStatus, TrustClass,
 };
-use sem_os_policy::affinity::AffinityGraph;
 use uuid::Uuid;
 
 type GraphCache = Option<(i64, AffinityGraph)>;

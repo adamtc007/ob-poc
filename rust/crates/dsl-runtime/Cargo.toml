@@ -42,6 +42,7 @@ dsl_types.workspace = true
 # and the VerbContractBody consumed by CrudExecutionPort. Kept deliberately
 # until a later slice resolves the cycle cleanly.
 sem_os_core.workspace = true
+sem_os_types.workspace = true
 sem_os_policy.workspace = true
 sem_os_ontology.workspace = true
 async-trait = "0.1"

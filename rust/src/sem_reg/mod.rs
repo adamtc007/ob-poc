@@ -85,7 +85,7 @@ pub mod stewardship;
 // Re-export core types at module boundary
 #[cfg(test)]
 pub(crate) use gates::evaluate_publish_gates;
-pub use sem_os_core::types::EvidenceGrade;
+pub use sem_os_types::EvidenceGrade;
 pub use store::SnapshotStore;
 pub use types::{
     ChangeType, Classification, GovernanceTier, HandlingControl, ObjectType, SecurityLabel,

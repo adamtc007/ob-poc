@@ -20,18 +20,18 @@ use sem_os_core::ports::{
     OutboxStore, ProjectionWriter, SnapshotStore,
 };
 use sem_os_core::principal::Principal;
-use sem_os_core::types::{
-    AuditEntry, ChangeType, Changeset, ChangesetEntry, ChangesetReview, ChangesetStatus,
-    CreateChangesetInput, DependentSnapshot, EventId, EvidenceInstance, Fqn, GovernanceTier,
-    Manifest, OutboxEvent, PublishInput, SecurityLabel, SnapshotExport, SnapshotId, SnapshotMeta,
-    SnapshotRow, SnapshotSetId, SnapshotStatus, SnapshotSummary, TrustClass, TypedObject,
-};
 use sem_os_policy::abac::ActorContext;
 use sem_os_policy::context_resolution::{
     ContextResolutionRequest, DiscoveryContext, DiscoverySurface, EvidenceMode,
     ResolutionConstraints, ResolutionStage, SubjectRef,
 };
 use sem_os_policy::service::{CoreService, CoreServiceImpl};
+use sem_os_types::{
+    AuditEntry, ChangeType, Changeset, ChangesetEntry, ChangesetReview, ChangesetStatus,
+    CreateChangesetInput, DependentSnapshot, EventId, EvidenceInstance, Fqn, GovernanceTier,
+    Manifest, OutboxEvent, PublishInput, SecurityLabel, SnapshotExport, SnapshotId, SnapshotMeta,
+    SnapshotRow, SnapshotSetId, SnapshotStatus, SnapshotSummary, TrustClass, TypedObject,
+};
 use serde::Deserialize;
 use uuid::Uuid;
 
@@ -198,7 +198,7 @@ impl ChangesetStore for NoopChangesetStore {
     async fn add_entry(
         &self,
         _changeset_id: uuid::Uuid,
-        _input: sem_os_core::types::AddChangesetEntryInput,
+        _input: sem_os_types::AddChangesetEntryInput,
     ) -> Result<ChangesetEntry, SemOsError> {
         unimplemented!("add_entry is not used by semos_discovery_hit_rate")
     }
@@ -213,7 +213,7 @@ impl ChangesetStore for NoopChangesetStore {
     async fn submit_review(
         &self,
         _changeset_id: uuid::Uuid,
-        _input: sem_os_core::types::SubmitReviewInput,
+        _input: sem_os_types::SubmitReviewInput,
     ) -> Result<ChangesetReview, SemOsError> {
         unimplemented!("submit_review is not used by semos_discovery_hit_rate")
     }
@@ -343,14 +343,14 @@ fn build_service() -> CoreServiceImpl {
     let mut active = Vec::new();
     for seed in &bundle.universes {
         active.push(snapshot_row(
-            sem_os_core::types::ObjectType::UniverseDef,
+            sem_os_types::ObjectType::UniverseDef,
             &seed.fqn,
             seed.payload.clone(),
         ));
     }
     for seed in &bundle.constellation_families {
         active.push(snapshot_row(
-            sem_os_core::types::ObjectType::ConstellationFamilyDef,
+            sem_os_types::ObjectType::ConstellationFamilyDef,
             &seed.fqn,
             seed.payload.clone(),
         ));
@@ -371,7 +371,7 @@ fn build_service() -> CoreServiceImpl {
 }
 
 fn snapshot_row(
-    object_type: sem_os_core::types::ObjectType,
+    object_type: sem_os_types::ObjectType,
     fqn: &str,
     definition: serde_json::Value,
 ) -> SnapshotRow {

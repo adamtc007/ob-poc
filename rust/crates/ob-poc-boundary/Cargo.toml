@@ -22,6 +22,7 @@ ob-poc-macros = { path = "../ob-poc-macros" }
 # control-plane (canonical domain types) and acceptable here. Not the
 # execution tier — see the boundary-tier discipline in lib.rs.
 sem_os_core.workspace = true
+sem_os_types.workspace = true
 sem_os_ontology.workspace = true
 sem_os_policy.workspace = true
 # dsl-core supplies VerbConfig metadata for ACP registry/pack projection

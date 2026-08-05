@@ -45,23 +45,21 @@ pub fn suggest_security_label(
     use super::types::{Classification, HandlingControl, SecurityLabel};
 
     let classification = match adapter_label.classification {
-        sem_os_core::types::Classification::Public => Classification::Public,
-        sem_os_core::types::Classification::Internal => Classification::Internal,
-        sem_os_core::types::Classification::Confidential => Classification::Confidential,
-        sem_os_core::types::Classification::Restricted => Classification::Restricted,
+        sem_os_types::Classification::Public => Classification::Public,
+        sem_os_types::Classification::Internal => Classification::Internal,
+        sem_os_types::Classification::Confidential => Classification::Confidential,
+        sem_os_types::Classification::Restricted => Classification::Restricted,
     };
 
     let handling_controls = adapter_label
         .handling_controls
         .into_iter()
         .map(|hc| match hc {
-            sem_os_core::types::HandlingControl::MaskByDefault => HandlingControl::MaskByDefault,
-            sem_os_core::types::HandlingControl::NoExport => HandlingControl::NoExport,
-            sem_os_core::types::HandlingControl::NoLlmExternal => HandlingControl::NoLlmExternal,
-            sem_os_core::types::HandlingControl::DualControl => HandlingControl::DualControl,
-            sem_os_core::types::HandlingControl::SecureViewerOnly => {
-                HandlingControl::SecureViewerOnly
-            }
+            sem_os_types::HandlingControl::MaskByDefault => HandlingControl::MaskByDefault,
+            sem_os_types::HandlingControl::NoExport => HandlingControl::NoExport,
+            sem_os_types::HandlingControl::NoLlmExternal => HandlingControl::NoLlmExternal,
+            sem_os_types::HandlingControl::DualControl => HandlingControl::DualControl,
+            sem_os_types::HandlingControl::SecureViewerOnly => HandlingControl::SecureViewerOnly,
         })
         .collect();
 

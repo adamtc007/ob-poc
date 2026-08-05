@@ -18,7 +18,7 @@ use sem_os_core::ports::{
     OutboxStore, ProjectionWriter, Result, SnapshotStore,
 };
 use sem_os_core::principal::Principal;
-use sem_os_core::types::*;
+use sem_os_types::*;
 
 use crate::sqlx_types::PgSnapshotRow;
 

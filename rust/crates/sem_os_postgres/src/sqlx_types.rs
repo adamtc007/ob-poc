@@ -9,7 +9,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use sem_os_core::types::{
+use sem_os_types::{
     ChangeType, GovernanceTier, ObjectType, SnapshotRow, SnapshotStatus, TrustClass,
 };
 

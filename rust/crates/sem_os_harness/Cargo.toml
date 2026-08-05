@@ -7,6 +7,7 @@ description = "Semantic OS test harness — golden/invariant tests against SemOs
 [dependencies]
 ob-poc-semantic-policy = { path = "../ob-poc-semantic-policy" }
 sem_os_core.workspace = true
+sem_os_types.workspace = true
 sem_os_policy.workspace = true
 sem_os_ontology.workspace = true
 sem_os_client = { path = "../sem_os_client" }

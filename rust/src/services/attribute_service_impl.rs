@@ -15,8 +15,8 @@
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use sem_os_core::principal::Principal;
-use sem_os_core::types::{AttributeVisibility, EvidenceGrade};
 use sem_os_ontology::attribute_def::{AttributeDataType, AttributeDefBody, AttributeSource};
+use sem_os_types::{AttributeVisibility, EvidenceGrade};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;

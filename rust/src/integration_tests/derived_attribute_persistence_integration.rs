@@ -14,7 +14,7 @@ mod integration {
     use crate::sem_reg::types::ObjectType;
     use crate::service_resources::{PopulationEngine, ServiceResourcePipelineService};
     use anyhow::{Context, Result};
-    use sem_os_core::types::EvidenceGrade;
+    use sem_os_types::EvidenceGrade;
     use serde_json::json;
     use sqlx::PgPool;
     use uuid::Uuid;

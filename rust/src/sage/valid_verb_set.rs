@@ -15,19 +15,16 @@ use chrono::Utc;
 use sem_os_core::resolver::{resolve_template, ResolverInputs};
 use sem_os_ontology::{
     constellation_map_def::{
-        ConstellationMapDefBody,
-        SlotDef as CoreSlotDef,
-        VerbPaletteEntry as CoreVerbPaletteEntry,
+        ConstellationMapDefBody, SlotDef as CoreSlotDef, VerbPaletteEntry as CoreVerbPaletteEntry,
     },
     state_machine_def::{ReducerDef, StateMachineDefBody, TransitionDef},
 };
 use sem_os_policy::grounding::{compute_slot_action_surface, ConstellationModel};
 
 #[cfg(test)]
-use sem_os_ontology::constellation_map_def::{
-    Cardinality, DependencyEntry as CoreDependencyEntry,
-    JoinDef as CoreJoinDef, SlotType as CoreSlotType,
-    VerbAvailability as CoreVerbAvailability,
+use dsl_types::{
+    Cardinality, DependencyEntry as CoreDependencyEntry, JoinDef as CoreJoinDef,
+    SlotType as CoreSlotType, VerbAvailability as CoreVerbAvailability,
 };
 
 use uuid::Uuid;

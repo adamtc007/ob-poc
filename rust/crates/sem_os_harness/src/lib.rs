@@ -343,7 +343,7 @@ async fn test_context_resolution_determinism(client: &dyn SemOsClient) {
             actor_id: "harness-agent".into(),
             roles: vec!["analyst".into()],
             department: Some("compliance".into()),
-            clearance: Some(sem_os_core::types::Classification::Confidential),
+            clearance: Some(sem_os_types::Classification::Confidential),
             jurisdictions: vec!["LU".into()],
         },
         goals: vec!["resolve_ubo".into()],

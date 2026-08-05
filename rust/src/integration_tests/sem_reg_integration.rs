@@ -25,12 +25,12 @@
 mod integration {
     use anyhow::Result;
     use chrono::Utc;
-    use sem_os_core::types::EvidenceGrade;
     use sem_os_policy::context_resolution::{
         ContextResolutionRequest, DiscoveryContext, EvidenceMode, SubjectRef,
     };
     use sem_os_policy::service::{CoreService, CoreServiceImpl};
     use sem_os_postgres::PgStores;
+    use sem_os_types::EvidenceGrade;
     use serde_json::json;
     use sqlx::PgPool;
     use std::sync::Arc;
