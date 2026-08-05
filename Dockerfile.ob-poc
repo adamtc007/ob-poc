@@ -11,7 +11,8 @@
 
 # ── Stage 1: chef ────────────────────────────────────────────────────
 FROM rust:1.95-bookworm AS chef
-RUN cargo install cargo-chef --locked
+RUN cargo install cargo-chef --locked \
+    && cargo install cargo-auditable --version 0.7.5 --locked
 WORKDIR /build
 
 # ── Stage 2: planner ─────────────────────────────────────────────────
@@ -37,7 +38,7 @@ RUN cargo chef cook --release -p ob-poc-web --recipe-path recipe.json
 
 COPY rust/ /build/rust/
 COPY eval/ /build/eval/
-RUN cargo build --release -p ob-poc-web \
+RUN cargo auditable build --release -p ob-poc-web \
     && mkdir -p /build/out \
     && cp target/release/ob-poc-web /build/out/ob-poc-web \
     && strip /build/out/ob-poc-web
