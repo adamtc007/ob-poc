@@ -9,6 +9,9 @@ short_revision=$(git -C "$repo_root" rev-parse --short=12 HEAD)
 image_ref=${1:-"ob-poc:rc-$short_revision"}
 output_dir=${2:-"$repo_root/target/release-candidate/$short_revision"}
 
+"$repo_root/scripts/verify-schema-artifacts.sh" >/dev/null
+schema_sha256=$(shasum -a 256 "$repo_root/migrations/master-schema.sql" | awk '{print $1}')
+
 shared_revisions=$(sed -n '/github.com\/adamtc007\/dsl/ s/.*rev = "\([^"]*\)".*/\1/p' "$repo_root/rust/Cargo.toml" | sort -u)
 shared_revision_count=$(printf '%s\n' "$shared_revisions" | sed '/^$/d' | wc -l | tr -d ' ')
 if [ "$shared_revision_count" -ne 1 ]; then
@@ -40,14 +43,17 @@ docker buildx build \
   --build-arg "APP_REVISION=$app_revision" \
   --build-arg "SHARED_DSL_REVISION=$shared_revision" \
   --build-arg "BPMN_LITE_REVISION=$bpmn_revision" \
+  --build-arg "SCHEMA_SHA256=$schema_sha256" \
   "$repo_root"
 
 recorded_app_revision=$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_ref")
 recorded_shared_revision=$(docker image inspect --format '{{ index .Config.Labels "io.ob-poc.shared-dsl-revision" }}' "$image_ref")
 recorded_bpmn_revision=$(docker image inspect --format '{{ index .Config.Labels "io.ob-poc.bpmn-lite-revision" }}' "$image_ref")
+recorded_schema_sha256=$(docker image inspect --format '{{ index .Config.Labels "io.ob-poc.schema-sha256" }}' "$image_ref")
 if [ "$recorded_app_revision" != "$app_revision" ] \
   || [ "$recorded_shared_revision" != "$shared_revision" ] \
-  || [ "$recorded_bpmn_revision" != "$bpmn_revision" ]; then
+  || [ "$recorded_bpmn_revision" != "$bpmn_revision" ] \
+  || [ "$recorded_schema_sha256" != "$schema_sha256" ]; then
   echo "image revision labels do not match the release inputs" >&2
   exit 1
 fi
@@ -66,6 +72,7 @@ sbom_sha256=$(shasum -a 256 "$output_dir/sbom.cdx.json" | awk '{print $1}')
   echo "application_revision=$app_revision"
   echo "shared_dsl_revision=$shared_revision"
   echo "bpmn_lite_revision=$bpmn_revision"
+  echo "schema_sha256=$schema_sha256"
   echo "sbom_sha256=$sbom_sha256"
 } > "$output_dir/release-receipt.env"
 

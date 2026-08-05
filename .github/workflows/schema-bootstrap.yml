@@ -1,0 +1,77 @@
+name: Schema bootstrap
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/master-schema.sql'
+      - 'schema_export.sql'
+      - 'rust/migrations/**'
+      - 'rust/xtask/src/main.rs'
+      - 'scripts/bootstrap-database.sh'
+      - 'scripts/verify-schema-artifacts.sh'
+      - '.github/workflows/schema-bootstrap.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/master-schema.sql'
+      - 'schema_export.sql'
+      - 'rust/migrations/**'
+      - 'rust/xtask/src/main.rs'
+      - 'scripts/bootstrap-database.sh'
+      - 'scripts/verify-schema-artifacts.sh'
+      - '.github/workflows/schema-bootstrap.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  clean-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_DB: data_designer
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d data_designer"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify checked-in schema identity
+        run: ./scripts/verify-schema-artifacts.sh
+      - name: Stage bootstrap inputs in the PostgreSQL 18 service
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$POSTGRES_CONTAINER" mkdir -p /schema-work/migrations /schema-work/scripts
+          docker cp migrations/master-schema.sql "$POSTGRES_CONTAINER":/schema-work/migrations/master-schema.sql
+          docker cp schema_export.sql "$POSTGRES_CONTAINER":/schema-work/schema_export.sql
+          docker cp scripts/bootstrap-database.sh "$POSTGRES_CONTAINER":/schema-work/scripts/bootstrap-database.sh
+          docker cp scripts/verify-schema-artifacts.sh "$POSTGRES_CONTAINER":/schema-work/scripts/verify-schema-artifacts.sh
+      - name: Bootstrap an empty PostgreSQL 18 database
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: >-
+          docker exec
+          --env DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/data_designer
+          "$POSTGRES_CONTAINER"
+          /schema-work/scripts/bootstrap-database.sh
+      - name: Prove bootstrap refuses a non-empty target
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          if docker exec \
+            --env DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/data_designer \
+            "$POSTGRES_CONTAINER" \
+            /schema-work/scripts/bootstrap-database.sh; then
+            echo "bootstrap unexpectedly accepted a non-empty database" >&2
+            exit 1
+          fi

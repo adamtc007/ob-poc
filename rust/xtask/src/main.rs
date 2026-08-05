@@ -2295,18 +2295,40 @@ fn schema_export(sh: &Shell) -> Result<()> {
     let root = project_root()?;
     sh.change_dir(&root);
 
+    let database = std::env::var("DATABASE_URL").unwrap_or_else(|_| "data_designer".to_string());
+    let canonical = root.join("migrations/master-schema.sql");
+    let convenience = root.join("schema_export.sql");
+
     println!("Exporting database schema...");
-    cmd!(
-        sh,
-        "pg_dump -d data_designer --schema-only --no-owner --no-privileges -f schema_export.sql"
-    )
-    .run()?;
-    cmd!(
-        sh,
-        "pg_dump -d data_designer --schema-only --no-owner --no-privileges -f migrations/master-schema.sql"
-    )
-    .run()?;
-    println!("Schema exported to schema_export.sql and migrations/master-schema.sql");
+    let status = std::process::Command::new("pg_dump")
+        .arg("--dbname")
+        .arg(&database)
+        .arg("--schema-only")
+        .arg("--no-owner")
+        .arg("--no-privileges")
+        .arg("--restrict-key=obpoccanonicalschemav1")
+        .arg("--exclude-schema=_sqlx_test")
+        .arg("--exclude-table=public._sqlx_migrations")
+        .arg("--file")
+        .arg(&canonical)
+        .status()
+        .context("running pg_dump for the canonical schema snapshot")?;
+    if !status.success() {
+        anyhow::bail!("pg_dump failed with status {status}");
+    }
+
+    std::fs::copy(&canonical, &convenience).with_context(|| {
+        format!(
+            "copying canonical schema {} to {}",
+            canonical.display(),
+            convenience.display()
+        )
+    })?;
+    println!(
+        "Schema exported once to {} and copied byte-for-byte to {}",
+        canonical.display(),
+        convenience.display()
+    );
     Ok(())
 }
 

@@ -1,7 +1,7 @@
 services:
   # Uncomment 'db' service if you want a separate Docker Postgres instance
   # db:
-  #   image: pgvector/pgvector:pg17
+  #   image: pgvector/pgvector:pg18
   #   container_name: ob-poc-db
   #   environment:
   #     POSTGRES_DB: data_designer
@@ -11,7 +11,7 @@ services:
   #     - "5433:5432"
   #   volumes:
   #     - postgres_data:/var/lib/postgresql/data
-  #     - ./init_docker.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+  #     - ./migrations/master-schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
   #   healthcheck:
   #     test: ["CMD-SHELL", "pg_isready -U postgres -d data_designer"]
   #     interval: 5s

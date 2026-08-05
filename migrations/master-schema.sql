@@ -2,9 +2,9 @@
 -- PostgreSQL database dump
 --
 
-\restrict vZfPfQ49jOq7a0vVldnb1LWmDE62eEbMaYs53cpTuNEupbctwoDIsidIwpFp1O1
+\restrict obpoccanonicalschemav1
 
--- Dumped from database version 18.1 (Homebrew)
+-- Dumped from database version 18.4 (Debian 18.4-1.pgdg12+1)
 -- Dumped by pg_dump version 18.1 (Homebrew)
 
 SET statement_timeout = 0;
@@ -20,13 +20,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: _sqlx_test; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA _sqlx_test;
-
-
---
 -- Name: ob-poc; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -38,13 +31,6 @@ CREATE SCHEMA "ob-poc";
 --
 
 COMMENT ON SCHEMA "ob-poc" IS 'OB-POC schema with config-driven visualization. Phase 2 adds layout persistence and caching.';
-
-
---
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
-
--- *not* creating schema, since initdb creates it
 
 
 --
@@ -6704,29 +6690,6 @@ $$;
 
 
 --
--- Name: database_ids; Type: SEQUENCE; Schema: _sqlx_test; Owner: -
---
-
-CREATE SEQUENCE _sqlx_test.database_ids
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: databases; Type: TABLE; Schema: _sqlx_test; Owner: -
---
-
-CREATE TABLE _sqlx_test.databases (
-    db_name text NOT NULL,
-    test_path text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: access_attestations; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -6964,7 +6927,7 @@ CREATE TABLE "ob-poc".application_instances (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT application_instances_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['PROVISIONED'::character varying, 'ACTIVE'::character varying, 'MAINTENANCE_WINDOW'::character varying, 'DEGRADED'::character varying, 'OFFLINE'::character varying, 'DECOMMISSIONED'::character varying])::text[])))
+    CONSTRAINT application_instances_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY (ARRAY[('PROVISIONED'::character varying)::text, ('ACTIVE'::character varying)::text, ('MAINTENANCE_WINDOW'::character varying)::text, ('DEGRADED'::character varying)::text, ('OFFLINE'::character varying)::text, ('DECOMMISSIONED'::character varying)::text])))
 );
 
 
@@ -7028,7 +6991,7 @@ CREATE TABLE "ob-poc".appointment_rights (
     source_document_ref character varying(255),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT appt_rights_chk_type CHECK (((right_type)::text = ANY ((ARRAY['APPOINT'::character varying, 'REMOVE'::character varying, 'APPOINT_AND_REMOVE'::character varying, 'VETO_APPOINTMENT'::character varying, 'OBSERVER'::character varying])::text[])))
+    CONSTRAINT appt_rights_chk_type CHECK (((right_type)::text = ANY (ARRAY[('APPOINT'::character varying)::text, ('REMOVE'::character varying)::text, ('APPOINT_AND_REMOVE'::character varying)::text, ('VETO_APPOINTMENT'::character varying)::text, ('OBSERVER'::character varying)::text])))
 );
 
 
@@ -7519,7 +7482,7 @@ CREATE TABLE "ob-poc".booking_principal_clearances (
     notes text,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    CONSTRAINT booking_principal_clearances_status_check CHECK (((clearance_status)::text = ANY ((ARRAY['PENDING'::character varying, 'SCREENING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying, 'REVOKED'::character varying])::text[])))
+    CONSTRAINT booking_principal_clearances_status_check CHECK (((clearance_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('SCREENING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('REVOKED'::character varying)::text])))
 );
 
 
@@ -7803,7 +7766,7 @@ CREATE TABLE "ob-poc".capability_bindings (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT capability_bindings_binding_status_check CHECK (((binding_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PILOT'::character varying, 'LIVE'::character varying, 'DEPRECATED'::character varying, 'RETIRED'::character varying])::text[])))
+    CONSTRAINT capability_bindings_binding_status_check CHECK (((binding_status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('PILOT'::character varying)::text, ('LIVE'::character varying)::text, ('DEPRECATED'::character varying)::text, ('RETIRED'::character varying)::text])))
 );
 
 
@@ -7950,7 +7913,7 @@ CREATE TABLE "ob-poc".cases (
     due_date date,
     escalation_date date,
     row_version bigint DEFAULT 1 NOT NULL,
-    CONSTRAINT cases_chk_case_status CHECK (((status)::text = ANY ((ARRAY['INTAKE'::character varying, 'DISCOVERY'::character varying, 'ASSESSMENT'::character varying, 'REVIEW'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'BLOCKED'::character varying, 'WITHDRAWN'::character varying, 'DO_NOT_ONBOARD'::character varying, 'EXPIRED'::character varying, 'REFER_TO_REGULATOR'::character varying])::text[]))),
+    CONSTRAINT cases_chk_case_status CHECK (((status)::text = ANY (ARRAY[('INTAKE'::character varying)::text, ('DISCOVERY'::character varying)::text, ('ASSESSMENT'::character varying)::text, ('REVIEW'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text, ('BLOCKED'::character varying)::text, ('WITHDRAWN'::character varying)::text, ('DO_NOT_ONBOARD'::character varying)::text, ('EXPIRED'::character varying)::text, ('REFER_TO_REGULATOR'::character varying)::text]))),
     CONSTRAINT cases_chk_case_type CHECK (((case_type)::text = ANY (ARRAY[('NEW_CLIENT'::character varying)::text, ('PERIODIC_REVIEW'::character varying)::text, ('EVENT_DRIVEN'::character varying)::text, ('REMEDIATION'::character varying)::text]))),
     CONSTRAINT cases_chk_escalation_level CHECK (((escalation_level)::text = ANY (ARRAY[('STANDARD'::character varying)::text, ('SENIOR_COMPLIANCE'::character varying)::text, ('EXECUTIVE'::character varying)::text, ('BOARD'::character varying)::text]))),
     CONSTRAINT cases_chk_risk_rating CHECK (((risk_rating IS NULL) OR ((risk_rating)::text = ANY (ARRAY[('LOW'::character varying)::text, ('MEDIUM'::character varying)::text, ('HIGH'::character varying)::text, ('VERY_HIGH'::character varying)::text, ('PROHIBITED'::character varying)::text]))))
@@ -8967,7 +8930,7 @@ CREATE TABLE "ob-poc".cbu_resource_instances (
     last_event_at timestamp with time zone,
     srdef_id text,
     resource_locator jsonb,
-    CONSTRAINT cbu_resource_instances_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROVISIONING'::character varying, 'AWAITING_OWNER'::character varying, 'ACTIVE'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying, 'SUSPENDED'::character varying, 'DECOMMISSIONED'::character varying])::text[])))
+    CONSTRAINT cbu_resource_instances_status_check CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('PROVISIONING'::character varying)::text, ('AWAITING_OWNER'::character varying)::text, ('ACTIVE'::character varying)::text, ('FAILED'::character varying)::text, ('CANCELLED'::character varying)::text, ('SUSPENDED'::character varying)::text, ('DECOMMISSIONED'::character varying)::text])))
 );
 
 
@@ -9336,7 +9299,7 @@ CREATE TABLE "ob-poc".cbu_structure_links (
     terminated_at timestamp with time zone,
     terminated_reason text,
     CONSTRAINT cbu_structure_links_no_self_link CHECK ((parent_cbu_id <> child_cbu_id)),
-    CONSTRAINT cbu_structure_links_status_check CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'TERMINATED'::character varying, 'SUSPENDED'::character varying])::text[])))
+    CONSTRAINT cbu_structure_links_status_check CHECK (((status)::text = ANY (ARRAY[('ACTIVE'::character varying)::text, ('TERMINATED'::character varying)::text, ('SUSPENDED'::character varying)::text])))
 );
 
 
@@ -9506,7 +9469,7 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
     group_id uuid,
     is_template boolean DEFAULT false NOT NULL,
     template_id uuid,
-    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SUBMITTED'::character varying, 'APPROVED'::character varying, 'PARALLEL_RUN'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
+    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('SUBMITTED'::character varying)::text, ('APPROVED'::character varying)::text, ('PARALLEL_RUN'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('REJECTED'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('ARCHIVED'::character varying)::text])))
 );
 
 
@@ -9629,8 +9592,8 @@ CREATE TABLE "ob-poc".cbus (
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY (ARRAY[('FUND_MANDATE'::character varying)::text, ('CORPORATE_GROUP'::character varying)::text, ('INSTITUTIONAL_ACCOUNT'::character varying)::text, ('RETAIL_CLIENT'::character varying)::text, ('FAMILY_TRUST'::character varying)::text, ('CORRESPONDENT_BANK'::character varying)::text, ('INTERNAL_TEST'::character varying)::text])))),
     CONSTRAINT chk_cbu_discovery_state CHECK (((cbu_discovery_state)::text = ANY (ARRAY['PENDING'::text, 'DISCOVERING'::text, 'ROLLUP'::text, 'POPULATE'::text, 'PROVISION'::text, 'READY'::text, 'FAILED'::text, 'BLOCKED'::text]))),
     CONSTRAINT chk_cbu_disposition_status CHECK (((disposition_status)::text = ANY (ARRAY[('active'::character varying)::text, ('under_remediation'::character varying)::text, ('soft_deleted'::character varying)::text, ('hard_deleted'::character varying)::text]))),
-    CONSTRAINT chk_cbu_operational_status CHECK (((operational_status IS NULL) OR ((operational_status)::text = ANY ((ARRAY['dormant'::character varying, 'trade_permissioned'::character varying, 'actively_trading'::character varying, 'restricted'::character varying, 'suspended'::character varying, 'winding_down'::character varying, 'offboarded'::character varying, 'archived'::character varying])::text[])))),
-    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
+    CONSTRAINT chk_cbu_operational_status CHECK (((operational_status IS NULL) OR ((operational_status)::text = ANY (ARRAY[('dormant'::character varying)::text, ('trade_permissioned'::character varying)::text, ('actively_trading'::character varying)::text, ('restricted'::character varying)::text, ('suspended'::character varying)::text, ('winding_down'::character varying)::text, ('offboarded'::character varying)::text, ('archived'::character varying)::text])))),
+    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY (ARRAY[('DISCOVERED'::character varying)::text, ('VALIDATION_PENDING'::character varying)::text, ('VALIDATED'::character varying)::text, ('UPDATE_PENDING_PROOF'::character varying)::text, ('VALIDATION_FAILED'::character varying)::text])))
 );
 
 
@@ -10288,7 +10251,7 @@ CREATE TABLE "ob-poc".compiled_runbook_events (
     new_status character varying(20),
     detail jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT valid_event_type CHECK (((event_type)::text = ANY ((ARRAY['status_change'::character varying, 'lock_acquired'::character varying, 'lock_released'::character varying, 'lock_contention'::character varying, 'step_completed'::character varying, 'step_failed'::character varying])::text[])))
+    CONSTRAINT valid_event_type CHECK (((event_type)::text = ANY (ARRAY[('status_change'::character varying)::text, ('lock_acquired'::character varying)::text, ('lock_released'::character varying)::text, ('lock_contention'::character varying)::text, ('step_completed'::character varying)::text, ('step_failed'::character varying)::text])))
 );
 
 
@@ -10453,6 +10416,41 @@ COMMENT ON COLUMN "ob-poc".control_edges.psc_category IS 'UK PSC category (auto-
 
 
 --
+-- Name: control_plane_audit; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".control_plane_audit (
+    seq bigint NOT NULL,
+    decision_id uuid NOT NULL,
+    event_type text NOT NULL,
+    occurred_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    session_id uuid NOT NULL,
+    payload jsonb NOT NULL
+);
+
+
+--
+-- Name: TABLE control_plane_audit; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".control_plane_audit IS 'EOP-DESIGN-CONTROLPLANE-G2-AUDIT-PROVENANCE-001 §2: append-only per-decision lifecycle event stream. Storage substrate for the consume_seam/post_dispatch gate-outcome provenance values and the G11 AuditReplay evaluation surface. No hash chain (struck at ratification -- single-operator deployment, no adversarial threat model).';
+
+
+--
+-- Name: control_plane_audit_seq_seq; Type: SEQUENCE; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE "ob-poc".control_plane_audit ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "ob-poc".control_plane_audit_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: control_plane_envelopes; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -10468,6 +10466,7 @@ CREATE TABLE "ob-poc".control_plane_envelopes (
     void_reason text,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     record jsonb,
+    entry_id uuid,
     CONSTRAINT control_plane_envelopes_status_check CHECK ((status = ANY (ARRAY['sealed'::text, 'consumed'::text, 'expired'::text, 'voided'::text])))
 );
 
@@ -10487,6 +10486,13 @@ COMMENT ON COLUMN "ob-poc".control_plane_envelopes.record IS 'T10.1: serialised 
 
 
 --
+-- Name: COLUMN control_plane_envelopes.entry_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_envelopes.entry_id IS 'G1 item 2 (EOP-DESIGN-CONTROLPLANE-G1-SEAL-CONSUME-001 §2.1): the RunbookEntry/CompiledStep.step_id that produced this sealed envelope. NULL for any envelope sealed before this column existed (none in production as of 2026-07-13 — shadow-sealing-only). The consume site looks up the freshest sealed row for (session_id, entry_id).';
+
+
+--
 -- Name: control_plane_shadow_decisions; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -10499,7 +10505,14 @@ CREATE TABLE "ob-poc".control_plane_shadow_decisions (
     gate_results jsonb NOT NULL,
     legacy_outcome_blocked boolean NOT NULL,
     shadow_intent_admission_blocked boolean CONSTRAINT control_plane_shadow_decisi_shadow_intent_admission_bl_not_null NOT NULL,
-    diverged boolean NOT NULL
+    diverged boolean NOT NULL,
+    floor_rejected boolean DEFAULT false NOT NULL,
+    floor_gate text,
+    floor_reason text,
+    execution_path text DEFAULT 'A'::text NOT NULL,
+    decision_id uuid,
+    CONSTRAINT control_plane_shadow_decisions_execution_path_valid CHECK ((execution_path = ANY (ARRAY['A'::text, 'B'::text, 'C'::text, 'D'::text]))),
+    CONSTRAINT control_plane_shadow_decisions_floor_reason_check CHECK ((((floor_rejected = false) AND (floor_gate IS NULL) AND (floor_reason IS NULL)) OR ((floor_rejected = true) AND (floor_gate IS NOT NULL) AND (floor_reason IS NOT NULL))))
 );
 
 
@@ -10508,6 +10521,41 @@ CREATE TABLE "ob-poc".control_plane_shadow_decisions (
 --
 
 COMMENT ON TABLE "ob-poc".control_plane_shadow_decisions IS 'T2.7 shadow-mode ob-poc-control-plane decisions vs legacy Phase 5 recheck outcome (EOP-PLAN-CONTROLPLANE-001). Never gates dispatch; divergence triage input for per-gate enforce-mode graduation.';
+
+
+--
+-- Name: COLUMN control_plane_shadow_decisions.floor_rejected; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_shadow_decisions.floor_rejected IS 'T11.F.2: true iff the definitional floor (G1 registry-absence, G3 MissingPack/AmbiguousPack, G4 topological/blocking_violations) actually blocked this dispatch -- distinguishes a real hard rejection from an ordinary shadow-only observation in the same table.';
+
+
+--
+-- Name: COLUMN control_plane_shadow_decisions.floor_gate; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_shadow_decisions.floor_gate IS 'Which gate fired the floor rejection: "G1" | "G3" | "G4". NULL unless floor_rejected.';
+
+
+--
+-- Name: COLUMN control_plane_shadow_decisions.floor_reason; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_shadow_decisions.floor_reason IS 'Human-readable reason the floor fired (e.g. the missing verb_fqn, the pack-resolution outcome, the blocking_violations join). NULL unless floor_rejected.';
+
+
+--
+-- Name: COLUMN control_plane_shadow_decisions.execution_path; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_shadow_decisions.execution_path IS 'G5: which of the 4 RR-2 ExecutionPath variants this shadow decision was evaluated under (A=RunbookSequencer, B=DslDirect, C=WorkflowDispatched, D=BusFederated). Default A is a correct historical backfill, not a guess -- every pre-G5 row came from Path A''s sole shadow call site.';
+
+
+--
+-- Name: COLUMN control_plane_shadow_decisions.decision_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".control_plane_shadow_decisions.decision_id IS 'G11 join fix: the same per-attempt-unique decision_id control_plane_audit rows for this shadow evaluation are keyed by (envelope.id() for ApprovedStp, a fresh Uuid::new_v4() otherwise) -- the correct DD-4(ii) re-derivation join key. entry_id alone is NOT unique (reused across retries of the same runbook step) and must never be used for that join. NULL for pre-this-migration rows and for shadow rows with no corresponding control_plane_audit DecisionEvaluated event (e.g. Path D/bus_runtime.rs, which does not emit one at all).';
 
 
 --
@@ -10704,7 +10752,7 @@ CREATE TABLE "ob-poc".deal_onboarding_requests (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT deal_onboarding_requests_status_check CHECK (((request_status)::text = ANY ((ARRAY['PENDING'::character varying, 'IN_PROGRESS'::character varying, 'BLOCKED'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying])::text[])))
+    CONSTRAINT deal_onboarding_requests_status_check CHECK (((request_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('IN_PROGRESS'::character varying)::text, ('BLOCKED'::character varying)::text, ('COMPLETED'::character varying)::text, ('CANCELLED'::character varying)::text])))
 );
 
 
@@ -10784,7 +10832,7 @@ CREATE TABLE "ob-poc".deals (
     CONSTRAINT deals_bac_status_check CHECK (((bac_status IS NULL) OR (bac_status = ANY (ARRAY['pending'::text, 'in_review'::text, 'approved'::text, 'rejected'::text])))),
     CONSTRAINT deals_kyc_clearance_status_check CHECK (((kyc_clearance_status IS NULL) OR (kyc_clearance_status = ANY (ARRAY['pending'::text, 'in_review'::text, 'approved'::text, 'rejected'::text])))),
     CONSTRAINT deals_operational_status_check CHECK (((operational_status IS NULL) OR (operational_status = ANY (ARRAY['ONBOARDING'::text, 'ACTIVE'::text, 'SUSPENDED'::text, 'WINDING_DOWN'::text, 'OFFBOARDED'::text])))),
-    CONSTRAINT deals_status_check CHECK (((deal_status)::text = ANY ((ARRAY['PROSPECT'::character varying, 'QUALIFYING'::character varying, 'NEGOTIATING'::character varying, 'IN_CLEARANCE'::character varying, 'CONTRACTED'::character varying, 'LOST'::character varying, 'REJECTED'::character varying, 'WITHDRAWN'::character varying, 'CANCELLED'::character varying])::text[])))
+    CONSTRAINT deals_status_check CHECK (((deal_status)::text = ANY (ARRAY[('PROSPECT'::character varying)::text, ('QUALIFYING'::character varying)::text, ('NEGOTIATING'::character varying)::text, ('IN_CLEARANCE'::character varying)::text, ('CONTRACTED'::character varying)::text, ('LOST'::character varying)::text, ('REJECTED'::character varying)::text, ('WITHDRAWN'::character varying)::text, ('CANCELLED'::character varying)::text])))
 );
 
 
@@ -10837,8 +10885,8 @@ CREATE TABLE "ob-poc".kyc_clearance_mandates (
     token_id character varying(100),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT chk_clearance_status CHECK (((clearance_status)::text = ANY ((ARRAY['NOT_REQUIRED'::character varying, 'IN_PROGRESS'::character varying, 'CLEARED'::character varying, 'FAILED'::character varying])::text[]))),
-    CONSTRAINT chk_role_id CHECK (((role_id)::text = ANY ((ARRAY['CONTRACTING_PARTY'::character varying, 'GUARANTOR'::character varying, 'INTRODUCER'::character varying, 'INVESTMENT_MANAGER'::character varying, 'FUND_ADMIN'::character varying])::text[])))
+    CONSTRAINT chk_clearance_status CHECK (((clearance_status)::text = ANY (ARRAY[('NOT_REQUIRED'::character varying)::text, ('IN_PROGRESS'::character varying)::text, ('CLEARED'::character varying)::text, ('FAILED'::character varying)::text]))),
+    CONSTRAINT chk_role_id CHECK (((role_id)::text = ANY (ARRAY[('CONTRACTING_PARTY'::character varying)::text, ('GUARANTOR'::character varying)::text, ('INTRODUCER'::character varying)::text, ('INVESTMENT_MANAGER'::character varying)::text, ('FUND_ADMIN'::character varying)::text])))
 );
 
 
@@ -10893,7 +10941,7 @@ CREATE TABLE "ob-poc".deal_documents (
     document_status character varying(50) DEFAULT 'DRAFT'::character varying,
     version integer DEFAULT 1,
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT deal_documents_status_check CHECK (((document_status)::text = ANY ((ARRAY['DRAFT'::character varying, 'UNDER_REVIEW'::character varying, 'SIGNED'::character varying, 'EXECUTED'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
+    CONSTRAINT deal_documents_status_check CHECK (((document_status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('UNDER_REVIEW'::character varying)::text, ('SIGNED'::character varying)::text, ('EXECUTED'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('ARCHIVED'::character varying)::text])))
 );
 
 
@@ -10970,7 +11018,7 @@ CREATE TABLE "ob-poc".deal_products (
     agreed_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT deal_products_status_check CHECK (((product_status)::text = ANY ((ARRAY['PROPOSED'::character varying, 'NEGOTIATING'::character varying, 'AGREED'::character varying, 'DECLINED'::character varying, 'REMOVED'::character varying])::text[])))
+    CONSTRAINT deal_products_status_check CHECK (((product_status)::text = ANY (ARRAY[('PROPOSED'::character varying)::text, ('NEGOTIATING'::character varying)::text, ('AGREED'::character varying)::text, ('DECLINED'::character varying)::text, ('REMOVED'::character varying)::text])))
 );
 
 
@@ -11091,7 +11139,7 @@ CREATE TABLE "ob-poc".deal_slas (
     created_at timestamp with time zone DEFAULT now(),
     sla_status character varying(30) DEFAULT 'NEGOTIATED'::character varying NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT deal_slas_sla_status_check CHECK (((sla_status IS NULL) OR ((sla_status)::text = ANY ((ARRAY['NEGOTIATED'::character varying, 'ACTIVE'::character varying, 'BREACHED'::character varying, 'IN_REMEDIATION'::character varying, 'RESOLVED'::character varying, 'WAIVED'::character varying])::text[]))))
+    CONSTRAINT deal_slas_sla_status_check CHECK (((sla_status IS NULL) OR ((sla_status)::text = ANY (ARRAY[('NEGOTIATED'::character varying)::text, ('ACTIVE'::character varying)::text, ('BREACHED'::character varying)::text, ('IN_REMEDIATION'::character varying)::text, ('RESOLVED'::character varying)::text, ('WAIVED'::character varying)::text]))))
 );
 
 
@@ -13359,7 +13407,7 @@ CREATE TABLE "ob-poc".extraction_jobs (
     created_at timestamp with time zone DEFAULT now(),
     started_at timestamp with time zone,
     completed_at timestamp with time zone,
-    CONSTRAINT check_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'RUNNING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying])::text[])))
+    CONSTRAINT check_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('RUNNING'::character varying)::text, ('COMPLETED'::character varying)::text, ('FAILED'::character varying)::text])))
 );
 
 
@@ -13448,7 +13496,7 @@ CREATE TABLE "ob-poc".fee_billing_periods (
     approved_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT fee_billing_periods_calc_status_check CHECK (((calc_status)::text = ANY ((ARRAY['PENDING'::character varying, 'CALCULATING'::character varying, 'CALCULATED'::character varying, 'REVIEWED'::character varying, 'APPROVED'::character varying, 'DISPUTED'::character varying, 'INVOICED'::character varying])::text[])))
+    CONSTRAINT fee_billing_periods_calc_status_check CHECK (((calc_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CALCULATING'::character varying)::text, ('CALCULATED'::character varying)::text, ('REVIEWED'::character varying)::text, ('APPROVED'::character varying)::text, ('DISPUTED'::character varying)::text, ('INVOICED'::character varying)::text])))
 );
 
 
@@ -13488,7 +13536,7 @@ CREATE TABLE "ob-poc".fee_billing_profiles (
     effective_to date,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT fee_billing_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying, 'CLOSED'::character varying])::text[])))
+    CONSTRAINT fee_billing_profiles_status_check CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('ACTIVE'::character varying)::text, ('SUSPENDED'::character varying)::text, ('CLOSED'::character varying)::text])))
 );
 
 
@@ -13715,9 +13763,9 @@ CREATE TABLE "ob-poc".graph_import_runs (
     superseded_reason text,
     imported_at timestamp with time zone DEFAULT now(),
     imported_by character varying(80) DEFAULT 'SYSTEM'::character varying NOT NULL,
-    CONSTRAINT chk_gir_run_kind CHECK (((run_kind)::text = ANY ((ARRAY['SKELETON_BUILD'::character varying, 'MANUAL_RESEARCH'::character varying, 'REFRESH'::character varying, 'CORRECTION_REPLAY'::character varying])::text[]))),
-    CONSTRAINT chk_gir_source CHECK (((source)::text = ANY ((ARRAY['GLEIF'::character varying, 'COMPANIES_HOUSE'::character varying, 'SEC_EDGAR'::character varying, 'CLIENT_PROVIDED'::character varying, 'INTERNAL_KYC'::character varying, 'BODS'::character varying, 'MANUAL'::character varying, 'AGENT_DISCOVERED'::character varying])::text[]))),
-    CONSTRAINT chk_gir_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SUPERSEDED'::character varying, 'ROLLED_BACK'::character varying, 'PARTIAL'::character varying])::text[])))
+    CONSTRAINT chk_gir_run_kind CHECK (((run_kind)::text = ANY (ARRAY[('SKELETON_BUILD'::character varying)::text, ('MANUAL_RESEARCH'::character varying)::text, ('REFRESH'::character varying)::text, ('CORRECTION_REPLAY'::character varying)::text]))),
+    CONSTRAINT chk_gir_source CHECK (((source)::text = ANY (ARRAY[('GLEIF'::character varying)::text, ('COMPANIES_HOUSE'::character varying)::text, ('SEC_EDGAR'::character varying)::text, ('CLIENT_PROVIDED'::character varying)::text, ('INTERNAL_KYC'::character varying)::text, ('BODS'::character varying)::text, ('MANUAL'::character varying)::text, ('AGENT_DISCOVERED'::character varying)::text]))),
+    CONSTRAINT chk_gir_status CHECK (((status)::text = ANY (ARRAY[('ACTIVE'::character varying)::text, ('SUPERSEDED'::character varying)::text, ('ROLLED_BACK'::character varying)::text, ('PARTIAL'::character varying)::text])))
 );
 
 
@@ -14569,8 +14617,8 @@ CREATE TABLE "ob-poc".kyc_ubo_evidence (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT kyc_ubo_evidence_chk_evidence_status CHECK (((status)::text = ANY ((ARRAY['REQUIRED'::character varying, 'REQUESTED'::character varying, 'RECEIVED'::character varying, 'VERIFIED'::character varying, 'REJECTED'::character varying, 'WAIVED'::character varying, 'EXPIRED'::character varying])::text[]))),
-    CONSTRAINT kyc_ubo_evidence_chk_evidence_type CHECK (((evidence_type)::text = ANY ((ARRAY['IDENTITY_DOC'::character varying, 'OWNERSHIP_REGISTER'::character varying, 'BOARD_RESOLUTION'::character varying, 'TRUST_DEED'::character varying, 'PARTNERSHIP_AGREEMENT'::character varying, 'SCREENING_CLEAR'::character varying, 'SPECIAL_RIGHTS_DOC'::character varying, 'ANNUAL_RETURN'::character varying, 'SHARE_CERTIFICATE'::character varying, 'CHAIN_PROOF'::character varying])::text[])))
+    CONSTRAINT kyc_ubo_evidence_chk_evidence_status CHECK (((status)::text = ANY (ARRAY[('REQUIRED'::character varying)::text, ('REQUESTED'::character varying)::text, ('RECEIVED'::character varying)::text, ('VERIFIED'::character varying)::text, ('REJECTED'::character varying)::text, ('WAIVED'::character varying)::text, ('EXPIRED'::character varying)::text]))),
+    CONSTRAINT kyc_ubo_evidence_chk_evidence_type CHECK (((evidence_type)::text = ANY (ARRAY[('IDENTITY_DOC'::character varying)::text, ('OWNERSHIP_REGISTER'::character varying)::text, ('BOARD_RESOLUTION'::character varying)::text, ('TRUST_DEED'::character varying)::text, ('PARTNERSHIP_AGREEMENT'::character varying)::text, ('SCREENING_CLEAR'::character varying)::text, ('SPECIAL_RIGHTS_DOC'::character varying)::text, ('ANNUAL_RETURN'::character varying)::text, ('SHARE_CERTIFICATE'::character varying)::text, ('CHAIN_PROOF'::character varying)::text])))
 );
 
 
@@ -14599,8 +14647,8 @@ CREATE TABLE "ob-poc".kyc_ubo_registry (
     approved_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT kyc_ubo_registry_chk_ubo_status CHECK (((status)::text = ANY ((ARRAY['CANDIDATE'::character varying, 'IDENTIFIED'::character varying, 'PROVABLE'::character varying, 'PROVED'::character varying, 'REVIEWED'::character varying, 'APPROVED'::character varying, 'WAIVED'::character varying, 'REJECTED'::character varying, 'EXPIRED'::character varying])::text[]))),
-    CONSTRAINT kyc_ubo_registry_chk_ubo_type CHECK (((ubo_type)::text = ANY ((ARRAY['OWNERSHIP'::character varying, 'CONTROL'::character varying, 'TRUST_ROLE'::character varying, 'SMO_FALLBACK'::character varying, 'NOMINEE_BENEFICIARY'::character varying])::text[])))
+    CONSTRAINT kyc_ubo_registry_chk_ubo_status CHECK (((status)::text = ANY (ARRAY[('CANDIDATE'::character varying)::text, ('IDENTIFIED'::character varying)::text, ('PROVABLE'::character varying)::text, ('PROVED'::character varying)::text, ('REVIEWED'::character varying)::text, ('APPROVED'::character varying)::text, ('WAIVED'::character varying)::text, ('REJECTED'::character varying)::text, ('EXPIRED'::character varying)::text]))),
+    CONSTRAINT kyc_ubo_registry_chk_ubo_type CHECK (((ubo_type)::text = ANY (ARRAY[('OWNERSHIP'::character varying)::text, ('CONTROL'::character varying)::text, ('TRUST_ROLE'::character varying)::text, ('SMO_FALLBACK'::character varying)::text, ('NOMINEE_BENEFICIARY'::character varying)::text])))
 );
 
 
@@ -15446,7 +15494,7 @@ CREATE TABLE "ob-poc".outreach_items (
     responded_at timestamp with time zone,
     document_id uuid,
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT outreach_items_chk_oi_status CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'SENT'::character varying, 'RESPONDED'::character varying, 'VERIFIED'::character varying, 'WAIVED'::character varying])::text[])))
+    CONSTRAINT outreach_items_chk_oi_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('SENT'::character varying)::text, ('RESPONDED'::character varying)::text, ('VERIFIED'::character varying)::text, ('WAIVED'::character varying)::text])))
 );
 
 
@@ -15463,7 +15511,7 @@ CREATE TABLE "ob-poc".outreach_plans (
     status character varying(20) DEFAULT 'DRAFT'::character varying,
     total_items integer DEFAULT 0 NOT NULL,
     items_responded integer DEFAULT 0,
-    CONSTRAINT outreach_plans_chk_op_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'APPROVED'::character varying, 'SENT'::character varying, 'PARTIALLY_RESPONDED'::character varying, 'CLOSED'::character varying])::text[])))
+    CONSTRAINT outreach_plans_chk_op_status CHECK (((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('APPROVED'::character varying)::text, ('SENT'::character varying)::text, ('PARTIALLY_RESPONDED'::character varying)::text, ('CLOSED'::character varying)::text])))
 );
 
 
@@ -17582,7 +17630,7 @@ CREATE TABLE "ob-poc".service_versions (
     notes text,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    CONSTRAINT service_versions_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['drafted'::character varying, 'reviewed'::character varying, 'published'::character varying, 'superseded'::character varying, 'retired'::character varying])::text[])))
+    CONSTRAINT service_versions_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY (ARRAY[('drafted'::character varying)::text, ('reviewed'::character varying)::text, ('published'::character varying)::text, ('superseded'::character varying)::text, ('retired'::character varying)::text])))
 );
 
 
@@ -17620,7 +17668,7 @@ CREATE TABLE "ob-poc".services (
     governance_status text DEFAULT 'active'::text NOT NULL,
     created_by text,
     CONSTRAINT services_governance_status_check CHECK ((governance_status = ANY (ARRAY['draft'::text, 'active'::text, 'deprecated'::text, 'retired'::text]))),
-    CONSTRAINT services_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY ((ARRAY['ungoverned'::character varying, 'draft'::character varying, 'active'::character varying, 'deprecated'::character varying, 'retired'::character varying])::text[])))
+    CONSTRAINT services_lifecycle_status_check CHECK (((lifecycle_status)::text = ANY (ARRAY[('ungoverned'::character varying)::text, ('draft'::character varying)::text, ('active'::character varying)::text, ('deprecated'::character varying)::text, ('retired'::character varying)::text])))
 );
 
 
@@ -18896,7 +18944,7 @@ CREATE TABLE "ob-poc".tollgate_definitions (
     override_permitted boolean DEFAULT true,
     override_authority character varying(30),
     override_max_days integer,
-    CONSTRAINT chk_td_applies CHECK (((applies_to)::text = ANY ((ARRAY['CASE'::character varying, 'WORKSTREAM'::character varying])::text[])))
+    CONSTRAINT chk_td_applies CHECK (((applies_to)::text = ANY (ARRAY[('CASE'::character varying)::text, ('WORKSTREAM'::character varying)::text])))
 );
 
 
@@ -18936,7 +18984,7 @@ CREATE TABLE "ob-poc".tollgate_thresholds (
     applies_to_case_types text[],
     description text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT tollgate_thresholds_chk_comparison CHECK (((comparison)::text = ANY ((ARRAY['eq'::character varying, 'neq'::character varying, 'gt'::character varying, 'gte'::character varying, 'lt'::character varying, 'lte'::character varying])::text[])))
+    CONSTRAINT tollgate_thresholds_chk_comparison CHECK (((comparison)::text = ANY (ARRAY[('eq'::character varying)::text, ('neq'::character varying)::text, ('gt'::character varying)::text, ('gte'::character varying)::text, ('lt'::character varying)::text, ('lte'::character varying)::text])))
 );
 
 
@@ -19448,12 +19496,12 @@ CREATE VIEW "ob-poc".v_attribute_lineage_summary AS
     ar.category,
     count(DISTINCT
         CASE
-            WHEN ((dal.direction)::text = ANY ((ARRAY['SOURCE'::character varying, 'BOTH'::character varying])::text[])) THEN dal.document_type_id
+            WHEN ((dal.direction)::text = ANY (ARRAY[('SOURCE'::character varying)::text, ('BOTH'::character varying)::text])) THEN dal.document_type_id
             ELSE NULL::uuid
         END) AS source_count,
     count(DISTINCT
         CASE
-            WHEN ((dal.direction)::text = ANY ((ARRAY['SINK'::character varying, 'BOTH'::character varying])::text[])) THEN dal.document_type_id
+            WHEN ((dal.direction)::text = ANY (ARRAY[('SINK'::character varying)::text, ('BOTH'::character varying)::text])) THEN dal.document_type_id
             ELSE NULL::uuid
         END) AS sink_count,
     count(DISTINCT rar.resource_id) AS resource_count,
@@ -19525,7 +19573,7 @@ CREATE VIEW "ob-poc".v_attribute_registry_reconciled AS
          SELECT document_attribute_links.attribute_id,
             count(*) AS document_sources
            FROM "ob-poc".document_attribute_links
-          WHERE ((document_attribute_links.direction)::text = ANY ((ARRAY['SOURCE'::character varying, 'BOTH'::character varying])::text[]))
+          WHERE ((document_attribute_links.direction)::text = ANY (ARRAY[('SOURCE'::character varying)::text, ('BOTH'::character varying)::text]))
           GROUP BY document_attribute_links.attribute_id
         )
  SELECT ar.id AS registry_id,
@@ -20523,7 +20571,7 @@ CREATE VIEW "ob-poc".v_cbu_service_gaps AS
    FROM required_resources rr
   WHERE (NOT (EXISTS ( SELECT 1
            FROM "ob-poc".cbu_resource_instances cri
-          WHERE ((cri.cbu_id = rr.cbu_id) AND (cri.product_id = rr.product_id) AND (cri.service_id = rr.service_id) AND (cri.resource_type_id = rr.resource_type_id) AND ((cri.status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROVISIONING'::character varying, 'ACTIVE'::character varying])::text[]))))))
+          WHERE ((cri.cbu_id = rr.cbu_id) AND (cri.product_id = rr.product_id) AND (cri.service_id = rr.service_id) AND (cri.resource_type_id = rr.resource_type_id) AND ((cri.status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('PROVISIONING'::character varying)::text, ('ACTIVE'::character varying)::text]))))))
   ORDER BY cbu_name, product_code, service_code, resource_code;
 
 
@@ -21161,7 +21209,7 @@ CREATE VIEW "ob-poc".v_entity_regulatory_summary AS
     (EXISTS ( SELECT 1
            FROM ("ob-poc".entity_regulatory_registrations verified
              JOIN "ob-poc".regulators reg_1 ON (((verified.regulator_code)::text = (reg_1.regulator_code)::text)))
-          WHERE ((verified.entity_id = e.entity_id) AND ((verified.status)::text = 'ACTIVE'::text) AND (verified.registration_verified = true) AND ((reg_1.tier)::text = ANY ((ARRAY['EQUIVALENT'::character varying, 'ACCEPTABLE'::character varying])::text[])) AND COALESCE(reg_1.active, true)))) AS allows_simplified_dd,
+          WHERE ((verified.entity_id = e.entity_id) AND ((verified.status)::text = 'ACTIVE'::text) AND (verified.registration_verified = true) AND ((reg_1.tier)::text = ANY (ARRAY[('EQUIVALENT'::character varying)::text, ('ACCEPTABLE'::character varying)::text])) AND COALESCE(reg_1.active, true)))) AS allows_simplified_dd,
     array_agg(DISTINCT r.regulator_code) FILTER (WHERE ((r.status)::text = 'ACTIVE'::text)) AS active_regulators,
     array_agg(DISTINCT r.regulator_code) FILTER (WHERE (r.registration_verified AND ((r.status)::text = 'ACTIVE'::text))) AS verified_regulators,
     max(r.verification_date) AS last_verified,
@@ -22565,20 +22613,6 @@ COMMENT ON COLUMN "ob-poc".workspace_fact_refs.status IS 'current = up to date; 
 
 
 --
--- Name: _sqlx_migrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public._sqlx_migrations (
-    version bigint NOT NULL,
-    description text NOT NULL,
-    installed_on timestamp with time zone DEFAULT now() NOT NULL,
-    success boolean NOT NULL,
-    checksum bytea NOT NULL,
-    execution_time bigint NOT NULL
-);
-
-
---
 -- Name: dsl_active_token; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -22816,7 +22850,7 @@ CREATE TABLE sem_reg.agent_plans (
     created_by character varying(200) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone,
-    CONSTRAINT agent_plans_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
+    CONSTRAINT agent_plans_status_check CHECK (((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('active'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text, ('cancelled'::character varying)::text])))
 );
 
 
@@ -22850,7 +22884,7 @@ CREATE TABLE sem_reg.basis_records (
     narrative text,
     created_by character varying(200) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT basis_records_kind_check CHECK (((kind)::text = ANY ((ARRAY['regulatory_fact'::character varying, 'market_practice'::character varying, 'platform_convention'::character varying, 'client_requirement'::character varying, 'precedent'::character varying])::text[])))
+    CONSTRAINT basis_records_kind_check CHECK (((kind)::text = ANY (ARRAY[('regulatory_fact'::character varying)::text, ('market_practice'::character varying)::text, ('platform_convention'::character varying)::text, ('client_requirement'::character varying)::text, ('precedent'::character varying)::text])))
 );
 
 
@@ -22894,7 +22928,7 @@ CREATE TABLE sem_reg.changeset_entries (
     artifact_type text,
     ordinal integer DEFAULT 0,
     entry_metadata jsonb,
-    CONSTRAINT changeset_entries_action_check CHECK (((action)::text = ANY ((ARRAY['add'::character varying, 'modify'::character varying, 'promote'::character varying, 'deprecate'::character varying, 'alias'::character varying])::text[]))),
+    CONSTRAINT changeset_entries_action_check CHECK (((action)::text = ANY (ARRAY[('add'::character varying)::text, ('modify'::character varying)::text, ('promote'::character varying)::text, ('deprecate'::character varying)::text, ('alias'::character varying)::text]))),
     CONSTRAINT changeset_entries_change_kind_check CHECK ((change_kind = ANY (ARRAY['add'::text, 'modify'::text, 'remove'::text])))
 );
 
@@ -22984,7 +23018,7 @@ CREATE TABLE sem_reg.conflict_records (
     resolution_rationale text,
     resolved_by character varying(200),
     resolved_at timestamp with time zone,
-    CONSTRAINT conflict_records_resolution_strategy_check CHECK (((resolution_strategy)::text = ANY ((ARRAY['merge'::character varying, 'rebase'::character varying, 'supersede'::character varying])::text[])))
+    CONSTRAINT conflict_records_resolution_strategy_check CHECK (((resolution_strategy)::text = ANY (ARRAY[('merge'::character varying)::text, ('rebase'::character varying)::text, ('supersede'::character varying)::text])))
 );
 
 
@@ -23098,7 +23132,7 @@ CREATE TABLE sem_reg.escalation_records (
     resolution text,
     created_by character varying(200) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT escalation_records_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])))
+    CONSTRAINT escalation_records_severity_check CHECK (((severity)::text = ANY (ARRAY[('info'::character varying)::text, ('warning'::character varying)::text, ('critical'::character varying)::text])))
 );
 
 
@@ -23114,7 +23148,7 @@ CREATE TABLE sem_reg.events (
     payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     viewport_manifest_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT events_event_type_check CHECK (((event_type)::text = ANY ((ARRAY['changeset_created'::character varying, 'item_added'::character varying, 'item_removed'::character varying, 'item_refined'::character varying, 'basis_attached'::character varying, 'guardrail_fired'::character varying, 'gate_prechecked'::character varying, 'submitted_for_review'::character varying, 'review_note_added'::character varying, 'review_decision_recorded'::character varying, 'focus_changed'::character varying, 'published'::character varying, 'rejected'::character varying])::text[])))
+    CONSTRAINT events_event_type_check CHECK (((event_type)::text = ANY (ARRAY[('changeset_created'::character varying)::text, ('item_added'::character varying)::text, ('item_removed'::character varying)::text, ('item_refined'::character varying)::text, ('basis_attached'::character varying)::text, ('guardrail_fired'::character varying)::text, ('gate_prechecked'::character varying)::text, ('submitted_for_review'::character varying)::text, ('review_note_added'::character varying)::text, ('review_decision_recorded'::character varying)::text, ('focus_changed'::character varying)::text, ('published'::character varying)::text, ('rejected'::character varying)::text])))
 );
 
 
@@ -23132,8 +23166,8 @@ CREATE TABLE sem_reg.focus_states (
     resolution_context jsonb,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_by character varying(20) DEFAULT 'agent'::character varying NOT NULL,
-    CONSTRAINT focus_states_overlay_mode_check CHECK (((overlay_mode)::text = ANY ((ARRAY['active_only'::character varying, 'draft_overlay'::character varying])::text[]))),
-    CONSTRAINT focus_states_updated_by_check CHECK (((updated_by)::text = ANY ((ARRAY['agent'::character varying, 'user_navigation'::character varying])::text[])))
+    CONSTRAINT focus_states_overlay_mode_check CHECK (((overlay_mode)::text = ANY (ARRAY[('active_only'::character varying)::text, ('draft_overlay'::character varying)::text]))),
+    CONSTRAINT focus_states_updated_by_check CHECK (((updated_by)::text = ANY (ARRAY[('agent'::character varying)::text, ('user_navigation'::character varying)::text])))
 );
 
 
@@ -23206,7 +23240,7 @@ CREATE TABLE sem_reg.plan_steps (
     error text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone,
-    CONSTRAINT plan_steps_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
+    CONSTRAINT plan_steps_status_check CHECK (((status)::text = ANY (ARRAY[('pending'::character varying)::text, ('running'::character varying)::text, ('completed'::character varying)::text, ('failed'::character varying)::text, ('skipped'::character varying)::text])))
 );
 
 
@@ -23276,7 +23310,7 @@ CREATE TABLE sem_reg.templates (
     created_by character varying(200) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT templates_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'deprecated'::character varying])::text[])))
+    CONSTRAINT templates_status_check CHECK (((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('active'::character varying)::text, ('deprecated'::character varying)::text])))
 );
 
 
@@ -23645,8 +23679,8 @@ CREATE TABLE sem_reg.verb_implementation_bindings (
     last_verified_at timestamp with time zone,
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT verb_implementation_bindings_binding_kind_check CHECK (((binding_kind)::text = ANY ((ARRAY['rust_handler'::character varying, 'bpmn_process'::character varying, 'remote_http'::character varying, 'macro_expansion'::character varying])::text[]))),
-    CONSTRAINT verb_implementation_bindings_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying, 'deprecated'::character varying])::text[])))
+    CONSTRAINT verb_implementation_bindings_binding_kind_check CHECK (((binding_kind)::text = ANY (ARRAY[('rust_handler'::character varying)::text, ('bpmn_process'::character varying)::text, ('remote_http'::character varying)::text, ('macro_expansion'::character varying)::text]))),
+    CONSTRAINT verb_implementation_bindings_status_check CHECK (((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('active'::character varying)::text, ('deprecated'::character varying)::text])))
 );
 
 
@@ -23954,14 +23988,6 @@ ALTER TABLE ONLY public.dsl_journey_log ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY sem_reg.classification_levels ALTER COLUMN level_id SET DEFAULT nextval('sem_reg.classification_levels_level_id_seq'::regclass);
-
-
---
--- Name: databases databases_pkey; Type: CONSTRAINT; Schema: _sqlx_test; Owner: -
---
-
-ALTER TABLE ONLY _sqlx_test.databases
-    ADD CONSTRAINT databases_pkey PRIMARY KEY (db_name);
 
 
 --
@@ -25186,6 +25212,14 @@ ALTER TABLE ONLY "ob-poc".contract_template
 
 ALTER TABLE ONLY "ob-poc".control_edges
     ADD CONSTRAINT control_edges_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: control_plane_audit control_plane_audit_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".control_plane_audit
+    ADD CONSTRAINT control_plane_audit_pkey PRIMARY KEY (seq);
 
 
 --
@@ -28285,14 +28319,6 @@ ALTER TABLE ONLY "ob-poc".workspace_fact_refs
 
 
 --
--- Name: _sqlx_migrations _sqlx_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public._sqlx_migrations
-    ADD CONSTRAINT _sqlx_migrations_pkey PRIMARY KEY (version);
-
-
---
 -- Name: dsl_active_token dsl_active_token_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -28738,13 +28764,6 @@ ALTER TABLE ONLY sem_reg_pub.active_verb_contracts
 
 ALTER TABLE ONLY sem_reg_pub.projection_watermark
     ADD CONSTRAINT projection_watermark_pkey PRIMARY KEY (projection_name);
-
-
---
--- Name: databases_created_at; Type: INDEX; Schema: _sqlx_test; Owner: -
---
-
-CREATE INDEX databases_created_at ON _sqlx_test.databases USING btree (created_at);
 
 
 --
@@ -30589,6 +30608,20 @@ CREATE UNIQUE INDEX idx_control_edges_unique_active ON "ob-poc".control_edges US
 
 
 --
+-- Name: idx_control_plane_audit_decision_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_audit_decision_id ON "ob-poc".control_plane_audit USING btree (decision_id);
+
+
+--
+-- Name: idx_control_plane_audit_event_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_audit_event_type ON "ob-poc".control_plane_audit USING btree (event_type);
+
+
+--
 -- Name: idx_control_plane_envelopes_sealed_not_after; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30603,10 +30636,38 @@ CREATE INDEX idx_control_plane_envelopes_session ON "ob-poc".control_plane_envel
 
 
 --
+-- Name: idx_control_plane_envelopes_session_entry_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_envelopes_session_entry_status ON "ob-poc".control_plane_envelopes USING btree (session_id, entry_id, status);
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_decision_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_decision_id ON "ob-poc".control_plane_shadow_decisions USING btree (decision_id) WHERE (decision_id IS NOT NULL);
+
+
+--
 -- Name: idx_control_plane_shadow_decisions_diverged; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_control_plane_shadow_decisions_diverged ON "ob-poc".control_plane_shadow_decisions USING btree (diverged, decided_at DESC) WHERE diverged;
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_execution_path; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_execution_path ON "ob-poc".control_plane_shadow_decisions USING btree (execution_path, decided_at DESC);
+
+
+--
+-- Name: idx_control_plane_shadow_decisions_floor_rejected; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_control_plane_shadow_decisions_floor_rejected ON "ob-poc".control_plane_shadow_decisions USING btree (floor_rejected, decided_at DESC) WHERE floor_rejected;
 
 
 --
@@ -34246,7 +34307,7 @@ CREATE UNIQUE INDEX idx_trading_profiles_one_active ON "ob-poc".cbu_trading_prof
 -- Name: idx_trading_profiles_one_working_version; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'SUBMITTED'::character varying, 'APPROVED'::character varying, 'PARALLEL_RUN'::character varying])::text[]));
+CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY (ARRAY[('DRAFT'::character varying)::text, ('SUBMITTED'::character varying)::text, ('APPROVED'::character varying)::text, ('PARALLEL_RUN'::character varying)::text]));
 
 
 --
@@ -35219,7 +35280,7 @@ CREATE INDEX idx_agent_plans_case_id ON sem_reg.agent_plans USING btree (case_id
 -- Name: idx_agent_plans_status; Type: INDEX; Schema: sem_reg; Owner: -
 --
 
-CREATE INDEX idx_agent_plans_status ON sem_reg.agent_plans USING btree (status) WHERE ((status)::text = ANY ((ARRAY['draft'::character varying, 'active'::character varying])::text[]));
+CREATE INDEX idx_agent_plans_status ON sem_reg.agent_plans USING btree (status) WHERE ((status)::text = ANY (ARRAY[('draft'::character varying)::text, ('active'::character varying)::text]));
 
 
 --
@@ -41177,5 +41238,5 @@ ALTER TABLE ONLY sem_reg_authoring.validation_reports
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vZfPfQ49jOq7a0vVldnb1LWmDE62eEbMaYs53cpTuNEupbctwoDIsidIwpFp1O1
+\unrestrict obpoccanonicalschemav1
 

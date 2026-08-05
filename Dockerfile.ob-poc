@@ -49,11 +49,13 @@ FROM gcr.io/distroless/cc-debian12:nonroot
 ARG APP_REVISION
 ARG SHARED_DSL_REVISION
 ARG BPMN_LITE_REVISION
+ARG SCHEMA_SHA256
 
 LABEL org.opencontainers.image.title="ob-poc" \
       org.opencontainers.image.revision="${APP_REVISION}" \
       io.ob-poc.shared-dsl-revision="${SHARED_DSL_REVISION}" \
-      io.ob-poc.bpmn-lite-revision="${BPMN_LITE_REVISION}"
+      io.ob-poc.bpmn-lite-revision="${BPMN_LITE_REVISION}" \
+      io.ob-poc.schema-sha256="${SCHEMA_SHA256}"
 
 ENV OB_POC_BUILD_REVISION="${APP_REVISION}" \
     OB_POC_SHARED_DSL_REVISION="${SHARED_DSL_REVISION}" \

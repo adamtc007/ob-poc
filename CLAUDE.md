@@ -85,7 +85,7 @@ cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check
 cargo run --manifest-path xtask/Cargo.toml -- sem-reg domain-pack-check --pack-id ob-poc.cbu --force-check --update-index
 ```
 
-**Schema ground truth (repo-root paths, not `rust/`-relative):** `migrations/master-schema.sql` (canonical) + `schema_export.sql` (convenience copy) — both written by `cargo x schema-export` (`rust/xtask/src/main.rs::schema_export`, which runs from the repo root). These are the ONLY two schema-dump files in the tree; `rust/migrations/master-schema.sql` / `rust/schema_export.sql` (unmaintained stale duplicates) and `docs/generated/schema.sql` (unmaintained, predated the `kyc`→`"ob-poc"` schema rename) were deleted 2026-07-02 during the state-graph remediation (RW-6) — if you see either path referenced in an older doc, treat it as historical and re-point to the canonical pair above.
+**Schema ground truth (repo-root paths, not `rust/`-relative):** `migrations/master-schema.sql` (canonical) + `schema_export.sql` (byte-identical convenience copy) — both written by `cargo x schema-export` (`rust/xtask/src/main.rs::schema_export`, which runs from the repo root). These are the ONLY two schema-dump files in the tree; `rust/migrations/master-schema.sql` / `rust/schema_export.sql` (unmaintained stale duplicates), `init_docker.sql` (stale PostgreSQL 17 dump), and `docs/generated/schema.sql` (unmaintained, predated the `kyc`→`"ob-poc"` schema rename) were deleted during schema remediation. Clean PostgreSQL 18 installs use `scripts/bootstrap-database.sh`; `rust/migrations` is an incremental history, not a clean-install baseline. See `docs/deployment/database-bootstrap.md`.
 
 ### BPMN-Lite Platform Status (bpmn-lite + dmn-lite consolidated, B0 — 2026-05-16)
 
