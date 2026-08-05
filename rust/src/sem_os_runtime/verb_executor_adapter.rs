@@ -1572,12 +1572,12 @@ mod t4_1_envelope_admission_tests {
     // this session's established practice of proving fixes via repeated
     // live-DB runs; the race pre-dates this tranche, same PIR-D-004 shape:
     // fix test isolation, not product code).
-    static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    static ENV_GUARD_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-    struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+    struct EnvGuard(#[allow(dead_code)] tokio::sync::MutexGuard<'static, ()>);
     impl EnvGuard {
-        fn set(verb_fqn: &str) -> Self {
-            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        async fn set(verb_fqn: &str) -> Self {
+            let guard = ENV_GUARD_LOCK.lock().await;
             std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", verb_fqn);
             Self(guard)
         }
@@ -1591,7 +1591,7 @@ mod t4_1_envelope_admission_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn shadow_default_admits_every_verb_with_no_envelope() {
-        let _guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = ENV_GUARD_LOCK.lock().await;
         std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS"); // explicit production default
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
@@ -1603,7 +1603,7 @@ mod t4_1_envelope_admission_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn enforced_verb_without_envelope_is_rejected() {
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
 
@@ -1616,7 +1616,7 @@ mod t4_1_envelope_admission_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn enforced_verb_with_consumed_envelope_admits_then_rejects_resubmission() {
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
 
         let envelope_id = Uuid::new_v4();
@@ -1662,7 +1662,7 @@ mod t4_1_envelope_admission_tests {
         // persisted row (e.g. minted from a different envelope, or
         // tampered with) must be rejected — this is exactly the guarantee
         // `try_consume_by_id` could not provide and `try_consume` can.
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
 
         let envelope_id = Uuid::new_v4();
@@ -1724,7 +1724,7 @@ mod t4_1_envelope_admission_tests {
         // real registered verb with no args instead; the new
         // `execute_verb_admitting_envelope_floor_rejects_an_unregistered_verb_before_any_scope_or_consume`
         // test below covers the floor-rejection case this one used to.
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
 
         let envelope_id = Uuid::new_v4();
@@ -1836,7 +1836,7 @@ mod t4_1_envelope_admission_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn execute_verb_admitting_envelope_rejects_on_pin_drift_and_leaves_envelope_reconsumable() {
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
 
         let (cbu_id, real_row_version): (Uuid, i64) =
@@ -1943,17 +1943,17 @@ mod g6a_bus_envelope_mint_tests {
         sqlx::PgPool::connect(&url).await.expect("connect")
     }
 
-    static ENV_GUARD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    static ENV_GUARD_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
-    struct EnvGuard(#[allow(dead_code)] std::sync::MutexGuard<'static, ()>);
+    struct EnvGuard(#[allow(dead_code)] tokio::sync::MutexGuard<'static, ()>);
     impl EnvGuard {
-        fn set(verb_fqn: &str) -> Self {
-            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        async fn set(verb_fqn: &str) -> Self {
+            let guard = ENV_GUARD_LOCK.lock().await;
             std::env::set_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS", format!("{verb_fqn}:D"));
             Self(guard)
         }
-        fn unset() -> Self {
-            let guard = ENV_GUARD_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        async fn unset() -> Self {
+            let guard = ENV_GUARD_LOCK.lock().await;
             std::env::remove_var("OB_POC_CONTROL_PLANE_ENFORCE_VERBS");
             Self(guard)
         }
@@ -2099,7 +2099,7 @@ mod g6a_bus_envelope_mint_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn not_enforced_short_circuits_to_none_without_touching_the_db() {
-        let _guard = EnvGuard::unset();
+        let _guard = EnvGuard::unset().await;
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
         let entity = Uuid::new_v4();
@@ -2146,7 +2146,7 @@ mod g6a_bus_envelope_mint_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn enforced_verb_with_full_context_mints_but_does_not_consume() {
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
         let entity = Uuid::new_v4();
@@ -2180,7 +2180,7 @@ mod g6a_bus_envelope_mint_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn enforced_verb_with_todays_realistic_context_is_rejected() {
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
         let entry_id = Uuid::new_v4();
@@ -2210,7 +2210,7 @@ mod g6a_bus_envelope_mint_tests {
     #[tokio::test]
     #[ignore = "requires DATABASE_URL"]
     async fn minted_handle_gates_a_real_dispatch_and_is_single_use() {
-        let _guard = EnvGuard::set("cbu.confirm");
+        let _guard = EnvGuard::set("cbu.confirm").await;
         let pool = test_pool().await;
         let executor = ObPocVerbExecutor::from_pool(pool.clone());
         let entity = Uuid::new_v4();

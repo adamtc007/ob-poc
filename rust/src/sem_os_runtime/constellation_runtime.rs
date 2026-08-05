@@ -647,8 +647,8 @@ pub(crate) fn compile_query_plan(map: &ValidatedConstellationMap) -> HydrationQu
 
     HydrationQueryPlan {
         levels: levels
-            .into_iter()
-            .map(|(_depth, queries)| QueryLevel { queries })
+            .into_values()
+            .map(|queries| QueryLevel { queries })
             .collect(),
     }
 }

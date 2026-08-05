@@ -1,9 +1,10 @@
 //! 100% live-DB integration coverage for all 22 dsl.kyc verbs.
 //!
-//! Each verb is exercised via its SemOsVerbOp through a real VerbExecutionContext
-//! + TransactionScope, committing to the durable stream and asserting the event
-//! lands with the correct verb_fqn. Verbs that have preconditions are tested in
-//! natural dependency order (assert → attach-evidence → verify, etc.).
+//! Each verb is exercised via its `SemOsVerbOp` through a real
+//! `VerbExecutionContext` and `TransactionScope`. The test commits to the
+//! durable stream and asserts that the event lands with the correct `verb_fqn`.
+//! Verbs with preconditions run in natural dependency order
+//! (assert → attach-evidence → verify, etc.).
 //!
 //! Six verbs are already proven in dedicated test files:
 //!   ubo.edge.assert-control          → tests/kyc_stream_ops.rs
@@ -80,7 +81,7 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> se
     let out = op
         .execute(&args, &mut ctx, &mut scope)
         .await
-        .expect(op.fqn());
+        .unwrap_or_else(|error| panic!("{}: {error}", op.fqn()));
     scope.commit().await;
     serde_json::to_value(format!("{:?}", out)).unwrap()
 }

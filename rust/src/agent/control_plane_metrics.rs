@@ -503,8 +503,8 @@ mod t7_2_metrics_tests {
         // table — an exact-equality delta is not (PIR-D-004: fails under
         // default parallel `cargo test`, only passed under
         // `--test-threads=1`).
-        assert!(after.total_decisions >= before.total_decisions + 1);
-        assert!(after.diverged >= before.diverged + 1);
+        assert!(after.total_decisions > before.total_decisions);
+        assert!(after.diverged > before.diverged);
     }
 
     #[tokio::test]
@@ -537,7 +537,7 @@ mod t7_2_metrics_tests {
         // race-safety reasoning as shadow_divergence_stats_counts_only_diverged_rows
         // above (PIR-D-004).
         assert!(after.total_attestations >= before.total_attestations + 2);
-        assert!(after.breaches >= before.breaches + 1);
+        assert!(after.breaches > before.breaches);
     }
 
     #[tokio::test]

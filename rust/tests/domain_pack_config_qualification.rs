@@ -99,7 +99,7 @@ fn changed_fingerprint_with_same_surface_updates_only_index() {
 #[test]
 fn missing_index_requires_publish() {
     let plan = refresh_domain_pack_taxonomy_with_index(
-        &config_root(),
+        config_root(),
         "ob-poc.cbu",
         None,
         false,

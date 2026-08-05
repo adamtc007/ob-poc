@@ -73,7 +73,7 @@ async fn run(op: &dyn SemOsVerbOp, args: serde_json::Value, pool: &PgPool) -> se
     let out = op
         .execute(&args, &mut ctx, &mut scope)
         .await
-        .expect(op.fqn());
+        .unwrap_or_else(|error| panic!("{}: {error}", op.fqn()));
     scope.commit().await;
     match out {
         dsl_runtime::VerbExecutionOutcome::Record(v) => v,

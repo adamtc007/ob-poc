@@ -127,6 +127,7 @@ use std::sync::Arc;
 // ============================================================================
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)] // Keep this focused unit test beside the service-type boundary.
 mod tests {
     use super::AgentService;
 

@@ -1601,6 +1601,7 @@ pub(crate) struct SessionListItem {
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)] // Compatibility conversions intentionally follow the session tests.
 mod tests {
     use super::*;
 

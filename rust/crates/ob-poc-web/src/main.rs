@@ -87,6 +87,7 @@ fn decide_gate_pipeline_startup(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)] // Startup tests stay beside the pure decision function.
 mod gate_pipeline_startup_tests {
     use super::*;
 

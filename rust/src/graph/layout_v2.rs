@@ -70,18 +70,10 @@ impl Default for LayoutConfigV2 {
 }
 
 /// Edge configuration for layout purposes
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct EdgeLayoutConfig {
     /// Whether this edge defines parent-child hierarchy for layout
     pub is_hierarchical: bool,
-}
-
-impl Default for EdgeLayoutConfig {
-    fn default() -> Self {
-        Self {
-            is_hierarchical: false,
-        }
-    }
 }
 
 #[cfg(feature = "database")]

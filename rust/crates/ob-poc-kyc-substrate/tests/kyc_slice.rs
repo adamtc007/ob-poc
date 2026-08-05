@@ -23,8 +23,8 @@ use ob_poc_kyc_substrate::{
     fold_obligations_versioned, freeze_determination, phase1_lexicon, reconciled_economic_edges,
     recover_determination_at, AuthorityRef, ControlState, DeterminationInProgress,
     DeterminationStrategy, EdgeId, EntityId, EventId, FoldImpl, FoldRegistry, Hash, IdemKey,
-    IntentEvent, ObligationId, ObligationState, OwnershipProngStrategy, PersonId, Principal,
-    Prong, RecoveryPin, SmoResult, SubjectId, TargetBinding, V1FoldImpl,
+    IntentEvent, ObligationId, ObligationState, OwnershipProngStrategy, PersonId, Principal, Prong,
+    RecoveryPin, SmoResult, SubjectId, TargetBinding, V1FoldImpl,
 };
 use std::sync::Arc;
 
@@ -35,6 +35,7 @@ use std::sync::Arc;
 /// Bridges the test fixtures (which pre-date the 7-arg constructor) to the
 /// new builder API without touching each call site individually.  Call sites
 /// still pass `idem("key")` for the idempotency arg.
+#[allow(clippy::too_many_arguments)] // Explicit event fields keep fixture call sites auditable.
 fn te(
     seq: u64,
     subject: SubjectId,
@@ -328,7 +329,7 @@ fn ec1_ownership_prong_differential_equality() {
 
     let strategy = OwnershipProngStrategy;
     let mut candidates = strategy.resolve(&control, entity_subject(), &natural_persons, 25.0);
-    candidates.sort_by(|a, b| a.person_id.0.cmp(&b.person_id.0));
+    candidates.sort_by_key(|candidate| candidate.person_id.0);
 
     // P1: 60% × 80% = 48.0% — above threshold.
     // P3: 40% direct — above threshold.
@@ -385,7 +386,7 @@ fn ec2_conflicting_edges_fail_without_reconcile() {
     let t = ts(2026, 1, 1);
 
     // Two sources claim 70% and 60% — combined 130% (conflict).
-    let events = vec![
+    let events = [
         te(
             0,
             subject,
@@ -500,7 +501,7 @@ fn ec3_verify_without_evidence_is_rejected() {
     let t = ts(2026, 1, 1);
 
     let edge = eid("b_a");
-    let events = vec![
+    let events = [
         te(
             0,
             subject,
@@ -647,7 +648,7 @@ fn ec4_smo_fallback_when_no_ubos_found() {
     let t = ts(2026, 1, 1);
 
     // Company with no known owners → strategy finds nothing.
-    let events = vec![
+    let events = [
         te(
             0,
             subject,
@@ -817,7 +818,7 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
     let a = entity_subject();
     let t = ts(2026, 1, 1);
 
-    let events = vec![
+    let events = [
         te(
             0,
             subject,
@@ -1023,7 +1024,7 @@ fn ec5_replay_determinism_after_supersede() {
     let strategy = OwnershipProngStrategy;
 
     // Snapshot the first-freeze event set as owned so we can keep borrowing later.
-    let events_phase1: Vec<IntentEvent> = events.iter().cloned().collect();
+    let events_phase1: Vec<IntentEvent> = events.to_vec();
     let events_at_freeze1: Vec<&IntentEvent> = events_phase1.iter().collect();
     let prior_det = recover_determination_at(
         &events_at_freeze1,
@@ -1217,7 +1218,7 @@ fn ec7_multi_role_person_one_subject_two_obligations() {
 
     // P1 appears as shareholder (obligation 1) and director (obligation 2).
     // Both obligations point to the SAME SubjectId (K-22: one identity record).
-    let events = vec![
+    let events = [
         // Register P1 as a subject.
         te(
             0,
@@ -1352,7 +1353,7 @@ fn k13_superseded_edges_remain_in_fold() {
     let t = ts(2026, 1, 1);
     let edge = eid("b_a");
 
-    let events = vec![
+    let events = [
         te(
             0,
             subject,

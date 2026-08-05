@@ -282,7 +282,7 @@ mod tests {
             .await
             .expect("batched lookup succeeds even when nothing matches");
 
-        assert!(results.get(&missing_id).is_none());
+        assert!(!results.contains_key(&missing_id));
     }
 
     #[tokio::test]
