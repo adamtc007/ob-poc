@@ -397,30 +397,30 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
-semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374", features = ["huggingface-download"] }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "f2c81aabe3939f695d7126c2b7d5fd1380617374" }
 
 # BPMN integration family: one exact immutable revision. Keeping the bus,
 # manifest, engine, FFI and runner crates on one commit prevents duplicate wire
 # types and cold-clone API skew.
-bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
-bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
+bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "5038ce19ded834142a737dd2a22f266b4c8c2867" }
 
 [lints.rust]
 dead_code = "deny"
