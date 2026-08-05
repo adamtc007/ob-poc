@@ -382,9 +382,6 @@ members = [
     "crates/bpmn-runtime",
     "crates/bpmn-test-harness",
 
-    # Unified DSL v0.2 — Tranche 1: Sage pack matcher
-    "crates/dsl-sage",
-
     # Unified DSL v0.2 — Tranche 5: Camunda 8 migration tool
     "crates/dsl-migrate",
     # Unified DSL v0.2 — Tranche 5b: round-trip verifier for dsl-migrate output

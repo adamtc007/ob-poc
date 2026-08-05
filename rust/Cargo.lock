@@ -2014,28 +2014,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dsl-sage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "dsl-ast",
- "dsl-atoms",
- "dsl-bpmn-frontend",
- "dsl-diagnostics",
- "dsl-parser",
- "dsl-render",
- "dsl-resolution",
- "dsl-sage",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
 name = "dsl-semos-frontend"
 version = "0.1.0"
 dependencies = [
