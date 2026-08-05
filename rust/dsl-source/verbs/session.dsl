@@ -2,269 +2,287 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb session.clear
+  :domain "session"
   :description "Remove all CBUs from session"
   :behavior "plugin"
   :handler "SessionClearOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"clear\",\"reset\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"clear\",\"reset\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding session.clear :phrases ["clear session" "reset session" "start over" "clear all" "remove all CBUs" "empty session" "start fresh" "wipe session" "clear everything" "reset scope"] :verb session.clear)
+(utterance-binding session.clear :phrases ["clear session" "reset session" "start over" "clear all" "remove all CBUs" "empty session" "start fresh" "wipe session" "clear everything" "reset scope"] :domain "session" :verb session.clear)
 
 (verb session.filter-jurisdiction
+  :domain "session"
   :description "Narrow session to only CBUs in a specific jurisdiction"
   :behavior "plugin"
   :handler "SessionFilterJurisdictionOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"filter\",\"narrow\",\"jurisdiction\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"jurisdiction\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"ISO country code to keep (LU, IE, DE, US, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"filter\",\"narrow\",\"jurisdiction\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"ISO country code to keep (LU, IE, DE, US, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.filter-jurisdiction :phrases ["filter to jurisdiction" "narrow to" "just the" "only" "filter by jurisdiction" "now use" "keep only CBUs in jurisdiction" "narrow scope to region" "restrict session to jurisdiction" "filter workspace by country"] :verb session.filter-jurisdiction)
+(utterance-binding session.filter-jurisdiction :phrases ["filter to jurisdiction" "narrow to" "just the" "only" "filter by jurisdiction" "now use" "keep only CBUs in jurisdiction" "narrow scope to region" "restrict session to jurisdiction" "filter workspace by country"] :domain "session" :verb session.filter-jurisdiction)
 
 (verb session.info
+  :domain "session"
   :description "Get session summary"
   :behavior "plugin"
   :handler "SessionInfoOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_info\",\"internal\":false,\"tags\":[\"read\",\"info\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_info\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"info\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding session.info :phrases ["session info" "show session" "session status" "what's loaded" "session summary" "show session state" "current scope" "what am I working on" "show me the session" "session details"] :verb session.info)
+(utterance-binding session.info :phrases ["session info" "show session" "session status" "what's loaded" "session summary" "show session state" "current scope" "what am I working on" "show me the session" "session details"] :domain "session" :verb session.info)
 
 (verb session.list
+  :domain "session"
   :description "List loaded CBUs"
   :behavior "plugin"
   :handler "SessionListOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"read\",\"list\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"limit\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":100,\"description\":\"Max results\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"jurisdiction\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by jurisdiction\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"list\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":100,\"description\":\"Max results\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"limit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by jurisdiction\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.list :phrases ["show loaded CBUs" "what CBUs are loaded" "list loaded" "show my CBUs" "which CBUs" "list session CBUs" "show scope" "what's in scope" "display loaded CBUs"] :verb session.list)
+(utterance-binding session.list :phrases ["show loaded CBUs" "what CBUs are loaded" "list loaded" "show my CBUs" "which CBUs" "list session CBUs" "show scope" "what's in scope" "display loaded CBUs"] :domain "session" :verb session.list)
 
 (verb session.load-cluster
+  :domain "session"
   :description "Load all CBUs under a GROUP entity (apex of ownership hierarchy)"
   :behavior "plugin"
   :handler "SessionLoadClusterOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
   :confirm-policy "quick_confirm"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"load\",\"cluster\",\"book\",\"client\",\"bulk\",\"scope\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :sentences-json "{\"step\":[\"Load {client} book into session\"],\"summary\":[],\"clarify\":{\"client\":\"Which client book should be loaded?\"},\"completed\":null}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"client\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":{\"table\":\"client_group\",\"schema\":\"ob-poc\",\"entity_type\":\"client_group\",\"search_key\":\"alias\",\"primary_key\":\"id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Client group nickname (e.g., \\\"Allianz\\\", \\\"AGI\\\", \\\"BlackRock\\\")\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":\"client_group_ref\",\"preferred_roles\":[\"governance_controller\",\"ultimate_parent\"]},{\"name\":\"apex-entity-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":{\"table\":\"entities\",\"schema\":\"ob-poc\",\"entity_type\":\"group\",\"search_key\":\"name\",\"primary_key\":\"entity_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"UUID of the GROUP apex entity (alternative to client)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"jurisdiction\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter to specific jurisdiction (LU, DE, IE, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"load\",\"cluster\",\"book\",\"client\",\"bulk\",\"scope\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :sentences-json "{\"clarify\":{\"client\":\"Which client book should be loaded?\"},\"completed\":null,\"step\":[\"Load {client} book into session\"],\"summary\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Client group nickname (e.g., \\\"Allianz\\\", \\\"AGI\\\", \\\"BlackRock\\\")\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"client_group\",\"primary_key\":\"id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"alias\",\"table\":\"client_group\"},\"maps_to\":null,\"name\":\"client\",\"preferred_roles\":[\"governance_controller\",\"ultimate_parent\"],\"required\":false,\"slot_type\":\"client_group_ref\",\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"UUID of the GROUP apex entity (alternative to client)\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"group\",\"primary_key\":\"entity_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"entities\"},\"maps_to\":null,\"name\":\"apex-entity-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter to specific jurisdiction (LU, DE, IE, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.load-cluster :phrases ["work on" "focus on" "use" "set scope to" "set session to" "switch to" "load book for" "load all funds under" "load group" "load cluster" "load book" "cbu book" "cbu universe" "load manco" "allianz" "blackrock" "aviva" "axa" "generali" "work on allianz" "work on blackrock" "work on aviva" "use allianz" "use blackrock" "use aviva" "focus on allianz" "focus on blackrock" "allianz book" "blackrock book" "allianz group" "blackrock group" "aviva group" "load allianz" "load blackrock" "load aviva" "load the allianz book" "load the blackrock book" "load the aviva book"] :verb session.load-cluster)
+(utterance-binding session.load-cluster :phrases ["work on" "focus on" "use" "set scope to" "set session to" "switch to" "load book for" "load all funds under" "load group" "load cluster" "load book" "cbu book" "cbu universe" "load manco" "allianz" "blackrock" "aviva" "axa" "generali" "work on allianz" "work on blackrock" "work on aviva" "use allianz" "use blackrock" "use aviva" "focus on allianz" "focus on blackrock" "allianz book" "blackrock book" "allianz group" "blackrock group" "aviva group" "load allianz" "load blackrock" "load aviva" "load the allianz book" "load the blackrock book" "load the aviva book"] :domain "session" :verb session.load-cluster)
 
 (verb session.load-deal
+  :domain "session"
   :description "Load a deal into session context for taxonomy visualization"
   :behavior "plugin"
   :handler "SessionLoadDealOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[\"context\",\"deal\",\"taxonomy\",\"navigation\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":{\"table\":\"deals\",\"schema\":\"ob-poc\",\"entity_type\":\"deal\",\"search_key\":\"deal_name\",\"primary_key\":\"deal_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Deal UUID to load\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"deal-name\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Search by deal name (fuzzy match)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"deal\",\"taxonomy\",\"navigation\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Deal UUID to load\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"deal\",\"primary_key\":\"deal_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"deal_name\",\"table\":\"deals\"},\"maps_to\":null,\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Search by deal name (fuzzy match)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"deal-name\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.load-deal :phrases ["load deal" "show deal" "open deal" "work on deal" "view deal" "select deal" "focus on deal" "deal taxonomy" "show deal taxonomy" "bring up deal record"] :verb session.load-deal)
+(utterance-binding session.load-deal :phrases ["load deal" "show deal" "open deal" "work on deal" "view deal" "select deal" "focus on deal" "deal taxonomy" "show deal taxonomy" "bring up deal record"] :domain "session" :verb session.load-deal)
 
 (verb session.load-galaxy
+  :domain "session"
   :description "Load all CBUs in a region/jurisdiction (Galaxy = regional)"
   :behavior "plugin"
   :handler "SessionLoadGalaxyOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
   :confirm-policy "quick_confirm"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"load\",\"galaxy\",\"jurisdiction\",\"bulk\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :sentences-json "{\"step\":[\"Load all CBUs in {jurisdiction}\"],\"summary\":[],\"clarify\":{\"jurisdiction\":\"Which jurisdiction? (e.g., LU, IE, DE, US)\"},\"completed\":null}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"jurisdiction\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"ISO country code (LU, IE, DE, US, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"load\",\"galaxy\",\"jurisdiction\",\"bulk\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :sentences-json "{\"clarify\":{\"jurisdiction\":\"Which jurisdiction? (e.g., LU, IE, DE, US)\"},\"completed\":null,\"step\":[\"Load all CBUs in {jurisdiction}\"],\"summary\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"ISO country code (LU, IE, DE, US, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.load-galaxy :phrases ["load galaxy" "load jurisdiction" "show all in" "load all CBUs in" "load region" "show funds by jurisdiction" "load structures in jurisdiction" "bring up all CBUs for region" "scope to jurisdiction" "load all trading units in" "show me the galaxy for Germany" "show the galaxy for this jurisdiction" "load the galaxy for UK" "show all funds in Germany" "load all structures in this country"] :verb session.load-galaxy)
+(utterance-binding session.load-galaxy :phrases ["load galaxy" "load jurisdiction" "show all in" "load all CBUs in" "load region" "show funds by jurisdiction" "load structures in jurisdiction" "bring up all CBUs for region" "scope to jurisdiction" "load all trading units in" "show me the galaxy for Germany" "show the galaxy for this jurisdiction" "load the galaxy for UK" "show all funds in Germany" "load all structures in this country"] :domain "session" :verb session.load-galaxy)
 
 (verb session.load-system
+  :domain "session"
   :description "Load a single CBU (Solar System = CBU container)"
   :behavior "plugin"
   :handler "SessionLoadSystemOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"load\",\"system\",\"cbu\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"cbu_id\",\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"The CBU to load\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"load\",\"system\",\"cbu\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The CBU to load\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":\"cbu_id\",\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.load-system :phrases ["load system" "load cbu" "load cbu into session" "open cbu" "load fund" "switch to cbu" "show cbu" "add cbu to session" "bring up single trading unit" "load this structure into workspace"] :verb session.load-system)
+(utterance-binding session.load-system :phrases ["load system" "load cbu" "load cbu into session" "open cbu" "load fund" "switch to cbu" "show cbu" "add cbu to session" "bring up single trading unit" "load this structure into workspace"] :domain "session" :verb session.load-system)
 
 (verb session.load-universe
+  :domain "session"
   :description "Load all CBUs (optionally filtered by client)"
   :behavior "plugin"
   :handler "SessionLoadUniverseOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"load\",\"universe\",\"bulk\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"client-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":{\"table\":\"entities\",\"schema\":\"ob-poc\",\"entity_type\":\"entity\",\"search_key\":\"name\",\"primary_key\":\"entity_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Optional client filter (defaults to all)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"load\",\"universe\",\"bulk\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Optional client filter (defaults to all)\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"entity\",\"primary_key\":\"entity_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"entities\"},\"maps_to\":null,\"name\":\"client-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.load-universe :phrases ["load universe" "load all" "show everything" "load all CBUs" "load entire fund universe" "show all client business units" "bring up all trading units" "load full portfolio scope" "show all structures in workspace" "open the full universe"] :verb session.load-universe)
+(utterance-binding session.load-universe :phrases ["load universe" "load all" "show everything" "load all CBUs" "load entire fund universe" "show all client business units" "bring up all trading units" "load full portfolio scope" "show all structures in workspace" "open the full universe"] :domain "session" :verb session.load-universe)
 
 (verb session.redo
+  :domain "session"
   :description "Re-apply undone state change"
   :behavior "plugin"
   :handler "SessionRedoOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_history\",\"internal\":false,\"tags\":[\"history\",\"redo\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_history\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"history\",\"redo\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding session.redo :phrases ["redo" "go forward" "redo last action" "reapply" "redo that" "restore" "step forward" "apply again" "put it back" "undo the undo"] :verb session.redo)
+(utterance-binding session.redo :phrases ["redo" "go forward" "redo last action" "reapply" "redo that" "restore" "step forward" "apply again" "put it back" "undo the undo"] :domain "session" :verb session.redo)
 
 (verb session.set-case
+  :domain "session"
   :description "Set current KYC case context for subsequent operations"
   :behavior "plugin"
   :handler "SessionSetCaseOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_context\",\"internal\":false,\"tags\":[\"context\",\"case\",\"macro_target\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"case-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cases\",\"schema\":\"kyc\",\"entity_type\":\"kyc_case\",\"search_key\":\"case_id\",\"primary_key\":\"case_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"KYC case ID to set as current case\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_context\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"case\",\"macro_target\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"KYC case ID to set as current case\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"kyc_case\",\"primary_key\":\"case_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"case_id\",\"table\":\"cases\"},\"maps_to\":null,\"name\":\"case-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.set-case :phrases ["select case" "use case" "work on case" "set case" "focus on case" "pick kyc case to review" "set active case context" "switch to this kyc case" "target case for operations"] :verb session.set-case)
+(utterance-binding session.set-case :phrases ["select case" "use case" "work on case" "set case" "focus on case" "pick kyc case to review" "set active case context" "switch to this kyc case" "target case for operations"] :domain "session" :verb session.set-case)
 
 (verb session.set-client
+  :domain "session"
   :description "Set client group context for entity resolution"
   :behavior "plugin"
   :handler "SessionSetClientOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_context\",\"internal\":false,\"tags\":[\"context\",\"client\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"client\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"client_group\",\"schema\":\"ob-poc\",\"entity_type\":\"client_group\",\"search_key\":\"alias\",\"primary_key\":\"id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Client nickname (resolved via client_group_alias)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":\"client_group_ref\",\"preferred_roles\":[\"governance_controller\",\"ultimate_parent\"]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_context\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"client\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Client nickname (resolved via client_group_alias)\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"client_group\",\"primary_key\":\"id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"alias\",\"table\":\"client_group\"},\"maps_to\":null,\"name\":\"client\",\"preferred_roles\":[\"governance_controller\",\"ultimate_parent\"],\"required\":true,\"slot_type\":\"client_group_ref\",\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.set-client :phrases ["set client context" "I'm working with" "client is" "set client to" "my client is" "switch client scope to" "change client context" "working on client" "scope to client group" "select client group" "switch to the BlackRock client" "switch to this client" "change to the Allianz client" "work with BlackRock"] :verb session.set-client)
+(utterance-binding session.set-client :phrases ["set client context" "I'm working with" "client is" "set client to" "my client is" "switch client scope to" "change client context" "working on client" "scope to client group" "select client group" "switch to the BlackRock client" "switch to this client" "change to the Allianz client" "work with BlackRock"] :domain "session" :verb session.set-client)
 
 (verb session.set-mandate
+  :domain "session"
   :description "Set current mandate (trading profile) context for subsequent operations"
   :behavior "plugin"
   :handler "SessionSetMandateOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_context\",\"internal\":false,\"tags\":[\"context\",\"mandate\",\"macro_target\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"mandate-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbu_trading_profiles\",\"schema\":\"ob-poc\",\"entity_type\":\"trading_profile\",\"search_key\":\"profile_id\",\"primary_key\":\"profile_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Trading profile ID to set as current mandate\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_context\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"mandate\",\"macro_target\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Trading profile ID to set as current mandate\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"trading_profile\",\"primary_key\":\"profile_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"profile_id\",\"table\":\"cbu_trading_profiles\"},\"maps_to\":null,\"name\":\"mandate-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.set-mandate :phrases ["select mandate" "use mandate" "work on mandate" "set mandate" "focus on trading profile" "select trading profile" "pick mandate to configure" "set active trading profile context" "switch to this mandate" "choose investment mandate"] :verb session.set-mandate)
+(utterance-binding session.set-mandate :phrases ["select mandate" "use mandate" "work on mandate" "set mandate" "focus on trading profile" "select trading profile" "pick mandate to configure" "set active trading profile context" "switch to this mandate" "choose investment mandate"] :domain "session" :verb session.set-mandate)
 
 (verb session.set-persona
+  :domain "session"
   :description "Set persona context for tag filtering"
   :behavior "plugin"
   :handler "SessionSetPersonaOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_context\",\"internal\":false,\"tags\":[\"context\",\"persona\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"persona\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"kyc\",\"trading\",\"ops\",\"onboarding\"],\"default\":null,\"description\":\"Persona for tag filtering\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_context\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"persona\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":\"Persona for tag filtering\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"persona\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"kyc\",\"trading\",\"ops\",\"onboarding\"],\"validation\":null}]"
 )
 
-(utterance-binding session.set-persona :phrases ["I'm doing kyc" "trading view" "for kyc" "for trading" "kyc mode" "trading mode" "ops mode" "switch to onboarding persona" "set session persona" "change to operations view" "I want to work as a compliance officer" "work as compliance" "switch to compliance officer role" "set my role to analyst"] :verb session.set-persona)
+(utterance-binding session.set-persona :phrases ["I'm doing kyc" "trading view" "for kyc" "for trading" "kyc mode" "trading mode" "ops mode" "switch to onboarding persona" "set session persona" "change to operations view" "I want to work as a compliance officer" "work as compliance" "switch to compliance officer role" "set my role to analyst"] :domain "session" :verb session.set-persona)
 
 (verb session.set-structure
+  :domain "session"
   :description "Set current structure (CBU) context for subsequent operations"
   :behavior "plugin"
   :handler "SessionSetStructureOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_context\",\"internal\":false,\"tags\":[\"context\",\"structure\",\"macro_target\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"structure-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU ID to set as current structure\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"structure-type\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"pe\",\"sicav\",\"hedge\",\"etf\",\"pension\",\"trust\",\"fof\"],\"default\":null,\"description\":\"Structure type (PE, SICAV, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_context\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"structure\",\"macro_target\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU ID to set as current structure\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"structure-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Structure type (PE, SICAV, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"structure-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"pe\",\"sicav\",\"hedge\",\"etf\",\"pension\",\"trust\",\"fof\"],\"validation\":null}]"
 )
 
-(utterance-binding session.set-structure :phrases ["select structure" "use structure" "work on structure" "set structure" "focus on fund" "select fund" "pick a fund structure" "set active CBU context" "choose structure to work on" "target this trading unit"] :verb session.set-structure)
+(utterance-binding session.set-structure :phrases ["select structure" "use structure" "work on structure" "set structure" "focus on fund" "select fund" "pick a fund structure" "set active CBU context" "choose structure to work on" "target this trading unit"] :domain "session" :verb session.set-structure)
 
 (verb session.start
+  :domain "session"
   :description "Start a new session or resume a previous one with fresh state"
   :behavior "plugin"
   :handler "SessionStartOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
   :confirm-policy "quick_confirm"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session\",\"internal\":false,\"tags\":[\"session\",\"lifecycle\",\"start\",\"resume\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :sentences-json "{\"step\":[\"Start {mode} session\"],\"summary\":[],\"clarify\":{\"mode\":\"New session or resume a previous one? (new/resume)\"},\"completed\":null}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"mode\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"new (blank slate) or resume (pre-load scope from previous session)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"from\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Session ID to resume from, or 'last' for most recent. Only used with mode=resume.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"session\",\"lifecycle\",\"start\",\"resume\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :sentences-json "{\"clarify\":{\"mode\":\"New session or resume a previous one? (new/resume)\"},\"completed\":null,\"step\":[\"Start {mode} session\"],\"summary\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"new (blank slate) or resume (pre-load scope from previous session)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"mode\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Session ID to resume from, or 'last' for most recent. Only used with mode=resume.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"from\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.start :phrases ["new session" "start new session" "resume session" "resume" "resume last session" "continue where I left off" "pick up where I left off" "restart"] :verb session.start)
+(utterance-binding session.start :phrases ["new session" "start new session" "resume session" "resume" "resume last session" "continue where I left off" "pick up where I left off" "restart"] :domain "session" :verb session.start)
 
 (verb session.undo
+  :domain "session"
   :description "Rollback to previous session state"
   :behavior "plugin"
   :handler "SessionUndoOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_history\",\"internal\":false,\"tags\":[\"history\",\"undo\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_history\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"history\",\"undo\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding session.undo :phrases ["undo" "go back" "revert" "undo last action" "step back" "rollback" "undo that" "previous state" "take that back" "reverse last change"] :verb session.undo)
+(utterance-binding session.undo :phrases ["undo" "go back" "revert" "undo last action" "step back" "rollback" "undo that" "previous state" "take that back" "reverse last change"] :domain "session" :verb session.undo)
 
 (verb session.unload-deal
+  :domain "session"
   :description "Clear deal context from session"
   :behavior "plugin"
   :handler "SessionUnloadDealOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[\"context\",\"deal\",\"clear\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"context\",\"deal\",\"clear\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding session.unload-deal :phrases ["unload deal" "close deal" "clear deal" "hide deal" "dismiss deal" "exit deal" "remove deal from session" "clear deal context" "stop working on deal" "leave deal view"] :verb session.unload-deal)
+(utterance-binding session.unload-deal :phrases ["unload deal" "close deal" "clear deal" "hide deal" "dismiss deal" "exit deal" "remove deal from session" "clear deal context" "stop working on deal" "leave deal view"] :domain "session" :verb session.unload-deal)
 
 (verb session.unload-system
+  :domain "session"
   :description "Remove a single CBU from the session"
   :behavior "plugin"
   :handler "SessionUnloadSystemOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"session_cbus\",\"internal\":false,\"tags\":[\"unload\",\"system\",\"cbu\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"cbu_id\",\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"The CBU to unload\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"session_cbus\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"unload\",\"system\",\"cbu\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The CBU to unload\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":\"cbu_id\",\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding session.unload-system :phrases ["unload system" "unload cbu" "unload cbu from session" "remove cbu from session" "drop cbu from scope" "take cbu out of session" "remove structure from workspace" "dismiss this trading unit"] :verb session.unload-system)
-
+(utterance-binding session.unload-system :phrases ["unload system" "unload cbu" "unload cbu from session" "remove cbu from session" "drop cbu from scope" "take cbu out of session" "remove structure from workspace" "dismiss this trading unit"] :domain "session" :verb session.unload-system)

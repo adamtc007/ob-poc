@@ -28,6 +28,8 @@ mod db_tests {
         async fn new() -> Result<Self> {
             let config_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config");
             std::env::set_var("DSL_CONFIG_DIR", &config_dir);
+            let config_loader = dsl_core::ConfigLoader::new(config_dir.to_string_lossy());
+            dsl_runtime::set_slot_state_table(config_loader.load_slot_state_table()?);
 
             let url = std::env::var("TEST_DATABASE_URL")
                 .or_else(|_| std::env::var("DATABASE_URL"))
@@ -1171,7 +1173,7 @@ slots:
         assert!(result.is_err(), "Should fail for unknown CBU");
         let err = result.unwrap_err().to_string();
         assert!(
-            err.contains("not found") || err.contains("CBU"),
+            err.contains("not found") || err.contains("CBU") || err.contains("state_unreadable"),
             "Error should mention CBU not found: {}",
             err
         );

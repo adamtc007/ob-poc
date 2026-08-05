@@ -4,903 +4,973 @@
 (utterance-binding deal :invocation-hints ["deal" "opportunity" "sales" "client onboarding" "rate card" "negotiation"])
 
 (verb deal.add-contract
+  :domain "deal"
   :description "Link a service contract to a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_contract\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"contract_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-role\",\"type\":\"string\",\"required\":false,\"maps_to\":\"contract_role\",\"lookup\":null,\"valid_values\":[\"PRIMARY\",\"ADDENDUM\",\"SCHEDULE\",\"SIDE_LETTER\",\"NDA\"],\"default\":\"PRIMARY\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sequence-order\",\"type\":\"integer\",\"required\":false,\"maps_to\":\"sequence_order\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_contract\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_id\",\"name\":\"contract-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":\"PRIMARY\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_role\",\"name\":\"contract-role\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PRIMARY\",\"ADDENDUM\",\"SCHEDULE\",\"SIDE_LETTER\",\"NDA\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sequence_order\",\"name\":\"sequence-order\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.add-contract :phrases ["add contract to deal" "link contract to deal" "attach contract" "sign the IMA" "link the agreement to this deal" "contract is signed attach it" "hook the contract up to the deal" "associate this MSA with the deal"] :verb deal.add-contract)
+(utterance-binding deal.add-contract :phrases ["add contract to deal" "link contract to deal" "attach contract" "sign the IMA" "link the agreement to this deal" "contract is signed attach it" "hook the contract up to the deal" "associate this MSA with the deal"] :domain "deal" :verb deal.add-contract)
 
 (verb deal.add-document
+  :domain "deal"
   :description "Link a document to a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_document\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"document-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"document_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"document-type\",\"type\":\"string\",\"required\":true,\"maps_to\":\"document_type\",\"lookup\":null,\"valid_values\":[\"CONTRACT\",\"TERM_SHEET\",\"SIDE_LETTER\",\"NDA\",\"RATE_SCHEDULE\",\"SLA\",\"PROPOSAL\",\"RFP_RESPONSE\",\"BOARD_APPROVAL\",\"LEGAL_OPINION\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"document-status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"document_status\",\"lookup\":null,\"valid_values\":[\"DRAFT\",\"UNDER_REVIEW\",\"SIGNED\",\"EXECUTED\",\"SUPERSEDED\",\"ARCHIVED\"],\"default\":\"DRAFT\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_document\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"document_id\",\"name\":\"document-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"document_type\",\"name\":\"document-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"CONTRACT\",\"TERM_SHEET\",\"SIDE_LETTER\",\"NDA\",\"RATE_SCHEDULE\",\"SLA\",\"PROPOSAL\",\"RFP_RESPONSE\",\"BOARD_APPROVAL\",\"LEGAL_OPINION\"],\"validation\":null},{\"default\":\"DRAFT\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"document_status\",\"name\":\"document-status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"DRAFT\",\"UNDER_REVIEW\",\"SIGNED\",\"EXECUTED\",\"SUPERSEDED\",\"ARCHIVED\"],\"validation\":null}]"
 )
 
-(utterance-binding deal.add-document :phrases ["add document to deal" "attach document" "link document"] :verb deal.add-document)
+(utterance-binding deal.add-document :phrases ["add document to deal" "attach document" "link document"] :domain "deal" :verb deal.add-document)
 
 (verb deal.add-participant
+  :domain "deal"
   :description "Add a participating entity (regional LEI) to a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_participant\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"entity-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"entity_id\",\"lookup\":{\"table\":\"entities\",\"schema\":\"ob-poc\",\"entity_type\":\"entity\",\"search_key\":\"search_name\",\"primary_key\":\"entity_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"participant-role\",\"type\":\"string\",\"required\":false,\"maps_to\":\"participant_role\",\"lookup\":null,\"valid_values\":[\"CONTRACTING_PARTY\",\"GUARANTOR\",\"INTRODUCER\",\"INVESTMENT_MANAGER\",\"FUND_ADMIN\"],\"default\":\"CONTRACTING_PARTY\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"lei\",\"type\":\"string\",\"required\":false,\"maps_to\":\"lei\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"LEI of the participating entity\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"is-primary\",\"type\":\"boolean\",\"required\":false,\"maps_to\":\"is_primary\",\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_participant\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"entity\",\"primary_key\":\"entity_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"search_name\",\"table\":\"entities\"},\"maps_to\":\"entity_id\",\"name\":\"entity-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":\"CONTRACTING_PARTY\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"participant_role\",\"name\":\"participant-role\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"CONTRACTING_PARTY\",\"GUARANTOR\",\"INTRODUCER\",\"INVESTMENT_MANAGER\",\"FUND_ADMIN\"],\"validation\":null},{\"default\":null,\"description\":\"LEI of the participating entity\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"lei\",\"name\":\"lei\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"is_primary\",\"name\":\"is-primary\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.add-participant :phrases ["add participant to deal" "add entity to deal" "add contracting party" "add deal participant"] :verb deal.add-participant)
+(utterance-binding deal.add-participant :phrases ["add participant to deal" "add entity to deal" "add contracting party" "add deal participant"] :domain "deal" :verb deal.add-participant)
 
 (verb deal.add-product
+  :domain "deal"
   :description "Add a product to the deal's commercial scope"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_product\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"deal_product_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"product_id\",\"lookup\":{\"table\":\"products\",\"schema\":\"ob-poc\",\"entity_type\":\"product\",\"search_key\":\"name\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"product_status\",\"lookup\":null,\"valid_values\":[\"PROPOSED\",\"NEGOTIATING\",\"AGREED\",\"DECLINED\",\"REMOVED\"],\"default\":\"PROPOSED\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"indicative-revenue\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"indicative_revenue\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Estimated annual revenue for this product\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"currency-code\",\"type\":\"string\",\"required\":false,\"maps_to\":\"currency_code\",\"lookup\":null,\"valid_values\":null,\"default\":\"USD\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"notes\",\"type\":\"string\",\"required\":false,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_product\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"deal_product_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"product\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"products\"},\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":\"PROPOSED\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_status\",\"name\":\"product-status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PROPOSED\",\"NEGOTIATING\",\"AGREED\",\"DECLINED\",\"REMOVED\"],\"validation\":null},{\"default\":null,\"description\":\"Estimated annual revenue for this product\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"indicative_revenue\",\"name\":\"indicative-revenue\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":\"USD\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"currency_code\",\"name\":\"currency-code\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"notes\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.add-product :phrases ["add product to deal" "include product in deal" "deal covers product" "add service to deal"] :verb deal.add-product)
+(utterance-binding deal.add-product :phrases ["add product to deal" "include product in deal" "deal covers product" "add service to deal"] :domain "deal" :verb deal.add-product)
 
 (verb deal.add-rate-card-line
+  :domain "deal"
   :description "Add a fee line to a rate card"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"rate_card_line\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create-rate-card\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"line_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"fee-type\",\"type\":\"string\",\"required\":true,\"maps_to\":\"fee_type\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Fee type (e.g., CUSTODY, FUND_ACCOUNTING, TA, FX, SETTLEMENT)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"fee-subtype\",\"type\":\"string\",\"required\":false,\"maps_to\":\"fee_subtype\",\"lookup\":null,\"valid_values\":null,\"default\":\"DEFAULT\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"pricing-model\",\"type\":\"string\",\"required\":true,\"maps_to\":\"pricing_model\",\"lookup\":null,\"valid_values\":[\"BPS\",\"FLAT\",\"PER_TRANSACTION\",\"TIERED\",\"SPREAD\",\"MINIMUM_FEE\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rate-value\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"rate_value\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"BPS or per-unit rate\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"minimum-fee\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"minimum_fee\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"maximum-fee\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"maximum_fee\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"currency-code\",\"type\":\"string\",\"required\":false,\"maps_to\":\"currency_code\",\"lookup\":null,\"valid_values\":null,\"default\":\"USD\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"tier-brackets\",\"type\":\"json\",\"required\":false,\"maps_to\":\"tier_brackets\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Tiered pricing brackets as JSON array\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"fee-basis\",\"type\":\"string\",\"required\":false,\"maps_to\":\"fee_basis\",\"lookup\":null,\"valid_values\":[\"AUM\",\"NAV\",\"TRADE_COUNT\",\"POSITION_COUNT\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"description\",\"type\":\"string\",\"required\":false,\"maps_to\":\"description\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"rate_card_line\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create-rate-card\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":true,\"name\":\"line_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Fee type (e.g., CUSTODY, FUND_ACCOUNTING, TA, FX, SETTLEMENT)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"fee_type\",\"name\":\"fee-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":\"DEFAULT\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"fee_subtype\",\"name\":\"fee-subtype\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"pricing_model\",\"name\":\"pricing-model\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"BPS\",\"FLAT\",\"PER_TRANSACTION\",\"TIERED\",\"SPREAD\",\"MINIMUM_FEE\"],\"validation\":null},{\"default\":null,\"description\":\"BPS or per-unit rate\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_value\",\"name\":\"rate-value\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"minimum_fee\",\"name\":\"minimum-fee\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"maximum_fee\",\"name\":\"maximum-fee\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":\"USD\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"currency_code\",\"name\":\"currency-code\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Tiered pricing brackets as JSON array\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"tier_brackets\",\"name\":\"tier-brackets\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"fee_basis\",\"name\":\"fee-basis\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"AUM\",\"NAV\",\"TRADE_COUNT\",\"POSITION_COUNT\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"description\",\"name\":\"description\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.add-rate-card-line :phrases ["add rate card line" "add fee line" "add pricing line" "add fee to rate card" "add a pricing row" "insert a fee row on the rate card" "add a charge line to this rate card"] :verb deal.add-rate-card-line)
+(utterance-binding deal.add-rate-card-line :phrases ["add rate card line" "add fee line" "add pricing line" "add fee to rate card" "add a pricing row" "insert a fee row on the rate card" "add a charge line to this rate card"] :domain "deal" :verb deal.add-rate-card-line)
 
 (verb deal.add-sla
+  :domain "deal"
   :description "Add a service level agreement to a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_sla\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"sla_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"contract_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"product_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service-attribute-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"service_attribute_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sla-name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"sla_name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sla-type\",\"type\":\"string\",\"required\":false,\"maps_to\":\"sla_type\",\"lookup\":null,\"valid_values\":[\"AVAILABILITY\",\"TURNAROUND\",\"ACCURACY\",\"REPORTING\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"metric-name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"metric_name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"target-value\",\"type\":\"string\",\"required\":true,\"maps_to\":\"target_value\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"measurement-unit\",\"type\":\"string\",\"required\":false,\"maps_to\":\"measurement_unit\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"penalty-type\",\"type\":\"string\",\"required\":false,\"maps_to\":\"penalty_type\",\"lookup\":null,\"valid_values\":[\"FEE_REBATE\",\"CREDIT\",\"ESCALATION\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"penalty-value\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"penalty_value\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"effective-from\",\"type\":\"date\",\"required\":true,\"maps_to\":\"effective_from\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_sla\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"sla_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_id\",\"name\":\"contract-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"service_attribute_id\",\"name\":\"service-attribute-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sla_name\",\"name\":\"sla-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sla_type\",\"name\":\"sla-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"AVAILABILITY\",\"TURNAROUND\",\"ACCURACY\",\"REPORTING\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"metric_name\",\"name\":\"metric-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"target_value\",\"name\":\"target-value\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"measurement_unit\",\"name\":\"measurement-unit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"penalty_type\",\"name\":\"penalty-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"FEE_REBATE\",\"CREDIT\",\"ESCALATION\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"penalty_value\",\"name\":\"penalty-value\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"effective_from\",\"name\":\"effective-from\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"date\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.add-sla :phrases ["add sla to deal" "create deal sla"] :verb deal.add-sla)
+(utterance-binding deal.add-sla :phrases ["add sla to deal" "create deal sla"] :domain "deal" :verb deal.add-sla)
 
 (verb deal.add-ubo-assessment
+  :domain "deal"
   :description "Link an entity's UBO assessment to a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_ubo_assessment\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"assessment_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"entity-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"entity_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"kyc-case-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"kyc_case_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_ubo_assessment\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"assessment_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"entity_id\",\"name\":\"entity-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"kyc_case_id\",\"name\":\"kyc-case-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.add-ubo-assessment :phrases ["add ubo assessment to deal" "link kyc assessment" "add deal ubo check"] :verb deal.add-ubo-assessment)
+(utterance-binding deal.add-ubo-assessment :phrases ["add ubo assessment to deal" "link kyc assessment" "add deal ubo check"] :domain "deal" :verb deal.add-ubo-assessment)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.agree-rate-card
+  :domain "deal"
   :description "Finalise rate card - both parties agree. Lines become immutable."
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_agree_rate_card"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_rate_card\"}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.propose-rate-card\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deal_rate_cards\",\"column\":\"status\",\"value\":\"AGREED\"}]"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_slot\":\"deal_rate_card\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.propose-rate-card\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"status\",\"table\":\"deal_rate_cards\",\"value\":\"AGREED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.agree-rate-card :phrases ["agree rate card" "accept rate card" "finalize rate card" "approve pricing" "lock in the rate card" "confirm the agreed pricing" "sign off on the fees" "finalize the fee schedule"] :verb deal.agree-rate-card)
+(utterance-binding deal.agree-rate-card :phrases ["agree rate card" "accept rate card" "finalize rate card" "approve pricing" "lock in the rate card" "confirm the agreed pricing" "sign off on the fees" "finalize the fee schedule"] :domain "deal" :verb deal.agree-rate-card)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.bac-approve
+  :domain "deal"
   :description "BAC approval decision — sets deals.bac_status='approved' (parallel substate of IN_CLEARANCE; CONTRACTED gated on bac_status AND kyc_clearance_status)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_bac_approve"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deals\",\"column\":\"bac_status\",\"value\":\"approved\"}]"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"bac_status\",\"table\":\"deals\",\"value\":\"approved\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.bac-approve :phrases ["BAC approve" "approve BAC review" "pass BAC decision" "clear BAC for this deal"] :verb deal.bac-approve)
+(utterance-binding deal.bac-approve :phrases ["BAC approve" "approve BAC review" "pass BAC decision" "clear BAC for this deal"] :domain "deal" :verb deal.bac-approve)
 
 (verb deal.bac-mark-in-review
+  :domain "deal"
   :description "Mark BAC clearance as in review — sets deals.bac_status='in_review' while preserving deal_status=IN_CLEARANCE"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deals\",\"column\":\"bac_status\",\"value\":\"in_review\"}]"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"bac_status\",\"table\":\"deals\",\"value\":\"in_review\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.bac-mark-in-review :phrases ["mark BAC in review" "start BAC review" "set BAC clearance in review"] :verb deal.bac-mark-in-review)
+(utterance-binding deal.bac-mark-in-review :phrases ["mark BAC in review" "start BAC review" "set BAC clearance in review"] :domain "deal" :verb deal.bac-mark-in-review)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.bac-reject
+  :domain "deal"
   :description "BAC rejection — sets deals.bac_status='rejected' while preserving deal_status=IN_CLEARANCE; terminal rejection is driven by deal.reject"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_bac_reject"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deals\",\"column\":\"bac_status\",\"value\":\"rejected\"}]"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"bac_status\",\"table\":\"deals\",\"value\":\"rejected\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.bac-reject :phrases ["BAC reject" "reject BAC review" "BAC decline" "fail BAC for this deal"] :verb deal.bac-reject)
+(utterance-binding deal.bac-reject :phrases ["BAC reject" "reject BAC review" "BAC decline" "fail BAC for this deal"] :domain "deal" :verb deal.bac-reject)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.begin-winding-down
+  :domain "deal"
   :description "Begin deal winding down — exit intent from active servicing"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_begin_winding_down"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.begin-winding-down :phrases ["wind down this deal" "begin deal exit" "start deal offboarding"] :verb deal.begin-winding-down)
+(utterance-binding deal.begin-winding-down :phrases ["wind down this deal" "begin deal exit" "start deal offboarding"] :domain "deal" :verb deal.begin-winding-down)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.cancel
+  :domain "deal"
   :description "Cancel a deal (soft delete - sets status to CANCELLED)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_cancel"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Cancellation reason\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Cancellation reason\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.cancel :phrases ["cancel deal" "abort deal" "close deal as lost" "kill this deal" "deal is dead" "we lost this one" "client walked away cancel the deal" "pull the plug on this deal" "mark this deal as lost"] :verb deal.cancel)
+(utterance-binding deal.cancel :phrases ["cancel deal" "abort deal" "close deal as lost" "kill this deal" "deal is dead" "we lost this one" "client walked away cancel the deal" "pull the plug on this deal" "mark this deal as lost"] :domain "deal" :verb deal.cancel)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.counter-rate-card
+  :domain "deal"
   :description "Client counter-offer - creates new version via clone"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_rate_card\"}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.propose-rate-card\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"new_rate_card_id\",\"capture\":true}"
-  :writes-json "[{\"table\":\"deal_rate_cards\",\"column\":\"status\",\"value\":\"COUNTER_OFFERED\"},{\"table\":\"deal_rate_cards\",\"column\":\"status\",\"value\":\"SUPERSEDED\"}]"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"counter-lines\",\"type\":\"json\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Array of {line_id, proposed_rate, proposed_minimum, proposed_maximum}\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_slot\":\"deal_rate_card\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.propose-rate-card\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":true,\"name\":\"new_rate_card_id\",\"type\":\"uuid\"}"
+  :writes-json "[{\"column\":\"status\",\"table\":\"deal_rate_cards\",\"value\":\"COUNTER_OFFERED\"},{\"column\":\"status\",\"table\":\"deal_rate_cards\",\"value\":\"SUPERSEDED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Array of {line_id, proposed_rate, proposed_minimum, proposed_maximum}\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"counter-lines\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.counter-rate-card :phrases ["counter rate card" "client counter offer" "counter proposal" "submit a counter offer on the rate card" "counter the current fee proposal" "send back a revised rate card"] :verb deal.counter-rate-card)
+(utterance-binding deal.counter-rate-card :phrases ["counter rate card" "client counter offer" "counter proposal" "submit a counter offer on the rate card" "counter the current fee proposal" "send back a revised rate card"] :domain "deal" :verb deal.counter-rate-card)
 
 (verb deal.create
+  :domain "deal"
   :description "Create a new deal record for a sales opportunity"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"deal_id\",\"capture\":true}"
-  :outputs-json "[{\"name\":\"created_deal_id\",\"type\":\"uuid\",\"entity_kind\":\"deal\",\"description\":\"ID of the newly created deal\"}]"
-  :args-json "[{\"name\":\"deal-name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"deal_name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Name of the deal\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"primary-client-group-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"primary_client_group_id\",\"lookup\":{\"table\":\"client_group\",\"schema\":\"ob-poc\",\"entity_type\":\"client_group\",\"search_key\":\"canonical_name\",\"primary_key\":\"id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Client group ID (e.g., Allianz, BlackRock)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"deal-reference\",\"type\":\"string\",\"required\":false,\"maps_to\":\"deal_reference\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Internal deal tracking reference\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sales-owner\",\"type\":\"string\",\"required\":false,\"maps_to\":\"sales_owner\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Lead sales contact\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sales-team\",\"type\":\"string\",\"required\":false,\"maps_to\":\"sales_team\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Sales team/desk\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"estimated-revenue\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"estimated_revenue\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Estimated annual revenue\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"currency-code\",\"type\":\"string\",\"required\":false,\"maps_to\":\"currency_code\",\"lookup\":null,\"valid_values\":null,\"default\":\"USD\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"notes\",\"type\":\"string\",\"required\":false,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"deal_id\",\"type\":\"uuid\"}"
+  :outputs-json "[{\"description\":\"ID of the newly created deal\",\"entity_kind\":\"deal\",\"name\":\"created_deal_id\",\"type\":\"uuid\"}]"
+  :args-json "[{\"default\":null,\"description\":\"Name of the deal\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_name\",\"name\":\"deal-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Client group ID (e.g., Allianz, BlackRock)\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"client_group\",\"primary_key\":\"id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"canonical_name\",\"table\":\"client_group\"},\"maps_to\":\"primary_client_group_id\",\"name\":\"primary-client-group-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Internal deal tracking reference\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_reference\",\"name\":\"deal-reference\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Lead sales contact\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sales_owner\",\"name\":\"sales-owner\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Sales team/desk\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sales_team\",\"name\":\"sales-team\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Estimated annual revenue\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"estimated_revenue\",\"name\":\"estimated-revenue\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":\"USD\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"currency_code\",\"name\":\"currency-code\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"notes\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.create :phrases ["create deal" "new deal" "create sales opportunity" "open new deal" "start deal" "create client deal" "set up a new deal" "register a sales opportunity" "open a deal for this client" "start a new commercial deal" "create a deal record" "kick off a new deal" "new mandate from the client" "log a new sales opportunity" "we've got a new prospect" "start the commercial process" "new IMA deal" "create a custody deal" "start a commercial deal" "start a deal for" "new deal for" "start a deal" "create a new deal" "open a deal" "commercial deal for" "new commercial deal" "start a commercial deal for"] :verb deal.create)
+(utterance-binding deal.create :phrases ["create deal" "new deal" "create sales opportunity" "open new deal" "start deal" "create client deal" "set up a new deal" "register a sales opportunity" "open a deal for this client" "start a new commercial deal" "create a deal record" "kick off a new deal" "new mandate from the client" "log a new sales opportunity" "we've got a new prospect" "start the commercial process" "new IMA deal" "create a custody deal" "start a commercial deal" "start a deal for" "new deal for" "start a deal" "create a new deal" "open a deal" "commercial deal for" "new commercial deal" "start a commercial deal for"] :domain "deal" :verb deal.create)
 
 (verb deal.create-rate-card
+  :domain "deal"
   :description "Create a negotiated rate card for a product within a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create\",\"requires_prior:deal.add-product\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"rate_card_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"contract_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"product_id\",\"lookup\":{\"table\":\"products\",\"schema\":\"ob-poc\",\"entity_type\":\"product\",\"search_key\":\"name\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rate-card-name\",\"type\":\"string\",\"required\":false,\"maps_to\":\"rate_card_name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"effective-from\",\"type\":\"date\",\"required\":true,\"maps_to\":\"effective_from\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"effective-to\",\"type\":\"date\",\"required\":false,\"maps_to\":\"effective_to\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create\",\"requires_prior:deal.add-product\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":true,\"name\":\"rate_card_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_id\",\"name\":\"contract-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"product\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"products\"},\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_name\",\"name\":\"rate-card-name\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"effective_from\",\"name\":\"effective-from\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"date\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"effective_to\",\"name\":\"effective-to\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"date\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.create-rate-card :phrases ["create deal rate card" "new rate card for deal" "create pricing for deal" "add rate card to deal" "set up the rate card" "set up rate card for custody services" "create a fee schedule for this deal" "build the rate card" "start a new rate card for this product" "set up pricing for custody" "create a pricing schedule" "set up the fee card for this product" "build a fee schedule for custody" "create the pricing card" "set up custody pricing" "create rate card for this service" "new fee schedule" "start the rate card for fund accounting" "add pricing for this deal product" "create rate card" "rate card for deal" "create rate card for this deal"] :verb deal.create-rate-card)
+(utterance-binding deal.create-rate-card :phrases ["create deal rate card" "new rate card for deal" "create pricing for deal" "add rate card to deal" "set up the rate card" "set up rate card for custody services" "create a fee schedule for this deal" "build the rate card" "start a new rate card for this product" "set up pricing for custody" "create a pricing schedule" "set up the fee card for this product" "build a fee schedule for custody" "create the pricing card" "set up custody pricing" "create rate card for this service" "new fee schedule" "start the rate card for fund accounting" "add pricing for this deal product" "create rate card" "rate card for deal" "create rate card for this deal"] :domain "deal" :verb deal.create-rate-card)
 
 (verb deal.kyc-mark-in-review
+  :domain "deal"
   :description "Mark deal KYC clearance as in review — sets deals.kyc_clearance_status='in_review' while preserving deal_status=IN_CLEARANCE"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deals\",\"column\":\"kyc_clearance_status\",\"value\":\"in_review\"}]"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"kyc_clearance_status\",\"table\":\"deals\",\"value\":\"in_review\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.kyc-mark-in-review :phrases ["mark deal KYC in review" "start deal KYC clearance review" "set KYC clearance in review"] :verb deal.kyc-mark-in-review)
+(utterance-binding deal.kyc-mark-in-review :phrases ["mark deal KYC in review" "start deal KYC clearance review" "set KYC clearance in review"] :domain "deal" :verb deal.kyc-mark-in-review)
 
 (verb deal.list
+  :domain "deal"
   :description "List deals with optional filters"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"client-group-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"primary_client_group_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"deal_status\",\"lookup\":null,\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"KYC_CLEARANCE\",\"CONTRACTED\",\"ONBOARDING\",\"ACTIVE\",\"WINDING_DOWN\",\"OFFBOARDED\",\"CANCELLED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sales-owner\",\"type\":\"string\",\"required\":false,\"maps_to\":\"sales_owner\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"v_deal_summary\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :confirm-policy "quick_confirm"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"primary_client_group_id\",\"name\":\"client-group-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_status\",\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"IN_CLEARANCE\",\"CONTRACTED\",\"LOST\",\"REJECTED\",\"WITHDRAWN\",\"CANCELLED\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sales_owner\",\"name\":\"sales-owner\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"v_deal_summary\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list :phrases ["what deals does Allianz Global Investors have?" "what deals does" "deals for Allianz" "show me deals for" "list deals" "show deals" "show me deals" "show me deal records" "show me deal record" "show me deal pipeline" "all deals" "deals for client" "my deals" "show me the deal pipeline" "what deals do we have" "list all active deals" "show the sales pipeline" "what's in the pipeline"] :verb deal.list)
+(utterance-binding deal.list :phrases ["what deals does Allianz Global Investors have?" "what deals does" "deals for Allianz" "show me deals for" "list deals" "show deals" "show me deals" "show me deal records" "show me deal record" "show me deal pipeline" "all deals" "deals for client" "my deals" "show me the deal pipeline" "what deals do we have" "list all active deals" "show the sales pipeline" "what's in the pipeline"] :domain "deal" :verb deal.list)
 
 (verb deal.list-active-rate-cards
+  :domain "deal"
   :description "List only the currently AGREED rate cards for a deal"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"v_active_rate_cards\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"v_active_rate_cards\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-active-rate-cards :phrases ["active rate cards" "current pricing" "agreed rate cards"] :verb deal.list-active-rate-cards)
+(utterance-binding deal.list-active-rate-cards :phrases ["active rate cards" "current pricing" "agreed rate cards"] :domain "deal" :verb deal.list-active-rate-cards)
 
 (verb deal.list-contracts
+  :domain "deal"
   :description "List all contracts linked to a deal"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_contract\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_contracts\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_contract\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_contracts\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-contracts :phrases ["list deal contracts" "show contracts for deal" "deal agreements"] :verb deal.list-contracts)
+(utterance-binding deal.list-contracts :phrases ["list deal contracts" "show contracts for deal" "deal agreements"] :domain "deal" :verb deal.list-contracts)
 
 (verb deal.list-documents
+  :domain "deal"
   :description "List all documents linked to a deal"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_document\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_documents\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_document\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_documents\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-documents :phrases ["list deal documents" "show deal documents" "deal paperwork"] :verb deal.list-documents)
+(utterance-binding deal.list-documents :phrases ["list deal documents" "show deal documents" "deal paperwork"] :domain "deal" :verb deal.list-documents)
 
 (verb deal.list-onboarding-requests
+  :domain "deal"
   :description "List onboarding requests for a deal"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_onboarding_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"request_status\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_onboarding_requests\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_onboarding_request\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"request_status\",\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_onboarding_requests\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-onboarding-requests :phrases ["list onboarding requests" "show onboarding requests" "deal onboarding status" "what's the onboarding status" "show me the onboarding progress" "where are we on onboarding"] :verb deal.list-onboarding-requests)
+(utterance-binding deal.list-onboarding-requests :phrases ["list onboarding requests" "show onboarding requests" "deal onboarding status" "what's the onboarding status" "show me the onboarding progress" "where are we on onboarding"] :domain "deal" :verb deal.list-onboarding-requests)
 
 (verb deal.list-participants
+  :domain "deal"
   :description "List all participants in a deal"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_participant\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_participants\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_participant\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_participants\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-participants :phrases ["list deal participants" "show deal participants" "who is in the deal"] :verb deal.list-participants)
+(utterance-binding deal.list-participants :phrases ["list deal participants" "show deal participants" "who is in the deal"] :domain "deal" :verb deal.list-participants)
 
 (verb deal.list-products
+  :domain "deal"
   :description "List all products in the deal's commercial scope"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_product\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"product_status\",\"lookup\":null,\"valid_values\":[\"PROPOSED\",\"NEGOTIATING\",\"AGREED\",\"DECLINED\",\"REMOVED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_products\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_product\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_status\",\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PROPOSED\",\"NEGOTIATING\",\"AGREED\",\"DECLINED\",\"REMOVED\"],\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_products\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-products :phrases ["list deal products" "show deal products" "what products in deal" "deal scope"] :verb deal.list-products)
+(utterance-binding deal.list-products :phrases ["list deal products" "show deal products" "what products in deal" "deal scope"] :domain "deal" :verb deal.list-products)
 
 (verb deal.list-rate-card-history
+  :domain "deal"
   :description "Show rate card supersession chain history"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"product_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"v_rate_card_history\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"v_rate_card_history\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-rate-card-history :phrases ["rate card history" "pricing history" "rate card versions"] :verb deal.list-rate-card-history)
+(utterance-binding deal.list-rate-card-history :phrases ["rate card history" "pricing history" "rate card versions"] :domain "deal" :verb deal.list-rate-card-history)
 
 (verb deal.list-rate-card-lines
+  :domain "deal"
   :description "List all fee lines for a rate card"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"rate_card_line\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_rate_card_lines\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"rate_card_line\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_rate_card_lines\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-rate-card-lines :phrases ["list rate card lines" "show fee lines" "rate card pricing" "what's the fee for custody" "show me the fees on this rate card" "what are the pricing lines" "show the fee breakdown" "what does custody cost on this product" "list the charges on the rate card" "show pricing details" "what's the fee for custody on this product" "how much does this service cost" "show the custody fees" "what are the charges for fund accounting" "fee line items" "what's the pricing on this rate card" "break down the fees" "show me what this product costs"] :verb deal.list-rate-card-lines)
+(utterance-binding deal.list-rate-card-lines :phrases ["list rate card lines" "show fee lines" "rate card pricing" "what's the fee for custody" "show me the fees on this rate card" "what are the pricing lines" "show the fee breakdown" "what does custody cost on this product" "list the charges on the rate card" "show pricing details" "what's the fee for custody on this product" "how much does this service cost" "show the custody fees" "what are the charges for fund accounting" "fee line items" "what's the pricing on this rate card" "break down the fees" "show me what this product costs"] :domain "deal" :verb deal.list-rate-card-lines)
 
 (verb deal.list-rate-cards
+  :domain "deal"
   :description "List all rate cards for a deal with status"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"product_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"status\",\"lookup\":null,\"valid_values\":[\"DRAFT\",\"PROPOSED\",\"COUNTER_PROPOSED\",\"AGREED\",\"SUPERSEDED\",\"CANCELLED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_rate_cards\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"status\",\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"DRAFT\",\"PROPOSED\",\"COUNTER_PROPOSED\",\"AGREED\",\"SUPERSEDED\",\"CANCELLED\"],\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_rate_cards\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-rate-cards :phrases ["list deal rate cards" "show rate cards" "deal pricing history" "show me the rate cards for this deal" "what rate cards exist on this deal" "list all pricing versions"] :verb deal.list-rate-cards)
+(utterance-binding deal.list-rate-cards :phrases ["list deal rate cards" "show rate cards" "deal pricing history" "show me the rate cards for this deal" "what rate cards exist on this deal" "list all pricing versions"] :domain "deal" :verb deal.list-rate-cards)
 
 (verb deal.list-slas
+  :domain "deal"
   :description "List SLAs for a deal"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_sla\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_slas\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_sla\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_slas\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.list-slas :phrases ["list deal slas" "show slas for deal" "deal service levels"] :verb deal.list-slas)
+(utterance-binding deal.list-slas :phrases ["list deal slas" "show slas for deal" "deal service levels"] :domain "deal" :verb deal.list-slas)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.mark-lost
+  :domain "deal"
   :description "Mark deal as lost (competitor won)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_mark_lost"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"deal-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"IN_CLEARANCE\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.mark-lost :phrases ["mark deal as lost" "we lost this deal" "competitor won" "mark deal lost to competitor"] :verb deal.mark-lost)
+(utterance-binding deal.mark-lost :phrases ["mark deal as lost" "we lost this deal" "competitor won" "mark deal lost to competitor"] :domain "deal" :verb deal.mark-lost)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.mark-withdrawn
+  :domain "deal"
   :description "Mark deal as withdrawn (client walked away)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_mark_withdrawn"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"deal-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"IN_CLEARANCE\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.mark-withdrawn :phrases ["client withdrew from deal" "mark deal as withdrawn" "client walked away"] :verb deal.mark-withdrawn)
+(utterance-binding deal.mark-withdrawn :phrases ["client withdrew from deal" "mark deal as withdrawn" "client walked away"] :domain "deal" :verb deal.mark-withdrawn)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.pricing-approve
+  :domain "deal"
   :description "Pricing committee approval of rate card — advances to ready-to-propose"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_pricing_approve"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_rate_card\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_slot\":\"deal_rate_card\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"rate-card-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PENDING_INTERNAL_APPROVAL\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.pricing-approve :phrases ["approve rate card pricing" "pricing committee approve" "internal approve rate card"] :verb deal.pricing-approve)
+(utterance-binding deal.pricing-approve :phrases ["approve rate card pricing" "pricing committee approve" "internal approve rate card"] :domain "deal" :verb deal.pricing-approve)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.pricing-reject
+  :domain "deal"
   :description "Pricing committee rejection — rate card returns to DRAFT for revision"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_pricing_reject"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_rate_card\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_slot\":\"deal_rate_card\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"rate-card-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PENDING_INTERNAL_APPROVAL\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.pricing-reject :phrases ["reject rate card pricing" "pricing committee reject" "send rate card back for pricing revision"] :verb deal.pricing-reject)
+(utterance-binding deal.pricing-reject :phrases ["reject rate card pricing" "pricing committee reject" "send rate card back for pricing revision"] :domain "deal" :verb deal.pricing-reject)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.propose-rate-card
+  :domain "deal"
   :description "Submit rate card for client review"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_rate_card\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_rate_card\"}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create-rate-card\",\"requires_prior:deal.add-rate-card-line\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deal_rate_cards\",\"column\":\"status\",\"value\":\"PROPOSED\"}]"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_rate_card\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_slot\":\"deal_rate_card\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create-rate-card\",\"requires_prior:deal.add-rate-card-line\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"status\",\"table\":\"deal_rate_cards\",\"value\":\"PROPOSED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.propose-rate-card :phrases ["propose rate card" "submit rate card" "send rate card to client" "send this rate card for review" "issue the commercial proposal" "propose these fees to the client" "share the pricing with the client" "submit the fee proposal" "put this rate card out for approval"] :verb deal.propose-rate-card)
+(utterance-binding deal.propose-rate-card :phrases ["propose rate card" "submit rate card" "send rate card to client" "send this rate card for review" "issue the commercial proposal" "propose these fees to the client" "share the pricing with the client" "submit the fee proposal" "put this rate card out for approval"] :domain "deal" :verb deal.propose-rate-card)
 
 (verb deal.read
+  :domain "deal"
   :description "Read the primary deal record by ID"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deals\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deals\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.read :phrases ["get deal" "show deal by id" "show deal record by id" "show me deal by id" "show me deal record by id" "deal details" "view deal by id" "read this deal" "show the current deal record" "what's the status of the deal" "what is the deal status" "check deal status" "pull up the deal" "give me the deal details" "where does the deal stand" "show me this deal" "what's happening with the deal" "deal progress" "how is the deal going" "what stage is the deal at" "check on this deal" "deal status check" "what's the current state of this deal" "look up this deal"] :verb deal.read)
+(utterance-binding deal.read :phrases ["get deal" "show deal by id" "show deal record by id" "show me deal by id" "show me deal record by id" "deal details" "view deal by id" "read this deal" "show the current deal record" "what's the status of the deal" "what is the deal status" "check deal status" "pull up the deal" "give me the deal details" "where does the deal stand" "show me this deal" "what's happening with the deal" "deal progress" "how is the deal going" "what stage is the deal at" "check on this deal" "deal status check" "what's the current state of this deal" "look up this deal"] :domain "deal" :verb deal.read)
 
 (verb deal.read-summary
+  :domain "deal"
   :description "Read full deal summary with linked entities, status, and progress"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.read-summary :phrases ["deal summary" "full deal details" "deal overview" "show me the deal summary" "get the deal overview" "give me the full deal picture" "what's going on with this deal" "deal snapshot" "summarize the deal" "show me everything about this deal" "deal at a glance" "complete deal picture" "what's the full story on this deal" "deal dashboard" "pull up the deal summary" "give me the deal rundown" "show deal with all linked entities"] :verb deal.read-summary)
+(utterance-binding deal.read-summary :phrases ["deal summary" "full deal details" "deal overview" "show me the deal summary" "get the deal overview" "give me the full deal picture" "what's going on with this deal" "deal snapshot" "summarize the deal" "show me everything about this deal" "deal at a glance" "complete deal picture" "what's the full story on this deal" "deal dashboard" "pull up the deal summary" "give me the deal rundown" "show deal with all linked entities"] :domain "deal" :verb deal.read-summary)
 
 (verb deal.read-timeline
+  :domain "deal"
   :description "Read the deal event timeline for audit trail"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal_event\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"event-type\",\"type\":\"string\",\"required\":false,\"maps_to\":\"event_type\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"from-date\",\"type\":\"timestamp\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter events from this date\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"to-date\",\"type\":\"timestamp\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter events to this date\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"deal_events\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal_event\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"event_type\",\"name\":\"event-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter events from this date\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"from-date\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"timestamp\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter events to this date\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"to-date\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"timestamp\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_events\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.read-timeline :phrases ["deal timeline" "deal history" "deal events" "deal audit trail" "show me the deal timeline" "what happened on this deal" "deal activity log" "show the deal event history" "when did this deal change status" "deal progression history" "show deal progress over time" "give me the deal chronology" "what's the history on this deal" "show the audit log for this deal" "deal milestones" "track deal changes" "walk me through what happened on this deal" "show deal activity"] :verb deal.read-timeline)
+(utterance-binding deal.read-timeline :phrases ["deal timeline" "deal history" "deal events" "deal audit trail" "show me the deal timeline" "what happened on this deal" "deal activity log" "show the deal event history" "when did this deal change status" "deal progression history" "show deal progress over time" "give me the deal chronology" "what's the history on this deal" "show the audit log for this deal" "deal milestones" "track deal changes" "walk me through what happened on this deal" "show deal activity"] :domain "deal" :verb deal.read-timeline)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.reinstate
+  :domain "deal"
   :description "Reinstate suspended deal back to active"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.reinstate :phrases ["reinstate deal" "resume deal" "lift deal suspension"] :verb deal.reinstate)
+(utterance-binding deal.reinstate :phrases ["reinstate deal" "resume deal" "lift deal suspension"] :domain "deal" :verb deal.reinstate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.reject
+  :domain "deal"
   :description "Reject deal (terminal-negative; internal decision)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_reject"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"deal-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"IN_CLEARANCE\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.reject :phrases ["reject this deal" "decline deal" "we reject this commercial engagement"] :verb deal.reject)
+(utterance-binding deal.reject :phrases ["reject this deal" "decline deal" "we reject this commercial engagement"] :domain "deal" :verb deal.reject)
 
 (verb deal.remove-contract
+  :domain "deal"
   :description "Unlink a contract from a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"destructive\",\"action_class\":null,\"noun\":\"deal_contract\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"contract_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"destructive\",\"internal\":false,\"noun\":\"deal_contract\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_id\",\"name\":\"contract-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.remove-contract :phrases ["remove contract from deal" "unlink contract" "detach contract"] :verb deal.remove-contract)
+(utterance-binding deal.remove-contract :phrases ["remove contract from deal" "unlink contract" "detach contract"] :domain "deal" :verb deal.remove-contract)
 
 (verb deal.remove-participant
+  :domain "deal"
   :description "Remove a participant from a deal"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"destructive\",\"action_class\":null,\"noun\":\"deal_participant\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"entity-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"entity_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"participant-role\",\"type\":\"string\",\"required\":false,\"maps_to\":\"participant_role\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"destructive\",\"internal\":false,\"noun\":\"deal_participant\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"entity_id\",\"name\":\"entity-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"participant_role\",\"name\":\"participant-role\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.remove-participant :phrases ["remove participant from deal" "remove deal participant" "delete participant"] :verb deal.remove-participant)
+(utterance-binding deal.remove-participant :phrases ["remove participant from deal" "remove deal participant" "delete participant"] :domain "deal" :verb deal.remove-participant)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.remove-product
+  :domain "deal"
   :description "Remove a product from the deal scope (sets status to REMOVED)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"destructive\",\"action_class\":null,\"noun\":\"deal_product\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"product-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_product\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"product_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"destructive\",\"internal\":false,\"noun\":\"deal_product\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"product-id\",\"target_slot\":\"deal_product\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.remove-product :phrases ["remove product from deal" "drop product from deal" "exclude product"] :verb deal.remove-product)
+(utterance-binding deal.remove-product :phrases ["remove product from deal" "drop product from deal" "exclude product"] :domain "deal" :verb deal.remove-product)
 
 (verb deal.remove-rate-card-line
+  :domain "deal"
   :description "Remove a fee line from a rate card"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"destructive\",\"action_class\":null,\"noun\":\"rate_card_line\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"line-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"line_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"destructive\",\"internal\":false,\"noun\":\"rate_card_line\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"line_id\",\"name\":\"line-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.remove-rate-card-line :phrases ["remove rate card line" "delete fee line"] :verb deal.remove-rate-card-line)
+(utterance-binding deal.remove-rate-card-line :phrases ["remove rate card line" "delete fee line"] :domain "deal" :verb deal.remove-rate-card-line)
 
 (verb deal.remove-sla
+  :domain "deal"
   :description "Remove an SLA from a deal"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"destructive\",\"action_class\":null,\"noun\":\"deal_sla\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"sla-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"sla_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"delete\",\"table\":\"deal_slas\",\"schema\":\"ob-poc\",\"key\":\"sla_id\",\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"destructive\",\"internal\":false,\"noun\":\"deal_sla\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sla_id\",\"name\":\"sla-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":\"sla_id\",\"operation\":\"delete\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"deal_slas\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding deal.remove-sla :phrases ["remove deal sla" "delete sla"] :verb deal.remove-sla)
+(utterance-binding deal.remove-sla :phrases ["remove deal sla" "delete sla"] :domain "deal" :verb deal.remove-sla)
 
 (verb deal.request-onboarding
+  :domain "deal"
   :description "Create onboarding request for an existing CBU - handoff from Sales to Ops after KYC clearance and contracting"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_onboarding_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create\",\"requires_prior:kyc-case.create\",\"requires_prior:deal.agree-rate-card\",\"requires_prior:deal.add-contract\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"request_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"contract_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"cbu_id\",\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Existing CBU to onboard to the contracted product\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"product_id\",\"lookup\":{\"table\":\"products\",\"schema\":\"ob-poc\",\"entity_type\":\"product\",\"search_key\":\"name\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"requires-kyc\",\"type\":\"boolean\",\"required\":false,\"maps_to\":\"requires_kyc\",\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"target-live-date\",\"type\":\"date\",\"required\":false,\"maps_to\":\"target_live_date\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"requested-by\",\"type\":\"string\",\"required\":false,\"maps_to\":\"requested_by\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"notes\",\"type\":\"string\",\"required\":false,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_onboarding_request\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create\",\"requires_prior:kyc-case.create\",\"requires_prior:deal.agree-rate-card\",\"requires_prior:deal.add-contract\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":true,\"name\":\"request_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_id\",\"name\":\"contract-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Existing CBU to onboard to the contracted product\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":\"cbu_id\",\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"product\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"products\"},\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"requires_kyc\",\"name\":\"requires-kyc\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"target_live_date\",\"name\":\"target-live-date\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"date\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"requested_by\",\"name\":\"requested-by\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"notes\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.request-onboarding :phrases ["request onboarding" "create onboarding request" "handoff to ops" "initiate onboarding" "kick off onboarding for this deal" "start onboarding for the deal products" "submit the onboarding request" "send this deal to operations" "trigger onboarding" "hand over to the onboarding team" "begin product setup for this deal" "target an existing cbu for onboarding" "start the onboarding process" "kick off product onboarding" "send deal products to onboarding" "initiate the ops handoff" "start setting up the deal products" "launch onboarding for this client" "submit onboarding handoff" "handoff deal to operations" "request deal onboarding" "onboarding handoff"] :verb deal.request-onboarding)
+(utterance-binding deal.request-onboarding :phrases ["request onboarding" "create onboarding request" "handoff to ops" "initiate onboarding" "kick off onboarding for this deal" "start onboarding for the deal products" "submit the onboarding request" "send this deal to operations" "trigger onboarding" "hand over to the onboarding team" "begin product setup for this deal" "target an existing cbu for onboarding" "start the onboarding process" "kick off product onboarding" "send deal products to onboarding" "initiate the ops handoff" "start setting up the deal products" "launch onboarding for this client" "submit onboarding handoff" "handoff deal to operations" "request deal onboarding" "onboarding handoff"] :domain "deal" :verb deal.request-onboarding)
 
 (verb deal.request-onboarding-batch
+  :domain "deal"
   :description "Batch onboarding request - multiple existing CBUs to multiple products after KYC clearance and contracting"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_onboarding_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :lifecycle-json "{\"entity_arg\":null,\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create\",\"requires_prior:kyc-case.create\",\"requires_prior:deal.agree-rate-card\",\"requires_prior:deal.add-contract\"],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"contract-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"contract_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"requests\",\"type\":\"json\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Array of {cbu-id, product-id, target-live-date} for existing CBUs\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"requires-kyc\",\"type\":\"boolean\",\"required\":false,\"maps_to\":\"requires_kyc\",\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"requested-by\",\"type\":\"string\",\"required\":false,\"maps_to\":\"requested_by\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_onboarding_request\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :lifecycle-json "{\"entity_arg\":null,\"precondition_checks\":[\"requires_prior:deal.create\",\"requires_prior:kyc-case.create\",\"requires_prior:deal.agree-rate-card\",\"requires_prior:deal.add-contract\"],\"reads_tables\":[],\"requires_states\":[],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"contract_id\",\"name\":\"contract-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Array of {cbu-id, product-id, target-live-date} for existing CBUs\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"requests\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"requires_kyc\",\"name\":\"requires-kyc\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"requested_by\",\"name\":\"requested-by\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.request-onboarding-batch :phrases ["batch onboarding request" "bulk onboard" "onboard multiple cbus"] :verb deal.request-onboarding-batch)
+(utterance-binding deal.request-onboarding-batch :phrases ["batch onboarding request" "bulk onboard" "onboard multiple cbus"] :domain "deal" :verb deal.request-onboarding-batch)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.resolve-sla-breach
+  :domain "deal"
   :description "Resolve SLA breach (remediation complete; transition to RESOLVED)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"sla-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_sla\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"sla-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"sla_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"sla-id\",\"target_slot\":\"deal_sla\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"sla-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"IN_REMEDIATION\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sla_id\",\"name\":\"sla-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.resolve-sla-breach :phrases ["resolve SLA breach" "SLA remediation complete" "mark SLA breach as resolved"] :verb deal.resolve-sla-breach)
+(utterance-binding deal.resolve-sla-breach :phrases ["resolve SLA breach" "SLA remediation complete" "mark SLA breach as resolved"] :domain "deal" :verb deal.resolve-sla-breach)
 
 (verb deal.search
+  :domain "deal"
   :description "Search deal records by name or reference"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"query\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Search term for deal name or reference\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Search term for deal name or reference\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"query\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.search :phrases ["search deals" "find deal" "lookup deal"] :verb deal.search)
+(utterance-binding deal.search :phrases ["search deals" "find deal" "lookup deal"] :domain "deal" :verb deal.search)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.set-stage
+  :domain "deal"
   :description "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_state_arg\":\"new-status\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"new-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"deal_status\",\"lookup\":null,\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"KYC_CLEARANCE\",\"CONTRACTED\",\"ONBOARDING\",\"ACTIVE\",\"WINDING_DOWN\",\"OFFBOARDED\",\"CANCELLED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_state_arg\":\"new-status\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_status\",\"name\":\"new-status\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"IN_CLEARANCE\",\"CONTRACTED\",\"LOST\",\"REJECTED\",\"WITHDRAWN\",\"CANCELLED\"],\"validation\":null}]"
 )
 
-(utterance-binding deal.set-stage :phrases ["move this deal to" "move this deal to mandate negotiation" "move deal to" "set deal stage" "set deal stage to" "change deal stage" "move deal stage" "update deal status" "change deal status"] :verb deal.set-stage)
+(utterance-binding deal.set-stage :phrases ["move this deal to" "move this deal to mandate negotiation" "move deal to" "set deal stage" "set deal stage to" "change deal stage" "move deal stage" "update deal status" "change deal status"] :domain "deal" :verb deal.set-stage)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.start-sla-remediation
+  :domain "deal"
   :description "Begin remediation of a breached SLA (transition BREACHED → IN_REMEDIATION)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"sla-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_sla\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"sla-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"sla_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"sla-id\",\"target_slot\":\"deal_sla\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"sla-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"BREACHED\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sla_id\",\"name\":\"sla-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.start-sla-remediation :phrases ["start SLA remediation" "remediate SLA breach" "begin SLA recovery"] :verb deal.start-sla-remediation)
+(utterance-binding deal.start-sla-remediation :phrases ["start SLA remediation" "remediate SLA breach" "begin SLA recovery"] :domain "deal" :verb deal.start-sla-remediation)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.submit-for-bac
+  :domain "deal"
   :description "Submit deal to Business Acceptance Committee — writes deal_status='IN_CLEARANCE' and bac_status='in_review' (Q21 (b) substate model)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deals\",\"column\":\"deal_status\",\"value\":\"IN_CLEARANCE\"},{\"table\":\"deals\",\"column\":\"bac_status\",\"value\":\"in_review\"},{\"table\":\"deals\",\"column\":\"kyc_clearance_status\",\"value\":\"pending\"}]"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"deal_status\",\"table\":\"deals\",\"value\":\"IN_CLEARANCE\"},{\"column\":\"bac_status\",\"table\":\"deals\",\"value\":\"in_review\"},{\"column\":\"kyc_clearance_status\",\"table\":\"deals\",\"value\":\"pending\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.submit-for-bac :phrases ["submit to BAC" "send for business acceptance" "submit for BAC approval" "kick off BAC review" "escalate deal to BAC"] :verb deal.submit-for-bac)
+(utterance-binding deal.submit-for-bac :phrases ["submit to BAC" "send for business acceptance" "submit for BAC approval" "kick off BAC review" "escalate deal to BAC"] :domain "deal" :verb deal.submit-for-bac)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.submit-for-pricing-approval
+  :domain "deal"
   :description "Submit rate card to pricing committee for internal approval (bespoke / discount threshold / new jurisdiction)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_submit_for_pricing_approval"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_rate_card\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"rate-card-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"rate_card_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"rate-card-id\",\"target_slot\":\"deal_rate_card\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"rate-card-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"DRAFT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_card_id\",\"name\":\"rate-card-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.submit-for-pricing-approval :phrases ["submit rate card for pricing approval" "send rate card to pricing committee" "request pricing approval" "escalate rate card for internal approval"] :verb deal.submit-for-pricing-approval)
+(utterance-binding deal.submit-for-pricing-approval :phrases ["submit rate card for pricing approval" "send rate card to pricing committee" "request pricing approval" "escalate rate card for internal approval"] :domain "deal" :verb deal.submit-for-pricing-approval)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.suspend
+  :domain "deal"
   :description "Suspend active deal (operational hold; restorable)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_suspend"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.suspend :phrases ["suspend deal" "put deal on hold" "pause this deal"] :verb deal.suspend)
+(utterance-binding deal.suspend :phrases ["suspend deal" "put deal on hold" "pause this deal"] :domain "deal" :verb deal.suspend)
 
 (verb deal.update
+  :domain "deal"
   :description "Update primary deal record fields"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"deal-name\",\"type\":\"string\",\"required\":false,\"maps_to\":\"deal_name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sales-owner\",\"type\":\"string\",\"required\":false,\"maps_to\":\"sales_owner\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"estimated-revenue\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"estimated_revenue\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"notes\",\"type\":\"string\",\"required\":false,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_name\",\"name\":\"deal-name\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sales_owner\",\"name\":\"sales-owner\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"estimated_revenue\",\"name\":\"estimated-revenue\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"notes\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.update :phrases ["update deal" "modify deal" "edit deal"] :verb deal.update)
+(utterance-binding deal.update :phrases ["update deal" "modify deal" "edit deal"] :domain "deal" :verb deal.update)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.update-document-status
+  :domain "deal"
   :description "Update document status (e.g. DRAFT → SIGNED → EXECUTED)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_document\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"document-id\",\"target_state_arg\":\"document-status\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_document\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"document-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"document_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"document-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"document_status\",\"lookup\":null,\"valid_values\":[\"DRAFT\",\"UNDER_REVIEW\",\"SIGNED\",\"EXECUTED\",\"SUPERSEDED\",\"ARCHIVED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_document\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"document-id\",\"target_slot\":\"deal_document\",\"target_state_arg\":\"document-status\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"document_id\",\"name\":\"document-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"document_status\",\"name\":\"document-status\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"DRAFT\",\"UNDER_REVIEW\",\"SIGNED\",\"EXECUTED\",\"SUPERSEDED\",\"ARCHIVED\"],\"validation\":null}]"
 )
 
-(utterance-binding deal.update-document-status :phrases ["update deal document status" "mark document signed" "execute document"] :verb deal.update-document-status)
+(utterance-binding deal.update-document-status :phrases ["update deal document status" "mark document signed" "execute document"] :domain "deal" :verb deal.update-document-status)
 
 (verb deal.update-kyc-clearance
+  :domain "deal"
   :description "Propagate KYC case outcome to deals.kyc_clearance_status — preserving verb invoked from the KYC workspace's case approval/rejection handler. The parallel substate of IN_CLEARANCE complementing bac_status."
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deals\",\"column\":\"kyc_clearance_status\",\"value\":\"approved\"},{\"table\":\"deals\",\"column\":\"kyc_clearance_status\",\"value\":\"rejected\"}]"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"kyc-clearance-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"kyc_clearance_status\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"One of pending|in_review|approved|rejected\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"kyc_clearance_status\",\"table\":\"deals\",\"value\":\"approved\"},{\"column\":\"kyc_clearance_status\",\"table\":\"deals\",\"value\":\"rejected\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"One of pending|in_review|approved|rejected\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"kyc_clearance_status\",\"name\":\"kyc-clearance-status\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.update-kyc-clearance :phrases ["update KYC clearance" "propagate KYC outcome to deal" "set KYC clearance status" "sync KYC case decision into deal"] :verb deal.update-kyc-clearance)
+(utterance-binding deal.update-kyc-clearance :phrases ["update KYC clearance" "propagate KYC outcome to deal" "set KYC clearance status" "sync KYC case decision into deal"] :domain "deal" :verb deal.update-kyc-clearance)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.update-onboarding-status
+  :domain "deal"
   :description "Update onboarding request status"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_onboarding_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"request-id\",\"target_state_arg\":\"request-status\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_onboarding_request\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :writes-json "[{\"table\":\"deal_onboarding_requests\",\"column\":\"request_status\",\"value\":\"COMPLETED\"}]"
-  :args-json "[{\"name\":\"request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"request_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"request-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"request_status\",\"lookup\":null,\"valid_values\":[\"REQUESTED\",\"KYC_PENDING\",\"KYC_CLEARED\",\"IN_PROGRESS\",\"COMPLETED\",\"BLOCKED\",\"CANCELLED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"kyc-case-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"kyc_case_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_onboarding_request\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"request-id\",\"target_slot\":\"deal_onboarding_request\",\"target_state_arg\":\"request-status\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"request_status\",\"table\":\"deal_onboarding_requests\",\"value\":\"COMPLETED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"request_id\",\"name\":\"request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"request_status\",\"name\":\"request-status\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PENDING\",\"IN_PROGRESS\",\"BLOCKED\",\"COMPLETED\",\"CANCELLED\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"kyc_case_id\",\"name\":\"kyc-case-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.update-onboarding-status :phrases ["update onboarding status" "progress onboarding" "mark onboarding complete"] :verb deal.update-onboarding-status)
+(utterance-binding deal.update-onboarding-status :phrases ["update onboarding status" "progress onboarding" "mark onboarding complete"] :domain "deal" :verb deal.update-onboarding-status)
 
 (verb deal.update-product-status
+  :domain "deal"
   :description "Update the status of a product in the deal scope"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_product\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"product_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"product_status\",\"lookup\":null,\"valid_values\":[\"PROPOSED\",\"NEGOTIATING\",\"AGREED\",\"DECLINED\",\"REMOVED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_product\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_id\",\"name\":\"product-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"product_status\",\"name\":\"product-status\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PROPOSED\",\"NEGOTIATING\",\"AGREED\",\"DECLINED\",\"REMOVED\"],\"validation\":null}]"
 )
 
-(utterance-binding deal.update-product-status :phrases ["update deal product status" "agree product" "decline product"] :verb deal.update-product-status)
+(utterance-binding deal.update-product-status :phrases ["update deal product status" "agree product" "decline product"] :domain "deal" :verb deal.update-product-status)
 
 (verb deal.update-rate-card-line
+  :domain "deal"
   :description "Modify an existing rate card line"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"rate_card_line\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"line-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"line_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rate-value\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"rate_value\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"minimum-fee\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"minimum_fee\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"maximum-fee\",\"type\":\"decimal\",\"required\":false,\"maps_to\":\"maximum_fee\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"tier-brackets\",\"type\":\"json\",\"required\":false,\"maps_to\":\"tier_brackets\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"rate_card_line\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"line_id\",\"name\":\"line-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"rate_value\",\"name\":\"rate-value\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"minimum_fee\",\"name\":\"minimum-fee\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"maximum_fee\",\"name\":\"maximum-fee\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"tier_brackets\",\"name\":\"tier-brackets\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.update-rate-card-line :phrases ["update rate card line" "modify fee line" "change rate"] :verb deal.update-rate-card-line)
+(utterance-binding deal.update-rate-card-line :phrases ["update rate card line" "modify fee line" "change rate"] :domain "deal" :verb deal.update-rate-card-line)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.update-status
+  :domain "deal"
   :description "Transition deal status with lifecycle validation, including pre-contract KYC clearance"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_state_arg\":\"new-status\",\"target_workspace\":\"deal\",\"target_slot\":\"deal\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"deal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"deal_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"new-status\",\"type\":\"string\",\"required\":true,\"maps_to\":\"deal_status\",\"lookup\":null,\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"KYC_CLEARANCE\",\"CONTRACTED\",\"ONBOARDING\",\"ACTIVE\",\"WINDING_DOWN\",\"OFFBOARDED\",\"CANCELLED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"deal-id\",\"target_slot\":\"deal\",\"target_state_arg\":\"new-status\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_id\",\"name\":\"deal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"deal_status\",\"name\":\"new-status\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PROSPECT\",\"QUALIFYING\",\"NEGOTIATING\",\"IN_CLEARANCE\",\"CONTRACTED\",\"LOST\",\"REJECTED\",\"WITHDRAWN\",\"CANCELLED\"],\"validation\":null}]"
 )
 
-(utterance-binding deal.update-status :phrases ["update deal status" "change deal status" "move deal to" "advance deal" "progress deal" "change the deal stage" "move this deal forward" "mark this deal as negotiated" "move this deal into onboarding" "advance the commercial status" "move the deal to approved" "transition the deal status" "promote the deal to the next stage" "set this deal to contracted" "mark deal as active" "push the deal to qualifying" "approve the deal" "push deal to next stage" "advance this deal to the next phase" "change the deal phase" "progress the deal forward" "escalate the deal to onboarding" "move deal status to contracted" "update the deal pipeline stage" "close the deal" "agree the commercial terms" "move to contracted" "the deal is signed move it forward"] :verb deal.update-status)
+(utterance-binding deal.update-status :phrases ["update deal status" "change deal status" "move deal to" "advance deal" "progress deal" "change the deal stage" "move this deal forward" "mark this deal as negotiated" "advance the commercial status" "move the deal to approved" "transition the deal status" "promote the deal to the next stage" "set this deal to contracted" "mark deal as active" "activate this deal" "activate the deal" "push the deal to qualifying" "approve the deal" "push deal to next stage" "advance this deal to the next phase" "change the deal phase" "progress the deal forward" "move deal status to contracted" "update the deal pipeline stage" "close the deal" "agree the commercial terms" "move to contracted" "the deal is signed move it forward"] :domain "deal" :verb deal.update-status)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.update-ubo-assessment
+  :domain "deal"
   :description "Update UBO assessment status and risk rating"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal_ubo_assessment\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"assessment-id\",\"target_state_arg\":\"assessment-status\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_ubo_assessment\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"assessment-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"assessment_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"assessment-status\",\"type\":\"string\",\"required\":false,\"maps_to\":\"assessment_status\",\"lookup\":null,\"valid_values\":[\"PENDING\",\"IN_PROGRESS\",\"COMPLETED\",\"REQUIRES_EDD\",\"BLOCKED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"risk-rating\",\"type\":\"string\",\"required\":false,\"maps_to\":\"risk_rating\",\"lookup\":null,\"valid_values\":[\"LOW\",\"MEDIUM\",\"HIGH\",\"PROHIBITED\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal_ubo_assessment\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"assessment-id\",\"target_slot\":\"deal_ubo_assessment\",\"target_state_arg\":\"assessment-status\",\"target_workspace\":\"deal\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"assessment_id\",\"name\":\"assessment-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"assessment_status\",\"name\":\"assessment-status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"PENDING\",\"IN_PROGRESS\",\"COMPLETED\",\"REQUIRES_EDD\",\"BLOCKED\"],\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"risk_rating\",\"name\":\"risk-rating\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"LOW\",\"MEDIUM\",\"HIGH\",\"PROHIBITED\"],\"validation\":null}]"
 )
 
-(utterance-binding deal.update-ubo-assessment :phrases ["update ubo assessment" "set assessment status" "rate ubo risk"] :verb deal.update-ubo-assessment)
+(utterance-binding deal.update-ubo-assessment :phrases ["update ubo assessment" "set assessment status" "rate ubo risk"] :domain "deal" :verb deal.update-ubo-assessment)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb deal.waive-sla-breach
+  :domain "deal"
   :description "Waive SLA breach (client concession; breach not pursued)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "deal_waive_sla_breach"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"deal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal\"],\"phase_tags\":[\"deal\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"sla-id\",\"target_workspace\":\"deal\",\"target_slot\":\"deal_sla\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"sla-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"sla_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"deal\",\"phase_tags\":[\"deal\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"sla-id\",\"target_slot\":\"deal_sla\",\"target_workspace\":\"deal\"}"
+  :lifecycle-json "{\"entity_arg\":\"sla-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"BREACHED\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"sla_id\",\"name\":\"sla-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding deal.waive-sla-breach :phrases ["waive SLA breach" "client waived SLA" "concede SLA breach"] :verb deal.waive-sla-breach)
-
+(utterance-binding deal.waive-sla-breach :phrases ["waive SLA breach" "client waived SLA" "concede SLA breach"] :domain "deal" :verb deal.waive-sla-breach)

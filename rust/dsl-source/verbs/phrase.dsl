@@ -3,6 +3,7 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb phrase.approve
+  :domain "phrase"
   :description "Approve a phrase proposal and publish through SemOS governance"
   :behavior "plugin"
   :handler "phrase_approve"
@@ -10,100 +11,107 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "phrase_approve"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"phrase-id\",\"target_workspace\":\"semos_maintenance\",\"target_slot\":\"phrase_authoring\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"proposal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rationale\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Written rationale (mandatory for critical-tier verbs)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"phrase-id\",\"target_slot\":\"phrase_authoring\",\"target_workspace\":\"semos_maintenance\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"proposal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Written rationale (mandatory for critical-tier verbs)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"rationale\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.approve :phrases ["approve phrase" "accept phrase proposal" "publish this phrase"] :verb phrase.approve)
+(utterance-binding phrase.approve :phrases ["approve phrase" "accept phrase proposal" "publish this phrase"] :domain "phrase" :verb phrase.approve)
 
 (verb phrase.batch-propose
+  :domain "phrase"
   :description "Generate bulk proposals from aggregated miss analysis (max 50)"
   :behavior "plugin"
   :handler "phrase_batch_propose"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"limit\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"50\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":\"50\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"limit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.batch-propose :phrases ["batch propose phrases" "bulk phrase proposals" "generate phrase proposals from misses" "propose phrases from observation"] :verb phrase.batch-propose)
+(utterance-binding phrase.batch-propose :phrases ["batch propose phrases" "bulk phrase proposals" "generate phrase proposals from misses" "propose phrases from observation"] :domain "phrase" :verb phrase.batch-propose)
 
 (verb phrase.check-collisions
+  :domain "phrase"
   :description "Check a candidate phrase for collisions against the phrase bank"
   :behavior "plugin"
   :handler "phrase_check_collisions"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"phrase\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The candidate phrase to check\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"target-verb\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The verb FQN the phrase should map to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"workspace\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Workspace scope (null for global)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The candidate phrase to check\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"phrase\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The verb FQN the phrase should map to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target-verb\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Workspace scope (null for global)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"workspace\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.check-collisions :phrases ["check phrase collisions" "collision check" "will this phrase collide" "test phrase for conflicts" "phrase collision audit"] :verb phrase.check-collisions)
+(utterance-binding phrase.check-collisions :phrases ["check phrase collisions" "collision check" "will this phrase collide" "test phrase for conflicts" "phrase collision audit"] :domain "phrase" :verb phrase.check-collisions)
 
 (verb phrase.coverage-report
+  :domain "phrase"
   :description "Per-workspace phrase coverage and gap analysis"
   :behavior "plugin"
   :handler "phrase_coverage_report"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
 )
 
-(utterance-binding phrase.coverage-report :phrases ["phrase coverage report" "show phrase coverage" "phrase gaps by workspace" "which workspaces need more phrases" "utterance coverage analysis"] :verb phrase.coverage-report)
+(utterance-binding phrase.coverage-report :phrases ["phrase coverage report" "show phrase coverage" "phrase gaps by workspace" "which workspaces need more phrases" "utterance coverage analysis"] :domain "phrase" :verb phrase.coverage-report)
 
 (verb phrase.defer
+  :domain "phrase"
   :description "Park a phrase proposal for later review"
   :behavior "plugin"
   :handler "phrase_defer"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"proposal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"proposal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.defer :phrases ["defer phrase" "park this proposal" "defer phrase review"] :verb phrase.defer)
+(utterance-binding phrase.defer :phrases ["defer phrase" "park this proposal" "defer phrase review"] :domain "phrase" :verb phrase.defer)
 
 (verb phrase.observe-misses
+  :domain "phrase"
   :description "Trawl session traces for utterance miss and wrong-match patterns"
   :behavior "plugin"
   :handler "phrase_observe_misses"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"limit\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"100\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":\"100\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"limit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.observe-misses :phrases ["observe misses" "find utterance misses" "trawl session traces for misses" "what utterances are failing" "show miss patterns" "scan for wrong matches" "phrase observation run"] :verb phrase.observe-misses)
+(utterance-binding phrase.observe-misses :phrases ["observe misses" "find utterance misses" "trawl session traces for misses" "what utterances are failing" "show miss patterns" "scan for wrong matches" "phrase observation run"] :domain "phrase" :verb phrase.observe-misses)
 
 (verb phrase.propose
+  :domain "phrase"
   :description "Generate a governed phrase proposal with evidence and collision report"
   :behavior "plugin"
   :handler "phrase_propose"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"phrase\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"target-verb\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"workspace\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rationale\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"phrase\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target-verb\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"workspace\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"rationale\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.propose :phrases ["propose a new phrase" "suggest phrase mapping" "create phrase proposal" "propose phrase for verb"] :verb phrase.propose)
+(utterance-binding phrase.propose :phrases ["propose a new phrase" "suggest phrase mapping" "create phrase proposal" "propose phrase for verb"] :domain "phrase" :verb phrase.propose)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb phrase.reject
+  :domain "phrase"
   :description "Reject a phrase proposal with reason code"
   :behavior "plugin"
   :handler "phrase_reject"
@@ -111,25 +119,25 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "phrase_reject"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"phrase-id\",\"target_workspace\":\"semos_maintenance\",\"target_slot\":\"phrase_authoring\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"proposal-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"phrase-id\",\"target_slot\":\"phrase_authoring\",\"target_workspace\":\"semos_maintenance\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"proposal-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding phrase.reject :phrases ["reject phrase" "decline phrase proposal" "reject this phrase"] :verb phrase.reject)
+(utterance-binding phrase.reject :phrases ["reject phrase" "decline phrase proposal" "reject this phrase"] :domain "phrase" :verb phrase.reject)
 
 (verb phrase.review-proposals
+  :domain "phrase"
   :description "List pending phrase proposals grouped by risk tier"
   :behavior "plugin"
   :handler "phrase_review_proposals"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"phrase\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"phrase\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
 )
 
-(utterance-binding phrase.review-proposals :phrases ["review phrase proposals" "show pending proposals" "list phrase proposals" "what phrases are pending review"] :verb phrase.review-proposals)
-
+(utterance-binding phrase.review-proposals :phrases ["review phrase proposals" "show pending proposals" "list phrase proposals" "what phrases are pending review"] :domain "phrase" :verb phrase.review-proposals)

@@ -5,102 +5,107 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb capability-binding.abort-pilot
+  :domain "capability-binding"
   :description "Abort pilot — return binding to DRAFT (pilot did not validate)"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"capability_binding\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"lifecycle_resources\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_workspace\":\"lifecycle_resources\",\"target_slot\":\"capability_binding\"}"
-  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"requires_states\":[\"PILOT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"binding-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"update\",\"table\":\"capability_bindings\",\"schema\":\"ob-poc\",\"key\":\"id\",\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":{\"binding_status\":\"DRAFT\"}}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"capability_binding\",\"phase_tags\":[\"lifecycle_resources\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_slot\":\"capability_binding\",\"target_workspace\":\"lifecycle_resources\"}"
+  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PILOT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"id\",\"name\":\"binding-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":\"id\",\"operation\":\"update\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":{\"binding_status\":\"DRAFT\"},\"table\":\"capability_bindings\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding capability-binding.abort-pilot :phrases ["abort pilot" "cancel pilot" "rollback pilot to draft" "fail pilot" "stop pilot and reset"] :verb capability-binding.abort-pilot)
+(utterance-binding capability-binding.abort-pilot :phrases ["abort pilot" "cancel pilot" "rollback pilot to draft" "fail pilot" "stop pilot and reset"] :domain "capability-binding" :verb capability-binding.abort-pilot)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb capability-binding.deprecate
+  :domain "capability-binding"
   :description "Deprecate a LIVE binding — no new consumers; existing traffic drains"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"capability_binding\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"lifecycle_resources\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_workspace\":\"lifecycle_resources\",\"target_slot\":\"capability_binding\"}"
-  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"requires_states\":[\"LIVE\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"binding-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"update\",\"table\":\"capability_bindings\",\"schema\":\"ob-poc\",\"key\":\"id\",\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":{\"binding_status\":\"DEPRECATED\",\"deprecated_at\":\"now()\"}}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"capability_binding\",\"phase_tags\":[\"lifecycle_resources\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_slot\":\"capability_binding\",\"target_workspace\":\"lifecycle_resources\"}"
+  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"LIVE\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"id\",\"name\":\"binding-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":\"id\",\"operation\":\"update\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":{\"binding_status\":\"DEPRECATED\",\"deprecated_at\":\"now()\"},\"table\":\"capability_bindings\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding capability-binding.deprecate :phrases ["deprecate capability binding" "deprecate binding" "mark binding deprecated" "phase out binding" "begin retirement of binding"] :verb capability-binding.deprecate)
+(utterance-binding capability-binding.deprecate :phrases ["deprecate capability binding" "deprecate binding" "mark binding deprecated" "phase out binding" "begin retirement of binding"] :domain "capability-binding" :verb capability-binding.deprecate)
 
 (verb capability-binding.draft
+  :domain "capability-binding"
   :description "Draft a new capability binding (creates row in DRAFT state)"
   :behavior "crud"
   :effect-class "append_fact"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"capability_binding\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"lifecycle_resources\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"id\",\"capture\":true}"
-  :args-json "[{\"name\":\"instance-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"application_instance_id\",\"lookup\":{\"table\":\"application_instances\",\"schema\":\"ob-poc\",\"entity_type\":\"application_instance\",\"search_key\":\"instance_label\",\"primary_key\":\"id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"service_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Layer 3 product_service id (R2 will add FK)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"notes\",\"type\":\"string\",\"required\":false,\"maps_to\":\"notes\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"insert\",\"table\":\"capability_bindings\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":\"id\",\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"capability_binding\",\"phase_tags\":[\"lifecycle_resources\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"application_instance\",\"primary_key\":\"id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"instance_label\",\"table\":\"application_instances\"},\"maps_to\":\"application_instance_id\",\"name\":\"instance-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Layer 3 product_service id (R2 will add FK)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"service_id\",\"name\":\"service-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"notes\",\"name\":\"notes\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"insert\",\"order_by\":null,\"primary_table\":null,\"returning\":\"id\",\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"capability_bindings\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding capability-binding.draft :phrases ["draft capability binding" "create new binding" "draft service binding" "declare binding for instance" "add capability binding" "register service to instance binding"] :verb capability-binding.draft)
+(utterance-binding capability-binding.draft :phrases ["draft capability binding" "create new binding" "draft service binding" "declare binding for instance" "add capability binding" "register service to instance binding"] :domain "capability-binding" :verb capability-binding.draft)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb capability-binding.promote-live
+  :domain "capability-binding"
   :description "Promote pilot binding to LIVE — full production traffic"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"capability_binding\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"lifecycle_resources\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_workspace\":\"lifecycle_resources\",\"target_slot\":\"capability_binding\"}"
-  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"requires_states\":[\"PILOT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"binding-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"update\",\"table\":\"capability_bindings\",\"schema\":\"ob-poc\",\"key\":\"id\",\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":{\"binding_status\":\"LIVE\",\"promoted_live_at\":\"now()\"}}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"capability_binding\",\"phase_tags\":[\"lifecycle_resources\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_slot\":\"capability_binding\",\"target_workspace\":\"lifecycle_resources\"}"
+  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"PILOT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"id\",\"name\":\"binding-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":\"id\",\"operation\":\"update\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":{\"binding_status\":\"LIVE\",\"promoted_live_at\":\"now()\"},\"table\":\"capability_bindings\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding capability-binding.promote-live :phrases ["promote binding to live" "go live with binding" "promote pilot to live" "graduate binding to production" "make binding live"] :verb capability-binding.promote-live)
+(utterance-binding capability-binding.promote-live :phrases ["promote binding to live" "go live with binding" "promote pilot to live" "graduate binding to production" "make binding live"] :domain "capability-binding" :verb capability-binding.promote-live)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb capability-binding.retire
+  :domain "capability-binding"
   :description "Retire a deprecated binding — terminal"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "capability_binding_retire"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"capability_binding\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"destructive\",\"platform\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"lifecycle_resources\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_workspace\":\"lifecycle_resources\",\"target_slot\":\"capability_binding\"}"
-  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"requires_states\":[\"DEPRECATED\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"binding-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"update\",\"table\":\"capability_bindings\",\"schema\":\"ob-poc\",\"key\":\"id\",\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":{\"binding_status\":\"RETIRED\",\"retired_at\":\"now()\"}}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"capability_binding\",\"phase_tags\":[\"lifecycle_resources\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"destructive\",\"platform\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_slot\":\"capability_binding\",\"target_workspace\":\"lifecycle_resources\"}"
+  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"DEPRECATED\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"id\",\"name\":\"binding-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":\"id\",\"operation\":\"update\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":{\"binding_status\":\"RETIRED\",\"retired_at\":\"now()\"},\"table\":\"capability_bindings\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding capability-binding.retire :phrases ["retire capability binding" "retire binding" "close binding" "terminate binding" "complete binding retirement"] :verb capability-binding.retire)
+(utterance-binding capability-binding.retire :phrases ["retire capability binding" "retire binding" "close binding" "terminate binding" "complete binding retirement"] :domain "capability-binding" :verb capability-binding.retire)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb capability-binding.start-pilot
+  :domain "capability-binding"
   :description "Start pilot — limited load, canary cohort"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"capability_binding\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"lifecycle_resources\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_workspace\":\"lifecycle_resources\",\"target_slot\":\"capability_binding\"}"
-  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"requires_states\":[\"DRAFT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"precondition_checks\":[],\"writes_tables\":[],\"reads_tables\":[]}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"binding-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"update\",\"table\":\"capability_bindings\",\"schema\":\"ob-poc\",\"key\":\"id\",\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":{\"pilot_started_at\":\"now()\",\"binding_status\":\"PILOT\"}}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"capability_binding\",\"phase_tags\":[\"lifecycle_resources\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"platform\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"binding-id\",\"target_slot\":\"capability_binding\",\"target_workspace\":\"lifecycle_resources\"}"
+  :lifecycle-json "{\"entity_arg\":\"binding-id\",\"precondition_checks\":[],\"reads_tables\":[],\"requires_states\":[\"DRAFT\"],\"transitions_to\":null,\"transitions_to_arg\":null,\"writes_tables\":[]}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"id\",\"name\":\"binding-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":\"id\",\"operation\":\"update\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":{\"binding_status\":\"PILOT\",\"pilot_started_at\":\"now()\"},\"table\":\"capability_bindings\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding capability-binding.start-pilot :phrases ["start pilot for binding" "begin canary on binding" "promote binding to pilot" "kick off pilot" "start canary pilot"] :verb capability-binding.start-pilot)
-
+(utterance-binding capability-binding.start-pilot :phrases ["start pilot for binding" "begin canary on binding" "promote binding to pilot" "kick off pilot" "start canary pilot"] :domain "capability-binding" :verb capability-binding.start-pilot)

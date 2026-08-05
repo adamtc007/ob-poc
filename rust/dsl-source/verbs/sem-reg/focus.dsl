@@ -4,83 +4,88 @@
 (utterance-binding focus :invocation-hints ["get focus" "set focus" "show current state" "show diff" "capture manifest"])
 
 (verb focus.capture-manifest
+  :domain "focus"
   :description "Capture and persist a ViewportManifest snapshot of the current focus"
   :behavior "plugin"
   :handler "FocusCaptureManifestOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"viewport_manifest\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"viewport_manifest\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding focus.capture-manifest :phrases ["capture manifest" "save viewport manifest" "persist focus snapshot" "capture current viewport state"] :verb focus.capture-manifest)
+(utterance-binding focus.capture-manifest :phrases ["capture manifest" "save viewport manifest" "persist focus snapshot" "capture current viewport state"] :domain "focus" :verb focus.capture-manifest)
 
 (verb focus.diff
+  :domain "focus"
   :description "Compute a structured diff between predecessor and current draft"
   :behavior "plugin"
   :handler "FocusDiffOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"focus_diff\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional changeset ID to diff (uses focused changeset if omitted)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"focus_diff\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Optional changeset ID to diff (uses focused changeset if omitted)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding focus.diff :phrases ["show diff" "compare changes" "what changed" "diff current focus"] :verb focus.diff)
+(utterance-binding focus.diff :phrases ["show diff" "compare changes" "what changed" "diff current focus"] :domain "focus" :verb focus.diff)
 
 (verb focus.get
+  :domain "focus"
   :description "Get the current focus state (what object the agent is working on)"
   :behavior "plugin"
   :handler "FocusGetOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"focus_state\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"focus_state\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding focus.get :phrases ["get current focus" "what am I focused on" "show focus state" "what is the current focus"] :verb focus.get)
+(utterance-binding focus.get :phrases ["get current focus" "what am I focused on" "show focus state" "what is the current focus"] :domain "focus" :verb focus.get)
 
 (verb focus.render
+  :domain "focus"
   :description "Render the current focus context (computes ShowPacket with all viewports)"
   :behavior "plugin"
   :handler "FocusRenderOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"show_packet\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"show_packet\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding focus.render :phrases ["render focus viewports" "display focus context" "render current focus state" "compute show packet"] :verb focus.render)
+(utterance-binding focus.render :phrases ["render focus viewports" "display focus context" "render current focus state" "compute show packet"] :domain "focus" :verb focus.render)
 
 (verb focus.set
+  :domain "focus"
   :description "Set the focus state to a specific registry object"
   :behavior "plugin"
   :handler "FocusSetOp"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"focus_state\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"fqn\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"FQN of the object to focus on\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"object-type\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Object type hint (attribute_def, verb_contract, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"focus_state\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"FQN of the object to focus on\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"fqn\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Object type hint (attribute_def, verb_contract, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"object-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding focus.set :phrases ["set focus to" "focus on this object" "switch focus to" "change focus"] :verb focus.set)
+(utterance-binding focus.set :phrases ["set focus to" "focus on this object" "switch focus to" "change focus"] :domain "focus" :verb focus.set)
 
 (verb focus.viewport
+  :domain "focus"
   :description "Compute a single viewport by kind (Focus Summary, Inspector, Diff, Gates)"
   :behavior "plugin"
   :handler "FocusViewportOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"viewport\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"viewport-kind\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Viewport kind: focus_summary, inspector, diff, gates\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"viewport\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Viewport kind: focus_summary, inspector, diff, gates\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"viewport-kind\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding focus.viewport :phrases ["show viewport" "render viewport" "get viewport data" "show focus summary viewport" "show inspector viewport" "show diff viewport" "show gates viewport"] :verb focus.viewport)
-
+(utterance-binding focus.viewport :phrases ["show viewport" "render viewport" "get viewport data" "show focus summary viewport" "show inspector viewport" "show diff viewport" "show gates viewport"] :domain "focus" :verb focus.viewport)

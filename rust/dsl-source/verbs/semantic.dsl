@@ -2,92 +2,98 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb semantic.get-state
+  :domain "semantic"
   :description "Derive semantic state for a CBU - shows stage progress, gaps, and blockers"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"reference\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to analyze\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"reference\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to analyze\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding semantic.get-state :phrases ["get onboarding state" "show stage progress for CBU" "where are we in onboarding" "what stages are complete" "derive semantic state" "onboarding progress check" "show gaps and blockers" "current onboarding status"] :verb semantic.get-state)
+(utterance-binding semantic.get-state :phrases ["get onboarding state" "show stage progress for CBU" "where are we in onboarding" "what stages are complete" "derive semantic state" "onboarding progress check" "show gaps and blockers" "current onboarding status"] :domain "semantic" :verb semantic.get-state)
 
 (verb semantic.list-stages
+  :domain "semantic"
   :description "List all defined semantic stages with their dependencies"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"reference\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":true}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"reference\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record_set\"}"
 )
 
-(utterance-binding semantic.list-stages :phrases ["list onboarding stages" "show all defined stages" "what stages exist" "display stage dependencies" "available onboarding stages" "stage definition overview" "get all stage definitions" "onboarding stage catalog"] :verb semantic.list-stages)
+(utterance-binding semantic.list-stages :phrases ["list onboarding stages" "show all defined stages" "what stages exist" "display stage dependencies" "available onboarding stages" "stage definition overview" "get all stage definitions" "onboarding stage catalog"] :domain "semantic" :verb semantic.list-stages)
 
 (verb semantic.missing-entities
+  :domain "semantic"
   :description "Get entities that are missing for stage completion"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to analyze\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"stage\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Specific stage to check (omit for all stages)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to analyze\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Specific stage to check (omit for all stages)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"stage\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding semantic.missing-entities :phrases ["what entities are missing" "missing roles for stage" "which parties need to be added" "gaps in entity setup" "incomplete entity requirements" "entities needed to proceed" "what is missing for completion" "show missing structure members"] :verb semantic.missing-entities)
+(utterance-binding semantic.missing-entities :phrases ["what entities are missing" "missing roles for stage" "which parties need to be added" "gaps in entity setup" "incomplete entity requirements" "entities needed to proceed" "what is missing for completion" "show missing structure members"] :domain "semantic" :verb semantic.missing-entities)
 
 (verb semantic.next-actionable
+  :domain "semantic"
   :description "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to analyze\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to analyze\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding semantic.next-actionable :phrases ["what is the next actionable onboarding stage for this CBU?" "what is the next actionable onboarding stage" "next actionable" "next actionable stage"] :verb semantic.next-actionable)
+(utterance-binding semantic.next-actionable :phrases ["what is the next actionable onboarding stage for this CBU?" "what is the next actionable onboarding stage" "next actionable" "next actionable stage"] :domain "semantic" :verb semantic.next-actionable)
 
 (verb semantic.next-actions
+  :domain "semantic"
   :description "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to analyze\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to analyze\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding semantic.next-actions :phrases ["what should I do next" "next actions for CBU" "show actionable stages" "what is unblocked" "suggest next onboarding step" "ready stages for progress" "unblocked items to work on" "next steps in onboarding"] :verb semantic.next-actions)
+(utterance-binding semantic.next-actions :phrases ["what should I do next" "next actions for CBU" "show actionable stages" "what is unblocked" "suggest next onboarding step" "ready stages for progress" "unblocked items to work on" "next steps in onboarding"] :domain "semantic" :verb semantic.next-actions)
 
 (verb semantic.prompt-context
+  :domain "semantic"
   :description "Get semantic state formatted for agent prompt injection"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"string\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to analyze\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"string\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to analyze\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding semantic.prompt-context :phrases ["get prompt context" "generate agent context" "build prompt for CBU" "semantic context for agent" "prepare onboarding summary" "context for decision support" "format state for prompt" "agent briefing for CBU"] :verb semantic.prompt-context)
+(utterance-binding semantic.prompt-context :phrases ["get prompt context" "generate agent context" "build prompt for CBU" "semantic context for agent" "prepare onboarding summary" "context for decision support" "format state for prompt" "agent briefing for CBU"] :domain "semantic" :verb semantic.prompt-context)
 
 (verb semantic.stages-for-product
+  :domain "semantic"
   :description "Get required stages for a specific product"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"semantic\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"product\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"products\",\"schema\":\"ob-poc\",\"entity_type\":\"product\",\"search_key\":\"product_code\",\"primary_key\":\"product_code\",\"resolution_mode\":\"reference\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Product code (e.g., CUSTODY, FUND_ACCOUNTING)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"semantic\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Product code (e.g., CUSTODY, FUND_ACCOUNTING)\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"product\",\"primary_key\":\"product_code\",\"resolution_mode\":\"reference\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"product_code\",\"table\":\"products\"},\"maps_to\":null,\"name\":\"product\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding semantic.stages-for-product :phrases ["stages for product" "what stages does custody need" "required stages for product" "onboarding path for product" "product stage requirements" "which stages for fund accounting" "show product onboarding steps" "product specific stage list"] :verb semantic.stages-for-product)
-
+(utterance-binding semantic.stages-for-product :phrases ["stages for product" "what stages does custody need" "required stages for product" "onboarding path for product" "product stage requirements" "which stages for fund accounting" "show product onboarding steps" "product specific stage list"] :domain "semantic" :verb semantic.stages-for-product)

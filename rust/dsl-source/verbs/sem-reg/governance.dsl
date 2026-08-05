@@ -4,49 +4,53 @@
 (utterance-binding governance :invocation-hints ["gate precheck" "submit for review" "validate changeset" "publish changeset" "rollback snapshot"])
 
 (verb governance.dry-run
+  :domain "governance"
   :description "Dry-run a changeset (Stage 2 scratch schema validation)"
   :behavior "plugin"
   :handler "GovernanceDryRunOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"dry_run_report\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset to dry-run\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"dry_run_report\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset to dry-run\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.dry-run :phrases ["dry run changeset" "run stage 2 dry-run" "test changeset in scratch schema" "preview changeset application" "dry run the changeset" "dry run changeset"] :verb governance.dry-run)
+(utterance-binding governance.dry-run :phrases ["dry run changeset" "run stage 2 dry-run" "test changeset in scratch schema" "preview changeset application" "dry run the changeset" "dry run changeset"] :domain "governance" :verb governance.dry-run)
 
 (verb governance.gate-precheck
+  :domain "governance"
   :description "Gate precheck before submitting a changeset for review"
   :behavior "plugin"
   :handler "GovernanceGatePrecheckOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"gate_precheck\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset to pre-check\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"gate_precheck\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset to pre-check\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.gate-precheck :phrases ["gate precheck" "check gates before review" "pre-check changeset" "run gate precheck"] :verb governance.gate-precheck)
+(utterance-binding governance.gate-precheck :phrases ["gate precheck" "check gates before review" "pre-check changeset" "run gate precheck"] :domain "governance" :verb governance.gate-precheck)
 
 (verb governance.plan-publish
+  :domain "governance"
   :description "Plan a publish operation (diff preview against active snapshot set)"
   :behavior "plugin"
   :handler "GovernancePlanPublishOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"publish_plan\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset to plan publishing for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"publish_plan\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset to plan publishing for\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.plan-publish :phrases ["plan publish" "preview publish impact" "what will publishing change"] :verb governance.plan-publish)
+(utterance-binding governance.plan-publish :phrases ["plan publish" "preview publish impact" "what will publishing change"] :domain "governance" :verb governance.plan-publish)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb governance.publish
+  :domain "governance"
   :description "Publish a validated changeset to the active snapshot set"
   :behavior "plugin"
   :handler "GovernancePublishOp"
@@ -54,17 +58,18 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "governance_publish"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"publish_result\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"changeset-id\",\"target_workspace\":\"semos_maintenance\",\"target_slot\":\"changeset\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset to publish\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"publish_result\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"changeset-id\",\"target_slot\":\"changeset\",\"target_workspace\":\"semos_maintenance\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset to publish\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.publish :phrases ["publish changeset" "publish to active snapshot set" "apply changeset" "commit changeset to registry"] :verb governance.publish)
+(utterance-binding governance.publish :phrases ["publish changeset" "publish to active snapshot set" "apply changeset" "commit changeset to registry"] :domain "governance" :verb governance.publish)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb governance.publish-batch
+  :domain "governance"
   :description "Batch publish multiple changesets in topological order"
   :behavior "plugin"
   :handler "GovernancePublishBatchOp"
@@ -72,16 +77,17 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "governance_publish_batch"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch_publish_result\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"changeset-id\",\"target_workspace\":\"semos_maintenance\",\"target_slot\":\"changeset\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-ids\",\"type\":\"json\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"JSON array of changeset IDs to publish in order\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch_publish_result\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"changeset-id\",\"target_slot\":\"changeset\",\"target_workspace\":\"semos_maintenance\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"JSON array of changeset IDs to publish in order\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-ids\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.publish-batch :phrases ["batch publish changesets" "publish multiple changesets" "bulk publish" "publish all pending changesets"] :verb governance.publish-batch)
+(utterance-binding governance.publish-batch :phrases ["batch publish changesets" "publish multiple changesets" "bulk publish" "publish all pending changesets"] :domain "governance" :verb governance.publish-batch)
 
 (verb governance.record-review
+  :domain "governance"
   :description "Record a review decision (approve/reject) on a changeset"
   :behavior "plugin"
   :handler "GovernanceRecordReviewOp"
@@ -89,16 +95,17 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "governance_record_review"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"review_decision\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset being reviewed\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"decision\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Review decision: approved, rejected\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"comment\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Reviewer comment\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"review_decision\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset being reviewed\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Review decision: approved, rejected\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"decision\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Reviewer comment\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"comment\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.record-review :phrases ["record review decision" "approve changeset" "reject changeset" "record review"] :verb governance.record-review)
+(utterance-binding governance.record-review :phrases ["record review decision" "approve changeset" "reject changeset" "record review"] :domain "governance" :verb governance.record-review)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb governance.rollback
+  :domain "governance"
   :description "Rollback the active snapshot set to a previous version"
   :behavior "plugin"
   :handler "GovernanceRollbackOp"
@@ -106,16 +113,17 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "governance_rollback"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"rollback_result\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"changeset-id\",\"target_workspace\":\"semos_maintenance\",\"target_slot\":\"changeset\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"target-snapshot-set-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The snapshot set ID to rollback to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"rollback_result\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"changeset-id\",\"target_slot\":\"changeset\",\"target_workspace\":\"semos_maintenance\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The snapshot set ID to rollback to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target-snapshot-set-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.rollback :phrases ["rollback snapshot set" "revert to previous snapshot" "undo last publish" "rollback registry"] :verb governance.rollback)
+(utterance-binding governance.rollback :phrases ["rollback snapshot set" "revert to previous snapshot" "undo last publish" "rollback registry"] :domain "governance" :verb governance.rollback)
 
 (verb governance.submit-for-review
+  :domain "governance"
   :description "Submit a changeset for human review"
   :behavior "plugin"
   :handler "GovernanceSubmitForReviewOp"
@@ -123,15 +131,16 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "governance_submit_for_review"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"review_submission\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset to submit for review\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"review_submission\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset to submit for review\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.submit-for-review :phrases ["submit for review" "send changeset for review" "request review" "submit changeset"] :verb governance.submit-for-review)
+(utterance-binding governance.submit-for-review :phrases ["submit for review" "send changeset for review" "request review" "submit changeset"] :domain "governance" :verb governance.submit-for-review)
 
 (verb governance.validate
+  :domain "governance"
   :description "Validate a changeset (Stage 1 artifact integrity)"
   :behavior "plugin"
   :handler "GovernanceValidateOp"
@@ -139,11 +148,10 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "governance_validate"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"validation_report\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"changeset-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The changeset to validate\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"validation_report\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The changeset to validate\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"changeset-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding governance.validate :phrases ["validate changeset" "run stage 1 validation" "check changeset integrity" "validate artifacts"] :verb governance.validate)
-
+(utterance-binding governance.validate :phrases ["validate changeset" "run stage 1 validation" "check changeset integrity" "validate artifacts"] :domain "governance" :verb governance.validate)

@@ -76,6 +76,42 @@ fn all_domains_load_without_errors() {
 }
 
 #[test]
+fn all_verb_identities_round_trip() {
+    let dir = dsl_dir();
+    if !dir.exists() {
+        eprintln!("SKIP: dsl-source/verbs not found");
+        return;
+    }
+
+    let yaml_config = yaml_config();
+    let mut diagnostics = DiagnosticBag::new();
+    let dsl_config = load_verbs_from_dsl_dir(&dir, &mut diagnostics);
+
+    let identities = |config: &dsl_core::VerbsConfig| {
+        config
+            .domains
+            .iter()
+            .flat_map(|(domain, config)| {
+                config
+                    .verbs
+                    .keys()
+                    .map(move |verb| (domain.clone(), verb.clone()))
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+
+    let yaml_identities = identities(&yaml_config);
+    let dsl_identities = identities(&dsl_config);
+    let missing: Vec<_> = yaml_identities.difference(&dsl_identities).collect();
+    let extra: Vec<_> = dsl_identities.difference(&yaml_identities).collect();
+
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "verb identity drift: missing={missing:?}, extra={extra:?}"
+    );
+}
+
+#[test]
 fn cbu_domain_round_trip() {
     let dir = dsl_dir();
     if !dir.exists() {
@@ -354,17 +390,11 @@ fn three_axis_round_trip() {
                 );
 
                 checked += 1;
-                if checked >= 20 {
-                    break; // spot check 20 verbs is sufficient
-                }
             }
-        }
-        if checked >= 20 {
-            break;
         }
     }
 
-    eprintln!("three_axis round-trip: {} verbs spot-checked", checked);
+    eprintln!("three_axis round-trip: {} verbs checked", checked);
 }
 
 #[test]

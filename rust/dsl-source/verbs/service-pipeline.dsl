@@ -3,265 +3,281 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb attributes.gaps
+  :domain "attributes"
   :description "Show attribute gaps - required values that are missing"
   :behavior "plugin"
   :handler "AttributeGapsOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"attribute_gaps\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"record_set\",\"name\":\"gaps\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"PROVISION\"},{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"READY\"},{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"BLOCKED\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"srdef-id\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter to specific SRDEF\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"attribute_gaps\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":\"gaps\",\"type\":\"record_set\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"PROVISION\"},{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"READY\"},{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"BLOCKED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter to specific SRDEF\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"srdef-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding attributes.gaps :phrases ["show attribute gaps" "what attributes are still missing" "identify missing required attributes" "display attribute value gaps" "which attributes need to be filled" "check for missing provisioning data" "find unfilled attribute requirements" "list outstanding attribute gaps for CBU"] :verb attributes.gaps)
+(utterance-binding attributes.gaps :phrases ["show attribute gaps" "what attributes are still missing" "identify missing required attributes" "display attribute value gaps" "which attributes need to be filled" "check for missing provisioning data" "find unfilled attribute requirements" "list outstanding attribute gaps for CBU"] :domain "attributes" :verb attributes.gaps)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb attributes.populate
+  :domain "attributes"
   :description "Auto-populate attribute values from available sources"
   :behavior "plugin"
   :handler "AttributePopulateOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"attribute_values\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"record\",\"name\":\"population_result\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"POPULATE\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sources\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Sources to try: entity, cbu, document, derived\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"attribute_values\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":\"population_result\",\"type\":\"record\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"POPULATE\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Sources to try: entity, cbu, document, derived\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"sources\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding attributes.populate :phrases ["populate attribute values automatically" "auto-fill attribute values from sources" "fill in resource attributes for CBU" "source attribute values for provisioning" "enrich attributes from entity data" "derive attribute values from documents" "pre-populate required attributes" "auto-populate service resource attributes"] :verb attributes.populate)
+(utterance-binding attributes.populate :phrases ["populate attribute values automatically" "auto-fill attribute values from sources" "fill in resource attributes for CBU" "source attribute values for provisioning" "enrich attributes from entity data" "derive attribute values from documents" "pre-populate required attributes" "auto-populate service resource attributes"] :domain "attributes" :verb attributes.populate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb attributes.rollup
+  :domain "attributes"
   :description "Roll up attribute requirements from discovered SRDEFs"
   :behavior "plugin"
   :handler "AttributeRollupOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"attribute_requirements\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"record\",\"name\":\"rollup_result\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"ROLLUP\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"attribute_requirements\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":\"rollup_result\",\"type\":\"record\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"ROLLUP\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding attributes.rollup :phrases ["roll up attribute requirements" "merge attribute needs from SRDEFs" "consolidate resource attribute requirements" "aggregate attribute requirements for CBU" "what attributes are needed for provisioning" "compute attribute rollup for resources" "collect required attributes across services" "summarize attribute requirements"] :verb attributes.rollup)
+(utterance-binding attributes.rollup :phrases ["roll up attribute requirements" "merge attribute needs from SRDEFs" "consolidate resource attribute requirements" "aggregate attribute requirements for CBU" "what attributes are needed for provisioning" "compute attribute rollup for resources" "collect required attributes across services" "summarize attribute requirements"] :domain "attributes" :verb attributes.rollup)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb attributes.set
+  :domain "attributes"
   :description "Set an attribute value manually"
   :behavior "plugin"
   :handler "AttributeSetOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"attribute_value\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":\"rows\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"READY\"},{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"BLOCKED\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"attr-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"value\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"evidence\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Document references supporting this value\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"attribute_value\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":\"rows\",\"type\":\"affected\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"READY\"},{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"BLOCKED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"attr-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"value\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Document references supporting this value\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"evidence\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding attributes.set :phrases ["set attribute value manually" "enter attribute value for resource" "provide attribute value for CBU" "manually fill in attribute" "override attribute value with evidence" "assign value to resource attribute" "update attribute for service provisioning" "supply missing attribute value"] :verb attributes.set)
+(utterance-binding attributes.set :phrases ["set attribute value manually" "enter attribute value for resource" "provide attribute value for CBU" "manually fill in attribute" "override attribute value with evidence" "assign value to resource attribute" "update attribute for service provisioning" "supply missing attribute value"] :domain "attributes" :verb attributes.set)
 
 (verb discovery.explain
+  :domain "discovery"
   :description "Explain why specific SRDEFs were discovered"
   :behavior "plugin"
   :handler "DiscoveryExplainOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"discovery\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":\"explanations\",\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"srdef-id\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Specific SRDEF to explain (or all if omitted)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"discovery\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"explanations\",\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Specific SRDEF to explain (or all if omitted)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"srdef-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding discovery.explain :phrases ["explain resource discovery results" "why was this SRDEF discovered" "show discovery rationale" "explain service resource requirements" "what triggered this resource requirement" "describe discovery reasoning for CBU" "how were resources determined" "justify resource discovery output"] :verb discovery.explain)
+(utterance-binding discovery.explain :phrases ["explain resource discovery results" "why was this SRDEF discovered" "show discovery rationale" "explain service resource requirements" "what triggered this resource requirement" "describe discovery reasoning for CBU" "how were resources determined" "justify resource discovery output"] :domain "discovery" :verb discovery.explain)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb discovery.run
+  :domain "discovery"
   :description "Run resource discovery - determines required SRDEFs from service intents"
   :behavior "plugin"
   :handler "DiscoveryRunOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"discovery\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"record\",\"name\":\"discovery_result\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"DISCOVERING\"},{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"ROLLUP\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"discovery\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":\"discovery_result\",\"type\":\"record\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"DISCOVERING\"},{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"ROLLUP\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding discovery.run :phrases ["run resource discovery" "discover required resources for CBU" "determine service resource definitions" "what resources does this CBU need" "execute SRDEF discovery" "identify required service resources" "map service intents to resources" "find resource requirements for structure"] :verb discovery.run)
+(utterance-binding discovery.run :phrases ["run resource discovery" "discover required resources for CBU" "determine service resource definitions" "what resources does this CBU need" "execute SRDEF discovery" "identify required service resources" "map service intents to resources" "find resource requirements for structure"] :domain "discovery" :verb discovery.run)
 
 (verb pipeline.full
+  :domain "pipeline"
   :description "Run the entire pipeline: discovery -> rollup -> populate -> provision -> readiness"
   :behavior "plugin"
   :handler "PipelineFullOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"pipeline\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":\"pipeline_result\",\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"dry-run\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"pipeline\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"pipeline_result\",\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"dry-run\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding pipeline.full :phrases ["run the full service pipeline" "execute end-to-end provisioning pipeline" "run complete onboarding pipeline for CBU" "discovery through readiness pipeline" "provision everything for this structure" "full service delivery pipeline" "orchestrate complete resource lifecycle" "run all pipeline stages for CBU"] :verb pipeline.full)
+(utterance-binding pipeline.full :phrases ["run the full service pipeline" "execute end-to-end provisioning pipeline" "run complete onboarding pipeline for CBU" "discovery through readiness pipeline" "provision everything for this structure" "full service delivery pipeline" "orchestrate complete resource lifecycle" "run all pipeline stages for CBU"] :domain "pipeline" :verb pipeline.full)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb provisioning.run
+  :domain "provisioning"
   :description "Run provisioning orchestrator - creates resources for ready SRDEFs"
   :behavior "plugin"
   :handler "ProvisioningRunOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"provisioning\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"trading\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"record\",\"name\":\"provisioning_result\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"DISCOVERING\"},{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"READY\"},{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"BLOCKED\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"dry-run\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"provisioning\",\"phase_tags\":[\"trading\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":\"provisioning_result\",\"type\":\"record\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"DISCOVERING\"},{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"READY\"},{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"BLOCKED\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"dry-run\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding provisioning.run :phrases ["run provisioning for CBU" "provision service resources" "create resources for ready SRDEFs" "execute resource provisioning" "start provisioning orchestrator" "provision all ready resources" "trigger service resource creation" "deploy resources for this structure"] :verb provisioning.run)
+(utterance-binding provisioning.run :phrases ["run provisioning for CBU" "provision service resources" "create resources for ready SRDEFs" "execute resource provisioning" "start provisioning orchestrator" "provision all ready resources" "trigger service resource creation" "deploy resources for this structure"] :domain "provisioning" :verb provisioning.run)
 
 (verb provisioning.status
+  :domain "provisioning"
   :description "Check provisioning request status"
   :behavior "plugin"
   :handler "ProvisioningStatusOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"provisioning_status\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"trading\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":\"request_status\",\"capture\":null}"
-  :args-json "[{\"name\":\"request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"provisioning_status\",\"phase_tags\":[\"trading\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"request_status\",\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding provisioning.status :phrases ["check provisioning request status" "what is the provisioning status" "show provisioning progress" "is provisioning complete" "get status of resource provisioning" "track provisioning request" "where is my provisioning request" "display provisioning outcome"] :verb provisioning.status)
+(utterance-binding provisioning.status :phrases ["check provisioning request status" "what is the provisioning status" "show provisioning progress" "is provisioning complete" "get status of resource provisioning" "track provisioning request" "where is my provisioning request" "display provisioning outcome"] :domain "provisioning" :verb provisioning.status)
 
 (verb readiness.compute
+  :domain "readiness"
   :description "Compute service readiness - determines 'good to transact' status"
   :behavior "plugin"
   :handler "ReadinessComputeOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"readiness\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":\"readiness_result\",\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"readiness\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"readiness_result\",\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding readiness.compute :phrases ["compute service readiness" "check if CBU is ready to transact" "determine good to transact status" "assess service readiness for structure" "is this CBU ready for business" "calculate readiness score" "evaluate transactional readiness" "run readiness check for services" "are we good to go" "ready to go" "readiness check" "good to transact"] :verb readiness.compute)
+(utterance-binding readiness.compute :phrases ["compute service readiness" "check if CBU is ready to transact" "determine good to transact status" "assess service readiness for structure" "is this CBU ready for business" "calculate readiness score" "evaluate transactional readiness" "run readiness check for services" "are we good to go" "ready to go" "readiness check" "good to transact"] :domain "readiness" :verb readiness.compute)
 
 (verb readiness.explain
+  :domain "readiness"
   :description "Explain blocking reasons for a service"
   :behavior "plugin"
   :handler "ReadinessExplainOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"blocking_reasons\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":\"blocking_reasons\",\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":{\"table\":\"services\",\"schema\":\"ob-poc\",\"entity_type\":\"service\",\"search_key\":\"name\",\"primary_key\":\"service_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Specific service (or all if omitted)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"blocking_reasons\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"blocking_reasons\",\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Specific service (or all if omitted)\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"service\",\"primary_key\":\"service_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"services\"},\"maps_to\":null,\"name\":\"service-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding readiness.explain :phrases ["explain readiness blockers" "why is this service not ready" "show blocking reasons for readiness" "what is preventing transact readiness" "list readiness failure reasons" "explain service delivery blockers" "identify readiness impediments" "why can this CBU not transact yet"] :verb readiness.explain)
+(utterance-binding readiness.explain :phrases ["explain readiness blockers" "why is this service not ready" "show blocking reasons for readiness" "what is preventing transact readiness" "list readiness failure reasons" "explain service delivery blockers" "identify readiness impediments" "why can this CBU not transact yet"] :domain "readiness" :verb readiness.explain)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-intent.cancel
+  :domain "service-intent"
   :description "Cancel a service intent (terminal)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "service_intent_cancel"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":null,\"noun\":\"service_intent\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-intent\"],\"phase_tags\":[\"archive\",\"terminate\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"cancelled\"},{\"from\":\"suspended\",\"to\":\"cancelled\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"intent-id\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"service_intent\"}"
-  :args-json "[{\"name\":\"intent-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"service_intent\",\"phase_tags\":[\"archive\",\"terminate\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"service-intent\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"cancelled\"},{\"from\":\"suspended\",\"to\":\"cancelled\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"intent-id\",\"target_slot\":\"service_intent\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"intent-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-intent.cancel :phrases ["cancel service intent" "terminate intent"] :verb service-intent.cancel)
+(utterance-binding service-intent.cancel :phrases ["cancel service intent" "terminate intent"] :domain "service-intent" :verb service-intent.cancel)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-intent.create
+  :domain "service-intent"
   :description "Create a service intent for a CBU"
   :behavior "plugin"
   :handler "ServiceIntentCreateOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"service_intent\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"cbu_discovery_state\"}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"intent_id\",\"capture\":true}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"PENDING\"}]"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to create intent for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"product-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"products\",\"schema\":\"ob-poc\",\"entity_type\":\"product\",\"search_key\":\"name\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Product being subscribed to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"services\",\"schema\":\"ob-poc\",\"entity_type\":\"service\",\"search_key\":\"name\",\"primary_key\":\"service_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Service being configured\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"options\",\"type\":\"json\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Service configuration options\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"service_intent\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu_discovery_state\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":true,\"name\":\"intent_id\",\"type\":\"uuid\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"PENDING\"}]"
+  :args-json "[{\"default\":null,\"description\":\"CBU to create intent for\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Product being subscribed to\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"product\",\"primary_key\":\"product_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"products\"},\"maps_to\":null,\"name\":\"product-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Service being configured\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"service\",\"primary_key\":\"service_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"services\"},\"maps_to\":null,\"name\":\"service-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Service configuration options\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"options\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-intent.create :phrases ["create a service intent" "declare service intent for CBU" "register new service subscription" "set up service intent" "what services does this CBU need" "add service intent to structure" "initiate service delivery request" "configure service for client unit"] :verb service-intent.create)
+(utterance-binding service-intent.create :phrases ["create a service intent" "declare service intent for CBU" "register new service subscription" "set up service intent" "what services does this CBU need" "add service intent to structure" "initiate service delivery request" "configure service for client unit"] :domain "service-intent" :verb service-intent.create)
 
 (verb service-intent.list
+  :domain "service-intent"
   :description "List all service intents for a CBU"
   :behavior "plugin"
   :handler "ServiceIntentListOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"service_intent\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":\"intents\",\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"service_intent\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"intents\",\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-intent.list :phrases ["list service intents for CBU" "show all service subscriptions" "what services are configured" "display service intent list" "get service intents for structure" "which services has this CBU requested" "enumerate service delivery requests" "view current service intents"] :verb service-intent.list)
+(utterance-binding service-intent.list :phrases ["list service intents for CBU" "show all service subscriptions" "what services are configured" "display service intent list" "get service intents for structure" "which services has this CBU requested" "enumerate service delivery requests" "view current service intents"] :domain "service-intent" :verb service-intent.list)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-intent.resume
+  :domain "service-intent"
   :description "Resume a suspended service intent (suspended → active)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service_intent\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-intent\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"suspended\",\"to\":\"active\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"intent-id\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"service_intent\"}"
-  :args-json "[{\"name\":\"intent-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service_intent\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"service-intent\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"suspended\",\"to\":\"active\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"intent-id\",\"target_slot\":\"service_intent\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"intent-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-intent.resume :phrases ["resume service intent" "reactivate intent"] :verb service-intent.resume)
+(utterance-binding service-intent.resume :phrases ["resume service intent" "reactivate intent"] :domain "service-intent" :verb service-intent.resume)
 
 (verb service-intent.supersede
+  :domain "service-intent"
   :description "Supersede an existing service intent with new options"
   :behavior "plugin"
   :handler "ServiceIntentSupersedeOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"service_intent\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"new_intent_id\",\"capture\":null}"
-  :writes-json "[{\"table\":\"cbus\",\"column\":\"cbu_discovery_state\",\"value\":\"PENDING\"}]"
-  :args-json "[{\"name\":\"intent-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"options\",\"type\":\"json\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"service_intent\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":\"new_intent_id\",\"type\":\"uuid\"}"
+  :writes-json "[{\"column\":\"cbu_discovery_state\",\"table\":\"cbus\",\"value\":\"PENDING\"}]"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"intent-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"options\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-intent.supersede :phrases ["supersede service intent" "replace existing service intent" "update service intent with new options" "override service subscription" "revise service delivery configuration" "change service intent options" "amend the current service intent" "create new version of service intent"] :verb service-intent.supersede)
+(utterance-binding service-intent.supersede :phrases ["supersede service intent" "replace existing service intent" "update service intent with new options" "override service subscription" "revise service delivery configuration" "change service intent options" "amend the current service intent" "create new version of service intent"] :domain "service-intent" :verb service-intent.supersede)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-intent.suspend
+  :domain "service-intent"
   :description "Suspend an active service intent (temporary hold)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "service_intent_suspend"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service_intent\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-intent\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"suspended\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"intent-id\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"service_intent\"}"
-  :args-json "[{\"name\":\"intent-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service_intent\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"service-intent\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"suspended\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"intent-id\",\"target_slot\":\"service_intent\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"intent-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-intent.suspend :phrases ["suspend service intent" "pause intent"] :verb service-intent.suspend)
-
+(utterance-binding service-intent.suspend :phrases ["suspend service intent" "pause intent"] :domain "service-intent" :verb service-intent.suspend)

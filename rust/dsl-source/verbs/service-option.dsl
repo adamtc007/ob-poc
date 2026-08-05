@@ -2,28 +2,29 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb service-option.list-by-service
+  :domain "service-option"
   :description "List option definitions for a service version"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"reference\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"service_option\",\"internal\":false,\"tags\":[\"service-options\",\"catalogue\",\"read\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-option\"],\"phase_tags\":[\"service-options\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"service-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service-version-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"service_option\",\"phase_tags\":[\"service-options\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[\"service-option\"],\"tags\":[\"service-options\",\"catalogue\",\"read\"],\"tier\":\"reference\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"service-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"service\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"service-version-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-option.list-by-service :phrases ["show service options" "list options for service" "show custody settlement options"] :verb service-option.list-by-service)
+(utterance-binding service-option.list-by-service :phrases ["show service options" "list options for service" "show custody settlement options"] :domain "service-option" :verb service-option.list-by-service)
 
 (verb service-option.read
+  :domain "service-option"
   :description "Read one service option definition"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"reference\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"service_option\",\"internal\":false,\"tags\":[\"service-options\",\"catalogue\",\"read\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-option\"],\"phase_tags\":[\"service-options\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"service-option-def-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"service\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"option-key\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"service_option\",\"phase_tags\":[\"service-options\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[\"service-option\"],\"tags\":[\"service-options\",\"catalogue\",\"read\"],\"tier\":\"reference\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"service-option-def-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"service-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"service\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"option-key\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-option.read :phrases ["read service option" "inspect service option" "show option definition"] :verb service-option.read)
-
+(utterance-binding service-option.read :phrases ["read service option" "inspect service option" "show option definition"] :domain "service-option" :verb service-option.read)

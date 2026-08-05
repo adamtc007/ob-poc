@@ -12,15 +12,15 @@ use std::sync::OnceLock;
 use uuid::Uuid;
 
 use crate::acp_pack_context_envelope_v2::{
-    load_online_acp_pack_context_registry_state_v2, AcpPackContextRegistryLoadOptions,
-    AcpPackContextRegistryStateV2, ACP_PACK_CONTEXT_ENVELOPE_V2_SCHEMA_VERSION,
-    ACP_PACK_CONTEXT_REGISTRY_STATE_V2_SCHEMA_VERSION,
+    ACP_PACK_CONTEXT_ENVELOPE_V2_SCHEMA_VERSION, ACP_PACK_CONTEXT_REGISTRY_STATE_V2_SCHEMA_VERSION,
+    AcpPackContextRegistryLoadOptions, AcpPackContextRegistryStateV2,
+    load_online_acp_pack_context_registry_state_v2,
 };
 use crate::acp_registry_projection::{
-    build_slice1_acp_registry_projection, AcpRegistryProjection, SLICE_1_ACP_PACK_IDS,
+    AcpRegistryProjection, SLICE_1_ACP_PACK_IDS, build_slice1_acp_registry_projection,
 };
-use crate::acp_runtime_context::{build_acp_runtime_context_projection, AcpRuntimeContextSource};
-use crate::pack_projection::{get_pack_projection_provider, PackProjection};
+use crate::acp_runtime_context::{AcpRuntimeContextSource, build_acp_runtime_context_projection};
+use crate::pack_projection::{PackProjection, get_pack_projection_provider};
 
 const MATCH_THRESHOLD: f32 = 0.42;
 const AMBIGUITY_MARGIN: f32 = 0.08;
@@ -1026,9 +1026,10 @@ pub fn resolve_acp_dag_semantic_prompt(
         .get(1)
         .map(|runner_up| top.score - runner_up.score < AMBIGUITY_MARGIN)
         .unwrap_or(false);
-    let disambiguated = ambiguous
-        .then(|| disambiguated_candidate(&scored, pack.as_ref(), utterance))
-        .flatten();
+    // Governed lexical rules may identify a more specific candidate even
+    // when expanded pack vocabulary pushes the raw score outside the generic
+    // ambiguity margin. Apply them before accepting the score-only winner.
+    let disambiguated = disambiguated_candidate(&scored, pack.as_ref(), utterance);
 
     let status = if ambiguous && disambiguated.is_none() {
         AcpDagSemanticStatus::Ambiguous
@@ -1533,15 +1534,17 @@ fn attach_runtime_context_trace(resolution: &mut AcpDagSemanticResolution) {
     if let Some(workflow_plan) = &resolution.workflow_plan {
         fields.insert(
             "workbook_step_statuses".to_string(),
-            serde_json::json!(workflow_plan
-                .state_transitions
-                .iter()
-                .enumerate()
-                .map(|(index, transition)| serde_json::json!({
-                    "step_id": format!("{}:{}", index + 1, transition.verb),
-                    "status": "planned"
-                }))
-                .collect::<Vec<_>>()),
+            serde_json::json!(
+                workflow_plan
+                    .state_transitions
+                    .iter()
+                    .enumerate()
+                    .map(|(index, transition)| serde_json::json!({
+                        "step_id": format!("{}:{}", index + 1, transition.verb),
+                        "status": "planned"
+                    }))
+                    .collect::<Vec<_>>()
+            ),
         );
     }
 
@@ -3071,36 +3074,43 @@ mod tests {
 
         assert_eq!(pack.pack_id, "instrument-matrix");
         assert_eq!(pack.pack_name, "Instrument Matrix");
-        assert!(pack
-            .invocation_phrases
-            .iter()
-            .any(|phrase| phrase == "trading profile"));
-        assert!(pack
-            .workspaces
-            .iter()
-            .any(|workspace| workspace == "instrument_matrix"));
-        assert!(pack
-            .allowed_verbs
-            .iter()
-            .any(|verb| verb == "trading-profile.read"));
+        assert!(
+            pack.invocation_phrases
+                .iter()
+                .any(|phrase| phrase == "trading profile")
+        );
+        assert!(
+            pack.workspaces
+                .iter()
+                .any(|workspace| workspace == "instrument_matrix")
+        );
+        assert!(
+            pack.allowed_verbs
+                .iter()
+                .any(|verb| verb == "trading-profile.read")
+        );
         assert!(pack.allowed_verb_count > 100);
-        assert!(pack
-            .required_context
-            .iter()
-            .any(|field| field == "client_group_id"));
-        assert!(pack
-            .optional_questions
-            .iter()
-            .any(|question| question.field == "profile_action"));
-        assert!(pack
-            .pack_summary_template
-            .as_deref()
-            .unwrap_or_default()
-            .contains("Instrument Matrix"));
-        assert!(pack
-            .section_layout
-            .iter()
-            .any(|section| section.title == "Trading Profile"));
+        assert!(
+            pack.required_context
+                .iter()
+                .any(|field| field == "client_group_id")
+        );
+        assert!(
+            pack.optional_questions
+                .iter()
+                .any(|question| question.field == "profile_action")
+        );
+        assert!(
+            pack.pack_summary_template
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Instrument Matrix")
+        );
+        assert!(
+            pack.section_layout
+                .iter()
+                .any(|section| section.title == "Trading Profile")
+        );
         assert!(resolved.top_candidates.iter().any(|candidate| {
             candidate.fqn == "trading-profile.read"
                 || candidate.fqn == "matrix-overlay.effective-matrix"
@@ -3123,18 +3133,21 @@ mod tests {
         assert_eq!(plan.plan_id, "onboarding.compile-data-request.preview.v1");
         assert!(plan.dry_run_only);
         assert!(!plan.mutation_allowed);
-        assert!(plan
-            .read_model
-            .iter()
-            .any(|entry| entry.contains("deal_onboarding_requests")));
-        assert!(plan
-            .would_create_or_update
-            .iter()
-            .any(|entry| entry.contains("onboarding_data_request_slices")));
-        assert!(plan
-            .needed_from_user
-            .iter()
-            .any(|field| field == "onboarding-request-id"));
+        assert!(
+            plan.read_model
+                .iter()
+                .any(|entry| entry.contains("deal_onboarding_requests"))
+        );
+        assert!(
+            plan.would_create_or_update
+                .iter()
+                .any(|entry| entry.contains("onboarding_data_request_slices"))
+        );
+        assert!(
+            plan.needed_from_user
+                .iter()
+                .any(|field| field == "onboarding-request-id")
+        );
     }
 
     #[test]
@@ -3188,10 +3201,12 @@ mod tests {
         assert_eq!(resolved.status, AcpDagSemanticStatus::Matched);
         assert_eq!(pack.pack_id, "cbu-maintenance");
         assert_eq!(resolved.selected_verb.as_deref(), Some("cbu.add-product"));
-        assert!(resolved
-            .missing_required_args
-            .iter()
-            .any(|arg| arg == "cbu-id"));
+        assert!(
+            resolved
+                .missing_required_args
+                .iter()
+                .any(|arg| arg == "cbu-id")
+        );
     }
 
     #[test]
@@ -3261,15 +3276,19 @@ mod tests {
 
         assert_eq!(pack.pack_id, "cbu-maintenance");
         assert_eq!(resolved.selected_verb.as_deref(), Some("cbu.create"));
-        assert!(resolved
-            .missing_required_args
-            .iter()
-            .any(|arg| arg == "name"));
-        assert!(resolved
-            .draft_dsl
-            .as_deref()
-            .unwrap_or_default()
-            .contains("<required:name>"));
+        assert!(
+            resolved
+                .missing_required_args
+                .iter()
+                .any(|arg| arg == "name")
+        );
+        assert!(
+            resolved
+                .draft_dsl
+                .as_deref()
+                .unwrap_or_default()
+                .contains("<required:name>")
+        );
     }
 
     #[test]

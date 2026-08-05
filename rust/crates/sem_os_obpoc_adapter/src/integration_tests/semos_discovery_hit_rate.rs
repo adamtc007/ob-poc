@@ -319,12 +319,11 @@ fn test_actor() -> ActorContext {
 }
 
 fn fixture_path() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../tests/fixtures/sem_os_discovery_utterances.toml")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/sem_os_discovery_utterances.toml")
 }
 
 fn metadata_path() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("config/sem_os_seeds/domain_metadata.yaml")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/sem_os_seeds/domain_metadata.yaml")
 }
 
 fn load_fixture() -> DiscoveryFixture {

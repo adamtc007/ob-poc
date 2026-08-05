@@ -2,57 +2,60 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb role.delete
+  :domain "role"
   :description "Delete a role"
   :behavior "crud"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"role\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"delete\",\"table\":\"roles\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"role\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"name\",\"name\":\"name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"delete\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"roles\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding role.delete :phrases ["delete a role" "remove role definition" "drop role from reference data" "purge a role record" "remove entity role type" "delete role reference entry" "clean up unused role" "eliminate role record"] :verb role.delete)
+(utterance-binding role.delete :phrases ["delete a role" "remove role definition" "drop role from reference data" "purge a role record" "remove entity role type" "delete role reference entry" "clean up unused role" "eliminate role record"] :domain "role" :verb role.delete)
 
 (verb role.ensure
+  :domain "role"
   :description "Create or update a role"
   :behavior "crud"
   :effect-class "idempotent_ensure"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"role\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"role_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"description\",\"type\":\"string\",\"required\":false,\"maps_to\":\"description\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"upsert\",\"table\":\"roles\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":\"role_id\",\"conflict_keys\":[\"name\"],\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"role\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"role_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"name\",\"name\":\"name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"description\",\"name\":\"description\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":[\"name\"],\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"upsert\",\"order_by\":null,\"primary_table\":null,\"returning\":\"role_id\",\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"roles\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding role.ensure :phrases ["add a new entity role" "register role definition" "create role reference entry" "configure a new role type" "set up entity role" "define a role like UBO" "upsert role record" "add role for onboarding"] :verb role.ensure)
+(utterance-binding role.ensure :phrases ["add a new entity role" "register role definition" "create role reference entry" "configure a new role type" "set up entity role" "define a role like UBO" "upsert role record" "add role for onboarding"] :domain "role" :verb role.ensure)
 
 (verb role.list
+  :domain "role"
   :description "List all roles"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"reference\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"role\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :crud-json "{\"operation\":\"select\",\"table\":\"roles\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":\"name\",\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"role\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"reference\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":\"name\",\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"roles\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding role.list :phrases ["list all entity roles" "show available roles" "what roles are defined" "display role reference table" "get all role records" "which roles can be assigned" "show me the role list"] :verb role.list)
+(utterance-binding role.list :phrases ["list all entity roles" "show available roles" "what roles are defined" "display role reference table" "get all role records" "which roles can be assigned" "show me the role list"] :domain "role" :verb role.list)
 
 (verb role.read
+  :domain "role"
   :description "Read a role by name"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"reference\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"role\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"roles\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"role\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"reference\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"name\",\"name\":\"name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"roles\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding role.read :phrases ["look up role by name" "get role details" "show me this role definition" "fetch role record" "what is this entity role" "read role reference data" "find role by name" "retrieve role information"] :verb role.read)
-
+(utterance-binding role.read :phrases ["look up role by name" "get role details" "show me this role definition" "fetch role record" "what is this entity role" "read role reference data" "find role by name" "retrieve role information"] :domain "role" :verb role.read)

@@ -5,8 +5,8 @@ description: |
 
     Phase 1 — Deal record created (PROSPECT entry)
     Phase 2 — Products added to deal (deal_product PROPOSED → AGREED)
-    Phase 3 — Deal progresses to CONTRACTED (KYC gate)
-    Phase 4 — CBU created and validated (KYC gate)
+    Phase 3 — Deal progresses to CONTRACTED (domain-local structural path)
+    Phase 4 — CBU created and structurally validated
     Phase 5 — CBU subscribes to deal's contracted products
               (service_consumption per (cbu, service))
     Phase 6 — Services discovered/published in product catalogue
@@ -18,9 +18,7 @@ description: |
   Each phase mutates state to advance the world, then check_transitions
   to verify the cross-workspace gates fire (or pass) as expected.
 
-  Walks 4 cross-workspace constraints:
-    - deal_contracted_requires_kyc_approved      (L1)
-    - cbu_validated_requires_kyc_case_approved    (L2)
+  Walks 3 cross-workspace constraints:
     - service_consumption_requires_deal_contracted (L2→L1, R4)
     - service_consumption_requires_active_service (L2→L3, R2)
     - service_consumption_active_requires_live_binding (L2→L4, R8)
@@ -107,9 +105,9 @@ steps:
       - { workspace: deal, slot: deal, entity: "deal-1", state: "IN_CLEARANCE" }
 
   # ────────────────────────────────────────────────────────────────────────
-  # PHASE 3: Deal CONTRACTED — compound BAC+KYC tollgate fires.
+  # PHASE 3: Deal CONTRACTED — no cross-workspace KYC gate is declared.
   # ────────────────────────────────────────────────────────────────────────
-  - name: "P3: deal CONTRACTED BLOCKED — KYC pending"
+  - name: "P3: deal CONTRACTED is not blocked by cross-workspace KYC state"
     check_transition:
       workspace: deal
       slot: deal
@@ -117,13 +115,12 @@ steps:
       from: "IN_CLEARANCE"
       to: "CONTRACTED"
     expect:
-      violations:
-        - { constraint_id: "deal_contracted_requires_kyc_approved",  severity: "error" }
+      violations: []
 
   - mutate:
       - { workspace: kyc,               slot: kyc_case,  entity: "case-1", state: "APPROVED" }
 
-  - name: "P3: deal CONTRACTED GREEN — tollgate satisfied"
+  - name: "P3: deal CONTRACTED remains independent after KYC approval"
     check_transition:
       workspace: deal
       slot: deal
@@ -137,12 +134,12 @@ steps:
       - { workspace: deal, slot: deal, entity: "deal-1", state: "CONTRACTED" }
 
   # ────────────────────────────────────────────────────────────────────────
-  # PHASE 4: CBU created and validated — KYC gate fires.
+  # PHASE 4: CBU created and structurally validated; KYC is independent.
   # ────────────────────────────────────────────────────────────────────────
   - mutate:
       - { workspace: cbu, slot: cbu, entity: "cbu-1", state: "VALIDATION_PENDING" }
 
-  - name: "P4: CBU VALIDATED gate satisfied (case-1 already APPROVED)"
+  - name: "P4: CBU VALIDATED follows the structural domain-local path"
     check_transition:
       workspace: cbu
       slot: cbu

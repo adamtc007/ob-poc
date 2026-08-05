@@ -2,16 +2,16 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb cbu-role.terminate
+  :domain "cbu-role"
   :description "Terminate or remove all CBU entity roles for a CBU"
   :behavior "plugin"
   :handler "CbuRoleTerminateOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"cbu_role\",\"internal\":true,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"archive\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"hard-delete\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":true,\"noun\":\"cbu_role\",\"phase_tags\":[\"archive\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"hard-delete\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding cbu-role.terminate :phrases ["terminate cbu roles" "remove all cbu roles"] :verb cbu-role.terminate)
-
+(utterance-binding cbu-role.terminate :phrases ["terminate cbu roles" "remove all cbu roles"] :domain "cbu-role" :verb cbu-role.terminate)

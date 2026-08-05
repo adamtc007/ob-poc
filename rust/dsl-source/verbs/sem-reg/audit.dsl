@@ -4,48 +4,52 @@
 (utterance-binding audit :invocation-hints ["create plan" "record decision" "record escalation" "record observation"])
 
 (verb audit.add-plan-step
+  :domain "audit"
   :description "Add a step to an existing agent plan"
   :behavior "plugin"
   :handler "AuditAddPlanStepOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"plan_step\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"plan-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The plan to add a step to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"verb-fqn\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The verb FQN for this step\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"params\",\"type\":\"json\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"JSON parameters for this step\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"plan_step\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The plan to add a step to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"plan-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The verb FQN for this step\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"verb-fqn\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"JSON parameters for this step\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"params\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.add-plan-step :phrases ["add step to plan" "add plan step" "append step to agent plan"] :verb audit.add-plan-step)
+(utterance-binding audit.add-plan-step :phrases ["add step to plan" "add plan step" "append step to agent plan"] :domain "audit" :verb audit.add-plan-step)
 
 (verb audit.create-plan
+  :domain "audit"
   :description "Create a new agent plan with goal and assumptions"
   :behavior "plugin"
   :handler "AuditCreatePlanOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"agent_plan\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"goal\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The goal or objective for this plan\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"assumptions\",\"type\":\"json\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"JSON array of assumptions underpinning the plan\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"agent_plan\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The goal or objective for this plan\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"goal\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"JSON array of assumptions underpinning the plan\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"assumptions\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.create-plan :phrases ["create agent plan" "start a new plan" "make a plan for this goal" "begin planning"] :verb audit.create-plan)
+(utterance-binding audit.create-plan :phrases ["create agent plan" "start a new plan" "make a plan for this goal" "begin planning"] :domain "audit" :verb audit.create-plan)
 
 (verb audit.execute-plan-step
+  :domain "audit"
   :description "Execute a specific step in an agent plan"
   :behavior "plugin"
   :handler "AuditExecutePlanStepOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"plan_step_execution\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"plan-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The plan containing the step\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"step-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The step to execute\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"plan_step_execution\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The plan containing the step\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"plan-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The step to execute\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"step-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.execute-plan-step :phrases ["execute plan step" "run plan step" "advance plan"] :verb audit.execute-plan-step)
+(utterance-binding audit.execute-plan-step :phrases ["execute plan step" "run plan step" "advance plan"] :domain "audit" :verb audit.execute-plan-step)
 
 (verb audit.record-decision
+  :domain "audit"
   :description "Record an agent decision with snapshot manifest provenance"
   :behavior "plugin"
   :handler "AuditRecordDecisionOp"
@@ -53,67 +57,70 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "audit_record_decision"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"decision_record\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"plan-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The plan this decision relates to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"decision\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The decision text\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rationale\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Rationale for the decision\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"decision_record\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The plan this decision relates to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"plan-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The decision text\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"decision\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Rationale for the decision\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"rationale\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.record-decision :phrases ["record decision" "log agent decision" "record a decision with provenance" "capture decision"] :verb audit.record-decision)
+(utterance-binding audit.record-decision :phrases ["record decision" "log agent decision" "record a decision with provenance" "capture decision"] :domain "audit" :verb audit.record-decision)
 
 (verb audit.record-disambiguation
+  :domain "audit"
   :description "Record a disambiguation prompt and selected choice"
   :behavior "plugin"
   :handler "AuditRecordDisambiguationOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"disambiguation_record\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"plan-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The plan this disambiguation relates to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"prompt\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The disambiguation prompt\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"options\",\"type\":\"json\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"JSON array of options presented\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"selected\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The selected option\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"disambiguation_record\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The plan this disambiguation relates to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"plan-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The disambiguation prompt\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"prompt\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"JSON array of options presented\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"options\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The selected option\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"selected\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.record-disambiguation :phrases ["record disambiguation" "log disambiguation choice" "capture disambiguation result"] :verb audit.record-disambiguation)
+(utterance-binding audit.record-disambiguation :phrases ["record disambiguation" "log disambiguation choice" "capture disambiguation result"] :domain "audit" :verb audit.record-disambiguation)
 
 (verb audit.record-escalation
+  :domain "audit"
   :description "Record an escalation to a human reviewer"
   :behavior "plugin"
   :handler "AuditRecordEscalationOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"escalation_record\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"plan-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The plan requiring escalation\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Reason for escalation\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"required-action\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"What the human reviewer needs to do\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"escalation_record\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The plan requiring escalation\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"plan-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Reason for escalation\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"What the human reviewer needs to do\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"required-action\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.record-escalation :phrases ["record escalation" "escalate to human" "flag for human review" "log escalation"] :verb audit.record-escalation)
+(utterance-binding audit.record-escalation :phrases ["record escalation" "escalate to human" "flag for human review" "log escalation"] :domain "audit" :verb audit.record-escalation)
 
 (verb audit.record-observation
+  :domain "audit"
   :description "Record an observation on a subject entity"
   :behavior "plugin"
   :handler "AuditRecordObservationOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"observation_record\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"subject-ref\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Subject entity or attribute reference\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"observation-type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Type of observation being recorded\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"value\",\"type\":\"json\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The observation value as JSON\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"observation_record\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Subject entity or attribute reference\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"subject-ref\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Type of observation being recorded\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"observation-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The observation value as JSON\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"value\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.record-observation :phrases ["record observation" "log observation on entity" "capture evidence observation" "note observation"] :verb audit.record-observation)
+(utterance-binding audit.record-observation :phrases ["record observation" "log observation on entity" "capture evidence observation" "note observation"] :domain "audit" :verb audit.record-observation)
 
 (verb audit.validate-plan
+  :domain "audit"
   :description "Validate an agent plan (check all steps have valid verbs and snapshots)"
   :behavior "plugin"
   :handler "AuditValidatePlanOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"plan_validation\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"plan-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The plan to validate\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"plan_validation\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The plan to validate\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"plan-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding audit.validate-plan :phrases ["validate plan" "check plan validity" "verify agent plan"] :verb audit.validate-plan)
-
+(utterance-binding audit.validate-plan :phrases ["validate plan" "check plan validity" "verify agent plan"] :domain "audit" :verb audit.validate-plan)

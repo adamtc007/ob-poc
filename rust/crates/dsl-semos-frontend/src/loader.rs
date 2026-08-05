@@ -144,21 +144,23 @@ fn extract_verb_atom(
         Some(n) => n.clone(),
         None => return,
     };
+    let raw = &atom.raw;
+    let explicit_domain = get_slot_str(raw, "domain");
 
-    // Use rsplit_once to handle domain names that contain dots
-    // e.g. "ubo.registry.advance" → domain="ubo.registry", verb="advance"
-    let (domain_name, verb_name) = match fqn.rsplit_once('.') {
+    // Generated artifacts carry an explicit domain because the FQN alone is
+    // ambiguous when either side may contain dots. Keep the historical last-
+    // dot split only for compatibility with older hand-authored artifacts.
+    let (domain_name, verb_name) = match split_verb_fqn(&fqn, explicit_domain.as_deref()) {
         Some(pair) => pair,
         None => {
             diagnostics.push(Diagnostic::error(format!(
-                "verb atom has non-FQN name '{}' (expected 'domain.verb')",
-                fqn
+                "verb atom '{}' has an invalid or inconsistent :domain slot",
+                fqn,
             )));
             return;
         }
     };
 
-    let raw = &atom.raw;
     let mut verb = VerbConfig::default();
 
     // ── Core slots ────────────────────────────────────────────────────────────
@@ -366,26 +368,25 @@ fn extract_utterance_binding(atom: &TypedAtom, domains: &mut HashMap<String, Dom
     // Domain-level: (utterance-binding domain-name :invocation-hints [...])
     // Verb-level:   (utterance-binding domain.verb :phrases [...] :verb domain.verb)
     if let Some(hints) = get_slot_list(raw, "invocation-hints") {
-        // domain-level hints — name is the domain name (no dot)
-        if !name.contains('.') {
-            let domain_entry = domains.entry(name.clone()).or_insert_with(|| DomainConfig {
-                description: name.clone(),
-                verbs: HashMap::new(),
-                dynamic_verbs: Vec::new(),
-                invocation_hints: Vec::new(),
-            });
-            // Merge — avoid duplicates
-            for hint in hints {
-                if !domain_entry.invocation_hints.contains(&hint) {
-                    domain_entry.invocation_hints.push(hint);
-                }
+        // The presence of :invocation-hints identifies a domain binding; a
+        // domain name itself may legitimately contain dots.
+        let domain_entry = domains.entry(name.clone()).or_insert_with(|| DomainConfig {
+            description: name.clone(),
+            verbs: HashMap::new(),
+            dynamic_verbs: Vec::new(),
+            invocation_hints: Vec::new(),
+        });
+        // Merge — avoid duplicates
+        for hint in hints {
+            if !domain_entry.invocation_hints.contains(&hint) {
+                domain_entry.invocation_hints.push(hint);
             }
         }
     }
 
     if let Some(phrases) = get_slot_list(raw, "phrases") {
-        // verb-level phrases — name is "domain.verb" (use rsplit_once for dotted domains)
-        if let Some((domain_name, verb_name)) = name.rsplit_once('.') {
+        let explicit_domain = get_slot_str(raw, "domain");
+        if let Some((domain_name, verb_name)) = split_verb_fqn(&name, explicit_domain.as_deref()) {
             if let Some(domain_entry) = domains.get_mut(domain_name) {
                 if let Some(verb) = domain_entry.verbs.get_mut(verb_name) {
                     // Merge — avoid duplicates (YAML loader may have generated them)
@@ -401,6 +402,19 @@ fn extract_utterance_binding(atom: &TypedAtom, domains: &mut HashMap<String, Dom
 }
 
 // ── Slot accessors ─────────────────────────────────────────────────────────────
+
+/// Resolve a verb FQN using explicit generated identity when available.
+fn split_verb_fqn<'a>(
+    fqn: &'a str,
+    explicit_domain: Option<&'a str>,
+) -> Option<(&'a str, &'a str)> {
+    if let Some(domain) = explicit_domain {
+        let verb = fqn.strip_prefix(domain)?.strip_prefix('.')?;
+        return (!domain.is_empty() && !verb.is_empty()).then_some((domain, verb));
+    }
+
+    fqn.rsplit_once('.')
+}
 
 /// Extract a string value from a slot. Returns `None` if the slot is absent
 /// or has a non-string value.

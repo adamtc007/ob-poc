@@ -4,72 +4,76 @@
 (utterance-binding research.sec-edgar :invocation-hints ["SEC" "EDGAR" "US company" "American company" "CIK" "13D" "13G" "beneficial ownership" "public company" "SEC filings"])
 
 (verb research.sec-edgar.fetch-beneficial-owners
+  :domain "research.sec-edgar"
   :description "Fetch 13D/13G beneficial ownership filings"
   :behavior "plugin"
   :handler "SecFetchBeneficialOwnersOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"external\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"beneficial_owner\",\"internal\":false,\"tags\":[\"read\",\"external-source\",\"registry-fetch\",\"ownership\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cik\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"SEC CIK number\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"include-13d\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":\"Include 13D filings (activist ownership)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"include-13g\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":\"Include 13G filings (passive ownership)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"since-date\",\"type\":\"date\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Only filings after this date\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"decision-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Research decision ID for audit trail\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"beneficial_owner\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"external-source\",\"registry-fetch\",\"ownership\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"SEC CIK number\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cik\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":\"Include 13D filings (activist ownership)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"include-13d\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":\"Include 13G filings (passive ownership)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"include-13g\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Only filings after this date\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"since-date\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"date\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Research decision ID for audit trail\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"decision-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding research.sec-edgar.fetch-beneficial-owners :phrases ["get 13D filings" "13G beneficial owners" "who owns this US company" "SEC beneficial ownership"] :verb research.sec-edgar.fetch-beneficial-owners)
+(utterance-binding research.sec-edgar.fetch-beneficial-owners :phrases ["get 13D filings" "13G beneficial owners" "who owns this US company" "SEC beneficial ownership"] :domain "research.sec-edgar" :verb research.sec-edgar.fetch-beneficial-owners)
 
 (verb research.sec-edgar.fetch-company
+  :domain "research.sec-edgar"
   :description "Fetch company information from SEC EDGAR"
   :behavior "plugin"
   :handler "SecFetchCompanyOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"external\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"company_profile\",\"internal\":false,\"tags\":[\"read\",\"external-source\",\"registry-fetch\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cik\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"SEC CIK number (10 digits, zero-padded)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"decision-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Research decision ID for audit trail\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"company_profile\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"external-source\",\"registry-fetch\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"SEC CIK number (10 digits, zero-padded)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cik\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Research decision ID for audit trail\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"decision-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding research.sec-edgar.fetch-company :phrases ["get SEC company" "fetch from EDGAR" "company from SEC"] :verb research.sec-edgar.fetch-company)
+(utterance-binding research.sec-edgar.fetch-company :phrases ["get SEC company" "fetch from EDGAR" "company from SEC"] :domain "research.sec-edgar" :verb research.sec-edgar.fetch-company)
 
 (verb research.sec-edgar.fetch-filings
+  :domain "research.sec-edgar"
   :description "Fetch recent SEC filings for a company"
   :behavior "plugin"
   :handler "SecFetchFilingsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"external\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"filing\",\"internal\":false,\"tags\":[\"read\",\"external-source\",\"registry-fetch\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cik\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"SEC CIK number\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"form-types\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by form type (10-K, 10-Q, 8-K, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"limit\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":50,\"description\":\"Maximum filings to return\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"filing\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"external-source\",\"registry-fetch\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"SEC CIK number\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cik\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by form type (10-K, 10-Q, 8-K, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"form-types\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":50,\"description\":\"Maximum filings to return\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"limit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding research.sec-edgar.fetch-filings :phrases ["get SEC filings" "recent EDGAR filings" "company filings"] :verb research.sec-edgar.fetch-filings)
+(utterance-binding research.sec-edgar.fetch-filings :phrases ["get SEC filings" "recent EDGAR filings" "company filings"] :domain "research.sec-edgar" :verb research.sec-edgar.fetch-filings)
 
 (verb research.sec-edgar.import-company
+  :domain "research.sec-edgar"
   :description "Import SEC company and optionally beneficial owners to database"
   :behavior "plugin"
   :handler "SecImportCompanyOp"
   :effect-class "read_snapshot"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"external\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"entity\",\"internal\":false,\"tags\":[\"write\",\"import\",\"registry-import\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"entity_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"cik\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"SEC CIK number\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"include-beneficial-owners\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":\"Also import 13D/13G beneficial owners\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"decision-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Research decision ID for audit trail\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"entity\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"write\",\"import\",\"registry-import\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"entity_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":\"SEC CIK number\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cik\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":\"Also import 13D/13G beneficial owners\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"include-beneficial-owners\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Research decision ID for audit trail\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"decision-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding research.sec-edgar.import-company :phrases ["import from SEC" "add US company to database" "import EDGAR company"] :verb research.sec-edgar.import-company)
+(utterance-binding research.sec-edgar.import-company :phrases ["import from SEC" "add US company to database" "import EDGAR company"] :domain "research.sec-edgar" :verb research.sec-edgar.import-company)
 
 (verb research.sec-edgar.search
+  :domain "research.sec-edgar"
   :description "Search SEC EDGAR for companies by name"
   :behavior "plugin"
   :handler "SecSearchOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"external\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"company_search_result\",\"internal\":false,\"tags\":[\"read\",\"external-source\",\"registry-lookup\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"query\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Company name or ticker symbol\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"limit\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":20,\"description\":\"Maximum results\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"company_search_result\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"external-source\",\"registry-lookup\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Company name or ticker symbol\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"query\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":20,\"description\":\"Maximum results\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"limit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding research.sec-edgar.search :phrases ["search SEC" "find US public company" "look up in EDGAR"] :verb research.sec-edgar.search)
-
+(utterance-binding research.sec-edgar.search :phrases ["search SEC" "find US public company" "look up in EDGAR"] :domain "research.sec-edgar" :verb research.sec-edgar.search)

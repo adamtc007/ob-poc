@@ -2,16 +2,16 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb derivation.recompute-stale
+  :domain "derivation"
   :description "Recompute stale derived values from the canonical queue in dependency-depth order"
   :behavior "plugin"
   :handler "derivation_recompute_stale"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"derivation\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"limit\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"100\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"derivation\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":\"100\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"limit\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding derivation.recompute-stale :phrases ["recompute stale derived values" "process the derivation recompute queue" "refresh stale derived attributes" "run the stale derivation batch" "recompute below the line values" "update derived attributes" "refresh derived attributes" "recompute derived"] :verb derivation.recompute-stale)
-
+(utterance-binding derivation.recompute-stale :phrases ["recompute stale derived values" "process the derivation recompute queue" "refresh stale derived attributes" "run the stale derivation batch" "recompute below the line values" "update derived attributes" "refresh derived attributes" "recompute derived"] :domain "derivation" :verb derivation.recompute-stale)

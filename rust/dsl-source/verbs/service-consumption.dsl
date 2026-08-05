@@ -3,97 +3,102 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-consumption.activate
+  :domain "service-consumption"
   :description "Activate service for operational use (provisioned → active)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service-consumption\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-consumption\"],\"phase_tags\":[\"service-consumption\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"service_consumption\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"consumption-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"consumption_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service-consumption\",\"phase_tags\":[\"service-consumption\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"service-consumption\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_slot\":\"service_consumption\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"consumption_id\",\"name\":\"consumption-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-consumption.activate :phrases ["activate service" "turn on service for CBU" "go live with service"] :verb service-consumption.activate)
+(utterance-binding service-consumption.activate :phrases ["activate service" "turn on service for CBU" "go live with service"] :domain "service-consumption" :verb service-consumption.activate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-consumption.begin-winddown
+  :domain "service-consumption"
   :description "Begin service wind-down for CBU (exit intent)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "service_consumption_begin_winddown"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service-consumption\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-consumption\"],\"phase_tags\":[\"service-consumption\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"service_consumption\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"consumption-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"consumption_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service-consumption\",\"phase_tags\":[\"service-consumption\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"service-consumption\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_slot\":\"service_consumption\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"consumption_id\",\"name\":\"consumption-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-consumption.begin-winddown :phrases ["wind down service" "retire service for CBU" "begin service exit"] :verb service-consumption.begin-winddown)
+(utterance-binding service-consumption.begin-winddown :phrases ["wind down service" "retire service for CBU" "begin service exit"] :domain "service-consumption" :verb service-consumption.begin-winddown)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-consumption.provision
+  :domain "service-consumption"
   :description "Provision a service for a CBU (proposed → provisioned; accounts opened, routings set)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service-consumption\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-consumption\"],\"phase_tags\":[\"service-consumption\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"service_consumption\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"consumption-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"consumption_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service-consumption\",\"phase_tags\":[\"service-consumption\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"service-consumption\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_slot\":\"service_consumption\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"consumption_id\",\"name\":\"consumption-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-consumption.provision :phrases ["provision service" "set up service for CBU" "open accounts for service" "provision service consumption"] :verb service-consumption.provision)
+(utterance-binding service-consumption.provision :phrases ["provision service" "set up service for CBU" "open accounts for service" "provision service consumption"] :domain "service-consumption" :verb service-consumption.provision)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-consumption.reinstate
+  :domain "service-consumption"
   :description "Reinstate suspended service back to active"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service-consumption\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-consumption\"],\"phase_tags\":[\"service-consumption\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"service_consumption\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"consumption-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"consumption_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service-consumption\",\"phase_tags\":[\"service-consumption\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"service-consumption\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_slot\":\"service_consumption\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"consumption_id\",\"name\":\"consumption-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-consumption.reinstate :phrases ["reinstate service" "resume service" "unsuspend service consumption"] :verb service-consumption.reinstate)
+(utterance-binding service-consumption.reinstate :phrases ["reinstate service" "resume service" "unsuspend service consumption"] :domain "service-consumption" :verb service-consumption.reinstate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-consumption.retire
+  :domain "service-consumption"
   :description "Retire service consumption (terminal-positive after winddown)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "service_consumption_retire"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service-consumption\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-consumption\"],\"phase_tags\":[\"service-consumption\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"service_consumption\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"consumption-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"consumption_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service-consumption\",\"phase_tags\":[\"service-consumption\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"service-consumption\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_slot\":\"service_consumption\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"consumption_id\",\"name\":\"consumption-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-consumption.retire :phrases ["retire service" "finalize service retirement" "complete service decommission"] :verb service-consumption.retire)
+(utterance-binding service-consumption.retire :phrases ["retire service" "finalize service retirement" "complete service decommission"] :domain "service-consumption" :verb service-consumption.retire)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb service-consumption.suspend
+  :domain "service-consumption"
   :description "Suspend service for CBU (service pause; restorable)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "service_consumption_suspend"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"service-consumption\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"service-consumption\"],\"phase_tags\":[\"service-consumption\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_workspace\":\"cbu\",\"target_slot\":\"service_consumption\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"consumption-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"consumption_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"service-consumption\",\"phase_tags\":[\"service-consumption\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"service-consumption\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"consumption-id\",\"target_slot\":\"service_consumption\",\"target_workspace\":\"cbu\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"consumption_id\",\"name\":\"consumption-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding service-consumption.suspend :phrases ["suspend service" "pause CBU service" "halt service consumption"] :verb service-consumption.suspend)
-
+(utterance-binding service-consumption.suspend :phrases ["suspend service" "pause CBU service" "halt service consumption"] :domain "service-consumption" :verb service-consumption.suspend)

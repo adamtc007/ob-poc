@@ -11,7 +11,7 @@
 //! See `tests/cross_workspace_dag_live_scenarios.rs` for the entry point.
 
 use crate::cross_workspace::DagRegistry;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde_json::Value as JsonValue;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -23,11 +23,13 @@ use crate::cross_workspace::derived_state::{DerivedStateEvaluator, DerivedStateV
 use crate::cross_workspace::gate_checker::{GateChecker, GateViolation};
 use crate::cross_workspace::hierarchy_cascade::{CascadeAction, CascadePlanner};
 use crate::cross_workspace::postgres_child_resolver::PostgresChildEntityResolver;
-use crate::cross_workspace::slot_state::PostgresSlotStateProvider;
+use crate::cross_workspace::slot_state::{
+    PostgresSlotStateProvider, SlotStateTable, set_slot_state_table,
+};
 use crate::cross_workspace::sql_predicate_resolver::SqlPredicateResolver;
 
 use super::assertions::{
-    check_cascade_actions, check_derived_value, check_violations, AssertionFailure,
+    AssertionFailure, check_cascade_actions, check_derived_value, check_violations,
 };
 use super::runner::{ScenarioReport, StepResult};
 use super::scenario::{
@@ -63,6 +65,12 @@ impl LiveScenarioRunner {
     }
 
     fn build(scenario: Scenario, pool: PgPool) -> Result<Self> {
+        // The live harness uses the production provider, so register the same
+        // application-owned table mapping that its seed path uses. Without
+        // this, the integration test result depends on another test having
+        // initialized the process-global table first.
+        set_slot_state_table(live_slot_state_table());
+
         let mut aliases = HashMap::new();
         for (name, uuid_str) in &scenario.entity_aliases {
             let id = Uuid::parse_str(uuid_str)
@@ -427,6 +435,50 @@ fn repo_root_join(rel: &str) -> std::path::PathBuf {
 type SlotKey = (&'static str, &'static str);
 type SlotTarget = (&'static str, &'static str, &'static str);
 
+const LIVE_SLOT_TARGETS: &[(SlotKey, SlotTarget)] = &[
+    // Phase 1
+    (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
+    (("kyc", "kyc_case"), ("cases", "status", "case_id")),
+    (("deal", "deal"), ("deals", "deal_status", "deal_id")),
+    // Phase 2
+    (
+        ("instrument_matrix", "trading_profile"),
+        ("cbu_trading_profiles", "status", "profile_id"),
+    ),
+    (
+        ("cbu", "service_consumption"),
+        ("cbu_service_consumption", "status", "consumption_id"),
+    ),
+    (
+        ("product_maintenance", "service"),
+        ("services", "lifecycle_status", "service_id"),
+    ),
+    (
+        ("lifecycle_resources", "application_instance"),
+        ("application_instances", "lifecycle_status", "id"),
+    ),
+    (
+        ("lifecycle_resources", "capability_binding"),
+        ("capability_bindings", "binding_status", "id"),
+    ),
+];
+
+fn live_slot_state_table() -> SlotStateTable {
+    LIVE_SLOT_TARGETS
+        .iter()
+        .map(|((workspace, slot), (table, state_column, pk_column))| {
+            (
+                format!("{workspace}.{slot}"),
+                (
+                    (*table).to_string(),
+                    (*state_column).to_string(),
+                    (*pk_column).to_string(),
+                ),
+            )
+        })
+        .collect()
+}
+
 /// Re-implementation of `slot_state::resolve_slot_table` that's accessible
 /// from the live runner. Kept in lockstep with the production dispatch
 /// table; if a workspace/slot is added to production, add it here too
@@ -438,34 +490,7 @@ fn resolve_slot_table(
     // Phase 1 MVP coverage: the 4 tables in
     // rust/test-migrations/cross_workspace_dag/0001_schema.sql.
     // Phase 2+ extends as more tables are added to that migration.
-    let mapping: &[(SlotKey, SlotTarget)] = &[
-        // Phase 1
-        (("cbu", "cbu"), ("cbus", "status", "cbu_id")),
-        (("kyc", "kyc_case"), ("cases", "status", "case_id")),
-        (("deal", "deal"), ("deals", "deal_status", "deal_id")),
-        // Phase 2
-        (
-            ("instrument_matrix", "trading_profile"),
-            ("cbu_trading_profiles", "status", "profile_id"),
-        ),
-        (
-            ("cbu", "service_consumption"),
-            ("cbu_service_consumption", "status", "consumption_id"),
-        ),
-        (
-            ("product_maintenance", "service"),
-            ("services", "lifecycle_status", "service_id"),
-        ),
-        (
-            ("lifecycle_resources", "application_instance"),
-            ("application_instances", "lifecycle_status", "id"),
-        ),
-        (
-            ("lifecycle_resources", "capability_binding"),
-            ("capability_bindings", "binding_status", "id"),
-        ),
-    ];
-    for ((ws, sl), value) in mapping {
+    for ((ws, sl), value) in LIVE_SLOT_TARGETS {
         if *ws == workspace && *sl == slot {
             return Ok(*value);
         }

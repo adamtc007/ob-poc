@@ -4,40 +4,42 @@
 (utterance-binding docs-bundle :invocation-hints ["docs bundle" "document bundle" "apply bundle" "required documents" "document set"])
 
 (verb docs-bundle.apply
+  :domain "docs-bundle"
   :description "Apply a document bundle to a CBU, creating document requirements"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"document_bundle\",\"internal\":false,\"tags\":[\"setup\",\"write\",\"macro-support\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to apply the bundle to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"bundle\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"docs.bundle.ucits-baseline\",\"docs.bundle.aif-baseline\",\"docs.bundle.hedge-baseline\",\"docs.bundle.private-equity-baseline\",\"docs.bundle.etf-baseline\",\"docs.bundle.uk-authorised-baseline\",\"docs.bundle.ltaf-baseline\",\"docs.bundle.manager-baseline\",\"docs.bundle.us-40act-baseline\"],\"default\":null,\"description\":\"Bundle identifier (e.g., docs.bundle.ucits-baseline)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"has-prime-broker\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":\"Whether the structure has a prime broker (for conditional docs)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"has-market-maker\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":\"Whether the ETF has designated market makers\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"wrapper\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"sicav\",\"fcp\",\"lp\",\"oeic\",\"aut\",\"acs\",\"icav\"],\"default\":null,\"description\":\"Fund wrapper type (for conditional docs)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"document_bundle\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"setup\",\"write\",\"macro-support\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to apply the bundle to\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Bundle identifier (e.g., docs.bundle.ucits-baseline)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"bundle\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"docs.bundle.ucits-baseline\",\"docs.bundle.aif-baseline\",\"docs.bundle.hedge-baseline\",\"docs.bundle.private-equity-baseline\",\"docs.bundle.etf-baseline\",\"docs.bundle.uk-authorised-baseline\",\"docs.bundle.ltaf-baseline\",\"docs.bundle.manager-baseline\",\"docs.bundle.us-40act-baseline\"],\"validation\":null},{\"default\":false,\"description\":\"Whether the structure has a prime broker (for conditional docs)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"has-prime-broker\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":\"Whether the ETF has designated market makers\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"has-market-maker\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Fund wrapper type (for conditional docs)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"wrapper\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"sicav\",\"fcp\",\"lp\",\"oeic\",\"aut\",\"acs\",\"icav\"],\"validation\":null}]"
 )
 
-(utterance-binding docs-bundle.apply :phrases ["apply document bundle" "apply docs bundle" "set up required documents" "apply ucits documents" "apply aif documents" "configure fund documents"] :verb docs-bundle.apply)
+(utterance-binding docs-bundle.apply :phrases ["apply document bundle" "apply docs bundle" "set up required documents" "apply ucits documents" "apply aif documents" "configure fund documents"] :domain "docs-bundle" :verb docs-bundle.apply)
 
 (verb docs-bundle.list-applied
+  :domain "docs-bundle"
   :description "List document bundles applied to a CBU"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"document_bundle\",\"internal\":false,\"tags\":[\"query\",\"read\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to query\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"document_bundle\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"query\",\"read\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to query\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding docs-bundle.list-applied :phrases ["list applied bundles" "show applied document bundles" "what bundles are applied" "get cbu bundles"] :verb docs-bundle.list-applied)
+(utterance-binding docs-bundle.list-applied :phrases ["list applied bundles" "show applied document bundles" "what bundles are applied" "get cbu bundles"] :domain "docs-bundle" :verb docs-bundle.list-applied)
 
 (verb docs-bundle.list-available
+  :domain "docs-bundle"
   :description "List all available document bundles"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"document_bundle\",\"internal\":false,\"tags\":[\"query\",\"read\",\"reference\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"document_bundle\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"query\",\"read\",\"reference\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
 )
 
-(utterance-binding docs-bundle.list-available :phrases ["list available bundles" "show available document bundles" "what bundles exist" "list docs bundles"] :verb docs-bundle.list-available)
-
+(utterance-binding docs-bundle.list-available :phrases ["list available bundles" "show available document bundles" "what bundles exist" "list docs bundles"] :domain "docs-bundle" :verb docs-bundle.list-available)

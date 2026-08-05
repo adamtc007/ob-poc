@@ -3,30 +3,31 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb instrument-matrix.attach
+  :domain "instrument-matrix"
   :description "Attach (bootstrap) an instrument matrix to a CBU, creating a draft trading profile if one does not exist. Idempotent."
   :behavior "plugin"
   :effect-class "idempotent_ensure"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"instrument_matrix\",\"internal\":false,\"tags\":[\"lifecycle\",\"write\",\"idempotent\",\"onboarding\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\",\"configuring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"cbu\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"template\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Template code for the initial instrument universe (e.g. LUX_SICAV, IE_UCITS). Defaults to CBU-category-derived template.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"instrument_matrix\",\"phase_tags\":[\"onboarding\",\"configuring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"lifecycle\",\"write\",\"idempotent\",\"onboarding\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"cbu-id\",\"target_slot\":\"cbu\",\"target_workspace\":\"instrument_matrix\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Template code for the initial instrument universe (e.g. LUX_SICAV, IE_UCITS). Defaults to CBU-category-derived template.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"template\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding instrument-matrix.attach :phrases ["attach instrument matrix to CBU" "initialise instrument matrix" "bootstrap instrument matrix" "set up instrument matrix for CBU" "create instrument matrix" "wire instrument matrix to structure" "attach IM to CBU" "initialise trading profile structure" "create trading profile for CBU" "bootstrap the instrument matrix" "set up IM for onboarding" "prepare instrument matrix" "attach matrix to onboarding unit"] :verb instrument-matrix.attach)
+(utterance-binding instrument-matrix.attach :phrases ["attach instrument matrix to CBU" "initialise instrument matrix" "bootstrap instrument matrix" "set up instrument matrix for CBU" "create instrument matrix" "wire instrument matrix to structure" "attach IM to CBU" "initialise trading profile structure" "create trading profile for CBU" "bootstrap the instrument matrix" "set up IM for onboarding" "prepare instrument matrix" "attach matrix to onboarding unit"] :domain "instrument-matrix" :verb instrument-matrix.attach)
 
 (verb mandate.instrument-matrix
+  :domain "mandate"
   :description "Show permitted instrument matrix for a mandate"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"instrument_matrix\",\"internal\":false,\"tags\":[\"read\",\"query\",\"limit\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\",\"configuring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"mandate-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"profile_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"v_permitted_instruments\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"instrument_matrix\",\"phase_tags\":[\"onboarding\",\"configuring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"read\",\"query\",\"limit\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"profile_id\",\"name\":\"mandate-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"v_permitted_instruments\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding mandate.instrument-matrix :phrases ["show me the permitted instrument matrix for this mandate" "can this mandate trade listed futures?" "permitted instrument matrix" "what instruments can this mandate trade" "show mandate instrument matrix"] :verb mandate.instrument-matrix)
-
+(utterance-binding mandate.instrument-matrix :phrases ["show me the permitted instrument matrix for this mandate" "can this mandate trade listed futures?" "permitted instrument matrix" "what instruments can this mandate trade" "show mandate instrument matrix"] :domain "mandate" :verb mandate.instrument-matrix)

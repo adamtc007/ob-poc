@@ -2,20 +2,22 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb onboarding.auto-complete
+  :domain "onboarding"
   :description "Automatically progress onboarding by generating and executing DSL for missing entities"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding\",\"internal\":false,\"tags\":[\"onboarding\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"cbu\"],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"The CBU to auto-complete onboarding for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"max-steps\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":20,\"description\":\"Maximum number of entities to create in one run\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"dry-run\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":\"If true, return generated DSL without executing\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"target-stage\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional: stop when this stage is complete (e.g., 'kyc_case', 'trading_profile')\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[\"cbu\"],\"tags\":[\"onboarding\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"The CBU to auto-complete onboarding for\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":20,\"description\":\"Maximum number of entities to create in one run\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"max-steps\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":\"If true, return generated DSL without executing\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"dry-run\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Optional: stop when this stage is complete (e.g., 'kyc_case', 'trading_profile')\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target-stage\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.auto-complete :phrases ["auto-complete onboarding" "finish onboarding automatically" "generate missing onboarding steps" "complete CBU setup automatically" "fill in remaining onboarding" "auto-generate missing entities" "progress onboarding to completion" "run auto-complete for structure"] :verb onboarding.auto-complete)
+(utterance-binding onboarding.auto-complete :phrases ["auto-complete onboarding" "finish onboarding automatically" "generate missing onboarding steps" "complete CBU setup automatically" "fill in remaining onboarding" "auto-generate missing entities" "progress onboarding to completion" "run auto-complete for structure"] :domain "onboarding" :verb onboarding.auto-complete)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb onboarding.cancel-data-request
+  :domain "onboarding"
   :description "Cancel all open slices for an onboarding data request"
   :behavior "plugin"
   :handler "CancelDataRequestOp"
@@ -23,17 +25,18 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"onboarding_admin\",\"ops_admin\",\"mlro\"]}"
   :audit-class "onboarding_data_request_cancel"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[\"onboarding\",\"service-resource\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"data-request-id\",\"target_workspace\":\"onboarding_request\",\"target_slot\":\"onboarding_data_request\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"data-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"onboarding\",\"service-resource\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"data-request-id\",\"target_slot\":\"onboarding_data_request\",\"target_workspace\":\"onboarding_request\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"data-request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.cancel-data-request :phrases ["cancel onboarding data request" "stand down all resource owner requests"] :verb onboarding.cancel-data-request)
+(utterance-binding onboarding.cancel-data-request :phrases ["cancel onboarding data request" "stand down all resource owner requests"] :domain "onboarding" :verb onboarding.cancel-data-request)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb onboarding.cancel-slice
+  :domain "onboarding"
   :description "Cancel one open onboarding data request slice"
   :behavior "plugin"
   :handler "CancelSliceOp"
@@ -41,128 +44,135 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"onboarding_admin\",\"ops_admin\",\"mlro\"]}"
   :audit-class "onboarding_data_request_slice_cancel"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_slice\",\"internal\":false,\"tags\":[\"onboarding\",\"service-resource\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"slice-id\",\"target_workspace\":\"onboarding_request\",\"target_slot\":\"onboarding_data_request_slice\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"slice-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request_slice\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"onboarding\",\"service-resource\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"slice-id\",\"target_slot\":\"onboarding_data_request_slice\",\"target_workspace\":\"onboarding_request\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"slice-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.cancel-slice :phrases ["cancel onboarding data request slice" "stand down this resource owner request"] :verb onboarding.cancel-slice)
+(utterance-binding onboarding.cancel-slice :phrases ["cancel onboarding data request slice" "stand down this resource owner request"] :domain "onboarding" :verb onboarding.cancel-slice)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb onboarding.compile-data-request
+  :domain "onboarding"
   :description "Compile a frozen service-resource data dictionary for a deal onboarding request"
   :behavior "plugin"
   :handler "CompileDataRequestOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[\"onboarding\",\"service-resource\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"deal_onboarding_request\"],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"onboarding-request-id\",\"target_workspace\":\"onboarding_request\",\"target_slot\":\"onboarding_data_request\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"onboarding-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"deal_onboarding_requests\",\"schema\":\"ob-poc\",\"entity_type\":\"deal_onboarding_request\",\"search_key\":\"request_id\",\"primary_key\":\"request_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"deal_onboarding_request\"],\"tags\":[\"onboarding\",\"service-resource\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"onboarding-request-id\",\"target_slot\":\"onboarding_data_request\",\"target_workspace\":\"onboarding_request\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"deal_onboarding_request\",\"primary_key\":\"request_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"request_id\",\"table\":\"deal_onboarding_requests\"},\"maps_to\":null,\"name\":\"onboarding-request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.compile-data-request :phrases ["compile onboarding data request" "build service resource data dictionary" "prepare resource owner data request" "freeze onboarding resource requirements"] :verb onboarding.compile-data-request)
+(utterance-binding onboarding.compile-data-request :phrases ["compile onboarding data request" "build service resource data dictionary" "prepare resource owner data request" "freeze onboarding resource requirements"] :domain "onboarding" :verb onboarding.compile-data-request)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb onboarding.dispatch-ready-slices
+  :domain "onboarding"
   :description "Dispatch all ready service-resource data request slices to resource owners"
   :behavior "plugin"
   :handler "DispatchReadySlicesOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"outbox_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[\"onboarding\",\"service-resource\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"data-request-id\",\"target_workspace\":\"onboarding_request\",\"target_slot\":\"onboarding_data_request\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"data-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"outbox_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"onboarding\",\"service-resource\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"data-request-id\",\"target_slot\":\"onboarding_data_request\",\"target_workspace\":\"onboarding_request\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"data-request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.dispatch-ready-slices :phrases ["dispatch ready onboarding slices" "dispatch the ready slices" "send ready resource owner requests" "send the ready resource owner requests" "send out the ready owner requests" "forward ready owner requests" "dispatch resource owner data requests" "release ready slices to resource owners" "kick off ready owner provisioning"] :verb onboarding.dispatch-ready-slices)
+(utterance-binding onboarding.dispatch-ready-slices :phrases ["dispatch ready onboarding slices" "dispatch the ready slices" "send ready resource owner requests" "send the ready resource owner requests" "send out the ready owner requests" "forward ready owner requests" "dispatch resource owner data requests" "release ready slices to resource owners" "kick off ready owner provisioning"] :domain "onboarding" :verb onboarding.dispatch-ready-slices)
 
 (verb onboarding.get-data-request
+  :domain "onboarding"
   :description "Read one onboarding data request"
   :behavior "plugin"
   :handler "GetDataRequestOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"data-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request\",\"phase_tags\":[],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"data-request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.get-data-request :phrases ["get onboarding data request" "show data request"] :verb onboarding.get-data-request)
+(utterance-binding onboarding.get-data-request :phrases ["get onboarding data request" "show data request"] :domain "onboarding" :verb onboarding.get-data-request)
 
 (verb onboarding.get-slice
+  :domain "onboarding"
   :description "Read one onboarding data request slice"
   :behavior "plugin"
   :handler "GetSliceOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_slice\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"slice-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request_slice\",\"phase_tags\":[],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"slice-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.get-slice :phrases ["get onboarding data request slice" "show resource owner slice"] :verb onboarding.get-slice)
+(utterance-binding onboarding.get-slice :phrases ["get onboarding data request slice" "show resource owner slice"] :domain "onboarding" :verb onboarding.get-slice)
 
 (verb onboarding.get-slice-attrs
+  :domain "onboarding"
   :description "List frozen attributes for an onboarding data request slice"
   :behavior "plugin"
   :handler "GetSliceAttrsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_attr\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"slice-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request_attr\",\"phase_tags\":[],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"slice-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.get-slice-attrs :phrases ["get onboarding data request attributes" "show frozen slice attributes"] :verb onboarding.get-slice-attrs)
+(utterance-binding onboarding.get-slice-attrs :phrases ["get onboarding data request attributes" "show frozen slice attributes"] :domain "onboarding" :verb onboarding.get-slice-attrs)
 
 (verb onboarding.list-data-requests
+  :domain "onboarding"
   :description "List onboarding data requests"
   :behavior "plugin"
   :handler "ListDataRequestsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request\",\"phase_tags\":[],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.list-data-requests :phrases ["list onboarding data requests" "show resource owner data requests"] :verb onboarding.list-data-requests)
+(utterance-binding onboarding.list-data-requests :phrases ["list onboarding data requests" "show resource owner data requests"] :domain "onboarding" :verb onboarding.list-data-requests)
 
 (verb onboarding.list-slices
+  :domain "onboarding"
   :description "List slices for an onboarding data request"
   :behavior "plugin"
   :handler "ListSlicesOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding_data_request_slice\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"data-request-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding_data_request_slice\",\"phase_tags\":[],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"data-request-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding onboarding.list-slices :phrases ["list onboarding data request slices" "show resource owner slices"] :verb onboarding.list-slices)
+(utterance-binding onboarding.list-slices :phrases ["list onboarding data request slices" "show resource owner slices"] :domain "onboarding" :verb onboarding.list-slices)
 
 (verb onboarding.status
+  :domain "onboarding"
   :description "Check the status of the onboarding journey for a client"
   :behavior "crud"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"onboarding\",\"internal\":false,\"tags\":[\"onboarding\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":\"cbu_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
-  :crud-json "{\"operation\":\"select\",\"table\":\"cbus\",\"schema\":\"ob-poc\",\"key\":null,\"returning\":null,\"conflict_keys\":null,\"conflict_constraint\":null,\"junction\":null,\"from_col\":null,\"to_col\":null,\"role_table\":null,\"role_col\":null,\"fk_col\":null,\"filter_col\":null,\"primary_table\":null,\"join_table\":null,\"join_col\":null,\"base_table\":null,\"extension_table\":null,\"extension_table_column\":null,\"type_id_column\":null,\"type_code\":null,\"order_by\":null,\"set_values\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"onboarding\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"onboarding\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"cbu_id\",\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
+  :crud-json "{\"base_table\":null,\"conflict_constraint\":null,\"conflict_keys\":null,\"extension_table\":null,\"extension_table_column\":null,\"filter_col\":null,\"fk_col\":null,\"from_col\":null,\"join_col\":null,\"join_table\":null,\"junction\":null,\"key\":null,\"operation\":\"select\",\"order_by\":null,\"primary_table\":null,\"returning\":null,\"role_col\":null,\"role_table\":null,\"schema\":\"ob-poc\",\"set_values\":null,\"table\":\"cbus\",\"to_col\":null,\"type_code\":null,\"type_id_column\":null}"
 )
 
-(utterance-binding onboarding.status :phrases ["where are we in the onboarding journey for this client?" "onboarding status" "where are we in the onboarding journey" "show onboarding status" "check onboarding progress"] :verb onboarding.status)
-
+(utterance-binding onboarding.status :phrases ["where are we in the onboarding journey for this client?" "onboarding status" "where are we in the onboarding journey" "show onboarding status" "check onboarding progress"] :domain "onboarding" :verb onboarding.status)

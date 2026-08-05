@@ -4,184 +4,196 @@
 (utterance-binding schema :invocation-hints ["describe entity schema" "show schema fields" "show schema relationships" "show schema verbs" "introspect schema" "extract attributes from schema" "extract verbs" "extract entities" "cross reference schema"])
 
 (verb schema.cross-reference
+  :domain "schema"
   :description "Cross-reference schema against registry snapshots for drift detection"
   :behavior "plugin"
   :handler "SchemaCrossReferenceOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_cross_reference\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"schema-name\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"PostgreSQL schema name to cross-reference (all schemas if omitted)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"object-type\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Object type to cross-reference: attribute_def, entity_type_def,\\nverb_contract. All types if omitted.\\n\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_cross_reference\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"PostgreSQL schema name to cross-reference (all schemas if omitted)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"schema-name\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Object type to cross-reference: attribute_def, entity_type_def,\\nverb_contract. All types if omitted.\\n\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"object-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.cross-reference :phrases ["cross reference schema against registry" "detect schema drift" "compare schema to registry snapshots" "check schema registry alignment" "find schema drift"] :verb schema.cross-reference)
+(utterance-binding schema.cross-reference :phrases ["cross reference schema against registry" "detect schema drift" "compare schema to registry snapshots" "check schema registry alignment" "find schema drift"] :domain "schema" :verb schema.cross-reference)
 
 (verb schema.domain.describe
+  :domain "schema"
   :description "Describe a data-management domain from structure semantics"
   :behavior "plugin"
   :handler "SchemaDomainDescribeOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_domain\",\"internal\":false,\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"domain\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Domain or entity type to describe (e.g., deal, cbu, document, product)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_domain\",\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Domain or entity type to describe (e.g., deal, cbu, document, product)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"domain\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.domain.describe :phrases ["describe schema domain" "describe data domain" "show domain schema" "show semantic model for domain"] :verb schema.domain.describe)
+(utterance-binding schema.domain.describe :phrases ["describe schema domain" "describe data domain" "show domain schema" "show semantic model for domain"] :domain "schema" :verb schema.domain.describe)
 
 (verb schema.entity.describe
+  :domain "schema"
   :description "Describe an entity type with fields, relationships, and available verbs"
   :behavior "plugin"
   :handler "SchemaEntityDescribeOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_entity\",\"internal\":false,\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity type to describe (e.g., deal, cbu, document, product)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_entity\",\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity type to describe (e.g., deal, cbu, document, product)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.entity.describe :phrases ["describe entity schema" "show entity schema" "show schema fields relationships and verbs" "describe semantic registry entity" "show semantic model for entity"] :verb schema.entity.describe)
+(utterance-binding schema.entity.describe :phrases ["describe entity schema" "show entity schema" "show schema fields relationships and verbs" "describe semantic registry entity" "show semantic model for entity"] :domain "schema" :verb schema.entity.describe)
 
 (verb schema.entity.list-fields
+  :domain "schema"
   :description "List fields for an entity type from registry or ontology metadata"
   :behavior "plugin"
   :handler "SchemaEntityListFieldsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_field\",\"internal\":false,\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity type to inspect\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_field\",\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity type to inspect\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.entity.list-fields :phrases ["list schema fields" "show fields for entity" "what fields does this entity have" "show entity attributes"] :verb schema.entity.list-fields)
+(utterance-binding schema.entity.list-fields :phrases ["list schema fields" "show fields for entity" "what fields does this entity have" "show entity attributes"] :domain "schema" :verb schema.entity.list-fields)
 
 (verb schema.entity.list-relationships
+  :domain "schema"
   :description "List relationships for an entity type from ontology metadata"
   :behavior "plugin"
   :handler "SchemaEntityListRelationshipsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_relationship\",\"internal\":false,\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity type to inspect\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_relationship\",\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity type to inspect\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.entity.list-relationships :phrases ["list schema relationships" "what does this entity relate to" "show foreign key relationships"] :verb schema.entity.list-relationships)
+(utterance-binding schema.entity.list-relationships :phrases ["list schema relationships" "what does this entity relate to" "show foreign key relationships"] :domain "schema" :verb schema.entity.list-relationships)
 
 (verb schema.entity.list-verbs
+  :domain "schema"
   :description "List DSL verbs available for an entity type's domain"
   :behavior "plugin"
   :handler "SchemaEntityListVerbsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_verb\",\"internal\":false,\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity type to inspect\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_verb\",\"phase_tags\":[\"stewardship\",\"data-management\",\"data\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\",\"schema\",\"data-management\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity type to inspect\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.entity.list-verbs :phrases ["list schema verbs" "show available verbs" "what verbs apply to this entity" "show operations for entity"] :verb schema.entity.list-verbs)
+(utterance-binding schema.entity.list-verbs :phrases ["list schema verbs" "show available verbs" "what verbs apply to this entity" "show operations for entity"] :domain "schema" :verb schema.entity.list-verbs)
 
 (verb schema.extract-attributes
+  :domain "schema"
   :description "Extract attribute definitions from schema columns"
   :behavior "plugin"
   :handler "SchemaExtractAttributesOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"attribute_extraction\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"schema-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"PostgreSQL schema name to extract attributes from\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"table-name\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional table name to extract attributes from a single table\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"attribute_extraction\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"PostgreSQL schema name to extract attributes from\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"schema-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Optional table name to extract attributes from a single table\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"table-name\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.extract-attributes :phrases ["extract attributes from schema" "derive attribute definitions from columns" "build attributes from table columns" "generate attribute defs from schema"] :verb schema.extract-attributes)
+(utterance-binding schema.extract-attributes :phrases ["extract attributes from schema" "derive attribute definitions from columns" "build attributes from table columns" "generate attribute defs from schema"] :domain "schema" :verb schema.extract-attributes)
 
 (verb schema.extract-entities
+  :domain "schema"
   :description "Extract entity type definitions from schema tables"
   :behavior "plugin"
   :handler "SchemaExtractEntitiesOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"entity_extraction\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"schema-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"PostgreSQL schema name to extract entity type definitions from\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"entity_extraction\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"PostgreSQL schema name to extract entity type definitions from\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"schema-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.extract-entities :phrases ["extract entity types from schema" "derive entity definitions from tables" "build entity type defs from schema" "generate entity types from database"] :verb schema.extract-entities)
+(utterance-binding schema.extract-entities :phrases ["extract entity types from schema" "derive entity definitions from tables" "build entity type defs from schema" "generate entity types from database"] :domain "schema" :verb schema.extract-entities)
 
 (verb schema.extract-verbs
+  :domain "schema"
   :description "Extract verb contracts from YAML config"
   :behavior "plugin"
   :handler "SchemaExtractVerbsOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"verb_extraction\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"domain\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional domain filter (e.g., cbu, entity, kyc) to extract verbs for a single domain\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"include-generated\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":\"Whether to include auto-generated phrase verbs in the output\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"verb_extraction\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Optional domain filter (e.g., cbu, entity, kyc) to extract verbs for a single domain\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"domain\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":\"Whether to include auto-generated phrase verbs in the output\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"include-generated\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.extract-verbs :phrases ["extract verb contracts from config" "derive verb definitions from YAML" "build verb contracts from verb config" "generate verb contracts" "extract verbs from YAML"] :verb schema.extract-verbs)
+(utterance-binding schema.extract-verbs :phrases ["extract verb contracts from config" "derive verb definitions from YAML" "build verb contracts from verb config" "generate verb contracts" "extract verbs from YAML"] :domain "schema" :verb schema.extract-verbs)
 
 (verb schema.generate-discovery-map
+  :domain "schema"
   :description "Generate a domain discovery map (Phase 2 stub)"
   :behavior "plugin"
   :handler "SchemaGenerateDiscoveryMapOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"discovery_map\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"domain\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional domain filter\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"format\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"mermaid\",\"description\":\"Output format (currently only mermaid supported)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"cluster-by\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"verb\",\"description\":\"Clustering mode (verb, data, intent, domain)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"discovery_map\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Optional domain filter\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"domain\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":\"mermaid\",\"description\":\"Output format (currently only mermaid supported)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"format\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":\"verb\",\"description\":\"Clustering mode (verb, data, intent, domain)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cluster-by\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.generate-discovery-map :phrases ["generate discovery map" "show domain discovery map" "visualize domain structure" "domain overview diagram" "show all domains and tables" "generate domain map" "domain data landscape" "show schema discovery map" "domain table map" "visualize data landscape"] :verb schema.generate-discovery-map)
+(utterance-binding schema.generate-discovery-map :phrases ["generate discovery map" "show domain discovery map" "visualize domain structure" "domain overview diagram" "show all domains and tables" "generate domain map" "domain data landscape" "show schema discovery map" "domain table map" "visualize data landscape"] :domain "schema" :verb schema.generate-discovery-map)
 
 (verb schema.generate-erd
+  :domain "schema"
   :description "Generate an entity-relationship diagram with verb surface annotations"
   :behavior "plugin"
   :handler "SchemaGenerateErdOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"erd_diagram\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"schema-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"PostgreSQL schema name to generate ERD for (e.g., ob-poc, sem_reg)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"format\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"mermaid\",\"description\":\"Output format (currently only mermaid supported)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"show-verb-surface\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":\"Whether to include verb surface annotations on entities\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"show-affinity-kind\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":false,\"description\":\"Whether to expose affinity relation labels alongside verbs\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"enrich\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":\"Whether to enrich with AffinityGraph metadata\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"tables\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional list of table names to include\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"depth\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":1,\"description\":\"Traversal depth hint for enrichment\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"group-by\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"schema\",\"description\":\"Grouping hint (domain, schema, verb_domain, none)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"domain\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional domain filter to show only tables for a specific domain\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"max-tables\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":50,\"description\":\"Maximum number of tables to include in the diagram\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"erd_diagram\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"PostgreSQL schema name to generate ERD for (e.g., ob-poc, sem_reg)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"schema-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":\"mermaid\",\"description\":\"Output format (currently only mermaid supported)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"format\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":\"Whether to include verb surface annotations on entities\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"show-verb-surface\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":false,\"description\":\"Whether to expose affinity relation labels alongside verbs\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"show-affinity-kind\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":\"Whether to enrich with AffinityGraph metadata\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"enrich\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Optional list of table names to include\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"tables\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":1,\"description\":\"Traversal depth hint for enrichment\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"depth\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null},{\"default\":\"schema\",\"description\":\"Grouping hint (domain, schema, verb_domain, none)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"group-by\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Optional domain filter to show only tables for a specific domain\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"domain\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":50,\"description\":\"Maximum number of tables to include in the diagram\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"max-tables\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.generate-erd :phrases ["generate ERD" "show schema diagram" "draw entity relationships" "create entity relationship diagram" "visualize database schema" "show schema as diagram" "generate mermaid ERD" "diagram this schema" "show table relationships" "ER diagram for schema"] :verb schema.generate-erd)
+(utterance-binding schema.generate-erd :phrases ["generate ERD" "show schema diagram" "draw entity relationships" "create entity relationship diagram" "visualize database schema" "show schema as diagram" "generate mermaid ERD" "diagram this schema" "show table relationships" "ER diagram for schema"] :domain "schema" :verb schema.generate-erd)
 
 (verb schema.generate-verb-flow
+  :domain "schema"
   :description "Generate a verb-flow diagram showing what data a verb touches"
   :behavior "plugin"
   :handler "SchemaGenerateVerbFlowOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"verb_flow_diagram\",\"internal\":false,\"tags\":[\"stewardship\",\"data\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\",\"data\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"verb-fqn\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Fully-qualified verb name to generate flow diagram for (e.g., cbu.create)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"domain\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Domain prefix to render a domain-centric verb flow (e.g., cbu)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"format\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":\"mermaid\",\"description\":\"Output format (currently only mermaid supported)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"depth\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":2,\"description\":\"Traversal depth for transitive data edges\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"verb_flow_diagram\",\"phase_tags\":[\"stewardship\",\"data\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\",\"data\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Fully-qualified verb name to generate flow diagram for (e.g., cbu.create)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"verb-fqn\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Domain prefix to render a domain-centric verb flow (e.g., cbu)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"domain\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":\"mermaid\",\"description\":\"Output format (currently only mermaid supported)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"format\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":2,\"description\":\"Traversal depth for transitive data edges\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"depth\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.generate-verb-flow :phrases ["show verb flow diagram" "visualize verb data dependencies" "draw verb flow" "generate verb data flow" "show what data this verb touches" "diagram verb data surface" "verb flow visualization" "show data flow for verb" "generate mermaid verb flow" "visualize verb graph"] :verb schema.generate-verb-flow)
+(utterance-binding schema.generate-verb-flow :phrases ["show verb flow diagram" "visualize verb data dependencies" "draw verb flow" "generate verb data flow" "show what data this verb touches" "diagram verb data surface" "verb flow visualization" "show data flow for verb" "generate mermaid verb flow" "visualize verb graph"] :domain "schema" :verb schema.generate-verb-flow)
 
 (verb schema.introspect
+  :domain "schema"
   :description "Introspect database schema (tables, columns, foreign keys)"
   :behavior "plugin"
   :handler "SchemaIntrospectOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"schema_introspection\",\"internal\":false,\"tags\":[\"stewardship\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"stewardship\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"schema-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"PostgreSQL schema name to introspect (e.g., ob-poc, sem_reg)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"table-name\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Optional table name to narrow introspection to a single table\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"include-fks\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":true,\"description\":\"Whether to include foreign key relationships in the output\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"schema_introspection\",\"phase_tags\":[\"stewardship\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"stewardship\"],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"PostgreSQL schema name to introspect (e.g., ob-poc, sem_reg)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"schema-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Optional table name to narrow introspection to a single table\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"table-name\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":true,\"description\":\"Whether to include foreign key relationships in the output\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"include-fks\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding schema.introspect :phrases ["introspect database schema" "show schema tables and columns" "describe database structure" "list tables in schema" "inspect schema foreign keys"] :verb schema.introspect)
-
+(utterance-binding schema.introspect :phrases ["introspect database schema" "show schema tables and columns" "describe database structure" "list tables in schema" "inspect schema foreign keys"] :domain "schema" :verb schema.introspect)

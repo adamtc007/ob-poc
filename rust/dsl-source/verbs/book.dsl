@@ -3,63 +3,66 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb book.abandon
+  :domain "book"
   :description "Abandon book-setup journey (pre-contract)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "book_abandon"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"book\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"book\"],\"phase_tags\":[\"book\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"book-id\",\"target_workspace\":\"book_setup\",\"target_slot\":\"book\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"book-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"book_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":\"reason\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"book\",\"phase_tags\":[\"book\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"book\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"book-id\",\"target_slot\":\"book\",\"target_workspace\":\"book_setup\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"book_id\",\"name\":\"book-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"reason\",\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding book.abandon :phrases ["abandon book setup" "cancel book" "stop book setup" "abort book creation"] :verb book.abandon)
+(utterance-binding book.abandon :phrases ["abandon book setup" "cancel book" "stop book setup" "abort book creation"] :domain "book" :verb book.abandon)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb book.create
+  :domain "book"
   :description "Create a new client book (scope: client_group_id). Starts book-setup journey."
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"book\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"book\"],\"phase_tags\":[\"book\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"client-group-id\",\"target_workspace\":\"book_setup\",\"target_slot\":\"book\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"client-group-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"client_group_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"name\",\"type\":\"string\",\"required\":true,\"maps_to\":\"name\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"book\",\"phase_tags\":[\"book\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"book\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"client-group-id\",\"target_slot\":\"book\",\"target_workspace\":\"book_setup\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"client_group_id\",\"name\":\"client-group-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"name\",\"name\":\"name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding book.create :phrases ["create a book" "new book for client" "set up client book" "book setup"] :verb book.create)
+(utterance-binding book.create :phrases ["create a book" "new book for client" "set up client book" "book setup"] :domain "book" :verb book.create)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb book.mark-ready
+  :domain "book"
   :description "Mark book as ready-for-deal (terminal-positive in book-setup journey)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"book\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"book\"],\"phase_tags\":[\"book\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"book-id\",\"target_workspace\":\"book_setup\",\"target_slot\":\"book\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"book-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"book_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"book\",\"phase_tags\":[\"book\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"book\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"book-id\",\"target_slot\":\"book\",\"target_workspace\":\"book_setup\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"book_id\",\"name\":\"book-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding book.mark-ready :phrases ["mark book ready for deal" "book setup complete" "handoff book to deal" "book ready for contracting"] :verb book.mark-ready)
+(utterance-binding book.mark-ready :phrases ["mark book ready for deal" "book setup complete" "handoff book to deal" "book ready for contracting"] :domain "book" :verb book.mark-ready)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb book.select-structure
+  :domain "book"
   :description "Select jurisdiction-specific structure template for the book (e.g. struct.lux.ucits.sicav)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"book\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"book\"],\"phase_tags\":[\"book\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"book-id\",\"target_workspace\":\"book_setup\",\"target_slot\":\"book\"}"
-  :returns-json "{\"type\":\"affected\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"book-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":\"book_id\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"structure-template\",\"type\":\"string\",\"required\":true,\"maps_to\":\"structure_template\",\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"book\",\"phase_tags\":[\"book\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[\"book\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"book-id\",\"target_slot\":\"book\",\"target_workspace\":\"book_setup\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"affected\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"book_id\",\"name\":\"book-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":\"structure_template\",\"name\":\"structure-template\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding book.select-structure :phrases ["select structure for book" "pick jurisdiction template" "set book structure" "choose fund template"] :verb book.select-structure)
-
+(utterance-binding book.select-structure :phrases ["select structure for book" "pick jurisdiction template" "set book structure" "choose fund template"] :domain "book" :verb book.select-structure)

@@ -2,90 +2,96 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb batch.abort
+  :domain "batch"
   :description "Abort the current batch execution"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Reason for aborting\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
+  :args-json "[{\"default\":null,\"description\":\"Reason for aborting\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding batch.abort :phrases ["abort the batch" "cancel batch processing" "stop the batch entirely" "kill batch execution" "terminate batch run" "abort bulk operation" "cancel all remaining items" "end batch immediately"] :verb batch.abort)
+(utterance-binding batch.abort :phrases ["abort the batch" "cancel batch processing" "stop the batch entirely" "kill batch execution" "terminate batch run" "abort bulk operation" "cancel all remaining items" "end batch immediately"] :domain "batch" :verb batch.abort)
 
 (verb batch.add-products
+  :domain "batch"
   :description "Add products to multiple CBUs in bulk"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cbu-ids\",\"type\":\"string_list\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"List of CBU IDs to add products to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"products\",\"type\":\"string_list\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"List of product codes to add\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
+  :args-json "[{\"default\":null,\"description\":\"List of CBU IDs to add products to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu-ids\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"List of product codes to add\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"products\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding batch.add-products :phrases ["bulk add products to CBUs" "add products to multiple structures" "batch assign products" "add custody products in bulk" "apply products across CBUs" "mass product assignment" "add products to all structures" "bulk product setup"] :verb batch.add-products)
+(utterance-binding batch.add-products :phrases ["bulk add products to CBUs" "add products to multiple structures" "batch assign products" "add custody products in bulk" "apply products across CBUs" "mass product assignment" "add products to all structures" "bulk product setup"] :domain "batch" :verb batch.add-products)
 
 (verb batch.continue
+  :domain "batch"
   :description "Continue batch execution for N more items"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"count\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":1,\"description\":\"Number of items to process before pausing again\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
+  :args-json "[{\"default\":1,\"description\":\"Number of items to process before pausing again\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"count\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding batch.continue :phrases ["continue batch for more items" "process next batch items" "do a few more" "run next N items" "continue with more entries" "process additional batch items" "advance batch by count" "step through batch items"] :verb batch.continue)
+(utterance-binding batch.continue :phrases ["continue batch for more items" "process next batch items" "do a few more" "run next N items" "continue with more entries" "process additional batch items" "advance batch by count" "step through batch items"] :domain "batch" :verb batch.continue)
 
 (verb batch.pause
+  :domain "batch"
   :description "Pause the current batch execution"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
 )
 
-(utterance-binding batch.pause :phrases ["pause the batch" "hold batch processing" "pause bulk operation" "stop batch temporarily" "suspend batch execution" "halt the batch run" "freeze batch processing" "pause current bulk job"] :verb batch.pause)
+(utterance-binding batch.pause :phrases ["pause the batch" "hold batch processing" "pause bulk operation" "stop batch temporarily" "suspend batch execution" "halt the batch run" "freeze batch processing" "pause current bulk job"] :domain "batch" :verb batch.pause)
 
 (verb batch.resume
+  :domain "batch"
   :description "Resume a paused batch execution"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
 )
 
-(utterance-binding batch.resume :phrases ["resume the batch" "continue batch processing" "restart paused batch" "unpause the batch" "resume bulk operation" "pick up where we left off" "continue the batch run" "resume batch execution"] :verb batch.resume)
+(utterance-binding batch.resume :phrases ["resume the batch" "continue batch processing" "restart paused batch" "unpause the batch" "resume bulk operation" "pick up where we left off" "continue the batch run" "resume batch execution"] :domain "batch" :verb batch.resume)
 
 (verb batch.skip
+  :domain "batch"
   :description "Skip the current batch item"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Reason for skipping the item\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
+  :args-json "[{\"default\":null,\"description\":\"Reason for skipping the item\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding batch.skip :phrases ["skip this batch item" "skip current item" "move to next item" "bypass this entry" "skip and continue" "pass on this one" "skip this CBU" "move past current item"] :verb batch.skip)
+(utterance-binding batch.skip :phrases ["skip this batch item" "skip current item" "move to next item" "bypass this entry" "skip and continue" "pass on this one" "skip this CBU" "move past current item"] :domain "batch" :verb batch.skip)
 
 (verb batch.status
+  :domain "batch"
   :description "Get the current batch execution status"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"batch\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"administration\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"batch_control_result\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"batch\",\"phase_tags\":[\"administration\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"batch_control_result\"}"
 )
 
-(utterance-binding batch.status :phrases ["batch status" "how is the batch doing" "show batch progress" "check batch execution status" "how many items processed" "batch completion percentage" "what is the batch progress" "get bulk operation status"] :verb batch.status)
-
+(utterance-binding batch.status :phrases ["batch status" "how is the batch doing" "show batch progress" "check batch execution status" "how many items processed" "batch completion percentage" "what is the batch progress" "get bulk operation status"] :domain "batch" :verb batch.status)

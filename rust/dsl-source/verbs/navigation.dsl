@@ -2,97 +2,103 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb nav.drill
+  :domain "nav"
   :description "Drill into a focused object — opens deeper level"
   :behavior "plugin"
   :handler "NavDrillOp"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"drill\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"target_id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Node ID to drill into\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"target_level\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Target view level (cluster, system, planet, surface, core)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"drill\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Node ID to drill into\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target_id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Target view level (cluster, system, planet, surface, core)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target_level\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding nav.drill :phrases ["drill into" "zoom into" "open" "explore" "navigate to"] :verb nav.drill)
+(utterance-binding nav.drill :phrases ["drill into" "zoom into" "open" "explore" "navigate to"] :domain "nav" :verb nav.drill)
 
 (verb nav.history-back
+  :domain "nav"
   :description "Navigate back in history — replay previous OrientationContract"
   :behavior "plugin"
   :handler "NavHistoryBackOp"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"history\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"history\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding nav.history-back :phrases ["back" "previous" "undo navigation"] :verb nav.history-back)
+(utterance-binding nav.history-back :phrases ["back" "previous" "undo navigation"] :domain "nav" :verb nav.history-back)
 
 (verb nav.history-forward
+  :domain "nav"
   :description "Navigate forward in history"
   :behavior "plugin"
   :handler "NavHistoryForwardOp"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"history\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"history\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding nav.history-forward :phrases ["forward" "next" "redo navigation"] :verb nav.history-forward)
+(utterance-binding nav.history-forward :phrases ["forward" "next" "redo navigation"] :domain "nav" :verb nav.history-forward)
 
 (verb nav.select
+  :domain "nav"
   :description "Set semantic focus to a specific entity or object"
   :behavior "plugin"
   :handler "NavSelectOp"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"select\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"target_id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity or object ID to focus on\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"select\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity or object ID to focus on\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"target_id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding nav.select :phrases ["select" "focus on" "look at"] :verb nav.select)
+(utterance-binding nav.select :phrases ["select" "focus on" "look at"] :domain "nav" :verb nav.select)
 
 (verb nav.set-cluster-type
+  :domain "nav"
   :description "Change cluster grouping mode (jurisdiction, client, risk, product)"
   :behavior "plugin"
   :handler "NavSetClusterTypeOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"none\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"cluster\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"cluster_type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"One of: jurisdiction, client, risk, product\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"none\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"cluster\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":\"One of: jurisdiction, client, risk, product\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cluster_type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding nav.set-cluster-type :phrases ["group by" "cluster by" "show by"] :verb nav.set-cluster-type)
+(utterance-binding nav.set-cluster-type :phrases ["group by" "cluster by" "show by"] :domain "nav" :verb nav.set-cluster-type)
 
 (verb nav.set-lens
+  :domain "nav"
   :description "Change observation lens (overlay, depth probe, filters)"
   :behavior "plugin"
   :handler "NavSetLensOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"none\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"lens\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"overlay\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"active_only or draft_overlay\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"depth_probe\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"ownership, control, services, documents\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"none\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"lens\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":\"active_only or draft_overlay\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"overlay\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"ownership, control, services, documents\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"depth_probe\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding nav.set-lens :phrases ["show drafts" "show active only" "show ownership" "show control" "overlay"] :verb nav.set-lens)
+(utterance-binding nav.set-lens :phrases ["show drafts" "show active only" "show ownership" "show control" "overlay"] :domain "nav" :verb nav.set-lens)
 
 (verb nav.zoom-out
+  :domain "nav"
   :description "Semantic zoom out — go up one level"
   :behavior "plugin"
   :handler "NavZoomOutOp"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"navigation\",\"internal\":false,\"tags\":[\"navigation\",\"zoom\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"navigation\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"zoom\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
 )
 
-(utterance-binding nav.zoom-out :phrases ["zoom out" "go up" "back up" "step back"] :verb nav.zoom-out)
-
+(utterance-binding nav.zoom-out :phrases ["zoom out" "go up" "back up" "step back"] :domain "nav" :verb nav.zoom-out)

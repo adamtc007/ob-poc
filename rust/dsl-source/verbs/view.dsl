@@ -2,179 +2,192 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb view.book
+  :domain "view"
   :description "View all CBUs for a commercial client (book view)"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"book\",\"client\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"client\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"entities\",\"schema\":\"ob-poc\",\"entity_type\":\"entity\",\"search_key\":\"name\",\"primary_key\":\"entity_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Commercial client entity\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"book\",\"client\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Commercial client entity\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"entity\",\"primary_key\":\"entity_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"entities\"},\"maps_to\":null,\"name\":\"client\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.book :phrases ["show client book" "view the book" "display client CBUs" "show me client portfolio" "open the book view" "view client entities" "show book for client" "display commercial book" "see client CBUs" "open client view" "show all CBUs for client"] :verb view.book)
+(utterance-binding view.book :phrases ["show client book" "view the book" "display client CBUs" "show me client portfolio" "open the book view" "view client entities" "show book for client" "display commercial book" "see client CBUs" "open client view" "show all CBUs for client"] :domain "view" :verb view.book)
 
 (verb view.cbu
+  :domain "view"
   :description "Focus on a single CBU with specified view mode"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"focus\",\"cbu\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"cbu-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"cbus\",\"schema\":\"ob-poc\",\"entity_type\":\"cbu\",\"search_key\":\"name\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"CBU to focus on\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"mode\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"trading\",\"ubo\"],\"default\":\"trading\",\"description\":\"View mode for CBU focus\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"focus\",\"cbu\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"CBU to focus on\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"cbu\",\"primary_key\":\"cbu_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"cbus\"},\"maps_to\":null,\"name\":\"cbu-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":\"trading\",\"description\":\"View mode for CBU focus\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"mode\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"trading\",\"ubo\"],\"validation\":null}]"
 )
 
-(utterance-binding view.cbu :phrases ["focus on CBU" "view this CBU" "open the CBU" "zoom into CBU" "display CBU view" "focus view on CBU" "show me the CBU" "select this CBU" "drill into CBU"] :verb view.cbu)
+(utterance-binding view.cbu :phrases ["focus on CBU" "view this CBU" "open the CBU" "zoom into CBU" "display CBU view" "focus view on CBU" "show me the CBU" "select this CBU" "drill into CBU"] :domain "view" :verb view.cbu)
 
 (verb view.clear-refinements
+  :domain "view"
   :description "Clear refinements and return to the base view"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"refinement\",\"reset\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"refinement\",\"reset\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
 )
 
-(utterance-binding view.clear-refinements :phrases ["clear all filters" "reset the view" "remove all refinements" "clear current filters" "reset to base view" "clear refinements" "remove filters" "reset filters" "go back to unfiltered"] :verb view.clear-refinements)
+(utterance-binding view.clear-refinements :phrases ["clear all filters" "reset the view" "remove all refinements" "clear current filters" "reset to base view" "clear refinements" "remove filters" "reset filters" "go back to unfiltered"] :domain "view" :verb view.clear-refinements)
 
 (verb view.entity-forest
+  :domain "view"
   :description "View entities by type/ownership filters"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"entity\",\"filtering\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"entity-type\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by entity types\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"jurisdiction\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by jurisdictions\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"role\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by roles\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"entity\",\"filtering\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Filter by entity types\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by jurisdictions\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by roles\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"role\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.entity-forest :phrases ["show entity tree" "view entity forest" "display entity hierarchy" "show me entities by type" "view ownership forest" "show entity structure" "display entity relationships" "see the entity tree" "open entity view" "show entities filtered by"] :verb view.entity-forest)
+(utterance-binding view.entity-forest :phrases ["show entity tree" "view entity forest" "display entity hierarchy" "show me entities by type" "view ownership forest" "show entity structure" "display entity relationships" "see the entity tree" "open entity view" "show entities filtered by"] :domain "view" :verb view.entity-forest)
 
 (verb view.navigate-back-to
+  :domain "view"
   :description "Navigate back to a specific breadcrumb level"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"fractal\",\"breadcrumbs\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"depth\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Breadcrumb depth (0 = root, 1 = first zoom, etc.)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"frame-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Specific frame ID to jump to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"fractal\",\"breadcrumbs\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Breadcrumb depth (0 = root, 1 = first zoom, etc.)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"depth\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Specific frame ID to jump to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"frame-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.navigate-back-to :phrases ["go back to" "jump back to" "return to level" "back to breadcrumb" "go to parent level" "jump to root" "return to start" "back to beginning" "go back several levels" "return to previous"] :verb view.navigate-back-to)
+(utterance-binding view.navigate-back-to :phrases ["go back to" "jump back to" "return to level" "back to breadcrumb" "go to parent level" "jump to root" "return to start" "back to beginning" "go back several levels" "return to previous"] :domain "view" :verb view.navigate-back-to)
 
 (verb view.read-breadcrumbs
+  :domain "view"
   :description "Read the current navigation breadcrumbs"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"fractal\",\"breadcrumbs\",\"introspection\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"object\",\"name\":null,\"capture\":true}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"fractal\",\"breadcrumbs\",\"introspection\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"object\"}"
 )
 
-(utterance-binding view.read-breadcrumbs :phrases ["show breadcrumbs" "where am I" "show navigation path" "display current path" "show my location" "what level am I at" "show navigation trail" "display breadcrumb trail" "current navigation path" "view breadcrumbs"] :verb view.read-breadcrumbs)
+(utterance-binding view.read-breadcrumbs :phrases ["show breadcrumbs" "where am I" "show navigation path" "display current path" "show my location" "what level am I at" "show navigation trail" "display breadcrumb trail" "current navigation path" "view breadcrumbs"] :domain "view" :verb view.read-breadcrumbs)
 
 (verb view.read-selection-info
+  :domain "view"
   :description "Read detailed info about the current selection"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"selection_info\",\"name\":null,\"capture\":true}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"selection_info\"}"
 )
 
-(utterance-binding view.read-selection-info :phrases ["show selection details" "what's selected" "selection summary" "show selected info" "details on selection" "info about selected" "selected items info" "describe selection" "view selection details" "get selection info"] :verb view.read-selection-info)
+(utterance-binding view.read-selection-info :phrases ["show selection details" "what's selected" "selection summary" "show selected info" "details on selection" "info about selected" "selected items info" "describe selection" "view selection details" "get selection info"] :domain "view" :verb view.read-selection-info)
 
 (verb view.read-status
+  :domain "view"
   :description "Read the current view state summary"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"operational\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"operational\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
 )
 
-(utterance-binding view.read-status :phrases ["show current status" "what's the status" "view state summary" "show view status" "current view state" "where am I now" "show session status" "display current state" "get view status" "check view state"] :verb view.read-status)
+(utterance-binding view.read-status :phrases ["show current status" "what's the status" "view state summary" "show view status" "current view state" "where am I now" "show session status" "display current state" "get view status" "check view state"] :domain "view" :verb view.read-status)
 
 (verb view.refine
+  :domain "view"
   :description "Refine current view with additional filter"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"refinement\",\"filtering\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"include\",\"type\":\"object\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter to include (narrows selection)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"exclude\",\"type\":\"object\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter to exclude (removes from selection)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"add\",\"type\":\"uuid_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Specific IDs to add to selection\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"remove\",\"type\":\"uuid_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Specific IDs to remove from selection\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"refinement\",\"filtering\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Filter to include (narrows selection)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"include\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"object\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter to exclude (removes from selection)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"exclude\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"object\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Specific IDs to add to selection\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"add\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Specific IDs to remove from selection\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"remove\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid_list\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.refine :phrases ["filter the view" "refine current selection" "narrow down results" "add a filter" "filter by status" "refine by jurisdiction" "narrow the view" "apply filter to view" "restrict to matching" "filter down to" "show only matching"] :verb view.refine)
+(utterance-binding view.refine :phrases ["filter the view" "refine current selection" "narrow down results" "add a filter" "filter by status" "refine by jurisdiction" "narrow the view" "apply filter to view" "restrict to matching" "filter down to" "show only matching"] :domain "view" :verb view.refine)
 
 (verb view.set-layout
+  :domain "view"
   :description "Set the layout strategy for the current view"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"visualization\",\"layout\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"layout_result\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"mode\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"auto\",\"galaxy\",\"grid\",\"tree\",\"network\",\"pyramid\"],\"default\":null,\"description\":\"Layout algorithm to use\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"primary-axis\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"jurisdiction\",\"fund_type\",\"status\",\"manco\",\"role_category\"],\"default\":null,\"description\":\"Primary grouping dimension for layout\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"size-by\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Attribute to map to node size\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"color-by\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Attribute to map to node color\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"visualization\",\"layout\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"layout_result\"}"
+  :args-json "[{\"default\":null,\"description\":\"Layout algorithm to use\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"mode\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"auto\",\"galaxy\",\"grid\",\"tree\",\"network\",\"pyramid\"],\"validation\":null},{\"default\":null,\"description\":\"Primary grouping dimension for layout\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"primary-axis\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"jurisdiction\",\"fund_type\",\"status\",\"manco\",\"role_category\"],\"validation\":null},{\"default\":null,\"description\":\"Attribute to map to node size\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"size-by\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Attribute to map to node color\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"color-by\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.set-layout :phrases ["change layout" "switch to grid view" "use tree layout" "show as network" "arrange as pyramid" "change display layout" "switch visualization" "use galaxy layout" "arrange nodes differently" "show in grid format" "display as hierarchy"] :verb view.set-layout)
+(utterance-binding view.set-layout :phrases ["change layout" "switch to grid view" "use tree layout" "show as network" "arrange as pyramid" "change display layout" "switch visualization" "use galaxy layout" "arrange nodes differently" "show in grid format" "display as hierarchy"] :domain "view" :verb view.set-layout)
 
 (verb view.set-selection
+  :domain "view"
   :description "Explicitly set selection within the current view"
   :behavior "plugin"
   :effect-class "pure"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"selection\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"navigating\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"ids\",\"type\":\"uuid_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Explicit IDs to select\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"all\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Select all nodes in current view\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"none\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Clear selection\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"selection\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"navigating\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Explicit IDs to select\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"ids\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Select all nodes in current view\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"all\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Clear selection\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"none\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.set-selection :phrases ["select these items" "select all visible" "mark as selected" "select everything" "clear selection" "select none" "choose these nodes" "select current items" "pick these entities" "highlight selected"] :verb view.set-selection)
+(utterance-binding view.set-selection :phrases ["select these items" "select all visible" "mark as selected" "select everything" "clear selection" "select none" "choose these nodes" "select current items" "pick these entities" "highlight selected"] :domain "view" :verb view.set-selection)
 
 (verb view.universe
+  :domain "view"
   :description "View all CBUs with optional filters"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"universe\",\"filtering\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"client\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":{\"table\":\"entities\",\"schema\":\"ob-poc\",\"entity_type\":\"entity\",\"search_key\":\"name\",\"primary_key\":\"entity_id\",\"resolution_mode\":\"entity\",\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Filter to CBUs for this client entity\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"jurisdiction\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by jurisdiction(s)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"fund-type\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by fund type(s)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"status\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"RED\",\"AMBER\",\"GREEN\"],\"default\":null,\"description\":\"Filter by status (RED, AMBER, GREEN)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"needs-attention\",\"type\":\"boolean\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter to items needing attention\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"universe\",\"filtering\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Filter to CBUs for this client entity\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"entity\",\"primary_key\":\"entity_id\",\"resolution_mode\":\"entity\",\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"name\",\"table\":\"entities\"},\"maps_to\":null,\"name\":\"client\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by jurisdiction(s)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by fund type(s)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"fund-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by status (RED, AMBER, GREEN)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":[\"RED\",\"AMBER\",\"GREEN\"],\"validation\":null},{\"default\":null,\"description\":\"Filter to items needing attention\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"needs-attention\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"boolean\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.universe :phrases ["show me everything" "view all CBUs" "show the universe" "display all clients" "view entire portfolio" "show global view" "display everything" "see all CBUs" "give me the full picture" "show complete universe" "view all records" "show my universe" "display universe view" "view universe" "show universe view" "display the universe" "show all cbus in universe" "universe view" "see the universe"] :verb view.universe)
+(utterance-binding view.universe :phrases ["show me everything" "view all CBUs" "show the universe" "display all clients" "view entire portfolio" "show global view" "display everything" "see all CBUs" "give me the full picture" "show complete universe" "view all records" "show my universe" "display universe view" "view universe" "show universe view" "display the universe" "show all cbus in universe" "universe view" "see the universe"] :domain "view" :verb view.universe)
 
 (verb view.zoom-in
+  :domain "view"
   :description "Zoom into a node, expanding it into its child taxonomy"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"fractal\",\"zoom\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"node-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Node to zoom into\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"fractal\",\"zoom\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
+  :args-json "[{\"default\":null,\"description\":\"Node to zoom into\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"node-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding view.zoom-in :phrases ["zoom in" "zoom into this" "expand this node" "go deeper" "dive into details" "expand and zoom" "zoom closer" "magnify this area" "zoom in for detail" "get closer view" "show more detail"] :verb view.zoom-in)
+(utterance-binding view.zoom-in :phrases ["zoom in" "zoom into this" "expand this node" "go deeper" "dive into details" "expand and zoom" "zoom closer" "magnify this area" "zoom in for detail" "get closer view" "show more detail"] :domain "view" :verb view.zoom-in)
 
 (verb view.zoom-out
+  :domain "view"
   :description "Zoom out to the parent taxonomy"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"session\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":\"view_state\",\"internal\":false,\"tags\":[\"navigation\",\"fractal\",\"zoom\",\"data-management\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"navigation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"view_state\",\"name\":null,\"capture\":true}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"view_state\",\"phase_tags\":[\"navigation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"session\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"navigation\",\"fractal\",\"zoom\",\"data-management\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"view_state\"}"
 )
 
-(utterance-binding view.zoom-out :phrases ["zoom out" "zoom back out" "see bigger picture" "widen the view" "expand view outward" "zoom to parent" "pull back view" "see wider context" "zoom out one level" "show less detail" "go back up"] :verb view.zoom-out)
-
+(utterance-binding view.zoom-out :phrases ["zoom out" "zoom back out" "see bigger picture" "widen the view" "expand view outward" "zoom to parent" "pull back view" "see wider context" "zoom out one level" "show less detail" "go back up"] :domain "view" :verb view.zoom-out)

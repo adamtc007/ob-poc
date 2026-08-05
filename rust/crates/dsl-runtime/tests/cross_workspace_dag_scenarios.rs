@@ -27,7 +27,7 @@ macro_rules! scenario_test {
 }
 
 scenario_test!(
-    cbu_validated_requires_kyc_approved,
+    cbu_validation_is_structurally_independent_of_kyc,
     "tests/fixtures/cross_workspace_dag/cbu_validated_requires_kyc_approved.yaml"
 );
 

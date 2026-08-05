@@ -2,67 +2,71 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb bpmn.cancel
+  :domain "bpmn"
   :description "Cancel a running BPMN process instance"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"workflow\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"instance-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Process instance ID to cancel\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Cancellation reason\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"workflow\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":\"Process instance ID to cancel\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"instance-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Cancellation reason\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn.cancel :phrases ["cancel bpmn process" "cancel workflow" "abort workflow"] :verb bpmn.cancel)
+(utterance-binding bpmn.cancel :phrases ["cancel bpmn process" "cancel workflow" "abort workflow"] :domain "bpmn" :verb bpmn.cancel)
 
 (verb bpmn.compile
+  :domain "bpmn"
   :description "Compile BPMN XML to bytecode via bpmn-lite"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"workflow\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"bpmn-xml\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"BPMN XML source to compile\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"workflow\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"BPMN XML source to compile\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"bpmn-xml\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn.compile :phrases ["compile bpmn model" "compile workflow" "build bpmn bytecode"] :verb bpmn.compile)
+(utterance-binding bpmn.compile :phrases ["compile bpmn model" "compile workflow" "build bpmn bytecode"] :domain "bpmn" :verb bpmn.compile)
 
 (verb bpmn.inspect
+  :domain "bpmn"
   :description "Inspect a running BPMN process instance"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"workflow\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"instance-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Process instance ID to inspect\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"workflow\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Process instance ID to inspect\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"instance-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn.inspect :phrases ["inspect bpmn process" "inspect workflow" "show workflow status"] :verb bpmn.inspect)
+(utterance-binding bpmn.inspect :phrases ["inspect bpmn process" "inspect workflow" "show workflow status"] :domain "bpmn" :verb bpmn.inspect)
 
 (verb bpmn.signal
+  :domain "bpmn"
   :description "Send a signal to a running BPMN process instance"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"workflow\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"instance-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Process instance ID to signal\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"message-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Signal message name\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"payload\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Signal payload as bytes\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"workflow\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":\"Process instance ID to signal\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"instance-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Signal message name\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"message-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Signal payload as bytes\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"payload\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn.signal :phrases ["signal bpmn process" "send workflow signal" "resume workflow"] :verb bpmn.signal)
+(utterance-binding bpmn.signal :phrases ["signal bpmn process" "send workflow signal" "resume workflow"] :domain "bpmn" :verb bpmn.signal)
 
 (verb bpmn.start
+  :domain "bpmn"
   :description "Start a BPMN process instance"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"workflow\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"process-key\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"BPMN process key (matches compiled model)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"payload\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Domain payload as JSON string\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"workflow\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":\"BPMN process key (matches compiled model)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"process-key\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Domain payload as JSON string\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"payload\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn.start :phrases ["start bpmn process" "start workflow instance" "launch workflow"] :verb bpmn.start)
-
+(utterance-binding bpmn.start :phrases ["start bpmn process" "start workflow instance" "launch workflow"] :domain "bpmn" :verb bpmn.start)

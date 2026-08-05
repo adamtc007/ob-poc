@@ -4,104 +4,112 @@
 (utterance-binding shared-atom :invocation-hints ["register shared atom" "activate shared atom" "list shared atoms" "shared atom consumers"])
 
 (verb shared-atom.acknowledge-shared-update
+  :domain "shared-atom"
   :description "Acknowledge a shared fact supersession for an in-flight entity, advancing the consumer ref to current"
   :behavior "plugin"
   :handler "SharedAtomAcknowledgeOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":\"update\",\"noun\":\"shared_atom_acknowledgement\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"cbu\"],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity ID to acknowledge the update for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The shared atom path to acknowledge (e.g. entity.lei)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"shared_atom_acknowledgement\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[\"cbu\"],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity ID to acknowledge the update for\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The shared atom path to acknowledge (e.g. entity.lei)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.acknowledge-shared-update :phrases ["acknowledge shared update" "accept shared fact change" "acknowledge stale fact" "pick up latest shared value"] :verb shared-atom.acknowledge-shared-update)
+(utterance-binding shared-atom.acknowledge-shared-update :phrases ["acknowledge shared update" "accept shared fact change" "acknowledge stale fact" "pick up latest shared value"] :domain "shared-atom" :verb shared-atom.acknowledge-shared-update)
 
 (verb shared-atom.activate
+  :domain "shared-atom"
   :description "Promote a shared atom from Draft to Active. Propagation enforcement begins."
   :behavior "plugin"
   :handler "SharedAtomActivateOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":\"update\",\"noun\":\"shared_atom\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Dot-notation attribute path of the atom to activate\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"shared_atom\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Dot-notation attribute path of the atom to activate\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.activate :phrases ["activate shared atom" "enable shared atom" "promote shared atom to active" "turn on shared atom enforcement"] :verb shared-atom.activate)
+(utterance-binding shared-atom.activate :phrases ["activate shared atom" "enable shared atom" "promote shared atom to active" "turn on shared atom enforcement"] :domain "shared-atom" :verb shared-atom.activate)
 
 (verb shared-atom.deprecate
+  :domain "shared-atom"
   :description "Mark a shared atom as deprecated. Still enforced but no new consumers allowed."
   :behavior "plugin"
   :handler "SharedAtomDeprecateOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":\"update\",\"noun\":\"shared_atom\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Dot-notation attribute path of the atom to deprecate\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"shared_atom\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Dot-notation attribute path of the atom to deprecate\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.deprecate :phrases ["deprecate shared atom" "mark shared atom deprecated" "sunset shared atom"] :verb shared-atom.deprecate)
+(utterance-binding shared-atom.deprecate :phrases ["deprecate shared atom" "mark shared atom deprecated" "sunset shared atom"] :domain "shared-atom" :verb shared-atom.deprecate)
 
 (verb shared-atom.list
+  :domain "shared-atom"
   :description "List all shared atoms, optionally filtered by lifecycle status"
   :behavior "plugin"
   :handler "SharedAtomListOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":\"list\",\"noun\":\"shared_atom\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"discovery\",\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"status\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by lifecycle status (draft, active, deprecated, retired)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"list\",\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"shared_atom\",\"phase_tags\":[\"discovery\",\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Filter by lifecycle status (draft, active, deprecated, retired)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"status\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.list :phrases ["list shared atoms" "show shared atoms" "what shared atoms exist" "shared atom registry" "show cross-workspace attributes"] :verb shared-atom.list)
+(utterance-binding shared-atom.list :phrases ["list shared atoms" "show shared atoms" "what shared atoms exist" "shared atom registry" "show cross-workspace attributes"] :domain "shared-atom" :verb shared-atom.list)
 
 (verb shared-atom.list-consumers
+  :domain "shared-atom"
   :description "Show discovered consumers of a shared atom from verb footprint analysis"
   :behavior "plugin"
   :handler "SharedAtomListConsumersOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":\"list\",\"noun\":\"shared_atom_consumer\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"discovery\",\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Dot-notation attribute path to inspect consumers for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"list\",\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"shared_atom_consumer\",\"phase_tags\":[\"discovery\",\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Dot-notation attribute path to inspect consumers for\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.list-consumers :phrases ["list shared atom consumers" "who consumes this shared atom" "show consumers of shared atom" "shared atom dependencies" "cross-workspace consumers"] :verb shared-atom.list-consumers)
+(utterance-binding shared-atom.list-consumers :phrases ["list shared atom consumers" "who consumes this shared atom" "show consumers of shared atom" "shared atom dependencies" "cross-workspace consumers"] :domain "shared-atom" :verb shared-atom.list-consumers)
 
 (verb shared-atom.register
+  :domain "shared-atom"
   :description "Register a new shared atom declaration. Enters Draft state."
   :behavior "plugin"
   :handler "SharedAtomRegisterOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":\"create\",\"noun\":\"shared_atom\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\",\"setup\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Dot-notation attribute path (e.g. entity.lei)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"display-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Human-readable name\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"owner-workspace\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Workspace that owns this atom\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"owner-constellation-family\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Constellation family within owner workspace\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"create\",\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"shared_atom\",\"phase_tags\":[\"governance\",\"setup\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Dot-notation attribute path (e.g. entity.lei)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Human-readable name\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"display-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Workspace that owns this atom\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"owner-workspace\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Constellation family within owner workspace\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"owner-constellation-family\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.register :phrases ["register shared atom" "declare shared atom" "create shared atom" "add shared attribute" "define cross-workspace attribute"] :verb shared-atom.register)
+(utterance-binding shared-atom.register :phrases ["register shared atom" "declare shared atom" "create shared atom" "add shared attribute" "define cross-workspace attribute"] :domain "shared-atom" :verb shared-atom.register)
 
 (verb shared-atom.replay-constellation
+  :domain "shared-atom"
   :description "Replay a consuming constellation from the top after a shared fact supersession"
   :behavior "plugin"
   :handler "SharedAtomReplayConstellationOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":\"update\",\"noun\":\"constellation_replay\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"cbu\"],\"phase_tags\":[\"governance\",\"remediation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Entity ID to replay the constellation for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"constellation-family\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Constellation family to replay (e.g. onboarding_workspace)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The shared atom that was superseded\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"constellation_replay\",\"phase_tags\":[\"governance\",\"remediation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[\"cbu\"],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Entity ID to replay the constellation for\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Constellation family to replay (e.g. onboarding_workspace)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"constellation-family\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The shared atom that was superseded\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.replay-constellation :phrases ["replay constellation" "rebuild stale constellation" "replay after shared fact change" "fix stale workspace state"] :verb shared-atom.replay-constellation)
+(utterance-binding shared-atom.replay-constellation :phrases ["replay constellation" "rebuild stale constellation" "replay after shared fact change" "fix stale workspace state"] :domain "shared-atom" :verb shared-atom.replay-constellation)
 
 (verb shared-atom.retire
+  :domain "shared-atom"
   :description "Remove a shared atom from active enforcement. Historical records retained."
   :behavior "plugin"
   :handler "SharedAtomRetireOp"
@@ -109,11 +117,10 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "shared_atom_retire"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":\"update\",\"noun\":\"shared_atom\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"atom-path\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Dot-notation attribute path of the atom to retire\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"shared_atom\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Dot-notation attribute path of the atom to retire\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"atom-path\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding shared-atom.retire :phrases ["retire shared atom" "remove shared atom" "deregister shared atom"] :verb shared-atom.retire)
-
+(utterance-binding shared-atom.retire :phrases ["retire shared atom" "remove shared atom" "deregister shared atom"] :domain "shared-atom" :verb shared-atom.retire)

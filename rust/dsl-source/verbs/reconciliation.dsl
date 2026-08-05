@@ -5,74 +5,78 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb reconciliation.activate
+  :domain "reconciliation"
   :description "Activate a reconciliation config (draft → active)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"reconciliation\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"reconciliation\"],\"phase_tags\":[\"preferences_set\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"draft\",\"to\":\"active\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"reconciliation\"}"
-  :args-json "[{\"name\":\"reconciliation\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"reconciliation\",\"phase_tags\":[\"preferences_set\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"reconciliation\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"draft\",\"to\":\"active\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_slot\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reconciliation\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding reconciliation.activate :phrases ["activate reconciliation" "enable recon" "go live on reconciliation"] :verb reconciliation.activate)
+(utterance-binding reconciliation.activate :phrases ["activate reconciliation" "enable recon" "go live on reconciliation"] :domain "reconciliation" :verb reconciliation.activate)
 
 (verb reconciliation.create-config
+  :domain "reconciliation"
   :description "Create new reconciliation config (entry state: draft)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"reconciliation\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"cbu\"],\"phase_tags\":[\"preferences_set\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"reconciliation_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"cbu\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"stream\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"position\",\"cash\",\"nav\"],\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"sor\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Source-of-record identifier (e.g. BNY_EAGLE, CUSTODIAN_SOR)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"tolerance\",\"type\":\"decimal\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"reconciliation\",\"phase_tags\":[\"preferences_set\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"cbu\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":\"reconciliation_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"stream\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"position\",\"cash\",\"nav\"],\"validation\":null},{\"default\":null,\"description\":\"Source-of-record identifier (e.g. BNY_EAGLE, CUSTODIAN_SOR)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"sor\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"tolerance\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding reconciliation.create-config :phrases ["create reconciliation config" "set up recon" "configure reconciliation" "define recon stream" "new reconciliation"] :verb reconciliation.create-config)
+(utterance-binding reconciliation.create-config :phrases ["create reconciliation config" "set up recon" "configure reconciliation" "define recon stream" "new reconciliation"] :domain "reconciliation" :verb reconciliation.create-config)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb reconciliation.reactivate
+  :domain "reconciliation"
   :description "Re-activate a suspended reconciliation (suspended → active)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"reconciliation\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"reconciliation\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"suspended\",\"to\":\"active\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"reconciliation\"}"
-  :args-json "[{\"name\":\"reconciliation\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"reconciliation\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"reconciliation\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"suspended\",\"to\":\"active\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_slot\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reconciliation\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding reconciliation.reactivate :phrases ["reactivate reconciliation" "resume recon" "re-enable recon"] :verb reconciliation.reactivate)
+(utterance-binding reconciliation.reactivate :phrases ["reactivate reconciliation" "resume recon" "re-enable recon"] :domain "reconciliation" :verb reconciliation.reactivate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb reconciliation.retire
+  :domain "reconciliation"
   :description "Retire a reconciliation config (terminal)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "reconciliation_retire"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":null,\"noun\":\"reconciliation\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"reconciliation\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"retired\"},{\"from\":\"suspended\",\"to\":\"retired\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"reconciliation\"}"
-  :args-json "[{\"name\":\"reconciliation\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"reconciliation\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"reconciliation\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"retired\"},{\"from\":\"suspended\",\"to\":\"retired\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_slot\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reconciliation\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding reconciliation.retire :phrases ["retire reconciliation" "decommission recon" "remove reconciliation"] :verb reconciliation.retire)
+(utterance-binding reconciliation.retire :phrases ["retire reconciliation" "decommission recon" "remove reconciliation"] :domain "reconciliation" :verb reconciliation.retire)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb reconciliation.suspend
+  :domain "reconciliation"
   :description "Suspend an active reconciliation (operational hold)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "reconciliation_suspend"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"reconciliation\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"reconciliation\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"suspended\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"reconciliation\"}"
-  :args-json "[{\"name\":\"reconciliation\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"reconciliation\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"reconciliation\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"suspended\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"reconciliation\",\"target_slot\":\"reconciliation\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reconciliation\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding reconciliation.suspend :phrases ["suspend reconciliation" "pause recon"] :verb reconciliation.suspend)
-
+(utterance-binding reconciliation.suspend :phrases ["suspend reconciliation" "pause recon"] :domain "reconciliation" :verb reconciliation.suspend)

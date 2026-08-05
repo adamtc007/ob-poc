@@ -5,76 +5,80 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb collateral-management.activate
+  :domain "collateral-management"
   :description "Activate collateral management (configured → active)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"collateral_management\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"collateral_management\"],\"phase_tags\":[\"preferences_set\",\"parallel_run\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"configured\",\"to\":\"active\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"collateral_management\"}"
-  :args-json "[{\"name\":\"collateral-management\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"collateral_management\",\"phase_tags\":[\"preferences_set\",\"parallel_run\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"collateral_management\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"configured\",\"to\":\"active\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_slot\":\"collateral_management\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"collateral-management\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding collateral-management.activate :phrases ["activate collateral" "go live on collateral" "start collateral management"] :verb collateral-management.activate)
+(utterance-binding collateral-management.activate :phrases ["activate collateral" "go live on collateral" "start collateral management"] :domain "collateral-management" :verb collateral-management.activate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb collateral-management.configure
+  :domain "collateral-management"
   :description "Configure collateral management for a CBU (entry state)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"collateral_management\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"cbu\",\"trading_profile\"],\"phase_tags\":[\"preferences_set\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"(new)\",\"to\":\"configured\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"collateral-id\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"collateral_management\"}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"collateral_management_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"cbu\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"csa-reference\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Reference to the ISDA/CSA that backs this collateral arrangement\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"threshold\",\"type\":\"decimal\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"minimum-transfer-amount\",\"type\":\"decimal\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"triparty-agent\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"collateral_management\",\"phase_tags\":[\"preferences_set\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"cbu\",\"trading_profile\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"(new)\",\"to\":\"configured\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"collateral-id\",\"target_slot\":\"collateral_management\",\"target_workspace\":\"instrument_matrix\"}"
+  :returns-json "{\"capture\":true,\"name\":\"collateral_management_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Reference to the ISDA/CSA that backs this collateral arrangement\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"csa-reference\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"threshold\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"minimum-transfer-amount\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"decimal\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"triparty-agent\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding collateral-management.configure :phrases ["configure collateral" "set up collateral management" "new collateral config" "configure CSA operations"] :verb collateral-management.configure)
+(utterance-binding collateral-management.configure :phrases ["configure collateral" "set up collateral management" "new collateral config" "configure CSA operations"] :domain "collateral-management" :verb collateral-management.configure)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb collateral-management.reactivate
+  :domain "collateral-management"
   :description "Reactivate suspended collateral (suspended → active)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"collateral_management\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"collateral_management\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"suspended\",\"to\":\"active\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"collateral_management\"}"
-  :args-json "[{\"name\":\"collateral-management\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"collateral_management\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"collateral_management\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"suspended\",\"to\":\"active\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_slot\":\"collateral_management\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"collateral-management\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding collateral-management.reactivate :phrases ["reactivate collateral" "resume collateral"] :verb collateral-management.reactivate)
+(utterance-binding collateral-management.reactivate :phrases ["reactivate collateral" "resume collateral"] :domain "collateral-management" :verb collateral-management.reactivate)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb collateral-management.suspend
+  :domain "collateral-management"
   :description "Suspend collateral operations (operational hold)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "collateral_management_suspend"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"collateral_management\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"collateral_management\"],\"phase_tags\":[\"operational\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"suspended\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"collateral_management\"}"
-  :args-json "[{\"name\":\"collateral-management\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"collateral_management\",\"phase_tags\":[\"operational\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"collateral_management\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"suspended\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_slot\":\"collateral_management\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"collateral-management\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding collateral-management.suspend :phrases ["suspend collateral" "pause collateral management"] :verb collateral-management.suspend)
+(utterance-binding collateral-management.suspend :phrases ["suspend collateral" "pause collateral management"] :domain "collateral-management" :verb collateral-management.suspend)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb collateral-management.terminate
+  :domain "collateral-management"
   :description "Terminate collateral management (terminal)"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "collateral_management_terminate"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"matrix\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":null,\"noun\":\"collateral_management\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"collateral_management\"],\"phase_tags\":[\"archive\",\"terminate\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"terminated\"},{\"from\":\"suspended\",\"to\":\"terminated\"}]}}"
-  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_workspace\":\"instrument_matrix\",\"target_slot\":\"collateral_management\"}"
-  :args-json "[{\"name\":\"collateral-management\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"collateral_management\",\"phase_tags\":[\"archive\",\"terminate\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"matrix\",\"status\":\"active\",\"subject_kinds\":[\"collateral_management\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\",\"transitions\":{\"dag\":\"instrument_matrix_dag\",\"edges\":[{\"from\":\"active\",\"to\":\"terminated\"},{\"from\":\"suspended\",\"to\":\"terminated\"}]}}"
+  :transition-args-json "{\"entity_id_arg\":\"collateral-management\",\"target_slot\":\"collateral_management\",\"target_workspace\":\"instrument_matrix\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"collateral-management\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding collateral-management.terminate :phrases ["terminate collateral" "unwind collateral" "close collateral"] :verb collateral-management.terminate)
-
+(utterance-binding collateral-management.terminate :phrases ["terminate collateral" "unwind collateral" "close collateral"] :domain "collateral-management" :verb collateral-management.terminate)

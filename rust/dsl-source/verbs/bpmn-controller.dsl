@@ -2,92 +2,98 @@
 ; DO NOT EDIT — regenerate with `cargo run --bin verb_to_dsl`
 
 (verb bpmn-controller.instance-status
+  :domain "bpmn-controller"
   :description "Return the current status of a BPMN process instance."
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"projection\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"none\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"process_instance\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"instance-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"UUID of the process instance.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"none\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"process_instance\"],\"tags\":[],\"tier\":\"projection\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"UUID of the process instance.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"instance-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn-controller.instance-status :phrases ["bpmn instance status" "check bpmn instance" "process instance status" "is bpmn instance running"] :verb bpmn-controller.instance-status)
+(utterance-binding bpmn-controller.instance-status :phrases ["bpmn instance status" "check bpmn instance" "process instance status" "is bpmn instance running"] :domain "bpmn-controller" :verb bpmn-controller.instance-status)
 
 (verb bpmn-controller.list-instances
+  :domain "bpmn-controller"
   :description "List BPMN process instances for a tenant."
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"projection\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"none\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"process_instance\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"tenant-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Tenant whose instances to list.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"none\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"process_instance\"],\"tags\":[],\"tier\":\"projection\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Tenant whose instances to list.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"tenant-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn-controller.list-instances :phrases ["list bpmn instances" "show process instances" "list process instances for tenant" "what bpmn processes are running"] :verb bpmn-controller.list-instances)
+(utterance-binding bpmn-controller.list-instances :phrases ["list bpmn instances" "show process instances" "list process instances for tenant" "what bpmn processes are running"] :domain "bpmn-controller" :verb bpmn-controller.list-instances)
 
 (verb bpmn-controller.start-instance
+  :domain "bpmn-controller"
   :description "Start a new BPMN process instance for a tenant. Validates the tenant and process definition, writes the instance row, and returns the instance_id. Execution is asynchronous — pool workers pick it up.\n"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"process_instance\"],\"phase_tags\":[\"execution\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"uuid\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"tenant-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Tenant that owns the instance.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"process-key\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Process key identifying the latest published template.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"payload\",\"type\":\"object\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Initial domain payload (JSON object). Default: {}.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"idempotency-key\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"If supplied, deduplicates retries for this key.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"execution\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"process_instance\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":\"Tenant that owns the instance.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"tenant-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Process key identifying the latest published template.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"process-key\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Initial domain payload (JSON object). Default: {}.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"payload\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"object\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"If supplied, deduplicates retries for this key.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"idempotency-key\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding bpmn-controller.start-instance :phrases ["start bpmn process" "start bpmn instance" "kick off bpmn workflow" "launch bpmn process" "start process instance" "trigger bpmn workflow"] :verb bpmn-controller.start-instance)
+(utterance-binding bpmn-controller.start-instance :phrases ["start bpmn process" "start bpmn instance" "kick off bpmn workflow" "launch bpmn process" "start process instance" "trigger bpmn workflow"] :domain "bpmn-controller" :verb bpmn-controller.start-instance)
 
 (verb loader.deprovision-pool
+  :domain "loader"
   :description "Deprovision a pool: delete the Kubernetes Deployment + HPA and remove the pool record. Fails if the pool still has tenants.\n"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"pool\"],\"phase_tags\":[\"infrastructure\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"pool-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Pool to deprovision. Cannot be 'default'.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"infrastructure\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"pool\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":\"Pool to deprovision. Cannot be 'default'.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"pool-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding loader.deprovision-pool :phrases ["deprovision bpmn pool" "remove worker pool" "delete worker pool" "tear down bpmn pool"] :verb loader.deprovision-pool)
+(utterance-binding loader.deprovision-pool :phrases ["deprovision bpmn pool" "remove worker pool" "delete worker pool" "tear down bpmn pool"] :domain "loader" :verb loader.deprovision-pool)
 
 (verb loader.list-pools
+  :domain "loader"
   :description "List all registered bpmn-lite worker pools."
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"projection\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"none\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"pool\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"none\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"pool\"],\"tags\":[],\"tier\":\"projection\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
 )
 
-(utterance-binding loader.list-pools :phrases ["list bpmn pools" "show worker pools" "list worker pools" "what pools exist"] :verb loader.list-pools)
+(utterance-binding loader.list-pools :phrases ["list bpmn pools" "show worker pools" "list worker pools" "what pools exist"] :domain "loader" :verb loader.list-pools)
 
 (verb loader.pool-status
+  :domain "loader"
   :description "Return current status of a pool: tenant count, queue depth, and live Kubernetes replica counts.\n"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"projection\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"none\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"pool\"],\"phase_tags\":[\"monitoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"pool-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Pool to inspect.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"monitoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"none\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"pool\"],\"tags\":[],\"tier\":\"projection\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Pool to inspect.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"pool-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding loader.pool-status :phrases ["check pool status" "pool status" "bpmn pool status" "how many workers in pool" "pool health"] :verb loader.pool-status)
+(utterance-binding loader.pool-status :phrases ["check pool status" "pool status" "bpmn pool status" "how many workers in pool" "pool health"] :domain "loader" :verb loader.pool-status)
 
 (verb loader.provision-pool
+  :domain "loader"
   :description "Provision a new bpmn-lite worker pool: create the pool record, assign initial tenants, and deploy a Kubernetes Deployment + HPA.\n"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":null,\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":null,\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"pool\"],\"phase_tags\":[\"infrastructure\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"void\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"pool-id\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Unique pool identifier (alphanumeric + hyphens).\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"image\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Container image for bpmn-lite worker pods.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"pool-type\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"'default' or 'dedicated'. Default: 'default'.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"tenants\",\"type\":\"string_list\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Tenant IDs to assign to this pool at creation.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"replicas\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Initial replica count. Default: 2.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"min-replicas\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"HPA minimum replicas. Default: 1.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"max-replicas\",\"type\":\"integer\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"HPA maximum replicas. Default: 5.\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":null,\"phase_tags\":[\"infrastructure\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":null,\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[\"pool\"],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"void\"}"
+  :args-json "[{\"default\":null,\"description\":\"Unique pool identifier (alphanumeric + hyphens).\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"pool-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Container image for bpmn-lite worker pods.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"image\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"'default' or 'dedicated'. Default: 'default'.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"pool-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Tenant IDs to assign to this pool at creation.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"tenants\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string_list\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Initial replica count. Default: 2.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"replicas\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"HPA minimum replicas. Default: 1.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"min-replicas\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"HPA maximum replicas. Default: 5.\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"max-replicas\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"integer\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding loader.provision-pool :phrases ["provision a bpmn worker pool" "create worker pool" "provision bpmn pool" "set up a dedicated pool" "provision a dedicated bpmn pool"] :verb loader.provision-pool)
-
+(utterance-binding loader.provision-pool :phrases ["provision a bpmn worker pool" "create worker pool" "provision bpmn pool" "set up a dedicated pool" "provision a dedicated bpmn pool"] :domain "loader" :verb loader.provision-pool)

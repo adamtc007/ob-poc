@@ -5,59 +5,62 @@
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb catalogue.commit-verb-declaration
+  :domain "catalogue"
   :description "Promote a staged proposal to the authoritative catalogue"
   :behavior "plugin"
   :effect-class "admin_override"
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "catalogue_commit_verb_declaration"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":null,\"noun\":\"catalogue_proposal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"catalogue_proposal\"],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"proposal\",\"target_workspace\":\"catalogue\",\"target_slot\":\"proposal\"}"
-  :args-json "[{\"name\":\"proposal\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"approver\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"catalogue_proposal\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[\"catalogue_proposal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"proposal\",\"target_slot\":\"proposal\",\"target_workspace\":\"catalogue\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"proposal\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"approver\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding catalogue.commit-verb-declaration :phrases ["commit verb change" "publish catalogue change" "approve and apply proposal"] :verb catalogue.commit-verb-declaration)
+(utterance-binding catalogue.commit-verb-declaration :phrases ["commit verb change" "publish catalogue change" "approve and apply proposal"] :domain "catalogue" :verb catalogue.commit-verb-declaration)
 
 (verb catalogue.list-proposals
+  :domain "catalogue"
   :description "List pending and recently-committed verb-declaration proposals"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":null,\"noun\":\"catalogue_proposal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"catalogue_proposal\"],\"phase_tags\":[\"read\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"status-filter\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"pending\",\"committed\",\"rolled_back\",\"all\"],\"default\":\"pending\",\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"catalogue_proposal\",\"phase_tags\":[\"read\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[\"catalogue_proposal\"],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":\"pending\",\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"status-filter\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"pending\",\"committed\",\"rolled_back\",\"all\"],\"validation\":null}]"
 )
 
-(utterance-binding catalogue.list-proposals :phrases ["list proposals" "show pending verb changes" "list catalogue proposals" "show staging"] :verb catalogue.list-proposals)
+(utterance-binding catalogue.list-proposals :phrases ["list proposals" "show pending verb changes" "list catalogue proposals" "show staging"] :domain "catalogue" :verb catalogue.list-proposals)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb catalogue.propose-verb-declaration
+  :domain "catalogue"
   :description "Stage a new or updated verb declaration for review"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"catalogue_proposal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"verb\"],\"phase_tags\":[\"authoring\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"proposal-id\",\"target_workspace\":\"catalogue\",\"target_slot\":\"proposal\"}"
-  :returns-json "{\"type\":\"uuid\",\"name\":\"proposal_id\",\"capture\":true}"
-  :args-json "[{\"name\":\"verb-fqn\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"FQN of the verb being changed (e.g. trading-profile.submit)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"proposed-declaration\",\"type\":\"json\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"The full verb YAML fragment as JSON (will be staged)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"rationale\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"catalogue_proposal\",\"phase_tags\":[\"authoring\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[\"verb\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"proposal-id\",\"target_slot\":\"proposal\",\"target_workspace\":\"catalogue\"}"
+  :returns-json "{\"capture\":true,\"name\":\"proposal_id\",\"type\":\"uuid\"}"
+  :args-json "[{\"default\":null,\"description\":\"FQN of the verb being changed (e.g. trading-profile.submit)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"verb-fqn\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"The full verb YAML fragment as JSON (will be staged)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"proposed-declaration\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"json\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"rationale\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding catalogue.propose-verb-declaration :phrases ["propose verb change" "stage verb declaration" "draft verb update" "submit catalogue change for review"] :verb catalogue.propose-verb-declaration)
+(utterance-binding catalogue.propose-verb-declaration :phrases ["propose verb change" "stage verb declaration" "draft verb update" "submit catalogue change for review"] :domain "catalogue" :verb catalogue.propose-verb-declaration)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb catalogue.rollback-verb-declaration
+  :domain "catalogue"
   :description "Discard a staged proposal (revert to prior authoritative state)"
   :behavior "plugin"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"catalog\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":null,\"noun\":\"catalogue_proposal\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[\"catalogue_proposal\"],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"proposal\",\"target_workspace\":\"catalogue\",\"target_slot\":\"proposal\"}"
-  :args-json "[{\"name\":\"proposal\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":null,\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"catalogue_proposal\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"catalog\",\"status\":\"active\",\"subject_kinds\":[\"catalogue_proposal\"],\"tags\":[],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"proposal\",\"target_slot\":\"proposal\",\"target_workspace\":\"catalogue\"}"
+  :args-json "[{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"proposal\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":null,\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding catalogue.rollback-verb-declaration :phrases ["rollback catalogue proposal" "discard verb change" "cancel proposed verb"] :verb catalogue.rollback-verb-declaration)
-
+(utterance-binding catalogue.rollback-verb-declaration :phrases ["rollback catalogue proposal" "discard verb change" "cancel proposed verb"] :domain "catalogue" :verb catalogue.rollback-verb-declaration)

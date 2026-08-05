@@ -4,48 +4,52 @@
 (utterance-binding remediation :invocation-hints ["list remediations" "defer remediation" "open remediations"])
 
 (verb remediation.confirm-external-correction
+  :domain "remediation"
   :description "Record that a manual external correction has been confirmed by the provider"
   :behavior "plugin"
   :handler "RemediationConfirmExternalOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":\"update\",\"noun\":\"remediation_event\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\",\"remediation\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"remediation-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Remediation event ID\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"provider-ref\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Provider reference confirming the correction\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"remediation_event\",\"phase_tags\":[\"governance\",\"remediation\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Remediation event ID\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"remediation-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Provider reference confirming the correction\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"provider-ref\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding remediation.confirm-external-correction :phrases ["confirm external correction" "provider confirmed correction" "manual correction done"] :verb remediation.confirm-external-correction)
+(utterance-binding remediation.confirm-external-correction :phrases ["confirm external correction" "provider confirmed correction" "manual correction done"] :domain "remediation" :verb remediation.confirm-external-correction)
 
 (verb remediation.defer
+  :domain "remediation"
   :description "Explicitly accept divergence from a superseded shared attribute version"
   :behavior "plugin"
   :handler "RemediationDeferOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"irreversible\",\"action_class\":\"update\",\"noun\":\"remediation_event\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"remediation-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Remediation event ID to defer\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Compliance-auditable reason for accepting divergence\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"irreversible\",\"internal\":false,\"noun\":\"remediation_event\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Remediation event ID to defer\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"remediation-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Compliance-auditable reason for accepting divergence\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding remediation.defer :phrases ["defer remediation" "accept divergence" "waive remediation" "defer stale state"] :verb remediation.defer)
+(utterance-binding remediation.defer :phrases ["defer remediation" "accept divergence" "waive remediation" "defer stale state"] :domain "remediation" :verb remediation.defer)
 
 (verb remediation.list-open
+  :domain "remediation"
   :description "List unresolved remediation events, optionally filtered by entity or workspace"
   :behavior "plugin"
   :handler "RemediationListOpenOp"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"diagnostics\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"facts_only\",\"harm_class\":\"read_only\",\"action_class\":\"list\",\"noun\":\"remediation_event\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"monitoring\",\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record_set\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"entity-id\",\"type\":\"uuid\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by entity ID\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"workspace\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Filter by affected workspace\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"list\",\"dangerous\":false,\"harm_class\":\"read_only\",\"internal\":false,\"noun\":\"remediation_event\",\"phase_tags\":[\"monitoring\",\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"facts_only\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"diagnostics\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record_set\"}"
+  :args-json "[{\"default\":null,\"description\":\"Filter by entity ID\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"entity-id\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Filter by affected workspace\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"workspace\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding remediation.list-open :phrases ["list open remediations" "show remediation events" "what remediations are pending" "stale workspace status"] :verb remediation.list-open)
+(utterance-binding remediation.list-open :phrases ["list open remediations" "show remediation events" "what remediations are pending" "stale workspace status"] :domain "remediation" :verb remediation.list-open)
 
 (verb remediation.revoke-deferral
+  :domain "remediation"
   :description "Re-open a previously deferred remediation event"
   :behavior "plugin"
   :handler "RemediationRevokeDeferralOp"
@@ -53,11 +57,10 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "remediation_revoke_deferral"
-  :metadata-json "{\"tier\":\"governance\",\"source_of_truth\":\"sem_reg\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":\"reversible\",\"action_class\":\"update\",\"noun\":\"remediation_event\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"governance\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":false}"
-  :args-json "[{\"name\":\"remediation-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Remediation event ID to re-open\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":\"update\",\"dangerous\":false,\"harm_class\":\"reversible\",\"internal\":false,\"noun\":\"remediation_event\",\"phase_tags\":[\"governance\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"sem_reg\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"governance\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":false,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Remediation event ID to re-open\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"remediation-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding remediation.revoke-deferral :phrases ["revoke deferral" "re-open remediation" "undo defer"] :verb remediation.revoke-deferral)
-
+(utterance-binding remediation.revoke-deferral :phrases ["revoke deferral" "re-open remediation" "undo defer"] :domain "remediation" :verb remediation.revoke-deferral)

@@ -4,15 +4,15 @@
 (utterance-binding research.generic :invocation-hints ["normalize research data" "validate source payload" "hash research input"])
 
 (verb research.generic.normalize
+  :domain "research.generic"
   :description "Normalize a raw research payload from an external source.\nTakes a source name and raw JSON payload, validates against\nconfig schema, produces canonical JSON with SHA-256 content hash.\nPersists the normalized payload for audit and deduplication.\n"
   :behavior "plugin"
   :effect-class "read_snapshot"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"composite\",\"source_of_truth\":\"external\",\"scope\":\"global\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"research\",\"internal\":false,\"tags\":[],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"onboarding\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"observational\"],\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"source-name\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Name of the research source (e.g., GLEIF, COMPANIES_HOUSE)\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"raw-payload\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Raw JSON payload from the external source\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"research\",\"phase_tags\":[\"onboarding\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"external\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[],\"tier\":\"composite\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"benign\",\"escalation\":[]},\"external_effects\":[\"observational\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Name of the research source (e.g., GLEIF, COMPANIES_HOUSE)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"source-name\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Raw JSON payload from the external source\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"raw-payload\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding research.generic.normalize :phrases ["normalize research payload" "normalize source data" "canonicalize research input" "validate and hash research data"] :verb research.generic.normalize)
-
+(utterance-binding research.generic.normalize :phrases ["normalize research payload" "normalize source data" "canonicalize research input" "validate and hash research data"] :domain "research.generic" :verb research.generic.normalize)

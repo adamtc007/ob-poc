@@ -24,7 +24,7 @@
 //! reports the diff. Pass count + provider label are printed on
 //! success so CI logs are self-describing.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use async_trait::async_trait;
 use ob_agentic::llm_client::{LlmClient, ToolCallResult, ToolDefinition};
 use ob_poc_agent::index::{DiskPackIndexLoader, IndexLoadRequest, IndexLoader};
@@ -319,7 +319,6 @@ mod tests {
             "kyc",
             "deal",
             "instrument-matrix",
-            "booking-principal",
             "lifecycle-resources",
             "product-maintenance",
             "semos-maintenance",

@@ -891,8 +891,7 @@ fn build_slice1_example_utterances() -> Result<Vec<AcpExampleUtteranceProjection
             required_bindings: vec!["name", "management_company", "depositary"],
             expected_status: "pending_question",
             pending_question: Some("Which management company should sponsor the SICAV?"),
-            rationale:
-                "Canonical structure macro happy path with pending question for required slot.",
+            rationale: "Canonical structure macro happy path with pending question for required slot.",
         },
         ExampleSeed {
             example_id: "ex-positive-add-product-suite",
@@ -1003,8 +1002,7 @@ fn build_slice1_example_utterances() -> Result<Vec<AcpExampleUtteranceProjection
             required_bindings: vec![],
             expected_status: "refusal",
             pending_question: None,
-            rationale:
-                "'Apex' is a CBU name, not a product — must not bind to the product-suite macro.",
+            rationale: "'Apex' is a CBU name, not a product — must not bind to the product-suite macro.",
         },
     ];
 
@@ -1423,7 +1421,7 @@ fn extract_macro_parity_fields(
                 Vec::new(),
                 None,
                 String::new(),
-            )
+            );
         }
     };
     let get_str = |key: &str| -> Option<String> {
@@ -2773,7 +2771,7 @@ mod tests {
     fn slice1_projection_includes_verb_binding_metadata() {
         let projection = build_slice1_acp_registry_projection(repo_config_root()).unwrap();
 
-        assert_eq!(projection.verb_binding_count, 74);
+        assert_eq!(projection.verb_binding_count, 167);
 
         let add_product = find_binding(&projection, "cbu.add-product");
         let cbu_id = add_product
@@ -2816,11 +2814,13 @@ mod tests {
             .unwrap();
         assert_eq!(cbu_id.binding_source, "pack_question");
         assert_eq!(cbu_id.pack_question_field.as_deref(), Some("cbu_id"));
-        assert!(cbu_id
-            .pack_question_prompt
-            .as_deref()
-            .unwrap()
-            .contains("existing CBU"));
+        assert!(
+            cbu_id
+                .pack_question_prompt
+                .as_deref()
+                .unwrap()
+                .contains("existing CBU")
+        );
 
         let target_live_date = request_onboarding
             .args
@@ -2838,7 +2838,7 @@ mod tests {
     fn slice1_projection_includes_entity_grain_effects() {
         let projection = build_slice1_acp_registry_projection(repo_config_root()).unwrap();
 
-        assert_eq!(projection.verb_effect_count, 81);
+        assert_eq!(projection.verb_effect_count, 174);
 
         let cbu_pack = find_pack(&projection, "cbu-maintenance");
         let create = find_effect(cbu_pack, "cbu.create", "allowed");
@@ -2846,23 +2846,29 @@ mod tests {
         assert_eq!(create.produces_entity_grain.as_deref(), Some("cbu"));
         assert!(create.write_entity_grains.contains(&"cbu".to_string()));
         assert!(create.read_entity_grains.contains(&"entity".to_string()));
-        assert!(create
-            .read_entity_grains
-            .contains(&"jurisdiction".to_string()));
+        assert!(
+            create
+                .read_entity_grains
+                .contains(&"jurisdiction".to_string())
+        );
 
         let taxonomy_pack = find_pack(&projection, "product-service-taxonomy");
         let product_list = find_effect(taxonomy_pack, "product.list", "allowed");
         assert_eq!(product_list.side_effects.as_deref(), Some("facts_only"));
-        assert!(product_list
-            .read_entity_grains
-            .contains(&"product".to_string()));
+        assert!(
+            product_list
+                .read_entity_grains
+                .contains(&"product".to_string())
+        );
         assert!(product_list.write_entity_grains.is_empty());
 
         let forbidden_create = find_effect(taxonomy_pack, "cbu.create", "forbidden");
         assert_eq!(forbidden_create.behavior, "plugin");
-        assert!(forbidden_create
-            .write_entity_grains
-            .contains(&"cbu".to_string()));
+        assert!(
+            forbidden_create
+                .write_entity_grains
+                .contains(&"cbu".to_string())
+        );
     }
 
     #[test]
@@ -2886,16 +2892,22 @@ mod tests {
         let composite = find_macro_tier(cbu_pack, "struct.ie.hedge.icav");
         assert_eq!(composite.tier, "lift");
         assert_eq!(composite.reason, "registry_macro_uses_nested_invocations");
-        assert!(composite
-            .invokes_macros
-            .contains(&"struct.ie.aif.icav".to_string()));
+        assert!(
+            composite
+                .invokes_macros
+                .contains(&"struct.ie.aif.icav".to_string())
+        );
 
-        assert!(find_pack(&projection, "onboarding-request")
-            .macro_tiers
-            .is_empty());
-        assert!(find_pack(&projection, "product-service-taxonomy")
-            .macro_tiers
-            .is_empty());
+        assert!(
+            find_pack(&projection, "onboarding-request")
+                .macro_tiers
+                .is_empty()
+        );
+        assert!(
+            find_pack(&projection, "product-service-taxonomy")
+                .macro_tiers
+                .is_empty()
+        );
     }
 
     #[test]
@@ -2909,10 +2921,12 @@ mod tests {
         assert!(create.policy.hitl_required);
         assert!(create.policy.dry_run_required);
         assert!(!create.policy.dry_run_supported);
-        assert!(create
-            .policy
-            .refusal_conditions
-            .contains(&"dry_run_metadata_missing".to_string()));
+        assert!(
+            create
+                .policy
+                .refusal_conditions
+                .contains(&"dry_run_metadata_missing".to_string())
+        );
 
         let taxonomy_pack = find_pack(&projection, "product-service-taxonomy");
         let product_list = find_effect(taxonomy_pack, "product.list", "allowed");
@@ -2938,10 +2952,12 @@ mod tests {
         let forbidden_create = find_effect(taxonomy_pack, "cbu.create", "forbidden");
         assert_eq!(forbidden_create.policy.policy_grade, "refusal");
         assert!(forbidden_create.policy.hitl_required);
-        assert!(forbidden_create
-            .policy
-            .refusal_conditions
-            .contains(&"pack_forbidden".to_string()));
+        assert!(
+            forbidden_create
+                .policy
+                .refusal_conditions
+                .contains(&"pack_forbidden".to_string())
+        );
 
         let direct_macro = find_macro_tier(cbu_pack, "struct.lux.pe.scsp");
         assert_eq!(direct_macro.policy.policy_grade, "policy_gap");
@@ -2949,10 +2965,12 @@ mod tests {
 
         let composite_macro = find_macro_tier(cbu_pack, "struct.ie.hedge.icav");
         assert_eq!(composite_macro.policy.policy_grade, "refusal");
-        assert!(composite_macro
-            .policy
-            .refusal_conditions
-            .contains(&"nested_macro_requires_lift_before_execution".to_string()));
+        assert!(
+            composite_macro
+                .policy
+                .refusal_conditions
+                .contains(&"nested_macro_requires_lift_before_execution".to_string())
+        );
 
         let handoff = find_plan(
             &projection,

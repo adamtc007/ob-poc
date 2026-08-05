@@ -4,35 +4,38 @@
 (utterance-binding evidence :invocation-hints ["evidence" "require evidence" "link document" "verify evidence" "waive evidence"])
 
 (verb evidence.attach-document
+  :domain "evidence"
   :description "Link a document to an evidence record"
   :behavior "plugin"
   :handler "EvidenceLinkOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"evidence\",\"internal\":false,\"tags\":[\"evidence\",\"document\",\"link\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"evidence-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Evidence record to link document to\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"document-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":{\"table\":\"document_catalog\",\"schema\":\"ob-poc\",\"entity_type\":\"document\",\"search_key\":\"document_name\",\"primary_key\":\"doc_id\",\"resolution_mode\":null,\"scope_key\":null,\"role_filter\":null},\"valid_values\":null,\"default\":null,\"description\":\"Document to link\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"evidence\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"evidence\",\"document\",\"link\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Evidence record to link document to\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"evidence-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Document to link\",\"fuzzy_check\":null,\"lookup\":{\"entity_type\":\"document\",\"primary_key\":\"doc_id\",\"resolution_mode\":null,\"role_filter\":null,\"schema\":\"ob-poc\",\"scope_key\":null,\"search_key\":\"document_name\",\"table\":\"document_catalog\"},\"maps_to\":null,\"name\":\"document-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding evidence.attach-document :phrases ["link evidence" "attach document to evidence" "evidence received" "upload evidence"] :verb evidence.attach-document)
+(utterance-binding evidence.attach-document :phrases ["link evidence" "attach document to evidence" "evidence received" "upload evidence"] :domain "evidence" :verb evidence.attach-document)
 
 (verb evidence.create-requirement
+  :domain "evidence"
   :description "Create a new evidence requirement for a UBO registry entry"
   :behavior "plugin"
   :handler "EvidenceRequireOp"
   :effect-class "read_modify_write"
   :flavour "instance_adding"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"evidence\",\"internal\":false,\"tags\":[\"evidence\",\"create\",\"kyc\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":true}"
-  :args-json "[{\"name\":\"registry-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"UBO registry entry this evidence is for\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"evidence-type\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":[\"OWNERSHIP_CERTIFICATE\",\"SHARE_REGISTER\",\"BOARD_RESOLUTION\",\"TRUST_DEED\",\"PARTNERSHIP_AGREEMENT\",\"ARTICLES_OF_ASSOCIATION\",\"IDENTITY_DOCUMENT\",\"PROOF_OF_ADDRESS\",\"SOURCE_OF_WEALTH\",\"SOURCE_OF_FUNDS\",\"REGULATORY_FILING\",\"ANNUAL_RETURN\",\"OTHER\"],\"default\":null,\"description\":\"Type of evidence required\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"description\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Detailed description of what is needed\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"doc-type\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Expected document type code\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"evidence\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"evidence\",\"create\",\"kyc\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":true,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"UBO registry entry this evidence is for\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"registry-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Type of evidence required\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"evidence-type\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":[\"OWNERSHIP_CERTIFICATE\",\"SHARE_REGISTER\",\"BOARD_RESOLUTION\",\"TRUST_DEED\",\"PARTNERSHIP_AGREEMENT\",\"ARTICLES_OF_ASSOCIATION\",\"IDENTITY_DOCUMENT\",\"PROOF_OF_ADDRESS\",\"SOURCE_OF_WEALTH\",\"SOURCE_OF_FUNDS\",\"REGULATORY_FILING\",\"ANNUAL_RETURN\",\"OTHER\"],\"validation\":null},{\"default\":null,\"description\":\"Detailed description of what is needed\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"description\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Expected document type code\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"doc-type\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding evidence.create-requirement :phrases ["require evidence" "add evidence requirement" "request proof" "need evidence for"] :verb evidence.create-requirement)
+(utterance-binding evidence.create-requirement :phrases ["require evidence" "add evidence requirement" "request proof" "need evidence for"] :domain "evidence" :verb evidence.create-requirement)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb evidence.mark-rejected
+  :domain "evidence"
   :description "Reject an evidence record (clears document link for re-submission)"
   :behavior "plugin"
   :handler "EvidenceRejectOp"
@@ -40,32 +43,34 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_officer\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "evidence_mark_rejected"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"evidence\",\"internal\":false,\"tags\":[\"evidence\",\"reject\",\"qa\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"evidence-id\",\"target_workspace\":\"kyc\",\"target_slot\":\"ubo_evidence\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"evidence-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Evidence record to reject\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Reason for rejection\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"evidence\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"evidence\",\"reject\",\"qa\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_explicit_authorisation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"evidence-id\",\"target_slot\":\"ubo_evidence\",\"target_workspace\":\"kyc\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Evidence record to reject\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"evidence-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Reason for rejection\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding evidence.mark-rejected :phrases ["reject evidence" "evidence rejected" "send back evidence" "evidence not acceptable"] :verb evidence.mark-rejected)
+(utterance-binding evidence.mark-rejected :phrases ["reject evidence" "evidence rejected" "send back evidence" "evidence not acceptable"] :domain "evidence" :verb evidence.mark-rejected)
 
 ; Pattern D: transition_args present — see docs/verb-redesigns/
 (verb evidence.mark-verified
+  :domain "evidence"
   :description "Verify (QA approve) an evidence record"
   :behavior "plugin"
   :handler "EvidenceVerifyOp"
   :effect-class "read_modify_write"
   :flavour "attribute_mutating"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"evidence\",\"internal\":false,\"tags\":[\"evidence\",\"verify\",\"qa\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"transition\",\"external_effects\":[],\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]}}"
-  :transition-args-json "{\"entity_id_arg\":\"evidence-id\",\"target_workspace\":\"kyc\",\"target_slot\":\"ubo_evidence\"}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"evidence-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Evidence record to verify\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"verified-by\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Identity of the verifier\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"notes\",\"type\":\"string\",\"required\":false,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Verification notes\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"evidence\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"evidence\",\"verify\",\"qa\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"transition\"}"
+  :transition-args-json "{\"entity_id_arg\":\"evidence-id\",\"target_slot\":\"ubo_evidence\",\"target_workspace\":\"kyc\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Evidence record to verify\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"evidence-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Identity of the verifier\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"verified-by\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Verification notes\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"notes\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding evidence.mark-verified :phrases ["verify evidence" "approve evidence" "evidence verified" "qa approve evidence"] :verb evidence.mark-verified)
+(utterance-binding evidence.mark-verified :phrases ["verify evidence" "approve evidence" "evidence verified" "qa approve evidence"] :domain "evidence" :verb evidence.mark-verified)
 
 (verb evidence.mark-waived
+  :domain "evidence"
   :description "Waive an evidence requirement with documented authority"
   :behavior "plugin"
   :handler "EvidenceWaiveOp"
@@ -73,11 +78,10 @@
   :flavour "discretionary"
   :role-guard "{\"any_of\":[\"compliance_admin\",\"senior_compliance\",\"mlro\"]}"
   :audit-class "evidence_mark_waived"
-  :metadata-json "{\"tier\":\"intent\",\"source_of_truth\":\"workflow\",\"scope\":\"cbu\",\"writes_operational\":false,\"side_effects\":\"state_write\",\"harm_class\":null,\"action_class\":null,\"noun\":\"evidence\",\"internal\":false,\"tags\":[\"evidence\",\"waive\",\"override\"],\"replaces\":null,\"status\":\"active\",\"replaced_by\":null,\"since_version\":null,\"removal_version\":null,\"dangerous\":false,\"subject_kinds\":[],\"phase_tags\":[\"kyc\"],\"requires_subject\":true,\"produces_focus\":false}"
-  :three-axis-json "{\"state_effect\":\"preserving\",\"external_effects\":[\"emitting\"],\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]}}"
-  :returns-json "{\"type\":\"record\",\"name\":null,\"capture\":null}"
-  :args-json "[{\"name\":\"evidence-id\",\"type\":\"uuid\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Evidence record to waive\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"reason\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Justification for waiver\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]},{\"name\":\"authority\",\"type\":\"string\",\"required\":true,\"maps_to\":null,\"lookup\":null,\"valid_values\":null,\"default\":null,\"description\":\"Authority granting the waiver\",\"validation\":null,\"fuzzy_check\":null,\"slot_type\":null,\"preferred_roles\":[]}]"
+  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"evidence\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"cbu\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"evidence\",\"waive\",\"override\"],\"tier\":\"intent\",\"writes_operational\":false}"
+  :three-axis-json "{\"consequence\":{\"baseline\":\"requires_confirmation\",\"escalation\":[]},\"external_effects\":[\"emitting\"],\"state_effect\":\"preserving\"}"
+  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
+  :args-json "[{\"default\":null,\"description\":\"Evidence record to waive\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"evidence-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Justification for waiver\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Authority granting the waiver\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"authority\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
 )
 
-(utterance-binding evidence.mark-waived :phrases ["waive evidence" "skip evidence requirement" "exempt from evidence" "evidence waiver"] :verb evidence.mark-waived)
-
+(utterance-binding evidence.mark-waived :phrases ["waive evidence" "skip evidence requirement" "exempt from evidence" "evidence waiver"] :domain "evidence" :verb evidence.mark-waived)
