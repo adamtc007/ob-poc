@@ -6,7 +6,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.book-setup
@@ -17,7 +17,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.bpmn-infrastructure
@@ -28,7 +28,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.bpmn-ops
@@ -39,7 +39,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.catalogue
@@ -50,7 +50,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.cbu-maintenance
@@ -61,7 +61,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.deal-lifecycle
@@ -72,7 +72,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.instrument-matrix
@@ -83,7 +83,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.kyc-case
@@ -94,7 +94,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.lifecycle-resources
@@ -105,7 +105,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.onboarding-request
@@ -116,7 +116,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.platform-admin
@@ -127,7 +127,7 @@ packs:
   pack_version: 1.0.0
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.semantic.change.add
@@ -140,7 +140,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.product-service-taxonomy
@@ -151,7 +151,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.semos-maintenance
@@ -162,7 +162,7 @@ packs:
   pack_version: '1.0'
   schema_version: 1
   canonicalization_version: 1
-  compiler_version: semantic-pack/0.2.0
+  compiler_version: semantic-pack/0.2.1
   dependencies: []
   adapter_bindings:
   - ob-poc.journey.session-bootstrap
