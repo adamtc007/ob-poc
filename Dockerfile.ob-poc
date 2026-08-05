@@ -6,8 +6,8 @@
 # Usage (from ob-poc/):
 #   docker build -f Dockerfile.ob-poc -t ob-poc-app:local .
 #
-# The build needs the full ob-poc workspace (rust/) plus the bpmn-lite
-# bus crates (referenced as path deps from rust/crates/).
+# BPMN and shared DSL/SemOS crates are exact Git dependencies. No sibling
+# checkout is copied into the build context.
 
 # ── Stage 1: chef ────────────────────────────────────────────────────
 FROM rust:1.95-bookworm AS chef
@@ -16,11 +16,9 @@ WORKDIR /build
 
 # ── Stage 2: planner ─────────────────────────────────────────────────
 FROM chef AS planner
-# Copy the full ob-poc workspace including bpmn-lite/ path deps.
+# Copy the full ob-poc workspace and its runtime evaluation inputs.
 COPY rust/ rust/
-COPY bpmn-lite/ bpmn-lite/
 COPY eval/ eval/
-# ob-poc-web Cargo.toml sits inside rust/ but has path deps to bpmn-lite/.
 WORKDIR /build/rust
 RUN cargo chef prepare --recipe-path recipe.json
 
@@ -33,7 +31,6 @@ RUN apt-get update \
 COPY --from=planner /build/rust/recipe.json /build/rust/recipe.json
 
 # Cook dependencies before full copy (Docker layer cache).
-COPY bpmn-lite/ /build/bpmn-lite/
 COPY eval/ /build/eval/
 WORKDIR /build/rust
 RUN cargo chef cook --release -p ob-poc-web --recipe-path recipe.json
@@ -47,6 +44,20 @@ RUN cargo build --release -p ob-poc-web \
 
 # ── Stage 4: runtime ─────────────────────────────────────────────────
 FROM gcr.io/distroless/cc-debian12:nonroot
+
+ARG APP_REVISION
+ARG SHARED_DSL_REVISION
+ARG BPMN_LITE_REVISION
+
+LABEL org.opencontainers.image.title="ob-poc" \
+      org.opencontainers.image.revision="${APP_REVISION}" \
+      io.ob-poc.shared-dsl-revision="${SHARED_DSL_REVISION}" \
+      io.ob-poc.bpmn-lite-revision="${BPMN_LITE_REVISION}"
+
+ENV OB_POC_BUILD_REVISION="${APP_REVISION}" \
+    OB_POC_SHARED_DSL_REVISION="${SHARED_DSL_REVISION}" \
+    OB_POC_BPMN_LITE_REVISION="${BPMN_LITE_REVISION}"
+
 WORKDIR /app
 
 COPY --from=builder /build/out/ob-poc-web /usr/local/bin/
