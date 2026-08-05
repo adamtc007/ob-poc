@@ -397,38 +397,30 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
-semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "5ac7da7a513744e907ca110484c3a6a9472ae985", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "9b76c951a084cca6af4885609d46f8dc02637b00" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e", features = ["huggingface-download"] }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "60bb00d1d732ae08273ba480b07325bf6afbe55e" }
 
-# bpmn-lite published as github.com/adamtc007/bpmn-lite v0.2.0 (T1 + T2:
-# dsl-manifest, dsl-bus-*, dmn-lite-server, bpmn-lite plan-walker bus
-# integration). Local-dev [patch] in ~/.cargo/config.toml redirects to
-# ~/dev/bpmn-lite/ for cross-repo editing.
-bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", tag = "v0.2.0" }
-# bpmn-lite-server-runner exists only post-split (the v0.2.0 tag still carries
-# the unsplit bpmn-lite-server), so it cannot pin to the tag; exact rev pin to
-# the pushed split commit instead. Locally the ~/.cargo [patch] closure
-# redirects it to ~/dev/bpmn-lite/ like every other bpmn-lite crate. Dev-dep
-# only (tests/bpmn_e2e_harness_test.rs); a cold clone mixes this rev's
-# subgraph with the v0.2.0 crates, so cold-clone `cargo check --tests` stays
-# broken for that one target until bpmn-lite re-tags and all pins move.
-bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "f9e48161855e57bcf6e34534c7ef6d2db6d80486" }
+# BPMN integration family: one exact immutable revision. Keeping the bus,
+# manifest, engine, FFI and runner crates on one commit prevents duplicate wire
+# types and cold-clone API skew.
+bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
+bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "58e4f6e98b1f6288944cec304a7fced80b21809d" }
 
 [lints.rust]
 dead_code = "deny"

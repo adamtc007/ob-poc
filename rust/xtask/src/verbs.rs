@@ -24,7 +24,7 @@ use ob_poc::session::verb_tiering_linter;
 /// This is the CI-appropriate counterpart to `verbs_compile`; the full sync
 /// is a deploy-time operation that writes to `"ob-poc".dsl_verbs`.
 pub(crate) async fn verbs_compile_validate_only(_verbose: bool) -> Result<()> {
-    use dsl_core::{validate_verbs_config, ValidationContext};
+    use dsl_core::{ValidationContext, validate_verbs_config};
     use std::collections::HashSet;
 
     println!("===========================================");
@@ -232,7 +232,9 @@ pub(crate) async fn verbs_show(verb_name: &str) -> Result<()> {
         }
         None => {
             println!("Verb not found: {}", verb_name);
-            println!("\nTip: Use the full verb name (e.g., 'cbu.ensure' or 'entity.create-proper-person')");
+            println!(
+                "\nTip: Use the full verb name (e.g., 'cbu.ensure' or 'entity.create-proper-person')"
+            );
 
             // Suggest similar verbs
             let similar: Vec<(String,)> = sqlx::query_as(
@@ -558,8 +560,8 @@ pub(crate) async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> 
     // =========================================================================
     {
         use dsl_core::{
-            collect_declared_fqns, flatten_pack_entries, load_packs_from_dir, validate_pack_fqns,
-            validate_verbs_config, ValidationContext,
+            ValidationContext, collect_declared_fqns, flatten_pack_entries, load_packs_from_dir,
+            validate_pack_fqns, validate_verbs_config,
         };
         use std::collections::HashSet;
         use std::path::PathBuf;
@@ -876,7 +878,7 @@ pub(crate) fn verbs_inventory(
                     description: verb_config.description.clone(),
                     tier: metadata.tier,
                     source: metadata.source_of_truth,
-                    scope: metadata.scope,
+                    scope: metadata.scope.clone(),
                     noun: metadata.noun.clone(),
                     internal: metadata.internal,
                 }
@@ -1896,11 +1898,7 @@ fn generate_atlas_md(rows: &[AtlasRow]) -> String {
             row.pack_membership.join(", ")
         };
         let handler = if row.behavior == "plugin" {
-            if row.handler_exists {
-                "yes"
-            } else {
-                "**NO**"
-            }
+            if row.handler_exists { "yes" } else { "**NO**" }
         } else {
             "n/a"
         };

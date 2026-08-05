@@ -8,9 +8,11 @@
 use super::*;
 use std::sync::Mutex;
 
+type RecordedCall = (String, String, Vec<ResolvedBinding>, Option<Uuid>);
+
 #[derive(Default)]
 struct MockExecutor {
-    calls: Mutex<Vec<(String, String, Vec<ResolvedBinding>, Option<Uuid>)>>,
+    calls: Mutex<Vec<RecordedCall>>,
 }
 
 #[async_trait]
@@ -101,10 +103,7 @@ async fn dispatch_forwards_absent_snapshot_pin_as_none() {
     let mock = std::sync::Arc::new(MockExecutor::default());
     let handler = ObPocBusHandler::from_arc(mock.clone());
 
-    handler
-        .dispatch(ctx("cbu.create"), vec![])
-        .await
-        .unwrap();
+    handler.dispatch(ctx("cbu.create"), vec![]).await.unwrap();
 
     let calls = mock.calls.lock().unwrap();
     assert_eq!(calls[0].3, None);
@@ -188,6 +187,7 @@ async fn noop_result_dispatcher_rejects_unknown_execution() {
     let err = rd
         .dispatch(
             ResultContext {
+                tenant_id: "default".to_string(),
                 idempotency_key: Uuid::now_v7(),
                 execution_id: Uuid::now_v7(),
                 source_domain: "bpmn-lite".into(),

@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use dsl_manifest::{
     DecisionEntry, InputSpec, Manifest, OutputSpec, ResourceDependency, Signature, TypeEntry,
     VerbEntry,
@@ -538,9 +538,9 @@ pub fn export_to_yaml(
     // Re-emit through our stable layout writer.
     let yaml = build_yaml(
         config,
-        &manifest.verbs,
-        &manifest.decisions,
-        &manifest.types,
+        manifest.verbs(),
+        manifest.decisions(),
+        manifest.types(),
     );
     Ok(yaml)
 }

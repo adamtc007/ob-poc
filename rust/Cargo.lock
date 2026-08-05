@@ -492,26 +492,26 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-analysis"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-types",
  "serde",
 ]
 
 [[package]]
 name = "bpmn-lite-bus-handler"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "async-trait",
  "blake3",
- "bpmn-lite-compiler 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-engine 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-server 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-compiler",
+ "bpmn-lite-engine",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
+ "dsl-bus-protocol",
+ "dsl-bus-server",
+ "dsl-manifest",
  "hex",
  "serde_json",
  "sqlx",
@@ -523,30 +523,13 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-compiler"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "blake3",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "petgraph",
- "quick-xml 0.36.2",
- "serde",
- "serde_json",
- "uuid",
-]
-
-[[package]]
-name = "bpmn-lite-compiler"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "blake3",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-types",
+ "dsl-manifest",
+ "ffi-types",
  "petgraph",
  "quick-xml 0.36.2",
  "serde",
@@ -559,47 +542,20 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-engine"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
  "blake3",
- "bpmn-lite-compiler 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "bpmn-lite-vm 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "chrono",
- "dsl-bus-client 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "ffi-dispatcher 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "prost",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bpmn-lite-engine"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake3",
- "bpmn-lite-compiler 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-compiler",
  "bpmn-lite-kernel",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-vm 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
+ "bpmn-lite-vm",
  "chrono",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-dispatcher 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dsl-manifest",
+ "ffi-dispatcher",
+ "ffi-types",
  "futures",
  "futures-executor",
  "hex",
@@ -614,28 +570,11 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-ffi-grpc"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "hex",
- "prost",
- "serde",
- "serde_json",
- "tokio",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
-name = "bpmn-lite-ffi-grpc"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "async-trait",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "ffi-types",
  "hex",
  "prost",
  "serde",
@@ -648,27 +587,11 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-ffi-http"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "hex",
- "percent-encoding",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "bpmn-lite-ffi-http"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "async-trait",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "ffi-types",
  "hex",
  "percent-encoding",
  "reqwest 0.12.28",
@@ -680,15 +603,15 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-kernel"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-types",
 ]
 
 [[package]]
 name = "bpmn-lite-server-runner"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -696,27 +619,27 @@ dependencies = [
  "blake3",
  "bpmn-lite-analysis",
  "bpmn-lite-bus-handler",
- "bpmn-lite-compiler 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-engine 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-ffi-grpc 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-ffi-http 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-compiler",
+ "bpmn-lite-engine",
+ "bpmn-lite-ffi-grpc",
+ "bpmn-lite-ffi-http",
+ "bpmn-lite-store",
  "bpmn-lite-store-postgres",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-vm 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-types",
+ "bpmn-lite-vm",
  "chrono",
- "dmn-lite-bridge 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dmn-lite-bridge",
  "dmn-lite-compiler",
  "dmn-lite-parser",
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-client 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-server 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-catalogue 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-dispatcher 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dmn-lite-types",
+ "dsl-bus-client",
+ "dsl-bus-protocol",
+ "dsl-bus-server",
+ "dsl-bus-storage",
+ "dsl-manifest",
+ "ffi-catalogue",
+ "ffi-dispatcher",
+ "ffi-types",
  "futures",
  "hex",
  "prost",
@@ -736,27 +659,11 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-store"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake3",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "chrono",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "bpmn-lite-store"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "async-trait",
  "blake3",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-types",
  "chrono",
  "serde",
  "serde_json",
@@ -768,15 +675,15 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-store-postgres"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "async-trait",
  "blake3",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-store",
+ "bpmn-lite-types",
  "chrono",
- "ffi-catalogue 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "ffi-catalogue",
+ "ffi-types",
  "serde",
  "serde_json",
  "sqlx",
@@ -787,20 +694,7 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-types"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "anyhow",
- "blake3",
- "serde",
- "serde_json",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bpmn-lite-types"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "blake3",
@@ -814,22 +708,7 @@ dependencies = [
 [[package]]
 name = "bpmn-lite-vm"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake3",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "serde_json",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "bpmn-lite-vm"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "blake3",
@@ -1540,27 +1419,13 @@ dependencies = [
 [[package]]
 name = "dmn-lite-bridge"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
- "dmn-lite-engine 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "serde_json",
- "uuid",
-]
-
-[[package]]
-name = "dmn-lite-bridge"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "async-trait",
- "dmn-lite-engine 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dmn-lite-engine",
+ "dmn-lite-types",
+ "ffi-types",
  "serde_json",
  "uuid",
 ]
@@ -1568,11 +1433,11 @@ dependencies = [
 [[package]]
 name = "dmn-lite-compiler"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "blake3",
  "dmn-lite-parser",
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dmn-lite-types",
  "serde",
  "thiserror 2.0.18",
  "toml 0.8.23",
@@ -1582,44 +1447,24 @@ dependencies = [
 [[package]]
 name = "dmn-lite-engine"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "smallvec",
-]
-
-[[package]]
-name = "dmn-lite-engine"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dmn-lite-types",
  "smallvec",
 ]
 
 [[package]]
 name = "dmn-lite-parser"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
- "dmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dmn-lite-types",
 ]
 
 [[package]]
 name = "dmn-lite-types"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "serde",
- "smallvec",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "dmn-lite-types"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "serde",
  "smallvec",
@@ -1712,29 +1557,11 @@ dependencies = [
 [[package]]
 name = "dsl-bus-client"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "chrono",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "prost",
- "prost-types",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "tonic",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "dsl-bus-client"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "chrono",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dsl-bus-protocol",
+ "dsl-bus-storage",
  "futures",
  "prost",
  "prost-types",
@@ -1749,18 +1576,7 @@ dependencies = [
 [[package]]
 name = "dsl-bus-protocol"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "prost",
- "prost-types",
- "tonic",
- "tonic-build",
-]
-
-[[package]]
-name = "dsl-bus-protocol"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "prost",
  "prost-types",
@@ -1771,33 +1587,13 @@ dependencies = [
 [[package]]
 name = "dsl-bus-server"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "async-trait",
  "chrono",
- "dsl-bus-client 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "prost",
- "prost-types",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "tonic",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "dsl-bus-server"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "async-trait",
- "chrono",
- "dsl-bus-client 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "dsl-bus-client",
+ "dsl-bus-protocol",
+ "dsl-bus-storage",
  "prost",
  "prost-types",
  "sqlx",
@@ -1811,18 +1607,7 @@ dependencies = [
 [[package]]
 name = "dsl-bus-storage"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "chrono",
- "sqlx",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "dsl-bus-storage"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "chrono",
  "sqlx",
@@ -1833,7 +1618,7 @@ dependencies = [
 [[package]]
 name = "dsl-core"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1901,17 +1686,7 @@ dependencies = [
 [[package]]
 name = "dsl-manifest"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "serde",
- "serde_yaml",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "dsl-manifest"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -2030,7 +1805,7 @@ dependencies = [
 [[package]]
 name = "dsl_types"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "serde",
  "serde_json",
@@ -2267,23 +2042,12 @@ dependencies = [
 [[package]]
 name = "ffi-catalogue"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "tokio",
-]
-
-[[package]]
-name = "ffi-catalogue"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "async-trait",
- "bpmn-lite-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "bpmn-lite-types",
+ "ffi-types",
  "thiserror 2.0.18",
  "tokio",
 ]
@@ -2291,42 +2055,18 @@ dependencies = [
 [[package]]
 name = "ffi-dispatcher"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
- "ffi-catalogue 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
-]
-
-[[package]]
-name = "ffi-dispatcher"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
-dependencies = [
- "anyhow",
- "async-trait",
- "ffi-catalogue 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
- "ffi-types 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486)",
+ "ffi-catalogue",
+ "ffi-types",
 ]
 
 [[package]]
 name = "ffi-types"
 version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0#e3d80562b42618b1a99d6e19d088665dd84c36e0"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake3",
- "serde",
- "serde_json",
- "uuid",
-]
-
-[[package]]
-name = "ffi-types"
-version = "0.1.0"
-source = "git+https://github.com/adamtc007/bpmn-lite?rev=f9e48161855e57bcf6e34534c7ef6d2db6d80486#f9e48161855e57bcf6e34534c7ef6d2db6d80486"
+source = "git+https://github.com/adamtc007/bpmn-lite?rev=58e4f6e98b1f6288944cec304a7fced80b21809d#58e4f6e98b1f6288944cec304a7fced80b21809d"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4390,22 +4130,22 @@ dependencies = [
  "bincode",
  "blake3",
  "bpmn-controller",
- "bpmn-lite-engine 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "bpmn-lite-ffi-grpc 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "bpmn-lite-ffi-http 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "bpmn-lite-engine",
+ "bpmn-lite-ffi-grpc",
+ "bpmn-lite-ffi-http",
  "bpmn-lite-server-runner",
- "bpmn-lite-store 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "bpmn-lite-store",
  "chrono",
  "clap",
  "colored",
  "crossbeam-channel",
- "dmn-lite-bridge 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "dmn-lite-bridge",
  "dotenvy",
  "dsl-analysis",
  "dsl-core",
  "dsl-runtime",
  "entity-gateway",
- "ffi-catalogue 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "ffi-catalogue",
  "futures",
  "handlebars",
  "hex",
@@ -4597,10 +4337,10 @@ name = "ob-poc-bus-handler"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "dsl-bus-client 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-server 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "dsl-bus-client",
+ "dsl-bus-protocol",
+ "dsl-bus-server",
+ "dsl-bus-storage",
  "sqlx",
  "tempfile",
  "thiserror 2.0.18",
@@ -4791,7 +4531,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "dsl-manifest 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "dsl-manifest",
  "serde",
  "serde_yaml",
  "tempfile",
@@ -4911,10 +4651,10 @@ dependencies = [
  "axum",
  "bpmn-runtime",
  "dsl-analysis",
- "dsl-bus-client 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-protocol 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-server 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
- "dsl-bus-storage 0.1.0 (git+https://github.com/adamtc007/bpmn-lite?tag=v0.2.0)",
+ "dsl-bus-client",
+ "dsl-bus-protocol",
+ "dsl-bus-server",
+ "dsl-bus-storage",
  "dsl-migrate-verify",
  "dsl-runtime",
  "entity-gateway",
@@ -6415,7 +6155,7 @@ dependencies = [
 [[package]]
 name = "sem_os_core"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6503,7 +6243,7 @@ dependencies = [
 [[package]]
 name = "sem_os_ontology"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "anyhow",
  "chrono",
@@ -6522,7 +6262,7 @@ dependencies = [
 [[package]]
 name = "sem_os_policy"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6606,7 +6346,7 @@ dependencies = [
 [[package]]
 name = "sem_os_types"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "chrono",
  "serde",
@@ -6618,7 +6358,7 @@ dependencies = [
 [[package]]
 name = "semantic-decision-contracts"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "hex",
  "serde",
@@ -6629,7 +6369,7 @@ dependencies = [
 [[package]]
 name = "semantic-embedder"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=5ac7da7a513744e907ca110484c3a6a9472ae985#5ac7da7a513744e907ca110484c3a6a9472ae985"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -6644,7 +6384,7 @@ dependencies = [
 [[package]]
 name = "semantic-pack"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=9b76c951a084cca6af4885609d46f8dc02637b00#9b76c951a084cca6af4885609d46f8dc02637b00"
+source = "git+https://github.com/adamtc007/dsl?rev=60bb00d1d732ae08273ba480b07325bf6afbe55e#60bb00d1d732ae08273ba480b07325bf6afbe55e"
 dependencies = [
  "dsl_types",
  "hex",
