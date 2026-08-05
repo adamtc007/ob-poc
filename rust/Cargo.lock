@@ -2040,7 +2040,7 @@ dependencies = [
 [[package]]
 name = "dsl_types"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=7da4b10cee570d7146cef3a0dac5ae388cb4fc9e#7da4b10cee570d7146cef3a0dac5ae388cb4fc9e"
+source = "git+https://github.com/adamtc007/dsl?rev=c65f01d514c99bf087673ce366ed3b7549217c1d#c65f01d514c99bf087673ce366ed3b7549217c1d"
 dependencies = [
  "serde",
  "serde_json",
@@ -6607,7 +6607,7 @@ dependencies = [
 [[package]]
 name = "semantic-decision-contracts"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=7da4b10cee570d7146cef3a0dac5ae388cb4fc9e#7da4b10cee570d7146cef3a0dac5ae388cb4fc9e"
+source = "git+https://github.com/adamtc007/dsl?rev=c65f01d514c99bf087673ce366ed3b7549217c1d#c65f01d514c99bf087673ce366ed3b7549217c1d"
 dependencies = [
  "hex",
  "serde",
@@ -6633,7 +6633,7 @@ dependencies = [
 [[package]]
 name = "semantic-pack"
 version = "0.2.0"
-source = "git+https://github.com/adamtc007/dsl?rev=7da4b10cee570d7146cef3a0dac5ae388cb4fc9e#7da4b10cee570d7146cef3a0dac5ae388cb4fc9e"
+source = "git+https://github.com/adamtc007/dsl?rev=c65f01d514c99bf087673ce366ed3b7549217c1d#c65f01d514c99bf087673ce366ed3b7549217c1d"
 dependencies = [
  "dsl_types 0.2.0",
  "hex",
