@@ -104,6 +104,10 @@ domains:
           consequence:
             baseline: reviewable
       update-status:
+        lifecycle:
+          entity_arg: workstream-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [any non-terminal]
         flavour: attribute_mutating
         description: Update workstream status
         effect_class: read_modify_write
@@ -217,6 +221,10 @@ domains:
           consequence:
             baseline: reviewable
       complete:
+        lifecycle:
+          entity_arg: workstream-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ASSESS, verified]
         flavour: attribute_mutating
         description: Mark workstream as complete
         effect_class: read_modify_write

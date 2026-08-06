@@ -986,6 +986,10 @@ domains:
             baseline: reviewable
 
       activate:
+        lifecycle:
+          entity_arg: instance-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [provisioned]
         flavour: attribute_mutating
         description: Activate a service resource instance
         effect_class: read_modify_write
@@ -1022,6 +1026,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: service_resource
       suspend:
+        lifecycle:
+          entity_arg: instance-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ACTIVE, activated]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -1070,6 +1078,10 @@ domains:
           target_workspace: instrument_matrix
           target_slot: service_resource
       decommission:
+        lifecycle:
+          entity_arg: instance-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ACTIVE, CANCELLED, FAILED, SUSPENDED, activated, suspended]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:

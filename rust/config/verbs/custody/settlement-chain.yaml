@@ -326,6 +326,9 @@ domains:
         returns:
           type: affected
         lifecycle:
+          entity_arg: chain-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [live, suspended]
           precondition_checks:
             - "requires_scope:cbu"
           writes_tables:

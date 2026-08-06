@@ -452,13 +452,31 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
                 if !all_verbs.contains(via) {
                     continue; // macro prose / table names — not verbs
                 }
+                // Some DAGs author multi-state froms as one
+                // parenthesized string: "(DRAFT, ACTIVE)". Expand.
+                let expand = |raw: &str, set: &mut BTreeSet<String>| {
+                    let raw = raw.trim();
+                    if let Some(inner) =
+                        raw.strip_prefix('(').and_then(|r| r.strip_suffix(')'))
+                    {
+                        set.extend(
+                            inner
+                                .split(',')
+                                .map(str::trim)
+                                .filter(|s| !s.is_empty())
+                                .map(str::to_owned),
+                        );
+                    } else if !raw.is_empty() {
+                        set.insert(raw.to_owned());
+                    }
+                };
                 let mut froms = BTreeSet::new();
                 match transition.get("from") {
-                    Some(serde_yaml::Value::String(s)) => {
-                        froms.insert(s.clone());
-                    }
+                    Some(serde_yaml::Value::String(s)) => expand(s, &mut froms),
                     Some(serde_yaml::Value::Sequence(seq)) => {
-                        froms.extend(seq.iter().filter_map(|s| s.as_str().map(str::to_owned)));
+                        for s in seq.iter().filter_map(|s| s.as_str()) {
+                            expand(s, &mut froms);
+                        }
                     }
                     _ => {}
                 }
@@ -494,7 +512,8 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
         "DAG-derivable verb universe shrank unexpectedly: {universe}"
     );
     assert!(
-        covered >= 31,
-        "requires_states coverage regressed below the recorded floor: {covered} of {universe}"
+        covered >= 80,
+        "requires_states coverage regressed below the recorded floor \
+         (batch 1 applied 2026-08-06): {covered} of {universe}"
     );
 }

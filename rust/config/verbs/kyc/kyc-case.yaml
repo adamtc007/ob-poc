@@ -131,6 +131,10 @@ domains:
           consequence:
             baseline: reviewable
       update-status:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ASSESSMENT, DISCOVERY, INTAKE]
         flavour: attribute_mutating
         description: Update case status with transition validation
         effect_class: read_modify_write
@@ -201,6 +205,10 @@ domains:
           target_workspace: kyc
           target_slot: kyc_case
       approve:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [PENDING_REVIEW, REVIEW]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -248,6 +256,10 @@ domains:
           target_workspace: kyc
           target_slot: kyc_case
       reject:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [PENDING_REVIEW, REVIEW, any non-terminal]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -299,6 +311,10 @@ domains:
           target_slot: kyc_case
 
       refer:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [any non-terminal]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -395,6 +411,10 @@ domains:
           target_workspace: kyc
           target_slot: kyc_case
       escalate:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [any non-terminal]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -603,6 +623,10 @@ domains:
           consequence:
             baseline: reviewable
       close:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [any non-terminal]
         flavour: discretionary
         effect_class: admin_override
         role_guard:

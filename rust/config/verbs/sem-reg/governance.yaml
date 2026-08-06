@@ -61,6 +61,10 @@ domains:
             baseline: reviewable
 
       submit-for-review:
+        lifecycle:
+          entity_arg: changeset-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [composing]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -100,6 +104,10 @@ domains:
             baseline: requires_confirmation
 
       record-review:
+        lifecycle:
+          entity_arg: changeset-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [active, reviewing, submitted, suspended]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -262,6 +270,10 @@ domains:
             baseline: requires_confirmation
 
       publish:
+        lifecycle:
+          entity_arg: changeset-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [approved, draft]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -348,6 +360,10 @@ domains:
           target_slot: changeset
 
       rollback:
+        lifecycle:
+          entity_arg: target-snapshot-set-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [reviewing]
         flavour: discretionary
         effect_class: admin_override
         role_guard:

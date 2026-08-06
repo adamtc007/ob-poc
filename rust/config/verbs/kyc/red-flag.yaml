@@ -110,6 +110,10 @@ domains:
           consequence:
             baseline: requires_confirmation
       escalate:
+        lifecycle:
+          entity_arg: red-flag-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [OPEN, any non-terminal]
         flavour: discretionary
         effect_class: admin_override
         role_guard:

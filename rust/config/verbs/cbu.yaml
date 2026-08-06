@@ -1976,6 +1976,10 @@ domains:
           consequence:
             baseline: reviewable
       verify-evidence:
+        lifecycle:
+          entity_arg: evidence-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [PENDING]
         flavour: attribute_mutating
         description: Mark evidence as verified or rejected
         effect_class: read_modify_write

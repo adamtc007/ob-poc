@@ -205,6 +205,10 @@ domains:
             baseline: reviewable
 
       run:
+        lifecycle:
+          entity_arg: workstream-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [PENDING, VERIFY, workstream_open]
         flavour: attribute_mutating
         description: Initiate a workstream screening. Idempotent by (workstream_id, screening_type).
         effect_class: idempotent_ensure
@@ -312,6 +316,10 @@ domains:
           target_slot: screening
 
       complete:
+        lifecycle:
+          entity_arg: screening-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [RUNNING]
         flavour: attribute_mutating
         description: Record workstream screening completion.
         effect_class: read_modify_write
@@ -479,6 +487,10 @@ domains:
           target_slot: screening
 
       bulk-refresh:
+        lifecycle:
+          entity_arg: case-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ERROR, EXPIRED]
         flavour: attribute_mutating
         description: Refresh screening coverage for all workstreams in a case.
         effect_class: read_modify_write

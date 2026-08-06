@@ -426,6 +426,10 @@ domains:
           target_slot: deal
 
       cancel:
+        lifecycle:
+          entity_arg: deal-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [IN_CLEARANCE, NEGOTIATING, PROSPECT, QUALIFYING]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -1233,6 +1237,9 @@ domains:
         behavior: plugin
         effect_class: read_modify_write
         lifecycle:
+          entity_arg: rate-card-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [APPROVED_INTERNALLY, COUNTER_PROPOSED, DRAFT]
           precondition_checks:
             - "requires_prior:deal.create-rate-card"
             - "requires_prior:deal.add-rate-card-line"
@@ -1282,6 +1289,9 @@ domains:
         behavior: plugin
         effect_class: read_modify_write
         lifecycle:
+          entity_arg: rate-card-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [PROPOSED]
           precondition_checks:
             - "requires_prior:deal.propose-rate-card"
         metadata:
@@ -1339,6 +1349,9 @@ domains:
         description: "Finalise rate card - both parties agree. Lines become immutable."
         behavior: plugin
         lifecycle:
+          entity_arg: rate-card-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [COUNTER_PROPOSED, PROPOSED]
           precondition_checks:
             - "requires_prior:deal.propose-rate-card"
         metadata:
@@ -1829,6 +1842,10 @@ domains:
             baseline: reviewable
 
       update-ubo-assessment:
+        lifecycle:
+          entity_arg: assessment-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [COMPLETED, IN_PROGRESS, PENDING, REQUIRES_EDD]
         flavour: attribute_mutating
         description: "Update UBO assessment status and risk rating"
         behavior: plugin
@@ -2235,6 +2252,10 @@ domains:
             baseline: benign
 
       submit-for-bac:
+        lifecycle:
+          entity_arg: deal-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [NEGOTIATING]
         flavour: attribute_mutating
         description: "Submit deal to Business Acceptance Committee — writes deal_status='IN_CLEARANCE' and bac_status='in_review' (Q21 (b) substate model)"
         behavior: plugin

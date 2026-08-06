@@ -396,6 +396,10 @@ domains:
             baseline: benign
 
       create-draft:
+        lifecycle:
+          entity_arg: cbu-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [REJECTED, parties_assigned]
         flavour: instance_adding
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
         effect_class: read_modify_write
@@ -1103,6 +1107,10 @@ domains:
             baseline: benign
 
       submit:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [DRAFT]
         flavour: attribute_mutating
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
         effect_class: read_modify_write
@@ -1170,6 +1178,10 @@ domains:
           target_slot: trading_profile
 
       approve:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [SUBMITTED]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -1223,6 +1235,10 @@ domains:
           target_slot: trading_profile
 
       reject:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [SUBMITTED]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -1276,6 +1292,10 @@ domains:
           target_slot: trading_profile
 
       archive:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ACTIVE, SUSPENDED]
         flavour: attribute_mutating
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
         effect_class: read_modify_write

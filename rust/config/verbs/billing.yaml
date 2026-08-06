@@ -135,6 +135,10 @@ domains:
             baseline: reviewable
 
       activate-profile:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [DRAFT, SUSPENDED]
         flavour: attribute_mutating
         description: "Activate a billing profile (CBU is live and generating activity)"
         behavior: plugin
@@ -177,6 +181,10 @@ domains:
           target_slot: billing_profile
 
       suspend-profile:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ACTIVE]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -226,6 +234,10 @@ domains:
           target_slot: billing_profile
 
       close-profile:
+        lifecycle:
+          entity_arg: profile-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [ACTIVE, DRAFT, SUSPENDED]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -597,6 +609,9 @@ domains:
         behavior: plugin
         effect_class: read_modify_write
         lifecycle:
+          entity_arg: period-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [PENDING]
           precondition_checks:
             - "requires_prior:billing.create-period"
         metadata:
@@ -642,6 +657,9 @@ domains:
         behavior: plugin
         effect_class: read_modify_write
         lifecycle:
+          entity_arg: period-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [CALCULATED]
           precondition_checks:
             - "requires_prior:billing.calculate-period"
         metadata:
@@ -698,6 +716,9 @@ domains:
         description: "Approve billing period for invoicing"
         behavior: plugin
         lifecycle:
+          entity_arg: period-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [REVIEWED]
           precondition_checks:
             - "requires_prior:billing.review-period"
         metadata:
@@ -752,6 +773,9 @@ domains:
         behavior: plugin
         effect_class: read_modify_write
         lifecycle:
+          entity_arg: period-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [APPROVED]
           precondition_checks:
             - "requires_prior:billing.approve-period"
         metadata:
@@ -799,6 +823,10 @@ domains:
           target_slot: billing_period
 
       dispute-period:
+        lifecycle:
+          entity_arg: period-id
+          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
+          requires_states: [APPROVED, CALCULATED, INVOICED, REVIEWED]
         flavour: attribute_mutating
         description: "Client disputes a billing period"
         behavior: plugin
