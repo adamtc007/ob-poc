@@ -1,0 +1,3604 @@
+{
+ "generated": "2026-08-06",
+ "universe": 215,
+ "already_declared": 31,
+ "backlog": 184,
+ "batch1_mapped_and_unambiguous": 49,
+ "mapped_but_ambiguous": 37,
+ "unmapped": 98,
+ "rows": [
+  {
+   "verb": "attribute.define",
+   "file": "verbs/attribute.yaml",
+   "derived_requires_states": [
+    "ungoverned"
+   ],
+   "slots": [
+    "semos_maintenance.attribute_def"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "id",
+    "display-name",
+    "category",
+    "value-type",
+    "domain",
+    "semos-description",
+    "validation-rules",
+    "applicability",
+    "evidence-grade"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "attribute.deprecate",
+   "file": "verbs/attribute.yaml",
+   "derived_requires_states": [
+    "active",
+    "deprecated"
+   ],
+   "slots": [
+    "semos_maintenance.attribute_def"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "id",
+    "reason",
+    "replacement"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "attribute.update",
+   "file": "verbs/attribute.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "semos_maintenance.attribute_def"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "id",
+    "display-name",
+    "validation-rules",
+    "applicability"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "attributes.populate",
+   "file": "verbs/service-pipeline.yaml",
+   "derived_requires_states": [
+    "ROLLUP"
+   ],
+   "slots": [
+    "cbu.cbu_discovery_state"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "cbu"
+   ],
+   "args": [
+    "cbu-id",
+    "sources"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "kind-exact"
+  },
+  {
+   "verb": "billing.activate-profile",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "DRAFT",
+    "SUSPENDED"
+   ],
+   "slots": [
+    "deal.billing_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.approve-period",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "REVIEWED"
+   ],
+   "slots": [
+    "deal.billing_period"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "period-id",
+    "approved-by"
+   ],
+   "entity_arg_inference": "period-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.calculate-period",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "PENDING"
+   ],
+   "slots": [
+    "deal.billing_period"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "period-id"
+   ],
+   "entity_arg_inference": "period-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.close-profile",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "(DRAFT, ACTIVE, SUSPENDED)"
+   ],
+   "slots": [
+    "deal.billing_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id",
+    "effective-to"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.dispute-period",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "(CALCULATED, REVIEWED, APPROVED, INVOICED)"
+   ],
+   "slots": [
+    "deal.billing_period"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "period-id",
+    "dispute-reason",
+    "disputed-lines"
+   ],
+   "entity_arg_inference": "period-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.generate-invoice",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "APPROVED"
+   ],
+   "slots": [
+    "deal.billing_period"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "period-id"
+   ],
+   "entity_arg_inference": "period-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.review-period",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "CALCULATED"
+   ],
+   "slots": [
+    "deal.billing_period"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "period-id",
+    "reviewed-by",
+    "adjustments"
+   ],
+   "entity_arg_inference": "period-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "billing.suspend-profile",
+   "file": "verbs/billing.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "deal.billing_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id",
+    "reason"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "book.abandon",
+   "file": "verbs/book.yaml",
+   "derived_requires_states": [
+    "cbus_scaffolded",
+    "entities_provisioned",
+    "mandates_defined",
+    "parties_assigned",
+    "proposed",
+    "structure_chosen"
+   ],
+   "slots": [
+    "book_setup.book"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "book-id",
+    "reason"
+   ],
+   "entity_arg_inference": "book-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "book.mark-ready",
+   "file": "verbs/book.yaml",
+   "derived_requires_states": [
+    "mandates_defined"
+   ],
+   "slots": [
+    "book_setup.book"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "book-id"
+   ],
+   "entity_arg_inference": "book-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "book.select-structure",
+   "file": "verbs/book.yaml",
+   "derived_requires_states": [
+    "proposed"
+   ],
+   "slots": [
+    "book_setup.book"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "book-id",
+    "structure-template"
+   ],
+   "entity_arg_inference": "book-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "catalogue.commit-verb-declaration",
+   "file": "verbs/catalogue.yaml",
+   "derived_requires_states": [
+    "STAGED"
+   ],
+   "slots": [
+    "catalogue.proposal"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "proposal",
+    "approver"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "catalogue.propose-verb-declaration",
+   "file": "verbs/catalogue.yaml",
+   "derived_requires_states": [
+    "DRAFT",
+    "REJECTED"
+   ],
+   "slots": [
+    "catalogue.proposal"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "verb-fqn",
+    "proposed-declaration",
+    "rationale"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "catalogue.rollback-verb-declaration",
+   "file": "verbs/catalogue.yaml",
+   "derived_requires_states": [
+    "DRAFT",
+    "STAGED"
+   ],
+   "slots": [
+    "catalogue.proposal"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "proposal",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu-ca.approve",
+   "file": "verbs/cbu-ca.yaml",
+   "derived_requires_states": [
+    "under_review"
+   ],
+   "slots": [
+    "cbu.cbu_corporate_action"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "event-id"
+   ],
+   "entity_arg_inference": "event-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu-ca.mark-implemented",
+   "file": "verbs/cbu-ca.yaml",
+   "derived_requires_states": [
+    "effective"
+   ],
+   "slots": [
+    "cbu.cbu_corporate_action"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "event-id"
+   ],
+   "entity_arg_inference": "event-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu-ca.reject",
+   "file": "verbs/cbu-ca.yaml",
+   "derived_requires_states": [
+    "under_review"
+   ],
+   "slots": [
+    "cbu.cbu_corporate_action"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "event-id",
+    "reason"
+   ],
+   "entity_arg_inference": "event-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu-ca.submit-for-review",
+   "file": "verbs/cbu-ca.yaml",
+   "derived_requires_states": [
+    "proposed"
+   ],
+   "slots": [
+    "cbu.cbu_corporate_action"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "event-id"
+   ],
+   "entity_arg_inference": "event-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu-ca.withdraw",
+   "file": "verbs/cbu-ca.yaml",
+   "derived_requires_states": [
+    "proposed",
+    "under_review"
+   ],
+   "slots": [
+    "cbu.cbu_corporate_action"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "event-id"
+   ],
+   "entity_arg_inference": "event-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu.assign-role",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "cbus_scaffolded"
+   ],
+   "slots": [
+    "book_setup.book"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "role-type",
+    "role",
+    "owner-entity-id",
+    "owned-entity-id",
+    "controller-entity-id",
+    "controlled-entity-id",
+    "trust-entity-id",
+    "participant-entity-id",
+    "entity-id",
+    "fund-entity-id",
+    "provider-entity-id",
+    "client-entity-id",
+    "person-entity-id",
+    "for-entity-id",
+    "percentage",
+    "ownership-type",
+    "effective-from",
+    "control-type",
+    "appointment-date",
+    "interest-percentage",
+    "interest-type",
+    "class-description",
+    "investment-percentage",
+    "is-regulated",
+    "regulatory-jurisdiction",
+    "service-agreement-date",
+    "authority-limit",
+    "authority-currency",
+    "requires-co-signatory"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu.attach-evidence",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "EXPIRED"
+   ],
+   "slots": [
+    "cbu.cbu_evidence"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "document-id",
+    "attestation-ref",
+    "evidence-type",
+    "evidence-category",
+    "description",
+    "attached-by"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu.clear-remediation",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "under_remediation"
+   ],
+   "slots": [
+    "cbu.cbu_disposition"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu.create",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "entities_provisioned"
+   ],
+   "slots": [
+    "book_setup.book"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "name",
+    "jurisdiction",
+    "fund-entity-id",
+    "client-type",
+    "nature-purpose",
+    "description",
+    "commercial-client-entity-id",
+    "manco-entity-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu.dirty-flag-bindings",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "clean"
+   ],
+   "slots": [
+    "cbu.cbu_service_option_binding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "service-id",
+    "source-kind"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu.flag-for-remediation",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "cbu.cbu_disposition"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "reason"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu.hard-delete",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "soft_deleted"
+   ],
+   "slots": [
+    "cbu.cbu_disposition"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu.override-option-binding",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "clean",
+    "dirty"
+   ],
+   "slots": [
+    "cbu.cbu_service_option_binding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "product-id",
+    "service-id",
+    "service",
+    "service-option-def-id",
+    "option-key",
+    "value"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu.recompute-bindings",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "dirty"
+   ],
+   "slots": [
+    "cbu.cbu_service_option_binding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "service-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "cbu.restore",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "soft_deleted"
+   ],
+   "slots": [
+    "cbu.cbu_disposition"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu.soft-delete",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "cbu.cbu_disposition"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "reason"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "cbu.verify-evidence",
+   "file": "verbs/cbu.yaml",
+   "derived_requires_states": [
+    "PENDING"
+   ],
+   "slots": [
+    "cbu.cbu_evidence"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "evidence-id",
+    "verification-status",
+    "verified-by",
+    "verification-notes"
+   ],
+   "entity_arg_inference": "evidence-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "collateral-management.activate",
+   "file": "verbs/collateral-management.yaml",
+   "derived_requires_states": [
+    "configured"
+   ],
+   "slots": [
+    "instrument_matrix.collateral_management"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "collateral-management"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "collateral-management.reactivate",
+   "file": "verbs/collateral-management.yaml",
+   "derived_requires_states": [
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.collateral_management"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "collateral-management"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "collateral-management.suspend",
+   "file": "verbs/collateral-management.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "instrument_matrix.collateral_management"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "collateral-management",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "collateral-management.terminate",
+   "file": "verbs/collateral-management.yaml",
+   "derived_requires_states": [
+    "active",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.collateral_management"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "collateral-management",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "corporate-action-event.elect",
+   "file": "verbs/corporate-action-event.yaml",
+   "derived_requires_states": [
+    "election_pending"
+   ],
+   "slots": [
+    "instrument_matrix.corporate_action_event"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "event",
+    "option"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "deal.agree-rate-card",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "COUNTER_PROPOSED",
+    "PROPOSED"
+   ],
+   "slots": [
+    "deal.deal_rate_card"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "rate-card-id"
+   ],
+   "entity_arg_inference": "rate-card-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "deal.cancel",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "IN_CLEARANCE",
+    "NEGOTIATING",
+    "PROSPECT",
+    "QUALIFYING"
+   ],
+   "slots": [
+    "deal.deal"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "deal-id",
+    "reason"
+   ],
+   "entity_arg_inference": "deal-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "deal.counter-rate-card",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "PROPOSED"
+   ],
+   "slots": [
+    "deal.deal_rate_card"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "rate-card-id",
+    "counter-lines"
+   ],
+   "entity_arg_inference": "rate-card-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "deal.propose-rate-card",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "APPROVED_INTERNALLY",
+    "COUNTER_PROPOSED",
+    "DRAFT"
+   ],
+   "slots": [
+    "deal.deal_rate_card"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "rate-card-id"
+   ],
+   "entity_arg_inference": "rate-card-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "deal.remove-product",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "(PROPOSED, NEGOTIATING, AGREED)"
+   ],
+   "slots": [
+    "deal.deal_product"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "deal-id",
+    "product-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "deal.submit-for-bac",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "NEGOTIATING"
+   ],
+   "slots": [
+    "deal.deal"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "deal-id"
+   ],
+   "entity_arg_inference": "deal-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "deal.update-document-status",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "(EXECUTED, SIGNED)",
+    "(EXECUTED, SUPERSEDED)",
+    "DRAFT",
+    "SIGNED",
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "deal.deal_document"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "deal-id",
+    "document-id",
+    "document-status"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "deal.update-onboarding-status",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "(PENDING, IN_PROGRESS)",
+    "(PENDING, IN_PROGRESS, BLOCKED)",
+    "BLOCKED",
+    "IN_PROGRESS",
+    "PENDING"
+   ],
+   "slots": [
+    "deal.deal_onboarding_request"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "request-id",
+    "request-status",
+    "kyc-case-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "deal.update-product-status",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "(PROPOSED, NEGOTIATING)",
+    "PROPOSED"
+   ],
+   "slots": [
+    "deal.deal_product"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "deal-id",
+    "product-id",
+    "product-status"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "deal.update-ubo-assessment",
+   "file": "verbs/deal.yaml",
+   "derived_requires_states": [
+    "(IN_PROGRESS, COMPLETED)",
+    "(IN_PROGRESS, REQUIRES_EDD)",
+    "IN_PROGRESS",
+    "PENDING"
+   ],
+   "slots": [
+    "deal.deal_ubo_assessment"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "assessment-id",
+    "assessment-status",
+    "risk-rating"
+   ],
+   "entity_arg_inference": "assessment-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "delivery.cancel",
+   "file": "verbs/delivery.yaml",
+   "derived_requires_states": [
+    "IN_PROGRESS",
+    "PENDING"
+   ],
+   "slots": [
+    "instrument_matrix.delivery"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "delivery",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "delivery.complete",
+   "file": "verbs/delivery.yaml",
+   "derived_requires_states": [
+    "IN_PROGRESS"
+   ],
+   "slots": [
+    "instrument_matrix.delivery"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "product",
+    "service",
+    "instance-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "delivery.fail",
+   "file": "verbs/delivery.yaml",
+   "derived_requires_states": [
+    "IN_PROGRESS"
+   ],
+   "slots": [
+    "instrument_matrix.delivery"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "product",
+    "service",
+    "reason"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "delivery.start",
+   "file": "verbs/delivery.yaml",
+   "derived_requires_states": [
+    "PENDING"
+   ],
+   "slots": [
+    "instrument_matrix.delivery"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "delivery"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "derivation.recompute-stale",
+   "file": "verbs/observation/derivation.yaml",
+   "derived_requires_states": [
+    "stale"
+   ],
+   "slots": [
+    "semos_maintenance.derivation_spec"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "limit"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "discovery.run",
+   "file": "verbs/service-pipeline.yaml",
+   "derived_requires_states": [
+    "PENDING"
+   ],
+   "slots": [
+    "cbu.cbu_discovery_state"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "cbu"
+   ],
+   "args": [
+    "cbu-id"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "kind-exact"
+  },
+  {
+   "verb": "document.create-request",
+   "file": "verbs/document.yaml",
+   "derived_requires_states": [
+    "DRAFT"
+   ],
+   "slots": [
+    "kyc.doc_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "workstream-id",
+    "doc-type",
+    "due-date",
+    "is-mandatory",
+    "priority"
+   ],
+   "entity_arg_inference": "workstream-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "document.mark-received",
+   "file": "verbs/document.yaml",
+   "derived_requires_states": [
+    "REQUESTED"
+   ],
+   "slots": [
+    "kyc.doc_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "request-id",
+    "document-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "document.mark-requested",
+   "file": "verbs/document.yaml",
+   "derived_requires_states": [
+    "REQUIRED"
+   ],
+   "slots": [
+    "kyc.doc_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "request-id"
+   ],
+   "entity_arg_inference": "request-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "document.verify-request",
+   "file": "verbs/document.yaml",
+   "derived_requires_states": [
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.doc_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "request-id",
+    "notes",
+    "verification-notes"
+   ],
+   "entity_arg_inference": "request-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "entity-workstream.complete",
+   "file": "verbs/kyc/entity-workstream.yaml",
+   "derived_requires_states": [
+    "ASSESS",
+    "verified"
+   ],
+   "slots": [
+    "kyc.entity_kyc",
+    "kyc.entity_workstream"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "workstream-id",
+    "risk-rating"
+   ],
+   "entity_arg_inference": "workstream-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "entity-workstream.create",
+   "file": "verbs/kyc/entity-workstream.yaml",
+   "derived_requires_states": [
+    "PENDING",
+    "filled"
+   ],
+   "slots": [
+    "kyc.entity_kyc",
+    "kyc.entity_workstream"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "entity-id",
+    "discovery-source-id",
+    "discovery-reason",
+    "discovery-depth",
+    "ownership-percentage",
+    "is-ubo"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "entity-workstream.update-status",
+   "file": "verbs/kyc/entity-workstream.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)"
+   ],
+   "slots": [
+    "kyc.entity_workstream"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "workstream-id",
+    "status"
+   ],
+   "entity_arg_inference": "workstream-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "entity.identify",
+   "file": "verbs/entity.yaml",
+   "derived_requires_states": [
+    "GHOST"
+   ],
+   "slots": [
+    "kyc.entity_proper_person"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "proper_person"
+   ],
+   "args": [
+    "entity-id",
+    "first-name",
+    "last-name",
+    "date-of-birth",
+    "nationality",
+    "id-document-type",
+    "id-document-number"
+   ],
+   "entity_arg_inference": "entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "entity.verify",
+   "file": "verbs/entity.yaml",
+   "derived_requires_states": [
+    "IDENTIFIED"
+   ],
+   "slots": [
+    "kyc.entity_proper_person"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "proper_person"
+   ],
+   "args": [
+    "entity-id",
+    "verification-notes"
+   ],
+   "entity_arg_inference": "entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "evidence.attach-document",
+   "file": "verbs/kyc/evidence.yaml",
+   "derived_requires_states": [
+    "REJECTED",
+    "REQUIRED",
+    "screening_complete"
+   ],
+   "slots": [
+    "kyc.entity_kyc",
+    "kyc.kyc_ubo_evidence"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "evidence-id",
+    "document-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "evidence.mark-rejected",
+   "file": "verbs/kyc/evidence.yaml",
+   "derived_requires_states": [
+    "PENDING",
+    "RECEIVED",
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.doc_request",
+    "kyc.kyc_ubo_evidence",
+    "kyc.ubo_evidence"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "evidence-id",
+    "reason"
+   ],
+   "entity_arg_inference": "evidence-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "evidence.mark-verified",
+   "file": "verbs/kyc/evidence.yaml",
+   "derived_requires_states": [
+    "COLLECT",
+    "PENDING",
+    "RECEIVED",
+    "evidence_collected"
+   ],
+   "slots": [
+    "kyc.entity_kyc",
+    "kyc.entity_workstream",
+    "kyc.kyc_ubo_evidence",
+    "kyc.ubo_evidence"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "evidence-id",
+    "verified-by",
+    "notes"
+   ],
+   "entity_arg_inference": "evidence-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "evidence.mark-waived",
+   "file": "verbs/kyc/evidence.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)"
+   ],
+   "slots": [
+    "kyc.doc_request",
+    "kyc.kyc_ubo_evidence"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "evidence-id",
+    "reason",
+    "authority"
+   ],
+   "entity_arg_inference": "evidence-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "governance.publish",
+   "file": "verbs/sem-reg/governance.yaml",
+   "derived_requires_states": [
+    "approved",
+    "draft"
+   ],
+   "slots": [
+    "semos_maintenance.changeset",
+    "semos_maintenance.derivation_spec"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "changeset-id"
+   ],
+   "entity_arg_inference": "changeset-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "governance.record-review",
+   "file": "verbs/sem-reg/governance.yaml",
+   "derived_requires_states": [
+    "active",
+    "reviewing",
+    "submitted",
+    "suspended"
+   ],
+   "slots": [
+    "onboarding_request.resource_owner_principal",
+    "product_maintenance.resource_owner_principal",
+    "semos_maintenance.changeset"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [
+    "resource_owner_principal"
+   ],
+   "args": [
+    "changeset-id",
+    "decision",
+    "comment"
+   ],
+   "entity_arg_inference": "changeset-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "governance.rollback",
+   "file": "verbs/sem-reg/governance.yaml",
+   "derived_requires_states": [
+    "reviewing"
+   ],
+   "slots": [
+    "semos_maintenance.changeset"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "target-snapshot-set-id"
+   ],
+   "entity_arg_inference": "target-snapshot-set-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "governance.submit-for-review",
+   "file": "verbs/sem-reg/governance.yaml",
+   "derived_requires_states": [
+    "composing"
+   ],
+   "slots": [
+    "semos_maintenance.changeset"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "changeset-id"
+   ],
+   "entity_arg_inference": "changeset-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "holding.close",
+   "file": "verbs/registry/holding.yaml",
+   "derived_requires_states": [
+    "ACTIVE",
+    "PENDING",
+    "RESTRICTED",
+    "SUSPENDED"
+   ],
+   "slots": [
+    "kyc.holding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "holding-id"
+   ],
+   "entity_arg_inference": "holding-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "holding.lift-restriction",
+   "file": "verbs/registry/holding.yaml",
+   "derived_requires_states": [
+    "RESTRICTED"
+   ],
+   "slots": [
+    "kyc.holding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "holding-id"
+   ],
+   "entity_arg_inference": "holding-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "holding.pledge",
+   "file": "verbs/registry/holding.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "kyc.holding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "holding-id",
+    "collateral-ref"
+   ],
+   "entity_arg_inference": "holding-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "holding.release-pledge",
+   "file": "verbs/registry/holding.yaml",
+   "derived_requires_states": [
+    "PLEDGED"
+   ],
+   "slots": [
+    "kyc.holding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "holding-id"
+   ],
+   "entity_arg_inference": "holding-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "holding.restrict",
+   "file": "verbs/registry/holding.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "kyc.holding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "holding-id",
+    "reason"
+   ],
+   "entity_arg_inference": "holding-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "holding.update-status",
+   "file": "verbs/registry/holding.yaml",
+   "derived_requires_states": [
+    "ACTIVE",
+    "PENDING",
+    "SUSPENDED"
+   ],
+   "slots": [
+    "kyc.holding"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "holding-id",
+    "holding-status"
+   ],
+   "entity_arg_inference": "holding-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investment-manager.suspend",
+   "file": "verbs/investment-manager.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "instrument_matrix.investment_manager_assignment"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "assignment-id"
+   ],
+   "entity_arg_inference": "assignment-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investment-manager.terminate",
+   "file": "verbs/investment-manager.yaml",
+   "derived_requires_states": [
+    "ACTIVE",
+    "SUSPENDED"
+   ],
+   "slots": [
+    "instrument_matrix.investment_manager_assignment"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "assignment-id",
+    "termination-date"
+   ],
+   "entity_arg_inference": "assignment-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.activate",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "ELIGIBLE"
+   ],
+   "slots": [
+    "kyc.investor"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.approve-kyc",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "IN_PROGRESS"
+   ],
+   "slots": [
+    "kyc.investor_kyc"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "risk-rating",
+    "next-review-date",
+    "notes"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.mark-eligible",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "DRAFT"
+   ],
+   "slots": [
+    "kyc.investor"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "eligible-share-classes"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.offboard",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "(ACTIVE, SUSPENDED)"
+   ],
+   "slots": [
+    "kyc.investor"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "offboard-reason",
+    "notes"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.reinstate",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "SUSPENDED"
+   ],
+   "slots": [
+    "kyc.investor"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "reinstate-to-state",
+    "notes"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.reject-kyc",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "IN_PROGRESS"
+   ],
+   "slots": [
+    "kyc.investor_kyc"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "rejection-reason",
+    "notes"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.request-documents",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "APPROVED"
+   ],
+   "slots": [
+    "kyc.investor_kyc"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "required-documents"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "investor.start-kyc",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "(EXPIRED, REFRESH_REQUIRED)",
+    "NOT_STARTED"
+   ],
+   "slots": [
+    "kyc.investor_kyc"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "case-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "investor.suspend",
+   "file": "verbs/registry/investor.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "kyc.investor"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "investor-id",
+    "suspension-reason",
+    "notes"
+   ],
+   "entity_arg_inference": "investor-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-agreement.update-status",
+   "file": "verbs/kyc-agreement.yaml",
+   "derived_requires_states": [
+    "(ACTIVE, SUSPENDED)"
+   ],
+   "slots": [
+    "kyc.kyc_service_agreement"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "agreement-id",
+    "status"
+   ],
+   "entity_arg_inference": "agreement-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.approve",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "PENDING_REVIEW",
+    "REVIEW"
+   ],
+   "slots": [
+    "kyc.kyc_case",
+    "kyc.kyc_decision"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "notes"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.approve-with-conditions",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "PENDING_REVIEW"
+   ],
+   "slots": [
+    "kyc.kyc_decision"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "conditions"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.close",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)"
+   ],
+   "slots": [
+    "kyc.kyc_case"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "status",
+    "notes"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.escalate",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)"
+   ],
+   "slots": [
+    "kyc.kyc_case"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "escalation-level",
+    "notes"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.refer",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)"
+   ],
+   "slots": [
+    "kyc.entity_workstream"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "reason"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.reject",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)",
+    "PENDING_REVIEW",
+    "REVIEW"
+   ],
+   "slots": [
+    "kyc.entity_workstream",
+    "kyc.kyc_case",
+    "kyc.kyc_decision"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "reason",
+    "do-not-onboard"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "kyc-case.update-status",
+   "file": "verbs/kyc/kyc-case.yaml",
+   "derived_requires_states": [
+    "ASSESSMENT",
+    "DISCOVERY",
+    "INTAKE"
+   ],
+   "slots": [
+    "kyc.kyc_case"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "status",
+    "notes"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.approve",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.begin-sunset",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "APPROVED",
+    "SUSPENDED",
+    "UNDER_INVESTIGATION"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.clear-regulatory",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "UNDER_INVESTIGATION"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.flag-regulatory",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "APPROVED"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id",
+    "reason"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.partial-reinstate",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "SUSPENDED"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.reject",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id",
+    "reason"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.suspend",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "UNDER_INVESTIGATION"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id",
+    "reason"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "manco.terminate",
+   "file": "verbs/manco-group.yaml",
+   "derived_requires_states": [
+    "SUNSET"
+   ],
+   "slots": [
+    "kyc.manco"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "limited_company"
+   ],
+   "args": [
+    "manco-entity-id"
+   ],
+   "entity_arg_inference": "manco-entity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "onboarding.cancel-data-request",
+   "file": "verbs/onboarding.yaml",
+   "derived_requires_states": [
+    "awaiting_owner",
+    "blocked",
+    "collecting",
+    "dispatching",
+    "ready_for_dispatch"
+   ],
+   "slots": [
+    "onboarding_request.onboarding_data_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "onboarding_data_request"
+   ],
+   "args": [
+    "data-request-id"
+   ],
+   "entity_arg_inference": "data-request-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "onboarding.compile-data-request",
+   "file": "verbs/onboarding.yaml",
+   "derived_requires_states": [
+    "collecting",
+    "missing"
+   ],
+   "slots": [
+    "onboarding_request.onboarding_data_request",
+    "onboarding_request.onboarding_data_request_attr",
+    "onboarding_request.onboarding_data_request_slice"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "onboarding_data_request",
+    "onboarding_data_request_attr",
+    "onboarding_data_request_slice"
+   ],
+   "args": [
+    "onboarding-request-id"
+   ],
+   "entity_arg_inference": "onboarding-request-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "onboarding.dispatch-ready-slices",
+   "file": "verbs/onboarding.yaml",
+   "derived_requires_states": [
+    "PENDING",
+    "PROVISIONING",
+    "dispatched",
+    "dispatching",
+    "queued",
+    "ready",
+    "ready_for_dispatch"
+   ],
+   "slots": [
+    "onboarding_request.cbu_resource_instance",
+    "onboarding_request.onboarding_data_request",
+    "onboarding_request.onboarding_data_request_slice",
+    "onboarding_request.provisioning_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "cbu_resource_instance",
+    "onboarding_data_request",
+    "onboarding_data_request_slice",
+    "provisioning_request"
+   ],
+   "args": [
+    "data-request-id"
+   ],
+   "entity_arg_inference": "data-request-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "phrase.approve",
+   "file": "verbs/phrase.yaml",
+   "derived_requires_states": [
+    "reviewed"
+   ],
+   "slots": [
+    "semos_maintenance.phrase_authoring"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "proposal-id",
+    "rationale"
+   ],
+   "entity_arg_inference": "proposal-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "phrase.check-collisions",
+   "file": "verbs/phrase.yaml",
+   "derived_requires_states": [
+    "proposed"
+   ],
+   "slots": [
+    "semos_maintenance.phrase_authoring"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "phrase",
+    "target-verb",
+    "workspace"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "phrase.defer",
+   "file": "verbs/phrase.yaml",
+   "derived_requires_states": [
+    "reviewed"
+   ],
+   "slots": [
+    "semos_maintenance.phrase_authoring"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "proposal-id",
+    "reason"
+   ],
+   "entity_arg_inference": "proposal-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "phrase.propose",
+   "file": "verbs/phrase.yaml",
+   "derived_requires_states": [
+    "deferred",
+    "refined"
+   ],
+   "slots": [
+    "semos_maintenance.phrase_authoring"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "phrase",
+    "target-verb",
+    "workspace",
+    "rationale"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "phrase.reject",
+   "file": "verbs/phrase.yaml",
+   "derived_requires_states": [
+    "reviewed"
+   ],
+   "slots": [
+    "semos_maintenance.phrase_authoring"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "proposal-id",
+    "reason"
+   ],
+   "entity_arg_inference": "proposal-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "phrase.review-proposals",
+   "file": "verbs/phrase.yaml",
+   "derived_requires_states": [
+    "collision_checked",
+    "quality_checked",
+    "reviewed"
+   ],
+   "slots": [
+    "semos_maintenance.phrase_authoring"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "provisioning.run",
+   "file": "verbs/service-pipeline.yaml",
+   "derived_requires_states": [
+    "POPULATE"
+   ],
+   "slots": [
+    "cbu.cbu_discovery_state"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "cbu"
+   ],
+   "args": [
+    "cbu-id",
+    "dry-run"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "kind-exact"
+  },
+  {
+   "verb": "reconciliation.activate",
+   "file": "verbs/reconciliation.yaml",
+   "derived_requires_states": [
+    "draft"
+   ],
+   "slots": [
+    "instrument_matrix.reconciliation"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "reconciliation"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "reconciliation.reactivate",
+   "file": "verbs/reconciliation.yaml",
+   "derived_requires_states": [
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.reconciliation"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "reconciliation"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "reconciliation.retire",
+   "file": "verbs/reconciliation.yaml",
+   "derived_requires_states": [
+    "active",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.reconciliation"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "reconciliation",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "reconciliation.suspend",
+   "file": "verbs/reconciliation.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "instrument_matrix.reconciliation"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "reconciliation",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "red-flag.close",
+   "file": "verbs/kyc/red-flag.yaml",
+   "derived_requires_states": [
+    "BLOCKING",
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.red_flag"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "red-flag-id",
+    "resolution",
+    "notes"
+   ],
+   "entity_arg_inference": "red-flag-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "red-flag.escalate",
+   "file": "verbs/kyc/red-flag.yaml",
+   "derived_requires_states": [
+    "(any non-terminal)",
+    "OPEN"
+   ],
+   "slots": [
+    "kyc.entity_workstream",
+    "kyc.red_flag"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "red-flag-id",
+    "reason"
+   ],
+   "entity_arg_inference": "red-flag-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "red-flag.update-rating",
+   "file": "verbs/kyc/red-flag.yaml",
+   "derived_requires_states": [
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.red_flag"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "red-flag-id",
+    "severity"
+   ],
+   "entity_arg_inference": "red-flag-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "red-flag.waive",
+   "file": "verbs/kyc/red-flag.yaml",
+   "derived_requires_states": [
+    "UNDER_REVIEW"
+   ],
+   "slots": [
+    "kyc.red_flag"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "red-flag-id",
+    "justification",
+    "approved-by"
+   ],
+   "entity_arg_inference": "red-flag-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "request.create",
+   "file": "verbs/kyc/request.yaml",
+   "derived_requires_states": [
+    "DRAFT"
+   ],
+   "slots": [
+    "kyc.outreach_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "subject-type",
+    "subject-id",
+    "type",
+    "subtype",
+    "from",
+    "from-entity",
+    "due-in-days",
+    "due-date",
+    "blocks",
+    "message",
+    "details"
+   ],
+   "entity_arg_inference": "subject-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "request.fulfill",
+   "file": "verbs/kyc/request.yaml",
+   "derived_requires_states": [
+    "(RESPONDED, REMINDED)",
+    "(SENT, REMINDED)"
+   ],
+   "slots": [
+    "kyc.outreach_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "request-id",
+    "fulfillment-type",
+    "reference-id",
+    "reference-type",
+    "notes"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "request.remind",
+   "file": "verbs/kyc/request.yaml",
+   "derived_requires_states": [
+    "PENDING",
+    "SENT"
+   ],
+   "slots": [
+    "kyc.outreach_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "request-id",
+    "channel",
+    "message"
+   ],
+   "entity_arg_inference": "request-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "screening.bulk-refresh",
+   "file": "verbs/screening.yaml",
+   "derived_requires_states": [
+    "ERROR",
+    "EXPIRED"
+   ],
+   "slots": [
+    "kyc.screening"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "screening-type"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "screening.complete",
+   "file": "verbs/screening.yaml",
+   "derived_requires_states": [
+    "RUNNING"
+   ],
+   "slots": [
+    "kyc.screening"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "screening-id",
+    "status",
+    "result-summary",
+    "match-count"
+   ],
+   "entity_arg_inference": "screening-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "screening.review-hit",
+   "file": "verbs/screening.yaml",
+   "derived_requires_states": [
+    "HIT_PENDING_REVIEW"
+   ],
+   "slots": [
+    "kyc.screening"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "screening-id",
+    "status",
+    "notes",
+    "red-flag-id"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "screening.run",
+   "file": "verbs/screening.yaml",
+   "derived_requires_states": [
+    "PENDING",
+    "VERIFY",
+    "workstream_open"
+   ],
+   "slots": [
+    "kyc.entity_kyc",
+    "kyc.entity_workstream",
+    "kyc.screening"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "workstream-id",
+    "screening-type",
+    "provider"
+   ],
+   "entity_arg_inference": "workstream-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-consumption.activate",
+   "file": "verbs/service-consumption.yaml",
+   "derived_requires_states": [
+    "provisioned"
+   ],
+   "slots": [
+    "cbu.service_consumption"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "consumption-id"
+   ],
+   "entity_arg_inference": "consumption-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-consumption.begin-winddown",
+   "file": "verbs/service-consumption.yaml",
+   "derived_requires_states": [
+    "active",
+    "suspended"
+   ],
+   "slots": [
+    "cbu.service_consumption"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "consumption-id"
+   ],
+   "entity_arg_inference": "consumption-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-consumption.provision",
+   "file": "verbs/service-consumption.yaml",
+   "derived_requires_states": [
+    "proposed"
+   ],
+   "slots": [
+    "cbu.service_consumption"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "consumption-id"
+   ],
+   "entity_arg_inference": "consumption-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-consumption.reinstate",
+   "file": "verbs/service-consumption.yaml",
+   "derived_requires_states": [
+    "suspended"
+   ],
+   "slots": [
+    "cbu.service_consumption"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "consumption-id"
+   ],
+   "entity_arg_inference": "consumption-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-consumption.retire",
+   "file": "verbs/service-consumption.yaml",
+   "derived_requires_states": [
+    "winding_down"
+   ],
+   "slots": [
+    "cbu.service_consumption"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "consumption-id"
+   ],
+   "entity_arg_inference": "consumption-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-consumption.suspend",
+   "file": "verbs/service-consumption.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "cbu.service_consumption"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "consumption-id",
+    "reason"
+   ],
+   "entity_arg_inference": "consumption-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-intent.cancel",
+   "file": "verbs/service-pipeline.yaml",
+   "derived_requires_states": [
+    "active",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.service_intent"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "intent-id",
+    "reason"
+   ],
+   "entity_arg_inference": "intent-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-intent.resume",
+   "file": "verbs/service-pipeline.yaml",
+   "derived_requires_states": [
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.service_intent"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "intent-id"
+   ],
+   "entity_arg_inference": "intent-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-intent.suspend",
+   "file": "verbs/service-pipeline.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "instrument_matrix.service_intent"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "intent-id",
+    "reason"
+   ],
+   "entity_arg_inference": "intent-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-resource.activate",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "provisioned"
+   ],
+   "slots": [
+    "instrument_matrix.service_resource"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "instance-id"
+   ],
+   "entity_arg_inference": "instance-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-resource.check-attribute-gaps",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "synced"
+   ],
+   "slots": [
+    "semos_maintenance.service_resource_def"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "service-resource.confirm-provisioning-result",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "AWAITING_OWNER",
+    "ack",
+    "awaiting_owner",
+    "collecting",
+    "dispatched",
+    "ready",
+    "sent"
+   ],
+   "slots": [
+    "onboarding_request.cbu_resource_instance",
+    "onboarding_request.onboarding_data_request",
+    "onboarding_request.onboarding_data_request_slice",
+    "onboarding_request.provisioning_request"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "cbu_resource_instance",
+    "onboarding_data_request",
+    "onboarding_data_request_slice",
+    "provisioning_request"
+   ],
+   "args": [
+    "provisioning-request-id",
+    "payload",
+    "content-hash"
+   ],
+   "entity_arg_inference": "provisioning-request-id",
+   "inference_basis": "kind-exact"
+  },
+  {
+   "verb": "service-resource.decommission",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "ACTIVE",
+    "CANCELLED",
+    "FAILED",
+    "SUSPENDED",
+    "activated",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.service_resource",
+    "onboarding_request.cbu_resource_instance"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [
+    "cbu_resource_instance"
+   ],
+   "args": [
+    "instance-id",
+    "reason"
+   ],
+   "entity_arg_inference": "instance-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-resource.provision",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "PENDING"
+   ],
+   "slots": [
+    "onboarding_request.cbu_resource_instance"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [
+    "cbu_resource_instance"
+   ],
+   "args": [
+    "cbu-id",
+    "resource-type",
+    "instance-url",
+    "instance-id",
+    "instance-name",
+    "product-id",
+    "service-id",
+    "market-id",
+    "currency",
+    "counterparty-entity-id",
+    "config",
+    "depends-on",
+    "settlement-account-url",
+    "custody-account-url",
+    "nav-engine-url"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "service-resource.reactivate",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "SUSPENDED",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.service_resource",
+    "onboarding_request.cbu_resource_instance"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [
+    "cbu_resource_instance"
+   ],
+   "args": [
+    "resource"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "service-resource.suspend",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "ACTIVE",
+    "activated"
+   ],
+   "slots": [
+    "instrument_matrix.service_resource",
+    "onboarding_request.cbu_resource_instance"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [
+    "cbu_resource_instance"
+   ],
+   "args": [
+    "instance-id",
+    "reason"
+   ],
+   "entity_arg_inference": "instance-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "service-resource.sync-definitions",
+   "file": "verbs/service-resource.yaml",
+   "derived_requires_states": [
+    "gaps_found",
+    "synced",
+    "unsynced"
+   ],
+   "slots": [
+    "semos_maintenance.service_resource_def"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "service.declare-option",
+   "file": "verbs/service.yaml",
+   "derived_requires_states": [
+    "drafted"
+   ],
+   "slots": [
+    "product_maintenance.service_option"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "service-id",
+    "service",
+    "service-version-id",
+    "option-key",
+    "option-kind",
+    "allowed-values",
+    "default-value",
+    "is-required",
+    "fanout-axis",
+    "source-kind",
+    "source-path"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "service.deprecate-option",
+   "file": "verbs/service.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "product_maintenance.service_option"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "service-option-def-id",
+    "service-id",
+    "service",
+    "option-key"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.abort-parallel-run",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "parallel_run"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.add-hop",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "draft"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain-id",
+    "sequence",
+    "role",
+    "intermediary-entity-id",
+    "intermediary-bic",
+    "intermediary-name",
+    "account-number",
+    "ssi-id",
+    "instructions"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.deactivate-chain",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "live",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain-id"
+   ],
+   "entity_arg_inference": "chain-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "settlement-chain.define-location",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "draft"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "code",
+    "name",
+    "location-type",
+    "country-code",
+    "bic",
+    "operating-hours",
+    "settlement-cycles"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.enter-parallel-run",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "reviewed"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.go-live",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "parallel_run"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.reactivate",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.request-review",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "configured"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "settlement-chain.suspend",
+   "file": "verbs/custody/settlement-chain.yaml",
+   "derived_requires_states": [
+    "live"
+   ],
+   "slots": [
+    "instrument_matrix.settlement_pattern_template"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "chain",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "share-class.begin-winddown",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "HARD_CLOSED",
+    "OPEN",
+    "SOFT_CLOSED"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "share-class.close",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "WINDING_DOWN"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "share-class.hard-close",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "OPEN",
+    "SOFT_CLOSED"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id",
+    "reason"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "share-class.launch",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "DRAFT"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "share-class.lift-hard-close",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "HARD_CLOSED"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "share-class.reopen",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "SOFT_CLOSED"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "share-class.soft-close",
+   "file": "verbs/registry/share-class.yaml",
+   "derived_requires_states": [
+    "OPEN"
+   ],
+   "slots": [
+    "cbu.share_class"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "share-class-id"
+   ],
+   "entity_arg_inference": "share-class-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "skeleton.build",
+   "file": "verbs/kyc/skeleton-build.yaml",
+   "derived_requires_states": [
+    "empty"
+   ],
+   "slots": [
+    "kyc.entity_kyc"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "case-id",
+    "source",
+    "threshold",
+    "max-outreach-items"
+   ],
+   "entity_arg_inference": "case-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trade-gateway.activate-gateway",
+   "file": "verbs/custody/trade-gateway.yaml",
+   "derived_requires_states": [
+    "enabled"
+   ],
+   "slots": [
+    "instrument_matrix.trade_gateway"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "connectivity-id"
+   ],
+   "entity_arg_inference": "connectivity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trade-gateway.enable-gateway",
+   "file": "verbs/custody/trade-gateway.yaml",
+   "derived_requires_states": [
+    "defined"
+   ],
+   "slots": [
+    "instrument_matrix.trade_gateway"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "gateway-id",
+    "status",
+    "connectivity-resource-id",
+    "credentials-reference",
+    "effective-date",
+    "config"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trade-gateway.reactivate-gateway",
+   "file": "verbs/custody/trade-gateway.yaml",
+   "derived_requires_states": [
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.trade_gateway"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "gateway"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trade-gateway.retire-gateway",
+   "file": "verbs/custody/trade-gateway.yaml",
+   "derived_requires_states": [
+    "active",
+    "suspended"
+   ],
+   "slots": [
+    "instrument_matrix.trade_gateway"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "gateway",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trade-gateway.suspend-gateway",
+   "file": "verbs/custody/trade-gateway.yaml",
+   "derived_requires_states": [
+    "active"
+   ],
+   "slots": [
+    "instrument_matrix.trade_gateway"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "connectivity-id",
+    "reason"
+   ],
+   "entity_arg_inference": "connectivity-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trading-profile.abort-parallel-run",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "PARALLEL_RUN"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trading-profile.approve",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "SUBMITTED"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id",
+    "approved-by",
+    "notes"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trading-profile.archive",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "ACTIVE",
+    "SUSPENDED"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id",
+    "archived-by",
+    "notes"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trading-profile.create-draft",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "REJECTED",
+    "parties_assigned"
+   ],
+   "slots": [
+    "book_setup.book",
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "cbu-id",
+    "notes"
+   ],
+   "entity_arg_inference": "cbu-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trading-profile.enter-parallel-run",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "APPROVED"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trading-profile.go-live",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "PARALLEL_RUN"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trading-profile.reactivate",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "SUSPENDED"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trading-profile.reject",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "SUBMITTED"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id",
+    "rejection-reason",
+    "rejected-by"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trading-profile.retire-template",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "available"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile_template"
+   ],
+   "slot_mapped": false,
+   "entity_kinds": [],
+   "args": [
+    "template",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trading-profile.submit",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "DRAFT"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile-id",
+    "submitted-by",
+    "notes"
+   ],
+   "entity_arg_inference": "profile-id",
+   "inference_basis": "sole-id-arg"
+  },
+  {
+   "verb": "trading-profile.supersede",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile",
+    "new-version"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  },
+  {
+   "verb": "trading-profile.suspend",
+   "file": "verbs/trading-profile.yaml",
+   "derived_requires_states": [
+    "ACTIVE"
+   ],
+   "slots": [
+    "instrument_matrix.trading_profile"
+   ],
+   "slot_mapped": true,
+   "entity_kinds": [],
+   "args": [
+    "profile",
+    "reason"
+   ],
+   "entity_arg_inference": null,
+   "inference_basis": "AMBIGUOUS"
+  }
+ ]
+}
