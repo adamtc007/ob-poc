@@ -35,7 +35,7 @@ slots:
     authoring_plane:
       pack_id: bpmn.designer
       pack_version: 1.0.0
-      artifact_sha256: ca698f442c4aa7eb1a80bddcf55a280fd44dc8fe6ccc4745b00ebac459d8d1ef
-      source_sha256: 343fdb2fd9fa2b09e1aea4ae11f7ff869f651cb5fe34c08a1078e96eb37435a7
+      artifact_sha256: 0459649ce9082ba62aee48bc25ea8ab6e9071367ed69adcea7956072fbe215db
+      source_sha256: 9c763264fdf51041eb75c88b028d03e2f3f9635d9260b7d563cdadf356c03e32
       authority: designer_authoring
       isolation: "Candidates stay Designer-side; never discoverable in the SemOS palette."
