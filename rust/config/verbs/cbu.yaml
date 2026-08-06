@@ -725,9 +725,12 @@ domains:
           side_effects: state_write
         lifecycle:
           entity_arg: cbu-id
+          # WS-2.D drift fix (2026-08-06): the normative cbu_dag routes
+          # VALIDATION_FAILED through the resubmit verb; this verb's DAG
+          # from-states are DISCOVERED and UPDATE_PENDING_PROOF.
           requires_states:
             - DISCOVERED
-            - VALIDATION_FAILED
+            - UPDATE_PENDING_PROOF
           precondition_checks:
             - "requires_scope:cbu"
         crud:

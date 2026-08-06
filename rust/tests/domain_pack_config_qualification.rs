@@ -356,3 +356,145 @@ fn bpmn_authoring_plane_pin_is_consistent_and_well_formed() {
         "domain-pack extension ref must agree exactly with the DAG slot pin"
     );
 }
+
+/// WS-2.D (EOP-PLAN-SEM-RESOLVER-001, review P1): verb state-precondition
+/// gate over the DAG-derived universe. The DAG is normative — for every
+/// verb reached `via:` a structured transition, its from-states ARE its
+/// legal `requires_states`. Two checks, both fail-closed:
+///   1. DRIFT: a verb that declares `lifecycle.requires_states` must
+///      declare exactly the DAG-derived from-state union — a declared
+///      set the DAG contradicts is a live inconsistency, not a style
+///      issue (the runtime enforces the YAML side at execute_verb_in_scope).
+///   2. RATCHET: the count of DAG-transition verbs declaring
+///      requires_states never drops below the recorded floor. The floor
+///      only rises as the derivable backlog (~184 verbs) is backfilled —
+///      scoped to slot_state_table-mapped slots to avoid the
+///      NoSlotMapping runtime trap.
+#[test]
+fn dag_transition_verbs_requires_states_drift_and_ratchet() {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    // Declared side: verb FQN -> requires_states from config/verbs/**.
+    let mut declared: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut all_verbs: BTreeSet<String> = BTreeSet::new();
+    let mut stack = vec![config_root().join("verbs")];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir).expect("read verbs dir").filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if !matches!(path.extension().and_then(|e| e.to_str()), Some("yaml" | "yml")) {
+                continue;
+            }
+            let value: serde_yaml::Value =
+                serde_yaml::from_str(&fs::read_to_string(&path).expect("read verb file"))
+                    .expect("parse verb file");
+            let Some(domains) = value.get("domains").and_then(|d| d.as_mapping()) else {
+                continue;
+            };
+            for (domain, body) in domains {
+                let Some(verbs) = body.get("verbs").and_then(|v| v.as_mapping()) else {
+                    continue;
+                };
+                for (verb, spec) in verbs {
+                    let fqn = format!(
+                        "{}.{}",
+                        domain.as_str().unwrap_or_default(),
+                        verb.as_str().unwrap_or_default()
+                    );
+                    all_verbs.insert(fqn.clone());
+                    let states = spec
+                        .get("lifecycle")
+                        .and_then(|l| l.get("requires_states"))
+                        .and_then(|r| r.as_sequence())
+                        .map(|seq| {
+                            seq.iter()
+                                .filter_map(|s| s.as_str().map(str::to_owned))
+                                .collect::<BTreeSet<_>>()
+                        })
+                        .unwrap_or_default();
+                    if !states.is_empty() {
+                        declared.insert(fqn, states);
+                    }
+                }
+            }
+        }
+    }
+
+    // Derived side: verb FQN -> union of DAG transition from-states.
+    let mut derived: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let dag_dir = config_root().join("sem_os_seeds/dag_taxonomies");
+    for entry in fs::read_dir(&dag_dir).expect("read dag dir").filter_map(Result::ok) {
+        let path = entry.path();
+        if !matches!(path.extension().and_then(|e| e.to_str()), Some("yaml" | "yml")) {
+            continue;
+        }
+        let dag: serde_yaml::Value =
+            serde_yaml::from_str(&fs::read_to_string(&path).expect("read dag")).expect("parse dag");
+        let Some(slots) = dag.get("slots").and_then(|s| s.as_sequence()) else {
+            continue;
+        };
+        for slot in slots {
+            let Some(transitions) = slot
+                .get("state_machine")
+                .and_then(|m| m.get("transitions"))
+                .and_then(|t| t.as_sequence())
+            else {
+                continue;
+            };
+            for transition in transitions {
+                let Some(via) = transition.get("via").and_then(|v| v.as_str()) else {
+                    continue;
+                };
+                let via = via.trim();
+                if !all_verbs.contains(via) {
+                    continue; // macro prose / table names — not verbs
+                }
+                let mut froms = BTreeSet::new();
+                match transition.get("from") {
+                    Some(serde_yaml::Value::String(s)) => {
+                        froms.insert(s.clone());
+                    }
+                    Some(serde_yaml::Value::Sequence(seq)) => {
+                        froms.extend(seq.iter().filter_map(|s| s.as_str().map(str::to_owned)));
+                    }
+                    _ => {}
+                }
+                if !froms.is_empty() {
+                    derived.entry(via.to_owned()).or_default().extend(froms);
+                }
+            }
+        }
+    }
+
+    // 1. DRIFT — declared must equal derived wherever both exist.
+    let mut drift = Vec::new();
+    for (verb, declared_states) in &declared {
+        if let Some(derived_states) = derived.get(verb) {
+            if declared_states != derived_states {
+                drift.push(format!(
+                    "{verb}: declares {declared_states:?} but the normative DAG derives {derived_states:?}"
+                ));
+            }
+        }
+    }
+    assert!(
+        drift.is_empty(),
+        "requires_states drift against the normative DAG:\n{}",
+        drift.join("\n")
+    );
+
+    // 2. RATCHET — floors only rise. Recorded 2026-08-06.
+    let universe = derived.len();
+    let covered = derived.keys().filter(|v| declared.contains_key(*v)).count();
+    assert!(
+        universe >= 200,
+        "DAG-derivable verb universe shrank unexpectedly: {universe}"
+    );
+    assert!(
+        covered >= 31,
+        "requires_states coverage regressed below the recorded floor: {covered} of {universe}"
+    );
+}
