@@ -24,3 +24,18 @@ slots:
   - id: workspace_root
     stateless: true
     rationale: "Stateless menu for real definition and instance operations; structural authoring and infrastructure are excluded."
+    # WS-2.A (EOP-PLAN-SEM-RESOLVER-001, ruled 2026-08-06): the Designer
+    # authoring plane is referenced by EXACT content-hash pin, never by
+    # promoting its operations into this palette (AST-mutation isolation
+    # ruling). The pinned pack is compiled/validated on the bpmn-lite
+    # side (utterance-engine/config/bpmn-semantic-pack.lock); the
+    # cross-file consistency of this declaration is gated by
+    # bpmn_authoring_plane_pin_is_consistent_and_well_formed in
+    # rust/tests/domain_pack_config_qualification.rs.
+    authoring_plane:
+      pack_id: bpmn.designer
+      pack_version: 1.0.0
+      artifact_sha256: ca698f442c4aa7eb1a80bddcf55a280fd44dc8fe6ccc4745b00ebac459d8d1ef
+      source_sha256: 343fdb2fd9fa2b09e1aea4ae11f7ff869f651cb5fe34c08a1078e96eb37435a7
+      authority: designer_authoring
+      isolation: "Candidates stay Designer-side; never discoverable in the SemOS palette."

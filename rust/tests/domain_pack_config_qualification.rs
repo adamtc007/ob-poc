@@ -296,3 +296,63 @@ fn application_dag_predicates_and_green_when_coverage_are_qualified() {
         "green_when predicate count regressed: {predicate_count}"
     );
 }
+
+/// WS-2.A (EOP-PLAN-SEM-RESOLVER-001, ruled 2026-08-06): the Designer
+/// authoring plane is referenced by exact content-hash pin in TWO seed
+/// declarations — the bpmn_dag workspace_root slot annotation and the
+/// ob-poc.bpmn-ops domain pack's typed extension point. This gate
+/// refuses silent drift between them and refuses a malformed pin
+/// (empty / non-64-hex — a pin that names nothing is a name-check,
+/// not a pin). The artifact-hash truth link is compiler-verified on
+/// the bpmn-lite side (bpmn-semantic-pack.lock); this side proves the
+/// declared copies agree and are well-formed.
+#[test]
+fn bpmn_authoring_plane_pin_is_consistent_and_well_formed() {
+    let root = config_root().join("sem_os_seeds");
+
+    let dag: serde_yaml::Value = serde_yaml::from_str(
+        &fs::read_to_string(root.join("dag_taxonomies/bpmn_dag.yaml")).expect("read bpmn_dag"),
+    )
+    .expect("parse bpmn_dag");
+    let slot = &dag["slots"][0];
+    assert_eq!(slot["id"].as_str(), Some("workspace_root"));
+    let plane = &slot["authoring_plane"];
+    let pack_id = plane["pack_id"].as_str().expect("authoring_plane.pack_id");
+    let version = plane["pack_version"]
+        .as_str()
+        .expect("authoring_plane.pack_version");
+    let artifact = plane["artifact_sha256"]
+        .as_str()
+        .expect("authoring_plane.artifact_sha256");
+    for (label, hash) in [
+        ("artifact_sha256", artifact),
+        (
+            "source_sha256",
+            plane["source_sha256"].as_str().expect("source_sha256"),
+        ),
+    ] {
+        assert_eq!(hash.len(), 64, "{label} must be 64 hex chars");
+        assert!(
+            hash.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+            "{label} must be lowercase hex"
+        );
+    }
+    assert!(!pack_id.trim().is_empty() && !version.trim().is_empty());
+
+    let pack: serde_yaml::Value = serde_yaml::from_str(
+        &fs::read_to_string(root.join("domain_packs/ob_poc_bpmn.yaml")).expect("read ob_poc_bpmn"),
+    )
+    .expect("parse ob_poc_bpmn");
+    let points = pack["typed_extension_points"]
+        .as_sequence()
+        .expect("typed_extension_points sequence");
+    let plane_ref = points
+        .iter()
+        .find(|p| p["extension_kind"].as_str() == Some("authoring_plane_ref"))
+        .expect("ob_poc_bpmn.yaml must declare the authoring_plane_ref extension point");
+    assert_eq!(
+        plane_ref["implementation_ref"].as_str(),
+        Some(format!("semantic-pack://{pack_id}@{version}#sha256:{artifact}").as_str()),
+        "domain-pack extension ref must agree exactly with the DAG slot pin"
+    );
+}

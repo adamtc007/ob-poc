@@ -26,7 +26,10 @@ workflow_phases: []
 acp_personas: []
 resource_uri_schemes: []
 external_mcp_transports: []
-typed_extension_points: []
+typed_extension_points:
+  - extension_id: bpmn.designer_authoring_plane
+    extension_kind: authoring_plane_ref
+    implementation_ref: "semantic-pack://bpmn.designer@1.0.0#sha256:ca698f442c4aa7eb1a80bddcf55a280fd44dc8fe6ccc4745b00ebac459d8d1ef"
 classification_policy:
   max_prompt_classification: internal
   allow_external_llm: false
