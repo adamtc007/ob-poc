@@ -14,10 +14,10 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use ob_poc_kyc_store::PgKycEventStore;
+use ob_poc_kyc_store::{load_source_text_history, PgKycEventStore};
 use ob_poc_kyc_substrate::{
-    phase1_lexicon, AuthorityRef, FoldRegistry, IdemKey, IntentEvent, Principal, SubjectId,
-    TargetBinding, V1FoldImpl,
+    phase1_lexicon, render_intent_event_to_sexpr, AuthorityRef, FoldRegistry, IdemKey, IntentEvent,
+    Principal, SubjectId, TargetBinding, V1FoldImpl,
 };
 
 fn database_url() -> String {
@@ -78,7 +78,7 @@ fn assert_control(subject: SubjectId, to: Uuid, idem: &str) -> IntentEvent {
 
 async fn append_committed(pool: &PgPool, registry: &FoldRegistry, ev: &IntentEvent) {
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, registry, ev, |_| Ok(()))
+    PgKycEventStore::append(&mut tx, registry, ev, "(test-event)", |_| Ok(()))
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -208,7 +208,7 @@ async fn committed_at_is_monotonic_with_seq_under_adversarial_begin_order() {
     // tx_a begins later, inserts seq0, commits.
     {
         let mut tx_a = pool.begin().await.unwrap();
-        PgKycEventStore::append(&mut tx_a, &registry, &register(subject), |_| Ok(()))
+        PgKycEventStore::append(&mut tx_a, &registry, &register(subject), "(test-event)", |_| Ok(()))
             .await
             .unwrap();
         tx_a.commit().await.unwrap();
@@ -219,6 +219,7 @@ async fn committed_at_is_monotonic_with_seq_under_adversarial_begin_order() {
         &mut tx_b,
         &registry,
         &assert_control(subject, Uuid::new_v4(), "adversarial"),
+        "(test-event)",
         |_| Ok(()),
     )
     .await
@@ -232,6 +233,63 @@ async fn committed_at_is_monotonic_with_seq_under_adversarial_begin_order() {
         t0 < t1,
         "committed_at must be monotonic with seq even when the higher-seq event's \
          transaction began earlier (requires clock_timestamp(), not now()): seq0={t0} seq1={t1}"
+    );
+
+    cleanup(&pool, subject).await;
+}
+
+// ── T1 gate test — EOP-PLAN-KYCUBO-KIT-001 §T1 (closes KIT-1) ────────────────
+
+/// A governed append persists non-null resolved `source_text`; UUIDs resolved,
+/// not placeholders — and it's re-loadable in seq order via
+/// `load_source_text_history`.
+#[tokio::test]
+async fn append_captures_source() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+
+    let reg_event = register(subject);
+    let reg_source = render_intent_event_to_sexpr(&reg_event, None);
+
+    let to = Uuid::new_v4();
+    let ctrl_event = assert_control(subject, to, "ctrl-1");
+    let ctrl_source = render_intent_event_to_sexpr(&ctrl_event, None);
+
+    {
+        let mut tx = pool.begin().await.unwrap();
+        PgKycEventStore::append(&mut tx, &registry, &reg_event, &reg_source, |_| Ok(()))
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+    {
+        let mut tx = pool.begin().await.unwrap();
+        PgKycEventStore::append(&mut tx, &registry, &ctrl_event, &ctrl_source, |_| Ok(()))
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    let mut conn = pool.acquire().await.unwrap();
+    let history = load_source_text_history(&mut conn, subject).await.unwrap();
+
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].0, 0);
+    assert_eq!(history[0].1.as_deref(), Some(reg_source.as_str()));
+    assert_eq!(history[1].0, 1);
+    assert_eq!(history[1].1.as_deref(), Some(ctrl_source.as_str()));
+
+    // UUIDs resolved, not placeholders: the "to" entity's real UUID appears
+    // literally in the persisted source text.
+    assert!(
+        history[1].1.as_deref().unwrap().contains(&to.to_string()),
+        "resolved UUID must appear in captured source_text, got: {:?}",
+        history[1].1
+    );
+    assert!(
+        !history[1].1.as_deref().unwrap().contains("@"),
+        "captured source is a resolved fact, not authoring syntax with @bindings"
     );
 
     cleanup(&pool, subject).await;

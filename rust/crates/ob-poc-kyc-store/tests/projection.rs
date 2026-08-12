@@ -95,7 +95,7 @@ fn edge_op(subject: SubjectId, verb: &str, edge: Uuid, idem: &str) -> IntentEven
 
 async fn append(pool: &PgPool, registry: &FoldRegistry, ev: &IntentEvent) {
     let mut tx = pool.begin().await.unwrap();
-    PgKycEventStore::append(&mut tx, registry, ev, |_| Ok(()))
+    PgKycEventStore::append(&mut tx, registry, ev, "(test-event)", |_| Ok(()))
         .await
         .unwrap();
     tx.commit().await.unwrap();

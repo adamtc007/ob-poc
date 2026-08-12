@@ -16,6 +16,9 @@ pub(crate) mod error;
 pub(crate) mod event;
 pub(crate) mod fold;
 pub(crate) mod lexicon;
+pub(crate) mod placement;
+pub(crate) mod preview;
+pub(crate) mod render;
 pub(crate) mod types;
 
 // ── Convenience re-exports ────────────────────────────────────────────────────
@@ -40,6 +43,9 @@ pub use fold::registry::{
     fold_control_versioned, fold_obligations_versioned, FoldImpl, FoldRegistry, V1FoldImpl,
 };
 pub use lexicon::{phase1_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition, Taxonomy};
+pub use placement::{enumerate_placement_set, LegalMove, MoveId, PlacementSet, NONE_OF_THE_ABOVE};
+pub use preview::preview;
+pub use render::render_intent_event_to_sexpr;
 pub use types::{
     AuthorityRef, EdgeId, EntityId, EventId, Hash, IdemKey, ObligationId, PersonId, Principal,
     SubjectId, TargetBinding, VerbFqn,

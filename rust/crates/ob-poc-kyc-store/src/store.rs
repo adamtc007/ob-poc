@@ -126,10 +126,16 @@ impl PgKycEventStore {
     ///
     /// `validate` is the precondition policy (e.g. proof-ratchet, reconcile). The
     /// store stays decoupled from the lexicon; the caller supplies the check.
+    ///
+    /// `source_text` is the resolved DSL S-expression for `event` (T1, KIT-1) —
+    /// rendered by the caller via `render_intent_event_to_sexpr` (the store
+    /// stays decoupled from the lexicon the same way it does for `validate`;
+    /// it only persists the string, never computes it).
     pub async fn append<V>(
         conn: &mut PgConnection,
         registry: &FoldRegistry,
         event: &IntentEvent,
+        source_text: &str,
         validate: V,
     ) -> Result<AppendOutcome, StoreError>
     where
@@ -181,7 +187,7 @@ impl PgKycEventStore {
         validate(&state)?; // precondition failure -> StoreError::Rejected -> caller rolls back
 
         // 4. Insert at next_seq + bump (same txn: event and seq-bump commit together).
-        insert_event(conn, event, next_seq).await?;
+        insert_event(conn, event, next_seq, source_text).await?;
         sqlx::query(
             r#"UPDATE "ob-poc".kyc_subject_streams
                SET next_seq = next_seq + 1, updated_at = now()
@@ -239,6 +245,7 @@ async fn insert_event(
     conn: &mut PgConnection,
     event: &IntentEvent,
     seq: i64,
+    source_text: &str,
 ) -> Result<(), StoreError> {
     let actor = serde_json::to_value(&event.actor).map_err(sqlx_json)?;
     let target = serde_json::to_value(&event.target).map_err(sqlx_json)?;
@@ -248,8 +255,8 @@ async fn insert_event(
         r#"INSERT INTO "ob-poc".kyc_intent_events
             (subject_root, seq, event_id, verb_fqn, lexicon_hash, actor, authority,
              target, payload, payload_hash, idempotency_key, causation_id,
-             correlation_id, as_of, captured_effects)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)"#,
+             correlation_id, as_of, captured_effects, source_text)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)"#,
     )
     .bind(event.subject_root.0)
     .bind(seq)
@@ -266,9 +273,34 @@ async fn insert_event(
     .bind(event.correlation_id)
     .bind(event.as_of)
     .bind(captured)
+    .bind(source_text)
     .execute(&mut *conn)
     .await?;
     Ok(())
+}
+
+/// Load the ordered `source_text` history for `subject_root` (T1 — KIT-1
+/// replayability). `NULL` entries are pre-T1 rows pending backfill.
+pub async fn load_source_text_history(
+    conn: &mut PgConnection,
+    subject_root: SubjectId,
+) -> Result<Vec<(u64, Option<String>)>, StoreError> {
+    let rows = sqlx::query(
+        r#"SELECT seq, source_text FROM "ob-poc".kyc_intent_events
+           WHERE subject_root = $1 ORDER BY seq ASC"#,
+    )
+    .bind(subject_root.0)
+    .fetch_all(&mut *conn)
+    .await?;
+
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let seq: i64 = row.get("seq");
+            let source_text: Option<String> = row.get("source_text");
+            (seq as u64, source_text)
+        })
+        .collect())
 }
 
 fn row_to_event(row: &sqlx::postgres::PgRow) -> Result<IntentEvent, StoreError> {

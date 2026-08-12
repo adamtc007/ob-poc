@@ -30,4 +30,4 @@ pub use projection::{
     PgKycProjectionDrainer, PgKycProjector, ProjectionStats, CONTROL_EDGE_PROJECTION_EFFECT,
     OBLIGATION_PROJECTION_EFFECT,
 };
-pub use store::{AppendOutcome, PgKycEventStore};
+pub use store::{load_source_text_history, AppendOutcome, PgKycEventStore};

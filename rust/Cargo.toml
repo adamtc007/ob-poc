@@ -65,6 +65,9 @@ dsl-runtime = { path = "crates/dsl-runtime" }
 ob-poc-kyc-substrate = { path = "crates/ob-poc-kyc-substrate" }
 ob-poc-kyc-store = { path = "crates/ob-poc-kyc-store" }
 ob-poc-kyc-seam = { path = "crates/ob-poc-kyc-seam" }
+# T4 (EOP-PLAN-KYCUBO-KIT-001): kyc_workbook recognition parses staged DSL
+# text with the real workspace lexer/parser (tier-0 deterministic matching).
+dsl-parser = { path = "crates/dsl-parser" }
 # dsl-runtime-split v1 Phase 11 (2026-05-14): ob-poc reaches the
 # analyser-tier directly through dsl_v2 re-exports + entity_kind callers
 # in mcp/verb_search, sage/verb_resolve, service_resources/discovery.

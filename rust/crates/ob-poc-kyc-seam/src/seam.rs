@@ -97,10 +97,11 @@ pub async fn append_in_scope<V>(
     scope: &mut dyn TransactionScope,
     registry: &FoldRegistry,
     event: &IntentEvent,
+    source_text: &str,
     validate: V,
 ) -> Result<AppendOutcome, StoreError>
 where
     V: FnOnce(&ControlState) -> Result<(), KycError>,
 {
-    PgKycEventStore::append(scope.executor(), registry, event, validate).await
+    PgKycEventStore::append(scope.executor(), registry, event, source_text, validate).await
 }

@@ -101,10 +101,10 @@ async fn exit3_idempotent_reapply_same_key_one_event() {
     let event = make_event(subject, "same-key");
 
     let mut tx = pool.begin().await.unwrap();
-    let o1 = PgKycEventStore::append(&mut tx, &registry, &event, |_| Ok(()))
+    let o1 = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_| Ok(()))
         .await
         .unwrap();
-    let o2 = PgKycEventStore::append(&mut tx, &registry, &event, |_| Ok(()))
+    let o2 = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_| Ok(()))
         .await
         .unwrap();
     tx.commit().await.unwrap();
@@ -135,7 +135,7 @@ async fn exit1_rollback_leaves_no_orphan() {
 
     {
         let mut tx = pool.begin().await.unwrap();
-        let outcome = PgKycEventStore::append(&mut tx, &registry, &event, |_| Ok(()))
+        let outcome = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_| Ok(()))
             .await
             .unwrap();
         assert_eq!(outcome.seq, 0);
@@ -179,7 +179,7 @@ async fn exit2_concurrent_appends_one_subject_dense_seq() {
             // so all N are distinct events (not deduped).
             let event = make_event(subject, &format!("concurrent-{i}"));
             let mut tx = pool.begin().await.unwrap();
-            let outcome = PgKycEventStore::append(&mut tx, &registry, &event, |_| Ok(()))
+            let outcome = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_| Ok(()))
                 .await
                 .expect("concurrent append must succeed");
             tx.commit().await.unwrap();
@@ -218,7 +218,7 @@ async fn precondition_rejection_under_lock_inserts_nothing() {
     let event = make_event(subject, "rejected");
 
     let mut tx = pool.begin().await.unwrap();
-    let result = PgKycEventStore::append(&mut tx, &registry, &event, |_state| {
+    let result = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_state| {
         // The validator rejects — simulating a failed proof-ratchet precondition.
         Err(KycError::PreconditionFailed {
             verb: VerbFqn("kyc.subject.register".into()),
@@ -257,7 +257,7 @@ async fn cross_subject_appends_are_independent() {
         async move {
             let event = make_event(subject, "x");
             let mut tx = pool.begin().await.unwrap();
-            let o = PgKycEventStore::append(&mut tx, &registry, &event, |_| Ok(()))
+            let o = PgKycEventStore::append(&mut tx, &registry, &event, "(test-event)", |_| Ok(()))
                 .await
                 .unwrap();
             tx.commit().await.unwrap();
@@ -291,7 +291,7 @@ async fn roundtrip_loaded_events_fold_identically() {
     {
         let mut tx = pool.begin().await.unwrap();
         for e in &in_mem {
-            PgKycEventStore::append(&mut tx, &registry, e, |_| Ok(()))
+            PgKycEventStore::append(&mut tx, &registry, e, "(test-event)", |_| Ok(()))
                 .await
                 .unwrap();
         }

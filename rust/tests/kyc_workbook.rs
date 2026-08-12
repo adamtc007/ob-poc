@@ -1,0 +1,489 @@
+//! T4 gate tests — `EOP-PLAN-KYCUBO-KIT-001` §T4 (closes KIT-10/11).
+//!
+//! Five gates per the design doc's §8 (v0.2): `session_roundtrip` (dependent
+//! chain, frontier recognition, canonical source_text), `new_ubo_from_baseplate`
+//! (empty-history path needs no special-casing), `invalid_workbook_blocks_commit`
+//! (both `validate()` and `commit()` independently reject, zero rows land),
+//! `zero_inference_assertion` (import allowlist over `kyc_workbook.rs`, fails
+//! closed on anything new), `stale_snapshot_recovers` (two real connections,
+//! a genuine mid-session interleave — the fail-fast re-check must catch a
+//! precondition that went stale between stage-time and commit-time).
+
+use std::sync::Arc;
+
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgPool, Postgres, Transaction};
+use uuid::Uuid;
+
+use dsl_runtime::TransactionScope;
+use ob_poc::domain_ops::kyc_workbook::{open_workbook, StagedMove};
+use ob_poc_kyc_seam::append_in_scope;
+use ob_poc_kyc_substrate::{
+    phase1_lexicon, render_intent_event_to_sexpr, AuthorityRef, EdgeId, FoldRegistry, IntentEvent,
+    LexiconManifest, MoveId, Principal, SubjectId, TargetBinding, V1FoldImpl,
+};
+use ob_poc_types::TransactionScopeId;
+use sem_os_core::principal::Principal as RuntimePrincipal;
+
+// ── Shared test scaffolding (mirrors ob-poc-kyc-seam/tests/seam.rs) ────────────
+
+fn database_url() -> String {
+    std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string())
+}
+
+async fn connect() -> PgPool {
+    PgPoolOptions::new()
+        .max_connections(8)
+        .connect(&database_url())
+        .await
+        .expect("connect to test DB")
+}
+
+fn v1_registry() -> FoldRegistry {
+    let mut r = FoldRegistry::new();
+    r.register(phase1_lexicon().hash, Arc::new(V1FoldImpl));
+    r
+}
+
+fn runtime_principal(actor_id: &str) -> RuntimePrincipal {
+    RuntimePrincipal {
+        actor_id: actor_id.to_string(),
+        roles: vec!["analyst".to_string()],
+        claims: std::collections::HashMap::new(),
+        tenancy: None,
+    }
+}
+
+fn fixed_ts() -> chrono::DateTime<chrono::Utc> {
+    chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc)
+}
+
+struct TestScope {
+    tx: Transaction<'static, Postgres>,
+    pool: PgPool,
+    id: TransactionScopeId,
+}
+impl TestScope {
+    async fn begin(pool: &PgPool) -> Self {
+        Self {
+            tx: pool.begin().await.unwrap(),
+            pool: pool.clone(),
+            id: TransactionScopeId::new(),
+        }
+    }
+    async fn commit(self) {
+        self.tx.commit().await.unwrap();
+    }
+    async fn rollback(self) {
+        self.tx.rollback().await.unwrap();
+    }
+}
+impl TransactionScope for TestScope {
+    fn scope_id(&self) -> TransactionScopeId {
+        self.id
+    }
+    fn transaction(&mut self) -> &mut Transaction<'static, Postgres> {
+        &mut self.tx
+    }
+    fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+}
+
+async fn count(pool: &PgPool, subject: SubjectId) -> i64 {
+    sqlx::query_scalar(r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#)
+        .bind(subject.0)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn cleanup(pool: &PgPool, subject: SubjectId) {
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#)
+        .bind(subject.0)
+        .execute(pool)
+        .await;
+    let _ = sqlx::query(r#"DELETE FROM "ob-poc".kyc_subject_streams WHERE subject_root = $1"#)
+        .bind(subject.0)
+        .execute(pool)
+        .await;
+}
+
+/// Build a `StagedMove` directly (bypassing `KycWorkbook::stage`'s own
+/// frontier-legality gate) — the only way to get an illegal move into
+/// `workbook.staged` at all, since `stage()` structurally cannot admit one.
+/// Mirrors what a workbook that's gone stale between stage-time and
+/// commit-time looks like from the outside.
+fn manual_staged_move(
+    subject: SubjectId,
+    verb_fqn: &str,
+    target: TargetBinding,
+    payload: serde_json::Value,
+    as_of: chrono::DateTime<chrono::Utc>,
+    lexicon: &LexiconManifest,
+) -> StagedMove {
+    let event = IntentEvent::new(
+        subject,
+        verb_fqn,
+        Principal::test_analyst(),
+        AuthorityRef("test".into()),
+        target,
+        payload,
+        as_of,
+    )
+    .with_lexicon_hash(lexicon.hash);
+    let source_text = render_intent_event_to_sexpr(&event, lexicon.get(verb_fqn));
+    StagedMove {
+        event,
+        source_text,
+        legal_move: MoveId(format!("{verb_fqn}::manual-test-fixture")),
+    }
+}
+
+// ── session_roundtrip ────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn session_roundtrip() {
+    let pool = connect().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+    let principal = runtime_principal("analyst-1");
+    let as_of = fixed_ts();
+    let lexicon = phase1_lexicon();
+
+    let edge = Uuid::new_v4();
+    let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
+    let doc_id = Uuid::new_v4();
+
+    let mut conn = pool.acquire().await.unwrap();
+    let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
+    drop(conn);
+    assert!(workbook.committed.is_empty());
+
+    // Dependent chain: assert-control -> attach-evidence -> verify. Three
+    // INDEPENDENT moves would false-green a committed-only recognition
+    // frontier (the bug the review pass caught) — this fixture is mandatory,
+    // not a flavour choice (design §8).
+    workbook
+        .stage(
+            &format!(
+                r#"(ubo.edge.assert-control :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
+            ),
+            &principal,
+            AuthorityRef("analyst.assert-control".into()),
+            as_of,
+        )
+        .expect("move 1 (assert-control) must recognise against the empty-committed frontier");
+
+    workbook
+        .stage(
+            &format!(r#"(ubo.edge.attach-evidence :edge-id "{edge}" :doc_id "{doc_id}")"#),
+            &principal,
+            AuthorityRef("analyst.attach-evidence".into()),
+            as_of,
+        )
+        .expect(
+            "move 2 (attach-evidence) must recognise against the frontier AFTER move 1 — \
+             a committed-only frontier would wrongly refuse this",
+        );
+
+    workbook
+        .stage(
+            &format!(r#"(ubo.edge.verify :edge-id "{edge}")"#),
+            &principal,
+            AuthorityRef("analyst.verify".into()),
+            as_of,
+        )
+        .expect(
+            "move 3 (verify) must recognise against the frontier AFTER moves 1+2 — \
+             a committed-only frontier would wrongly refuse this too",
+        );
+
+    // Every staged move's source_text is the canonical resolved re-render
+    // (T0.2 / design §6 step 4), not verbatim typed text.
+    for staged in &workbook.staged {
+        let entry = lexicon.get(staged.event.verb_fqn.as_str());
+        assert_eq!(
+            staged.source_text,
+            render_intent_event_to_sexpr(&staged.event, entry),
+            "source_text must be the canonical render, recomputed independently"
+        );
+    }
+
+    let pre_commit_state = workbook.validate().expect("staged chain must validate");
+    let pre_commit_status = pre_commit_state
+        .edges
+        .get(&EdgeId(edge))
+        .map(|e| e.status)
+        .expect("edge must exist in the pre-commit preview");
+
+    let mut scope = TestScope::begin(&pool).await;
+    let outcomes = workbook
+        .commit(&mut scope, &registry)
+        .await
+        .expect("a fully legal 3-move chain must commit");
+    assert_eq!(outcomes.len(), 3);
+    scope.commit().await;
+
+    // Re-open (KIT-4 re-run-whole) must reproduce the pre-commit preview,
+    // bit-identically — not just at the T3 layer, end to end through commit.
+    let mut conn2 = pool.acquire().await.unwrap();
+    let reopened = open_workbook(&mut conn2, subject).await.unwrap();
+    assert_eq!(reopened.committed.len(), 3);
+    let post_commit_state = reopened.validate().unwrap();
+    assert_eq!(
+        post_commit_state.edges.get(&EdgeId(edge)).map(|e| e.status),
+        Some(pre_commit_status),
+        "re-open after commit must reproduce the last pre-commit validate() state"
+    );
+
+    cleanup(&pool, subject).await;
+}
+
+// ── new_ubo_from_baseplate ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn new_ubo_from_baseplate() {
+    let pool = connect().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+    let principal = runtime_principal("analyst-1");
+    let as_of = fixed_ts();
+
+    let mut conn = pool.acquire().await.unwrap();
+    let workbook = open_workbook(&mut conn, subject).await.unwrap();
+    drop(conn);
+    assert!(workbook.committed.is_empty(), "never-appended subject has no committed history");
+    let empty_state = workbook.validate().unwrap();
+    assert_eq!(empty_state.edges.len(), 0);
+    assert!(!empty_state.registered);
+
+    let mut conn = pool.acquire().await.unwrap();
+    let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
+    drop(conn);
+    workbook
+        .stage("(kyc.subject.register)", &principal, AuthorityRef("analyst.register".into()), as_of)
+        .expect("register has no preconditions — legal against the empty baseplate");
+
+    let mut scope = TestScope::begin(&pool).await;
+    workbook.commit(&mut scope, &registry).await.unwrap();
+    scope.commit().await;
+
+    let mut conn2 = pool.acquire().await.unwrap();
+    let reopened = open_workbook(&mut conn2, subject).await.unwrap();
+    let state = reopened.validate().unwrap();
+    assert!(state.registered, "committed register must fold true on re-open");
+
+    cleanup(&pool, subject).await;
+}
+
+// ── invalid_workbook_blocks_commit ──────────────────────────────────────────
+
+#[tokio::test]
+async fn invalid_workbook_blocks_commit() {
+    let pool = connect().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+    let lexicon = phase1_lexicon();
+    let as_of = fixed_ts();
+
+    let edge = Uuid::new_v4();
+    let (from, to) = (Uuid::new_v4(), Uuid::new_v4());
+
+    let mut conn = pool.acquire().await.unwrap();
+    let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
+    drop(conn);
+
+    // Move 1: legal. Move 2: illegal (verify with no evidence attached — the
+    // K-11 proof ratchet). Move 3: would-be-legal, never gets the chance.
+    workbook.staged.push(manual_staged_move(
+        subject,
+        "ubo.edge.assert-control",
+        TargetBinding::for_subject(subject),
+        serde_json::json!({"edge_id": edge, "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"}),
+        as_of,
+        &lexicon,
+    ));
+    workbook.staged.push(manual_staged_move(
+        subject,
+        "ubo.edge.verify",
+        TargetBinding::for_edge(subject, EdgeId(edge)),
+        serde_json::json!({}),
+        as_of,
+        &lexicon,
+    ));
+    workbook.staged.push(manual_staged_move(
+        subject,
+        "ubo.edge.attach-evidence",
+        TargetBinding::for_edge(subject, EdgeId(edge)),
+        serde_json::json!({"doc_id": Uuid::new_v4()}),
+        as_of,
+        &lexicon,
+    ));
+
+    assert!(workbook.validate().is_err(), "validate() must reject before any commit attempt");
+
+    // Directly call commit() too — simulating a caller that skipped validate().
+    let mut scope = TestScope::begin(&pool).await;
+    let result = workbook.commit(&mut scope, &registry).await;
+    assert!(result.is_err(), "commit() must independently reject via its own fail-fast preview");
+    scope.rollback().await;
+
+    assert_eq!(
+        count(&pool, subject).await,
+        0,
+        "a rejected commit must leave zero rows — nothing partial lands"
+    );
+
+    cleanup(&pool, subject).await;
+}
+
+// ── zero_inference_assertion ────────────────────────────────────────────────
+
+/// Import allowlist over `kyc_workbook.rs` (design §8 v0.2: allowlist, not a
+/// keyword denylist — fails closed on anything new, including via a new
+/// sibling helper module this file starts importing from). No model/LLM/
+/// agent crate may ever appear in this module's `use` statements.
+#[test]
+fn zero_inference_assertion() {
+    const ALLOWLIST: &[&str] = &[
+        "std",
+        "chrono",
+        "sqlx",
+        "uuid",
+        "thiserror",
+        "serde_json",
+        "dsl_parser",
+        "dsl_runtime",
+        "ob_poc_kyc_seam",
+        "ob_poc_kyc_store",
+        "ob_poc_kyc_substrate",
+        "sem_os_core",
+    ];
+
+    let source = include_str!("../src/domain_ops/kyc_workbook.rs");
+    let mut violations = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        let Some(rest) = trimmed.strip_prefix("use ") else { continue };
+        let root = rest
+            .split(|c: char| c == ':' || c == ';' || c == '{' || c.is_whitespace())
+            .next()
+            .unwrap_or("");
+        if root.is_empty() || root == "crate" || root == "super" || root == "self" {
+            continue;
+        }
+        if !ALLOWLIST.contains(&root) {
+            violations.push(line.to_string());
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "kyc_workbook.rs has imports outside the zero-inference allowlist {ALLOWLIST:?} \
+         (extend the allowlist deliberately, in this test, if the import is genuinely \
+         zero-inference — never silently): {violations:#?}"
+    );
+}
+
+// ── stale_snapshot_recovers ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn stale_snapshot_recovers() {
+    let pool = connect().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let registry = v1_registry();
+    let principal = runtime_principal("analyst-1");
+    let lexicon = phase1_lexicon();
+    let as_of = fixed_ts();
+    let edge = Uuid::new_v4();
+
+    // Pre-existing committed history: an evidenced edge (setup connection).
+    {
+        let mut scope = TestScope::begin(&pool).await;
+        let assert_event = IntentEvent::new(
+            subject,
+            "ubo.edge.assert-control",
+            Principal::test_analyst(),
+            AuthorityRef("setup.assert-control".into()),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": edge, "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights"}),
+            as_of,
+        )
+        .with_lexicon_hash(lexicon.hash);
+        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_| Ok(())).await.unwrap();
+
+        let evidence_event = IntentEvent::new(
+            subject,
+            "ubo.edge.attach-evidence",
+            Principal::test_analyst(),
+            AuthorityRef("setup.attach-evidence".into()),
+            TargetBinding::for_edge(subject, EdgeId(edge)),
+            serde_json::json!({"doc_id": Uuid::new_v4()}),
+            as_of,
+        )
+        .with_lexicon_hash(lexicon.hash);
+        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_| Ok(())).await.unwrap();
+        scope.commit().await;
+    }
+
+    // Workbook opens: sees the edge Evidenced, stages `verify` — legal
+    // against THIS frontier.
+    let mut conn = pool.acquire().await.unwrap();
+    let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
+    drop(conn);
+    workbook
+        .stage(
+            &format!(r#"(ubo.edge.verify :edge-id "{edge}")"#),
+            &principal,
+            AuthorityRef("analyst.verify".into()),
+            as_of,
+        )
+        .expect("verify must recognise — the edge is Evidenced in this workbook's committed history");
+
+    // Concurrent connection commits `supersede` on the SAME edge mid-session
+    // — a genuine second connection, a real interleave, not a mock.
+    {
+        let mut scope2 = TestScope::begin(&pool).await;
+        let supersede_event = IntentEvent::new(
+            subject,
+            "ubo.edge.supersede",
+            Principal::test_analyst(),
+            AuthorityRef("concurrent.supersede".into()),
+            TargetBinding::for_edge(subject, EdgeId(edge)),
+            serde_json::json!({}),
+            as_of,
+        )
+        .with_lexicon_hash(lexicon.hash);
+        let outcome = append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_| Ok(()))
+            .await
+            .expect("concurrent supersede must itself succeed (no precondition on supersede)");
+        scope2.commit().await;
+        assert!(!outcome.deduped, "concurrent supersede must be a real new append, not a dedupe no-op");
+    }
+
+    // Workbook 1 now commits its staged `verify` — the edge it validated
+    // against is gone (superseded) by the time commit runs. The fail-fast
+    // whole-chain preview (against a FRESH load_events on the scope's own
+    // connection) must catch this and reject — never silently commit a
+    // verify against a now-superseded edge.
+    let mut scope1 = TestScope::begin(&pool).await;
+    let result = workbook.commit(&mut scope1, &registry).await;
+    assert!(
+        result.is_err(),
+        "commit() must re-validate against TRUE current state and reject the now-stale verify"
+    );
+    scope1.rollback().await;
+
+    // The concurrent supersede is the only row that landed for the workbook's
+    // own staged verify — confirm nothing from the stale commit attempt did.
+    assert_eq!(
+        count(&pool, subject).await,
+        3,
+        "2 setup rows + 1 concurrent supersede; the stale verify must NOT have appended a 4th"
+    );
+
+    cleanup(&pool, subject).await;
+}
