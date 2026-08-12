@@ -155,6 +155,7 @@ pub mod helpers;
 // Registration flows through inventory; external ob-poc code does not
 // import these types directly.
 pub mod kyc_stream_ops;
+pub mod kyc_workbook;
 mod onboarding;
 mod onboarding_data_request;
 // Phase 5c — outreach_ops relocated to `dsl-runtime::domain_ops::outreach_ops`
@@ -431,9 +432,8 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationFreeze));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectRegister));
     registry.register(Arc::new(kyc_stream_ops::KycSubjectClassifyStructure));
-    // W3: role-basis recording
-    registry.register(Arc::new(kyc_stream_ops::KycRoleAssign));
-    registry.register(Arc::new(kyc_stream_ops::KycRoleWithdraw));
+    // W3: role-basis recording — KycRoleAssign/KycRoleWithdraw retired
+    // 2026-08-12 (T0.3 K-G7 fold-blind write; see kyc_stream_ops.rs).
     // W5: obligation lifecycle
     registry.register(Arc::new(kyc_stream_ops::KycObligationCreate));
     registry.register(Arc::new(kyc_stream_ops::KycObligationUpdateIdentity));

@@ -22,10 +22,10 @@ use ob_poc_kyc_seam::{append_in_scope, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
 use ob_poc_kyc_substrate::{
     check_control_preconditions, find_subject_entity, fold_control_versioned,
-    fold_obligations_versioned, natural_persons_from_events, phase1_lexicon, AuthorityRef,
-    ControlProngStrategy, DeterminationStrategy, EdgeId, FoldRegistry, OwnershipProngStrategy,
-    PersonId, Prong, ProngCandidate, SmoResult, SubjectId, SubjectOverallState, TargetBinding,
-    V1FoldImpl,
+    fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
+    render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
+    EdgeId, FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
+    SubjectId, SubjectOverallState, TargetBinding, V1FoldImpl,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
 #[allow(unused_imports)]
@@ -56,6 +56,11 @@ async fn stream_append(
                 .ok_or_else(|| anyhow!("{fqn} missing from lexicon"))
         })
         .transpose()?;
+    // Rendering looks the entry up independently of `validate_entry_fqn` — 8 of
+    // the 20 dsl.kyc verbs have no lexicon entry at all yet (T0.3 gap K-G6;
+    // T6.0 closes this), so `render_intent_event_to_sexpr` takes `Option` and
+    // degrades gracefully.
+    let render_entry = entry.or_else(|| lexicon.get(verb_fqn));
 
     let event = IntentEventDraft {
         verb_fqn: verb_fqn.into(),
@@ -67,8 +72,9 @@ async fn stream_append(
         as_of: ctx.as_of,
     }
     .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
+    let source_text = render_intent_event_to_sexpr(&event, render_entry);
 
-    append_in_scope(scope, &KYC_REGISTRY, &event, |state| {
+    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |state| {
         if let Some(e) = entry {
             check_control_preconditions(e, state, &event)?;
         }
@@ -130,8 +136,9 @@ impl SemOsVerbOp for UboEdgeAssertControl {
             as_of: ctx.as_of, // frozen at verb entry — never now() here
         }
         .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
+        let source_text = render_intent_event_to_sexpr(&event, Some(entry));
 
-        let outcome = append_in_scope(scope, &KYC_REGISTRY, &event, |state| {
+        let outcome = append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |state| {
             check_control_preconditions(entry, state, &event)
         })
         .await
@@ -715,70 +722,9 @@ fn normalize_obligation_payload(args: &serde_json::Value) -> serde_json::Value {
     p
 }
 
-// ── W3: Role-basis recording ──────────────────────────────────────────────────
-
-pub struct KycRoleAssign;
-
-#[async_trait]
-impl SemOsVerbOp for KycRoleAssign {
-    fn fqn(&self) -> &str {
-        "kyc.role.assign"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let _role = json_extract_string(args, "role")?;
-        let outcome = stream_append(
-            "kyc.role.assign",
-            subject,
-            TargetBinding::for_subject(subject),
-            args.clone(),
-            "analyst.role-assign",
-            None,
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
-
-pub struct KycRoleWithdraw;
-
-#[async_trait]
-impl SemOsVerbOp for KycRoleWithdraw {
-    fn fqn(&self) -> &str {
-        "kyc.role.withdraw"
-    }
-    async fn execute(
-        &self,
-        args: &serde_json::Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let outcome = stream_append(
-            "kyc.role.withdraw",
-            subject,
-            TargetBinding::for_subject(subject),
-            args.clone(),
-            "analyst.role-withdraw",
-            None,
-            ctx,
-            scope,
-        )
-        .await?;
-        Ok(VerbExecutionOutcome::Record(
-            serde_json::json!({ "seq": outcome.seq }),
-        ))
-    }
-}
+// KycRoleAssign / KycRoleWithdraw retired 2026-08-12 (T0.3 K-G7 fold-blind
+// write — see dsl-kyc-obligation.yaml's retirement comment for the full
+// rationale; reintroduction only via T6, precondition attached from birth).
 
 // ── W5: Obligation lifecycle ──────────────────────────────────────────────────
 

@@ -121,8 +121,6 @@ dsl_verb_reconciliation:
     - kyc.obligation.waive
     - kyc.person.approve
     - kyc.person.reject
-    - kyc.role.assign
-    - kyc.role.withdraw
     - kyc.subject.classify-structure
     - kyc.subject.register
   observation_surface:

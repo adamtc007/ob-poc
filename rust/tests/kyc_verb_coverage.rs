@@ -1,4 +1,5 @@
-//! 100% live-DB integration coverage for all 22 dsl.kyc verbs.
+//! 100% live-DB integration coverage for all 20 dsl.kyc verbs
+//! (kyc.role.assign/withdraw retired 2026-08-12, T0.3 K-G7 fold-blind write).
 //!
 //! Each verb is exercised via its `SemOsVerbOp` through a real
 //! `VerbExecutionContext` and `TransactionScope`. The test commits to the
@@ -6,15 +7,14 @@
 //! Verbs with preconditions run in natural dependency order
 //! (assert → attach-evidence → verify, etc.).
 //!
-//! Six verbs are already proven in dedicated test files:
+//! Five verbs are already proven in dedicated test files:
 //!   ubo.edge.assert-control          → tests/kyc_stream_ops.rs
 //!   kyc.subject.register             → tests/kyc_stream_ops.rs + kyc_w3_w5_w6.rs
-//!   kyc.role.assign                  → tests/kyc_w3_w5_w6.rs
 //!   kyc.obligation.create            → tests/kyc_w3_w5_w6.rs
 //!   kyc.obligation.satisfy           → tests/kyc_w3_w5_w6.rs
 //!   kyc.person.approve               → tests/kyc_w3_w5_w6.rs
 //!
-//! This file covers the remaining 16.
+//! This file covers the remaining 15.
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -23,11 +23,11 @@ use uuid::Uuid;
 use dsl_runtime::{TransactionScope, VerbExecutionContext};
 use ob_poc::domain_ops::kyc_stream_ops::{
     KycObligationCreate, KycObligationUpdateIdentity, KycObligationUpdateRisk,
-    KycObligationUpdateScreening, KycObligationWaive, KycPersonReject, KycRoleAssign,
-    KycRoleWithdraw, KycSubjectClassifyStructure, KycSubjectRegister,
-    UboDeterminationApplySmoFallback, UboDeterminationComputeFold, UboDeterminationFreeze,
-    UboDeterminationSelectStrategy, UboEdgeAssertControl, UboEdgeAssertEconomicInterest,
-    UboEdgeAttachEvidence, UboEdgeReconcileConflict, UboEdgeSupersede, UboEdgeVerify,
+    KycObligationUpdateScreening, KycObligationWaive, KycPersonReject,
+    KycSubjectClassifyStructure, KycSubjectRegister, UboDeterminationApplySmoFallback,
+    UboDeterminationComputeFold, UboDeterminationFreeze, UboDeterminationSelectStrategy,
+    UboEdgeAssertControl, UboEdgeAssertEconomicInterest, UboEdgeAttachEvidence,
+    UboEdgeReconcileConflict, UboEdgeSupersede, UboEdgeVerify,
 };
 use ob_poc_kyc_substrate::SubjectId;
 use ob_poc_types::TransactionScopeId;
@@ -424,36 +424,9 @@ async fn coverage_kyc_subject_classify_structure() {
 
 // ── Role-basis (kyc.role.*) ───────────────────────────────────────────────────
 
-#[tokio::test]
-async fn coverage_kyc_role_withdraw() {
-    let pool = pool().await;
-    let subject = SubjectId(Uuid::new_v4());
-    run(
-        &KycSubjectRegister,
-        serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
-        &pool,
-    )
-    .await;
-    run(
-        &KycRoleAssign,
-        serde_json::json!({ "subject-id": subject.0, "role": "signatory" }),
-        &pool,
-    )
-    .await;
-    run(&KycRoleWithdraw, serde_json::json!({
-        "subject-id": subject.0, "role": "signatory", "reason": "no longer authorised signatory",
-    }), &pool).await;
-    assert_event(&pool, subject, "kyc.role.withdraw").await;
-    // K-13 analogue: assign event stays in stream
-    let assigns: i64 = sqlx::query_scalar(
-        r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root=$1 AND verb_fqn='kyc.role.assign'"#,
-    ).bind(subject.0).fetch_one(&pool).await.unwrap();
-    assert_eq!(
-        assigns, 1,
-        "role.assign event stays in stream after withdraw"
-    );
-    cleanup(&pool, &[subject]).await;
-}
+// coverage_kyc_role_withdraw removed 2026-08-12 — kyc.role.assign/withdraw
+// retired (T0.3 K-G7 fold-blind write); see dsl-kyc-obligation.yaml's
+// retirement comment.
 
 // ── Obligation lifecycle (kyc.obligation.*) ───────────────────────────────────
 

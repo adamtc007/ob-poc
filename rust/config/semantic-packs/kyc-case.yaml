@@ -236,8 +236,6 @@ capabilities:
     - ubo.determination.freeze
     - kyc.subject.register
     - kyc.subject.classify-structure
-    - kyc.role.assign
-    - kyc.role.withdraw
     - kyc.obligation.create
     - kyc.obligation.update-identity
     - kyc.obligation.update-screening

@@ -203,9 +203,10 @@ impl LexiconManifest {
 
 // ── Phase-1/2 verb entries ────────────────────────────────────────────────────
 
-/// Build the canonical `LexiconManifest` for the ~10 Phase-1/2 verbs.
-/// This is the normative lexicon for the vertical slice (V&S Appendix A,
-/// phases 1–2).
+/// Build the canonical `LexiconManifest` for all 20 dsl.kyc verbs (12
+/// Phase-1/2 determination verbs + 8 W5 obligation/person verbs, T6.0
+/// closure, 2026-08-12). This is the normative lexicon for the vertical
+/// slice (V&S Appendix A, phases 1–2) plus the W5 obligation lifecycle.
 pub fn phase1_lexicon() -> LexiconManifest {
     use smallvec::smallvec;
 
@@ -327,6 +328,85 @@ pub fn phase1_lexicon() -> LexiconManifest {
             ],
             AuthoritySpec::senior_analyst(),
             vec![EmitSpec::person_obligation(), EmitSpec::entity_obligation()],
+        ),
+        // ── T6.0 — obligation/person family entries (K-G6 closure) ──────────
+        // Entries only (T0.3-ratified split from T6): no preconditions
+        // authored here — that stays T6.1+. `governing_taxonomy: Obligation`
+        // for all 8 — the Subject→role→obligation→evidence→decision chain
+        // (§7.3) this taxonomy names explicitly includes the decision step,
+        // which is what `person.approve`/`person.reject` are.
+        LexiconEntry::build(
+            "kyc.obligation.create",
+            "Create an obligation for a subject under a stated role basis (K-21, K-35)",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.obligation.update-identity",
+            "Advance the identity verification track of an obligation",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.obligation.update-screening",
+            "Advance the screening track of an obligation (K-26 — screening gates \
+             approval, not determination)",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.obligation.update-risk",
+            "Advance the risk-assessment track of an obligation",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.obligation.satisfy",
+            "Mark all tracks on an obligation as satisfied (full KYC clearance)",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.obligation.waive",
+            "Waive an obligation (all tracks set to Waived with a recorded reason)",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.person.approve",
+            "Approve a subject once all obligations are terminal (K-23 gate)",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.person.reject",
+            "Reject a subject (K-23 — decision recorded on the stream, never erased)",
+            Taxonomy::Obligation,
+            smallvec![FoldId::ObligationGraph],
+            vec![],
+            AuthoritySpec::senior_analyst(),
+            vec![],
         ),
     ];
 

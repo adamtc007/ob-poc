@@ -112,31 +112,3 @@
 )
 
 (utterance-binding kyc.person.reject :phrases ["reject person" "reject subject" "reject KYC subject" "refuse KYC approval" "reject this person" "KYC reject" "mark subject rejected" "record KYC rejection" "reject the KYC application" "decline KYC approval"] :domain "kyc" :verb kyc.person.reject)
-
-(verb kyc.role.assign
-  :domain "kyc"
-  :description "Assign a KYC role to a subject, recording the basis for obligation (K-21, K-24)"
-  :behavior "plugin"
-  :effect-class "append_fact"
-  :flavour "instance_adding"
-  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"kyc_subject\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"kyc\",\"role\",\"obligation-basis\",\"w3\",\"dsl-kyc\"],\"tier\":\"intent\",\"writes_operational\":false}"
-  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
-  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
-  :args-json "[{\"default\":null,\"description\":\"The KYC subject receiving the role\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"subject-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Role name e.g. beneficial_owner, controller, signatory, investor\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"role\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Jurisdiction driving the obligation (ISO 3166-1 alpha-2)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"jurisdiction\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"CBU/Deal role linking obligation to commercial exposure (K-24)\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"cbu-role\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
-)
-
-(utterance-binding kyc.role.assign :phrases ["assign KYC role" "assign role to subject" "record role basis" "assign beneficial owner role" "assign controller role" "assign signatory role" "record subject role" "assign KYC obligation basis" "assign subject to role" "record the basis for KYC obligation" "assign this entity a KYC role" "mark as beneficial owner" "record controller basis"] :domain "kyc" :verb kyc.role.assign)
-
-(verb kyc.role.withdraw
-  :domain "kyc"
-  :description "Withdraw a previously assigned role from a subject (K-13 style — event recorded, not deleted)"
-  :behavior "plugin"
-  :effect-class "append_fact"
-  :flavour "attribute_mutating"
-  :metadata-json "{\"action_class\":null,\"dangerous\":false,\"harm_class\":null,\"internal\":false,\"noun\":\"kyc_subject\",\"phase_tags\":[\"kyc\"],\"produces_focus\":false,\"removal_version\":null,\"replaced_by\":null,\"replaces\":null,\"requires_subject\":true,\"scope\":\"global\",\"side_effects\":\"state_write\",\"since_version\":null,\"source_of_truth\":\"workflow\",\"status\":\"active\",\"subject_kinds\":[],\"tags\":[\"kyc\",\"role\",\"obligation-basis\",\"w3\",\"dsl-kyc\"],\"tier\":\"intent\",\"writes_operational\":false}"
-  :three-axis-json "{\"consequence\":{\"baseline\":\"reviewable\",\"escalation\":[]},\"external_effects\":[],\"state_effect\":\"preserving\"}"
-  :returns-json "{\"capture\":null,\"name\":null,\"type\":\"record\"}"
-  :args-json "[{\"default\":null,\"description\":\"The KYC subject\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"subject-id\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"uuid\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Role to withdraw\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"role\",\"preferred_roles\":[],\"required\":true,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null},{\"default\":null,\"description\":\"Reason for withdrawal\",\"fuzzy_check\":null,\"lookup\":null,\"maps_to\":null,\"name\":\"reason\",\"preferred_roles\":[],\"required\":false,\"slot_type\":null,\"type\":\"string\",\"valid_values\":null,\"validation\":null}]"
-)
-
-(utterance-binding kyc.role.withdraw :phrases ["withdraw role" "remove role from subject" "withdraw KYC role" "revoke role assignment" "withdraw role basis" "remove obligation basis" "withdraw this subject's role" "remove KYC role" "retract role assignment"] :domain "kyc" :verb kyc.role.withdraw)

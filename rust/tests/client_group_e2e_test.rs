@@ -262,8 +262,6 @@ mod e2e_tests {
         let allowed_verbs: std::collections::HashSet<String> = [
             "kyc.subject.register",
             "kyc.subject.classify-structure",
-            "kyc.role.assign",
-            "kyc.role.withdraw",
             "ubo.edge.assert-control",
             "ubo.edge.assert-economic-interest",
             "ubo.determination.freeze",

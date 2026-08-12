@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
 use ob_poc::domain_ops::kyc_stream_ops::{
-    KycObligationCreate, KycObligationSatisfy, KycPersonApprove, KycRoleAssign, KycSubjectRegister,
+    KycObligationCreate, KycObligationSatisfy, KycPersonApprove, KycSubjectRegister,
 };
 use ob_poc_kyc_store::{
     PgKycObligationDrainer, PgKycProjectionDrainer, CONTROL_EDGE_PROJECTION_EFFECT,
@@ -113,14 +113,16 @@ async fn w3_w5_w6_obligation_lifecycle_end_to_end() {
     let subject = SubjectId(Uuid::new_v4());
     let registry = v1_registry();
 
-    // W3: register subject + assign role (obligation basis)
+    // W3: register subject. kyc.role.assign retired 2026-08-12 (T0.3 K-G7 —
+    // it was fold-blind; the obligation basis below (K-21) is recorded
+    // entirely by obligation.create's own required `role` arg, asserted at
+    // `o_role` below, independent of role.assign ever having been called).
     dispatch(
         &KycSubjectRegister,
         serde_json::json!({ "subject-id": subject.0, "is_natural_person": true }),
         &pool,
     )
     .await;
-    dispatch(&KycRoleAssign, serde_json::json!({ "subject-id": subject.0, "role": "beneficial_owner", "jurisdiction": "LU" }), &pool).await;
 
     // W5: create obligation with the recorded basis
     let obligation_id = Uuid::new_v4();
