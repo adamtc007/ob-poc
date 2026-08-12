@@ -57,6 +57,40 @@ pub enum Precondition {
     /// A prior `ubo.determination.select-strategy` event must exist in the
     /// stream (K-4).  Enforces: strategy before fold.
     StrategySelected,
+
+    // ── T6.1(b) — EOP-DD-KYCUBO-KIT-T6 §2 variant inventory ────────────────
+    // Machinery only in this tranche: every variant below is evaluable, but
+    // only `StructureClassSupported` is attached to a lexicon entry today
+    // (the T6.1(c) exemplar, matrix rows 6a/8a). The other 9 ship unattached;
+    // T6.2–T6.4 attach them per the ratified matrix.
+    /// `ControlState.registered` must be true (rows 1,2,5,6,10,11).
+    SubjectRegistered,
+    /// `ControlState.registered` must be false (row 9 — no double-registration).
+    NotAlreadyRegistered,
+    /// `ControlState.structure_class` must be `Some` (row 6).
+    StructureClassified,
+    /// `ControlState.structure_class` must be a member of the pinned
+    /// implemented-strategy set (rows 6a/8a — the T6.1(c) fail-closed guard).
+    StructureClassSupported,
+    /// No active edge may already exist with the same (from, to, kind) as the
+    /// event payload — contradicting claims go through `supersede`, never a
+    /// second assert (rows 1,2; K-13).
+    NoDuplicateActiveEdge,
+    /// The edge named by `target.edge_id` must exist in the control graph
+    /// (rows 3,4).
+    EdgeExists,
+    /// The edge named by `target.edge_id` must exist and not be superseded
+    /// (rows 3,4).
+    EdgeActive,
+    /// The obligation named by the event payload's `obligation_id` must exist
+    /// (rows 12–16).
+    ObligationExists,
+    /// The subject's obligation rollup must not already be
+    /// `Approved`/`Rejected` (rows 12–18; K-23: decision is final).
+    SubjectNotDecided,
+    /// The subject's obligation rollup must be `AllTerminal`
+    /// (row 17 — the K-23 approval gate).
+    SubjectAllTerminal,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -235,7 +269,13 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Claim a control edge (voting, board, GP statutory, etc.)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            vec![],
+            // T6.2 row 1: subject must be registered; no active edge with the
+            // same (from, to, kind) may already exist — contradicting claims
+            // go through supersede, never a second assert (K-13).
+            vec![
+                Precondition::SubjectRegistered,
+                Precondition::NoDuplicateActiveEdge,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -244,7 +284,11 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Claim an economic-interest edge (shareholding percentage)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            vec![],
+            // T6.2 row 2: same two studs as row 1, reused.
+            vec![
+                Precondition::SubjectRegistered,
+                Precondition::NoDuplicateActiveEdge,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -253,7 +297,8 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Cite documentary proof for a control or economic edge",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            vec![],
+            // T6.2 row 3: target edge must exist and not be superseded.
+            vec![Precondition::EdgeExists, Precondition::EdgeActive],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -272,7 +317,9 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Retire an edge and replace with a new one (supersede-never-delete, K-13)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            vec![],
+            // T6.2 row 4: target edge must exist and not already be
+            // superseded (double-supersede would no-op-pollute the stream).
+            vec![Precondition::EdgeExists, Precondition::EdgeActive],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -281,7 +328,10 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Canonicalise conflicting source edges before determination (K-14)",
             Taxonomy::Control,
             smallvec![FoldId::ControlGraph],
-            vec![],
+            // T6.2 row 5: subject must be registered. Ratified WITHOUT the
+            // matrix's optional "≥1 active economic edge" amendment — kept
+            // callable early, deliberately, per the T6 ratification note.
+            vec![Precondition::SubjectRegistered],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -291,7 +341,12 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Choose the determination strategy keyed on the subject structure class (K-4)",
             Taxonomy::Control,
             smallvec![FoldId::Determination],
-            vec![],
+            // T6.1(c) exemplar (matrix row 6a): structure class must have an
+            // implemented DeterminationStrategy — converts a silently-wrong
+            // determination for the 6 unimplemented classes into a
+            // fail-closed error. SubjectRegistered/StructureClassified
+            // (row 6's remainder) are T6.3 scope, not shipped here.
+            vec![Precondition::StructureClassSupported],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -322,9 +377,13 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Pin an immutable determination; emits PersonObligation for each resolved person",
             Taxonomy::Control,
             smallvec![FoldId::Determination, FoldId::ObligationGraph],
+            // T6.1(c) exemplar (matrix row 8a): StructureClassSupported ADDED
+            // to freeze's existing two — defense in depth at the terminal
+            // verb; the guard holds even if select-strategy is bypassed.
             vec![
                 Precondition::ReconciledProjection,
                 Precondition::StrategySelected,
+                Precondition::StructureClassSupported,
             ],
             AuthoritySpec::senior_analyst(),
             vec![EmitSpec::person_obligation(), EmitSpec::entity_obligation()],

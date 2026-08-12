@@ -280,6 +280,15 @@ async fn coverage_ubo_determination_select_strategy() {
         &pool,
     )
     .await;
+    // T6.1(c): select-strategy now carries `StructureClassSupported` (the 6a
+    // exemplar) — classify-structure into an implemented class must precede
+    // it, or the append is rejected fail-closed (as it should be).
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
+        &pool,
+    )
+    .await;
     run(
         &UboDeterminationSelectStrategy,
         serde_json::json!({
@@ -302,6 +311,31 @@ async fn coverage_ubo_determination_compute_fold() {
         &pool,
     )
     .await;
+    // T6-tooth fix (2026-08-12, EOP-PLAN-KYCUBO-KIT-001 Part A): compute-fold
+    // now genuinely enforces its declared [ReconciledProjection,
+    // StrategySelected] preconditions (K-14) — classify + reconcile +
+    // select-strategy must fire first (select-strategy's own
+    // `StructureClassSupported` precondition, from T6.1, requires the
+    // classify step too; same fix as `kyc_m3_remediation.rs::m3_3_structure_
+    // class_round_trips_through_the_fold`).
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({ "subject-id": subject.0, "structure-class": "private_company" }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
+        &pool,
+    )
+    .await;
     // compute-fold is a pure read — returns a summary, no new event appended
     run(
         &UboDeterminationComputeFold,
@@ -309,7 +343,8 @@ async fn coverage_ubo_determination_compute_fold() {
         &pool,
     )
     .await;
-    // Only the register event is in the stream (compute-fold is a read)
+    // register + classify-structure + reconcile-conflict + select-strategy are in the stream
+    // (compute-fold is a read — appends nothing itself)
     let count: i64 = sqlx::query_scalar(
         r#"SELECT count(*) FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#,
     )
@@ -317,7 +352,7 @@ async fn coverage_ubo_determination_compute_fold() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(count, 1, "compute-fold is a pure read — no event appended");
+    assert_eq!(count, 4, "compute-fold is a pure read — no event appended by it specifically");
     cleanup(&pool, &[subject]).await;
 }
 

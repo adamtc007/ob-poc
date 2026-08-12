@@ -393,13 +393,44 @@ pub fn fold_control(events: &[&IntentEvent]) -> ControlState {
 // ── Precondition checker ──────────────────────────────────────────────────────
 
 use crate::error::KycError;
+use crate::fold::obligation::{obligation_id_from_payload, ObligationState};
 use crate::lexicon::{LexiconEntry, Precondition};
 
-/// Check all preconditions for a verb against the current control state
-/// and target binding **before** appending the event (K-11, K-14).
-pub fn check_control_preconditions(
+/// The structure classes with an implemented `DeterminationStrategy` **today**
+/// (T6.1(c) exemplar — `StructureClassSupported`, matrix rows 6a/8a).
+///
+/// Derived, not guessed: `kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute`
+/// dispatch (`match strategy_name { "ownership_prong_strategy" => ...,
+/// "control_prong_strategy" => ..., other => Err(...) }`) recognises exactly
+/// two strategy names, and this plan's own TS.0–TS.4 build-out enumerates the
+/// 6 `StructureClass` variants with NO strategy behind them yet — `Trust`,
+/// `Foundation`, `InvestmentFund`, `StateOwned`, `Cooperative`, `Nominee`
+/// (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.0–TS.4). The set below is the complement:
+/// the 11-variant `StructureClass` taxonomy minus those 6 — the
+/// "corporate-ownership-prong" classes the two implemented strategies
+/// actually cover. Widen this set ONLY when a new `DeterminationStrategy`
+/// impl lands for the class (the "seventh tooth",
+/// `tests/kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`,
+/// pins the strategy count and must be consciously updated in lockstep).
+pub const IMPLEMENTED_STRATEGY_CLASSES: &[StructureClass] = &[
+    StructureClass::PrivateCompany,
+    StructureClass::MultiTierHoldingGroup,
+    StructureClass::ListedEntity,
+    StructureClass::LimitedPartnershipFund,
+    StructureClass::Llp,
+];
+
+/// Check all preconditions for a verb against the current control state,
+/// obligation state, and target binding **before** appending the event
+/// (K-11, K-14). The unified two-fold checker (T6.1(a)): a single evaluator
+/// sees both folds so a stud can read either axis — e.g. an obligation verb
+/// reading `ControlState.registered`, or an obligation-basis stud reading
+/// `ObligationState` — without forking the precondition discipline into two
+/// parallel checkers.
+pub fn check_preconditions(
     lexicon_entry: &LexiconEntry,
-    state: &ControlState,
+    control: &ControlState,
+    obligation: &ObligationState,
     event: &IntentEvent,
 ) -> Result<(), KycError> {
     for pre in &lexicon_entry.preconditions {
@@ -408,7 +439,7 @@ pub fn check_control_preconditions(
                 let eid = event.target.edge_id.ok_or_else(|| {
                     KycError::MissingTarget("edge_id required for EvidenceCited".into())
                 })?;
-                match state.edges.get(&eid) {
+                match control.edges.get(&eid) {
                     Some(e) if e.status == EdgeStatus::Evidenced => {} // ok
                     Some(e) => {
                         return Err(KycError::VerifyWithoutEvidence(eid, e.status.to_string()));
@@ -417,7 +448,7 @@ pub fn check_control_preconditions(
                 }
             }
             Precondition::ReconciledProjection => {
-                if !state.is_reconciled() {
+                if !control.is_reconciled() {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),
                         reason: "reconcile-conflict must fire before compute-fold / freeze".into(),
@@ -425,16 +456,185 @@ pub fn check_control_preconditions(
                 }
             }
             Precondition::StrategySelected => {
-                if !state.has_strategy() {
+                if !control.has_strategy() {
                     return Err(KycError::PreconditionFailed {
                         verb: lexicon_entry.fqn.clone(),
                         reason: "select-strategy must fire before compute-fold / freeze".into(),
                     });
                 }
             }
+            Precondition::SubjectRegistered => {
+                if !control.registered {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: "subject must be registered (kyc.subject.register) before this verb"
+                            .into(),
+                    });
+                }
+            }
+            Precondition::NotAlreadyRegistered => {
+                if control.registered {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: "subject is already registered; re-registration is not a \
+                                 supported move"
+                            .into(),
+                    });
+                }
+            }
+            Precondition::StructureClassified => {
+                if control.structure_class.is_none() {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: "structure class must be set (kyc.subject.classify-structure) \
+                                 before this verb"
+                            .into(),
+                    });
+                }
+            }
+            Precondition::StructureClassSupported => match &control.structure_class {
+                Some(class) if IMPLEMENTED_STRATEGY_CLASSES.contains(class) => {}
+                Some(class) => {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "structure class {class:?} has no implemented determination \
+                             strategy yet — fail-closed guard (see \
+                             OwnershipProngStrategy/ControlProngStrategy scope notes; \
+                             TS.0-TS.4 tracks the build-out)"
+                        ),
+                    });
+                }
+                None => {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: "structure class must be set before this verb — no class means \
+                                 no strategy can be confirmed supported"
+                            .into(),
+                    });
+                }
+            },
+            Precondition::NoDuplicateActiveEdge => {
+                let (from, to) = (
+                    entity_id(&event.payload, "from_entity_id"),
+                    entity_id(&event.payload, "to_entity_id"),
+                );
+                // T6.2 finding (2026-08-12): unlike every other precondition
+                // variant, `NoDuplicateActiveEdge` reads `event.payload`, not
+                // just target-addressed state — but this is "the same
+                // oracle" (placement.rs's own docstring) the T2 placement
+                // generator uses to PROBE legality with a generic/`Null`
+                // payload (`placement::probe_event`), never the caller's
+                // real one. Erroring here on missing from/to made
+                // `assert-control`/`assert-economic-interest` permanently
+                // unrecognisable through `enumerate_placement_set` (and
+                // therefore through `KycWorkbook::stage()`, and the whole
+                // T4.5 REPL surface — no workaround exists at that layer,
+                // unlike the T4 Rust-level `manual_staged_move` escape
+                // hatch), even for a state that would have genuinely
+                // admitted the move. A REAL candidate can never reach this
+                // arm with from/to actually absent — both assert verbs
+                // declare `from_entity_id`/`to_entity_id` as required args,
+                // enforced upstream of this checker — so "missing" only ever
+                // means "this is an abstract probe, not a real candidate";
+                // treating it as vacuously satisfied (skip, don't veto)
+                // costs nothing at the real write path (still governed by
+                // this exact check, still exercised end-to-end by
+                // `kyc_t62_studs.rs`'s block/admit gates against the REAL
+                // op) while restoring probe-based recognisability.
+                let (Some(from), Some(to)) = (from, to) else {
+                    continue;
+                };
+                let kind = if event.verb_fqn.as_str() == "ubo.edge.assert-economic-interest" {
+                    EdgeKind::EconomicInterest
+                } else {
+                    edge_kind_from_payload(&event.payload)
+                };
+                let duplicate = control
+                    .edges
+                    .values()
+                    .any(|e| e.is_active() && e.from == from && e.to == to && e.kind == kind);
+                if duplicate {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: format!(
+                            "an active edge of kind {kind:?} already exists from {from:?} to \
+                             {to:?}; use ubo.edge.supersede, never a contradicting assert (K-13)"
+                        ),
+                    });
+                }
+            }
+            Precondition::EdgeExists => {
+                let eid = event.target.edge_id.ok_or_else(|| {
+                    KycError::MissingTarget("edge_id required for EdgeExists".into())
+                })?;
+                if !control.edges.contains_key(&eid) {
+                    return Err(KycError::EdgeNotFound(eid));
+                }
+            }
+            Precondition::EdgeActive => {
+                let eid = event.target.edge_id.ok_or_else(|| {
+                    KycError::MissingTarget("edge_id required for EdgeActive".into())
+                })?;
+                match control.edges.get(&eid) {
+                    Some(e) if e.is_active() => {}
+                    Some(_) => {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!("edge {eid:?} is superseded"),
+                        });
+                    }
+                    None => return Err(KycError::EdgeNotFound(eid)),
+                }
+            }
+            Precondition::ObligationExists => {
+                let oid = obligation_id_from_payload(&event.payload).ok_or_else(|| {
+                    KycError::MissingTarget("obligation_id required for ObligationExists".into())
+                })?;
+                if !obligation.obligations.contains_key(&oid) {
+                    return Err(KycError::ObligationNotFound(oid));
+                }
+            }
+            Precondition::SubjectNotDecided => {
+                if let crate::fold::obligation::SubjectOverallState::Approved { .. }
+                | crate::fold::obligation::SubjectOverallState::Rejected { .. } =
+                    obligation.derive_subject_state(event.subject_root)
+                {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: "subject has already been decided (approved/rejected); the \
+                                 decision is final (K-23)"
+                            .into(),
+                    });
+                }
+            }
+            Precondition::SubjectAllTerminal => {
+                if obligation.derive_subject_state(event.subject_root)
+                    != crate::fold::obligation::SubjectOverallState::AllTerminal
+                {
+                    return Err(KycError::PreconditionFailed {
+                        verb: lexicon_entry.fqn.clone(),
+                        reason: "not all required obligation tracks are terminal (K-23 gate)"
+                            .into(),
+                    });
+                }
+            }
         }
     }
     Ok(())
+}
+
+/// Thin delegate over [`check_preconditions`] for callers that don't need the
+/// obligation axis yet (T6.1(a) — shrinks the diff for call sites where no
+/// attached precondition reads `ObligationState`; the real append chokepoint
+/// (`ob-poc-kyc-store::PgKycEventStore::append`) uses the two-fold function
+/// directly with a genuinely folded `ObligationState`, never this delegate).
+pub fn check_control_preconditions(
+    lexicon_entry: &LexiconEntry,
+    state: &ControlState,
+    event: &IntentEvent,
+) -> Result<(), KycError> {
+    check_preconditions(lexicon_entry, state, &ObligationState::default(), event)
 }
 
 // ── Economic edge summary (for determination strategy) ────────────────────────

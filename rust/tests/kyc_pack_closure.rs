@@ -15,6 +15,34 @@
 //! assert a known-open gap set is *exactly* what the audit found, not that
 //! it's empty. Widening or shrinking a pinned set must touch this file
 //! consciously, in either direction.
+//!
+//! The 9th tooth (EOP-PLAN-KYCUBO-KIT-001 Part A, the "checker-reach" tooth)
+//! is `every_precondition_carrying_verb_is_reached_by_the_checker` +
+//! `precondition_carrying_verbs_actually_enforce_their_stud` — two tests
+//! answering two different halves of one question, counted as the plan's
+//! single 9th tooth (a wiring proof needs a semantic-correctness proof
+//! alongside it or a "wired to nothing meaningful" checker could pass it
+//! vacuously). This is a hybrid:
+//! `check_preconditions` cannot be driven through the REAL op `execute()` in
+//! this file without `DATABASE_URL` (every `dsl.kyc` op takes a
+//! `&mut dyn TransactionScope` backed by Postgres — there is no in-memory
+//! substitute), so a live-DB drive-through would break this file's pure
+//! discipline for what is otherwise a fast, no-DB pack. Per the tooth's own
+//! fallback clause, the wiring question ("is `check_preconditions`/
+//! `check_control_preconditions` genuinely reached when this verb's op runs")
+//! is answered by source-level dispatch-site enumeration instead — scanning
+//! `kyc_stream_ops.rs` for the two real call shapes (`stream_append`'s
+//! `validate_entry_fqn` argument, and the two inline
+//! `lexicon.get(fqn) → check_preconditions(entry, ...)` sites) — while the
+//! *semantic* question ("does the checker actually enforce what the entry
+//! declares") is answered behaviorally, reusing the same
+//! `fold_control_versioned` + `check_preconditions` composition as
+//! `edge_status_lifecycle_is_fully_reachable`, immediately below it. Together
+//! they close the gap a pure-checker-only test would miss: a checker that is
+//! semantically correct but never actually called from the real op (the
+//! historical defect — freeze's dead `None` precondition, pre-DD-003) fails
+//! the wiring half; a checker that is called but semantically wrong fails the
+//! behavioral half.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -22,8 +50,9 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, AuthorityRef, EdgeId, EdgeStatus, EntityId,
-    FoldRegistry, Hash, IntentEvent, Precondition, Principal, SubjectId, TargetBinding,
+    check_control_preconditions, check_preconditions, fold_control_versioned, phase1_lexicon,
+    AuthorityRef, ControlState, EdgeId, EdgeStatus, EntityId, FoldRegistry, Hash, IntentEvent,
+    ObligationState, Precondition, Principal, StructureClass, SubjectId, TargetBinding,
     V1FoldImpl,
 };
 
@@ -351,12 +380,6 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     let mut expected: BTreeMap<String, Vec<Precondition>> = [
         "kyc.subject.register",
         "kyc.subject.classify-structure",
-        "ubo.edge.assert-control",
-        "ubo.edge.assert-economic-interest",
-        "ubo.edge.attach-evidence",
-        "ubo.edge.supersede",
-        "ubo.edge.reconcile-conflict",
-        "ubo.determination.select-strategy",
         "ubo.determination.apply-smo-fallback",
         // T6.0 (2026-08-12): entries only, no preconditions authored here —
         // that stays T6.1+.
@@ -383,12 +406,55 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
             Precondition::StrategySelected,
         ],
     );
+    // T6.1(c) (2026-08-12): the fail-closed strategy guard (matrix rows
+    // 6a/8a) — `select-strategy` gets `StructureClassSupported` as its sole
+    // precondition; `freeze` gets it ADDED to its existing two (defense in
+    // depth — the guard holds even if select-strategy is bypassed). The
+    // strategy-COUNT pin below (2) is unchanged — this is a precondition-map
+    // change, not a new `DeterminationStrategy`.
+    expected.insert(
+        "ubo.determination.select-strategy".to_string(),
+        vec![Precondition::StructureClassSupported],
+    );
     expected.insert(
         "ubo.determination.freeze".to_string(),
         vec![
             Precondition::ReconciledProjection,
             Precondition::StrategySelected,
+            Precondition::StructureClassSupported,
         ],
+    );
+    // T6.2 (2026-08-12, edge family — EOP-DD-KYCUBO-KIT-T6 matrix rows 1-5):
+    // 5 more verbs go from geometry-free to studded. Rows 1/2 share the same
+    // two studs (registration + no-duplicate-active-edge); rows 3/4 share
+    // the same two (edge exists + active); row 5 is registration alone,
+    // deliberately WITHOUT the optional "≥1 active economic edge" amendment
+    // (kept callable early, per the ratified matrix note).
+    expected.insert(
+        "ubo.edge.assert-control".to_string(),
+        vec![
+            Precondition::SubjectRegistered,
+            Precondition::NoDuplicateActiveEdge,
+        ],
+    );
+    expected.insert(
+        "ubo.edge.assert-economic-interest".to_string(),
+        vec![
+            Precondition::SubjectRegistered,
+            Precondition::NoDuplicateActiveEdge,
+        ],
+    );
+    expected.insert(
+        "ubo.edge.attach-evidence".to_string(),
+        vec![Precondition::EdgeExists, Precondition::EdgeActive],
+    );
+    expected.insert(
+        "ubo.edge.supersede".to_string(),
+        vec![Precondition::EdgeExists, Precondition::EdgeActive],
+    );
+    expected.insert(
+        "ubo.edge.reconcile-conflict".to_string(),
+        vec![Precondition::SubjectRegistered],
     );
 
     assert_eq!(
@@ -399,9 +465,10 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — today only verify/compute-fold/freeze \
-         carry a precondition; any other change is either T6 progress (update \
-         the T0.3 audit) or a regression"
+        "K-G5 precondition map changed — as of T6.2, verify/compute-fold/select-strategy/freeze \
+         AND the 5 edge-family verbs (assert-control, assert-economic-interest, \
+         attach-evidence, supersede, reconcile-conflict) carry preconditions; any other change \
+         is either T6.3/T6.4 progress (update the T0.3 audit) or a regression"
     );
 
     let classes = structure_class_valid_values();
@@ -516,4 +583,275 @@ fn edge_status_lifecycle_is_fully_reachable() {
     )
     .expect("fold ok");
     assert_eq!(state.edges.get(&edge).unwrap().status, EdgeStatus::Superseded);
+}
+
+// ── Part A (EOP-PLAN-KYCUBO-KIT-001) — the checker-reach tooth ─────────────
+
+/// Extract `stream_append(fqn, subject, target, payload, authority,
+/// validate_entry_fqn, ctx, scope)` call sites from `kyc_stream_ops.rs`.
+/// Every call site in the file (verified 2026-08-12) lays out its 8
+/// arguments one per line in this fixed order, so a 6th-line read is exact
+/// rather than a heuristic guess — brittle to reformatting, but this file's
+/// whole M.O. (`fold_match_arms`, `registered_op_fqns`, `extract_verb_fqns`,
+/// above) is pinned source-shape scanning, not a real parser.
+///
+/// Returns `fqn -> validate_entry_fqn` where the value is `None` when the
+/// call site passes literal `None`, or `Some(x)` when it passes
+/// `Some("x")`.
+fn stream_append_wiring(src: &str) -> BTreeMap<String, Option<String>> {
+    // `= stream_append(` (a call site) rather than bare `stream_append(`,
+    // which would also match the `async fn stream_append(` definition
+    // itself.
+    let marker = "= stream_append(";
+    let mut out = BTreeMap::new();
+    let mut search_from = 0usize;
+    while let Some(rel) = src[search_from..].find(marker) {
+        let start = search_from + rel + marker.len();
+        let mut lines = src[start..].lines().filter(|l| !l.trim().is_empty());
+        let arg = |l: &str| l.trim().trim_end_matches(',').to_string();
+        let Some(fqn_line) = lines.next() else { break };
+        let fqn = arg(fqn_line).trim_matches('"').to_string();
+        // Skip subject, target, payload, authority (lines 2-5); line 6 is
+        // validate_entry_fqn.
+        for _ in 0..4 {
+            if lines.next().is_none() {
+                break;
+            }
+        }
+        let validate = lines.next().map(arg).unwrap_or_default();
+        let value = if validate == "None" {
+            None
+        } else if let Some(inner) = validate
+            .strip_prefix("Some(\"")
+            .and_then(|s| s.strip_suffix("\")"))
+        {
+            Some(inner.to_string())
+        } else {
+            // Unrecognised shape (e.g. `Some(some_variable)`) — record it
+            // verbatim so a drifted call site fails loudly (as "wired to
+            // <garbage>", not silently treated as unwired) rather than
+            // being missed by this scanner.
+            Some(format!("UNRECOGNISED[{validate}]"))
+        };
+        out.insert(fqn, value);
+        search_from = start;
+    }
+    out
+}
+
+/// Extract fqns wired via the inline `let entry = lexicon.get("<fqn>")` →
+/// `check_preconditions(entry, ...)` / `check_control_preconditions(entry,
+/// ...)` shape (`ubo.edge.assert-control`'s hand-rolled `append_in_scope`
+/// closure, and `ubo.determination.compute-fold`'s read-path precondition
+/// check — the Part A A3 fix). Looks ahead a bounded window (25 lines, well
+/// past both real call sites' distance) for the checker call, stopping
+/// early at the next `lexicon.get(` so a miss can never be misattributed to
+/// the wrong fqn.
+fn inline_lexicon_get_wiring(src: &str) -> BTreeSet<String> {
+    let marker = ".get(\"";
+    let mut out = BTreeSet::new();
+    let mut search_from = 0usize;
+    while let Some(rel) = src[search_from..].find(marker) {
+        let start = search_from + rel + marker.len();
+        let Some(end) = src[start..].find('"') else {
+            break;
+        };
+        let fqn = src[start..start + end].to_string();
+        let window_end = (start + end + 4000).min(src.len());
+        let window = &src[start + end..window_end];
+        let next_get = window[1..].find(".get(\"").unwrap_or(usize::MAX);
+        let checker_hit = window
+            .find("check_preconditions(entry")
+            .or_else(|| window.find("check_control_preconditions(entry"));
+        if let Some(hit) = checker_hit {
+            if hit < next_get {
+                out.insert(fqn);
+            }
+        }
+        search_from = start + end;
+    }
+    out
+}
+
+/// The wiring half of the tooth: every lexicon entry with a non-empty
+/// `preconditions` list must have a genuine call-site in `kyc_stream_ops.rs`
+/// that reaches `check_preconditions`/`check_control_preconditions` for that
+/// exact fqn when the verb's real op runs — not just a correct checker
+/// function in the abstract (see module doc for why this can't be a live-DB
+/// drive-through in this pure file).
+#[test]
+fn every_precondition_carrying_verb_is_reached_by_the_checker() {
+    let lexicon = phase1_lexicon();
+    let precondition_carrying: BTreeSet<String> = lexicon
+        .entries
+        .values()
+        .filter(|e| !e.preconditions.is_empty())
+        .map(|e| e.fqn.0.clone())
+        .collect();
+
+    let stream_wired = stream_append_wiring(KYC_STREAM_OPS_SRC);
+    let inline_wired = inline_lexicon_get_wiring(KYC_STREAM_OPS_SRC);
+
+    let mut unreached: Vec<String> = Vec::new();
+    for fqn in &precondition_carrying {
+        let via_stream_append = stream_wired.get(fqn).map(|v| v.as_deref()) == Some(Some(fqn));
+        let via_inline = inline_wired.contains(fqn);
+        if !via_stream_append && !via_inline {
+            unreached.push(fqn.clone());
+        }
+    }
+
+    assert!(
+        unreached.is_empty(),
+        "declared precondition(s) on {unreached:#?} are never reached by the checker at the \
+         real op call site (stream_append wiring: {stream_wired:#?}; inline wiring: \
+         {inline_wired:#?}) — this is the exact defect class of freeze's pre-DD-003 dead \
+         precondition and the pre-T6.1(c) select-strategy gap"
+    );
+
+    // Sanity: the scanner itself must not be vacuously trivial — it must
+    // have found at least the 4 pre-T6.2 wired verbs (verify, select-strategy,
+    // freeze, and compute-fold post the A3 fix) as a floor, or a scanner bug
+    // (not a real gap) could be silently passing this test by finding nothing
+    // to check in the first place.
+    for known_wired in [
+        "ubo.edge.verify",
+        "ubo.determination.select-strategy",
+        "ubo.determination.freeze",
+        "ubo.determination.compute-fold",
+    ] {
+        assert!(
+            precondition_carrying.contains(known_wired),
+            "scanner sanity: {known_wired} must still carry a precondition in the pinned \
+             lexicon — if not, this floor check needs a conscious update"
+        );
+    }
+}
+
+/// The semantic half: for each of today's precondition-carrying verbs, a
+/// state that violates its stud must produce the real `KycError`, and a
+/// state that satisfies it must succeed — driven through the same
+/// `check_preconditions`/`check_control_preconditions` composition the real
+/// op calls (proven wired by the sibling test above), not a bespoke
+/// re-implementation.
+#[test]
+fn precondition_carrying_verbs_actually_enforce_their_stud() {
+    let lexicon = phase1_lexicon();
+    let subject = SubjectId(uuid::Uuid::new_v4());
+    let as_of = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+    let empty_obligation = ObligationState::default();
+
+    let probe = |verb_fqn: &str, target: TargetBinding| {
+        IntentEvent::new(
+            subject,
+            verb_fqn,
+            Principal::test_analyst(),
+            AuthorityRef("closure-tooth-probe".into()),
+            target,
+            serde_json::Value::Null,
+            as_of,
+        )
+    };
+
+    // ubo.edge.verify — EvidenceCited: an Asserted (not-yet-evidenced) edge
+    // must block; an Evidenced edge must admit.
+    let edge = EdgeId(uuid::Uuid::new_v4());
+    let verify_entry = lexicon.get("ubo.edge.verify").unwrap();
+    let mut asserted_only = ControlState::default();
+    asserted_only.edges.insert(
+        edge,
+        ob_poc_kyc_substrate::EdgeState {
+            id: edge,
+            kind: ob_poc_kyc_substrate::EdgeKind::VotingRights,
+            from: EntityId(uuid::Uuid::new_v4()),
+            to: EntityId(uuid::Uuid::new_v4()),
+            percentage: None,
+            status: EdgeStatus::Asserted,
+            evidence_event_id: None,
+            originating_event_id: ob_poc_kyc_substrate::EventId::new(),
+        },
+    );
+    assert!(
+        check_preconditions(
+            verify_entry,
+            &asserted_only,
+            &empty_obligation,
+            &probe("ubo.edge.verify", TargetBinding::for_edge(subject, edge)),
+        )
+        .is_err(),
+        "verify must block an edge with no evidence attached"
+    );
+    let mut evidenced = asserted_only.clone();
+    evidenced.edges.get_mut(&edge).unwrap().status = EdgeStatus::Evidenced;
+    assert!(
+        check_preconditions(
+            verify_entry,
+            &evidenced,
+            &empty_obligation,
+            &probe("ubo.edge.verify", TargetBinding::for_edge(subject, edge)),
+        )
+        .is_ok(),
+        "verify must admit an edge with evidence attached"
+    );
+
+    // ubo.determination.select-strategy / freeze — StructureClassSupported:
+    // an unsupported class must block; a supported one must admit.
+    let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
+    let unsupported = ControlState {
+        structure_class: Some(StructureClass::Trust),
+        ..Default::default()
+    };
+    assert!(
+        check_preconditions(
+            select_entry,
+            &unsupported,
+            &empty_obligation,
+            &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
+        )
+        .is_err(),
+        "select-strategy must block an unsupported structure class (Trust)"
+    );
+    let supported = ControlState {
+        structure_class: Some(StructureClass::PrivateCompany),
+        ..Default::default()
+    };
+    assert!(
+        check_preconditions(
+            select_entry,
+            &supported,
+            &empty_obligation,
+            &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
+        )
+        .is_ok(),
+        "select-strategy must admit a supported structure class (PrivateCompany)"
+    );
+
+    // ubo.determination.compute-fold — ReconciledProjection + StrategySelected
+    // (the A3 fix): an unreconciled/unstrategized state must block; a
+    // reconciled+strategized one must admit.
+    let compute_fold_entry = lexicon.get("ubo.determination.compute-fold").unwrap();
+    let not_ready = ControlState::default();
+    assert!(
+        check_control_preconditions(
+            compute_fold_entry,
+            &not_ready,
+            &probe("ubo.determination.compute-fold", TargetBinding::for_subject(subject)),
+        )
+        .is_err(),
+        "compute-fold must block before reconcile-conflict + select-strategy have fired (K-14)"
+    );
+    let ready = ControlState {
+        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
+        selected_strategy: Some("ownership_prong_strategy".to_string()),
+        ..Default::default()
+    };
+    assert!(
+        check_control_preconditions(
+            compute_fold_entry,
+            &ready,
+            &probe("ubo.determination.compute-fold", TargetBinding::for_subject(subject)),
+        )
+        .is_ok(),
+        "compute-fold must admit once reconcile-conflict + select-strategy have fired"
+    );
 }

@@ -51,6 +51,10 @@ pub(crate) mod entity_resolution;
 pub(crate) mod deterministic_extraction;
 pub(crate) mod preconditions;
 
+// T4.5 (EOP-PLAN-KYCUBO-KIT-001 §T4.5): KYC super-user workbook REPL surface.
+pub(crate) mod kyc_entity_resolver;
+pub(crate) mod kyc_workbook_surface;
+
 // Phase 3 slice 2c.2b (2026-05-12): relocated to ob-poc-boundary.
 pub use ob_poc_boundary::session_trace;
 

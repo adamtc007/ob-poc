@@ -1749,3 +1749,404 @@ fn d2_phase3b_registry_replay_is_bit_identical() {
     );
     assert_eq!(state1.edges.len(), state2.edges.len(), "same edge count");
 }
+
+// ── T5 — Bitemporal recovery gate tests (EOP-PLAN-KYCUBO-KIT-001 §T5) ────────
+//
+// `recover_determination_bitemporal(events, .., valid_at, known_at)` filters
+// the event slice by BOTH axes (as_of <= valid_at AND committed_at <=
+// known_at) before delegating to `recover_determination_at` unchanged.
+
+use ob_poc_kyc_substrate::recover_determination_bitemporal;
+
+#[test]
+fn axes_diverge_on_correction() {
+    let subject = fixture_subject_id();
+    let h = dummy_hash();
+    let a = entity_subject();
+    let p1 = person_p1();
+    let p2 = person_p2();
+    let p1_entity = EntityId(p1.0);
+    let p2_entity = EntityId(p2.0);
+
+    let t1 = ts(2026, 1, 1); // original facts asserted + first freeze
+    let t2 = ts(2026, 6, 1); // correction's valid-time (P1's edge is superseded)
+    let known_at = ts(2026, 8, 1); // both queries share full knowledge of the correction
+
+    let before_correction = ts(2026, 3, 1); // strictly between t1 and t2
+    let after_correction = ts(2026, 7, 1); // strictly after t2
+
+    let edge_p1_a = eid("p1_a");
+    let edge_p2_a = eid("p2_a");
+    let natural_persons: BTreeSet<PersonId> = [p1, p2].into();
+
+    let mut events: Vec<IntentEvent> = vec![
+        te(
+            0,
+            subject,
+            "kyc.subject.register",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
+            idem("reg-a"),
+            t1,
+        ),
+        te(
+            1,
+            subject,
+            "kyc.subject.classify-structure",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
+            idem("cls"),
+            t1,
+        ),
+        te(
+            2,
+            subject,
+            "kyc.subject.register",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
+            idem("reg-p1"),
+            t1,
+        ),
+        te(
+            3,
+            subject,
+            "kyc.subject.register",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p2.0, "is_natural_person": true}),
+            idem("reg-p2"),
+            t1,
+        ),
+        // P1 -> A: 30% (above 25% threshold; will be superseded at t2).
+        te(
+            4,
+            subject,
+            "ubo.edge.assert-economic-interest",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": edge_p1_a.0,
+                "from_entity_id": p1_entity.0, "to_entity_id": a.0, "percentage": 30.0}),
+            idem("edge-p1-a"),
+            t1,
+        ),
+        // P2 -> A: 40% (above threshold; survives both windows).
+        te(
+            5,
+            subject,
+            "ubo.edge.assert-economic-interest",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": edge_p2_a.0,
+                "from_entity_id": p2_entity.0, "to_entity_id": a.0, "percentage": 40.0}),
+            idem("edge-p2-a"),
+            t1,
+        ),
+        te(
+            6,
+            subject,
+            "ubo.edge.reconcile-conflict",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("reconcile1"),
+            t1,
+        ),
+        te(
+            7,
+            subject,
+            "ubo.determination.select-strategy",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"strategy": "ownership_prong_strategy"}),
+            idem("strategy"),
+            t1,
+        ),
+        // First freeze at t1 — both P1 and P2 active.
+        te(
+            8,
+            subject,
+            "ubo.determination.freeze",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("freeze1"),
+            t1,
+        ),
+    ];
+
+    // Correction: P1's edge is superseded, effective (valid-time) t2, but not
+    // recorded/committed until well after — the divergence-producing event.
+    events.push(
+        te(
+            9,
+            subject,
+            "ubo.edge.supersede",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_edge(subject, edge_p1_a),
+            serde_json::json!({"reason": "P1 sold its stake"}),
+            idem("supersede-p1-a"),
+            t2,
+        )
+        .with_committed_at(t2),
+    );
+    events.push(
+        te(
+            10,
+            subject,
+            "ubo.edge.reconcile-conflict",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("reconcile2"),
+            t2,
+        )
+        .with_committed_at(t2),
+    );
+    // Second freeze at t2 — P2 remains active alone.
+    events.push(
+        te(
+            11,
+            subject,
+            "ubo.determination.freeze",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("freeze2"),
+            t2,
+        )
+        .with_committed_at(t2),
+    );
+
+    let refs: Vec<&IntentEvent> = events.iter().collect();
+    let strategy = OwnershipProngStrategy;
+    let lexicon_hash = dummy_hash();
+    let ref_snap = Uuid::new_v4();
+
+    // Window 1: valid_at BEFORE the correction's effective date, but known_at
+    // is fully caught up. The correction's as_of (t2) is excluded — P1 + P2
+    // both stand.
+    let det_before = recover_determination_bitemporal(
+        &refs,
+        &strategy,
+        &natural_persons,
+        25.0,
+        test_pin("v1.0", lexicon_hash, ref_snap),
+        before_correction,
+        known_at,
+    )
+    .expect("should recover a determination before the correction's valid-time");
+
+    // Window 2: valid_at AFTER the correction's effective date, same known_at.
+    // The correction is now in-window — only P2 stands.
+    let det_after = recover_determination_bitemporal(
+        &refs,
+        &strategy,
+        &natural_persons,
+        25.0,
+        test_pin("v1.0", lexicon_hash, ref_snap),
+        after_correction,
+        known_at,
+    )
+    .expect("should recover a determination after the correction's valid-time");
+
+    assert_eq!(
+        det_before.candidates.len(),
+        2,
+        "before the correction's valid-time, both P1 and P2 stand: {:?}",
+        det_before.candidates
+    );
+    assert_eq!(
+        det_after.candidates.len(),
+        1,
+        "after the correction's valid-time, only P2 stands: {:?}",
+        det_after.candidates
+    );
+    assert_eq!(
+        det_after.candidates[0].person_id, p2,
+        "the surviving candidate after correction must be P2"
+    );
+    assert_ne!(
+        det_before.determination_hash, det_after.determination_hash,
+        "the two axis windows must produce PROVABLY DIFFERENT determinations"
+    );
+}
+
+#[test]
+fn bitemporal_matches_txtime_when_axes_align() {
+    let subject = fixture_subject_id();
+    let h = dummy_hash();
+    let a = entity_subject();
+    let b = entity_b();
+    let t1 = ts(2026, 1, 1);
+    let far_future = ts(2027, 1, 1); // both axes aligned "now" — no filtering effect
+
+    let edge_b_a = eid("b_a");
+    let p1 = person_p1();
+    let p1_entity = EntityId(p1.0);
+    let natural_persons: BTreeSet<PersonId> = [p1].into();
+
+    let events: Vec<IntentEvent> = vec![
+        te(
+            0,
+            subject,
+            "kyc.subject.register",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
+            idem("reg-a"),
+            t1,
+        ),
+        te(
+            1,
+            subject,
+            "kyc.subject.classify-structure",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
+            idem("cls"),
+            t1,
+        ),
+        te(
+            2,
+            subject,
+            "kyc.subject.register",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
+            idem("reg-p1"),
+            t1,
+        ),
+        // B -> A: 60%
+        te(
+            3,
+            subject,
+            "ubo.edge.assert-economic-interest",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": edge_b_a.0,
+                "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
+            idem("edge-b-a"),
+            t1,
+        ),
+        // P1 -> B: 100%
+        te(
+            4,
+            subject,
+            "ubo.edge.assert-economic-interest",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": eid("p1_b").0,
+                "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
+            idem("edge-p1-b"),
+            t1,
+        ),
+        te(
+            5,
+            subject,
+            "ubo.edge.reconcile-conflict",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("reconcile1"),
+            t1,
+        ),
+        te(
+            6,
+            subject,
+            "ubo.determination.select-strategy",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"strategy": "ownership_prong_strategy"}),
+            idem("strategy"),
+            t1,
+        ),
+        te(
+            7,
+            subject,
+            "ubo.determination.freeze",
+            h,
+            analyst(),
+            authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}),
+            idem("freeze1"),
+            t1,
+        ),
+    ];
+
+    let refs: Vec<&IntentEvent> = events.iter().collect();
+    let strategy = OwnershipProngStrategy;
+    let lexicon_hash = dummy_hash();
+    let ref_snap = Uuid::new_v4();
+
+    let det_txtime = recover_determination_at(
+        &refs,
+        &strategy,
+        &natural_persons,
+        25.0,
+        test_pin("v1.0", lexicon_hash, ref_snap),
+    )
+    .expect("recover_determination_at must succeed on the aligned fixture");
+
+    let det_bitemporal = recover_determination_bitemporal(
+        &refs,
+        &strategy,
+        &natural_persons,
+        25.0,
+        test_pin("v1.0", lexicon_hash, ref_snap),
+        far_future,
+        far_future,
+    )
+    .expect("recover_determination_bitemporal must succeed when both axes are aligned with now");
+
+    assert_eq!(
+        det_txtime.determination_hash, det_bitemporal.determination_hash,
+        "bitemporal recovery with both axes aligned to 'now' must match pure transaction-time recovery"
+    );
+    assert_eq!(det_txtime.candidates.len(), det_bitemporal.candidates.len());
+    assert_eq!(
+        det_txtime.candidates[0].person_id,
+        det_bitemporal.candidates[0].person_id
+    );
+}

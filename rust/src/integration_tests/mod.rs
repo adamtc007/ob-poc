@@ -37,6 +37,7 @@ mod gleif_parse_test;
 mod intent_hit_rate;
 #[cfg(test)]
 mod intent_trace_eval;
+mod kyc_workbook_repl_surface;
 #[cfg(test)]
 mod lock_contention_integration;
 #[cfg(test)]

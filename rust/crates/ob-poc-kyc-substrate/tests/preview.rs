@@ -25,6 +25,21 @@ fn t() -> chrono::DateTime<chrono::Utc> {
     chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap()
 }
 
+/// T6.2 (2026-08-12): `assert-control` now carries `SubjectRegistered`
+/// (matrix row 1) — every candidate chain below that starts with
+/// assert-control needs a preceding register.
+fn register_event(subj: SubjectId) -> IntentEvent {
+    IntentEvent::new(
+        subj,
+        "kyc.subject.register",
+        Principal::test_analyst(),
+        ob_poc_kyc_substrate::AuthorityRef("preview-test".into()),
+        TargetBinding::for_subject(subj),
+        serde_json::json!({ "entity_id": subj.0 }),
+        t(),
+    )
+}
+
 fn assert_control_event(subj: SubjectId, edge: EdgeId, from: EntityId, to: EntityId) -> IntentEvent {
     IntentEvent::new(
         subj,
@@ -80,7 +95,11 @@ fn preview_is_pure() {
     let edge = EdgeId(Uuid::new_v4());
     let (from, to) = (entity(), entity());
 
-    let result = preview(&[], &[assert_control_event(subj, edge, from, to)], &lexicon);
+    let result = preview(
+        &[],
+        &[register_event(subj), assert_control_event(subj, edge, from, to)],
+        &lexicon,
+    );
     assert!(result.is_ok(), "pure fold over a legal single-candidate chain must succeed");
 }
 
@@ -94,6 +113,7 @@ fn per_step_matches_single_move() {
     let (from, to) = (entity(), entity());
 
     let candidates = vec![
+        register_event(subj),
         assert_control_event(subj, edge, from, to),
         attach_evidence_event(subj, edge),
         verify_event(subj, edge),
@@ -132,8 +152,8 @@ fn committed_line_equals_preview() {
     let committed = vec![assert_control_event(subj, edge, from, to)];
     let candidates = vec![attach_evidence_event(subj, edge), verify_event(subj, edge)];
 
-    let previewed: ControlState = preview(&committed, &candidates, &lexicon)
-        .expect("legal chain must preview successfully");
+    let (previewed, _previewed_obligation): (ControlState, _) =
+        preview(&committed, &candidates, &lexicon).expect("legal chain must preview successfully");
 
     // The stand-in for "the real append path" (T4 hasn't built the store
     // append yet): a straight full fold over the same committed ++
@@ -158,17 +178,18 @@ fn illegal_mid_chain_rejected() {
     let edge = EdgeId(Uuid::new_v4());
     let (from, to) = (entity(), entity());
 
-    // Step 0 legal (assert-control), step 1 illegal (verify with no
-    // evidence attached — the K-11 proof ratchet), step 2 would-be-legal
-    // (attach-evidence) never gets the chance to run.
+    // Step 0 legal (register), step 1 legal (assert-control), step 2
+    // illegal (verify with no evidence attached — the K-11 proof ratchet),
+    // step 3 would-be-legal (attach-evidence) never gets the chance to run.
     let candidates = vec![
+        register_event(subj),
         assert_control_event(subj, edge, from, to),
         verify_event(subj, edge),
         attach_evidence_event(subj, edge),
     ];
 
     let result = preview(&[], &candidates, &lexicon);
-    assert!(result.is_err(), "chain with an illegal step 1 must reject, not silently skip");
+    assert!(result.is_err(), "chain with an illegal step 2 must reject, not silently skip");
 
     let err = result.unwrap_err().to_string();
     assert!(
@@ -177,8 +198,8 @@ fn illegal_mid_chain_rejected() {
     );
 
     // Nothing partial escapes: preview has no side channel to leak
-    // step-0's application through on an Err path — the only observable
+    // steps 0-1's application through on an Err path — the only observable
     // outcome of a rejected chain is the Err itself.
-    let legal_prefix_only = preview(&[], &candidates[..1], &lexicon);
+    let legal_prefix_only = preview(&[], &candidates[..2], &lexicon);
     assert!(legal_prefix_only.is_ok(), "the legal prefix alone must still preview cleanly");
 }

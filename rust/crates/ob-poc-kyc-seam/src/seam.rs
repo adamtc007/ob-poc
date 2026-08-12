@@ -6,8 +6,8 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    AuthorityRef, ControlState, FoldRegistry, Hash, IdemKey, IntentEvent, KycError, Principal,
-    SubjectId, TargetBinding, VerbFqn,
+    AuthorityRef, ControlState, FoldRegistry, Hash, IdemKey, IntentEvent, KycError,
+    ObligationState, Principal, SubjectId, TargetBinding, VerbFqn,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
 
@@ -90,9 +90,12 @@ impl IntentEventDraft {
 /// else the verb did in the same scope (the shadow-write, in §6 step 1).
 ///
 /// A thin bridge `scope.executor()` → the store. Holds **no** logic — the
-/// store orchestrates lock/fold/insert; the substrate folds; `validate` is the
-/// precondition policy the caller supplies (typically
-/// `substrate::check_control_preconditions(entry, state, event)`).
+/// store orchestrates lock/fold/insert; the substrate folds both `ControlState`
+/// and `ObligationState` under the same lock (T6.1(a) unified checker);
+/// `validate` is the precondition policy the caller supplies (typically
+/// `substrate::check_preconditions(entry, control, obligation, event)`, or
+/// the `check_control_preconditions` delegate when only the control axis
+/// matters).
 pub async fn append_in_scope<V>(
     scope: &mut dyn TransactionScope,
     registry: &FoldRegistry,
@@ -101,7 +104,7 @@ pub async fn append_in_scope<V>(
     validate: V,
 ) -> Result<AppendOutcome, StoreError>
 where
-    V: FnOnce(&ControlState) -> Result<(), KycError>,
+    V: FnOnce(&ControlState, &ObligationState) -> Result<(), KycError>,
 {
     PgKycEventStore::append(scope.executor(), registry, event, source_text, validate).await
 }

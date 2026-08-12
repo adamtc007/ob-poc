@@ -471,6 +471,48 @@ pub fn recover_determination_at(
     .ok()
 }
 
+/// Replay the determination **bitemporally** (T5, EOP-SA-OBP-001 §I.5): the
+/// constructor is parameterised by *both* time axes explicitly — `valid_at`
+/// ("what was true as of this business time") and `known_at` ("what we knew,
+/// given everything recorded by this transaction time") — rather than a single
+/// axis-selector switching between the two framings §I.5 describes. Passing
+/// both timestamps is a strict generalisation of a single-axis parameter: it
+/// answers either question (`known_at = +inf` for a pure valid-time query,
+/// `valid_at = +inf` for a pure knowledge-time query — same as
+/// `recover_determination_at`) and the general bitemporal question the two
+/// aligned. **Design judgment call** (flagged per plan instruction; the plan's
+/// literal signature `recover_determination_bitemporal(subject, valid_at,
+/// known_at)` names no third `axis` argument): this crate's pure `IntentEvent`
+/// carries `as_of` (valid-time) and `committed_at` (knowledge-time, additively
+/// added in this tranche — see `event.rs`), so both axes are simple per-event
+/// predicates; no separate axis-selector type was introduced.
+///
+/// Filters `events` to the bitemporal slice — `as_of <= valid_at AND
+/// committed_at <= known_at` — then delegates to `recover_determination_at`
+/// **unchanged** over the filtered slice, reusing the SAME fold (no duplicated
+/// determination logic). `recover_determination_bitemporal(events, .., now,
+/// now)` is therefore identical to `recover_determination_at(events, ..)` when
+/// every event's `as_of`/`committed_at` predate `now` — the transaction-time-
+/// only case both axes collapse to.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_determination_bitemporal(
+    events: &[&IntentEvent],
+    strategy: &dyn DeterminationStrategy,
+    natural_persons: &BTreeSet<PersonId>,
+    threshold_pct: f64,
+    pin: RecoveryPin<'_>,
+    valid_at: DateTime<Utc>,
+    known_at: DateTime<Utc>,
+) -> Option<FrozenDetermination> {
+    let filtered: Vec<&IntentEvent> = events
+        .iter()
+        .copied()
+        .filter(|e| e.as_of <= valid_at && e.committed_at <= known_at)
+        .collect();
+
+    recover_determination_at(&filtered, strategy, natural_persons, threshold_pct, pin)
+}
+
 /// Find the subject's own `EntityId`, recorded on `kyc.subject.classify-structure`
 /// (payload field `entity_id`). Shared by `recover_determination_at` (replay) and
 /// the live `ubo.determination.freeze` verb (EOP-DD-KYCUBO-003 remediation) so

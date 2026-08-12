@@ -18,10 +18,10 @@ use dsl_runtime::TransactionScope;
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 use sem_os_postgres::ops::SemOsVerbOp;
 
-use ob_poc_kyc_seam::{append_in_scope, IntentEventDraft};
+use ob_poc_kyc_seam::{append_in_scope, map_principal, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, find_subject_entity, fold_control_versioned,
+    check_control_preconditions, check_preconditions, find_subject_entity, fold_control_versioned,
     fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
     EdgeId, FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
@@ -74,9 +74,9 @@ async fn stream_append(
     .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
     let source_text = render_intent_event_to_sexpr(&event, render_entry);
 
-    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |state| {
+    append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation| {
         if let Some(e) = entry {
-            check_control_preconditions(e, state, &event)?;
+            check_preconditions(e, control, obligation, &event)?;
         }
         Ok(())
     })
@@ -130,7 +130,7 @@ impl SemOsVerbOp for UboEdgeAssertControl {
             verb_fqn: "ubo.edge.assert-control".into(),
             subject_root: subject,
             target: TargetBinding::for_edge(subject, edge),
-            payload: args.clone(),
+            payload: normalize_edge_id_payload(args, edge),
             authority: AuthorityRef("analyst.assert-control".into()),
             lexicon_hash: lexicon.hash,
             as_of: ctx.as_of, // frozen at verb entry — never now() here
@@ -138,8 +138,8 @@ impl SemOsVerbOp for UboEdgeAssertControl {
         .into_event(&ctx.principal, ctx.correlation_id, ctx.execution_id);
         let source_text = render_intent_event_to_sexpr(&event, Some(entry));
 
-        let outcome = append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |state| {
-            check_control_preconditions(entry, state, &event)
+        let outcome = append_in_scope(scope, &KYC_REGISTRY, &event, &source_text, |control, obligation| {
+            check_preconditions(entry, control, obligation, &event)
         })
         .await
         .map_err(|e| anyhow!("ubo.edge.assert-control append failed: {e}"))?;
@@ -171,7 +171,7 @@ impl SemOsVerbOp for UboEdgeAssertEconomicInterest {
             "ubo.edge.assert-economic-interest",
             subject,
             TargetBinding::for_edge(subject, edge),
-            args.clone(),
+            normalize_edge_id_payload(args, edge),
             "analyst.assert-economic-interest",
             Some("ubo.edge.assert-economic-interest"),
             ctx,
@@ -263,13 +263,18 @@ impl SemOsVerbOp for UboEdgeSupersede {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let edge = EdgeId(json_extract_uuid(args, ctx, "edge-id")?);
+        // T6.2 row 4: EdgeExists + EdgeActive now attached — `Some(fqn)`
+        // wires it to the real checker (previously `None` was harmless
+        // because the entry declared no preconditions; leaving it `None`
+        // now would silently never enforce the new stud — the exact defect
+        // class the Part A closure tooth exists to catch).
         let outcome = stream_append(
             "ubo.edge.supersede",
             subject,
             TargetBinding::for_edge(subject, edge),
             args.clone(),
             "analyst.supersede",
-            None,
+            Some("ubo.edge.supersede"),
             ctx,
             scope,
         )
@@ -294,13 +299,15 @@ impl SemOsVerbOp for UboEdgeReconcileConflict {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        // T6.2 row 5: SubjectRegistered now attached — see the supersede
+        // comment above for why `Some(fqn)` (not `None`) is required.
         let outcome = stream_append(
             "ubo.edge.reconcile-conflict",
             subject,
             TargetBinding::for_subject(subject),
             args.clone(),
             "analyst.reconcile-conflict",
-            None,
+            Some("ubo.edge.reconcile-conflict"),
             ctx,
             scope,
         )
@@ -327,13 +334,19 @@ impl SemOsVerbOp for UboDeterminationSelectStrategy {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        //    `Some(fqn)` — T6.1(c): select-strategy now carries a real
+        //    precondition (`StructureClassSupported`, the 6a exemplar). Before
+        //    this it had none, so `None` here was harmless; leaving it `None`
+        //    now would silently never enforce the fail-closed guard at the
+        //    real write path (same defect class as freeze's dead-precondition
+        //    bug fixed in EOP-DD-KYCUBO-003 — a declared-but-unwired check).
         let outcome = stream_append(
             "ubo.determination.select-strategy",
             subject,
             TargetBinding::for_subject(subject),
             args.clone(),
             "analyst.select-strategy",
-            None,
+            Some("ubo.determination.select-strategy"),
             ctx,
             scope,
         )
@@ -365,6 +378,37 @@ impl SemOsVerbOp for UboDeterminationComputeFold {
         let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
         let state = ob_poc_kyc_substrate::fold_control_versioned(&refs, &KYC_REGISTRY)
             .map_err(|e| anyhow!("compute-fold failed: {e}"))?;
+
+        // T6-tooth fix (2026-08-12, EOP-PLAN-KYCUBO-KIT-001 Part A): compute-fold's
+        // lexicon entry declares [ReconciledProjection, StrategySelected] (K-14),
+        // but this op is a pure read/projection with NO append call — it never
+        // routed through `stream_append`'s `validate_entry_fqn`, so the declared
+        // precondition was dead: the placement/preview board (which calls
+        // `check_preconditions` directly over every lexicon entry) already
+        // enforced it, but the real invocation path did not. Same defect family
+        // as freeze's pre-DD-003 dead precondition and the pre-T6.1(c)
+        // select-strategy gap — found by the new `every_precondition_carrying_
+        // verb_is_reached_by_the_checker` closure tooth (A2). Both declared
+        // preconditions read only `ControlState`, so `check_control_preconditions`
+        // (no obligation fold needed) is sufficient; the probe event mirrors the
+        // pattern `placement.rs`/`preview.rs` already use for precondition-only
+        // (no-append) evaluation.
+        let lexicon = phase1_lexicon();
+        let entry = lexicon
+            .get("ubo.determination.compute-fold")
+            .ok_or_else(|| anyhow!("ubo.determination.compute-fold missing from lexicon"))?;
+        let probe = ob_poc_kyc_substrate::IntentEvent::new(
+            subject,
+            "ubo.determination.compute-fold",
+            map_principal(&ctx.principal),
+            AuthorityRef("compute-fold.precondition-probe".into()),
+            TargetBinding::for_subject(subject),
+            serde_json::Value::Null,
+            ctx.as_of,
+        );
+        check_control_preconditions(entry, &state, &probe)
+            .map_err(|e| anyhow!("ubo.determination.compute-fold precondition failed: {e}"))?;
+
         Ok(VerbExecutionOutcome::Record(serde_json::json!({
             "registered": state.registered,
             "edge_count": state.edges.len(),
@@ -407,6 +451,36 @@ impl SemOsVerbOp for UboDeterminationApplySmoFallback {
             serde_json::json!({ "seq": outcome.seq }),
         ))
     }
+}
+
+/// Normalize the edge-identity payload key for `ubo.edge.assert-control` /
+/// `ubo.edge.assert-economic-interest` (T6.2, found while wiring the
+/// `EdgeExists`/`EdgeActive` studs onto `attach-evidence`/`supersede`): the
+/// caller-facing arg is kebab-case `edge-id`, but the fold's
+/// `edge_id_from_payload` only recognises snake_case `edge_id`
+/// (`fold::control::edge_id_from_payload`) — without this, a caller-supplied
+/// `edge-id` was silently ignored by the fold, which fell back to its own
+/// deterministic `Uuid::new_v5` hash of `(from, to, kind)` as the edge's real
+/// key. `attach-evidence`/`verify`/`supersede` all require an explicit
+/// `edge-id` arg (`json_extract_uuid`, not `_opt`) and address the edge via
+/// `TargetBinding::for_edge(subject, edge)` using exactly that caller-supplied
+/// id — so the two ends of the addressing scheme never actually agreed on
+/// the edge's identity. Harmless while no precondition read `state.edges` by
+/// id; live-breaking now that `EdgeExists`/`EdgeActive` do (T6.2 rows 3/4) —
+/// same bug class as R3 (`structure_class`)/`cbu_role`/`smo_person_id` above.
+/// Stamps the OP's resolved `edge` (caller-supplied-or-fresh) as `edge_id` in
+/// the payload, so the fold's key and the op's own `target`/`Record` output
+/// are always the same id, by construction.
+fn normalize_edge_id_payload(args: &serde_json::Value, edge: EdgeId) -> serde_json::Value {
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        obj.remove("edge-id");
+        obj.insert(
+            "edge_id".to_string(),
+            serde_json::Value::String(edge.0.to_string()),
+        );
+    }
+    p
 }
 
 /// Normalize `ubo.determination.apply-smo-fallback` payload: the YAML arg is

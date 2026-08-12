@@ -182,7 +182,12 @@ fn subject_id_from_event(event: &IntentEvent) -> Option<SubjectId> {
     })
 }
 
-fn obligation_id_from_payload(payload: &serde_json::Value) -> Option<ObligationId> {
+/// `pub(crate)`: T6.1's unified precondition checker (`fold::control::check_preconditions`,
+/// `ObligationExists`) reads the obligation id off the event payload the same
+/// way the obligation fold itself does — obligation-scoped verbs never set
+/// `TargetBinding.obligation_id` in production (`kyc_stream_ops.rs`), only the
+/// payload's `obligation_id` key.
+pub(crate) fn obligation_id_from_payload(payload: &serde_json::Value) -> Option<ObligationId> {
     payload
         .get("obligation_id")
         .and_then(|v| v.as_str())

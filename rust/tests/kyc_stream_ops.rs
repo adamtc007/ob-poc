@@ -13,7 +13,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
-use ob_poc::domain_ops::kyc_stream_ops::UboEdgeAssertControl;
+use ob_poc::domain_ops::kyc_stream_ops::{KycSubjectRegister, UboEdgeAssertControl};
 use ob_poc_kyc_store::{PgKycProjectionDrainer, CONTROL_EDGE_PROJECTION_EFFECT};
 use ob_poc_kyc_substrate::{phase1_lexicon, FoldRegistry, SubjectId, V1FoldImpl};
 use ob_poc_types::TransactionScopeId;
@@ -111,9 +111,22 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
         "edge_kind": "voting_rights",
     });
 
+    // T6.2 (2026-08-12): `assert-control` now carries `SubjectRegistered`
+    // (matrix row 1) — register first, inside each scope, same fix as the
+    // other T4/T4.5/M3 fixtures updated for this tranche. A FRESH
+    // `VerbExecutionContext` per call: `execution_id` seeds the idempotency
+    // key (B3), so reusing one `ctx` across register+assert-control would
+    // dedupe the second call against the first (the same gotcha
+    // `kyc_t61_studs.rs::select_strategy_blocked_end_to_end` documents).
+    let register_args = serde_json::json!({ "subject-id": subject.0.to_string() });
+
     // 1. Rollback path: the verb's append participates in the scope's txn.
     {
         let mut scope = TestScope::begin(&pool).await;
+        KycSubjectRegister
+            .execute(&register_args, &mut VerbExecutionContext::default(), &mut scope)
+            .await
+            .expect("register executes");
         UboEdgeAssertControl
             .execute(&args, &mut ctx, &mut scope)
             .await
@@ -132,6 +145,10 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
     // 2. Commit path: event lands in the stream with the right verb + as_of.
     let outcome = {
         let mut scope = TestScope::begin(&pool).await;
+        KycSubjectRegister
+            .execute(&register_args, &mut VerbExecutionContext::default(), &mut scope)
+            .await
+            .expect("register executes");
         let outcome = UboEdgeAssertControl
             .execute(&args, &mut ctx, &mut scope)
             .await
@@ -140,12 +157,13 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
         outcome
     };
     match outcome {
-        VerbExecutionOutcome::Record(v) => assert_eq!(v["seq"].as_u64(), Some(0)),
+        // seq 1, not 0 — register is seq 0 in this subject's stream now.
+        VerbExecutionOutcome::Record(v) => assert_eq!(v["seq"].as_u64(), Some(1)),
         other => panic!("expected Record, got {other:?}"),
     }
 
     let (verb, as_of): (String, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
-        r#"SELECT verb_fqn, as_of FROM "ob-poc".kyc_intent_events WHERE subject_root = $1"#,
+        r#"SELECT verb_fqn, as_of FROM "ob-poc".kyc_intent_events WHERE subject_root = $1 AND verb_fqn = 'ubo.edge.assert-control'"#,
     )
     .bind(subject.0)
     .fetch_one(&pool)

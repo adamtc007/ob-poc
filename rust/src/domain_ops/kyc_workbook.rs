@@ -53,9 +53,9 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, map_principal};
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, enumerate_placement_set, phase1_lexicon,
-    preview, render_intent_event_to_sexpr, AuthorityRef, ControlState, EdgeId, EntityId,
-    FoldRegistry, IntentEvent, KycError, LexiconManifest, MoveId, ObligationId, PersonId,
+    check_preconditions, enumerate_placement_set, phase1_lexicon, preview,
+    render_intent_event_to_sexpr, AuthorityRef, ControlState, EdgeId, EntityId, FoldRegistry,
+    IntentEvent, KycError, LexiconManifest, MoveId, ObligationId, ObligationState, PersonId,
     SubjectId, TargetBinding, VerbFqn,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
@@ -245,12 +245,15 @@ fn sexpr_to_parsed_move(
 
 /// Fold `committed ++ staged` over the pinned kit — the re-run-whole
 /// reconstruction (KIT-4) shared by `validate()` and `stage()`'s frontier
-/// computation. Pure; no store dependency.
+/// computation. Pure; no store dependency. Returns both folds (T6.1(a) —
+/// the unified checker): `enumerate_placement_set`'s frontier computation and
+/// `check_preconditions` both need the obligation axis available, even
+/// though no T6.1-attached precondition reads it yet.
 fn folded_state(
     committed: &[IntentEvent],
     staged: &[StagedMove],
     kit: &LexiconManifest,
-) -> Result<ControlState, KycError> {
+) -> Result<(ControlState, ObligationState), KycError> {
     let candidates: Vec<IntentEvent> = staged.iter().map(|m| m.event.clone()).collect();
     preview(committed, &candidates, kit)
 }
@@ -279,8 +282,9 @@ pub async fn open_workbook(
 
 impl KycWorkbook {
     /// The Repl's job: re-run-whole over the staged workbook (T2∘T3
-    /// composed). Called after every stage, not just before commit.
-    pub fn validate(&self) -> Result<ControlState, KycError> {
+    /// composed). Called after every stage, not just before commit. Returns
+    /// both folds (T6.1(a)).
+    pub fn validate(&self) -> Result<(ControlState, ObligationState), KycError> {
         folded_state(&self.committed, &self.staged, &self.kit)
     }
 
@@ -309,8 +313,10 @@ impl KycWorkbook {
         }
         let parsed = sexpr_to_parsed_move(&source_file.atoms[0], self.subject)?;
 
-        let frontier = folded_state(&self.committed, &self.staged, &self.kit)?;
-        let placement_set = enumerate_placement_set(self.subject, &frontier, &self.kit);
+        let (frontier, frontier_obligation) =
+            folded_state(&self.committed, &self.staged, &self.kit)?;
+        let placement_set =
+            enumerate_placement_set(self.subject, &frontier, &frontier_obligation, &self.kit);
 
         let legal_move = placement_set
             .moves
@@ -384,11 +390,11 @@ impl KycWorkbook {
                 registry,
                 &staged.event,
                 &staged.source_text,
-                |state: &ControlState| {
+                |control: &ControlState, obligation: &ObligationState| {
                     let entry = kit.get(staged.event.verb_fqn.as_str()).ok_or_else(|| {
                         KycError::UnknownVerb(staged.event.verb_fqn.clone())
                     })?;
-                    check_control_preconditions(entry, state, &staged.event)
+                    check_preconditions(entry, control, obligation, &staged.event)
                 },
             )
             .await?;

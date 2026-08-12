@@ -16,30 +16,35 @@
 
 use crate::error::KycError;
 use crate::event::IntentEvent;
-use crate::fold::control::{apply_one_control_event, check_control_preconditions, fold_control, ControlState};
+use crate::fold::control::{apply_one_control_event, check_preconditions, fold_control, ControlState};
+use crate::fold::obligation::{apply_one_obligation_event, fold_obligations, ObligationState};
 use crate::lexicon::LexiconManifest;
 
-/// Fold `committed ++ candidates` into the resulting `ControlState`,
-/// admitting each candidate in turn against the state folded from
-/// everything before it (committed history, then prior candidates in the
-/// chain). Rejects at the first candidate whose lexicon preconditions fail
-/// — steps before it are never applied to the returned state, and nothing
-/// is written anywhere (pure function, no store dependency).
+/// Fold `committed ++ candidates` into the resulting `(ControlState,
+/// ObligationState)` pair, admitting each candidate in turn against the
+/// state folded from everything before it (committed history, then prior
+/// candidates in the chain), evaluated against BOTH folds (T6.1(a) — the
+/// unified checker). Rejects at the first candidate whose lexicon
+/// preconditions fail — steps before it are never applied to the returned
+/// state, and nothing is written anywhere (pure function, no store
+/// dependency).
 pub fn preview(
     committed: &[IntentEvent],
     candidates: &[IntentEvent],
     lexicon: &LexiconManifest,
-) -> Result<ControlState, KycError> {
+) -> Result<(ControlState, ObligationState), KycError> {
     let committed_refs: Vec<&IntentEvent> = committed.iter().collect();
-    let mut state = fold_control(&committed_refs);
+    let mut control = fold_control(&committed_refs);
+    let mut obligation = fold_obligations(&committed_refs);
 
     for candidate in candidates {
         let entry = lexicon
             .get(candidate.verb_fqn.as_str())
             .ok_or_else(|| KycError::UnknownVerb(candidate.verb_fqn.clone()))?;
-        check_control_preconditions(entry, &state, candidate)?;
-        state = apply_one_control_event(state, candidate);
+        check_preconditions(entry, &control, &obligation, candidate)?;
+        control = apply_one_control_event(control, candidate);
+        obligation = apply_one_obligation_event(obligation, candidate);
     }
 
-    Ok(state)
+    Ok((control, obligation))
 }

@@ -29,7 +29,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::event::IntentEvent;
-use crate::fold::control::{check_control_preconditions, ControlState};
+use crate::fold::control::{check_preconditions, ControlState};
+use crate::fold::obligation::ObligationState;
 use crate::lexicon::LexiconManifest;
 use crate::types::{AuthorityRef, EdgeId, Hash, Principal, SubjectId, TargetBinding, VerbFqn};
 
@@ -126,8 +127,11 @@ fn board_content_hash(moves: &[LegalMove]) -> Hash {
     Hash::of_json(&serde_json::json!({ "moves": ids }))
 }
 
-/// Enumerate the legal placement set for `subject` given its folded
-/// `state` and the `lexicon`'s registered verb set.
+/// Enumerate the legal placement set for `subject` given its folded control
+/// and obligation `state` and the `lexicon`'s registered verb set. Takes both
+/// folds (T6.1(a) — the unified checker) even though no T6.1-attached
+/// precondition reads `ObligationState` yet; T6.4 attaches obligation-family
+/// studs and this generator must already be able to admit/reject them.
 ///
 /// For edge-scoped verbs, one candidate move is probed per edge present in
 /// `state.edges` (including superseded edges — K-13 supersede-never-delete
@@ -137,6 +141,7 @@ fn board_content_hash(moves: &[LegalMove]) -> Hash {
 pub fn enumerate_placement_set(
     subject: SubjectId,
     state: &ControlState,
+    obligation: &ObligationState,
     lexicon: &LexiconManifest,
 ) -> PlacementSet {
     let mut candidates: BTreeMap<MoveId, LegalMove> = BTreeMap::new();
@@ -155,7 +160,7 @@ pub fn enumerate_placement_set(
 
         for target in targets {
             let probe = probe_event(subject, fqn, target.clone());
-            if check_control_preconditions(entry, state, &probe).is_ok() {
+            if check_preconditions(entry, state, obligation, &probe).is_ok() {
                 let id = move_id_for(fqn, &target);
                 candidates.insert(
                     id.clone(),

@@ -350,6 +350,28 @@ async fn m3_3_structure_class_round_trips_through_the_fold() {
     )
     .await;
 
+    // T6-tooth fix (2026-08-12, EOP-PLAN-KYCUBO-KIT-001 Part A): compute-fold
+    // now genuinely enforces its declared [ReconciledProjection,
+    // StrategySelected] preconditions (K-14) instead of silently skipping
+    // them (it was a pure read op with no append call, so the checker was
+    // never reached) — reconcile + select-strategy must fire first, same
+    // stage-gate discipline every other freeze/compute-fold caller in this
+    // suite already follows.
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({
+            "subject-id": subject.0, "strategy": "ownership_prong_strategy",
+        }),
+        &pool,
+    )
+    .await;
+
     let fold_out = run(
         &UboDeterminationComputeFold,
         serde_json::json!({

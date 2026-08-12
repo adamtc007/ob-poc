@@ -21,8 +21,9 @@ use sqlx::{PgConnection, Row};
 use uuid::Uuid;
 
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, AuthorityRef, CapturedEffect, ControlState, EventId, FoldRegistry,
-    Hash, IdemKey, IntentEvent, KycError, Principal, SubjectId, TargetBinding, VerbFqn,
+    fold_control_versioned, fold_obligations_versioned, AuthorityRef, CapturedEffect,
+    ControlState, EventId, FoldRegistry, Hash, IdemKey, IntentEvent, KycError, ObligationState,
+    Principal, SubjectId, TargetBinding, VerbFqn,
 };
 
 use crate::error::StoreError;
@@ -31,7 +32,7 @@ use crate::error::StoreError;
 /// Single source of truth so every SELECT and the row mapper cannot drift.
 const EVENT_COLUMNS: &str = "subject_root, seq, event_id, verb_fqn, lexicon_hash, actor, \
     authority, target, payload, payload_hash, idempotency_key, causation_id, correlation_id, \
-    as_of, captured_effects";
+    as_of, captured_effects, committed_at";
 
 /// Outcome of an append.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +127,9 @@ impl PgKycEventStore {
     ///
     /// `validate` is the precondition policy (e.g. proof-ratchet, reconcile). The
     /// store stays decoupled from the lexicon; the caller supplies the check.
+    /// It sees BOTH folded states (T6.1(a) — the unified two-fold checker):
+    /// the store folds `ObligationState` under the same lock, from the same
+    /// event slice, as `ControlState` — a stud may read either axis.
     ///
     /// `source_text` is the resolved DSL S-expression for `event` (T1, KIT-1) —
     /// rendered by the caller via `render_intent_event_to_sexpr` (the store
@@ -139,7 +143,7 @@ impl PgKycEventStore {
         validate: V,
     ) -> Result<AppendOutcome, StoreError>
     where
-        V: FnOnce(&ControlState) -> Result<(), KycError>,
+        V: FnOnce(&ControlState, &ObligationState) -> Result<(), KycError>,
     {
         let subject = event.subject_root;
 
@@ -184,7 +188,8 @@ impl PgKycEventStore {
         let events = Self::load_events(conn, subject).await?;
         let refs: Vec<&IntentEvent> = events.iter().collect();
         let state = fold_control_versioned(&refs, registry)?; // KycError -> StoreError::Rejected
-        validate(&state)?; // precondition failure -> StoreError::Rejected -> caller rolls back
+        let obligation_state = fold_obligations_versioned(&refs, registry)?;
+        validate(&state, &obligation_state)?; // precondition failure -> StoreError::Rejected -> caller rolls back
 
         // 4. Insert at next_seq + bump (same txn: event and seq-bump commit together).
         insert_event(conn, event, next_seq, source_text).await?;
@@ -338,6 +343,7 @@ fn row_to_event(row: &sqlx::postgres::PgRow) -> Result<IntentEvent, StoreError> 
         causation_id: row.get::<Option<Uuid>, _>("causation_id").map(EventId),
         correlation_id: row.get("correlation_id"),
         as_of: row.get("as_of"),
+        committed_at: row.get("committed_at"),
         captured_effects,
     })
 }

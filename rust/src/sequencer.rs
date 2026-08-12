@@ -303,6 +303,15 @@ pub struct ReplOrchestratorV2 {
     /// constructor is `#[cfg(test)]`-gated. Set via
     /// `with_test_only_unlocked_execution()`.
     unlocked_execution_token: Option<crate::runbook::UnlockedExecutionToken>,
+    /// T4.5 (`EOP-PLAN-KYCUBO-KIT-001` §T4.5): in-memory KYC super-user
+    /// workbook sessions, keyed by REPL session id. Deliberately NOT part
+    /// of `sessions`/`ReplSessionV2` (which persists — `KycWorkbook` is
+    /// session-scoped in-memory only by design, see the T4 module doc) and
+    /// deliberately NOT the same map as any other session-keyed state on
+    /// this struct, so a workbook command can never be silently routed
+    /// through ordinary REPL/runbook dispatch.
+    #[cfg(feature = "database")]
+    kyc_workbooks: Arc<RwLock<HashMap<Uuid, crate::domain_ops::kyc_workbook::KycWorkbook>>>,
 }
 
 impl ReplOrchestratorV2 {
@@ -341,6 +350,8 @@ impl ReplOrchestratorV2 {
             nlci_compiler: None,
             verb_searcher: None,
             unlocked_execution_token: None,
+            #[cfg(feature = "database")]
+            kyc_workbooks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -1409,6 +1420,23 @@ impl ReplOrchestratorV2 {
             .and_then(|hs| hs.hydrated_constellation.as_ref())
             .map(|c| crate::agent::narration_engine::SlotSnapshot::capture(&c.slots))
             .unwrap_or_default();
+
+        // KYC super-user workbook surface intercept (T4.5,
+        // `EOP-PLAN-KYCUBO-KIT-001` §T4.5). `kyc-workbook.*` commands are a
+        // wholly separate command family from `ReplCommandV2` (which has
+        // its own, unrelated `Run` — "execute the runbook") and from the
+        // tollgate-guided pack pipeline below: recognised here, dispatched
+        // to `KycWorkbook` directly, zero model/LLM/Sage involvement by
+        // construction (this check runs before the Sage pre-classification
+        // call a few lines down).
+        #[cfg(feature = "database")]
+        if let UserInputV2::Message { ref content } = input {
+            if let Some(cmd_result) = crate::repl::kyc_workbook_surface::parse_kyc_workbook_command(content) {
+                let response = self.handle_kyc_workbook_command(session, cmd_result).await;
+                drop(sessions);
+                return Ok(response);
+            }
+        }
 
         // Contextual query intercept (ADR 043 Phase 2).
         // "what's next", "what's missing", "where are we" bypass verb search
@@ -4999,6 +5027,64 @@ impl ReplOrchestratorV2 {
             constellation_verb_index,
             allowed_verbs,
             ..Default::default()
+        }
+    }
+
+    /// T4.5: dispatch one `kyc-workbook.*` command to the T4 `KycWorkbook`
+    /// surface (`crate::repl::kyc_workbook_surface`). `cmd_result` is the
+    /// output of `parse_kyc_workbook_command` — `Err` for a malformed
+    /// command (surfaced verbatim, never guessed at), `Ok` for a
+    /// recognised one. Always returns a plain `Info` response; this
+    /// surface never enters the tollgate/runbook pipeline.
+    #[cfg(feature = "database")]
+    async fn handle_kyc_workbook_command(
+        &self,
+        session: &mut ReplSessionV2,
+        cmd_result: Result<crate::repl::kyc_workbook_surface::KycWorkbookCommand, String>,
+    ) -> ReplResponseV2 {
+        let message = match cmd_result {
+            Err(parse_err) => format!("kyc-workbook: {parse_err}"),
+            Ok(cmd) => match self.pool.clone() {
+                None => "kyc-workbook surface requires a database pool".to_string(),
+                Some(pool) => {
+                    let actor = ob_poc_boundary::policy::ActorResolver::from_env();
+                    let principal = sem_os_core::principal::Principal {
+                        actor_id: actor.actor_id,
+                        roles: actor.roles,
+                        claims: std::collections::HashMap::new(),
+                        tenancy: None,
+                    };
+                    let mut workbooks = self.kyc_workbooks.write().await;
+                    match crate::repl::kyc_workbook_surface::dispatch(
+                        cmd,
+                        &mut workbooks,
+                        session.id,
+                        &pool,
+                        &principal,
+                        chrono::Utc::now(),
+                    )
+                    .await
+                    {
+                        Ok(msg) => msg,
+                        Err(e) => format!("kyc-workbook error: {e}"),
+                    }
+                }
+            },
+        };
+
+        ReplResponseV2 {
+            state: session.state.clone(),
+            kind: crate::repl::response_v2::ReplResponseKindV2::Info {
+                detail: message.clone(),
+            },
+            message,
+            runbook_summary: None,
+            step_count: session.runbook.entries.len(),
+            session_feedback: Some(session.build_session_feedback(false)),
+            narration: None,
+            trace_id: None,
+            acp_dag_semantic: None,
+            bpmn_form: None,
         }
     }
 

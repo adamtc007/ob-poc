@@ -74,7 +74,15 @@ pub struct IntentEvent {
     pub correlation_id: Uuid,
 
     /// **Frozen** point-in-time for this event (Q6 — never `now()` inside a verb).
+    /// This is the **valid-time** axis (EOP-SA-OBP-001 §I.5): "when the fact holds".
     pub as_of: DateTime<Utc>,
+    /// The **knowledge-time** axis (EOP-SA-OBP-001 §I.5): "when we recorded it" —
+    /// the durable store's `committed_at` (`DEFAULT clock_timestamp()`, B1
+    /// monotonicity fix). Defaults to `as_of` for synthetic/in-memory events that
+    /// never round-trip through the durable store (T5 recon: the store-layer row
+    /// already carried both timestamps; this field closes the gap on the pure
+    /// substrate's `IntentEvent`, additively).
+    pub committed_at: DateTime<Utc>,
     /// External-lookup results captured at first execution; replayed verbatim (Q6).
     pub captured_effects: Vec<CapturedEffect>,
 }
@@ -106,6 +114,7 @@ impl IntentEvent {
             causation_id: None,
             correlation_id: Uuid::new_v4(),
             as_of,
+            committed_at: as_of,
             captured_effects: vec![],
         }
     }
@@ -113,6 +122,14 @@ impl IntentEvent {
     /// Set the sequence number (normally assigned by the store; override for testing).
     pub fn with_seq(mut self, seq: u64) -> Self {
         self.seq = seq;
+        self
+    }
+
+    /// Override the knowledge-time axis (`committed_at`) — defaults to `as_of`
+    /// in `new()`. Test/fixture setter for bitemporal recovery (T5); the durable
+    /// store hydrates the real `clock_timestamp()`-derived value instead.
+    pub fn with_committed_at(mut self, committed_at: DateTime<Utc>) -> Self {
+        self.committed_at = committed_at;
         self
     }
 

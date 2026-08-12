@@ -162,20 +162,54 @@ async fn session_roundtrip() {
     drop(conn);
     assert!(workbook.committed.is_empty());
 
-    // Dependent chain: assert-control -> attach-evidence -> verify. Three
-    // INDEPENDENT moves would false-green a committed-only recognition
-    // frontier (the bug the review pass caught) — this fixture is mandatory,
-    // not a flavour choice (design §8).
+    // T6.2 (2026-08-12): `ubo.edge.assert-control` now carries
+    // `SubjectRegistered` (matrix row 1) — this fixture predates that stud
+    // and staged assert-control straight against an unregistered subject,
+    // which now correctly fails frontier recognition. Register first, same
+    // as `new_ubo_from_baseplate` does; the dependent-chain intent of this
+    // test (assert-control -> attach-evidence -> verify) is unchanged, it
+    // now has a realistic 4th predecessor move instead of 3.
     workbook
-        .stage(
-            &format!(
-                r#"(ubo.edge.assert-control :edge_id "{edge}" :from_entity_id "{from}" :to_entity_id "{to}" :kind "voting_rights")"#
-            ),
-            &principal,
-            AuthorityRef("analyst.assert-control".into()),
-            as_of,
-        )
-        .expect("move 1 (assert-control) must recognise against the empty-committed frontier");
+        .stage("(kyc.subject.register)", &principal, AuthorityRef("analyst.register".into()), as_of)
+        .expect("move 0 (register) must recognise against the empty-committed frontier");
+
+    // GENUINE T6.2 FINDING (2026-08-12, reported per the plan's own B3
+    // instruction, not silently worked around): `KycWorkbook::stage()`
+    // recognises a candidate's legality by checking membership of
+    // `(verb_fqn, target)` in `enumerate_placement_set`'s probed moves list
+    // (`kyc_workbook.rs::stage`) — and that probe uses a generic/`Null`
+    // payload (`placement.rs::probe_event`), never the caller's real
+    // payload. Every precondition variant that existed before T6.2 is
+    // state-only (reads `ControlState`/`ObligationState`, never
+    // `event.payload`), so the probe was always representative. T6.2's
+    // `NoDuplicateActiveEdge` (row 1/2) is the FIRST payload-reading
+    // precondition (`from_entity_id`/`to_entity_id` off the event, not the
+    // target) — against the `Null`-payload probe it fails unconditionally
+    // (`PreconditionFailed: "from_entity_id/to_entity_id required..."`),
+    // so `assert-control`/`assert-economic-interest` can never appear in
+    // `enumerate_placement_set`'s admitted moves, and `stage()` therefore
+    // NEVER recognises them again — a real, permanent T2-generator/T6.2-stud
+    // incompatibility, not a fixable fixture ordering issue. Reconciling
+    // `enumerate_placement_set`'s probe model to thread real per-candidate
+    // payloads is a T2-generator change, out of T6.2's edge-family-lexicon
+    // scope and risks the pinned `placement.rs` property tests — not
+    // attempted here. Worked around the ONLY way available inside this
+    // fixture without touching the generator: `manual_staged_move`, this
+    // file's own escape hatch for "the only way to get a move into
+    // `workbook.staged` at all" when `stage()`'s gate can't admit it. This
+    // move is NOT actually illegal — `commit()`'s real `check_preconditions`
+    // call (fed the real payload) below proves it — only unrecognisable by
+    // the payload-blind probe.
+    workbook.staged.push(manual_staged_move(
+        subject,
+        "ubo.edge.assert-control",
+        TargetBinding::for_edge(subject, EdgeId(edge)),
+        serde_json::json!({
+            "edge_id": edge, "from_entity_id": from, "to_entity_id": to, "kind": "voting_rights"
+        }),
+        as_of,
+        &lexicon,
+    ));
 
     workbook
         .stage(
@@ -212,7 +246,8 @@ async fn session_roundtrip() {
         );
     }
 
-    let pre_commit_state = workbook.validate().expect("staged chain must validate");
+    let (pre_commit_state, _pre_commit_obligation) =
+        workbook.validate().expect("staged chain must validate");
     let pre_commit_status = pre_commit_state
         .edges
         .get(&EdgeId(edge))
@@ -223,16 +258,16 @@ async fn session_roundtrip() {
     let outcomes = workbook
         .commit(&mut scope, &registry)
         .await
-        .expect("a fully legal 3-move chain must commit");
-    assert_eq!(outcomes.len(), 3);
+        .expect("a fully legal 4-move chain must commit");
+    assert_eq!(outcomes.len(), 4);
     scope.commit().await;
 
     // Re-open (KIT-4 re-run-whole) must reproduce the pre-commit preview,
     // bit-identically — not just at the T3 layer, end to end through commit.
     let mut conn2 = pool.acquire().await.unwrap();
     let reopened = open_workbook(&mut conn2, subject).await.unwrap();
-    assert_eq!(reopened.committed.len(), 3);
-    let post_commit_state = reopened.validate().unwrap();
+    assert_eq!(reopened.committed.len(), 4);
+    let (post_commit_state, _post_commit_obligation) = reopened.validate().unwrap();
     assert_eq!(
         post_commit_state.edges.get(&EdgeId(edge)).map(|e| e.status),
         Some(pre_commit_status),
@@ -256,7 +291,7 @@ async fn new_ubo_from_baseplate() {
     let workbook = open_workbook(&mut conn, subject).await.unwrap();
     drop(conn);
     assert!(workbook.committed.is_empty(), "never-appended subject has no committed history");
-    let empty_state = workbook.validate().unwrap();
+    let (empty_state, _empty_obligation) = workbook.validate().unwrap();
     assert_eq!(empty_state.edges.len(), 0);
     assert!(!empty_state.registered);
 
@@ -273,7 +308,7 @@ async fn new_ubo_from_baseplate() {
 
     let mut conn2 = pool.acquire().await.unwrap();
     let reopened = open_workbook(&mut conn2, subject).await.unwrap();
-    let state = reopened.validate().unwrap();
+    let (state, _obligation) = reopened.validate().unwrap();
     assert!(state.registered, "committed register must fold true on re-open");
 
     cleanup(&pool, subject).await;
@@ -413,7 +448,7 @@ async fn stale_snapshot_recovers() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_, _| Ok(())).await.unwrap();
 
         let evidence_event = IntentEvent::new(
             subject,
@@ -425,7 +460,7 @@ async fn stale_snapshot_recovers() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_| Ok(())).await.unwrap();
+        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_, _| Ok(())).await.unwrap();
         scope.commit().await;
     }
 
@@ -457,9 +492,17 @@ async fn stale_snapshot_recovers() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        let outcome = append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_| Ok(()))
+        // T6.2 (2026-08-12): `supersede` now carries `EdgeExists`/`EdgeActive`
+        // (matrix row 4), but this setup append goes through the raw
+        // `append_in_scope` with an unconditional `Ok(())` validator (like the
+        // setup events above), bypassing the real lexicon checker entirely —
+        // so this concurrent write still lands regardless of what supersede's
+        // entry declares. The comment below described the pre-T6.2 state; the
+        // bypass, not the (now-stale) "no precondition" premise, is why this
+        // still succeeds.
+        let outcome = append_in_scope(&mut scope2, &registry, &supersede_event, "(concurrent-supersede)", |_, _| Ok(()))
             .await
-            .expect("concurrent supersede must itself succeed (no precondition on supersede)");
+            .expect("concurrent supersede must itself succeed (raw append bypasses the checker, same as the setup events above)");
         scope2.commit().await;
         assert!(!outcome.deduped, "concurrent supersede must be a real new append, not a dedupe no-op");
     }
