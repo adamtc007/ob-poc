@@ -436,13 +436,17 @@ impl SemOsVerbOp for UboDeterminationApplySmoFallback {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let payload = normalize_smo_fallback_payload(args);
+        // T6.3 row 7 finding: `validate_entry_fqn` was `None`, so the
+        // lexicon's declared ReconciledProjection/StrategySelected
+        // preconditions were dead at the real write path — same defect
+        // class as freeze's pre-DD-003 dead precondition.
         let outcome = stream_append(
             "ubo.determination.apply-smo-fallback",
             subject,
             TargetBinding::for_subject(subject),
             payload,
             "analyst.smo-fallback",
-            None,
+            Some("ubo.determination.apply-smo-fallback"),
             ctx,
             scope,
         )
@@ -685,6 +689,10 @@ impl SemOsVerbOp for KycSubjectRegister {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let payload = normalize_register_payload(args, ctx, subject);
+        // T6.3 row 9 HALTED (not shipped) — see the lexicon entry's own
+        // comment for why `NotAlreadyRegistered` is incompatible with this
+        // verb's real multi-call-per-stream usage. `validate_entry_fqn`
+        // stays `None`; there is nothing to check.
         let outcome = stream_append(
             "kyc.subject.register",
             subject,
@@ -718,13 +726,16 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let _class = json_extract_string(args, "structure-class")?;
         let payload = normalize_classify_structure_payload(args, ctx, subject);
+        // T6.3 row 10 finding: `validate_entry_fqn` was `None`, so the
+        // newly-declared SubjectRegistered precondition would be dead at
+        // the real write path without this wire.
         let outcome = stream_append(
             "kyc.subject.classify-structure",
             subject,
             TargetBinding::for_subject(subject),
             payload,
             "analyst.classify-structure",
-            None,
+            Some("kyc.subject.classify-structure"),
             ctx,
             scope,
         )
@@ -830,13 +841,16 @@ impl SemOsVerbOp for KycObligationCreate {
                 obj.insert("cbu_role".to_string(), v);
             }
         }
+        // T6.4 row 11 finding: `validate_entry_fqn` was `None` — the
+        // SubjectRegistered precondition (the motivating cross-fold case
+        // for the T6.1 unified checker) was dead at the real write path.
         let outcome = stream_append(
             "kyc.obligation.create",
             subject,
             TargetBinding::for_subject(subject),
             payload,
             "analyst.obligation-create",
-            None,
+            Some("kyc.obligation.create"),
             ctx,
             scope,
         )
@@ -862,13 +876,16 @@ impl SemOsVerbOp for KycObligationUpdateIdentity {
     ) -> Result<VerbExecutionOutcome> {
         let subject =
             SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        // T6.4 row 12 finding: `validate_entry_fqn` was `None` —
+        // ObligationExists / SubjectNotDecided were dead at the real write
+        // path.
         let outcome = stream_append(
             "kyc.obligation.update-identity",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-update",
-            None,
+            Some("kyc.obligation.update-identity"),
             ctx,
             scope,
         )
@@ -894,13 +911,16 @@ impl SemOsVerbOp for KycObligationUpdateScreening {
     ) -> Result<VerbExecutionOutcome> {
         let subject =
             SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        // T6.4 row 13 finding: `validate_entry_fqn` was `None` —
+        // ObligationExists / SubjectNotDecided were dead at the real write
+        // path.
         let outcome = stream_append(
             "kyc.obligation.update-screening",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-update",
-            None,
+            Some("kyc.obligation.update-screening"),
             ctx,
             scope,
         )
@@ -926,13 +946,16 @@ impl SemOsVerbOp for KycObligationUpdateRisk {
     ) -> Result<VerbExecutionOutcome> {
         let subject =
             SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        // T6.4 row 14 finding: `validate_entry_fqn` was `None` —
+        // ObligationExists / SubjectNotDecided were dead at the real write
+        // path.
         let outcome = stream_append(
             "kyc.obligation.update-risk",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-update",
-            None,
+            Some("kyc.obligation.update-risk"),
             ctx,
             scope,
         )
@@ -958,13 +981,16 @@ impl SemOsVerbOp for KycObligationSatisfy {
     ) -> Result<VerbExecutionOutcome> {
         let subject =
             SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        // T6.4 row 15 finding: `validate_entry_fqn` was `None` —
+        // ObligationExists / SubjectNotDecided were dead at the real write
+        // path.
         let outcome = stream_append(
             "kyc.obligation.satisfy",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-satisfy",
-            None,
+            Some("kyc.obligation.satisfy"),
             ctx,
             scope,
         )
@@ -991,13 +1017,16 @@ impl SemOsVerbOp for KycObligationWaive {
         let subject =
             SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
         let _reason = json_extract_string(args, "reason")?;
+        // T6.4 row 16 finding: `validate_entry_fqn` was `None` —
+        // ObligationExists / SubjectNotDecided were dead at the real write
+        // path.
         let outcome = stream_append(
             "kyc.obligation.waive",
             subject,
             TargetBinding::for_subject(subject),
             normalize_obligation_payload(args),
             "analyst.obligation-waive",
-            None,
+            Some("kyc.obligation.waive"),
             ctx,
             scope,
         )
@@ -1044,13 +1073,20 @@ impl SemOsVerbOp for KycPersonApprove {
             ));
         }
 
+        // T6.4 row 17 finding: `validate_entry_fqn` was `None` — the K-23
+        // gate (SubjectAllTerminal / SubjectNotDecided) was declared in the
+        // lexicon but never reached by the checker at the real op call
+        // site; the hand-rolled fold above already enforces the same gate
+        // (kept as-is), this wires the declared precondition too so the
+        // checker is the single enforced source of truth, not just this
+        // op's bespoke pre-check.
         let outcome = stream_append(
             "kyc.person.approve",
             subject,
             TargetBinding::for_subject(subject),
             args.clone(),
             "senior-analyst.approve",
-            None,
+            Some("kyc.person.approve"),
             ctx,
             scope,
         )
@@ -1075,13 +1111,15 @@ impl SemOsVerbOp for KycPersonReject {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        // T6.4 row 18 finding: `validate_entry_fqn` was `None` —
+        // SubjectNotDecided was dead at the real write path.
         let outcome = stream_append(
             "kyc.person.reject",
             subject,
             TargetBinding::for_subject(subject),
             args.clone(),
             "senior-analyst.reject",
-            None,
+            Some("kyc.person.reject"),
             ctx,
             scope,
         )

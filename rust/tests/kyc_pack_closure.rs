@@ -377,24 +377,7 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         .map(|e| (e.fqn.0.clone(), e.preconditions.clone()))
         .collect();
 
-    let mut expected: BTreeMap<String, Vec<Precondition>> = [
-        "kyc.subject.register",
-        "kyc.subject.classify-structure",
-        "ubo.determination.apply-smo-fallback",
-        // T6.0 (2026-08-12): entries only, no preconditions authored here —
-        // that stays T6.1+.
-        "kyc.obligation.create",
-        "kyc.obligation.update-identity",
-        "kyc.obligation.update-screening",
-        "kyc.obligation.update-risk",
-        "kyc.obligation.satisfy",
-        "kyc.obligation.waive",
-        "kyc.person.approve",
-        "kyc.person.reject",
-    ]
-    .into_iter()
-    .map(|fqn| (fqn.to_string(), Vec::new()))
-    .collect();
+    let mut expected: BTreeMap<String, Vec<Precondition>> = BTreeMap::new();
     expected.insert(
         "ubo.edge.verify".to_string(),
         vec![Precondition::EvidenceCited],
@@ -407,14 +390,21 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         ],
     );
     // T6.1(c) (2026-08-12): the fail-closed strategy guard (matrix rows
-    // 6a/8a) — `select-strategy` gets `StructureClassSupported` as its sole
-    // precondition; `freeze` gets it ADDED to its existing two (defense in
-    // depth — the guard holds even if select-strategy is bypassed). The
-    // strategy-COUNT pin below (2) is unchanged — this is a precondition-map
-    // change, not a new `DeterminationStrategy`.
+    // 6a/8a) — `select-strategy` gets `StructureClassSupported`; `freeze`
+    // gets it ADDED to its existing two (defense in depth — the guard holds
+    // even if select-strategy is bypassed). The strategy-COUNT pin below (2)
+    // is unchanged — this is a precondition-map change, not a new
+    // `DeterminationStrategy`.
+    // T6.3 row 6 (2026-08-12) widens select-strategy's sole 6a precondition
+    // into the full documented order: subject registered -> structure
+    // classified -> structure class supported.
     expected.insert(
         "ubo.determination.select-strategy".to_string(),
-        vec![Precondition::StructureClassSupported],
+        vec![
+            Precondition::SubjectRegistered,
+            Precondition::StructureClassified,
+            Precondition::StructureClassSupported,
+        ],
     );
     expected.insert(
         "ubo.determination.freeze".to_string(),
@@ -457,6 +447,61 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         vec![Precondition::SubjectRegistered],
     );
 
+    // T6.3 (2026-08-12, determination-family remainder — EOP-DD-KYCUBO-KIT-T6
+    // matrix rows 7, 9, 10; row 6 is folded into select-strategy above; row 8
+    // is the unchanged 8a freeze guard, asserted below).
+    expected.insert(
+        "ubo.determination.apply-smo-fallback".to_string(),
+        vec![
+            Precondition::ReconciledProjection,
+            Precondition::StrategySelected,
+        ],
+    );
+    // row 9 (`kyc.subject.register`) HALTED, not shipped (see the lexicon
+    // entry's own comment): `NotAlreadyRegistered` is incompatible with
+    // this verb's real multi-call-per-stream usage (one call per
+    // natural-person candidate under one subject_root). Stays at its
+    // pre-T6.3 empty precondition list — the ONE of the 20 dsl.kyc verbs
+    // that remains geometry-free after T6.4.
+    expected.insert("kyc.subject.register".to_string(), vec![]);
+    expected.insert(
+        "kyc.subject.classify-structure".to_string(),
+        vec![Precondition::SubjectRegistered],
+    );
+
+    // T6.4 (2026-08-12, obligation/person family — EOP-DD-KYCUBO-KIT-T6
+    // matrix rows 11-18, every row cross-fold via the T6.1 unified checker).
+    expected.insert(
+        "kyc.obligation.create".to_string(),
+        vec![Precondition::SubjectRegistered],
+    );
+    for fqn in [
+        "kyc.obligation.update-identity",
+        "kyc.obligation.update-screening",
+        "kyc.obligation.update-risk",
+        "kyc.obligation.satisfy",
+        "kyc.obligation.waive",
+    ] {
+        expected.insert(
+            fqn.to_string(),
+            vec![
+                Precondition::ObligationExists,
+                Precondition::SubjectNotDecided,
+            ],
+        );
+    }
+    expected.insert(
+        "kyc.person.approve".to_string(),
+        vec![
+            Precondition::SubjectAllTerminal,
+            Precondition::SubjectNotDecided,
+        ],
+    );
+    expected.insert(
+        "kyc.person.reject".to_string(),
+        vec![Precondition::SubjectNotDecided],
+    );
+
     assert_eq!(
         actual.len(),
         20,
@@ -465,9 +510,10 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of T6.2, verify/compute-fold/select-strategy/freeze \
-         AND the 5 edge-family verbs (assert-control, assert-economic-interest, \
-         attach-evidence, supersede, reconcile-conflict) carry preconditions; any other change \
+        "K-G5 precondition map changed — as of T6.4, every one of the 20 dsl.kyc verbs except \
+         select-strategy/freeze's own 8a guard interaction now carries a stud (verify, \
+         compute-fold, select-strategy, freeze, the 5 edge-family verbs, apply-smo-fallback, \
+         register, classify-structure, and all 8 obligation/person verbs); any other change \
          is either T6.3/T6.4 progress (update the T0.3 audit) or a regression"
     );
 
@@ -796,8 +842,15 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
 
     // ubo.determination.select-strategy / freeze — StructureClassSupported:
     // an unsupported class must block; a supported one must admit.
+    // T6.3 row 6: select-strategy also carries SubjectRegistered +
+    // StructureClassified now, so both fixtures below must set
+    // `registered: true` too — the Trust case still blocks (on
+    // StructureClassSupported, checked last), the PrivateCompany case would
+    // otherwise incorrectly block on SubjectRegistered instead of proving
+    // the guard this sub-test targets.
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let unsupported = ControlState {
+        registered: true,
         structure_class: Some(StructureClass::Trust),
         ..Default::default()
     };
@@ -812,6 +865,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         "select-strategy must block an unsupported structure class (Trust)"
     );
     let supported = ControlState {
+        registered: true,
         structure_class: Some(StructureClass::PrivateCompany),
         ..Default::default()
     };

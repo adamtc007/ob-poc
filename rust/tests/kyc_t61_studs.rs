@@ -106,8 +106,14 @@ async fn cleanup(pool: &PgPool, subject: SubjectId) {
 // (`select-strategy`, `freeze`) that `StructureClassSupported` fail-closes on
 // an unimplemented class and admits an implemented one.
 
+// T6.3 row 6 (2026-08-12): select-strategy now ALSO carries SubjectRegistered
+// + StructureClassified (attached alongside 6a's StructureClassSupported) —
+// both helpers below must set `registered: true` too, or the fixtures below
+// would incorrectly block on the ordering studs instead of proving the 6a/8a
+// StructureClassSupported guard they target.
 fn control_with_class(class: StructureClass) -> ControlState {
     ControlState {
+        registered: true,
         structure_class: Some(class),
         ..Default::default()
     }
@@ -115,6 +121,7 @@ fn control_with_class(class: StructureClass) -> ControlState {
 
 fn control_with_class_reconciled_and_strategized(class: StructureClass) -> ControlState {
     ControlState {
+        registered: true,
         structure_class: Some(class),
         reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
         selected_strategy: Some("ownership_prong_strategy".to_string()),

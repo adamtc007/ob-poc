@@ -367,6 +367,33 @@ async fn coverage_ubo_determination_apply_smo_fallback() {
         &pool,
     )
     .await;
+    // T6.3 row 7 finding: apply-smo-fallback now carries ReconciledProjection
+    // + StrategySelected (reused from compute-fold/freeze's own gates) —
+    // this fixture predates that stud and called apply-smo-fallback
+    // straight after register. Real predecessor moves added, same fix
+    // pattern as `coverage_ubo_determination_freeze` below already uses.
+    run(
+        &KycSubjectClassifyStructure,
+        serde_json::json!({
+            "subject-id": subject.0, "structure-class": "private_company",
+        }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboEdgeReconcileConflict,
+        serde_json::json!({ "subject-id": subject.0 }),
+        &pool,
+    )
+    .await;
+    run(
+        &UboDeterminationSelectStrategy,
+        serde_json::json!({
+            "subject-id": subject.0, "strategy": "ownership_prong_strategy",
+        }),
+        &pool,
+    )
+    .await;
     run(
         &UboDeterminationApplySmoFallback,
         serde_json::json!({

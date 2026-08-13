@@ -251,6 +251,25 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Bring a subject into KYC scope, recording the basis for obligation",
             Taxonomy::Subject,
             smallvec![FoldId::ObligationGraph],
+            // T6.3 row 9 HALTED (2026-08-12), not shipped: the ratified
+            // matrix's `NotAlreadyRegistered` (`!state.registered`, a bare
+            // stream-level boolean) is incompatible with `register`'s real
+            // production usage — `kyc_stream_ops.rs`'s own
+            // `UboDeterminationFreeze` resolves natural-person candidates
+            // via `natural_persons_from_events`, which scans for MULTIPLE
+            // `kyc.subject.register` events sharing one subject_root,
+            // differentiated by payload `entity_id` (one call registers the
+            // subject entity itself, one more per natural-person
+            // candidate — see `kyc_m3_remediation.rs`'s
+            // `m3_1_freeze_differential_matches_ownership_prong_strategy` /
+            // `m4_control_prong_strategy_resolves_gp_statutory_control`,
+            // both real production-shaped fixtures, not test-only
+            // workarounds). Attaching this stud as ratified would block
+            // every multi-person determination. Left geometry-free pending
+            // a matrix amendment (row 9 needs a KEYED check — "this
+            // (subject_root, entity_id) pair must not already be
+            // registered" — not the niladic boolean the matrix's own §2
+            // inventory claims suffices; out of this tranche's scope).
             vec![],
             AuthoritySpec::analyst(),
             vec![],
@@ -260,7 +279,10 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Set structure class, driving both determination strategy and obligation set",
             Taxonomy::Subject,
             smallvec![FoldId::ControlGraph, FoldId::ObligationGraph],
-            vec![],
+            // T6.3 row 10: subject must be registered. Reclassification
+            // stays legal (last-wins, per the current fold) — deliberately
+            // NOT freezing the class; reclassify is a real workflow.
+            vec![Precondition::SubjectRegistered],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -341,12 +363,18 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Choose the determination strategy keyed on the subject structure class (K-4)",
             Taxonomy::Control,
             smallvec![FoldId::Determination],
-            // T6.1(c) exemplar (matrix row 6a): structure class must have an
-            // implemented DeterminationStrategy — converts a silently-wrong
-            // determination for the 6 unimplemented classes into a
-            // fail-closed error. SubjectRegistered/StructureClassified
-            // (row 6's remainder) are T6.3 scope, not shipped here.
-            vec![Precondition::StructureClassSupported],
+            // T6.3 row 6 (remainder of the T6.1(c) 6a exemplar): subject
+            // registered -> structure classified -> structure class
+            // supported, in that documented order. StructureClassSupported
+            // (6a) is the fail-closed guard converting a silently-wrong
+            // determination for the 6 unimplemented classes into an error;
+            // SubjectRegistered/StructureClassified are the ordering studs
+            // added in T6.3.
+            vec![
+                Precondition::SubjectRegistered,
+                Precondition::StructureClassified,
+                Precondition::StructureClassSupported,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -367,7 +395,13 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Record SMO where ownership+control resolution is empty (K-5, never silent)",
             Taxonomy::Control,
             smallvec![FoldId::Determination],
-            vec![],
+            // T6.3 row 7: reuses the two EXISTING variants that gate
+            // compute-fold/freeze — zero new machinery. Prevents SMO
+            // fallback firing before the determination stage is set up.
+            vec![
+                Precondition::ReconciledProjection,
+                Precondition::StrategySelected,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -399,7 +433,9 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Create an obligation for a subject under a stated role basis (K-21, K-35)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 11 (⊗ cross-fold, the motivating case for the T6.1
+            // unified checker): subject must be registered.
+            vec![Precondition::SubjectRegistered],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -408,7 +444,12 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Advance the identity verification track of an obligation",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 12 (⊗): target obligation exists; subject not
+            // already decided (K-23: decision is final).
+            vec![
+                Precondition::ObligationExists,
+                Precondition::SubjectNotDecided,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -418,7 +459,11 @@ pub fn phase1_lexicon() -> LexiconManifest {
              approval, not determination)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 13 (⊗): same two studs as row 12, reused.
+            vec![
+                Precondition::ObligationExists,
+                Precondition::SubjectNotDecided,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -427,7 +472,11 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Advance the risk-assessment track of an obligation",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 14 (⊗): same two studs as row 12, reused.
+            vec![
+                Precondition::ObligationExists,
+                Precondition::SubjectNotDecided,
+            ],
             AuthoritySpec::analyst(),
             vec![],
         ),
@@ -436,7 +485,12 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Mark all tracks on an obligation as satisfied (full KYC clearance)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 15 (⊗): same two studs as row 12, reused. Prevents
+            // satisfying dead/decided work.
+            vec![
+                Precondition::ObligationExists,
+                Precondition::SubjectNotDecided,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -445,7 +499,13 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Waive an obligation (all tracks set to Waived with a recorded reason)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 16 (⊗): same two studs as row 12, reused. Waive's
+            // extra sensitivity is an AUTHORITY question (AuthoritySpec),
+            // a separate ruling — not a stud, per the ratified matrix.
+            vec![
+                Precondition::ObligationExists,
+                Precondition::SubjectNotDecided,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -454,7 +514,14 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Approve a subject once all obligations are terminal (K-23 gate)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 17 (⊗ — the highest-value row in this tranche): all
+            // required obligation tracks terminal (THE K-23 GATE, closes
+            // the DD-003 finding that approve was ungated at the checker
+            // layer) + subject not already decided.
+            vec![
+                Precondition::SubjectAllTerminal,
+                Precondition::SubjectNotDecided,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
@@ -463,7 +530,11 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Reject a subject (K-23 — decision recorded on the stream, never erased)",
             Taxonomy::Obligation,
             smallvec![FoldId::ObligationGraph],
-            vec![],
+            // T6.4 row 18 (⊗): subject not already decided ONLY. Rejection
+            // deliberately allowed at ANY stage (early rejection is a real
+            // compliance outcome) — no SubjectAllTerminal stud here, per
+            // the ratified matrix.
+            vec![Precondition::SubjectNotDecided],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),
