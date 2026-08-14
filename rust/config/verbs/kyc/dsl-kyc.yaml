@@ -59,8 +59,8 @@ domains:
           - name: kind
             type: string
             required: true
-            description: "Control basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload). trust_role is a recognized EdgeKind variant but has no wire mapping from this string yet (M4 follow-up: needs a sub-kind for settlor/trustee/protector/beneficiary) — passing it, or any unrecognized/omitted value, silently resolves to dominant_influence (the fold's catch-all; the fold is infallible by design, so this cannot be a hard error today)."
-            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, nominee, dominant_influence, economic_interest]
+            description: "Control basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload; canonical wire set: EDGE_KIND_WIRE_VALUES, TS.1 §1a). Trust roles are sub-kind-explicit: trust_settlor / trust_trustee / trust_protector / trust_beneficiary each map to their EdgeKind::TrustRole sub-kind, so distinct roles between the same (from,to) pair derive distinct edge ids and coexist under NoDuplicateActiveEdge. Unrecognized or omitted values are REJECTED at the op-normalizer before append (TS.1 §1b, fail-closed); the fold itself stays infallible — its dominant_influence catch-all remains only as the total-dispatch backstop for historical events."
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, nominee, dominant_influence, economic_interest]
           - name: edge-id
             type: uuid
             required: false
@@ -69,6 +69,10 @@ domains:
             type: decimal
             required: false
             description: Percentage (for economic_interest edges)
+          - name: trust-revocable
+            type: boolean
+            required: false
+            description: "Whether the trust IS revocable — only meaningful on trust_settlor edges (TS.1 §2.1). Polarity: false = PROVEN irrevocable, the only value that excludes the settlor from trust_role_strategy candidates; true or absent both treat the trust as revocable, so the settlor is INCLUDED (fail-closed toward inclusion: over-identify, never silently drop a controller)."
         returns:
           type: record
           fields:
@@ -355,8 +359,8 @@ domains:
           - name: strategy
             type: string
             required: true
-            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %) and control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4) are implemented. Role-based strategies remain open (M2)."
-            valid_values: [ownership_prong_strategy, control_prong_strategy]
+            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %), control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4), and trust_role_strategy (trust-role control: trustee/protector always, settlor unless proven irrevocable, beneficiary never — TS.1) are implemented. Strategies for foundation/investment_fund/state_owned/cooperative/nominee remain open (TS.2-TS.4)."
+            valid_values: [ownership_prong_strategy, control_prong_strategy, trust_role_strategy]
         returns:
           type: record
           fields:
@@ -582,7 +586,7 @@ domains:
           - name: structure-class
             type: string
             required: true
-            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4). trust/foundation/investment_fund/state_owned/cooperative/nominee classify successfully but have no wire mapping from ubo.edge.assert-control's kind arg to a control edge kind for their structure-specific control basis yet (e.g. TrustRole — separate, smaller follow-on gap)."
+            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4); trust pairs with trust_role_strategy (trust_settlor/trust_trustee/trust_protector/trust_beneficiary wire values, TS.1). foundation/investment_fund/state_owned/cooperative/nominee classify successfully but have no implemented strategy yet (fail-closed at select-strategy/freeze via StructureClassSupported; TS.2-TS.4 tracks the build-out)."
             valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
           - name: entity-id
             type: uuid

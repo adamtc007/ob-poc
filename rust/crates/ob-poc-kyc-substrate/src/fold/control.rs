@@ -103,6 +103,18 @@ pub struct EdgeState {
     pub evidence_event_id: Option<EventId>,
     /// The original assertion event (K-35 traceability).
     pub originating_event_id: EventId,
+    /// Whether the trust IS revocable (meaningful on
+    /// `TrustRole(Settlor)` edges only; captured from the assert-control
+    /// payload key `trust_revocable` — TS.1, EOP-DD-KYCUBO-KIT-TS0 §2.1).
+    ///
+    /// **Polarity:** `Some(false)` means the trust is PROVEN irrevocable —
+    /// the only value that excludes the settlor from
+    /// `trust_role_strategy` candidates. `Some(true)` and `None` (absent /
+    /// unproven) both treat the trust as revocable, so the settlor is
+    /// INCLUDED — fail-closed toward inclusion: over-identify, never
+    /// silently drop a controller.
+    #[serde(default)]
+    pub trust_revocable: Option<bool>,
 }
 
 impl EdgeState {
@@ -227,6 +239,29 @@ fn opt_f64(v: &serde_json::Value, field: &str) -> Option<f64> {
     v.get(field)?.as_f64()
 }
 
+/// The canonical `kind` wire-string set for `ubo.edge.assert-control` —
+/// exactly the strings `edge_kind_from_payload` recognizes with a dedicated
+/// arm (TS.1, EOP-DD-KYCUBO-KIT-TS0 §1a/§1b). ONE source of truth: the
+/// op-normalizer (`kyc_stream_ops.rs`) rejects any `kind` outside this set
+/// BEFORE append (fail-closed), and the wire-value closure tooth
+/// (`tests/kyc_pack_closure.rs::edge_kind_wire_values_are_exactly_known`)
+/// pins this const against the YAML `valid_values` — adding an `EdgeKind`
+/// wire value is a conscious three-way edit (arm + const + YAML), never a
+/// silent widening.
+pub const EDGE_KIND_WIRE_VALUES: &[&str] = &[
+    "economic_interest",
+    "voting_rights",
+    "board_appointment",
+    "gp_statutory",
+    "designated_member",
+    "trust_settlor",
+    "trust_trustee",
+    "trust_protector",
+    "trust_beneficiary",
+    "nominee",
+    "dominant_influence",
+];
+
 fn edge_kind_from_payload(payload: &serde_json::Value) -> EdgeKind {
     match payload.get("kind").and_then(|v| v.as_str()) {
         Some("economic_interest") => EdgeKind::EconomicInterest,
@@ -234,7 +269,16 @@ fn edge_kind_from_payload(payload: &serde_json::Value) -> EdgeKind {
         Some("board_appointment") => EdgeKind::BoardAppointment,
         Some("gp_statutory") => EdgeKind::GpStatutory,
         Some("designated_member") => EdgeKind::DesignatedMember,
+        Some("trust_settlor") => EdgeKind::TrustRole(TrustRoleKind::Settlor),
+        Some("trust_trustee") => EdgeKind::TrustRole(TrustRoleKind::Trustee),
+        Some("trust_protector") => EdgeKind::TrustRole(TrustRoleKind::Protector),
+        Some("trust_beneficiary") => EdgeKind::TrustRole(TrustRoleKind::Beneficiary),
         Some("nominee") => EdgeKind::Nominee,
+        // Total-dispatch backstop for HISTORICAL events only (the fold must
+        // stay infallible — D2). The live append path can no longer reach
+        // this with an unknown/absent kind: the op-normalizer rejects
+        // anything outside `EDGE_KIND_WIRE_VALUES` before the event exists
+        // (TS.1 §1b).
         Some("dominant_influence") | Some(_) | None => EdgeKind::DominantInfluence,
     }
 }
@@ -295,6 +339,7 @@ pub(crate) fn apply_one_control_event(
                         status: EdgeStatus::Asserted,
                         evidence_event_id: None,
                         originating_event_id: event.id,
+                        trust_revocable: None,
                     },
                 );
             }
@@ -319,6 +364,9 @@ pub(crate) fn apply_one_control_event(
                         status: EdgeStatus::Asserted,
                         evidence_event_id: None,
                         originating_event_id: event.id,
+                        // TS.1 §2.1: revocability proof for settlor edges
+                        // (see the field's polarity doc on `EdgeState`).
+                        trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
                     },
                 );
             }
@@ -401,23 +449,27 @@ use crate::lexicon::{LexiconEntry, Precondition};
 ///
 /// Derived, not guessed: `kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute`
 /// dispatch (`match strategy_name { "ownership_prong_strategy" => ...,
-/// "control_prong_strategy" => ..., other => Err(...) }`) recognises exactly
-/// two strategy names, and this plan's own TS.0–TS.4 build-out enumerates the
-/// 6 `StructureClass` variants with NO strategy behind them yet — `Trust`,
-/// `Foundation`, `InvestmentFund`, `StateOwned`, `Cooperative`, `Nominee`
-/// (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.0–TS.4). The set below is the complement:
-/// the 11-variant `StructureClass` taxonomy minus those 6 — the
-/// "corporate-ownership-prong" classes the two implemented strategies
-/// actually cover. Widen this set ONLY when a new `DeterminationStrategy`
-/// impl lands for the class (the "seventh tooth",
-/// `tests/kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`,
-/// pins the strategy count and must be consciously updated in lockstep).
+/// "control_prong_strategy" => ..., "trust_role_strategy" => ...,
+/// other => Err(...) }`) recognises exactly three strategy names, and the
+/// TS.0–TS.4 build-out enumerates the 5 `StructureClass` variants with NO
+/// strategy behind them yet — `Foundation`, `InvestmentFund`, `StateOwned`,
+/// `Cooperative`, `Nominee` (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.2–TS.4;
+/// `Trust` joined the implemented set at TS.1 via `TrustRoleStrategy`,
+/// EOP-DD-KYCUBO-KIT-TS0 §2.1). The set below is the complement: the
+/// 11-variant `StructureClass` taxonomy minus those 5. Widen this set ONLY
+/// when a new `DeterminationStrategy` impl lands for the class — two teeth
+/// pin the lockstep: the "seventh tooth"
+/// (`tests/kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`,
+/// strategy count) and the TS.1 split pin
+/// (`implemented_class_split_matches_strategy_arms`, arm↔classes-served
+/// mapping) — both must be consciously updated together with this const.
 pub const IMPLEMENTED_STRATEGY_CLASSES: &[StructureClass] = &[
     StructureClass::PrivateCompany,
     StructureClass::MultiTierHoldingGroup,
     StructureClass::ListedEntity,
     StructureClass::LimitedPartnershipFund,
     StructureClass::Llp,
+    StructureClass::Trust,
 ];
 
 /// Check all preconditions for a verb against the current control state,
@@ -727,6 +779,55 @@ pub fn reconciled_control_edges(state: &ControlState) -> Vec<ReconciledControlEd
                 None
             },
             originating_event_id: e.originating_event_id,
+        })
+        .collect()
+}
+
+// ── Trust edge summary (for TrustRoleStrategy, TS.1) ─────────────────────────
+
+/// An active trust-role edge ready for the role-based prong computation.
+/// Consumed by `TrustRoleStrategy::resolve()` (EOP-DD-KYCUBO-KIT-TS0 §2.1).
+#[derive(Debug, Clone)]
+pub struct ReconciledTrustEdge {
+    pub id: EdgeId,
+    pub from: EntityId,
+    pub to: EntityId,
+    pub role: TrustRoleKind,
+    /// Revocability proof carried on the edge (settlor edges only — see the
+    /// polarity doc on `EdgeState::trust_revocable`).
+    pub trust_revocable: Option<bool>,
+    /// The event that verified this edge (K-35 traceability on the candidate).
+    pub verified_by: Option<EventId>,
+    /// The event that originally asserted this edge (deterministic; never random).
+    pub originating_event_id: EventId,
+}
+
+/// Extract the active `EdgeKind::TrustRole(_)` edges from the control state —
+/// the symmetric sibling of `reconciled_control_edges` for the trust-role
+/// axis (TS.1). Per-role admissibility (trustee/protector always; settlor
+/// unless proven irrevocable; beneficiary never) is the STRATEGY's ruling,
+/// not this extractor's — this returns every active trust edge so the
+/// strategy's exclusions stay visible in one place (`TrustRoleStrategy`).
+pub fn reconciled_trust_edges(state: &ControlState) -> Vec<ReconciledTrustEdge> {
+    state
+        .edges
+        .values()
+        .filter(|e| e.is_active())
+        .filter_map(|e| match &e.kind {
+            EdgeKind::TrustRole(role) => Some(ReconciledTrustEdge {
+                id: e.id,
+                from: e.from,
+                to: e.to,
+                role: role.clone(),
+                trust_revocable: e.trust_revocable,
+                verified_by: if e.is_verified() {
+                    e.evidence_event_id
+                } else {
+                    None
+                },
+                originating_event_id: e.originating_event_id,
+            }),
+            _ => None,
         })
         .collect()
 }

@@ -27,14 +27,15 @@ pub use determination::{
     find_subject_entity, freeze_determination, recover_determination_at,
     recover_determination_bitemporal, ControlProngStrategy, DeterminationInProgress,
     DeterminationPin, DeterminationStrategy, FrozenDetermination, OwnershipProngStrategy, Prong,
-    ProngCandidate, RecoveryPin, SmoResult,
+    ProngCandidate, RecoveryPin, SmoResult, TrustRoleStrategy,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
     check_control_preconditions, check_preconditions, fold_control, natural_persons_from_events,
-    reconciled_control_edges, reconciled_economic_edges, ControlState, EdgeKind, EdgeState,
-    EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge, StructureClass, TrustRoleKind,
+    reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
+    EdgeKind, EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge,
+    ReconciledTrustEdge, StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
     IMPLEMENTED_STRATEGY_CLASSES,
 };
 pub use fold::obligation::{

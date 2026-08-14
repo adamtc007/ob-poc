@@ -38,6 +38,7 @@ fn edge(status: EdgeStatus) -> EdgeState {
         evidence_event_id: matches!(status, EdgeStatus::Evidenced | EdgeStatus::Verified)
             .then(EventId::new),
         originating_event_id: EventId::new(),
+        trust_revocable: None,
     }
 }
 

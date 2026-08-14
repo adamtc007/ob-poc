@@ -148,20 +148,24 @@ fn precondition_blocks_illegal_placement() {
     let subject = SubjectId(Uuid::new_v4());
     let empty_obligation = ObligationState::default();
 
-    // Trust is one of the 6 classes with no implemented DeterminationStrategy
-    // (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.0-TS.4) — select-strategy must
-    // fail-closed rather than silently proceed toward a wrong determination.
-    let trust_state = control_with_class(StructureClass::Trust);
+    // Foundation is one of the classes with no implemented
+    // DeterminationStrategy (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.2-TS.4) —
+    // select-strategy must fail-closed rather than silently proceed toward a
+    // wrong determination. (TS.1 fixture fix: this exemplar originally used
+    // Trust, which joined the implemented set via TrustRoleStrategy —
+    // Foundation stays unimplemented until TS.2, so the guard's block
+    // semantics are unchanged, only the exemplar class moved.)
+    let foundation_state = control_with_class(StructureClass::Foundation);
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let result = check_preconditions(
         select_entry,
-        &trust_state,
+        &foundation_state,
         &empty_obligation,
         &probe(subject, "ubo.determination.select-strategy"),
     );
     assert!(
         result.is_err(),
-        "select-strategy must be blocked for a Trust-classified subject (6a exemplar)"
+        "select-strategy must be blocked for a Foundation-classified subject (6a exemplar)"
     );
     let msg = result.unwrap_err().to_string();
     assert!(
@@ -171,18 +175,19 @@ fn precondition_blocks_illegal_placement() {
 
     // 8a: freeze carries the SAME guard as defense in depth, even with its
     // other two preconditions (ReconciledProjection/StrategySelected)
-    // otherwise satisfied — the guard alone must still block Trust.
-    let trust_ready = control_with_class_reconciled_and_strategized(StructureClass::Trust);
+    // otherwise satisfied — the guard alone must still block Foundation.
+    let foundation_ready =
+        control_with_class_reconciled_and_strategized(StructureClass::Foundation);
     let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
     let freeze_result = check_preconditions(
         freeze_entry,
-        &trust_ready,
+        &foundation_ready,
         &empty_obligation,
         &probe(subject, "ubo.determination.freeze"),
     );
     assert!(
         freeze_result.is_err(),
-        "freeze must be blocked for a Trust-classified subject even with reconcile+strategy \
+        "freeze must be blocked for a Foundation-classified subject even with reconcile+strategy \
          satisfied (8a defense in depth)"
     );
 }
@@ -306,7 +311,7 @@ async fn select_strategy_blocked_end_to_end() {
         .expect("register has no preconditions");
     KycSubjectClassifyStructure
         .execute(
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": "trust" }),
+            &serde_json::json!({ "subject-id": subject.0, "structure-class": "foundation" }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )
@@ -322,8 +327,9 @@ async fn select_strategy_blocked_end_to_end() {
         .await;
     assert!(
         result.is_err(),
-        "select-strategy on a Trust-classified subject must be rejected through the real \
-         governed append path (6a exemplar, end to end)"
+        "select-strategy on a Foundation-classified subject must be rejected through the real \
+         governed append path (6a exemplar, end to end; TS.1 fixture fix — Trust is now \
+         implemented, Foundation stays fail-closed until TS.2)"
     );
     scope.commit().await;
 

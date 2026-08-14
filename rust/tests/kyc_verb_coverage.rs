@@ -172,7 +172,7 @@ async fn coverage_ubo_edge_attach_evidence() {
     .await;
     run(&UboEdgeAssertControl, serde_json::json!({
         "subject-id": subject.0, "edge-id": edge, "edge_id": edge.to_string(),
-        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "edge_kind": "voting_rights",
+        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights",
     }), &pool).await;
     run(
         &UboEdgeAttachEvidence,
@@ -199,7 +199,7 @@ async fn coverage_ubo_edge_verify() {
     // and stores the edge under our explicit UUID (not a derived v5).
     run(&UboEdgeAssertControl, serde_json::json!({
         "subject-id": subject.0, "edge-id": edge, "edge_id": edge.to_string(),
-        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "edge_kind": "voting_rights",
+        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights",
     }), &pool).await;
     // Precondition: must attach evidence before verify (EvidenceCited precondition, K-11)
     run(
@@ -231,7 +231,7 @@ async fn coverage_ubo_edge_supersede() {
     .await;
     run(&UboEdgeAssertControl, serde_json::json!({
         "subject-id": subject.0, "edge-id": edge, "edge_id": edge.to_string(),
-        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "edge_kind": "voting_rights",
+        "from_entity_id": Uuid::new_v4(), "to_entity_id": Uuid::new_v4(), "kind": "voting_rights",
     }), &pool).await;
     run(
         &UboEdgeSupersede,

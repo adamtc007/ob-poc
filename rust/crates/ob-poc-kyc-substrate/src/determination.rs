@@ -25,7 +25,8 @@ use uuid::Uuid;
 use crate::error::KycError;
 use crate::event::IntentEvent;
 use crate::fold::control::{
-    reconciled_control_edges, reconciled_economic_edges, ControlState, ReconciledEconomicEdge,
+    reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
+    ReconciledEconomicEdge, TrustRoleKind,
 };
 use crate::types::{EntityId, EventId, Hash, PersonId};
 
@@ -240,6 +241,116 @@ impl DeterminationStrategy for ControlProngStrategy {
                 let parent_person_id = PersonId(parent.0);
                 if natural_persons.contains(&parent_person_id) {
                     // First deterministic path wins (control is binary, not summed).
+                    candidates
+                        .entry(parent_person_id)
+                        .or_insert_with(|| (path.clone(), chain_orig));
+                } else {
+                    let mut new_path = path.clone();
+                    new_path.push(parent);
+                    stack.push((parent, new_path, Some(chain_orig)));
+                }
+            }
+        }
+
+        candidates
+            .into_iter()
+            .map(|(pid, (chain, orig))| ProngCandidate {
+                person_id: pid,
+                prong: Prong::ControlByOtherMeans,
+                effective_ownership_pct: None,
+                ownership_chain: chain,
+                originating_event_id: orig,
+            })
+            .collect()
+    }
+}
+
+// ── TrustRoleStrategy (TS.1 — control of a trust follows role) ───────────────
+
+/// Resolves natural persons controlling a Trust-classified subject by trust
+/// ROLE, not shareholding — a trust has no shares, so there is no ownership
+/// prong (EOP-DD-KYCUBO-KIT-TS0 §2.1, ratified 2026-08-12). Every candidate
+/// is `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always
+/// `None`; `threshold_pct` is accepted for signature parity but unused.
+///
+/// Per-role rulings (RATIFIED):
+/// - **Trustee** — always a candidate (legal control of trust assets).
+/// - **Protector** — always a candidate (veto/replacement power over
+///   trustees).
+/// - **Settlor** — candidate UNLESS the edge proves irrevocability:
+///   excluded only when `trust_revocable == Some(false)`; `Some(true)` and
+///   `None` (absent/unproven) both INCLUDE the settlor — fail-closed toward
+///   inclusion (over-identify, never silently drop a controller).
+/// - **Beneficiary** — NEVER a candidate: a quantified beneficiary interest
+///   belongs on the economic axis (`assert-economic-interest` → ownership
+///   prong); a discretionary beneficiary has neither control nor a quantum.
+///
+/// Traverses ONLY `EdgeKind::TrustRole(_)` edges (via
+/// `reconciled_trust_edges`); non-trust control kinds on a Trust-classified
+/// subject are ignored by this strategy — deliberate: if the structure
+/// genuinely mixes, classification is wrong, and reclassification is legal
+/// (matrix row 10).
+///
+/// **Scope (TS.1 v1):** chain semantics mirror `ControlProngStrategy` — where
+/// a trust edge's `from` is a legal entity rather than a natural person, the
+/// traversal continues through that entity's own qualifying trust edges only.
+/// It does NOT cross into the economic axis (or the general control axis) to
+/// resolve an intermediate corporate trustee's own UBOs — the same
+/// further-removed v2 boundary `ControlProngStrategy` documents.
+pub struct TrustRoleStrategy;
+
+impl TrustRoleStrategy {
+    /// The ratified per-role admissibility rule (see type doc for polarity).
+    fn edge_qualifies(role: &TrustRoleKind, trust_revocable: Option<bool>) -> bool {
+        match role {
+            TrustRoleKind::Trustee | TrustRoleKind::Protector => true,
+            TrustRoleKind::Settlor => trust_revocable != Some(false),
+            TrustRoleKind::Beneficiary => false,
+        }
+    }
+}
+
+impl DeterminationStrategy for TrustRoleStrategy {
+    fn name(&self) -> &'static str {
+        "trust_role_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        _threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        // Adjacency over QUALIFYING trust edges only — the per-role
+        // exclusions apply at the edge, so an excluded edge (beneficiary,
+        // proven-irrevocable settlor) is never traversed at all.
+        // Same determinism contract as ControlProngStrategy (Q6, K-16/18/33).
+        let edges = reconciled_trust_edges(state);
+        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        for e in &edges {
+            if Self::edge_qualifies(&e.role, e.trust_revocable) {
+                adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+            }
+        }
+        for neighbours in adj.values_mut() {
+            neighbours.sort_by_key(|&(from, orig)| (from, orig));
+        }
+
+        // DFS mirroring ControlProngStrategy: no quantum, first deterministic
+        // path wins, cycle guard on the path.
+        let mut stack: Vec<(EntityId, Vec<EntityId>, Option<EventId>)> =
+            vec![(subject_entity_id, vec![subject_entity_id], None)];
+        let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId)> = BTreeMap::new();
+
+        while let Some((entity, path, first_orig)) = stack.pop() {
+            if path.iter().filter(|&&e| e == entity).count() > 1 {
+                continue; // cycle guard
+            }
+            for &(parent, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
+                let chain_orig = first_orig.unwrap_or(edge_orig);
+                let parent_person_id = PersonId(parent.0);
+                if natural_persons.contains(&parent_person_id) {
                     candidates
                         .entry(parent_person_id)
                         .or_insert_with(|| (path.clone(), chain_orig));

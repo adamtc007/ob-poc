@@ -108,7 +108,7 @@ async fn assert_control_verb_appends_to_stream_and_projects() {
         "subject-id": subject.0.to_string(),
         "from_entity_id": Uuid::new_v4().to_string(),
         "to_entity_id": Uuid::new_v4().to_string(),
-        "edge_kind": "voting_rights",
+        "kind": "voting_rights",
     });
 
     // T6.2 (2026-08-12): `assert-control` now carries `SubjectRegistered`

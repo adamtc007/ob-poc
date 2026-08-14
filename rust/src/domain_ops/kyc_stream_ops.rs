@@ -25,7 +25,8 @@ use ob_poc_kyc_substrate::{
     fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
     EdgeId, FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
-    SubjectId, SubjectOverallState, TargetBinding, V1FoldImpl,
+    SubjectId, SubjectOverallState, TargetBinding, TrustRoleStrategy, V1FoldImpl,
+    EDGE_KIND_WIRE_VALUES,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
 #[allow(unused_imports)]
@@ -130,7 +131,7 @@ impl SemOsVerbOp for UboEdgeAssertControl {
             verb_fqn: "ubo.edge.assert-control".into(),
             subject_root: subject,
             target: TargetBinding::for_edge(subject, edge),
-            payload: normalize_edge_id_payload(args, edge),
+            payload: normalize_assert_control_payload(args, edge)?,
             authority: AuthorityRef("analyst.assert-control".into()),
             lexicon_hash: lexicon.hash,
             as_of: ctx.as_of, // frozen at verb entry — never now() here
@@ -487,6 +488,54 @@ fn normalize_edge_id_payload(args: &serde_json::Value, edge: EdgeId) -> serde_js
     p
 }
 
+/// Normalize `ubo.edge.assert-control`'s payload (TS.1, EOP-DD-KYCUBO-KIT-TS0
+/// §1b + §2.1) — three duties, fail-closed:
+///
+/// 1. **Kill the silent catch-all:** the `kind` string must be present AND a
+///    member of the canonical wire set (`EDGE_KIND_WIRE_VALUES`, the single
+///    source of truth kept in lockstep with the fold's
+///    `edge_kind_from_payload` arms). Anything else — a typo, the old
+///    un-mapped `trust_role`, or an omitted key — previously folded silently
+///    to `DominantInfluence` (the exact "silently-wrong" defect class of
+///    R3/M4). The fold's own catch-all REMAINS (total dispatch for
+///    historical events); only the append path rejects.
+/// 2. **Kebab→snake for `trust-revocable`:** the YAML arg is kebab-case, the
+///    fold reads snake_case `trust_revocable` (the edge-id kebab/snake
+///    defect class, T6.2) — meaningful on `trust_settlor` edges only; see
+///    `EdgeState::trust_revocable` for the fail-closed polarity.
+/// 3. The existing `edge_id` stamping (`normalize_edge_id_payload`).
+fn normalize_assert_control_payload(
+    args: &serde_json::Value,
+    edge: EdgeId,
+) -> Result<serde_json::Value> {
+    match args.get("kind").and_then(|v| v.as_str()) {
+        Some(kind) if EDGE_KIND_WIRE_VALUES.contains(&kind) => {}
+        Some(unknown) => {
+            return Err(anyhow!(
+                "ubo.edge.assert-control: unrecognized kind '{unknown}' — rejected fail-closed \
+                 (TS.1 §1b; an unknown kind previously collapsed silently to \
+                 dominant_influence). Valid wire values: {}",
+                EDGE_KIND_WIRE_VALUES.join(", ")
+            ));
+        }
+        None => {
+            return Err(anyhow!(
+                "ubo.edge.assert-control: kind is required — rejected fail-closed (TS.1 §1b; \
+                 an absent kind previously collapsed silently to dominant_influence). \
+                 Valid wire values: {}",
+                EDGE_KIND_WIRE_VALUES.join(", ")
+            ));
+        }
+    }
+    let mut p = normalize_edge_id_payload(args, edge);
+    if let Some(obj) = p.as_object_mut() {
+        if let Some(v) = obj.remove("trust-revocable") {
+            obj.insert("trust_revocable".to_string(), v);
+        }
+    }
+    Ok(p)
+}
+
 /// Normalize `ubo.determination.apply-smo-fallback` payload: the YAML arg is
 /// kebab-case `smo-person-id`, but the fold reads snake_case `smo_person_id`
 /// (`fold::control::apply_one_control_event`, via `person_id(p, "smo_person_id")`)
@@ -550,12 +599,16 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             // walks control-kind edges only, does not cross into the economic
             // axis for an intermediate controlling entity's own UBOs.
             "control_prong_strategy" => &ControlProngStrategy,
+            // TS.1: trust control follows role (trustee/protector always;
+            // settlor unless proven irrevocable; beneficiary never). Scope
+            // note lives on TrustRoleStrategy itself.
+            "trust_role_strategy" => &TrustRoleStrategy,
             other => {
                 return Err(anyhow!(
                     "freeze: strategy '{other}' selected but no DeterminationStrategy is \
-                     registered for it — only ownership_prong_strategy and \
-                     control_prong_strategy exist today (role-based strategies for \
-                     e.g. investor-role-profile-driven determination remain M2 \
+                     registered for it — only ownership_prong_strategy, \
+                     control_prong_strategy, and trust_role_strategy exist today \
+                     (the remaining structure-class strategies are TS.2-TS.4 \
                      follow-on work)"
                 ));
             }

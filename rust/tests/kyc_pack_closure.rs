@@ -528,9 +528,143 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     let strategies = freeze_strategy_arms();
     assert_eq!(
         strategies.len(),
-        2,
+        3,
         "freeze's implemented DeterminationStrategy count drifted from the \
-         audited 2 (ownership_prong_strategy, control_prong_strategy): {strategies:#?}"
+         TS.1 3 (ownership_prong_strategy, control_prong_strategy, \
+         trust_role_strategy) — a new strategy is a CONSCIOUS pin edit here \
+         AND in the TS.1 split pin below: {strategies:#?}"
+    );
+}
+
+// ── TS.1 §1c — the two new closure-tooth pins (EOP-DD-KYCUBO-KIT-TS0) ──────
+
+/// `kind`'s `valid_values: [...]` bracketed list from `assert-control` in
+/// dsl-kyc.yaml — identified by membership ("voting_rights" appears only in
+/// this list), same mechanism as `structure_class_valid_values()`.
+fn assert_control_kind_valid_values() -> BTreeSet<String> {
+    let marker_line = DSL_KYC_YAML
+        .lines()
+        .find(|l| l.trim_start().starts_with("valid_values:") && l.contains("voting_rights"))
+        .expect("assert-control kind valid_values line must exist in dsl-kyc.yaml");
+    let inner = marker_line
+        .split('[')
+        .nth(1)
+        .and_then(|s| s.split(']').next())
+        .expect("valid_values must be a bracketed list");
+    inner.split(',').map(|s| s.trim().to_string()).collect()
+}
+
+/// TS.1 wire-value pin (closes R4 fact 5's "EdgeKind is unguarded"): the
+/// YAML `valid_values`, the substrate's canonical `EDGE_KIND_WIRE_VALUES`
+/// const, and the pinned 11-value set here must be EXACTLY the same set.
+/// Any future `EdgeKind` wire addition is a conscious dual (YAML + const)
+/// edit plus this pin — never a silent widening (and never a fold-arm that
+/// exists without a wire value, or vice versa: the const's own doc binds it
+/// to `edge_kind_from_payload`'s arms).
+#[test]
+fn edge_kind_wire_values_are_exactly_known() {
+    let expected: BTreeSet<String> = [
+        "economic_interest",
+        "voting_rights",
+        "board_appointment",
+        "gp_statutory",
+        "designated_member",
+        "trust_settlor",
+        "trust_trustee",
+        "trust_protector",
+        "trust_beneficiary",
+        "nominee",
+        "dominant_influence",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+
+    let from_const: BTreeSet<String> = ob_poc_kyc_substrate::EDGE_KIND_WIRE_VALUES
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    assert_eq!(
+        from_const, expected,
+        "EDGE_KIND_WIRE_VALUES drifted from the pinned TS.1 11-value set — \
+         adding/removing a wire value must consciously touch the const, the \
+         fold's edge_kind_from_payload arms, the YAML valid_values, AND this pin"
+    );
+
+    let from_yaml = assert_control_kind_valid_values();
+    assert_eq!(
+        from_yaml, expected,
+        "assert-control's kind valid_values (dsl-kyc.yaml) drifted from the \
+         pinned TS.1 11-value set — the YAML and EDGE_KIND_WIRE_VALUES must \
+         stay in lockstep (one source of truth, two declared surfaces)"
+    );
+}
+
+/// TS.1 split pin (closes R4 fact 5's second half): the freeze dispatch's
+/// strategy arms and `IMPLEMENTED_STRATEGY_CLASSES` must stay in lockstep
+/// via an explicit arm → classes-served mapping. Widening
+/// `IMPLEMENTED_STRATEGY_CLASSES` without a real strategy arm landing (or
+/// landing an arm that serves no class) fails here: every implemented class
+/// must be served by exactly the strategy this map says, and every arm must
+/// serve at least one class.
+#[test]
+fn implemented_class_split_matches_strategy_arms() {
+    use ob_poc_kyc_substrate::IMPLEMENTED_STRATEGY_CLASSES;
+
+    // The ruled mapping (EOP-DD-KYCUBO-KIT-TS0 §2 + kyc_stream_ops dispatch):
+    // which structure classes each freeze-dispatch arm serves.
+    let classes_served: BTreeMap<&str, Vec<StructureClass>> = BTreeMap::from([
+        (
+            "ownership_prong_strategy",
+            vec![
+                StructureClass::PrivateCompany,
+                StructureClass::MultiTierHoldingGroup,
+                StructureClass::ListedEntity,
+            ],
+        ),
+        (
+            "control_prong_strategy",
+            vec![
+                StructureClass::LimitedPartnershipFund,
+                StructureClass::Llp,
+            ],
+        ),
+        ("trust_role_strategy", vec![StructureClass::Trust]),
+    ]);
+
+    // Every dispatch arm appears in the mapping and vice versa.
+    let arms = freeze_strategy_arms();
+    let mapped: BTreeSet<String> = classes_served.keys().map(|s| s.to_string()).collect();
+    assert_eq!(
+        arms, mapped,
+        "freeze's dispatch arms and the arm→classes-served mapping diverged — \
+         a new DeterminationStrategy arm must land WITH the classes it serves \
+         (and a mapping entry must never exist without a real arm): lockstep \
+         rule, EOP-DD-KYCUBO-KIT-TS0 §1c"
+    );
+
+    // Every arm serves at least one class; the union of served classes is
+    // EXACTLY IMPLEMENTED_STRATEGY_CLASSES (no class implemented without a
+    // strategy, no strategy arm serving a class outside the guard set).
+    let mut served: BTreeSet<String> = BTreeSet::new();
+    for (arm, classes) in &classes_served {
+        assert!(
+            !classes.is_empty(),
+            "strategy arm {arm} serves no structure class — an arm with no \
+             class behind it is dead dispatch (lockstep rule)"
+        );
+        served.extend(classes.iter().map(|c| format!("{c:?}")));
+    }
+    let implemented: BTreeSet<String> = IMPLEMENTED_STRATEGY_CLASSES
+        .iter()
+        .map(|c| format!("{c:?}"))
+        .collect();
+    assert_eq!(
+        served, implemented,
+        "IMPLEMENTED_STRATEGY_CLASSES and the arm→classes-served mapping \
+         diverged — widening the guard set without a strategy arm (or vice \
+         versa) is exactly what this pin fail-closes; after TS.1 the split \
+         is 3 arms serving 6 classes (lockstep rule, EOP-DD-KYCUBO-KIT-TS0 §1c)"
     );
 }
 
@@ -815,6 +949,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             status: EdgeStatus::Asserted,
             evidence_event_id: None,
             originating_event_id: ob_poc_kyc_substrate::EventId::new(),
+            trust_revocable: None,
         },
     );
     assert!(
@@ -848,10 +983,13 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     // StructureClassSupported, checked last), the PrivateCompany case would
     // otherwise incorrectly block on SubjectRegistered instead of proving
     // the guard this sub-test targets.
+    // TS.1 fixture fix: Trust joined the implemented set (TrustRoleStrategy),
+    // so the fail-closed exemplar class becomes Foundation (still
+    // unimplemented until TS.2).
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let unsupported = ControlState {
         registered: true,
-        structure_class: Some(StructureClass::Trust),
+        structure_class: Some(StructureClass::Foundation),
         ..Default::default()
     };
     assert!(
@@ -862,7 +1000,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
         )
         .is_err(),
-        "select-strategy must block an unsupported structure class (Trust)"
+        "select-strategy must block an unsupported structure class (Foundation)"
     );
     let supported = ControlState {
         registered: true,
