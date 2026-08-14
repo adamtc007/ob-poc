@@ -33,22 +33,11 @@
 //!   included — the TS.3 exemplar `nominee_pierce_strategy` moved to
 //!   `no_such_strategy` in this tranche because the arm is now real).
 //!
-//! FENCED-DEFECT NOTE (same as `kyc_ts1_trust.rs` (d)/(e),
-//! `kyc_ts2_fund_foundation.rs`, and `kyc_ts3_state_owned_cooperative.rs`):
-//! test (e) cannot drive `ubo.determination.freeze` to SUCCESS — freeze's
-//! event payload embeds the candidates, and every ControlByOtherMeans
-//! candidate carries `effective_ownership_pct: null`, which trips the
-//! PRE-EXISTING render.rs:102 nested-null defect (the exact reason
-//! `m4_control_prong_strategy_resolves_gp_statutory_control` and
-//! `coverage_ubo_determination_freeze` are fenced pre-existing reds). That
-//! defect stays fenced in TS.4, so candidates are resolved via the exact
-//! strategy instance freeze dispatches to (arm proven by test (f) +
-//! `implemented_class_split_matches_strategy_arms`), over the REAL
-//! DB-loaded stream + the same `fold_control_versioned` /
-//! `natural_persons_from_events` / `find_subject_entity` composition the
-//! freeze op uses. Tests (d)/(f) DO drive the real freeze op — both error
-//! paths fire before the payload render. Upgrade (e) to drive freeze
-//! directly once the render defect is fixed.
+//! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
+//! (`render_value` omits nulls at every depth), so test (e)'s final
+//! determination leg now drives `ubo.determination.freeze` LIVE to SUCCESS
+//! and reads the candidates + recorded strategy off the freeze outcome.
+//! Tests (d)/(f) drive the real freeze op's error paths as before.
 //!
 //! DB/fixture pattern mirrors `kyc_ts3_state_owned_cooperative.rs`.
 
@@ -63,8 +52,8 @@ use ob_poc::domain_ops::kyc_stream_ops::{
     UboEdgeReconcileConflict, UboEdgeSupersede,
 };
 use ob_poc_kyc_substrate::{
-    fold_control_versioned, phase1_lexicon, DeterminationStrategy, EdgeKind, EdgeStatus,
-    FoldRegistry, IntentEvent, SubjectId, V1FoldImpl,
+    fold_control_versioned, phase1_lexicon, EdgeKind, EdgeStatus, FoldRegistry, IntentEvent,
+    SubjectId, V1FoldImpl,
 };
 use ob_poc_types::TransactionScopeId;
 use sem_os_postgres::ops::SemOsVerbOp;
@@ -209,32 +198,31 @@ async fn fold_subject(pool: &PgPool, subject: SubjectId) -> ob_poc_kyc_substrate
     fold_control_versioned(&refs, &reg).expect("fold ok")
 }
 
-/// Load the subject's REAL stream from the DB, fold it, assert the recorded
-/// strategy name, and resolve via the given strategy instance — the exact
-/// composition the freeze op uses (see the FENCED-DEFECT NOTE above).
-async fn resolve_via_strategy(
+/// Drive the REAL freeze op, assert the recorded strategy name on the
+/// outcome, and return the candidates array (render nested-null defect
+/// fixed 2026-08-14 — freeze is drivable live for pct-less candidates).
+async fn freeze_candidates(
     pool: &PgPool,
     subject: SubjectId,
     expected_strategy: &str,
-    strategy: &dyn DeterminationStrategy,
-) -> Vec<ob_poc_kyc_substrate::ProngCandidate> {
-    let mut conn = pool.acquire().await.expect("acquire connection");
-    let events = ob_poc_kyc_store::PgKycEventStore::load_events(&mut conn, subject)
-        .await
-        .expect("load events");
-    let refs: Vec<&IntentEvent> = events.iter().collect();
-    let mut reg = FoldRegistry::new();
-    reg.register(phase1_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
-    let control = fold_control_versioned(&refs, &reg).expect("fold ok");
+) -> Vec<serde_json::Value> {
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        pool,
+    )
+    .await;
     assert_eq!(
-        control.selected_strategy.as_deref(),
+        outcome.get("strategy").and_then(|v| v.as_str()),
         Some(expected_strategy),
-        "select-strategy (real op) must have recorded {expected_strategy}"
+        "select-strategy (real op) must have recorded {expected_strategy} — freeze \
+         dispatches to it and records it on the outcome; got {outcome:?}"
     );
-    let subject_entity =
-        ob_poc_kyc_substrate::find_subject_entity(&refs).expect("classify recorded entity");
-    let persons = ob_poc_kyc_substrate::natural_persons_from_events(&refs);
-    strategy.resolve(&control, subject_entity, &persons, 25.0)
+    outcome
+        .get("candidates")
+        .and_then(|c| c.as_array())
+        .cloned()
+        .unwrap_or_default()
 }
 
 // ── (a) pierce end-to-end — supersede + reassert in ONE governed event ──────
@@ -592,13 +580,7 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
         "select-strategy must be admitted post-TS.4: {select:?}"
     );
 
-    let candidates = resolve_via_strategy(
-        &pool,
-        subject,
-        "nominee_pierce_strategy",
-        &ob_poc_kyc_substrate::NomineePierceStrategy,
-    )
-    .await;
+    let candidates = freeze_candidates(&pool, subject, "nominee_pierce_strategy").await;
 
     assert_eq!(
         candidates.len(),
@@ -606,17 +588,21 @@ async fn e_post_pierce_strategy_resolves_nominator_chain() {
         "expected exactly the disclosed nominator; got {candidates:#?}"
     );
     assert_eq!(
-        candidates[0].person_id.0, nominator,
+        candidates[0].get("person_id").and_then(|v| v.as_str()),
+        Some(nominator.to_string().as_str()),
         "post-pierce, the NOMINATOR (never the nominee) is the candidate (K-8)"
     );
     assert_eq!(
-        candidates[0].prong,
-        ob_poc_kyc_substrate::Prong::ControlByOtherMeans,
+        candidates[0].get("prong").and_then(|v| v.as_str()),
+        Some("ControlByOtherMeans"),
         "K-1 basis: the delegated control walk yields ControlByOtherMeans"
     );
     assert!(
-        candidates[0].effective_ownership_pct.is_none(),
-        "control carries no quantum — effective_ownership_pct must be None"
+        candidates[0]
+            .get("effective_ownership_pct")
+            .map(|v| v.is_null())
+            .unwrap_or(false),
+        "control carries no quantum — effective_ownership_pct must be null"
     );
 
     cleanup(&pool, &[subject]).await;

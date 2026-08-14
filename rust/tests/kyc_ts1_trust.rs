@@ -334,44 +334,35 @@ async fn c_normalizer_rejects_unknown_and_absent_kind_listing_wire_values() {
 // beneficiary excluded (economic axis only). All `ControlByOtherMeans`,
 // `effective_ownership_pct` None.
 //
-// FENCED-DEFECT NOTE: the final leg cannot drive `ubo.determination.freeze`
-// itself — freeze's event payload embeds the candidates, and every
-// ControlByOtherMeans candidate carries `effective_ownership_pct: null`,
-// which trips the PRE-EXISTING render.rs:102 nested-null defect (the exact
-// reason `m4_control_prong_strategy_resolves_gp_statutory_control` and
-// `coverage_ubo_determination_freeze` are fenced pre-existing reds — any
-// pct-less candidate set panics freeze's render today). That defect is
-// fenced (not fixed) in TS.1, so candidates are resolved here via the exact
-// `TrustRoleStrategy` instance freeze dispatches to (arm proven by test (f)
-// + `implemented_class_split_matches_strategy_arms`), over the REAL
-// DB-loaded stream + the same `fold_control_versioned` /
-// `natural_persons_from_events` / `find_subject_entity` composition the
-// freeze op uses. Upgrade these two tests to drive freeze directly once the
-// render defect is fixed.
+// NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
+// (`render_value` now omits nulls at every depth), so these tests drive
+// `ubo.determination.freeze` LIVE and read the candidates + recorded
+// strategy off the freeze outcome.
 
-async fn resolve_via_selected_strategy(
+/// Drive the REAL freeze op, assert the recorded strategy name on the
+/// outcome, and return the candidates array.
+async fn freeze_candidates(
     pool: &PgPool,
     subject: SubjectId,
-) -> Vec<ob_poc_kyc_substrate::ProngCandidate> {
-    use ob_poc_kyc_substrate::DeterminationStrategy;
-
-    let mut conn = pool.acquire().await.expect("acquire connection");
-    let events = ob_poc_kyc_store::PgKycEventStore::load_events(&mut conn, subject)
-        .await
-        .expect("load events");
-    let refs: Vec<&IntentEvent> = events.iter().collect();
-    let mut reg = FoldRegistry::new();
-    reg.register(phase1_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
-    let control = fold_control_versioned(&refs, &reg).expect("fold ok");
+    expected_strategy: &str,
+) -> Vec<serde_json::Value> {
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        pool,
+    )
+    .await;
     assert_eq!(
-        control.selected_strategy.as_deref(),
-        Some("trust_role_strategy"),
-        "select-strategy (real op) must have recorded trust_role_strategy"
+        outcome.get("strategy").and_then(|v| v.as_str()),
+        Some(expected_strategy),
+        "select-strategy (real op) must have recorded {expected_strategy} — freeze \
+         dispatches to it and records it on the outcome; got {outcome:?}"
     );
-    let subject_entity =
-        ob_poc_kyc_substrate::find_subject_entity(&refs).expect("classify recorded entity");
-    let persons = ob_poc_kyc_substrate::natural_persons_from_events(&refs);
-    ob_poc_kyc_substrate::TrustRoleStrategy.resolve(&control, subject_entity, &persons, 25.0)
+    outcome
+        .get("candidates")
+        .and_then(|c| c.as_array())
+        .cloned()
+        .unwrap_or_default()
 }
 
 async fn setup_trust_subject(
@@ -446,10 +437,10 @@ async fn d_trust_role_strategy_resolves_trustee_protector_and_revocable_settlor(
     )
     .await;
 
-    let candidates = resolve_via_selected_strategy(&pool, subject).await;
+    let candidates = freeze_candidates(&pool, subject, "trust_role_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
-        .map(|c| c.person_id.0.to_string())
+        .filter_map(|c| c.get("person_id").and_then(|v| v.as_str()).map(String::from))
         .collect();
 
     assert_eq!(
@@ -472,13 +463,15 @@ async fn d_trust_role_strategy_resolves_trustee_protector_and_revocable_settlor(
 
     for c in &candidates {
         assert_eq!(
-            c.prong,
-            ob_poc_kyc_substrate::Prong::ControlByOtherMeans,
+            c.get("prong").and_then(|v| v.as_str()),
+            Some("ControlByOtherMeans"),
             "K-1 basis: every trust-role candidate is ControlByOtherMeans"
         );
         assert!(
-            c.effective_ownership_pct.is_none(),
-            "trust control has no quantum — effective_ownership_pct must be None"
+            c.get("effective_ownership_pct")
+                .map(|v| v.is_null())
+                .unwrap_or(false),
+            "trust control has no quantum — effective_ownership_pct must be null"
         );
     }
 
@@ -531,12 +524,12 @@ async fn e_settlor_excluded_when_trust_revocable_is_false() {
     )
     .await;
 
-    // Same fenced-defect note as (d): resolved via the exact strategy freeze
-    // dispatches to, over the real DB-loaded stream.
-    let candidates = resolve_via_selected_strategy(&pool, subject).await;
+    // Final leg drives the REAL freeze op (render nested-null defect fixed
+    // 2026-08-14).
+    let candidates = freeze_candidates(&pool, subject, "trust_role_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
-        .map(|c| c.person_id.0.to_string())
+        .filter_map(|c| c.get("person_id").and_then(|v| v.as_str()).map(String::from))
         .collect();
     assert!(
         person_ids.contains(&trustee.to_string()),

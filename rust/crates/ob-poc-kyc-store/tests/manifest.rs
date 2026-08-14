@@ -40,13 +40,22 @@ async fn w2_publish_manifest_stamps_verbs_and_is_idempotent() {
         .unwrap();
 
     // First publish.
+    // Universe pin: 21 dsl.kyc verbs (12 W1/W4 + 8 T6.0 obligation/person + pierce-nominee TS.4).
+    // The authoritative universe pin lives in rust/tests/kyc_pack_closure.rs
+    // (verb_universe_is_exactly_21); this literal is the store-side echo — bump both consciously.
+    let expected_entries = manifest.entries.len();
+    assert_eq!(expected_entries, 21, "phase1_lexicon universe (see kyc_pack_closure)");
+
     let mut conn = pool.acquire().await.unwrap();
     let outcome = publish_manifest(&mut conn, Some("w2-test")).await.unwrap();
-    assert_eq!(outcome.entry_count, 12, "phase1_lexicon has 12 entries");
+    assert_eq!(
+        outcome.entry_count, expected_entries,
+        "publish covers the whole lexicon"
+    );
     assert!(!outcome.already_existed, "first publish inserts the row");
     assert_eq!(
-        outcome.verb_rows_updated, 12,
-        "all 12 dsl.kyc verb rows stamped"
+        outcome.verb_rows_updated, expected_entries as u64,
+        "all dsl.kyc verb rows stamped"
     );
     assert_eq!(
         outcome.manifest_hash,

@@ -29,20 +29,14 @@
 //!   exemplar moved to a never-will-exist string), message lists all 8
 //!   implemented strategy names.
 //!
-//! FENCED-DEFECT NOTE (same as `kyc_ts1_trust.rs` (d)/(e) and
-//! `kyc_ts2_fund_foundation.rs`): the final leg cannot drive
-//! `ubo.determination.freeze` itself — freeze's event payload embeds the
-//! candidates, and every ControlByOtherMeans candidate carries
-//! `effective_ownership_pct: null`, which trips the PRE-EXISTING
-//! render.rs:102 nested-null defect (the exact reason
-//! `m4_control_prong_strategy_resolves_gp_statutory_control` and
-//! `coverage_ubo_determination_freeze` are fenced pre-existing reds). That
-//! defect stays fenced in TS.3, so candidates are resolved via the exact
-//! strategy instance freeze dispatches to (arm proven by test (f) +
-//! `implemented_class_split_matches_strategy_arms`), over the REAL DB-loaded
-//! stream + the same `fold_control_versioned` / `natural_persons_from_events`
-//! / `find_subject_entity` composition the freeze op uses. Upgrade to drive
-//! freeze directly once the render defect is fixed.
+//! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
+//! (`render_value` omits nulls at every depth), so the final determination
+//! legs of (a)/(c)/(d) now drive `ubo.determination.freeze` LIVE and read
+//! the candidates + recorded strategy off the freeze outcome. Test (b)'s
+//! zero-candidate case cannot freeze to SUCCESS by design (freeze refuses a
+//! silent determination when no candidates and no SMO result exist), so it
+//! pins the empty Vec at the strategy level over the real DB-loaded stream
+//! AND drives the real freeze op to prove the silent-determination refusal.
 //!
 //! DB/fixture pattern mirrors `kyc_ts2_fund_foundation.rs`.
 
@@ -191,9 +185,37 @@ async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], clas
     .await;
 }
 
+/// Drive the REAL freeze op, assert the recorded strategy name on the
+/// outcome, and return the candidates array (render nested-null defect
+/// fixed 2026-08-14 — freeze is drivable live for pct-less candidates).
+async fn freeze_candidates(
+    pool: &PgPool,
+    subject: SubjectId,
+    expected_strategy: &str,
+) -> Vec<serde_json::Value> {
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        pool,
+    )
+    .await;
+    assert_eq!(
+        outcome.get("strategy").and_then(|v| v.as_str()),
+        Some(expected_strategy),
+        "select-strategy (real op) must have recorded {expected_strategy} — freeze \
+         dispatches to it and records it on the outcome; got {outcome:?}"
+    );
+    outcome
+        .get("candidates")
+        .and_then(|c| c.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
 /// Load the subject's REAL stream from the DB, fold it, assert the recorded
 /// strategy name, and resolve via the given strategy instance — the exact
-/// composition the freeze op uses (see the FENCED-DEFECT NOTE above).
+/// composition the freeze op uses. Kept ONLY for test (b)'s zero-candidate
+/// case, which freeze refuses to commit by design (silent determination).
 async fn resolve_via_strategy(
     pool: &PgPool,
     subject: SubjectId,
@@ -264,13 +286,7 @@ async fn a_state_owned_strategy_resolves_rare_natural_person_controller() {
          post-TS.3 (StructureClassSupported widened): {select:?}"
     );
 
-    let candidates = resolve_via_strategy(
-        &pool,
-        subject,
-        "state_owned_strategy",
-        &ob_poc_kyc_substrate::StateOwnedStrategy,
-    )
-    .await;
+    let candidates = freeze_candidates(&pool, subject, "state_owned_strategy").await;
 
     assert_eq!(
         candidates.len(),
@@ -278,17 +294,21 @@ async fn a_state_owned_strategy_resolves_rare_natural_person_controller() {
         "expected exactly the rare natural-person controller; got {candidates:#?}"
     );
     assert_eq!(
-        candidates[0].person_id.0, controller,
+        candidates[0].get("person_id").and_then(|v| v.as_str()),
+        Some(controller.to_string().as_str()),
         "the dominant_influence controller must be the candidate (§2.4)"
     );
     assert_eq!(
-        candidates[0].prong,
-        ob_poc_kyc_substrate::Prong::ControlByOtherMeans,
+        candidates[0].get("prong").and_then(|v| v.as_str()),
+        Some("ControlByOtherMeans"),
         "K-1 basis: every state-owned candidate is ControlByOtherMeans"
     );
     assert!(
-        candidates[0].effective_ownership_pct.is_none(),
-        "state-owned control has no quantum — effective_ownership_pct must be None"
+        candidates[0]
+            .get("effective_ownership_pct")
+            .map(|v| v.is_null())
+            .unwrap_or(false),
+        "state-owned control has no quantum — effective_ownership_pct must be null"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -349,6 +369,9 @@ async fn b_state_owned_strategy_yields_empty_when_no_natural_person_crosses() {
          post-TS.3: {select:?}"
     );
 
+    // Strategy-level: the empty Vec, pinned over the real DB-loaded stream.
+    // (Freeze cannot commit this case — see below — so the empty candidate
+    // set is only observable at the strategy layer.)
     let candidates = resolve_via_strategy(
         &pool,
         subject,
@@ -361,6 +384,25 @@ async fn b_state_owned_strategy_yields_empty_when_no_natural_person_crosses() {
         "no natural-person control chain crosses — the strategy must return an \
          empty Vec (the SMO-fallback route supplies the determination, §2.4); \
          got {candidates:#?}"
+    );
+
+    // Real-op leg: freeze REFUSES a silent determination — zero candidates
+    // and no SMO result must never commit (the SMO-fallback route is the
+    // sanctioned path for this class, §2.4).
+    let frozen = run_fallible(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        &pool,
+    )
+    .await;
+    assert!(
+        frozen.is_err(),
+        "freeze must refuse to commit a zero-candidate, no-SMO determination"
+    );
+    let msg = frozen.unwrap_err().to_string();
+    assert!(
+        msg.contains("determination would be silent"),
+        "the refusal must be the silent-determination guard; got: {msg}"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -411,13 +453,7 @@ async fn c_cooperative_member_strategy_resolves_office_holder() {
          post-TS.3 (StructureClassSupported widened): {select:?}"
     );
 
-    let candidates = resolve_via_strategy(
-        &pool,
-        subject,
-        "cooperative_member_strategy",
-        &ob_poc_kyc_substrate::CooperativeMemberStrategy,
-    )
-    .await;
+    let candidates = freeze_candidates(&pool, subject, "cooperative_member_strategy").await;
 
     assert_eq!(
         candidates.len(),
@@ -425,17 +461,21 @@ async fn c_cooperative_member_strategy_resolves_office_holder() {
         "expected exactly the board chair (office, §2.5); got {candidates:#?}"
     );
     assert_eq!(
-        candidates[0].person_id.0, board_chair,
+        candidates[0].get("person_id").and_then(|v| v.as_str()),
+        Some(board_chair.to_string().as_str()),
         "the board_appointment office holder must be the candidate (§2.5)"
     );
     assert_eq!(
-        candidates[0].prong,
-        ob_poc_kyc_substrate::Prong::ControlByOtherMeans,
+        candidates[0].get("prong").and_then(|v| v.as_str()),
+        Some("ControlByOtherMeans"),
         "K-1 basis: every cooperative candidate is ControlByOtherMeans"
     );
     assert!(
-        candidates[0].effective_ownership_pct.is_none(),
-        "cooperative control has no quantum — effective_ownership_pct must be None"
+        candidates[0]
+            .get("effective_ownership_pct")
+            .map(|v| v.is_null())
+            .unwrap_or(false),
+        "cooperative control has no quantum — effective_ownership_pct must be null"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -489,15 +529,15 @@ async fn d_cooperative_member_strategy_filters_to_admitted_kinds() {
     .await;
     assert!(select.is_ok(), "select-strategy must be admitted post-TS.3: {select:?}");
 
-    let candidates = resolve_via_strategy(
-        &pool,
-        subject,
-        "cooperative_member_strategy",
-        &ob_poc_kyc_substrate::CooperativeMemberStrategy,
-    )
-    .await;
-    let person_ids: std::collections::BTreeSet<Uuid> =
-        candidates.iter().map(|c| c.person_id.0).collect();
+    let candidates = freeze_candidates(&pool, subject, "cooperative_member_strategy").await;
+    let person_ids: std::collections::BTreeSet<Uuid> = candidates
+        .iter()
+        .filter_map(|c| {
+            c.get("person_id")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<Uuid>().ok())
+        })
+        .collect();
 
     assert!(
         person_ids.contains(&concentrated_voter),

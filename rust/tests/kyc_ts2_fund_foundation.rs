@@ -26,19 +26,12 @@
 //!   implemented strategy names (TS.4 fixture fix: the exemplar moved to a
 //!   never-will-exist string and the list is now 8).
 //!
-//! FENCED-DEFECT NOTE (same as `kyc_ts1_trust.rs` (d)/(e)): the final leg
-//! cannot drive `ubo.determination.freeze` itself — freeze's event payload
-//! embeds the candidates, and every ControlByOtherMeans candidate carries
-//! `effective_ownership_pct: null`, which trips the PRE-EXISTING
-//! render.rs:102 nested-null defect (the exact reason
-//! `m4_control_prong_strategy_resolves_gp_statutory_control` and
-//! `coverage_ubo_determination_freeze` are fenced pre-existing reds). That
-//! defect stays fenced in TS.2, so candidates are resolved via the exact
-//! strategy instance freeze dispatches to (arm proven by test (e) +
-//! `implemented_class_split_matches_strategy_arms`), over the REAL DB-loaded
-//! stream + the same `fold_control_versioned` / `natural_persons_from_events`
-//! / `find_subject_entity` composition the freeze op uses. Upgrade to drive
-//! freeze directly once the render defect is fixed.
+//! NOTE: the render.rs:102 nested-null defect was fixed 2026-08-14
+//! (`render_value` omits nulls at every depth), so the final determination
+//! leg of (a)/(b) now drives `ubo.determination.freeze` LIVE and reads the
+//! candidates + recorded strategy off the freeze outcome. Test (c) still
+//! calls `ControlProngStrategy.resolve` directly on purpose — it pins
+//! strategy-level differential behavior, not the freeze path.
 //!
 //! DB/fixture pattern mirrors `kyc_ts1_trust.rs`.
 
@@ -187,32 +180,31 @@ async fn setup_subject(pool: &PgPool, subject: SubjectId, persons: &[Uuid], clas
     .await;
 }
 
-/// Load the subject's REAL stream from the DB, fold it, assert the recorded
-/// strategy name, and resolve via the given strategy instance — the exact
-/// composition the freeze op uses (see the FENCED-DEFECT NOTE above).
-async fn resolve_via_strategy(
+/// Drive the REAL freeze op, assert the recorded strategy name on the
+/// outcome, and return the candidates array (render nested-null defect
+/// fixed 2026-08-14 — freeze is drivable live for pct-less candidates).
+async fn freeze_candidates(
     pool: &PgPool,
     subject: SubjectId,
     expected_strategy: &str,
-    strategy: &dyn DeterminationStrategy,
-) -> Vec<ob_poc_kyc_substrate::ProngCandidate> {
-    let mut conn = pool.acquire().await.expect("acquire connection");
-    let events = ob_poc_kyc_store::PgKycEventStore::load_events(&mut conn, subject)
-        .await
-        .expect("load events");
-    let refs: Vec<&IntentEvent> = events.iter().collect();
-    let mut reg = FoldRegistry::new();
-    reg.register(phase1_lexicon().hash, std::sync::Arc::new(V1FoldImpl));
-    let control = fold_control_versioned(&refs, &reg).expect("fold ok");
+) -> Vec<serde_json::Value> {
+    let outcome = run(
+        &UboDeterminationFreeze,
+        serde_json::json!({ "subject-id": subject.0, "policy-version": "v1.0" }),
+        pool,
+    )
+    .await;
     assert_eq!(
-        control.selected_strategy.as_deref(),
+        outcome.get("strategy").and_then(|v| v.as_str()),
         Some(expected_strategy),
-        "select-strategy (real op) must have recorded {expected_strategy}"
+        "select-strategy (real op) must have recorded {expected_strategy} — freeze \
+         dispatches to it and records it on the outcome; got {outcome:?}"
     );
-    let subject_entity =
-        ob_poc_kyc_substrate::find_subject_entity(&refs).expect("classify recorded entity");
-    let persons = ob_poc_kyc_substrate::natural_persons_from_events(&refs);
-    strategy.resolve(&control, subject_entity, &persons, 25.0)
+    outcome
+        .get("candidates")
+        .and_then(|c| c.as_array())
+        .cloned()
+        .unwrap_or_default()
 }
 
 // ── (a) fund_control_strategy end-to-end ────────────────────────────────────
@@ -281,16 +273,10 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
          post-TS.2 (StructureClassSupported widened): {select:?}"
     );
 
-    let candidates = resolve_via_strategy(
-        &pool,
-        subject,
-        "fund_control_strategy",
-        &ob_poc_kyc_substrate::FundControlStrategy,
-    )
-    .await;
+    let candidates = freeze_candidates(&pool, subject, "fund_control_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
-        .map(|c| c.person_id.0.to_string())
+        .filter_map(|c| c.get("person_id").and_then(|v| v.as_str()).map(String::from))
         .collect();
 
     assert_eq!(
@@ -311,13 +297,15 @@ async fn a_fund_control_strategy_resolves_manager_and_excludes_investors() {
     }
     for c in &candidates {
         assert_eq!(
-            c.prong,
-            ob_poc_kyc_substrate::Prong::ControlByOtherMeans,
+            c.get("prong").and_then(|v| v.as_str()),
+            Some("ControlByOtherMeans"),
             "K-1 basis: every fund-control candidate is ControlByOtherMeans"
         );
         assert!(
-            c.effective_ownership_pct.is_none(),
-            "fund control has no quantum — effective_ownership_pct must be None"
+            c.get("effective_ownership_pct")
+                .map(|v| v.is_null())
+                .unwrap_or(false),
+            "fund control has no quantum — effective_ownership_pct must be null"
         );
     }
 
@@ -387,16 +375,10 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
          post-TS.2 (StructureClassSupported widened): {select:?}"
     );
 
-    let candidates = resolve_via_strategy(
-        &pool,
-        subject,
-        "foundation_council_strategy",
-        &ob_poc_kyc_substrate::FoundationCouncilStrategy,
-    )
-    .await;
+    let candidates = freeze_candidates(&pool, subject, "foundation_council_strategy").await;
     let person_ids: std::collections::BTreeSet<String> = candidates
         .iter()
-        .map(|c| c.person_id.0.to_string())
+        .filter_map(|c| c.get("person_id").and_then(|v| v.as_str()).map(String::from))
         .collect();
 
     assert_eq!(
@@ -417,13 +399,15 @@ async fn b_foundation_council_strategy_resolves_council_and_ignores_voting_right
     );
     for c in &candidates {
         assert_eq!(
-            c.prong,
-            ob_poc_kyc_substrate::Prong::ControlByOtherMeans,
+            c.get("prong").and_then(|v| v.as_str()),
+            Some("ControlByOtherMeans"),
             "K-1 basis: every council candidate is ControlByOtherMeans"
         );
         assert!(
-            c.effective_ownership_pct.is_none(),
-            "foundation control has no quantum — effective_ownership_pct must be None"
+            c.get("effective_ownership_pct")
+                .map(|v| v.is_null())
+                .unwrap_or(false),
+            "foundation control has no quantum — effective_ownership_pct must be null"
         );
     }
 

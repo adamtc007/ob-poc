@@ -91,8 +91,11 @@ pub fn render_intent_event_to_sexpr(
 /// Render one payload value as a DSL literal. Verified against `dsl-parser`'s
 /// lexer grammar (`crates/dsl-parser/src/lexer.rs`): string/int/float/bool
 /// literals and `[...]`/`{:k v}` list/map forms are real tokens; there is no
-/// null/nil literal, so callers must never pass `Value::Null` here (the only
-/// call site above already filters it out at the object-entry level).
+/// null/nil literal. Nulls are therefore *omitted* at every depth, mirroring
+/// the top-level absent-optional-arg rule: a null object entry is dropped
+/// (e.g. a `ProngCandidate` with `pct: null` from a control-basis strategy),
+/// and a null array element is skipped. Only a direct top-level `Value::Null`
+/// argument is a caller bug (the call site above filters those).
 fn render_value(v: &Value) -> String {
     match v {
         Value::String(s) => render_string_literal(s),
@@ -103,11 +106,16 @@ fn render_value(v: &Value) -> String {
             String::new()
         }
         Value::Array(items) => {
-            let rendered: Vec<String> = items.iter().map(render_value).collect();
+            let rendered: Vec<String> = items
+                .iter()
+                .filter(|item| !item.is_null())
+                .map(render_value)
+                .collect();
             format!("[{}]", rendered.join(" "))
         }
         Value::Object(map) => {
-            let mut entries: Vec<(&String, &Value)> = map.iter().collect();
+            let mut entries: Vec<(&String, &Value)> =
+                map.iter().filter(|(_, v)| !v.is_null()).collect();
             entries.sort_by(|a, b| a.0.cmp(b.0));
             let rendered: Vec<String> = entries
                 .iter()

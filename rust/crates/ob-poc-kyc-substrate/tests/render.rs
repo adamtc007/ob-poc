@@ -59,6 +59,13 @@ fn raw_value_to_json(v: &RawValue) -> serde_json::Value {
         RawValue::IntLit(n) => json!(n),
         RawValue::FloatLit(f) => json!(f),
         RawValue::BoolLit(b) => json!(b),
+        RawValue::List(items) => serde_json::Value::Array(items.iter().map(raw_value_to_json).collect()),
+        RawValue::Map(entries) => serde_json::Value::Object(
+            entries
+                .iter()
+                .map(|(k, v)| (k.clone(), raw_value_to_json(v)))
+                .collect(),
+        ),
         other => panic!("unexpected RawValue shape in KYC round-trip test: {other:?}"),
     }
 }
@@ -361,5 +368,51 @@ fn history_replayable_as_dsl() {
         format!("{original_state:?}"),
         format!("{replayed_state:?}"),
         "re-executing rendered DSL source must reproduce the folded state bit-identically"
+    );
+}
+
+/// Regression pin for the nested-null render defect (formerly a fenced red at
+/// render.rs:102): control-basis strategies emit `ProngCandidate`s with
+/// `pct: null`, which reach `render_value` *inside* the candidates array —
+/// below the call site's top-level null filter. Nulls must be omitted at every
+/// depth (the DSL grammar has no null literal), and the result must still be a
+/// real, re-parseable statement.
+#[test]
+fn sexpr_render_omits_nested_nulls_at_every_depth() {
+    let subject = SubjectId(Uuid::new_v4());
+    let person = Uuid::new_v4().to_string();
+    let event = IntentEvent::new(
+        subject,
+        "ubo.determination.freeze",
+        analyst(),
+        authority(),
+        TargetBinding::for_subject(subject),
+        json!({
+            "strategy": "control_prong_strategy",
+            "candidates": [
+                { "person_id": person, "pct": null, "prong": "control_by_other_means" },
+                null,
+            ],
+            "basis": { "axis": "control", "quantum": null },
+        }),
+        ts(),
+    );
+
+    let rendered = render_intent_event_to_sexpr(&event, None);
+    assert!(!rendered.contains("pct"), "null entry must be omitted: {rendered}");
+    assert!(!rendered.contains("quantum"), "nested null entry must be omitted: {rendered}");
+
+    let atom = parse_one_atom(&rendered);
+    assert_eq!(atom.kind, "ubo.determination.freeze");
+    let candidates = atom
+        .slots
+        .iter()
+        .find(|(name, _)| name == "candidates")
+        .map(|(_, v)| raw_value_to_json(v))
+        .expect("candidates slot survives the round trip");
+    assert_eq!(
+        candidates,
+        json!([{ "person_id": person, "prong": "control_by_other_means" }]),
+        "null array element skipped, null object entry dropped, rest intact"
     );
 }
