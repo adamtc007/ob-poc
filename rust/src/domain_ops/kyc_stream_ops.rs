@@ -24,8 +24,9 @@ use ob_poc_kyc_substrate::{
     check_control_preconditions, check_preconditions, find_subject_entity, fold_control_versioned,
     fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
-    EdgeId, FoldRegistry, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
-    SubjectId, SubjectOverallState, TargetBinding, TrustRoleStrategy, V1FoldImpl,
+    EdgeId, FoldRegistry, FoundationCouncilStrategy, FundControlStrategy, OwnershipProngStrategy,
+    PersonId, Prong, ProngCandidate, SmoResult, SubjectId, SubjectOverallState, TargetBinding,
+    TrustRoleStrategy, V1FoldImpl,
     EDGE_KIND_WIRE_VALUES,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
@@ -603,13 +604,24 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             // settlor unless proven irrevocable; beneficiary never). Scope
             // note lives on TrustRoleStrategy itself.
             "trust_role_strategy" => &TrustRoleStrategy,
+            // TS.2: fund control sits with the manager (ManCo/AIFM/GP-analog),
+            // asserted as dominant_influence/board_appointment — a NAMED thin
+            // delegate to the control-prong traversal so the freeze pin
+            // records WHICH model ran. Scope note lives on FundControlStrategy.
+            "fund_control_strategy" => &FundControlStrategy,
+            // TS.2: a foundation has no owners by construction — control sits
+            // with the council/board. Traverses board_appointment +
+            // dominant_influence ONLY. Scope note lives on
+            // FoundationCouncilStrategy.
+            "foundation_council_strategy" => &FoundationCouncilStrategy,
             other => {
                 return Err(anyhow!(
                     "freeze: strategy '{other}' selected but no DeterminationStrategy is \
                      registered for it — only ownership_prong_strategy, \
-                     control_prong_strategy, and trust_role_strategy exist today \
-                     (the remaining structure-class strategies are TS.2-TS.4 \
-                     follow-on work)"
+                     control_prong_strategy, trust_role_strategy, \
+                     fund_control_strategy, and foundation_council_strategy exist \
+                     today (the remaining structure-class strategies are \
+                     TS.3-TS.4 follow-on work)"
                 ));
             }
         };

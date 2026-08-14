@@ -528,11 +528,12 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     let strategies = freeze_strategy_arms();
     assert_eq!(
         strategies.len(),
-        3,
+        5,
         "freeze's implemented DeterminationStrategy count drifted from the \
-         TS.1 3 (ownership_prong_strategy, control_prong_strategy, \
-         trust_role_strategy) — a new strategy is a CONSCIOUS pin edit here \
-         AND in the TS.1 split pin below: {strategies:#?}"
+         TS.2 5 (ownership_prong_strategy, control_prong_strategy, \
+         trust_role_strategy, fund_control_strategy, \
+         foundation_council_strategy) — a new strategy is a CONSCIOUS pin \
+         edit here AND in the TS.1 split pin below: {strategies:#?}"
     );
 }
 
@@ -630,6 +631,13 @@ fn implemented_class_split_matches_strategy_arms() {
             ],
         ),
         ("trust_role_strategy", vec![StructureClass::Trust]),
+        // TS.2 (EOP-DD-KYCUBO-KIT-TS0 §2.2/§2.3): fund control sits with the
+        // manager; foundation control sits with the council.
+        ("fund_control_strategy", vec![StructureClass::InvestmentFund]),
+        (
+            "foundation_council_strategy",
+            vec![StructureClass::Foundation],
+        ),
     ]);
 
     // Every dispatch arm appears in the mapping and vice versa.
@@ -663,8 +671,8 @@ fn implemented_class_split_matches_strategy_arms() {
         served, implemented,
         "IMPLEMENTED_STRATEGY_CLASSES and the arm→classes-served mapping \
          diverged — widening the guard set without a strategy arm (or vice \
-         versa) is exactly what this pin fail-closes; after TS.1 the split \
-         is 3 arms serving 6 classes (lockstep rule, EOP-DD-KYCUBO-KIT-TS0 §1c)"
+         versa) is exactly what this pin fail-closes; after TS.2 the split \
+         is 5 arms serving 8 classes (lockstep rule, EOP-DD-KYCUBO-KIT-TS0 §1c)"
     );
 }
 
@@ -983,13 +991,13 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     // StructureClassSupported, checked last), the PrivateCompany case would
     // otherwise incorrectly block on SubjectRegistered instead of proving
     // the guard this sub-test targets.
-    // TS.1 fixture fix: Trust joined the implemented set (TrustRoleStrategy),
-    // so the fail-closed exemplar class becomes Foundation (still
-    // unimplemented until TS.2).
+    // TS.2 fixture fix: Foundation joined the implemented set
+    // (FoundationCouncilStrategy), so the fail-closed exemplar class becomes
+    // StateOwned (survives until TS.3 — this exemplar moves again then).
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let unsupported = ControlState {
         registered: true,
-        structure_class: Some(StructureClass::Foundation),
+        structure_class: Some(StructureClass::StateOwned),
         ..Default::default()
     };
     assert!(
@@ -1000,7 +1008,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
         )
         .is_err(),
-        "select-strategy must block an unsupported structure class (Foundation)"
+        "select-strategy must block an unsupported structure class (StateOwned)"
     );
     let supported = ControlState {
         registered: true,

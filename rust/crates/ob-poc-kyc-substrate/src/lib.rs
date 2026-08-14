@@ -26,8 +26,9 @@ pub(crate) mod types;
 pub use determination::{
     find_subject_entity, freeze_determination, recover_determination_at,
     recover_determination_bitemporal, ControlProngStrategy, DeterminationInProgress,
-    DeterminationPin, DeterminationStrategy, FrozenDetermination, OwnershipProngStrategy, Prong,
-    ProngCandidate, RecoveryPin, SmoResult, TrustRoleStrategy,
+    DeterminationPin, DeterminationStrategy, FoundationCouncilStrategy, FrozenDetermination,
+    FundControlStrategy, OwnershipProngStrategy, Prong, ProngCandidate, RecoveryPin, SmoResult,
+    TrustRoleStrategy,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};

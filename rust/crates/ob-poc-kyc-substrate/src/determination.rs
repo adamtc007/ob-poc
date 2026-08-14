@@ -173,6 +173,73 @@ impl DeterminationStrategy for OwnershipProngStrategy {
     }
 }
 
+// ── Shared control-chain traversal (M4/TS.1/TS.2) ────────────────────────────
+
+/// The shared control-chain DFS used by every control-axis strategy
+/// (`ControlProngStrategy`, `TrustRoleStrategy`,
+/// `FoundationCouncilStrategy`; `FundControlStrategy` reaches it by
+/// delegating to `ControlProngStrategy`). Extracted verbatim from the
+/// previously-duplicated `ControlProngStrategy`/`TrustRoleStrategy` bodies
+/// (TS.2 — behavior-preserving refactor): the caller builds the adjacency
+/// (`to_entity → (from_entity, originating_event_id)`) from whichever edge
+/// set its ruling admits; this walks it.
+///
+/// Semantics (Q6, K-16/18/33 determinism contract):
+/// - adjacency lists are sorted by `(from, orig)` so traversal order is
+///   deterministic regardless of insertion order;
+/// - DFS from `subject_entity_id` with a path-based cycle guard;
+/// - a `from` that is a natural person becomes a candidate — first
+///   deterministic path wins (control is binary, not summed);
+/// - a `from` that is a legal entity is traversed further;
+/// - every candidate is `Prong::ControlByOtherMeans` with
+///   `effective_ownership_pct: None` — control carries no quantum.
+fn resolve_chain_candidates(
+    mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>>,
+    subject_entity_id: EntityId,
+    natural_persons: &BTreeSet<PersonId>,
+) -> Vec<ProngCandidate> {
+    for neighbours in adj.values_mut() {
+        neighbours.sort_by_key(|&(from, orig)| (from, orig));
+    }
+
+    // DFS: no percentage to carry, just the path (for ownership_chain / K-35)
+    // and the earliest originating event.
+    let mut stack: Vec<(EntityId, Vec<EntityId>, Option<EventId>)> =
+        vec![(subject_entity_id, vec![subject_entity_id], None)];
+    let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId)> = BTreeMap::new();
+
+    while let Some((entity, path, first_orig)) = stack.pop() {
+        if path.iter().filter(|&&e| e == entity).count() > 1 {
+            continue; // cycle guard
+        }
+        for &(parent, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
+            let chain_orig = first_orig.unwrap_or(edge_orig);
+            let parent_person_id = PersonId(parent.0);
+            if natural_persons.contains(&parent_person_id) {
+                // First deterministic path wins (control is binary, not summed).
+                candidates
+                    .entry(parent_person_id)
+                    .or_insert_with(|| (path.clone(), chain_orig));
+            } else {
+                let mut new_path = path.clone();
+                new_path.push(parent);
+                stack.push((parent, new_path, Some(chain_orig)));
+            }
+        }
+    }
+
+    candidates
+        .into_iter()
+        .map(|(pid, (chain, orig))| ProngCandidate {
+            person_id: pid,
+            prong: Prong::ControlByOtherMeans,
+            effective_ownership_pct: None,
+            ownership_chain: chain,
+            originating_event_id: orig,
+        })
+        .collect()
+}
+
 // ── ControlProngStrategy (M4 — control by other means) ───────────────────────
 
 /// Resolves natural persons reachable via a chain of asserted-and-reconciled
@@ -222,46 +289,7 @@ impl DeterminationStrategy for ControlProngStrategy {
         for e in &edges {
             adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
         }
-        for neighbours in adj.values_mut() {
-            neighbours.sort_by_key(|&(from, orig)| (from, orig));
-        }
-
-        // DFS: no percentage to carry, just the path (for ownership_chain / K-35)
-        // and the earliest originating event.
-        let mut stack: Vec<(EntityId, Vec<EntityId>, Option<EventId>)> =
-            vec![(subject_entity_id, vec![subject_entity_id], None)];
-        let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId)> = BTreeMap::new();
-
-        while let Some((entity, path, first_orig)) = stack.pop() {
-            if path.iter().filter(|&&e| e == entity).count() > 1 {
-                continue; // cycle guard
-            }
-            for &(parent, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
-                let chain_orig = first_orig.unwrap_or(edge_orig);
-                let parent_person_id = PersonId(parent.0);
-                if natural_persons.contains(&parent_person_id) {
-                    // First deterministic path wins (control is binary, not summed).
-                    candidates
-                        .entry(parent_person_id)
-                        .or_insert_with(|| (path.clone(), chain_orig));
-                } else {
-                    let mut new_path = path.clone();
-                    new_path.push(parent);
-                    stack.push((parent, new_path, Some(chain_orig)));
-                }
-            }
-        }
-
-        candidates
-            .into_iter()
-            .map(|(pid, (chain, orig))| ProngCandidate {
-                person_id: pid,
-                prong: Prong::ControlByOtherMeans,
-                effective_ownership_pct: None,
-                ownership_chain: chain,
-                originating_event_id: orig,
-            })
-            .collect()
+        resolve_chain_candidates(adj, subject_entity_id, natural_persons)
     }
 }
 
@@ -333,45 +361,101 @@ impl DeterminationStrategy for TrustRoleStrategy {
                 adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
             }
         }
-        for neighbours in adj.values_mut() {
-            neighbours.sort_by_key(|&(from, orig)| (from, orig));
-        }
+        resolve_chain_candidates(adj, subject_entity_id, natural_persons)
+    }
+}
 
-        // DFS mirroring ControlProngStrategy: no quantum, first deterministic
-        // path wins, cycle guard on the path.
-        let mut stack: Vec<(EntityId, Vec<EntityId>, Option<EventId>)> =
-            vec![(subject_entity_id, vec![subject_entity_id], None)];
-        let mut candidates: BTreeMap<PersonId, (Vec<EntityId>, EventId)> = BTreeMap::new();
+// ── FundControlStrategy (TS.2 — fund control sits with the manager) ──────────
 
-        while let Some((entity, path, first_orig)) = stack.pop() {
-            if path.iter().filter(|&&e| e == entity).count() > 1 {
-                continue; // cycle guard
+/// Resolves natural persons controlling an InvestmentFund-classified subject
+/// — the corporate-form fund (SICAV/OEIC/unit trust) whose control edge is
+/// the MANAGEMENT relationship (ManCo/AIFM/GP-analog), not its investors
+/// (EOP-DD-KYCUBO-KIT-TS0 §2.2, ratified 2026-08-12).
+///
+/// **No new `EdgeKind`:** the management relationship asserts as
+/// `dominant_influence` (or `board_appointment` where literal). The strategy
+/// is a thin delegate to `ControlProngStrategy`'s traversal with fund
+/// framing: same `reconciled_control_edges` walk, same natural-person chain
+/// resolution. Investor `economic_interest` edges are NOT traversed — they
+/// stay on the economic axis and feed the existing ownership prong only when
+/// someone genuinely crosses the threshold. Every candidate is
+/// `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always `None`;
+/// `threshold_pct` is accepted for signature parity but unused.
+///
+/// **Why a NAMED strategy rather than mapping InvestmentFund →
+/// `control_prong_strategy` directly** (the §2.2 alternative, rejected at
+/// ratification): auditability — the freeze pin records WHICH model ran.
+/// `"fund_control_strategy"` on the frozen determination says "this subject
+/// was resolved under the fund-control basis (manager, not investors)", not
+/// merely "some control walk happened".
+///
+/// **Scope (TS.2 v1):** inherits `ControlProngStrategy`'s v1 boundary — does
+/// not cross into the economic axis for an intermediate controlling entity's
+/// own UBOs (v2).
+pub struct FundControlStrategy;
+
+impl DeterminationStrategy for FundControlStrategy {
+    fn name(&self) -> &'static str {
+        "fund_control_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        // Thin delegate (§2.2): same traversal machinery, fund framing.
+        ControlProngStrategy.resolve(state, subject_entity_id, natural_persons, threshold_pct)
+    }
+}
+
+// ── FoundationCouncilStrategy (TS.2 — control sits with the council) ─────────
+
+/// Resolves natural persons controlling a Foundation-classified subject —
+/// a foundation has NO owners by construction, so control sits with the
+/// council/board (EOP-DD-KYCUBO-KIT-TS0 §2.3, ratified 2026-08-12).
+///
+/// Traverses ONLY active reconciled `EdgeKind::BoardAppointment` +
+/// `EdgeKind::DominantInfluence` edges — narrower than the full control
+/// walk. A stray `voting_rights` (or any other control-kind) edge on a
+/// Foundation subject is IGNORED by this strategy — deliberate, mirroring
+/// `TrustRoleStrategy`'s kind-filtering stance: if the structure genuinely
+/// mixes, classification is wrong, and reclassification is legal (matrix
+/// row 10). Every candidate is `Prong::ControlByOtherMeans`;
+/// `effective_ownership_pct` is always `None`; `threshold_pct` is accepted
+/// for signature parity but unused.
+///
+/// **Scope (TS.2 v1):** same natural-person chain resolution and the same
+/// v1 boundary as the other control-axis strategies — an intermediate legal
+/// entity is traversed through its own qualifying (council-kind) edges
+/// only; no crossing into the economic axis (v2).
+pub struct FoundationCouncilStrategy;
+
+impl DeterminationStrategy for FoundationCouncilStrategy {
+    fn name(&self) -> &'static str {
+        "foundation_council_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        _threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        use crate::fold::control::EdgeKind;
+
+        // Council-kind edges only (§2.3): board_appointment + dominant_influence.
+        let edges = reconciled_control_edges(state);
+        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        for e in &edges {
+            if matches!(e.kind, EdgeKind::BoardAppointment | EdgeKind::DominantInfluence) {
+                adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
             }
-            for &(parent, edge_orig) in adj.get(&entity).unwrap_or(&vec![]) {
-                let chain_orig = first_orig.unwrap_or(edge_orig);
-                let parent_person_id = PersonId(parent.0);
-                if natural_persons.contains(&parent_person_id) {
-                    candidates
-                        .entry(parent_person_id)
-                        .or_insert_with(|| (path.clone(), chain_orig));
-                } else {
-                    let mut new_path = path.clone();
-                    new_path.push(parent);
-                    stack.push((parent, new_path, Some(chain_orig)));
-                }
-            }
         }
-
-        candidates
-            .into_iter()
-            .map(|(pid, (chain, orig))| ProngCandidate {
-                person_id: pid,
-                prong: Prong::ControlByOtherMeans,
-                effective_ownership_pct: None,
-                ownership_chain: chain,
-                originating_event_id: orig,
-            })
-            .collect()
+        resolve_chain_candidates(adj, subject_entity_id, natural_persons)
     }
 }
 
