@@ -425,6 +425,7 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::UboEdgeAttachEvidence));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeVerify));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeSupersede));
+    registry.register(Arc::new(kyc_stream_ops::UboEdgePierceNominee));
     registry.register(Arc::new(kyc_stream_ops::UboEdgeReconcileConflict));
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationSelectStrategy));
     registry.register(Arc::new(kyc_stream_ops::UboDeterminationComputeFold));

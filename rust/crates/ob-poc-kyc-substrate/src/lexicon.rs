@@ -237,10 +237,12 @@ impl LexiconManifest {
 
 // ── Phase-1/2 verb entries ────────────────────────────────────────────────────
 
-/// Build the canonical `LexiconManifest` for all 20 dsl.kyc verbs (12
-/// Phase-1/2 determination verbs + 8 W5 obligation/person verbs, T6.0
-/// closure, 2026-08-12). This is the normative lexicon for the vertical
-/// slice (V&S Appendix A, phases 1–2) plus the W5 obligation lifecycle.
+/// Build the canonical `LexiconManifest` for all 21 dsl.kyc verbs: 13
+/// Phase-1/2 determination verbs (incl. `ubo.edge.pierce-nominee`, TS.4 =
+/// K-8, preconditions from birth per the K-G7 reintroduction discipline)
+/// plus 8 W5 obligation/person verbs (T6.0 closure, 2026-08-12). This is
+/// the normative lexicon for the vertical slice (V&S Appendix A, phases
+/// 1–2) plus the W5 obligation lifecycle.
 pub fn phase1_lexicon() -> LexiconManifest {
     use smallvec::smallvec;
 
@@ -342,6 +344,28 @@ pub fn phase1_lexicon() -> LexiconManifest {
             // T6.2 row 4: target edge must exist and not already be
             // superseded (double-supersede would no-op-pollute the stream).
             vec![Precondition::EdgeExists, Precondition::EdgeActive],
+            AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            // TS.4 = K-8 (EOP-DD-KYCUBO-KIT-TS0 §2.6): supersede the target
+            // nominee edge + assert the disclosed nominator's underlying
+            // edge in ONE governed event. Preconditions FROM BIRTH (the
+            // K-G7 reintroduction discipline): subject registered; target
+            // edge exists and is active (matrix rows 3/4 vocabulary). The
+            // "target is actually EdgeKind::Nominee" check has no
+            // precondition primitive — enforced op-layer, fail-closed
+            // (kyc_stream_ops.rs::UboEdgePierceNominee).
+            "ubo.edge.pierce-nominee",
+            "Pierce a nominee arrangement: supersede the nominee edge and assert the \
+             disclosed nominator's underlying edge (K-8, K-13)",
+            Taxonomy::Control,
+            smallvec![FoldId::ControlGraph],
+            vec![
+                Precondition::SubjectRegistered,
+                Precondition::EdgeExists,
+                Precondition::EdgeActive,
+            ],
             AuthoritySpec::senior_analyst(),
             vec![],
         ),

@@ -27,8 +27,8 @@ pub use determination::{
     find_subject_entity, freeze_determination, recover_determination_at,
     recover_determination_bitemporal, ControlProngStrategy, CooperativeMemberStrategy,
     DeterminationInProgress, DeterminationPin, DeterminationStrategy, FoundationCouncilStrategy,
-    FrozenDetermination, FundControlStrategy, OwnershipProngStrategy, Prong, ProngCandidate,
-    RecoveryPin, SmoResult, StateOwnedStrategy, TrustRoleStrategy,
+    FrozenDetermination, FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy,
+    Prong, ProngCandidate, RecoveryPin, SmoResult, StateOwnedStrategy, TrustRoleStrategy,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};

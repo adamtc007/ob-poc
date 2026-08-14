@@ -46,6 +46,8 @@ fn w7_oracle_ownership_prong_on_private_company_fixture() {
                 evidence_event_id: None,
                 originating_event_id: nil_event,
                 trust_revocable: None,
+                superseded_by: None,
+                pierced_from: None,
             },
         )
     };

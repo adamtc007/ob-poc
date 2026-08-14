@@ -52,8 +52,7 @@ use chrono::{TimeZone, Utc};
 use ob_poc_kyc_substrate::{
     check_control_preconditions, check_preconditions, fold_control_versioned, phase1_lexicon,
     AuthorityRef, ControlState, EdgeId, EdgeStatus, EntityId, FoldRegistry, Hash, IntentEvent,
-    ObligationState, Precondition, Principal, StructureClass, SubjectId, TargetBinding,
-    V1FoldImpl,
+    ObligationState, Precondition, Principal, StructureClass, SubjectId, TargetBinding, V1FoldImpl,
 };
 
 const DSL_KYC_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc.yaml");
@@ -69,10 +68,11 @@ const OBLIGATION_FOLD_SRC: &str =
 /// Parse `domains: { <domain>: { verbs: { <verb>: ... } } }` from a dsl.kyc
 /// verb YAML file — a plain line-scan (2-space domain keys, 6-space verb
 /// keys) rather than a full YAML parse, matching the fixed hand-authored
-/// indentation of these two files (verified: exactly 2 domain lines + 12 verb
+/// indentation of these two files (verified: exactly 2 domain lines + 13 verb
 /// lines in dsl-kyc.yaml, 1 domain line + 8 verb lines in
-/// dsl-kyc-obligation.yaml — 20 total, post K-G7 retirement of
-/// kyc.role.assign/withdraw, 2026-08-12).
+/// dsl-kyc-obligation.yaml — 21 total, post K-G7 retirement of
+/// kyc.role.assign/withdraw (2026-08-12) and the TS.4 `ubo.edge.pierce-nominee`
+/// addition (K-8, full-kit-citizenship reintroduction discipline)).
 fn extract_verb_fqns(yaml: &str) -> BTreeSet<String> {
     let mut fqns = BTreeSet::new();
     let mut domain: Option<&str> = None;
@@ -123,8 +123,7 @@ fn registered_op_fqns() -> BTreeSet<String> {
         if line.trim() == marker {
             if let Some(next) = lines.next() {
                 let trimmed = next.trim();
-                if let Some(literal) = trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
-                {
+                if let Some(literal) = trimmed.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
                     fqns.insert(literal.to_string());
                 }
             }
@@ -162,14 +161,14 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_20() {
+fn verb_universe_is_exactly_21() {
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        20,
-        "dsl.kyc verb count drifted from the post-retirement 20 (K-G7: \
-         kyc.role.assign/withdraw retired 2026-08-12) — update the T0.3 \
-         audit and every other pinned test in this file, not just this \
+        21,
+        "dsl.kyc verb count drifted from the post-TS.4 21 (20 post-K-G7 \
+         retirement + ubo.edge.pierce-nominee, TS.4 = K-8) — update the \
+         T0.3 audit and every other pinned test in this file, not just this \
          assertion: {fqns:#?}"
     );
 }
@@ -209,8 +208,8 @@ fn every_declared_verb_has_a_registered_op() {
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        20,
-        "registered dsl.kyc op count drifted from the post-retirement 20: {registered:#?}"
+        21,
+        "registered dsl.kyc op count drifted from the post-TS.4 21: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -362,12 +361,11 @@ fn structure_class_valid_values() -> Vec<String> {
     inner.split(',').map(|s| s.trim().to_string()).collect()
 }
 
-/// RED-honest pin (K-G5): passes because the gap is exactly as documented —
-/// 3 of 20 lexicon-covered verbs carry a precondition (post-T6.0: all 20
-/// dsl.kyc verbs are now lexicon-covered, K-G6 closed), and 1 of 11
-/// structure classes (Nominee, TS.4) has no strategy behind it. Authoring a T6.1+
-/// precondition, or a new `DeterminationStrategy`, is a CONSCIOUS edit here,
-/// not a silent pass or a silent break.
+/// Pin (K-G5): as of TS.4 the map is fully studded (only `kyc.subject.register`
+/// remains geometry-free — row 9 HALTED, see its lexicon comment) and ALL 11
+/// structure classes have a strategy behind them (the guard set is total).
+/// Authoring a precondition, or a new `DeterminationStrategy`, is a CONSCIOUS
+/// edit here, not a silent pass or a silent break.
 #[test]
 fn precondition_and_strategy_coverage_is_exactly_known() {
     let lexicon = phase1_lexicon();
@@ -446,6 +444,19 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         "ubo.edge.reconcile-conflict".to_string(),
         vec![Precondition::SubjectRegistered],
     );
+    // TS.4 (EOP-DD-KYCUBO-KIT-TS0 §2.6): the K-8 pierce verb, preconditions
+    // FROM BIRTH (the K-G7 reintroduction discipline) — subject registered +
+    // target edge exists + active (matrix rows 3/4 vocabulary). The "target
+    // is actually a nominee edge" check has NO precondition primitive; it is
+    // enforced op-layer, fail-closed (kyc_stream_ops.rs, per the §2.6 note).
+    expected.insert(
+        "ubo.edge.pierce-nominee".to_string(),
+        vec![
+            Precondition::SubjectRegistered,
+            Precondition::EdgeExists,
+            Precondition::EdgeActive,
+        ],
+    );
 
     // T6.3 (2026-08-12, determination-family remainder — EOP-DD-KYCUBO-KIT-T6
     // matrix rows 7, 9, 10; row 6 is folded into select-strategy above; row 8
@@ -504,17 +515,17 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
 
     assert_eq!(
         actual.len(),
-        20,
-        "phase1_lexicon() entry count drifted from the post-T6.0 20 \
-         lexicon-covered verbs"
+        21,
+        "phase1_lexicon() entry count drifted from the post-TS.4 21 \
+         lexicon-covered verbs (20 post-T6.0 + ubo.edge.pierce-nominee)"
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of T6.4, every one of the 20 dsl.kyc verbs except \
-         select-strategy/freeze's own 8a guard interaction now carries a stud (verify, \
-         compute-fold, select-strategy, freeze, the 5 edge-family verbs, apply-smo-fallback, \
-         register, classify-structure, and all 8 obligation/person verbs); any other change \
-         is either T6.3/T6.4 progress (update the T0.3 audit) or a regression"
+        "K-G5 precondition map changed — as of TS.4, every one of the 21 dsl.kyc verbs except \
+         register carries a stud (verify, compute-fold, select-strategy, freeze, the 5 \
+         edge-family verbs, pierce-nominee, apply-smo-fallback, classify-structure, and all \
+         8 obligation/person verbs); any other change is either matrix progress (update the \
+         T0.3 audit) or a regression"
     );
 
     let classes = structure_class_valid_values();
@@ -528,13 +539,14 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     let strategies = freeze_strategy_arms();
     assert_eq!(
         strategies.len(),
-        7,
+        8,
         "freeze's implemented DeterminationStrategy count drifted from the \
-         TS.3 7 (ownership_prong_strategy, control_prong_strategy, \
+         TS.4 8 (ownership_prong_strategy, control_prong_strategy, \
          trust_role_strategy, fund_control_strategy, \
          foundation_council_strategy, state_owned_strategy, \
-         cooperative_member_strategy) — a new strategy is a CONSCIOUS pin \
-         edit here AND in the TS.1 split pin below: {strategies:#?}"
+         cooperative_member_strategy, nominee_pierce_strategy) — a new \
+         strategy is a CONSCIOUS pin edit here AND in the TS.1 split pin \
+         below: {strategies:#?}"
     );
 }
 
@@ -626,15 +638,15 @@ fn implemented_class_split_matches_strategy_arms() {
         ),
         (
             "control_prong_strategy",
-            vec![
-                StructureClass::LimitedPartnershipFund,
-                StructureClass::Llp,
-            ],
+            vec![StructureClass::LimitedPartnershipFund, StructureClass::Llp],
         ),
         ("trust_role_strategy", vec![StructureClass::Trust]),
         // TS.2 (EOP-DD-KYCUBO-KIT-TS0 §2.2/§2.3): fund control sits with the
         // manager; foundation control sits with the council.
-        ("fund_control_strategy", vec![StructureClass::InvestmentFund]),
+        (
+            "fund_control_strategy",
+            vec![StructureClass::InvestmentFund],
+        ),
         (
             "foundation_council_strategy",
             vec![StructureClass::Foundation],
@@ -647,6 +659,12 @@ fn implemented_class_split_matches_strategy_arms() {
             "cooperative_member_strategy",
             vec![StructureClass::Cooperative],
         ),
+        // TS.4 (EOP-DD-KYCUBO-KIT-TS0 §2.6): post-piercing the subject
+        // resolves by the UNDERLYING structure — the strategy delegates to
+        // the control prong; the "no unpierced nominee edges" guard lives at
+        // the freeze dispatch site (resolve() cannot error). The guard set
+        // is now TOTAL: 11/11 classes served, none fail-closed.
+        ("nominee_pierce_strategy", vec![StructureClass::Nominee]),
     ]);
 
     // Every dispatch arm appears in the mapping and vice versa.
@@ -680,8 +698,9 @@ fn implemented_class_split_matches_strategy_arms() {
         served, implemented,
         "IMPLEMENTED_STRATEGY_CLASSES and the arm→classes-served mapping \
          diverged — widening the guard set without a strategy arm (or vice \
-         versa) is exactly what this pin fail-closes; after TS.3 the split \
-         is 7 arms serving 10 classes (lockstep rule, EOP-DD-KYCUBO-KIT-TS0 §1c)"
+         versa) is exactly what this pin fail-closes; after TS.4 the split \
+         is 8 arms serving all 11 classes — TOTAL (lockstep rule, \
+         EOP-DD-KYCUBO-KIT-TS0 §1c)"
     );
 }
 
@@ -748,9 +767,11 @@ fn edge_status_lifecycle_is_fully_reachable() {
         as_of,
         lexicon_hash,
     );
-    let state =
-        fold_control_versioned(&[&assert_event, &evidence_event], &reg).expect("fold ok");
-    assert_eq!(state.edges.get(&edge).unwrap().status, EdgeStatus::Evidenced);
+    let state = fold_control_versioned(&[&assert_event, &evidence_event], &reg).expect("fold ok");
+    assert_eq!(
+        state.edges.get(&edge).unwrap().status,
+        EdgeStatus::Evidenced
+    );
 
     let verify_event = make_event(
         subject,
@@ -775,11 +796,19 @@ fn edge_status_lifecycle_is_fully_reachable() {
         lexicon_hash,
     );
     let state = fold_control_versioned(
-        &[&assert_event, &evidence_event, &verify_event, &supersede_event],
+        &[
+            &assert_event,
+            &evidence_event,
+            &verify_event,
+            &supersede_event,
+        ],
         &reg,
     )
     .expect("fold ok");
-    assert_eq!(state.edges.get(&edge).unwrap().status, EdgeStatus::Superseded);
+    assert_eq!(
+        state.edges.get(&edge).unwrap().status,
+        EdgeStatus::Superseded
+    );
 }
 
 // ── Part A (EOP-PLAN-KYCUBO-KIT-001) — the checker-reach tooth ─────────────
@@ -967,6 +996,8 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             evidence_event_id: None,
             originating_event_id: ob_poc_kyc_substrate::EventId::new(),
             trust_revocable: None,
+            superseded_by: None,
+            pierced_from: None,
         },
     );
     assert!(
@@ -992,48 +1023,77 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         "verify must admit an edge with evidence attached"
     );
 
-    // ubo.determination.select-strategy / freeze — StructureClassSupported:
-    // an unsupported class must block; a supported one must admit.
+    // ubo.determination.select-strategy — StructureClassSupported.
     // T6.3 row 6: select-strategy also carries SubjectRegistered +
-    // StructureClassified now, so both fixtures below must set
-    // `registered: true` too — the Trust case still blocks (on
-    // StructureClassSupported, checked last), the PrivateCompany case would
-    // otherwise incorrectly block on SubjectRegistered instead of proving
-    // the guard this sub-test targets.
-    // TS.3 fixture fix: StateOwned + Cooperative joined the implemented set
-    // (StateOwnedStrategy/CooperativeMemberStrategy), so the fail-closed
-    // exemplar class becomes Nominee — the LAST strategy-less class (moves
-    // again at TS.4, to a taxonomy widening or the pin's retirement).
+    // StructureClassified, so fixtures set `registered: true`.
+    // TS.4 rework (the old "unsupported-class exemplar" is RETIRED — there
+    // is no strategy-less class left): the guard set is now TOTAL, so this
+    // sub-test pins (i) totality — every one of the 11 StructureClass
+    // variants is admitted — and (ii) the fail-closed floor — a subject
+    // with NO recorded class (which is exactly what an unknown/garbage
+    // wire string folds to, `structure_class_from_payload` → None) still
+    // blocks. The guard is retained, not retired: it now fail-closes the
+    // unknown-class case rather than a named class.
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
-    let unsupported = ControlState {
+    let all_classes = [
+        StructureClass::PrivateCompany,
+        StructureClass::MultiTierHoldingGroup,
+        StructureClass::ListedEntity,
+        StructureClass::LimitedPartnershipFund,
+        StructureClass::Llp,
+        StructureClass::Trust,
+        StructureClass::Foundation,
+        StructureClass::InvestmentFund,
+        StructureClass::StateOwned,
+        StructureClass::Cooperative,
+        StructureClass::Nominee,
+    ];
+    assert_eq!(
+        all_classes.len(),
+        ob_poc_kyc_substrate::IMPLEMENTED_STRATEGY_CLASSES.len(),
+        "the implemented set must be TOTAL post-TS.4 (11/11 classes)"
+    );
+    for class in all_classes {
+        let supported = ControlState {
+            registered: true,
+            structure_class: Some(class.clone()),
+            ..Default::default()
+        };
+        assert!(
+            check_preconditions(
+                select_entry,
+                &supported,
+                &empty_obligation,
+                &probe(
+                    "ubo.determination.select-strategy",
+                    TargetBinding::for_subject(subject)
+                ),
+            )
+            .is_ok(),
+            "select-strategy must admit every implemented structure class \
+             post-TS.4 (totality); {class:?} was blocked"
+        );
+    }
+    // The fail-closed floor: no class (= what a garbage wire string folds
+    // to) still blocks, even with registration satisfied.
+    let unclassified = ControlState {
         registered: true,
-        structure_class: Some(StructureClass::Nominee),
+        structure_class: None,
         ..Default::default()
     };
     assert!(
         check_preconditions(
             select_entry,
-            &unsupported,
+            &unclassified,
             &empty_obligation,
-            &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
+            &probe(
+                "ubo.determination.select-strategy",
+                TargetBinding::for_subject(subject)
+            ),
         )
         .is_err(),
-        "select-strategy must block an unsupported structure class (Nominee)"
-    );
-    let supported = ControlState {
-        registered: true,
-        structure_class: Some(StructureClass::PrivateCompany),
-        ..Default::default()
-    };
-    assert!(
-        check_preconditions(
-            select_entry,
-            &supported,
-            &empty_obligation,
-            &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
-        )
-        .is_ok(),
-        "select-strategy must admit a supported structure class (PrivateCompany)"
+        "select-strategy must still fail-close on a subject with no recorded \
+         structure class (unknown wire strings fold to None)"
     );
 
     // ubo.determination.compute-fold — ReconciledProjection + StrategySelected
@@ -1045,7 +1105,10 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         check_control_preconditions(
             compute_fold_entry,
             &not_ready,
-            &probe("ubo.determination.compute-fold", TargetBinding::for_subject(subject)),
+            &probe(
+                "ubo.determination.compute-fold",
+                TargetBinding::for_subject(subject)
+            ),
         )
         .is_err(),
         "compute-fold must block before reconcile-conflict + select-strategy have fired (K-14)"
@@ -1059,7 +1122,10 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         check_control_preconditions(
             compute_fold_entry,
             &ready,
-            &probe("ubo.determination.compute-fold", TargetBinding::for_subject(subject)),
+            &probe(
+                "ubo.determination.compute-fold",
+                TargetBinding::for_subject(subject)
+            ),
         )
         .is_ok(),
         "compute-fold must admit once reconcile-conflict + select-strategy have fired"

@@ -5,9 +5,9 @@
 # kyc_intent_events stream; current state is a fold/projection of that stream — never a
 # direct table write. Ops live in domain_ops::kyc_stream_ops.
 #
-# The domain split: ubo.edge.* (6 edge lifecycle), ubo.determination.* (4 fold/freeze),
-# kyc.subject.* (2 subject registration). All are covered by phase1_lexicon() in the
-# ob-poc-kyc-substrate crate.
+# The domain split: ubo.edge.* (7 edge lifecycle, incl. pierce-nominee — TS.4 = K-8),
+# ubo.determination.* (4 fold/freeze), kyc.subject.* (2 subject registration). All are
+# covered by phase1_lexicon() in the ob-poc-kyc-substrate crate.
 
 domains:
   ubo:
@@ -285,6 +285,69 @@ domains:
           consequence:
             baseline: reviewable
 
+      edge.pierce-nominee:
+        flavour: attribute_mutating
+        description: Pierce a nominee arrangement — supersede the nominee edge and assert the disclosed nominator's underlying edge in one governed event (K-8, K-13)
+        effect_class: append_fact
+        invocation_phrases:
+          - "pierce nominee"
+          - "pierce the nominee edge"
+          - "pierce this nominee arrangement"
+          - "disclose the nominator"
+          - "look through the nominee"
+          - "pierce nominee shareholding"
+          - "replace nominee with true holder"
+          - "record the disclosed nominator"
+          - "pierce the nominee to the beneficial holder"
+          - "unwind the nominee arrangement"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          scope: global
+          noun: control_edge
+          tags: [ubo, nominee, pierce, determination, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root (the subject stream)
+          - name: edge-id
+            type: uuid
+            required: true
+            description: The target nominee edge to pierce (must exist, be active, and be of kind nominee — the kind check is op-layer fail-closed; EdgeExists/EdgeActive are lexicon preconditions)
+          - name: nominator-id
+            type: uuid
+            required: true
+            description: The disclosed nominator — the entity that actually holds the underlying interest; the new control edge is asserted FROM this entity with pierced_from provenance (TS.4 §2.6)
+          - name: kind
+            type: string
+            required: true
+            description: "The UNDERLYING kind the nominator actually holds (what the pierced arrangement resolves to). Any canonical wire value EXCEPT nominee — a pierce cannot produce another nominee edge (fail-closed at the op-normalizer, TS.4 §2.6). The new edge's id derives from the assert-control scheme with this kind."
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, dominant_influence, economic_interest]
+          - name: percentage
+            type: decimal
+            required: false
+            description: Percentage (for an underlying economic_interest kind)
+          - name: trust-revocable
+            type: boolean
+            required: false
+            description: "Whether the trust IS revocable — only meaningful when the underlying kind is trust_settlor (same polarity as assert-control's trust-revocable, TS.1 §2.1)"
+        returns:
+          type: record
+          fields:
+            - name: pierced_edge_id
+              type: uuid
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
       edge.reconcile-conflict:
         flavour: attribute_mutating
         description: Record a conflict-reconciliation event on the subject stream
@@ -359,8 +422,8 @@ domains:
           - name: strategy
             type: string
             required: true
-            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %), control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4), trust_role_strategy (trust-role control: trustee/protector always, settlor unless proven irrevocable, beneficiary never — TS.1), fund_control_strategy (corporate-form fund: control sits with the manager (ManCo/AIFM/GP-analog) asserted as dominant_influence/board_appointment, investors stay on the economic axis — TS.2), foundation_council_strategy (foundation: no owners by construction, control sits with the council — board_appointment + dominant_influence edges ONLY — TS.2), state_owned_strategy (state-owned: the controller is a state organ, so the terminal answer is usually SMO — the full control walk runs for the rare genuine natural-person controller, zero candidates legitimizes the existing apply-smo-fallback route — TS.3), and cooperative_member_strategy (cooperative: one-member-one-vote, membership per se never yields a UBO, control arises from office — voting_rights + board_appointment + dominant_influence edges ONLY — TS.3) are implemented. The strategy for nominee (nominee_pierce_strategy) remains open (TS.4 = K-8 piercing)."
-            valid_values: [ownership_prong_strategy, control_prong_strategy, trust_role_strategy, fund_control_strategy, foundation_council_strategy, state_owned_strategy, cooperative_member_strategy]
+            description: "DeterminationStrategy::name() to run at freeze — ownership_prong_strategy (economic %), control_prong_strategy (voting rights, board appointment, GP statutory, LLP designated member, dominant influence; M4), trust_role_strategy (trust-role control: trustee/protector always, settlor unless proven irrevocable, beneficiary never — TS.1), fund_control_strategy (corporate-form fund: control sits with the manager (ManCo/AIFM/GP-analog) asserted as dominant_influence/board_appointment, investors stay on the economic axis — TS.2), foundation_council_strategy (foundation: no owners by construction, control sits with the council — board_appointment + dominant_influence edges ONLY — TS.2), state_owned_strategy (state-owned: the controller is a state organ, so the terminal answer is usually SMO — the full control walk runs for the rare genuine natural-person controller, zero candidates legitimizes the existing apply-smo-fallback route — TS.3), and cooperative_member_strategy (cooperative: one-member-one-vote, membership per se never yields a UBO, control arises from office — voting_rights + board_appointment + dominant_influence edges ONLY — TS.3), and nominee_pierce_strategy (nominee: pierce first via ubo.edge.pierce-nominee, then the subject resolves by the UNDERLYING structure — a delegate to the control-prong walk; freeze hard-errors while any unpierced nominee edge remains active — TS.4 = K-8) are implemented. The strategy set is TOTAL: all 11 structure classes are served."
+            valid_values: [ownership_prong_strategy, control_prong_strategy, trust_role_strategy, fund_control_strategy, foundation_council_strategy, state_owned_strategy, cooperative_member_strategy, nominee_pierce_strategy]
         returns:
           type: record
           fields:
@@ -586,7 +649,7 @@ domains:
           - name: structure-class
             type: string
             required: true
-            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4); trust pairs with trust_role_strategy (trust_settlor/trust_trustee/trust_protector/trust_beneficiary wire values, TS.1); investment_fund pairs with fund_control_strategy (manager control, TS.2); foundation pairs with foundation_council_strategy (council control, TS.2); state_owned pairs with state_owned_strategy (rare natural-person controller, else the SMO route, TS.3); cooperative pairs with cooperative_member_strategy (office-based control, never membership per se, TS.3). nominee classifies successfully but has no implemented strategy yet (fail-closed at select-strategy/freeze via StructureClassSupported; TS.4 = K-8 piercing tracks the build-out)."
+            description: "Structure class — drives ubo.determination strategy selection (K-4). private_company/multi_tier_holding/listed_entity typically pair with ownership_prong_strategy (economic %); lp_fund/llp typically pair with control_prong_strategy (GP statutory / designated member control edges, M4); trust pairs with trust_role_strategy (trust_settlor/trust_trustee/trust_protector/trust_beneficiary wire values, TS.1); investment_fund pairs with fund_control_strategy (manager control, TS.2); foundation pairs with foundation_council_strategy (council control, TS.2); state_owned pairs with state_owned_strategy (rare natural-person controller, else the SMO route, TS.3); cooperative pairs with cooperative_member_strategy (office-based control, never membership per se, TS.3); nominee pairs with nominee_pierce_strategy (pierce via ubo.edge.pierce-nominee first, then the underlying structure resolves — freeze fail-closes while unpierced nominee edges remain, TS.4 = K-8). The taxonomy is fully served: all 11 classes have an implemented strategy."
             valid_values: [private_company, multi_tier_holding, listed_entity, lp_fund, llp, trust, foundation, investment_fund, state_owned, cooperative, nominee]
           - name: entity-id
             type: uuid

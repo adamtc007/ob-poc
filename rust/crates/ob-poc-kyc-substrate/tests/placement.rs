@@ -39,6 +39,8 @@ fn edge(status: EdgeStatus) -> EdgeState {
             .then(EventId::new),
         originating_event_id: EventId::new(),
         trust_revocable: None,
+        superseded_by: None,
+        pierced_from: None,
     }
 }
 
@@ -73,7 +75,9 @@ fn abstain_always_present() {
     ] {
         let set = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
         assert!(
-            set.moves.iter().any(|m| m.move_id == PlacementSet::abstain_move_id()),
+            set.moves
+                .iter()
+                .any(|m| m.move_id == PlacementSet::abstain_move_id()),
             "abstention move must be present regardless of state"
         );
     }
@@ -90,7 +94,10 @@ fn placement_set_deterministic() {
     let a = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
     let b = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
 
-    assert_eq!(a.board_hash, b.board_hash, "same state ⇒ bit-identical hash");
+    assert_eq!(
+        a.board_hash, b.board_hash,
+        "same state ⇒ bit-identical hash"
+    );
     let ids_a: Vec<&str> = a.moves.iter().map(|m| m.move_id.0.as_str()).collect();
     let ids_b: Vec<&str> = b.moves.iter().map(|m| m.move_id.0.as_str()).collect();
     assert_eq!(ids_a, ids_b, "same state ⇒ bit-identical move list");
@@ -114,7 +121,10 @@ fn canonical_order_stable() {
     let ids: Vec<&str> = set.moves.iter().map(|m| m.move_id.0.as_str()).collect();
     let mut sorted = ids.clone();
     sorted.sort_unstable();
-    assert_eq!(ids, sorted, "moves must be emitted in canonical (move_id) order");
+    assert_eq!(
+        ids, sorted,
+        "moves must be emitted in canonical (move_id) order"
+    );
 }
 
 // ── placement_iff_precondition (differential oracle) ───────────────────────
@@ -129,7 +139,10 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
         let fqn = entry.fqn.as_str();
         let is_edge_scoped = matches!(
             fqn,
-            "ubo.edge.verify" | "ubo.edge.attach-evidence" | "ubo.edge.supersede"
+            "ubo.edge.verify"
+                | "ubo.edge.attach-evidence"
+                | "ubo.edge.supersede"
+                | "ubo.edge.pierce-nominee"
         );
         let targets: Vec<TargetBinding> = if is_edge_scoped {
             state
@@ -168,7 +181,11 @@ fn placement_iff_precondition_empty_state() {
 
 #[test]
 fn placement_iff_precondition_asserted_edge() {
-    assert_matches_oracle(subject(), &state_with_edge(EdgeStatus::Asserted), &phase1_lexicon());
+    assert_matches_oracle(
+        subject(),
+        &state_with_edge(EdgeStatus::Asserted),
+        &phase1_lexicon(),
+    );
 }
 
 #[test]
@@ -182,12 +199,20 @@ fn placement_iff_precondition_evidenced_edge() {
 
 #[test]
 fn placement_iff_precondition_verified_edge() {
-    assert_matches_oracle(subject(), &state_with_edge(EdgeStatus::Verified), &phase1_lexicon());
+    assert_matches_oracle(
+        subject(),
+        &state_with_edge(EdgeStatus::Verified),
+        &phase1_lexicon(),
+    );
 }
 
 #[test]
 fn placement_iff_precondition_reconciled_and_strategized() {
-    assert_matches_oracle(subject(), &reconciled_and_strategized_state(), &phase1_lexicon());
+    assert_matches_oracle(
+        subject(),
+        &reconciled_and_strategized_state(),
+        &phase1_lexicon(),
+    );
 }
 
 #[test]

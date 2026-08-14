@@ -19,12 +19,12 @@
 //! - (c) `control_prong_strategy` behavior unchanged after the
 //!   shared-traversal refactor: an explicit differential fixture — the same
 //!   edge set resolves identically pre/post (plus the existing m4/w7 suites).
-//! - (d) select-strategy still BLOCKS the remaining unimplemented class
-//!   (`nominee` exemplar — TS.3 fixture fix: state_owned/cooperative joined
-//!   the implemented set) — the fail-closed guard held while widening.
+//! - (d) select-strategy ADMITS nominee (TS.4 fixture flip: Nominee joined
+//!   the implemented set via NomineePierceStrategy — the guard set is now
+//!   total; the old "still blocks" assertion inverted).
 //! - (e) freeze's unknown-strategy arm still errors, message lists all
-//!   implemented strategy names (TS.3 fixture fix: the exemplar moved to
-//!   `nominee_pierce_strategy` and the list is now 7).
+//!   implemented strategy names (TS.4 fixture fix: the exemplar moved to a
+//!   never-will-exist string and the list is now 8).
 //!
 //! FENCED-DEFECT NOTE (same as `kyc_ts1_trust.rs` (d)/(e)): the final leg
 //! cannot drive `ubo.determination.freeze` itself — freeze's event payload
@@ -551,35 +551,30 @@ fn c_control_prong_strategy_behavior_unchanged_after_shared_helper_refactor() {
     );
 }
 
-// ── (d) fail-closed guard held for the remaining class ──────────────────────
+// ── (d) nominee ADMITTED post-TS.4 (the guard set went total) ───────────────
 
 #[tokio::test]
-async fn d_select_strategy_still_blocks_nominee_after_widening() {
+async fn d_select_strategy_admits_nominee_after_ts4() {
     let pool = pool().await;
     let subject = SubjectId(Uuid::new_v4());
 
-    // TS.3 fixture fix: StateOwned/Cooperative joined the implemented set
-    // (StateOwnedStrategy/CooperativeMemberStrategy), so the exemplar class
-    // for "the guard held while widening" becomes Nominee — the LAST
-    // fail-closed class, surviving until TS.4 (= K-8 piercing; moves again
-    // at TS.4, to a taxonomy widening or the pin's retirement).
+    // TS.4 fixture flip (was `d_select_strategy_still_blocks_nominee_after_
+    // widening`): Nominee joined the implemented set (NomineePierceStrategy),
+    // so select-strategy on a Nominee-classified subject is now ADMITTED —
+    // the old assertion inverted. The fail-closed floor for unknown/garbage
+    // class strings is pinned in kyc_t61_studs.rs and kyc_pack_closure.rs.
     setup_subject(&pool, subject, &[], "nominee").await;
 
     let result = run_fallible(
         &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "ownership_prong_strategy" }),
+        serde_json::json!({ "subject-id": subject.0, "strategy": "nominee_pierce_strategy" }),
         &pool,
     )
     .await;
     assert!(
-        result.is_err(),
-        "select-strategy on a Nominee-classified subject must STILL be rejected \
-         post-TS.3 (StructureClassSupported fail-closed until TS.4)"
-    );
-    let msg = result.unwrap_err().to_string();
-    assert!(
-        msg.contains("no implemented determination"),
-        "rejection must be attributable to the StructureClassSupported guard; got: {msg}"
+        result.is_ok(),
+        "select-strategy on a Nominee-classified subject must be ADMITTED \
+         post-TS.4 (StructureClassSupported widened to the total set): {result:?}"
     );
 
     cleanup(&pool, &[subject]).await;
@@ -609,13 +604,12 @@ async fn e_freeze_rejects_unknown_strategy_listing_all_implemented() {
         &pool,
     )
     .await;
-    // A strategy name with no arm behind it — TS.3 fixture fix:
-    // state_owned_strategy gained a real dispatch arm, so the exemplar
-    // becomes nominee_pierce_strategy (real per the TS0 taxonomy, unbuilt
-    // until TS.4 — moves again at TS.4).
+    // A strategy name with no arm behind it — TS.4 fixture fix:
+    // nominee_pierce_strategy gained a real dispatch arm, so the exemplar
+    // is now a never-will-exist string.
     run(
         &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "nominee_pierce_strategy" }),
+        serde_json::json!({ "subject-id": subject.0, "strategy": "no_such_strategy" }),
         &pool,
     )
     .await;
@@ -633,7 +627,7 @@ async fn e_freeze_rejects_unknown_strategy_listing_all_implemented() {
     );
     let msg = result.unwrap_err().to_string();
     assert!(
-        msg.contains("nominee_pierce_strategy") && msg.contains("no DeterminationStrategy"),
+        msg.contains("no_such_strategy") && msg.contains("no DeterminationStrategy"),
         "error should name the missing strategy; got: {msg}"
     );
     for implemented in [
@@ -644,10 +638,11 @@ async fn e_freeze_rejects_unknown_strategy_listing_all_implemented() {
         "foundation_council_strategy",
         "state_owned_strategy",
         "cooperative_member_strategy",
+        "nominee_pierce_strategy",
     ] {
         assert!(
             msg.contains(implemented),
-            "the rejection must list all 7 implemented strategies (expected \
+            "the rejection must list all 8 implemented strategies (expected \
              {implemented} in: {msg})"
         );
     }

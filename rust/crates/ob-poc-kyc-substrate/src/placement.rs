@@ -98,7 +98,10 @@ impl PlacementSet {
 fn is_edge_scoped(verb_fqn: &str) -> bool {
     matches!(
         verb_fqn,
-        "ubo.edge.verify" | "ubo.edge.attach-evidence" | "ubo.edge.supersede"
+        "ubo.edge.verify"
+            | "ubo.edge.attach-evidence"
+            | "ubo.edge.supersede"
+            | "ubo.edge.pierce-nominee"
     )
 }
 

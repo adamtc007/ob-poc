@@ -148,47 +148,54 @@ fn precondition_blocks_illegal_placement() {
     let subject = SubjectId(Uuid::new_v4());
     let empty_obligation = ObligationState::default();
 
-    // Nominee is the LAST class with no implemented DeterminationStrategy
-    // (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.4 = K-8 piercing) — select-strategy
-    // must fail-closed rather than silently proceed toward a wrong
-    // determination. (TS.3 fixture fix: this exemplar originally used Trust
-    // (TS.1), then Foundation (TS.2), then StateOwned, which joined the
-    // implemented set via StateOwnedStrategy — Nominee stays unimplemented
-    // until TS.4 (this exemplar moves again at TS.4), so the guard's block
-    // semantics are unchanged, only the exemplar class moved.)
-    let nominee_state = control_with_class(StructureClass::Nominee);
+    // TS.4 fixture rework: the exemplar class walked TS.1 Trust → TS.2
+    // Foundation → TS.3 StateOwned → Nominee; at TS.4 Nominee joined the
+    // implemented set (NomineePierceStrategy) and NO strategy-less class
+    // remains — the guard set is TOTAL. The guard is retained, not retired:
+    // the illegal placement it now fail-closes is the UNCLASSIFIED subject —
+    // which is exactly what an unknown/garbage wire string folds to
+    // (`structure_class_from_payload` → None). Both 6a (select-strategy)
+    // and 8a (freeze) must still block that state.
+    let unclassified = ControlState {
+        registered: true,
+        structure_class: None,
+        ..Default::default()
+    };
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let result = check_preconditions(
         select_entry,
-        &nominee_state,
+        &unclassified,
         &empty_obligation,
         &probe(subject, "ubo.determination.select-strategy"),
     );
     assert!(
         result.is_err(),
-        "select-strategy must be blocked for a Nominee-classified subject (6a exemplar)"
-    );
-    let msg = result.unwrap_err().to_string();
-    assert!(
-        msg.contains("no implemented determination"),
-        "rejection must be attributable to the StructureClassSupported guard; got: {msg}"
+        "select-strategy must be blocked for an unclassified subject (6a — the \
+         post-TS.4 fail-closed floor)"
     );
 
-    // 8a: freeze carries the SAME guard as defense in depth, even with its
-    // other two preconditions (ReconciledProjection/StrategySelected)
-    // otherwise satisfied — the guard alone must still block Nominee.
-    let nominee_ready = control_with_class_reconciled_and_strategized(StructureClass::Nominee);
+    // 8a: freeze carries the guard as defense in depth, even with its other
+    // two preconditions (ReconciledProjection/StrategySelected) otherwise
+    // satisfied — the guard alone must still block a class-less subject.
+    let unclassified_ready = ControlState {
+        registered: true,
+        structure_class: None,
+        reconciliation_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
+        selected_strategy: Some("ownership_prong_strategy".to_string()),
+        strategy_event_id: Some(ob_poc_kyc_substrate::EventId::new()),
+        ..Default::default()
+    };
     let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
     let freeze_result = check_preconditions(
         freeze_entry,
-        &nominee_ready,
+        &unclassified_ready,
         &empty_obligation,
         &probe(subject, "ubo.determination.freeze"),
     );
     assert!(
         freeze_result.is_err(),
-        "freeze must be blocked for a Nominee-classified subject even with reconcile+strategy \
-         satisfied (8a defense in depth)"
+        "freeze must be blocked for an unclassified subject even with reconcile+strategy \
+         satisfied (8a defense in depth, post-TS.4 fail-closed floor)"
     );
 }
 
@@ -311,15 +318,19 @@ async fn select_strategy_blocked_end_to_end() {
         .expect("register has no preconditions");
     KycSubjectClassifyStructure
         .execute(
-            // TS.3 fixture fix: StateOwned joined the implemented set — the
-            // fail-closed end-to-end exemplar becomes nominee (until TS.4;
-            // moves again at TS.4).
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": "nominee" }),
+            // TS.4 fixture rework: Nominee joined the implemented set
+            // (NomineePierceStrategy) — the last named fail-closed class is
+            // gone, so the end-to-end exemplar becomes an UNKNOWN wire
+            // string, which the fold maps to `structure_class: None`
+            // (classify itself succeeds; the fail-close fires downstream at
+            // select-strategy — proving garbage classes still cannot reach
+            // a determination through the real governed append path).
+            &serde_json::json!({ "subject-id": subject.0, "structure-class": "not_a_real_class" }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )
         .await
-        .expect("classify-structure has no preconditions");
+        .expect("classify-structure records the event; an unknown class folds to None");
 
     let result = UboDeterminationSelectStrategy
         .execute(
@@ -330,9 +341,9 @@ async fn select_strategy_blocked_end_to_end() {
         .await;
     assert!(
         result.is_err(),
-        "select-strategy on a Nominee-classified subject must be rejected through the real \
-         governed append path (6a exemplar, end to end; TS.3 fixture fix — StateOwned is now \
-         implemented, Nominee stays fail-closed until TS.4)"
+        "select-strategy on an unknown-class subject must be rejected through the real \
+         governed append path (post-TS.4 fail-closed floor: garbage wire strings fold to \
+         None and never reach a strategy)"
     );
     scope.commit().await;
 

@@ -566,6 +566,59 @@ impl DeterminationStrategy for CooperativeMemberStrategy {
     }
 }
 
+// ── NomineePierceStrategy (TS.4 = K-8 — resolve the UNDERLYING structure) ───
+
+/// Resolves natural persons controlling a Nominee-classified subject — but
+/// ONLY once every nominee arrangement has been pierced
+/// (`ubo.edge.pierce-nominee`: the nominee edge is superseded and the
+/// disclosed nominator's underlying edge is asserted in one governed event —
+/// EOP-DD-KYCUBO-KIT-TS0 §2.6, ratified 2026-08-12; K-8: attributing control
+/// to the nominee itself is exactly the wrong answer piercing exists to
+/// prevent).
+///
+/// Post-piercing the subject resolves by the UNDERLYING structure: this
+/// strategy is a thin delegate to `ControlProngStrategy`'s traversal
+/// (mirroring `FundControlStrategy`'s delegation shape). Pierced nominee
+/// edges never traverse by construction — `reconciled_control_edges`
+/// excludes both `EdgeKind::Nominee` and superseded edges — and a
+/// quantified underlying interest asserted as `economic_interest` stays on
+/// the economic axis, feeding the normal ownership path. Every candidate is
+/// `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always `None`;
+/// `threshold_pct` is accepted for signature parity but unused on the
+/// control walk.
+///
+/// **Fail-closed guard (§2.6 "errors if unpierced nominee edges remain
+/// active"):** `resolve()` returns `Vec<ProngCandidate>` and cannot signal
+/// error, so the unpierced-nominee scan lives at the freeze dispatch site
+/// (`kyc_stream_ops.rs`, `UboDeterminationFreeze`): freeze hard-errors
+/// while any active `EdgeKind::Nominee` edge remains, BEFORE this strategy
+/// ever runs. Callers reaching `resolve()` outside freeze (e.g. replay)
+/// must apply the same scan themselves if they need the guard.
+///
+/// **Scope (TS.4 v1):** inherits `ControlProngStrategy`'s v1 boundary — no
+/// crossing into the economic axis for an intermediate controlling entity's
+/// own UBOs (v2).
+pub struct NomineePierceStrategy;
+
+impl DeterminationStrategy for NomineePierceStrategy {
+    fn name(&self) -> &'static str {
+        "nominee_pierce_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        // Thin delegate (§2.6): the underlying structure resolves via the
+        // control prong; the unpierced-nominee guard lives at the freeze
+        // dispatch site (see type doc).
+        ControlProngStrategy.resolve(state, subject_entity_id, natural_persons, threshold_pct)
+    }
+}
+
 // ── SMO fallback (K-5: never silent) ────────────────────────────────────────
 
 /// If ownership + control fold yields no persons, the SMO fallback fires.

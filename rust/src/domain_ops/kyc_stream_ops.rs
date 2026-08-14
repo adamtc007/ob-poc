@@ -24,10 +24,10 @@ use ob_poc_kyc_substrate::{
     check_control_preconditions, check_preconditions, find_subject_entity, fold_control_versioned,
     fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
-    CooperativeMemberStrategy, EdgeId, FoldRegistry, FoundationCouncilStrategy,
-    FundControlStrategy, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
-    StateOwnedStrategy, SubjectId, SubjectOverallState, TargetBinding, TrustRoleStrategy,
-    V1FoldImpl,
+    CooperativeMemberStrategy, EdgeId, EdgeKind, FoldRegistry, FoundationCouncilStrategy,
+    FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId, Prong,
+    ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, SubjectOverallState, TargetBinding,
+    TrustRoleStrategy, V1FoldImpl,
     EDGE_KIND_WIRE_VALUES,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
@@ -286,6 +286,161 @@ impl SemOsVerbOp for UboEdgeSupersede {
             serde_json::json!({ "seq": outcome.seq }),
         ))
     }
+}
+
+/// `ubo.edge.pierce-nominee` — TS.4 = K-8 (EOP-DD-KYCUBO-KIT-TS0 §2.6,
+/// ratified 2026-08-12): pierce a nominee arrangement. ONE governed event,
+/// TWO fold effects: (a) the target nominee edge is superseded (K-13,
+/// `superseded_by` = the pierce event); (b) a new control edge from the
+/// disclosed nominator is asserted with the UNDERLYING kind and
+/// `pierced_from` provenance. The "target is actually a nominee edge" check
+/// has no precondition primitive — enforced here, fail-closed, via a
+/// pre-append fold (same pre-fold pattern as freeze/person.approve; the
+/// EdgeExists/EdgeActive/SubjectRegistered studs re-check under the lock).
+pub struct UboEdgePierceNominee;
+
+#[async_trait]
+impl SemOsVerbOp for UboEdgePierceNominee {
+    fn fqn(&self) -> &str {
+        "ubo.edge.pierce-nominee"
+    }
+
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let edge = EdgeId(json_extract_uuid(args, ctx, "edge-id")?);
+        let nominator = json_extract_uuid(args, ctx, "nominator-id")?;
+        let payload = normalize_pierce_nominee_payload(args, edge, nominator)?;
+
+        // Op-layer fail-closed kind check (§2.6 checklist note): no
+        // precondition primitive expresses "edge is of kind X", so the
+        // nominee-kind verification lives here. Pre-append fold — same
+        // accepted small race window as freeze's pre-fold; existence/
+        // activeness are ALSO re-checked under the lock by the declared
+        // EdgeExists/EdgeActive studs.
+        let events = PgKycEventStore::load_events(scope.executor(), subject)
+            .await
+            .map_err(|e| anyhow!("pierce-nominee: load events failed: {e}"))?;
+        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+        let control = fold_control_versioned(&refs, &KYC_REGISTRY)
+            .map_err(|e| anyhow!("pierce-nominee: control fold failed: {e}"))?;
+        match control.edges.get(&edge) {
+            None => {
+                return Err(anyhow!(
+                    "ubo.edge.pierce-nominee: target edge {} not found in the control graph \
+                     (EdgeExists)",
+                    edge.0
+                ));
+            }
+            Some(e) if !matches!(e.kind, EdgeKind::Nominee) => {
+                return Err(anyhow!(
+                    "ubo.edge.pierce-nominee: target edge {} is not a nominee edge \
+                     (kind {:?}) — only EdgeKind::Nominee arrangements can be pierced \
+                     (K-8, fail-closed)",
+                    edge.0,
+                    e.kind
+                ));
+            }
+            Some(_) => {}
+        }
+
+        let outcome = stream_append(
+            "ubo.edge.pierce-nominee",
+            subject,
+            TargetBinding::for_edge(subject, edge),
+            payload,
+            "senior-analyst.pierce-nominee",
+            Some("ubo.edge.pierce-nominee"),
+            ctx,
+            scope,
+        )
+        .await?;
+        Ok(VerbExecutionOutcome::Record(json!({
+            "pierced_edge_id": edge.0,
+            "seq": outcome.seq,
+        })))
+    }
+}
+
+/// Normalize `ubo.edge.pierce-nominee`'s payload (TS.4, §2.6) — fail-closed
+/// duties, mirroring `normalize_assert_control_payload`'s §1b discipline:
+///
+/// 1. **`kind` must be a member of the canonical wire set AND not
+///    `nominee`:** the arg is the UNDERLYING kind the nominator actually
+///    holds; a pierce can never produce another nominee edge (fail-closed —
+///    that would just relocate the K-8 problem). Unknown/absent kinds are
+///    rejected before append, exactly as assert-control's normalizer does.
+/// 2. **Kebab→snake:** `edge-id`→`edge_id` (the TARGET nominee edge — the
+///    fold reads `target.edge_id`, but the payload copy keeps the event
+///    self-describing), `nominator-id`→`nominator_entity_id` (read by the
+///    fold arm), `trust-revocable`→`trust_revocable` (meaningful if the
+///    underlying kind is `trust_settlor`).
+/// 3. **Provenance stamp:** `pierced_from` = the target nominee edge id
+///    (§2.6 — carried on the event payload; the fold also records it on the
+///    new `EdgeState`).
+fn normalize_pierce_nominee_payload(
+    args: &serde_json::Value,
+    edge: EdgeId,
+    nominator: Uuid,
+) -> Result<serde_json::Value> {
+    let underlying_values = || {
+        EDGE_KIND_WIRE_VALUES
+            .iter()
+            .filter(|k| **k != "nominee")
+            .copied()
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    match args.get("kind").and_then(|v| v.as_str()) {
+        Some("nominee") => {
+            return Err(anyhow!(
+                "ubo.edge.pierce-nominee: kind 'nominee' rejected — a pierce cannot produce \
+                 another nominee edge (K-8, fail-closed); pass the UNDERLYING kind the \
+                 nominator actually holds. Valid wire values: {}",
+                underlying_values()
+            ));
+        }
+        Some(kind) if EDGE_KIND_WIRE_VALUES.contains(&kind) => {}
+        Some(unknown) => {
+            return Err(anyhow!(
+                "ubo.edge.pierce-nominee: unrecognized kind '{unknown}' — rejected fail-closed \
+                 (TS.1 §1b wire-normalizer discipline). Valid wire values: {}",
+                underlying_values()
+            ));
+        }
+        None => {
+            return Err(anyhow!(
+                "ubo.edge.pierce-nominee: kind is required (the UNDERLYING kind the nominator \
+                 actually holds) — rejected fail-closed. Valid wire values: {}",
+                underlying_values()
+            ));
+        }
+    }
+    let mut p = args.clone();
+    if let Some(obj) = p.as_object_mut() {
+        obj.remove("edge-id");
+        obj.insert(
+            "edge_id".to_string(),
+            serde_json::Value::String(edge.0.to_string()),
+        );
+        obj.remove("nominator-id");
+        obj.insert(
+            "nominator_entity_id".to_string(),
+            serde_json::Value::String(nominator.to_string()),
+        );
+        if let Some(v) = obj.remove("trust-revocable") {
+            obj.insert("trust_revocable".to_string(), v);
+        }
+        obj.insert(
+            "pierced_from".to_string(),
+            serde_json::Value::String(edge.0.to_string()),
+        );
+    }
+    Ok(p)
 }
 
 pub struct UboEdgeReconcileConflict;
@@ -593,6 +748,30 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .selected_strategy
             .as_deref()
             .ok_or_else(|| anyhow!("freeze: no strategy selected (K-4 precondition)"))?;
+        // TS.4 (§2.6) fail-closed guard, BEFORE dispatch (so the dispatch arm
+        // below stays a plain `"..." => &Strategy` expression the closure
+        // tooth's arm scanner recognises): `resolve()` returns
+        // `Vec<ProngCandidate>` and cannot signal error, so the
+        // unpierced-nominee scan lives here. Freezing while an unpierced
+        // nominee edge is active would either attribute control to the
+        // nominee (the exact wrong answer K-8 exists to prevent) or silently
+        // drop the arrangement — hard-error instead.
+        if strategy_name == "nominee_pierce_strategy" {
+            let unpierced: Vec<String> = control
+                .edges
+                .values()
+                .filter(|e| e.is_active() && matches!(e.kind, EdgeKind::Nominee))
+                .map(|e| e.id.0.to_string())
+                .collect();
+            if !unpierced.is_empty() {
+                return Err(anyhow!(
+                    "freeze: nominee_pierce_strategy selected but unpierced nominee edge(s) \
+                     remain active: [{}] — pierce each via ubo.edge.pierce-nominee before \
+                     freezing (K-8, fail-closed)",
+                    unpierced.join(", ")
+                ));
+            }
+        }
         let strategy: &dyn DeterminationStrategy = match strategy_name {
             "ownership_prong_strategy" => &OwnershipProngStrategy,
             // M4: control-by-other-means (voting rights, board appointment, GP
@@ -626,14 +805,19 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             // board_appointment + dominant_influence ONLY. Scope note lives
             // on CooperativeMemberStrategy.
             "cooperative_member_strategy" => &CooperativeMemberStrategy,
+            // TS.4: post-piercing the subject resolves by the UNDERLYING
+            // structure — a thin delegate to the control-prong traversal;
+            // the unpierced-nominee fail-closed guard runs above, before
+            // this dispatch. Scope note lives on NomineePierceStrategy.
+            "nominee_pierce_strategy" => &NomineePierceStrategy,
             other => {
                 return Err(anyhow!(
                     "freeze: strategy '{other}' selected but no DeterminationStrategy is \
                      registered for it — only ownership_prong_strategy, \
                      control_prong_strategy, trust_role_strategy, \
                      fund_control_strategy, foundation_council_strategy, \
-                     state_owned_strategy, and cooperative_member_strategy exist \
-                     today (nominee_pierce_strategy is TS.4 follow-on work)"
+                     state_owned_strategy, cooperative_member_strategy, and \
+                     nominee_pierce_strategy exist today"
                 ));
             }
         };

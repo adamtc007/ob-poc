@@ -115,6 +115,16 @@ pub struct EdgeState {
     /// silently drop a controller.
     #[serde(default)]
     pub trust_revocable: Option<bool>,
+    /// The event that superseded this edge (set by `ubo.edge.supersede` and
+    /// `ubo.edge.pierce-nominee` — K-35 traceability on the supersession;
+    /// TS.4, EOP-DD-KYCUBO-KIT-TS0 §2.6: for a pierced nominee edge this
+    /// points at the pierce event).
+    #[serde(default)]
+    pub superseded_by: Option<EventId>,
+    /// Provenance: the nominee edge this edge was pierced FROM (set only on
+    /// edges created by `ubo.edge.pierce-nominee` — TS.4 §2.6, K-8).
+    #[serde(default)]
+    pub pierced_from: Option<EdgeId>,
 }
 
 impl EdgeState {
@@ -340,6 +350,8 @@ pub(crate) fn apply_one_control_event(
                         evidence_event_id: None,
                         originating_event_id: event.id,
                         trust_revocable: None,
+                        superseded_by: None,
+                        pierced_from: None,
                     },
                 );
             }
@@ -367,6 +379,8 @@ pub(crate) fn apply_one_control_event(
                         // TS.1 §2.1: revocability proof for settlor edges
                         // (see the field's polarity doc on `EdgeState`).
                         trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
+                        superseded_by: None,
+                        pierced_from: None,
                     },
                 );
             }
@@ -398,6 +412,55 @@ pub(crate) fn apply_one_control_event(
             if let Some(eid) = edge_id_from_target(event) {
                 if let Some(edge) = state.edges.get_mut(&eid) {
                     edge.status = EdgeStatus::Superseded;
+                    edge.superseded_by = Some(event.id);
+                }
+            }
+        }
+
+        "ubo.edge.pierce-nominee" => {
+            // TS.4 (K-8, EOP-DD-KYCUBO-KIT-TS0 §2.6): TWO effects in ONE
+            // governed event. (a) the target nominee edge is SUPERSEDED
+            // (the existing supersession lifecycle — K-13
+            // supersede-never-contradict; `superseded_by` points at this
+            // pierce event); (b) a NEW control edge from the disclosed
+            // nominator is asserted with the UNDERLYING kind (payload
+            // `kind` — what the nominator actually holds; the op-normalizer
+            // rejects `nominee` fail-closed before append) and
+            // `pierced_from` provenance. Total-dispatch discipline: if the
+            // target edge or nominator is unresolvable (historical/garbage
+            // event), the arm applies nothing — the fold stays infallible;
+            // the live append path can't reach that state (EdgeExists/
+            // EdgeActive preconditions + the op-layer nominee-kind check).
+            if let (Some(eid), Some(nominator)) = (
+                edge_id_from_target(event),
+                entity_id(p, "nominator_entity_id"),
+            ) {
+                if let Some(to) = state.edges.get(&eid).map(|e| e.to) {
+                    if let Some(edge) = state.edges.get_mut(&eid) {
+                        edge.status = EdgeStatus::Superseded;
+                        edge.superseded_by = Some(event.id);
+                    }
+                    let kind = edge_kind_from_payload(p);
+                    // Edge-id derivation follows the assert-control scheme
+                    // with the UNDERLYING kind (deterministic, never random).
+                    let key = format!("control:{}:{}:{:?}", nominator.0, to.0, kind);
+                    let new_id = EdgeId(Uuid::new_v5(&Uuid::NAMESPACE_OID, key.as_bytes()));
+                    state.edges.insert(
+                        new_id,
+                        EdgeState {
+                            id: new_id,
+                            kind,
+                            from: nominator,
+                            to,
+                            percentage: opt_f64(p, "percentage"),
+                            status: EdgeStatus::Asserted,
+                            evidence_event_id: None,
+                            originating_event_id: event.id,
+                            trust_revocable: p.get("trust_revocable").and_then(|v| v.as_bool()),
+                            superseded_by: None,
+                            pierced_from: Some(eid),
+                        },
+                    );
                 }
             }
         }
@@ -447,23 +510,24 @@ use crate::lexicon::{LexiconEntry, Precondition};
 /// The structure classes with an implemented `DeterminationStrategy` **today**
 /// (T6.1(c) exemplar — `StructureClassSupported`, matrix rows 6a/8a).
 ///
-/// Derived, not guessed: `kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute`
-/// dispatch (`match strategy_name { "ownership_prong_strategy" => ...,
-/// "control_prong_strategy" => ..., "trust_role_strategy" => ...,
-/// "fund_control_strategy" => ..., "foundation_council_strategy" => ...,
-/// "state_owned_strategy" => ..., "cooperative_member_strategy" => ...,
-/// other => Err(...) }`) recognises exactly seven strategy names, and the
-/// TS.4 build-out enumerates the single `StructureClass` variant with NO
-/// strategy behind it yet — `Nominee` (TS.4 = K-8 piercing;
-/// EOP-PLAN-KYCUBO-KIT-001 v0.6; `Trust` joined the implemented
-/// set at TS.1 via `TrustRoleStrategy`, EOP-DD-KYCUBO-KIT-TS0 §2.1;
-/// `InvestmentFund` and `Foundation` joined at TS.2 via
-/// `FundControlStrategy` and `FoundationCouncilStrategy`, §2.2/§2.3;
-/// `StateOwned` and `Cooperative` joined at TS.3 via `StateOwnedStrategy`
-/// and `CooperativeMemberStrategy`, §2.4/§2.5). The set below is the
-/// complement: the 11-variant `StructureClass` taxonomy minus `Nominee`.
-/// Widen this set ONLY when a new `DeterminationStrategy` impl lands for
-/// the class — two teeth pin the lockstep: the "seventh tooth"
+/// **TOTAL as of TS.4** — every one of the 11 `StructureClass` variants is
+/// served; no class remains fail-closed. Derived, not guessed:
+/// `kyc_stream_ops.rs`'s `UboDeterminationFreeze::execute` dispatch
+/// recognises exactly eight strategy names (`ownership_prong_strategy`,
+/// `control_prong_strategy`, `trust_role_strategy`, `fund_control_strategy`,
+/// `foundation_council_strategy`, `state_owned_strategy`,
+/// `cooperative_member_strategy`, `nominee_pierce_strategy`). Build-out
+/// history: `Trust` joined at TS.1 (`TrustRoleStrategy`,
+/// EOP-DD-KYCUBO-KIT-TS0 §2.1); `InvestmentFund`/`Foundation` at TS.2
+/// (§2.2/§2.3); `StateOwned`/`Cooperative` at TS.3 (§2.4/§2.5); `Nominee`
+/// at TS.4 (§2.6 = K-8 — `ubo.edge.pierce-nominee` +
+/// `NomineePierceStrategy`, whose unpierced-nominee guard fail-closes at
+/// the freeze dispatch site). The guard itself (`StructureClassSupported`)
+/// is retained: it now fail-closes the UNKNOWN-class case (a garbage wire
+/// string folds to `None`) and any future `StructureClass` widening that
+/// lands without a strategy. Widen this set ONLY when a new
+/// `DeterminationStrategy` impl lands for the class — two teeth pin the
+/// lockstep: the "seventh tooth"
 /// (`tests/kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`,
 /// strategy count) and the TS.1 split pin
 /// (`implemented_class_split_matches_strategy_arms`, arm↔classes-served
@@ -479,6 +543,7 @@ pub const IMPLEMENTED_STRATEGY_CLASSES: &[StructureClass] = &[
     StructureClass::Foundation,
     StructureClass::StateOwned,
     StructureClass::Cooperative,
+    StructureClass::Nominee,
 ];
 
 /// Check all preconditions for a verb against the current control state,
