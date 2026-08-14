@@ -451,15 +451,17 @@ use crate::lexicon::{LexiconEntry, Precondition};
 /// dispatch (`match strategy_name { "ownership_prong_strategy" => ...,
 /// "control_prong_strategy" => ..., "trust_role_strategy" => ...,
 /// "fund_control_strategy" => ..., "foundation_council_strategy" => ...,
-/// other => Err(...) }`) recognises exactly five strategy names, and the
-/// TS.3–TS.4 build-out enumerates the 3 `StructureClass` variants with NO
-/// strategy behind them yet — `StateOwned`, `Cooperative`, `Nominee`
-/// (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.3–TS.4; `Trust` joined the implemented
+/// "state_owned_strategy" => ..., "cooperative_member_strategy" => ...,
+/// other => Err(...) }`) recognises exactly seven strategy names, and the
+/// TS.4 build-out enumerates the single `StructureClass` variant with NO
+/// strategy behind it yet — `Nominee` (TS.4 = K-8 piercing;
+/// EOP-PLAN-KYCUBO-KIT-001 v0.6; `Trust` joined the implemented
 /// set at TS.1 via `TrustRoleStrategy`, EOP-DD-KYCUBO-KIT-TS0 §2.1;
 /// `InvestmentFund` and `Foundation` joined at TS.2 via
-/// `FundControlStrategy` and `FoundationCouncilStrategy`, §2.2/§2.3). The
-/// set below is the
-/// complement: the 11-variant `StructureClass` taxonomy minus those 3.
+/// `FundControlStrategy` and `FoundationCouncilStrategy`, §2.2/§2.3;
+/// `StateOwned` and `Cooperative` joined at TS.3 via `StateOwnedStrategy`
+/// and `CooperativeMemberStrategy`, §2.4/§2.5). The set below is the
+/// complement: the 11-variant `StructureClass` taxonomy minus `Nominee`.
 /// Widen this set ONLY when a new `DeterminationStrategy` impl lands for
 /// the class — two teeth pin the lockstep: the "seventh tooth"
 /// (`tests/kyc_pack_closure.rs::precondition_and_strategy_coverage_is_exactly_known`,
@@ -475,6 +477,8 @@ pub const IMPLEMENTED_STRATEGY_CLASSES: &[StructureClass] = &[
     StructureClass::Trust,
     StructureClass::InvestmentFund,
     StructureClass::Foundation,
+    StructureClass::StateOwned,
+    StructureClass::Cooperative,
 ];
 
 /// Check all preconditions for a verb against the current control state,

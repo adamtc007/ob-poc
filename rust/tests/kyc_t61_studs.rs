@@ -148,25 +148,25 @@ fn precondition_blocks_illegal_placement() {
     let subject = SubjectId(Uuid::new_v4());
     let empty_obligation = ObligationState::default();
 
-    // StateOwned is one of the classes with no implemented
-    // DeterminationStrategy (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.3-TS.4) —
-    // select-strategy must fail-closed rather than silently proceed toward a
-    // wrong determination. (TS.2 fixture fix: this exemplar originally used
-    // Trust (TS.1), then Foundation, which joined the implemented set via
-    // FoundationCouncilStrategy — StateOwned stays unimplemented until TS.3
-    // (this exemplar moves again then), so the guard's block semantics are
-    // unchanged, only the exemplar class moved.)
-    let state_owned_state = control_with_class(StructureClass::StateOwned);
+    // Nominee is the LAST class with no implemented DeterminationStrategy
+    // (EOP-PLAN-KYCUBO-KIT-001 v0.6 §TS.4 = K-8 piercing) — select-strategy
+    // must fail-closed rather than silently proceed toward a wrong
+    // determination. (TS.3 fixture fix: this exemplar originally used Trust
+    // (TS.1), then Foundation (TS.2), then StateOwned, which joined the
+    // implemented set via StateOwnedStrategy — Nominee stays unimplemented
+    // until TS.4 (this exemplar moves again at TS.4), so the guard's block
+    // semantics are unchanged, only the exemplar class moved.)
+    let nominee_state = control_with_class(StructureClass::Nominee);
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let result = check_preconditions(
         select_entry,
-        &state_owned_state,
+        &nominee_state,
         &empty_obligation,
         &probe(subject, "ubo.determination.select-strategy"),
     );
     assert!(
         result.is_err(),
-        "select-strategy must be blocked for a StateOwned-classified subject (6a exemplar)"
+        "select-strategy must be blocked for a Nominee-classified subject (6a exemplar)"
     );
     let msg = result.unwrap_err().to_string();
     assert!(
@@ -176,19 +176,18 @@ fn precondition_blocks_illegal_placement() {
 
     // 8a: freeze carries the SAME guard as defense in depth, even with its
     // other two preconditions (ReconciledProjection/StrategySelected)
-    // otherwise satisfied — the guard alone must still block StateOwned.
-    let state_owned_ready =
-        control_with_class_reconciled_and_strategized(StructureClass::StateOwned);
+    // otherwise satisfied — the guard alone must still block Nominee.
+    let nominee_ready = control_with_class_reconciled_and_strategized(StructureClass::Nominee);
     let freeze_entry = lexicon.get("ubo.determination.freeze").unwrap();
     let freeze_result = check_preconditions(
         freeze_entry,
-        &state_owned_ready,
+        &nominee_ready,
         &empty_obligation,
         &probe(subject, "ubo.determination.freeze"),
     );
     assert!(
         freeze_result.is_err(),
-        "freeze must be blocked for a StateOwned-classified subject even with reconcile+strategy \
+        "freeze must be blocked for a Nominee-classified subject even with reconcile+strategy \
          satisfied (8a defense in depth)"
     );
 }
@@ -312,9 +311,10 @@ async fn select_strategy_blocked_end_to_end() {
         .expect("register has no preconditions");
     KycSubjectClassifyStructure
         .execute(
-            // TS.2 fixture fix: Foundation joined the implemented set — the
-            // fail-closed end-to-end exemplar becomes state_owned (until TS.3).
-            &serde_json::json!({ "subject-id": subject.0, "structure-class": "state_owned" }),
+            // TS.3 fixture fix: StateOwned joined the implemented set — the
+            // fail-closed end-to-end exemplar becomes nominee (until TS.4;
+            // moves again at TS.4).
+            &serde_json::json!({ "subject-id": subject.0, "structure-class": "nominee" }),
             &mut VerbExecutionContext::default(),
             &mut scope,
         )
@@ -330,9 +330,9 @@ async fn select_strategy_blocked_end_to_end() {
         .await;
     assert!(
         result.is_err(),
-        "select-strategy on a StateOwned-classified subject must be rejected through the real \
-         governed append path (6a exemplar, end to end; TS.2 fixture fix — Foundation is now \
-         implemented, StateOwned stays fail-closed until TS.3)"
+        "select-strategy on a Nominee-classified subject must be rejected through the real \
+         governed append path (6a exemplar, end to end; TS.3 fixture fix — StateOwned is now \
+         implemented, Nominee stays fail-closed until TS.4)"
     );
     scope.commit().await;
 

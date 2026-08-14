@@ -364,8 +364,8 @@ fn structure_class_valid_values() -> Vec<String> {
 
 /// RED-honest pin (K-G5): passes because the gap is exactly as documented —
 /// 3 of 20 lexicon-covered verbs carry a precondition (post-T6.0: all 20
-/// dsl.kyc verbs are now lexicon-covered, K-G6 closed), and 6 of 11
-/// structure classes have no strategy behind them. Authoring a T6.1+
+/// dsl.kyc verbs are now lexicon-covered, K-G6 closed), and 1 of 11
+/// structure classes (Nominee, TS.4) has no strategy behind it. Authoring a T6.1+
 /// precondition, or a new `DeterminationStrategy`, is a CONSCIOUS edit here,
 /// not a silent pass or a silent break.
 #[test]
@@ -528,11 +528,12 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     let strategies = freeze_strategy_arms();
     assert_eq!(
         strategies.len(),
-        5,
+        7,
         "freeze's implemented DeterminationStrategy count drifted from the \
-         TS.2 5 (ownership_prong_strategy, control_prong_strategy, \
+         TS.3 7 (ownership_prong_strategy, control_prong_strategy, \
          trust_role_strategy, fund_control_strategy, \
-         foundation_council_strategy) — a new strategy is a CONSCIOUS pin \
+         foundation_council_strategy, state_owned_strategy, \
+         cooperative_member_strategy) — a new strategy is a CONSCIOUS pin \
          edit here AND in the TS.1 split pin below: {strategies:#?}"
     );
 }
@@ -638,6 +639,14 @@ fn implemented_class_split_matches_strategy_arms() {
             "foundation_council_strategy",
             vec![StructureClass::Foundation],
         ),
+        // TS.3 (EOP-DD-KYCUBO-KIT-TS0 §2.4/§2.5): state-owned control is
+        // usually SMO (the strategy legitimizes the fallback route);
+        // cooperative control arises from office, never membership.
+        ("state_owned_strategy", vec![StructureClass::StateOwned]),
+        (
+            "cooperative_member_strategy",
+            vec![StructureClass::Cooperative],
+        ),
     ]);
 
     // Every dispatch arm appears in the mapping and vice versa.
@@ -671,8 +680,8 @@ fn implemented_class_split_matches_strategy_arms() {
         served, implemented,
         "IMPLEMENTED_STRATEGY_CLASSES and the arm→classes-served mapping \
          diverged — widening the guard set without a strategy arm (or vice \
-         versa) is exactly what this pin fail-closes; after TS.2 the split \
-         is 5 arms serving 8 classes (lockstep rule, EOP-DD-KYCUBO-KIT-TS0 §1c)"
+         versa) is exactly what this pin fail-closes; after TS.3 the split \
+         is 7 arms serving 10 classes (lockstep rule, EOP-DD-KYCUBO-KIT-TS0 §1c)"
     );
 }
 
@@ -991,13 +1000,14 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
     // StructureClassSupported, checked last), the PrivateCompany case would
     // otherwise incorrectly block on SubjectRegistered instead of proving
     // the guard this sub-test targets.
-    // TS.2 fixture fix: Foundation joined the implemented set
-    // (FoundationCouncilStrategy), so the fail-closed exemplar class becomes
-    // StateOwned (survives until TS.3 — this exemplar moves again then).
+    // TS.3 fixture fix: StateOwned + Cooperative joined the implemented set
+    // (StateOwnedStrategy/CooperativeMemberStrategy), so the fail-closed
+    // exemplar class becomes Nominee — the LAST strategy-less class (moves
+    // again at TS.4, to a taxonomy widening or the pin's retirement).
     let select_entry = lexicon.get("ubo.determination.select-strategy").unwrap();
     let unsupported = ControlState {
         registered: true,
-        structure_class: Some(StructureClass::StateOwned),
+        structure_class: Some(StructureClass::Nominee),
         ..Default::default()
     };
     assert!(
@@ -1008,7 +1018,7 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
             &probe("ubo.determination.select-strategy", TargetBinding::for_subject(subject)),
         )
         .is_err(),
-        "select-strategy must block an unsupported structure class (StateOwned)"
+        "select-strategy must block an unsupported structure class (Nominee)"
     );
     let supported = ControlState {
         registered: true,

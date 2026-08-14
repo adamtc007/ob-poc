@@ -24,9 +24,10 @@ use ob_poc_kyc_substrate::{
     check_control_preconditions, check_preconditions, find_subject_entity, fold_control_versioned,
     fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
-    EdgeId, FoldRegistry, FoundationCouncilStrategy, FundControlStrategy, OwnershipProngStrategy,
-    PersonId, Prong, ProngCandidate, SmoResult, SubjectId, SubjectOverallState, TargetBinding,
-    TrustRoleStrategy, V1FoldImpl,
+    CooperativeMemberStrategy, EdgeId, FoldRegistry, FoundationCouncilStrategy,
+    FundControlStrategy, OwnershipProngStrategy, PersonId, Prong, ProngCandidate, SmoResult,
+    StateOwnedStrategy, SubjectId, SubjectOverallState, TargetBinding, TrustRoleStrategy,
+    V1FoldImpl,
     EDGE_KIND_WIRE_VALUES,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
@@ -614,14 +615,25 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             // dominant_influence ONLY. Scope note lives on
             // FoundationCouncilStrategy.
             "foundation_council_strategy" => &FoundationCouncilStrategy,
+            // TS.3: the controller of a state-owned entity is a state organ
+            // — the strategy runs the full control walk for the rare genuine
+            // natural-person controller; zero candidates legitimizes the
+            // existing apply-smo-fallback route. Scope note lives on
+            // StateOwnedStrategy.
+            "state_owned_strategy" => &StateOwnedStrategy,
+            // TS.3: one-member-one-vote — membership never yields a UBO;
+            // control arises from office. Traverses voting_rights +
+            // board_appointment + dominant_influence ONLY. Scope note lives
+            // on CooperativeMemberStrategy.
+            "cooperative_member_strategy" => &CooperativeMemberStrategy,
             other => {
                 return Err(anyhow!(
                     "freeze: strategy '{other}' selected but no DeterminationStrategy is \
                      registered for it — only ownership_prong_strategy, \
                      control_prong_strategy, trust_role_strategy, \
-                     fund_control_strategy, and foundation_council_strategy exist \
-                     today (the remaining structure-class strategies are \
-                     TS.3-TS.4 follow-on work)"
+                     fund_control_strategy, foundation_council_strategy, \
+                     state_owned_strategy, and cooperative_member_strategy exist \
+                     today (nominee_pierce_strategy is TS.4 follow-on work)"
                 ));
             }
         };

@@ -459,6 +459,113 @@ impl DeterminationStrategy for FoundationCouncilStrategy {
     }
 }
 
+// ── StateOwnedStrategy (TS.3 — the terminal answer is usually SMO) ──────────
+
+/// Resolves natural persons controlling a StateOwned-classified subject —
+/// the controller is a state organ, not a natural person, so the terminal
+/// answer is usually **SMO** (senior managing official)
+/// (EOP-DD-KYCUBO-KIT-TS0 §2.4, ratified 2026-08-12).
+///
+/// The strategy runs the full control-chain traversal (same edge-kind
+/// admission as `ControlProngStrategy` — voting rights, board appointment,
+/// GP statutory, LLP designated member, trust roles, dominant influence)
+/// for the RARE genuine natural-person controller. When no candidate
+/// crosses, the result is an empty Vec and the EXISTING
+/// `apply-smo-fallback` path (already stage-gated by `ReconciledProjection`
+/// + `StrategySelected`, matrix row 7) supplies the determination — that
+/// is, `state_owned_strategy` legitimizes the SMO route for this class
+/// rather than inventing a new resolution model; NO new SMO machinery.
+/// Candidates it does emit are `Prong::ControlByOtherMeans`;
+/// `effective_ownership_pct` is always `None`; `threshold_pct` is accepted
+/// for signature parity but unused. BODS `UboType::StateOwned`
+/// (`dsl-runtime/src/bods/types.rs`) is reference vocabulary for projection
+/// rendering, not a dependency.
+///
+/// **Scope (TS.3 v1):** inherits `ControlProngStrategy`'s v1 boundary — no
+/// crossing into the economic axis for an intermediate controlling entity's
+/// own UBOs (v2).
+pub struct StateOwnedStrategy;
+
+impl DeterminationStrategy for StateOwnedStrategy {
+    fn name(&self) -> &'static str {
+        "state_owned_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        _threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        // Full control-edge admission (§2.4: same as control-prong), walked
+        // by the shared DFS. Same determinism contract (Q6, K-16/18/33).
+        let edges = reconciled_control_edges(state);
+        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        for e in &edges {
+            adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+        }
+        resolve_chain_candidates(adj, subject_entity_id, natural_persons)
+    }
+}
+
+// ── CooperativeMemberStrategy (TS.3 — control from office, never membership) ─
+
+/// Resolves natural persons controlling a Cooperative-classified subject —
+/// one-member-one-vote: by construction no member holds ≥25% of votes
+/// through membership alone, so membership per se NEVER yields a UBO;
+/// control arises only from **office** (board/management edges) or an
+/// anomalous concentrated voting arrangement (EOP-DD-KYCUBO-KIT-TS0 §2.5,
+/// ratified 2026-08-12).
+///
+/// Traverses ONLY active reconciled `EdgeKind::VotingRights` +
+/// `EdgeKind::BoardAppointment` + `EdgeKind::DominantInfluence` edges —
+/// kind-filtered like `FoundationCouncilStrategy` (its 2-kind filter plus
+/// voting_rights for the anomalous-concentration case). Any other
+/// control-kind edge on a Cooperative subject is IGNORED by this strategy —
+/// deliberate, mirroring the TrustRole/FoundationCouncil stance: if the
+/// structure genuinely mixes, classification is wrong, and reclassification
+/// is legal (matrix row 10). Expected COMMON outcome is zero candidates →
+/// SMO fallback, same route as `StateOwnedStrategy` (§2.4). Every candidate
+/// is `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always
+/// `None`; `threshold_pct` is accepted for signature parity but unused.
+///
+/// **Scope (TS.3 v1):** same natural-person chain resolution and v1
+/// boundary as the other control-axis strategies — an intermediate legal
+/// entity is traversed through its own qualifying (admitted-kind) edges
+/// only; no crossing into the economic axis (v2).
+pub struct CooperativeMemberStrategy;
+
+impl DeterminationStrategy for CooperativeMemberStrategy {
+    fn name(&self) -> &'static str {
+        "cooperative_member_strategy"
+    }
+
+    fn resolve(
+        &self,
+        state: &ControlState,
+        subject_entity_id: EntityId,
+        natural_persons: &BTreeSet<PersonId>,
+        _threshold_pct: f64,
+    ) -> Vec<ProngCandidate> {
+        use crate::fold::control::EdgeKind;
+
+        // Admitted kinds only (§2.5): voting_rights + board_appointment +
+        // dominant_influence.
+        let edges = reconciled_control_edges(state);
+        let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
+        for e in &edges {
+            if matches!(
+                e.kind,
+                EdgeKind::VotingRights | EdgeKind::BoardAppointment | EdgeKind::DominantInfluence
+            ) {
+                adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
+            }
+        }
+        resolve_chain_candidates(adj, subject_entity_id, natural_persons)
+    }
+}
+
 // ── SMO fallback (K-5: never silent) ────────────────────────────────────────
 
 /// If ownership + control fold yields no persons, the SMO fallback fires.

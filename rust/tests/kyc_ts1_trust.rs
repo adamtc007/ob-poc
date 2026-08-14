@@ -575,13 +575,13 @@ async fn f_freeze_still_rejects_unknown_strategy_after_trust_widening() {
         &pool,
     )
     .await;
-    // TS.2 fixture fix: foundation_council_strategy gained a real dispatch
-    // arm (FoundationCouncilStrategy), so the unknown-strategy exemplar
-    // becomes state_owned_strategy (unimplemented until TS.3 — moves again
-    // then).
+    // TS.3 fixture fix: state_owned_strategy gained a real dispatch arm
+    // (StateOwnedStrategy), so the unknown-strategy exemplar becomes
+    // nominee_pierce_strategy (real per the TS0 taxonomy, unbuilt until
+    // TS.4 — moves again at TS.4).
     run(
         &UboDeterminationSelectStrategy,
-        serde_json::json!({ "subject-id": subject.0, "strategy": "state_owned_strategy" }),
+        serde_json::json!({ "subject-id": subject.0, "strategy": "nominee_pierce_strategy" }),
         &pool,
     )
     .await;
@@ -599,7 +599,7 @@ async fn f_freeze_still_rejects_unknown_strategy_after_trust_widening() {
     );
     let msg = result.unwrap_err().to_string();
     assert!(
-        msg.contains("state_owned_strategy") && msg.contains("no DeterminationStrategy"),
+        msg.contains("nominee_pierce_strategy") && msg.contains("no DeterminationStrategy"),
         "error should name the missing strategy; got: {msg}"
     );
 
