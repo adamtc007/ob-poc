@@ -350,14 +350,11 @@ domains:
           - "the check is done record it"
           - "mark the sanctions check as complete"
           - "sign off on the screening result"
-        behavior: crud
-        crud:
-          operation: update
-          table: screenings
-          schema: ob-poc
-          key: screening_id
-          set_values:
-            completed_at: now()
+        # Plugin, not crud (EOP-DD-KYCUBO-004 Part 1, W5 screening hook wiring):
+        # the completion also fans out an obligation.update-screening event to
+        # every open obligation for the screened entity's dsl.kyc subject
+        # stream. See src/domain_ops/kyc_stream_ops.rs ScreeningComplete.
+        behavior: plugin
         emits_event: screening.completed
         args:
           - name: screening-id
@@ -433,14 +430,10 @@ domains:
           - "dismiss this alert it's not a match"
           - "confirm this is a true match"
           - "adjudicate this flag"
-        behavior: crud
-        crud:
-          operation: update
-          table: screenings
-          schema: ob-poc
-          key: screening_id
-          set_values:
-            reviewed_at: now()
+        # Plugin, not crud (EOP-DD-KYCUBO-004 Part 1, W5 screening hook wiring):
+        # same reasoning as screening.complete above. See
+        # src/domain_ops/kyc_stream_ops.rs ScreeningReviewHit.
+        behavior: plugin
         emits_event: screening.reviewed
         args:
           - name: screening-id

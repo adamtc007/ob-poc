@@ -87,7 +87,9 @@ async fn stream_append(
     .map_err(|e| anyhow!("{verb_fqn} stream append failed: {e}"))
 }
 
-use super::helpers::{json_extract_string, json_extract_uuid, json_extract_uuid_opt};
+use super::helpers::{
+    json_extract_string, json_extract_string_opt, json_extract_uuid, json_extract_uuid_opt,
+};
 
 /// The KYC fold registry (v1) — maps the phase-1 lexicon hash to its `FoldImpl`.
 /// Module-level for now; becomes an injected platform service when fold
@@ -1398,5 +1400,191 @@ impl SemOsVerbOp for KycPersonReject {
         Ok(VerbExecutionOutcome::Record(
             serde_json::json!({ "seq": outcome.seq }),
         ))
+    }
+}
+
+// ── W5 screening hook (EOP-DD-KYCUBO-004 Part 1) ───────────────────────────────
+
+/// Map a `screenings.status` value to the `kyc.obligation.update-screening`
+/// track `state` it represents. Fail-closed on any value outside the verb
+/// YAML's declared `valid_values` — `valid_values` is descriptive metadata,
+/// not a DSL-parse-time hard reject (see CLAUDE.md), so this op is the actual
+/// enforcement point, matching the `STRUCTURE_CLASS_WIRE_VALUES` precedent.
+fn screening_complete_status_to_track_state(status: &str) -> Result<&'static str> {
+    match status {
+        "CLEAR" => Ok("satisfied"),
+        // Not yet resolved — awaits `screening.review-hit`.
+        "HIT_PENDING_REVIEW" => Ok("in_progress"),
+        // Transient provider/infra failure — still open, not a KYC outcome.
+        "ERROR" => Ok("in_progress"),
+        other => Err(anyhow!(
+            "screening.complete: unrecognized status {other:?} (expected CLEAR | HIT_PENDING_REVIEW | ERROR)"
+        )),
+    }
+}
+
+/// Map a `screening.review-hit` resolution to the obligation track `state`.
+fn review_hit_status_to_track_state(status: &str) -> Result<&'static str> {
+    match status {
+        // A confirmed sanctions/PEP/adverse-media match fails the screening
+        // track outright — it does not go back to `in_progress`.
+        "HIT_CONFIRMED" => Ok("rejected"),
+        "HIT_DISMISSED" => Ok("satisfied"),
+        other => Err(anyhow!(
+            "screening.review-hit: unrecognized status {other:?} (expected HIT_CONFIRMED | HIT_DISMISSED)"
+        )),
+    }
+}
+
+/// Resolve `workstream_id` to the entity being screened, and fan out an
+/// `kyc.obligation.update-screening` event to every obligation currently
+/// registered for that entity's subject stream (`kyc.obligation.*` verbs key
+/// `subject-id` to the natural person/entity's own UUID — see
+/// `tests/kyc_w3_w5_w6.rs`).
+///
+/// If no obligation has been raised yet for this entity (screening ran ahead
+/// of `kyc.obligation.create`), this is a no-op — the legacy `screenings` row
+/// write already happened in the caller; there is nothing further to fold.
+async fn apply_screening_outcome_to_obligations(
+    workstream_id: Uuid,
+    state: &'static str,
+    ctx: &mut VerbExecutionContext,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let entity: Option<(Uuid,)> = sqlx::query_as(
+        r#"SELECT entity_id FROM "ob-poc".entity_workstreams WHERE workstream_id = $1"#,
+    )
+    .bind(workstream_id)
+    .fetch_optional(scope.executor())
+    .await?;
+    let Some((entity_id,)) = entity else {
+        return Ok(());
+    };
+    let subject = SubjectId(entity_id);
+
+    let events = PgKycEventStore::load_events(scope.executor(), subject)
+        .await
+        .map_err(|e| anyhow!("apply_screening_outcome_to_obligations: load_events failed: {e}"))?;
+    let refs: Vec<_> = events.iter().collect();
+    let obligation_state = fold_obligations_versioned(&refs, &KYC_REGISTRY)
+        .map_err(|e| anyhow!("apply_screening_outcome_to_obligations: fold failed: {e}"))?;
+    let Some(rollup) = obligation_state.subjects.get(&subject) else {
+        return Ok(());
+    };
+    let obligation_ids = rollup.obligations.clone();
+
+    for oid in obligation_ids {
+        let payload = serde_json::json!({
+            "subject_id": subject.0,
+            "obligation_id": oid.0,
+            "state": state,
+        });
+        stream_append(
+            "kyc.obligation.update-screening",
+            subject,
+            TargetBinding::for_subject(subject),
+            payload,
+            "system.screening-hook",
+            Some("kyc.obligation.update-screening"),
+            ctx,
+            scope,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// `screening.complete` — was `behavior: crud`; now `plugin` so completion
+/// also fans out to the dsl.kyc obligation stream (EOP-DD-KYCUBO-004 Part 1,
+/// closing the previously-unwired W5 hook: `kyc.obligation.update-screening`
+/// existed and folded correctly but nothing called it from a real screening
+/// outcome). Preserves the original CRUD semantics exactly: only
+/// `result-summary`/`match-count` when present, `completed_at = now()`
+/// unconditionally.
+pub struct ScreeningComplete;
+
+#[async_trait]
+impl SemOsVerbOp for ScreeningComplete {
+    fn fqn(&self) -> &str {
+        "screening.complete"
+    }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let screening_id = json_extract_uuid(args, ctx, "screening-id")?;
+        let status = json_extract_string(args, "status")?;
+        let state = screening_complete_status_to_track_state(&status)?;
+        let result_summary = json_extract_string_opt(args, "result-summary");
+        let match_count = args
+            .get("match-count")
+            .and_then(|v| v.as_i64())
+            .map(|n| n as i32);
+
+        let row: (Uuid,) = sqlx::query_as(
+            r#"UPDATE "ob-poc".screenings
+               SET completed_at = now(),
+                   status = $1,
+                   result_summary = COALESCE($2, result_summary),
+                   match_count = COALESCE($3, match_count)
+               WHERE screening_id = $4
+               RETURNING workstream_id"#,
+        )
+        .bind(&status)
+        .bind(&result_summary)
+        .bind(match_count)
+        .bind(screening_id)
+        .fetch_one(scope.executor())
+        .await
+        .map_err(|e| anyhow!("screening.complete: update failed: {e}"))?;
+
+        apply_screening_outcome_to_obligations(row.0, state, ctx, scope).await?;
+
+        Ok(VerbExecutionOutcome::Affected(1))
+    }
+}
+
+/// `screening.review-hit` — same treatment as `ScreeningComplete` above.
+pub struct ScreeningReviewHit;
+
+#[async_trait]
+impl SemOsVerbOp for ScreeningReviewHit {
+    fn fqn(&self) -> &str {
+        "screening.review-hit"
+    }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let screening_id = json_extract_uuid(args, ctx, "screening-id")?;
+        let status = json_extract_string(args, "status")?;
+        let state = review_hit_status_to_track_state(&status)?;
+        let notes = json_extract_string(args, "notes")?;
+        let red_flag_id = json_extract_uuid_opt(args, ctx, "red-flag-id");
+
+        let row: (Uuid,) = sqlx::query_as(
+            r#"UPDATE "ob-poc".screenings
+               SET reviewed_at = now(),
+                   status = $1,
+                   review_notes = $2,
+                   red_flag_id = COALESCE($3, red_flag_id)
+               WHERE screening_id = $4
+               RETURNING workstream_id"#,
+        )
+        .bind(&status)
+        .bind(&notes)
+        .bind(red_flag_id)
+        .bind(screening_id)
+        .fetch_one(scope.executor())
+        .await
+        .map_err(|e| anyhow!("screening.review-hit: update failed: {e}"))?;
+
+        apply_screening_outcome_to_obligations(row.0, state, ctx, scope).await?;
+
+        Ok(VerbExecutionOutcome::Affected(1))
     }
 }

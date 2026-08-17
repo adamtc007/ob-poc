@@ -445,6 +445,8 @@ pub fn extend_registry(registry: &mut sem_os_postgres::ops::SemOsVerbOpRegistry)
     registry.register(Arc::new(kyc_stream_ops::KycObligationWaive));
     registry.register(Arc::new(kyc_stream_ops::KycPersonApprove));
     registry.register(Arc::new(kyc_stream_ops::KycPersonReject));
+    registry.register(Arc::new(kyc_stream_ops::ScreeningComplete));
+    registry.register(Arc::new(kyc_stream_ops::ScreeningReviewHit));
 
     // Phase B Pattern B slice #72: onboarding.auto-complete (bridges to
     // crate::database::derive_semantic_state + ob_poc_ontology::SemanticStageRegistry
