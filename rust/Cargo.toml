@@ -408,15 +408,15 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
-semantic-decision-contracts = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727", features = ["huggingface-download"] }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
+semantic-decision-contracts = { git = "https://github.com/adamtc007/dsl", rev = "196525352f66596feabe67236ff6c132dbd66727" }
 
 # BPMN integration family: one exact immutable revision. Keeping the bus,
 # manifest, engine, FFI and runner crates on one commit prevents duplicate wire

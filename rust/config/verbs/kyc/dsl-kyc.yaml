@@ -37,7 +37,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: control_edge
           tags: [ubo, control, determination, stream-backed, dsl-kyc]
@@ -106,7 +106,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: economic_edge
           tags: [ubo, economic, ownership, determination, stream-backed, dsl-kyc]
@@ -164,7 +164,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: control_edge
           tags: [ubo, evidence, determination, stream-backed, dsl-kyc]
@@ -211,7 +211,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: control_edge
           tags: [ubo, verification, determination, stream-backed, dsl-kyc]
@@ -259,7 +259,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: control_edge
           tags: [ubo, supersede, determination, stream-backed, dsl-kyc]
@@ -303,7 +303,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: control_edge
           tags: [ubo, nominee, pierce, determination, stream-backed, dsl-kyc]
@@ -366,7 +366,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: control_edge
           tags: [ubo, reconcile, conflict, determination, stream-backed, dsl-kyc]
@@ -408,7 +408,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: determination
           tags: [ubo, strategy, determination, stream-backed, dsl-kyc]
@@ -451,7 +451,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: determination
           tags: [ubo, fold, computation, determination, stream-backed, dsl-kyc]
@@ -488,7 +488,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: determination
           tags: [ubo, smo, fallback, determination, stream-backed, dsl-kyc]
@@ -535,7 +535,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: determination
           tags: [ubo, freeze, pin, determination, stream-backed, dsl-kyc]
@@ -587,7 +587,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: kyc_subject
           tags: [kyc, subject, registration, stream-backed, dsl-kyc]
@@ -635,7 +635,7 @@ domains:
         behavior: plugin
         metadata:
           tier: intent
-          source_of_truth: workflow  # TODO: add kyc_stream variant to dsl-core SourceOfTruth enum
+          source_of_truth: kyc_stream
           scope: global
           noun: kyc_subject
           tags: [kyc, subject, classification, structure, stream-backed, dsl-kyc]

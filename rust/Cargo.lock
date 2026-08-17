@@ -4162,7 +4162,7 @@ dependencies = [
  "sem_os_policy",
  "sem_os_postgres",
  "sem_os_types",
- "semantic-decision-contracts 0.4.0 (git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1)",
+ "semantic-decision-contracts 0.4.0 (git+https://github.com/adamtc007/dsl?rev=196525352f66596feabe67236ff6c132dbd66727)",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4477,7 +4477,7 @@ dependencies = [
  "chrono",
  "dsl-parser",
  "hex",
- "semantic-decision-contracts 0.4.0 (git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1)",
+ "semantic-decision-contracts 0.4.0 (git+https://github.com/adamtc007/dsl?rev=196525352f66596feabe67236ff6c132dbd66727)",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -6394,7 +6394,7 @@ dependencies = [
 [[package]]
 name = "semantic-decision-contracts"
 version = "0.4.0"
-source = "git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1#1d039d958a91620ab15374f05176bdfac4c872d1"
+source = "git+https://github.com/adamtc007/dsl?rev=196525352f66596feabe67236ff6c132dbd66727#196525352f66596feabe67236ff6c132dbd66727"
 dependencies = [
  "hex",
  "serde",
@@ -6406,7 +6406,7 @@ dependencies = [
 [[package]]
 name = "semantic-embedder"
 version = "0.4.0"
-source = "git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1#1d039d958a91620ab15374f05176bdfac4c872d1"
+source = "git+https://github.com/adamtc007/dsl?rev=196525352f66596feabe67236ff6c132dbd66727#196525352f66596feabe67236ff6c132dbd66727"
 dependencies = [
  "candle-core",
  "candle-nn",
