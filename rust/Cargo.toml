@@ -61,6 +61,9 @@ sem_os_client = { path = "crates/sem_os_client" }
 sem_os_obpoc_adapter = { path = "crates/sem_os_obpoc_adapter" }
 sem_os_postgres = { path = "crates/sem_os_postgres" }
 dsl-runtime = { path = "crates/dsl-runtime" }
+# Shared gameboard/disposition vocabulary (T7 §8 adoption) — used by
+# domain_ops::kyc_ramp_capture for MoveAttemptOutcome.
+semantic-decision-contracts.workspace = true
 # KYC/UBO durable verb-stream stack (EOP-DD-KYCUBO-002) — stream-backed verb ops live in domain_ops
 ob-poc-kyc-substrate = { path = "crates/ob-poc-kyc-substrate" }
 ob-poc-kyc-store = { path = "crates/ob-poc-kyc-store" }
@@ -401,14 +404,15 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
-semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "a38eefe1e8d039bd8b52e52477ffd58ba39c3058" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1", features = ["huggingface-download"] }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
+semantic-decision-contracts = { git = "https://github.com/adamtc007/dsl", rev = "1d039d958a91620ab15374f05176bdfac4c872d1" }
 
 # BPMN integration family: one exact immutable revision. Keeping the bus,
 # manifest, engine, FFI and runner crates on one commit prevents duplicate wire

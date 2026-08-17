@@ -5,7 +5,7 @@
 |---|---|
 | **Document** | EOP-VS-KYCUBO-KIT-001 |
 | **Type** | Vision & Scope (material change of approach) |
-| **Version** | 0.2 — Draft for review |
+| **Version** | 0.3 — Draft for review |
 | **Owner** | Adam Cearns |
 | **Status** | Draft. A new V&S for the KYC/UBO pack's interactive build model. Depends on — does **not** amend — EOP-VS-BPMN-DESIGN-003 (ratified), cited as the *contract* baseline. |
 | **Contract baseline** | EOP-VS-BPMN-DESIGN-003 (Sage/Utterance-Engine/Repl split; ranker-only SLM contract; single-disposition-function rule; the move/board *discipline*). |
@@ -116,9 +116,22 @@ For a regulated determination this is the stronger audit position: the source re
 ## §10 Dependencies and reuse (corrected against the tree)
 
 - **The contract discipline is the reusable asset; the contracts crate is not (as-is).** Dossier R2 verdict on `semantic-decision-contracts` @ `1d039d9`: *nominally domain-agnostic, operationally graph-specific* — `GraphRevision`, `GraphDeltaPreview`, `GraphElementRef`-as-anchor presume a mutable versioned graph an append-only stream doesn't have. **Position #7 amended (v0.2): KYC builds native board/move types that mirror the contract discipline** — content-addressed move identity, canonical ordering, `NONE_OF_THE_ABOVE`, board content-hash, single-disposition-function — **adopting the crate only if/when its graph-specific types are split from the generic core** (a stated later convergence, not now). *(Pending formal T0.1 ratification in the plan.)*
+- **Position #7 superseded (v0.3, 2026-08-17):** see §10a. The R2 graph-coupling concern is real but narrower than the v0.2 wording implied — it applies to `DesignPosition`/`LegalMove`/`MoveAttempt`/`GraphRevision`/`GraphContentHash`/`GraphStateHash` (all genuinely graph-shaped), not to the bare closed-set vocabulary (`ABSTENTION_CANDIDATE_ID`, `GameDispositionKind`, `MoveAttemptOutcome`), which carries zero graph coupling. `ob-poc-kyc-substrate` now depends directly on `semantic-decision-contracts` for exactly that vocabulary subset; KYC's own board/move types (`PlacementSet`/`LegalMove`(KYC)/`MoveId`/`board_hash`) remain KYC-native and un-adopted, per the original reasoning.
 - **Reusable with change:** the pipeline shape, the `LegalityOracle`/`BoardUniverseProvider` trait *interfaces*, the ranker-only SLM contract, the single-disposition-function rule, clone-before-ratify staging, and now the **shipped chain-preview semantics** (per-step admission) — minus the DAG clone.
 - **BPMN-specific, not applicable:** `DesignerDag`, `ops::apply`/`admit`, V-1..V-11 (`bpmn-lite-types::v2_verifier`). Do not lift `utterance-engine` wholesale.
 - **Do not conflate:** `ob-poc-sage::ValidVerbSet`/`ValidVerbSetEngine` — DTO + trait, **zero implementations** (dossier R6); a separate partial artifact, addressed (implement or retire) in plan T4.
+
+## §10a Position #7 superseded (v0.3, 2026-08-17)
+
+Landed in `ob-poc-kyc-substrate` this session, against `semantic-decision-contracts` @ `1d039d9` (the same commit R2 reviewed):
+
+- `Cargo.toml`: direct dependency, a named exception to the crate's existing "no sem_os_core (git dep)" boundary comment.
+- `placement.rs`: `NONE_OF_THE_ABOVE` now re-exports `semantic_decision_contracts::ABSTENTION_CANDIDATE_ID` (byte-identical value — a pure rename, zero behavioral change).
+- `domain_ops/kyc_ramp_capture.rs` + `repl/kyc_workbook_surface.rs`: the capture-correlation `UserAction` enum (`Accepted`/`Edited`/`Rejected`) replaced by `MoveAttemptOutcome` (10 variants) — `Applied`/`Corrected`/`CompilerRefused` mapped at the `Stage` call sites, giving the capture path real distinctions it didn't have as a 3-value hand-roll (board-rejected-as-illegal vs operator-declined-a-legal-proposal). Migration widened the `kyc_ramp_capture.user_action` CHECK constraint to the full variant set.
+
+**Why this narrows, rather than contradicts, R2.** `ABSTENTION_CANDIDATE_ID` is a bare `&str` const; `GameDispositionKind`/`MoveAttemptOutcome` are closed `serde`-only enums with no graph-shaped field on any variant. None of the three reference `GraphRevision`, `GraphElementRef`, or any board-position concept — the graph-specific coupling R2 flagged lives entirely in `DesignPosition`/`LegalMove`/`MoveAttempt`, which KYC still does **not** depend on and still mirrors natively (`PlacementSet`/`LegalMove`(KYC)/`MoveId`/`board_hash` unchanged — event-stream-shaped, no adoption). This is confirmed by direct source read of `semantic-decision-contracts/src/gameboard.rs` before landing, not by re-litigating R2's verdict on the graph types, which stands.
+
+Position #7's underlying warning — don't let type-satisfaction convenience smuggle a graph-shaped model into an event-stream substrate — is upheld, not overturned; it's now scoped correctly to the types that actually carry that risk.
 
 ## §11 Invariants (consolidated)
 
@@ -145,7 +158,7 @@ For a regulated determination this is the stronger audit position: the source re
 | 4 | S-expression source is authoritative; rows are the cache | Source records reasoning — the stronger audit posture; rows regenerate from source | Snapshot must be reproducible under a pinned constructor version |
 | 5 | The DB holds no graph; taxonomy built in code, per viewer | Per-viewer flexibility (KIT-5) unreachable with schema-baked graphs | Concentrates trust in the pinned, attestable constructor |
 | 6 | SLM selects moves; open free-text args bound outside the game | Preserves the closed-move property that makes ranking sound | Arg-validation stays ordinary governed validation, not a new tier |
-| 7 *(amended v0.2)* | Mirror the `semantic-decision-contracts` discipline in KYC-native types; adopt the crate only if/when graph-specific types split out | R2: the crate is operationally graph-specific; artificial type-satisfaction is the smell this V&S exists to avoid | Convergence deferred, stated; discipline (content-addressed moves, canonical order, abstain, board hash, single disposition fn) is mandatory regardless |
+| 7 *(superseded v0.3 — see §10a)* | Adopt the bare closed-set vocabulary (`ABSTENTION_CANDIDATE_ID`, `GameDispositionKind`, `MoveAttemptOutcome`) directly as a dependency; continue to mirror-not-adopt the graph-shaped types (`DesignPosition`/`LegalMove`/`GraphRevision`) | Direct source inspection found the R2 graph-coupling concern applies only to the graph-shaped subset, not the vocabulary subset | KYC board/move types remain native; only the outcome/disposition vocabulary is shared |
 | 8 | Regulated determination pins one frozen view; flexibility is for reading | "Which graph is real?" must answer crisply for a regulator | Frozen view carries viewer/axis/kit-version/constructor-version pins |
 | 9 *(new v0.2)* | Super-user-first: the session ships as a zero-inference DSL IDE; the plain-English ramp follows, bootstrapped from expert corpus | De-risks the whole programme (no model in the critical path at launch); generates the *real* corpus the ramp needs; inherits and strengthens the DESIGN-003 safety posture | Plain-English users wait for the ramp; corpus capture is charter-gated (KIT-12) before any training use |
 
@@ -180,3 +193,4 @@ For a regulated determination this is the stronger audit position: the source re
 |---|---|---|
 | 0.1 | 2026-07-03 | Initial V&S: construction-kit thesis; S-expression source of truth; generated placement-set; re-run-whole; per-viewer constructor; frozen-view pin; session loop; pure-fold lookahead; SLM verb-select/arg-bind split; ten invariants, eight positions. |
 | 0.2 | — | **The Vision stated** (taxonomy = the board/village; DSL = the moves/tools; dynamic build from DSL ⇒ PITR + complete intent→action audit trail). **Persona ladder added** (§2a): super-user IDE baseline with zero inference in the path (KIT-11); plain-English ramp bootstrapped from charter-gated expert corpus (KIT-12); position #9. **Position #7 amended** per dossier R2 (mirror the contracts discipline in KYC-native types; adopt the crate on later split). Grounding refreshed post-`68723b9` (chain preview shipped; lookahead mirrors proven semantics); KIT-1 marked PARTIAL-in-tree; verb-denominator discrepancy logged (§14 Q6); precondition count corrected to 3-of-registered. |
+| 0.3 | 2026-08-17 | **Position #7 superseded** (§10a): direct source read of `semantic-decision-contracts/src/gameboard.rs` @ `1d039d9` found the R2 graph-coupling concern applies only to `DesignPosition`/`LegalMove`/`GraphRevision`, not to the bare closed-set vocabulary (`ABSTENTION_CANDIDATE_ID`, `GameDispositionKind`, `MoveAttemptOutcome`). `ob-poc-kyc-substrate` now depends directly on `semantic-decision-contracts` for that vocabulary subset (dsl pin bumped to `1d039d9`); KYC's board/move types remain native and un-adopted. Landed: `NONE_OF_THE_ABOVE` re-exports `ABSTENTION_CANDIDATE_ID`; capture-correlation's `UserAction` replaced by `MoveAttemptOutcome`. |

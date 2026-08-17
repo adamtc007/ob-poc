@@ -312,6 +312,12 @@ pub struct ReplOrchestratorV2 {
     /// through ordinary REPL/runbook dispatch.
     #[cfg(feature = "database")]
     kyc_workbooks: Arc<RwLock<HashMap<Uuid, crate::domain_ops::kyc_workbook::KycWorkbook>>>,
+    /// T7 capture-correlation slice 1: bridges a `Propose` call to whatever
+    /// `Stage` follows it. Same session-scoped, in-memory, process-lifetime
+    /// shape as `kyc_workbooks` — see `PendingProposal`'s doc comment.
+    #[cfg(feature = "database")]
+    kyc_pending_proposals:
+        Arc<RwLock<HashMap<Uuid, crate::repl::kyc_workbook_surface::PendingProposal>>>,
 }
 
 impl ReplOrchestratorV2 {
@@ -352,6 +358,8 @@ impl ReplOrchestratorV2 {
             unlocked_execution_token: None,
             #[cfg(feature = "database")]
             kyc_workbooks: Arc::new(RwLock::new(HashMap::new())),
+            #[cfg(feature = "database")]
+            kyc_pending_proposals: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -1029,7 +1037,10 @@ impl ReplOrchestratorV2 {
     /// ```rust,ignore
     /// let feedback = orchestrator.session_feedback(session_id).await?;
     /// ```
-    pub(crate) async fn session_feedback(&self, session_id: Uuid) -> anyhow::Result<SessionFeedback> {
+    pub(crate) async fn session_feedback(
+        &self,
+        session_id: Uuid,
+    ) -> anyhow::Result<SessionFeedback> {
         let sessions = self.sessions.read().await;
         let session = sessions
             .get(&session_id)
@@ -1431,7 +1442,9 @@ impl ReplOrchestratorV2 {
         // call a few lines down).
         #[cfg(feature = "database")]
         if let UserInputV2::Message { ref content } = input {
-            if let Some(cmd_result) = crate::repl::kyc_workbook_surface::parse_kyc_workbook_command(content) {
+            if let Some(cmd_result) =
+                crate::repl::kyc_workbook_surface::parse_kyc_workbook_command(content)
+            {
                 let response = self.handle_kyc_workbook_command(session, cmd_result).await;
                 drop(sessions);
                 return Ok(response);
@@ -2213,8 +2226,9 @@ impl ReplOrchestratorV2 {
                 // search and getting matched to an unrelated verb (e.g. "deal.list") instead of
                 // resolving scope.
                 #[cfg(feature = "database")]
-                let mut precomputed_outcome: Option<crate::repl::bootstrap::BootstrapOutcome> =
-                    None;
+                let mut precomputed_outcome: Option<
+                    crate::repl::bootstrap::BootstrapOutcome,
+                > = None;
                 #[cfg(feature = "database")]
                 if let Some(pool) = self.pool() {
                     let outcome =
@@ -3351,7 +3365,10 @@ impl ReplOrchestratorV2 {
                     state: session.state.clone(),
                     kind: ReplResponseKindV2::Question {
                         field: String::new(),
-                        prompt: format!("Staying in '{}'. What would you like to do?", current_pack_id),
+                        prompt: format!(
+                            "Staying in '{}'. What would you like to do?",
+                            current_pack_id
+                        ),
                         answer_kind: "string".to_string(),
                     },
                     message: format!("Staying in '{}'.", current_pack_id),
@@ -5054,19 +5071,54 @@ impl ReplOrchestratorV2 {
                         claims: std::collections::HashMap::new(),
                         tenancy: None,
                     };
-                    let mut workbooks = self.kyc_workbooks.write().await;
-                    match crate::repl::kyc_workbook_surface::dispatch(
-                        cmd,
-                        &mut workbooks,
-                        session.id,
-                        &pool,
-                        &principal,
-                        chrono::Utc::now(),
-                    )
-                    .await
-                    {
-                        Ok(msg) => msg,
-                        Err(e) => format!("kyc-workbook error: {e}"),
+
+                    // T7.2: `Propose` needs an utterance embedding for the
+                    // ramp's tier-0 retrieval. Computed here — outside
+                    // kyc_workbook_surface, which stays free of any
+                    // model/embedder import (I-5) — reusing the same shared
+                    // embedder singleton HybridVerbSearcher already holds
+                    // (never constructed fresh per call; that would reload
+                    // the model on every proposal).
+                    let embedding_result: Result<Option<Vec<f32>>, String> = match &cmd {
+                        crate::repl::kyc_workbook_surface::KycWorkbookCommand::Propose {
+                            utterance,
+                        } => match self.verb_searcher.as_ref().and_then(|vs| vs.embedder()) {
+                            Some(embedder) => embedder
+                                .embed_query(utterance)
+                                .await
+                                .map(Some)
+                                .map_err(|e| {
+                                    format!("kyc-workbook.propose: embedding failed: {e}")
+                                }),
+                            None => Ok(None),
+                        },
+                        _ => Ok(None),
+                    };
+
+                    match embedding_result {
+                        Err(e) => e,
+                        Ok(utterance_embedding) => {
+                            // Lock ordering: kyc_workbooks before
+                            // kyc_pending_proposals — the only call site
+                            // acquiring both today.
+                            let mut workbooks = self.kyc_workbooks.write().await;
+                            let mut pending_proposals = self.kyc_pending_proposals.write().await;
+                            match crate::repl::kyc_workbook_surface::dispatch(
+                                cmd,
+                                &mut workbooks,
+                                &mut pending_proposals,
+                                session.id,
+                                &pool,
+                                &principal,
+                                chrono::Utc::now(),
+                                utterance_embedding.as_deref(),
+                            )
+                            .await
+                            {
+                                Ok(msg) => msg,
+                                Err(e) => format!("kyc-workbook error: {e}"),
+                            }
+                        }
                     }
                 }
             },
@@ -8198,9 +8250,7 @@ impl ReplOrchestratorV2 {
                 .map(|(manifest, _hash)| manifest.as_ref());
             let pack_resolution = Some(
                 crate::agent::control_plane_shadow::build_pack_resolution_input(
-                    active_pack_id
-                        .as_deref()
-                        .zip(active_pack),
+                    active_pack_id.as_deref().zip(active_pack),
                     &entry.verb,
                     !envelope.is_unavailable(),
                 ),
@@ -8231,7 +8281,10 @@ impl ReplOrchestratorV2 {
             // function already uses for `insert_shadow_decision`.
             if let Some(pr) = pack_resolution.as_ref() {
                 if ob_poc_control_plane::floor::g3_input_is_floor_eligible(pr) {
-                    let reason = format!("{}: G3 pack resolution floor (MissingPack/AmbiguousPack)", entry.verb);
+                    let reason = format!(
+                        "{}: G3 pack resolution floor (MissingPack/AmbiguousPack)",
+                        entry.verb
+                    );
                     let row = crate::agent::control_plane_floor::FloorRejectionRow {
                         session_id: session.id,
                         entry_id,
@@ -8241,7 +8294,8 @@ impl ReplOrchestratorV2 {
                     };
                     let pool = pool.clone();
                     tokio::spawn(async move {
-                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row)
+                            .await;
                     });
                     return Some(StepOutcome::Failed {
                         error: format!("T11.F floor rejection [G3]: {reason}"),
@@ -8250,7 +8304,10 @@ impl ReplOrchestratorV2 {
             }
             if let Some(dp) = dag_proof.as_ref() {
                 if ob_poc_control_plane::floor::g4_input_is_floor_eligible(dp) {
-                    let reason = format!("{}: G4 DAG legality floor (blocking_violations or topological)", entry.verb);
+                    let reason = format!(
+                        "{}: G4 DAG legality floor (blocking_violations or topological)",
+                        entry.verb
+                    );
                     let row = crate::agent::control_plane_floor::FloorRejectionRow {
                         session_id: session.id,
                         entry_id,
@@ -8260,7 +8317,8 @@ impl ReplOrchestratorV2 {
                     };
                     let pool = pool.clone();
                     tokio::spawn(async move {
-                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row).await;
+                        crate::agent::control_plane_floor::insert_floor_rejection(&pool, &row)
+                            .await;
                     });
                     return Some(StepOutcome::Failed {
                         error: format!("T11.F floor rejection [G4]: {reason}"),
@@ -8362,7 +8420,9 @@ impl ReplOrchestratorV2 {
             // the bug this session fixed (see `ShadowDecisionRow::
             // decision_id`'s doc).
             let decision_id = match &decision {
-                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => envelope.id(),
+                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => {
+                    envelope.id()
+                }
                 _ => Uuid::new_v4(),
             };
             let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
@@ -8374,7 +8434,10 @@ impl ReplOrchestratorV2 {
                 legacy_outcome.is_some(),
                 ob_poc_types::ExecutionPath::RunbookSequencer,
             );
-            let sealed = matches!(decision, ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_));
+            let sealed = matches!(
+                decision,
+                ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(_)
+            );
             let session_id = session.id;
             let entry_verb = entry.verb.clone();
             let pool = pool.clone();
@@ -8439,7 +8502,9 @@ impl ReplOrchestratorV2 {
             // effort/fire-and-forget below (unchanged posture, W1 window-
             // discipline: additive only) — only the seal->consume
             // correlation itself needs the synchronous guarantee.
-            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) = decision {
+            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) =
+                decision
+            {
                 crate::agent::control_plane_envelope_store::persist_sealed(
                     &pool,
                     session_id,
@@ -8452,7 +8517,9 @@ impl ReplOrchestratorV2 {
 
             tokio::spawn(async move {
                 crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
-                if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
+                if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) =
+                    decision
+                {
                     // `decision_id` here is the SAME value computed above
                     // (before `row` was built) and already carried on
                     // `row.decision_id` -- not recomputed independently.
@@ -8561,8 +8628,11 @@ impl ReplOrchestratorV2 {
                 Some(HashMap::new())
             } else {
                 let source = ob_poc_boundary::entity_facts::PgEntityFactsSource { pool };
-                match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(&source, &entity_requests)
-                    .await
+                match ob_poc_boundary::entity_facts::EntityFactsSource::entity_facts(
+                    &source,
+                    &entity_requests,
+                )
+                .await
                 {
                     Ok(facts) => Some(facts),
                     Err(e) => {
@@ -8584,11 +8654,13 @@ impl ReplOrchestratorV2 {
             .as_deref()
             .and_then(|id| self.pack_router.get_pack(id))
             .map(|(manifest, _hash)| manifest.as_ref());
-        let pack_resolution = Some(crate::agent::control_plane_shadow::build_pack_resolution_input(
-            active_pack_id.as_deref().zip(active_pack),
-            &entry.verb,
-            !envelope.is_unavailable(),
-        ));
+        let pack_resolution = Some(
+            crate::agent::control_plane_shadow::build_pack_resolution_input(
+                active_pack_id.as_deref().zip(active_pack),
+                &entry.verb,
+                !envelope.is_unavailable(),
+            ),
+        );
 
         let dag_proof = crate::agent::control_plane_shadow::build_dag_proof_input(
             self.gate_pipeline.as_ref(),
@@ -8605,19 +8677,25 @@ impl ReplOrchestratorV2 {
         );
         // G6b: real per-entity pin fact (see the primary call site's
         // identical comment in `phase5_runtime_recheck`, above).
-        let stp_classifier = Some(crate::agent::control_plane_shadow::build_stp_classifier_input(
-            &entry.verb,
-            crate::agent::control_plane_shadow::has_unpinned_entities(
-                &entity_requests,
-                entity_facts_map.as_ref(),
+        let stp_classifier = Some(
+            crate::agent::control_plane_shadow::build_stp_classifier_input(
+                &entry.verb,
+                crate::agent::control_plane_shadow::has_unpinned_entities(
+                    &entity_requests,
+                    entity_facts_map.as_ref(),
+                ),
             ),
-        ));
-        let snapshot =
-            crate::agent::control_plane_shadow::build_decision_snapshot_input(entity_facts_map.as_ref());
-        let runbook_proof = Some(crate::agent::control_plane_shadow::build_runbook_proof_input(
-            entry.compiled_runbook_id.map(|id| id.0),
-        ));
-        let version_pinning = Some(crate::agent::control_plane_shadow::build_version_pinning_input());
+        );
+        let snapshot = crate::agent::control_plane_shadow::build_decision_snapshot_input(
+            entity_facts_map.as_ref(),
+        );
+        let runbook_proof = Some(
+            crate::agent::control_plane_shadow::build_runbook_proof_input(
+                entry.compiled_runbook_id.map(|id| id.0),
+            ),
+        );
+        let version_pinning =
+            Some(crate::agent::control_plane_shadow::build_version_pinning_input());
 
         let cp_ctx = crate::agent::control_plane_shadow::build_evaluation_context(
             &envelope,
@@ -8638,14 +8716,17 @@ impl ReplOrchestratorV2 {
             chrono::Utc::now(),
             chrono::Utc::now() + chrono::Duration::minutes(5),
         );
-        let (report, decision) = ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
+        let (report, decision) =
+            ob_poc_control_plane::decision::evaluate_with_report(&cp_ctx, validity);
         // G11 join fix (EOP-SESSION-CONTROLPLANE-G11-JOIN-FIX-001): same
         // reasoning as `phase5_runtime_recheck`'s primary call site --
         // mint/read `decision_id` before building `row`, then reuse this
         // SAME binding for the `insert_audit_event` calls below, never
         // `entry_id` (reused across retries of the same runbook step).
         let decision_id = match &decision {
-            ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => envelope.id(),
+            ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) => {
+                envelope.id()
+            }
             _ => Uuid::new_v4(),
         };
         let row = crate::agent::control_plane_shadow::build_shadow_decision_row(
@@ -8665,7 +8746,9 @@ impl ReplOrchestratorV2 {
         // before `handle_human_gate_approval` calls `execute_entry_via_gate`
         // a few lines later, in the SAME resume, so the fresh row exists
         // by consume time.
-        if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) = decision {
+        if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(ref envelope) =
+            decision
+        {
             crate::agent::control_plane_envelope_store::persist_sealed(
                 &pool,
                 session_id,
@@ -8704,7 +8787,9 @@ impl ReplOrchestratorV2 {
         // additive only).
         tokio::spawn(async move {
             crate::agent::control_plane_shadow::insert_shadow_decision(&pool, &row).await;
-            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) = decision {
+            if let ob_poc_control_plane::decision::ControlPlaneDecision::ApprovedStp(envelope) =
+                decision
+            {
                 // Reuses the outer `decision_id` binding (already carried
                 // on `row.decision_id`) -- not an independent recompute.
                 crate::agent::control_plane_audit::insert_audit_event(
@@ -9452,8 +9537,10 @@ impl ReplOrchestratorV2 {
                     }
                     Some((verb.clone(), owner.id.clone(), owner.name.clone()))
                 });
-                if let (Some((verb, suggested_pack_id, suggested_pack_name)), Some(current_pack_id)) =
-                    (backout, current_pack_id.clone())
+                if let (
+                    Some((verb, suggested_pack_id, suggested_pack_name)),
+                    Some(current_pack_id),
+                ) = (backout, current_pack_id.clone())
                 {
                     session.set_state(ReplStateV2::PackMismatchConfirm {
                         current_pack_id: current_pack_id.clone(),
@@ -11959,11 +12046,14 @@ mod g1_humangate_reseal_tests {
         ContextResolutionRequest as ResolveContextRequest,
         ContextResolutionResponse as ResolveContextResponse,
     };
-    use sem_os_policy::context_resolution::{ContextResolutionResponse, ResolutionStage, VerbCandidate};
+    use sem_os_policy::context_resolution::{
+        ContextResolutionResponse, ResolutionStage, VerbCandidate,
+    };
     use sem_os_types::{Changeset, GovernanceTier, TrustClass};
 
     async fn test_pool() -> sqlx::PgPool {
-        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
+        let url =
+            std::env::var("DATABASE_URL").expect("DATABASE_URL required for db-integration tests");
         sqlx::PgPool::connect(&url).await.expect("connect")
     }
 
@@ -12038,7 +12128,10 @@ mod g1_humangate_reseal_tests {
             })
         }
 
-        async fn get_manifest(&self, _snapshot_set_id: &str) -> sem_os_client::Result<GetManifestResponse> {
+        async fn get_manifest(
+            &self,
+            _snapshot_set_id: &str,
+        ) -> sem_os_client::Result<GetManifestResponse> {
             Err(Self::unsupported())
         }
 
@@ -12078,15 +12171,24 @@ mod g1_humangate_reseal_tests {
             })
         }
 
-        async fn changeset_diff(&self, _changeset_id: &str) -> sem_os_client::Result<ChangesetDiffResponse> {
+        async fn changeset_diff(
+            &self,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<ChangesetDiffResponse> {
             Err(Self::unsupported())
         }
 
-        async fn changeset_impact(&self, _changeset_id: &str) -> sem_os_client::Result<ChangesetImpactResponse> {
+        async fn changeset_impact(
+            &self,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<ChangesetImpactResponse> {
             Err(Self::unsupported())
         }
 
-        async fn changeset_gate_preview(&self, _changeset_id: &str) -> sem_os_client::Result<GatePreviewResponse> {
+        async fn changeset_gate_preview(
+            &self,
+            _changeset_id: &str,
+        ) -> sem_os_client::Result<GatePreviewResponse> {
             Err(Self::unsupported())
         }
 
@@ -12098,7 +12200,9 @@ mod g1_humangate_reseal_tests {
             Err(Self::unsupported())
         }
 
-        async fn get_affinity_graph(&self) -> sem_os_client::Result<Arc<sem_os_policy::affinity::AffinityGraph>> {
+        async fn get_affinity_graph(
+            &self,
+        ) -> sem_os_client::Result<Arc<sem_os_policy::affinity::AffinityGraph>> {
             Err(Self::unsupported())
         }
 
@@ -12170,7 +12274,8 @@ cross_workspace_constraints: []
     /// construction, decoupled from the real `cbus` table's own state
     /// columns.
     fn test_gate_pipeline(cbu_id: Uuid) -> GatePipeline {
-        let dir = std::env::temp_dir().join(format!("g1_humangate_reseal_test_dag_{}", Uuid::new_v4()));
+        let dir =
+            std::env::temp_dir().join(format!("g1_humangate_reseal_test_dag_{}", Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("test.yaml"), TEST_DAG_YAML).unwrap();
         let registry = Arc::new(dsl_runtime::cross_workspace::DagRegistry::from_dir(&dir).unwrap());
@@ -12187,12 +12292,13 @@ cross_workspace_constraints: []
             Arc::new(FixedSlotState(states)),
             Arc::new(dsl_runtime::cross_workspace::SameEntityResolver),
         ));
-        let verb_metadata: Arc<dyn VerbTransitionLookup> = Arc::new(FixedLookup(Some(dsl_core::TransitionArgs {
-            entity_id_arg: "cbu-id".into(),
-            target_state_arg: None,
-            target_workspace: Some("testws".into()),
-            target_slot: Some("testslot".into()),
-        })));
+        let verb_metadata: Arc<dyn VerbTransitionLookup> =
+            Arc::new(FixedLookup(Some(dsl_core::TransitionArgs {
+                entity_id_arg: "cbu-id".into(),
+                target_state_arg: None,
+                target_workspace: Some("testws".into()),
+                target_slot: Some("testslot".into()),
+            })));
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres://harness-mock-never-connects")
             .expect("connect_lazy with a valid-shaped URL never fails");
@@ -12243,7 +12349,8 @@ cross_workspace_constraints: []
         let yaml = format!(
             "domains:\n  test:\n    description: test\n    verb_data_footprint:\n      {verb_fqn}:\n        writes: [cbus]\n"
         );
-        sem_os_obpoc_adapter::metadata::DomainMetadata::from_yaml(&yaml).expect("valid fixture YAML")
+        sem_os_obpoc_adapter::metadata::DomainMetadata::from_yaml(&yaml)
+            .expect("valid fixture YAML")
     }
 
     fn test_pack_yaml() -> &'static str {
@@ -12294,11 +12401,12 @@ description: Minimal, unconstrained pack (no allowed_verbs) — G3 pack resoluti
             .fetch_one(&pool)
             .await
             .expect("at least one cbu row exists in the dev database");
-        let original_name: String = sqlx::query_scalar(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#)
-            .bind(cbu_id)
-            .fetch_one(&pool)
-            .await
-            .expect("fetch original name for restore");
+        let original_name: String =
+            sqlx::query_scalar(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_one(&pool)
+                .await
+                .expect("fetch original name for restore");
         sqlx::query(
             r#"UPDATE "ob-poc".cbus SET deleted_at = NULL, disposition_status = 'active',
                operational_status = 'actively_trading' WHERE cbu_id = $1"#,
@@ -12338,13 +12446,18 @@ description: Minimal, unconstrained pack (no allowed_verbs) — G3 pack resoluti
             sentence: entry.sentence.clone(),
             verb: entry.verb.clone(),
             dsl: entry.dsl.clone(),
-            args: entry.args.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            args: entry
+                .args
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
             depends_on: vec![],
             execution_mode: CompiledExecutionMode::HumanGate,
             write_set: vec![],
             verb_contract_snapshot_id: None,
         };
-        let compiled = CompiledRunbook::new(session.id, 1, vec![compiled_step], ReplayEnvelope::empty());
+        let compiled =
+            CompiledRunbook::new(session.id, 1, vec![compiled_step], ReplayEnvelope::empty());
         let compiled_id = compiled.id;
         let store = RunbookStore::new();
         store.insert_sync(&compiled);
@@ -12408,7 +12521,11 @@ description: Minimal, unconstrained pack (no allowed_verbs) — G3 pack resoluti
         // persist_sealed), then dispatches through the real Path A
         // consume site.
         let _approve_response = orch
-            .handle_human_gate_approval(&mut session, entry_id, Some("g1-test-approver".to_string()))
+            .handle_human_gate_approval(
+                &mut session,
+                entry_id,
+                Some("g1-test-approver".to_string()),
+            )
             .await;
 
         assert_eq!(

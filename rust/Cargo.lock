@@ -4149,6 +4149,7 @@ dependencies = [
  "sem_os_policy",
  "sem_os_postgres",
  "sem_os_types",
+ "semantic-decision-contracts 0.4.0 (git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1)",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -4463,6 +4464,7 @@ dependencies = [
  "chrono",
  "dsl-parser",
  "hex",
+ "semantic-decision-contracts 0.4.0 (git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1)",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -6262,7 +6264,7 @@ dependencies = [
  "dsl_types",
  "hex",
  "sem_os_types",
- "semantic-decision-contracts",
+ "semantic-decision-contracts 0.4.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -6283,7 +6285,7 @@ dependencies = [
  "sem_os_core",
  "sem_os_ontology",
  "sem_os_types",
- "semantic-decision-contracts",
+ "semantic-decision-contracts 0.4.0",
  "semantic-pack",
  "serde",
  "serde_json",
@@ -6377,9 +6379,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "semantic-decision-contracts"
+version = "0.4.0"
+source = "git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1#1d039d958a91620ab15374f05176bdfac4c872d1"
+dependencies = [
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "semantic-embedder"
-version = "0.2.2"
-source = "git+https://github.com/adamtc007/dsl?rev=a38eefe1e8d039bd8b52e52477ffd58ba39c3058#a38eefe1e8d039bd8b52e52477ffd58ba39c3058"
+version = "0.4.0"
+source = "git+https://github.com/adamtc007/dsl?rev=1d039d958a91620ab15374f05176bdfac4c872d1#1d039d958a91620ab15374f05176bdfac4c872d1"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -6397,7 +6411,7 @@ version = "0.4.0"
 dependencies = [
  "dsl_types",
  "hex",
- "semantic-decision-contracts",
+ "semantic-decision-contracts 0.4.0",
  "serde",
  "serde_json",
  "serde_path_to_error",

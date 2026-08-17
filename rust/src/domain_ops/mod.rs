@@ -154,6 +154,7 @@ pub mod helpers;
 // (multi-namespace UNION query over dictionary, registry, SemOS defs).
 // Registration flows through inventory; external ob-poc code does not
 // import these types directly.
+pub mod kyc_ramp_capture;
 pub mod kyc_stream_ops;
 pub mod kyc_workbook;
 mod onboarding;

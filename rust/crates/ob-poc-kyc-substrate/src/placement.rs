@@ -1,11 +1,23 @@
 //! Placement-set generator — EOP-PLAN-KYCUBO-KIT-001 T2 (closes KIT-3).
 //!
-//! KYC-native board/move types mirroring the `semantic-decision-contracts`
-//! gameboard discipline (T0.1 rec c — mirror, do not adopt: its types are
-//! graph-specific `GraphRevision`/`GraphDeltaPreview` anchors, ours are
-//! event-stream/precondition-native): content-addressed move identity,
-//! canonical ordering, an explicit abstention candidate, and a single
-//! content hash for the whole placement set.
+//! KYC-native board/move types shaped after `semantic-decision-contracts`'
+//! gameboard discipline (T0.1 rec c — mirror, do not adopt the *graph-shaped*
+//! types: `DesignPosition`/`LegalMove`/`GraphRevision`/`GraphDeltaPreview`
+//! carry BPMN authoring-session concepts — focus/viewport, compiler profile,
+//! policy identity, edit history — with no honest KYC equivalent; ours are
+//! event-stream/precondition-native instead). The bare, graph-agnostic
+//! vocabulary (`ABSTENTION_CANDIDATE_ID`, and — see `kyc_ramp_capture.rs` —
+//! `GameDispositionKind`/`MoveAttemptOutcome`) genuinely is domain-agnostic
+//! and *is* adopted directly from that crate: content-addressed move
+//! identity, canonical ordering, an explicit abstention candidate, and a
+//! single content hash for the whole placement set.
+//!
+//! **What "board" means here:** not a fixed layout — the authoritative,
+//! inspectable state at one position, recomputed from the folded event
+//! stream, over which the lexicon's preconditions determine the next legal
+//! transformations (construction-game / graph-rewriting model, not chess).
+//! Ratified vision + the instance-authoring/taxonomy-authoring recursive
+//! split: `docs/todo/EOP-PLAN-KYCUBO-KIT-T7_Plain-English-Ramp_v0.1.md` §7.
 //!
 //! Pure: `(state, lexicon, subject) -> PlacementSet`. No I/O, no store, no
 //! clock read — the precondition checker never reads `as_of`, so a fixed
@@ -35,9 +47,10 @@ use crate::lexicon::LexiconManifest;
 use crate::types::{AuthorityRef, EdgeId, Hash, Principal, SubjectId, TargetBinding, VerbFqn};
 
 /// Canonical candidate id for "none of these moves apply" — always present
-/// in a `PlacementSet`. Mirrors
-/// `semantic-decision-contracts::ABSTENTION_CANDIDATE_ID`.
-pub const NONE_OF_THE_ABOVE: &str = "abstain.none_of_the_above";
+/// in a `PlacementSet`. Re-exported from the shared, domain-agnostic
+/// vocabulary crate rather than duplicated (Phase 2, T7 gameboard-vocabulary
+/// adoption — `docs/todo/EOP-PLAN-KYCUBO-KIT-T7_Plain-English-Ramp_v0.1.md`).
+pub const NONE_OF_THE_ABOVE: &str = semantic_decision_contracts::ABSTENTION_CANDIDATE_ID;
 
 /// Fixed probe timestamp. `check_control_preconditions` never reads
 /// `as_of` — this exists only so `IntentEvent::new` has a value, not to

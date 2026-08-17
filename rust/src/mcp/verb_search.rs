@@ -248,7 +248,9 @@ impl VerbSearchResult {
 /// carried one in — see the comment at `orchestrator.rs`'s
 /// `soft_stage_flow: trace.soft_stage_flow...` call site.
 #[cfg(test)]
-pub(crate) fn soft_stage_flow(results: &[VerbSearchResult]) -> crate::agent::telemetry::SoftStageFlow {
+pub(crate) fn soft_stage_flow(
+    results: &[VerbSearchResult],
+) -> crate::agent::telemetry::SoftStageFlow {
     let mut by_source: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
     let mut by_tier: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
@@ -334,7 +336,10 @@ pub(crate) enum VerbSearchOutcome {
 ///
 /// IMPORTANT: Run this AFTER union+dedupe+sort (Issue I), so margin
 /// reflects true best alternatives across all semantic sources.
-pub(crate) fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbSearchOutcome {
+pub(crate) fn check_ambiguity(
+    candidates: &[VerbSearchResult],
+    threshold: f32,
+) -> VerbSearchOutcome {
     // Use default fallback threshold if not specified
     check_ambiguity_with_fallback(candidates, threshold, DEFAULT_FALLBACK_THRESHOLD)
 }
@@ -496,7 +501,6 @@ pub(crate) fn normalize_candidates(
     combined_results
 }
 
-
 /// Hybrid verb searcher combining all discovery strategies
 ///
 /// All DB access is through VerbService - no direct sqlx calls.
@@ -577,6 +581,15 @@ impl HybridVerbSearcher {
             fallback_threshold: 0.45,
             blocklist_threshold: 0.80,
         }
+    }
+
+    /// Borrow the shared embedder singleton, if configured. Lets other
+    /// query-embedding call sites (e.g. the KYC plain-English ramp, T7.2)
+    /// reuse this process's one loaded model instead of constructing their
+    /// own — `CandleEmbedder::new()` loads weights and is expensive per the
+    /// startup wiring in `agent_state.rs`.
+    pub fn embedder(&self) -> Option<&SharedEmbedder> {
+        self.embedder.as_ref()
     }
 
     /// Add embedder for semantic search capabilities

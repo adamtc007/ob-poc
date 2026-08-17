@@ -40,11 +40,14 @@ use uuid::Uuid;
 use ob_poc_kyc_seam::append_in_scope;
 use ob_poc_kyc_store::{PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_preconditions, phase1_lexicon, AuthorityRef, FoldRegistry, KycError, SubjectId,
-    V1FoldImpl,
+    check_preconditions, enumerate_placement_set, phase1_lexicon, AuthorityRef, FoldRegistry,
+    KycError, MoveId, PlacementSet, SubjectId, V1FoldImpl,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
 
+use semantic_decision_contracts::MoveAttemptOutcome;
+
+use crate::domain_ops::kyc_ramp_capture::{record_capture, CaptureRecord, Disposition};
 use crate::domain_ops::kyc_workbook::{open_workbook, KycWorkbook, RecognitionError, WorkbookError};
 use crate::sequencer_tx::PgTransactionScope;
 
@@ -66,11 +69,43 @@ static SURFACE_REGISTRY: LazyLock<FoldRegistry> = LazyLock::new(|| {
 pub(crate) enum KycWorkbookCommand {
     Open { subject: SubjectId },
     Stage { text: String },
+    /// T7.2 (`EOP-PLAN-KYCUBO-KIT-T7` §3 Q2a): plain-English proposal —
+    /// tier-0 board-restricted retrieval (`super::kyc_ramp`) over the
+    /// current frontier, never a call into `stage()`/`commit()`/`run()`
+    /// (I-1). Purely advisory: the operator still issues an ordinary
+    /// `kyc-workbook.stage <dsl-text>` themselves to actually recognise and
+    /// stage a move — this command only reads back what the board looks
+    /// like and which candidate the deterministic disposition policy
+    /// selected/clarified/abstained on (I-3). Argument values are never
+    /// synthesized here (I-4): the proposal names a verb, not filled-in
+    /// DSL text.
+    Propose { utterance: String },
     Validate,
     Show,
     Commit,
     Run,
     Discard,
+}
+
+/// T7 capture-correlation slice 1
+/// (`EOP-DD-KYCUBO-KIT-T7_Capture-Correlation-Design_v0.1.md`, RATIFIED
+/// 2026-08-17): what `Propose` showed the operator, remembered until their
+/// next `Stage` resolves it into a `CaptureRecord`. Session-scoped,
+/// in-memory, process-lifetime — same lifecycle rationale as `KycWorkbook`
+/// itself (design doc §3.1): a proposal's pending status is exactly as
+/// ephemeral as an unstaged workbook edit. `pub(crate)` because
+/// `sequencer.rs` names this type in a field declaration; fields stay
+/// module-private.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct PendingProposal {
+    utterance_text: String,
+    placement_set_hash: String,
+    proposal: String,
+    disposition: Disposition,
+    /// 1 entry for a `Select` disposition, 2+ for `Clarify`. Never built for
+    /// `Abstain` — there is no candidate to later accept or reject.
+    candidate_verb_fqns: Vec<String>,
+    created_at: DateTime<Utc>,
 }
 
 /// `None` when `content` isn't a `kyc-workbook.*` command at all (falls
@@ -93,14 +128,21 @@ pub(crate) fn parse_kyc_workbook_command(content: &str) -> Option<Result<KycWork
                 Ok(KycWorkbookCommand::Stage { text: arg.to_string() })
             }
         }
+        "propose" => {
+            if arg.is_empty() {
+                Err("kyc-workbook.propose requires plain-English text after the command".to_string())
+            } else {
+                Ok(KycWorkbookCommand::Propose { utterance: arg.to_string() })
+            }
+        }
         "validate" => Ok(KycWorkbookCommand::Validate),
         "show" => Ok(KycWorkbookCommand::Show),
         "commit" => Ok(KycWorkbookCommand::Commit),
         "run" => Ok(KycWorkbookCommand::Run),
         "discard" => Ok(KycWorkbookCommand::Discard),
         other => Err(format!(
-            "unknown kyc-workbook command {other:?} (expected one of: open, stage, validate, \
-             show, commit, run, discard)"
+            "unknown kyc-workbook command {other:?} (expected one of: open, stage, propose, \
+             validate, show, commit, run, discard)"
         )),
     })
 }
@@ -143,13 +185,26 @@ pub(crate) struct RunReport {
 
 /// Human-readable outcome text for each command — the REPL orchestrator
 /// wraps this in `ReplResponseKindV2::Info`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn dispatch(
     cmd: KycWorkbookCommand,
     workbooks: &mut HashMap<Uuid, KycWorkbook>,
+    // T7 capture-correlation slice 1: bridges a `Propose` call to whatever
+    // `Stage` follows it, so `record_capture` can be called with a real
+    // (never guessed) `user_action`. See `PendingProposal`'s doc comment.
+    pending_proposals: &mut HashMap<Uuid, PendingProposal>,
     session_id: Uuid,
     pool: &sqlx::PgPool,
     principal: &RuntimePrincipal,
     as_of: DateTime<Utc>,
+    // T7.2: precomputed utterance embedding for `Propose`, or `None` when
+    // the caller has no embedder configured (falls back to unscored board
+    // enumeration — every candidate ties at 0.0, so disposition abstains).
+    // Computed by the caller, not this module — see the module doc: no
+    // model/embedder import belongs in this zero-inference-import-gated
+    // file (I-5); `super::kyc_ramp` is the only thing here that knows how
+    // to turn a `&[f32]` into a ranked board.
+    utterance_embedding: Option<&[f32]>,
 ) -> Result<String, SurfaceError> {
     match cmd {
         KycWorkbookCommand::Open { subject } => {
@@ -170,19 +225,122 @@ pub(crate) async fn dispatch(
 
             let authority = AuthorityRef(format!("repl.kyc-workbook.stage/{}", principal.actor_id));
             match workbook.stage(&resolved_text, principal, authority, as_of) {
-                Ok(staged) => Ok(format!(
-                    "staged move: {}\ncanonical: {}",
-                    staged.legal_move.0, staged.source_text
-                )),
+                Ok(staged) => {
+                    let response = format!(
+                        "staged move: {}\ncanonical: {}",
+                        staged.legal_move.0, staged.source_text
+                    );
+                    if let Some(pending) = pending_proposals.remove(&session_id) {
+                        let staged_verb_fqn = staged.event.verb_fqn.as_str();
+                        // Applied: the operator staged exactly what was
+                        // proposed. Corrected: they staged a different,
+                        // still-legal move instead — a real signal, distinct
+                        // from an outright rejection (T7 §7 Amendment
+                        // 2026-08-17).
+                        let user_action = if pending
+                            .candidate_verb_fqns
+                            .iter()
+                            .any(|c| c == staged_verb_fqn)
+                        {
+                            MoveAttemptOutcome::Applied
+                        } else {
+                            MoveAttemptOutcome::Corrected
+                        };
+                        record_pending_capture(
+                            pool,
+                            pending,
+                            user_action,
+                            Some(staged.event.id.0),
+                        )
+                        .await;
+                    }
+                    Ok(response)
+                }
                 Err(WorkbookError::Recognition(RecognitionError::NotCurrentlyLegal {
                     verb_fqn,
                     legal,
-                })) => Ok(format!(
-                    "REJECTED — {verb_fqn} is not currently legal; currently-legal moves at the \
-                     frontier: {legal:?}"
-                )),
+                })) => {
+                    let response = format!(
+                        "REJECTED — {verb_fqn} is not currently legal; currently-legal moves at \
+                         the frontier: {legal:?}"
+                    );
+                    if let Some(pending) = pending_proposals.remove(&session_id) {
+                        // The board itself refused this as no-longer-legal —
+                        // distinct from the operator declining an accepted
+                        // proposal (`RejectedByUser`, not yet a produced
+                        // outcome from any call site here).
+                        record_pending_capture(
+                            pool,
+                            pending,
+                            MoveAttemptOutcome::CompilerRefused,
+                            None,
+                        )
+                        .await;
+                    }
+                    Ok(response)
+                }
+                // Any other error (parse failure, kit drift, DB error): a
+                // pending proposal, if any, is left untouched — nothing
+                // conclusively happened yet (T7 capture-correlation design
+                // §3.4 / Q2: "record nothing on silent abandonment", applied
+                // the same way to a failed-but-retriable attempt).
                 Err(e) => Err(e.into()),
             }
+        }
+        KycWorkbookCommand::Propose { utterance } => {
+            let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
+            let (control, obligation) = workbook.validate()?;
+            let board =
+                enumerate_placement_set(workbook.subject, &control, &obligation, &workbook.kit);
+
+            let ranked = match utterance_embedding {
+                Some(embedding) => {
+                    super::kyc_ramp::rank_placement_set(pool, embedding, &board).await?
+                }
+                None => super::kyc_ramp::rank_board_with_scores(&board, &HashMap::new()),
+            };
+            let outcome = super::kyc_ramp::decide_disposition(
+                &ranked,
+                super::kyc_ramp::DEFAULT_SELECT_THRESHOLD,
+                super::kyc_ramp::DEFAULT_CLARIFY_MARGIN,
+            );
+            let proposal_text = render_proposal(&utterance, &board, &outcome);
+
+            // Q1(a) binary v0: only Select/Clarify are ever reachable
+            // dispositions for capture — Abstain has no candidate to later
+            // accept or reject, so no PendingProposal is stored for it.
+            // Overwriting a prior unresolved entry without recording it as
+            // Rejected is the explicit, ratified slice-1 scope boundary
+            // (Q3) — supersede handling is a fast-follow.
+            let candidate_verb_fqns: Vec<String> = match &outcome {
+                super::kyc_ramp::DispositionOutcome::Select(move_id) => {
+                    vec![verb_fqn_for_move(&board, move_id).to_string()]
+                }
+                super::kyc_ramp::DispositionOutcome::Clarify(candidates) => candidates
+                    .iter()
+                    .map(|m| verb_fqn_for_move(&board, m).to_string())
+                    .collect(),
+                super::kyc_ramp::DispositionOutcome::Abstain => Vec::new(),
+            };
+            let disposition = match &outcome {
+                super::kyc_ramp::DispositionOutcome::Select(_) => Some(Disposition::Select),
+                super::kyc_ramp::DispositionOutcome::Clarify(_) => Some(Disposition::Clarify),
+                super::kyc_ramp::DispositionOutcome::Abstain => None,
+            };
+            if let Some(disposition) = disposition {
+                pending_proposals.insert(
+                    session_id,
+                    PendingProposal {
+                        utterance_text: utterance.clone(),
+                        placement_set_hash: board.board_hash.to_hex(),
+                        proposal: proposal_text.clone(),
+                        disposition,
+                        candidate_verb_fqns,
+                        created_at: as_of,
+                    },
+                );
+            }
+            Ok(proposal_text)
         }
         KycWorkbookCommand::Validate => {
             let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
@@ -328,6 +486,82 @@ fn render_preview(
     )
 }
 
+/// Looks up a `MoveId`'s verb fqn on `board`. Shared by `render_proposal`
+/// (rendering text for the operator) and the `Propose` dispatch arm
+/// (building a `PendingProposal`'s `candidate_verb_fqns`) so both read the
+/// same board lookup rather than duplicating it.
+fn verb_fqn_for_move<'a>(board: &'a PlacementSet, move_id: &MoveId) -> &'a str {
+    board
+        .moves
+        .iter()
+        .find(|m| &m.move_id == move_id)
+        .map(|m| m.verb_fqn.as_str())
+        .unwrap_or("?")
+}
+
+/// Renders a `Propose` disposition into plain text. Never fills in argument
+/// values (I-4) — only names the verb(s) the disposition landed on; the
+/// operator composes and issues the actual `kyc-workbook.stage <dsl-text>`.
+fn render_proposal(
+    utterance: &str,
+    board: &PlacementSet,
+    outcome: &super::kyc_ramp::DispositionOutcome,
+) -> String {
+    match outcome {
+        super::kyc_ramp::DispositionOutcome::Select(move_id) => format!(
+            "proposal for {utterance:?}: {} — review, then accept with \
+             kyc-workbook.stage (<verb-with-args>), or type a different stage yourself",
+            verb_fqn_for_move(board, move_id)
+        ),
+        super::kyc_ramp::DispositionOutcome::Clarify(candidates) => {
+            let options: Vec<&str> =
+                candidates.iter().map(|m| verb_fqn_for_move(board, m)).collect();
+            format!(
+                "ambiguous — {utterance:?} could mean any of: {options:?}; stage one of these \
+                 directly to disambiguate"
+            )
+        }
+        super::kyc_ramp::DispositionOutcome::Abstain => {
+            let legal: Vec<&str> = board.moves.iter().map(|m| m.verb_fqn.as_str()).collect();
+            format!(
+                "no confident match for {utterance:?} — currently legal moves at the frontier: \
+                 {legal:?}"
+            )
+        }
+    }
+}
+
+/// Best-effort capture write for a resolved `PendingProposal`: by the time
+/// this runs, the real KYC stage attempt has already succeeded or already
+/// fully resolved to a well-formed rejection — a telemetry write failure
+/// must never surface to the operator as if their stage failed, so this
+/// never propagates an error, only logs one.
+async fn record_pending_capture(
+    pool: &sqlx::PgPool,
+    pending: PendingProposal,
+    user_action: MoveAttemptOutcome,
+    staged_move_id: Option<Uuid>,
+) {
+    let record = CaptureRecord {
+        utterance_text: pending.utterance_text,
+        placement_set_hash: pending.placement_set_hash,
+        proposal: pending.proposal,
+        disposition: pending.disposition,
+        user_action,
+        staged_move_id,
+    };
+    let mut conn = match pool.acquire().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            tracing::warn!("kyc-workbook: capture write failed to acquire a connection: {e}");
+            return;
+        }
+    };
+    if let Err(e) = record_capture(&mut conn, &record).await {
+        tracing::warn!("kyc-workbook: capture write failed: {e}");
+    }
+}
+
 fn render_run_report(report: &RunReport) -> String {
     let mut msg = String::new();
     for (i, step) in report.steps.iter().enumerate() {
@@ -384,6 +618,23 @@ mod tests {
             cmd,
             Some(Ok(KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() }))
         );
+    }
+
+    #[test]
+    fn parses_propose_with_utterance() {
+        let cmd = parse_kyc_workbook_command("kyc-workbook.propose register this subject");
+        assert_eq!(
+            cmd,
+            Some(Ok(KycWorkbookCommand::Propose {
+                utterance: "register this subject".to_string()
+            }))
+        );
+    }
+
+    #[test]
+    fn rejects_propose_without_utterance() {
+        let cmd = parse_kyc_workbook_command("kyc-workbook.propose");
+        assert!(matches!(cmd, Some(Err(_))));
     }
 
     #[test]
@@ -468,6 +719,9 @@ mod tests {
             "ob_poc_kyc_store",
             "ob_poc_kyc_substrate",
             "sem_os_core",
+            // Pure, inference-free vocabulary crate (hex/serde/sha2/thiserror
+            // only, no model/embedder) — T7 §8 gameboard-vocabulary adoption.
+            "semantic_decision_contracts",
             "crate",
             "super",
         ];
@@ -478,6 +732,493 @@ mod tests {
     fn zero_inference_assertion_resolver() {
         const ALLOWLIST: &[&str] = &["regex", "sqlx", "uuid", "thiserror", "std", "super"];
         assert_no_inference_imports(include_str!("kyc_entity_resolver.rs"), ALLOWLIST);
+    }
+
+    /// T7.2 gate test (plan §2): scripted utterance → proposal → user
+    /// accepts by staging the proposed verb → ordinary `stage()` → the
+    /// resulting preview matches real T4 semantics. The "utterance" here is
+    /// simulated by feeding `Propose` a real stored embedding for
+    /// `kyc.subject.register` (fetched from the live
+    /// `verb_pattern_embeddings` table) rather than tokenizing English
+    /// text — this module has no embedder of its own (I-5); production
+    /// wiring (`sequencer.rs::handle_kyc_workbook_command`) is what turns
+    /// real utterance text into this same shape of vector. What this test
+    /// proves is everything downstream of that: `Propose` names the right
+    /// verb, and staging the operator's own resulting DSL text lands
+    /// through the SAME `KycWorkbook::stage()`/`validate()` path T4 always
+    /// used — the ramp never bypasses or duplicates it (I-1).
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn propose_then_stage_matches_frontier_semantics() {
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&database_url)
+            .await
+            .expect("connect to test DB");
+
+        // A real stored embedding for the verb we expect the proposal to
+        // land on — stands in for "an utterance that clearly means this".
+        let (embedding,): (pgvector::Vector,) = sqlx::query_as(
+            r#"SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+               WHERE verb_name = 'kyc.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("kyc.subject.register must have at least one populated embedding");
+
+        // Guard against a stale row from a prior interrupted/failed run of
+        // this test (this test's own capture-row assertion below does a
+        // `fetch_one`, which is ambiguous if more than one row matches).
+        sqlx::query(
+            r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'register this subject'"#,
+        )
+        .execute(&pool)
+        .await
+        .expect("pre-test cleanup of any stale capture row");
+
+        let subject = SubjectId(Uuid::new_v4());
+        let session_id = Uuid::new_v4();
+        let mut workbooks: HashMap<Uuid, KycWorkbook> = HashMap::new();
+        let mut pending_proposals: HashMap<Uuid, PendingProposal> = HashMap::new();
+        let principal = RuntimePrincipal {
+            actor_id: "test-actor".to_string(),
+            roles: vec!["viewer".to_string()],
+            claims: std::collections::HashMap::new(),
+            tenancy: None,
+        };
+        let as_of = Utc::now();
+
+        dispatch(
+            KycWorkbookCommand::Open { subject },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("open");
+
+        let proposal = dispatch(
+            KycWorkbookCommand::Propose { utterance: "register this subject".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            Some(embedding.as_slice()),
+        )
+        .await
+        .expect("propose");
+        assert!(
+            proposal.starts_with("proposal for") && proposal.contains("kyc.subject.register"),
+            "proposal for a register-shaped utterance should SELECT kyc.subject.register \
+             (not merely mention it in an abstain/clarify listing): {proposal:?}"
+        );
+        assert!(pending_proposals.contains_key(&session_id), "Propose(Select) must stash a pending proposal");
+
+        // The operator reads the proposal and stages the real DSL text
+        // themselves (I-4: args are never synthesized by the ramp) —
+        // ordinary `Stage`, wholly unmodified by T7.
+        dispatch(
+            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("stage the proposed verb");
+        assert!(
+            !pending_proposals.contains_key(&session_id),
+            "Stage must resolve and clear the pending proposal"
+        );
+
+        let preview = dispatch(
+            KycWorkbookCommand::Validate,
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("validate");
+        assert!(
+            preview.contains("registered=true"),
+            "T4 semantics: staging kyc.subject.register must flip registered=true in the preview: {preview:?}"
+        );
+
+        // T7 capture-correlation slice 1: Stage after a matching Select
+        // proposal must have written one accepted, resolved capture row.
+        let (disposition, user_action, staged_move_id): (String, String, Option<Uuid>) =
+            sqlx::query_as(
+                r#"SELECT disposition, user_action, staged_move_id FROM "ob-poc".kyc_ramp_capture
+                   WHERE utterance_text = 'register this subject'"#,
+            )
+            .fetch_one(&pool)
+            .await
+            .expect("capture row written for this test's utterance");
+        assert_eq!(disposition, "select");
+        assert_eq!(user_action, "applied");
+        assert!(staged_move_id.is_some());
+
+        sqlx::query(
+            r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'register this subject'"#,
+        )
+        .execute(&pool)
+        .await
+        .expect("cleanup capture row");
+    }
+
+    /// Shared setup for the correlation tests below: a connected pool and a
+    /// freshly opened, empty workbook. Not used by
+    /// `propose_then_stage_matches_frontier_semantics` above (predates this
+    /// helper; left as-is to avoid an unrelated diff).
+    #[cfg(feature = "database")]
+    async fn open_test_workbook() -> (
+        sqlx::PgPool,
+        SubjectId,
+        Uuid,
+        HashMap<Uuid, KycWorkbook>,
+        HashMap<Uuid, PendingProposal>,
+        RuntimePrincipal,
+        DateTime<Utc>,
+    ) {
+        let database_url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .max_connections(2)
+            .connect(&database_url)
+            .await
+            .expect("connect to test DB");
+
+        let subject = SubjectId(Uuid::new_v4());
+        let session_id = Uuid::new_v4();
+        let mut workbooks: HashMap<Uuid, KycWorkbook> = HashMap::new();
+        let pending_proposals: HashMap<Uuid, PendingProposal> = HashMap::new();
+        let principal = RuntimePrincipal {
+            actor_id: "test-actor".to_string(),
+            roles: vec!["viewer".to_string()],
+            claims: std::collections::HashMap::new(),
+            tenancy: None,
+        };
+        let as_of = Utc::now();
+
+        let mut opening_pending = HashMap::new();
+        dispatch(
+            KycWorkbookCommand::Open { subject },
+            &mut workbooks,
+            &mut opening_pending,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("open");
+
+        (pool, subject, session_id, workbooks, pending_proposals, principal, as_of)
+    }
+
+    async fn cleanup_capture_rows(pool: &sqlx::PgPool, utterance_text: &str) {
+        sqlx::query(r#"DELETE FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = $1"#)
+            .bind(utterance_text)
+            .execute(pool)
+            .await
+            .expect("cleanup capture rows");
+    }
+
+    /// `Stage` after a `PendingProposal` whose `candidate_verb_fqns` do NOT
+    /// include the staged verb must record `user_action = Corrected` — the
+    /// staged move itself lands successfully, but it wasn't what was
+    /// proposed (T7 §7 Amendment 2026-08-17: distinct from an outright
+    /// `RejectedByUser`/`CompilerRefused`).
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn stage_mismatched_verb_records_corrected_capture() {
+        let (pool, _subject, session_id, mut workbooks, mut pending_proposals, principal, as_of) =
+            open_test_workbook().await;
+        cleanup_capture_rows(&pool, "mismatch-utterance").await;
+
+        pending_proposals.insert(
+            session_id,
+            PendingProposal {
+                utterance_text: "mismatch-utterance".to_string(),
+                placement_set_hash: "deadbeef".to_string(),
+                proposal: "proposal for \"mismatch-utterance\": some.other.verb".to_string(),
+                disposition: Disposition::Select,
+                candidate_verb_fqns: vec!["some.other.verb".to_string()],
+                created_at: as_of,
+            },
+        );
+
+        dispatch(
+            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("stage a legal but non-matching verb");
+        assert!(!pending_proposals.contains_key(&session_id), "resolved either way — cleared");
+
+        let (disposition, user_action, staged_move_id): (String, String, Option<Uuid>) =
+            sqlx::query_as(
+                r#"SELECT disposition, user_action, staged_move_id FROM "ob-poc".kyc_ramp_capture
+                   WHERE utterance_text = 'mismatch-utterance'"#,
+            )
+            .fetch_one(&pool)
+            .await
+            .expect("capture row written");
+        assert_eq!(disposition, "select");
+        assert_eq!(user_action, "corrected");
+        assert!(staged_move_id.is_some(), "the stage itself succeeded — a real move landed");
+
+        cleanup_capture_rows(&pool, "mismatch-utterance").await;
+    }
+
+    /// `Stage` that resolves to `NotCurrentlyLegal` (well-formed DSL, not
+    /// admitted at this position) with a pending proposal present must
+    /// record `CompilerRefused` with `staged_move_id = None` — a completed,
+    /// well-formed attempt the board itself refused, not silence, and not
+    /// the operator declining an accepted proposal (T7 §7 Amendment
+    /// 2026-08-17).
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn stage_not_currently_legal_records_compiler_refused_with_no_staged_move_id() {
+        let (pool, _subject, session_id, mut workbooks, mut pending_proposals, principal, as_of) =
+            open_test_workbook().await;
+        cleanup_capture_rows(&pool, "illegal-utterance").await;
+
+        // `kyc.subject.classify-structure` requires SubjectRegistered
+        // (lexicon.rs) — on a freshly opened, never-registered subject it is
+        // NOT in the frontier placement set.
+        pending_proposals.insert(
+            session_id,
+            PendingProposal {
+                utterance_text: "illegal-utterance".to_string(),
+                placement_set_hash: "deadbeef".to_string(),
+                proposal: "proposal for \"illegal-utterance\": kyc.subject.classify-structure"
+                    .to_string(),
+                disposition: Disposition::Select,
+                candidate_verb_fqns: vec!["kyc.subject.classify-structure".to_string()],
+                created_at: as_of,
+            },
+        );
+
+        let response = dispatch(
+            KycWorkbookCommand::Stage {
+                text: r#"(kyc.subject.classify-structure :structure-class "private_company")"#
+                    .to_string(),
+            },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("dispatch returns Ok with a REJECTED message, not an Err");
+        assert!(response.starts_with("REJECTED"), "unexpected response: {response:?}");
+        assert!(!pending_proposals.contains_key(&session_id));
+
+        let (disposition, user_action, staged_move_id): (String, String, Option<Uuid>) =
+            sqlx::query_as(
+                r#"SELECT disposition, user_action, staged_move_id FROM "ob-poc".kyc_ramp_capture
+                   WHERE utterance_text = 'illegal-utterance'"#,
+            )
+            .fetch_one(&pool)
+            .await
+            .expect("capture row written");
+        assert_eq!(disposition, "select");
+        assert_eq!(user_action, "compiler_refused");
+        assert!(staged_move_id.is_none(), "no IntentEvent exists for a NotCurrentlyLegal refusal");
+
+        cleanup_capture_rows(&pool, "illegal-utterance").await;
+    }
+
+    /// A `Stage` call that errors outright (malformed DSL text) must leave a
+    /// pending proposal completely untouched and record nothing — nothing
+    /// conclusively happened yet (Q2). A well-formed follow-up `Stage` then
+    /// resolves it normally, proving the earlier failure only deferred
+    /// resolution, never dropped it.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn stage_error_leaves_pending_proposal_untouched_and_records_nothing() {
+        let (pool, _subject, session_id, mut workbooks, mut pending_proposals, principal, as_of) =
+            open_test_workbook().await;
+        cleanup_capture_rows(&pool, "error-utterance").await;
+
+        let original = PendingProposal {
+            utterance_text: "error-utterance".to_string(),
+            placement_set_hash: "deadbeef".to_string(),
+            proposal: "proposal for \"error-utterance\": kyc.subject.register".to_string(),
+            disposition: Disposition::Select,
+            candidate_verb_fqns: vec!["kyc.subject.register".to_string()],
+            created_at: as_of,
+        };
+        pending_proposals.insert(session_id, original.clone());
+
+        let err = dispatch(
+            KycWorkbookCommand::Stage { text: "not valid dsl text at all".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await;
+        assert!(err.is_err(), "malformed DSL text must be a dispatch Err, not an Ok/REJECTED");
+        assert_eq!(
+            pending_proposals.get(&session_id),
+            Some(&original),
+            "an Err stage must leave the pending proposal byte-for-byte untouched"
+        );
+
+        let row_exists: Option<(Uuid,)> = sqlx::query_as(
+            r#"SELECT id FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'error-utterance'"#,
+        )
+        .fetch_optional(&pool)
+        .await
+        .expect("query capture rows");
+        assert!(row_exists.is_none(), "an Err stage must record nothing");
+
+        // The earlier malformed attempt only deferred resolution — a
+        // well-formed follow-up now resolves the SAME pending proposal.
+        dispatch(
+            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("well-formed follow-up stage");
+        assert!(!pending_proposals.contains_key(&session_id));
+
+        let (user_action,): (String,) = sqlx::query_as(
+            r#"SELECT user_action FROM "ob-poc".kyc_ramp_capture WHERE utterance_text = 'error-utterance'"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("capture row written by the follow-up stage");
+        assert_eq!(user_action, "applied");
+
+        cleanup_capture_rows(&pool, "error-utterance").await;
+    }
+
+    /// Regression guard (I-1 "ramp is optional"): `Stage` with no prior
+    /// `Propose` for this session must behave exactly as it did before
+    /// slice 1 — no map entry, no capture row, unchanged response shape.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn stage_without_pending_proposal_matches_pre_slice1_behavior() {
+        let (pool, _subject, session_id, mut workbooks, mut pending_proposals, principal, as_of) =
+            open_test_workbook().await;
+        assert!(pending_proposals.is_empty());
+
+        let response = dispatch(
+            KycWorkbookCommand::Stage { text: "(kyc.subject.register)".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("stage with no pending proposal");
+        assert!(response.starts_with("staged move:"));
+        assert!(pending_proposals.is_empty(), "no pending proposal existed to insert or clear");
+
+        let count: (i64,) = sqlx::query_as(
+            r#"SELECT count(*) FROM "ob-poc".kyc_ramp_capture WHERE proposal = $1"#,
+        )
+        .bind(&response)
+        .fetch_one(&pool)
+        .await
+        .expect("query capture rows");
+        assert_eq!(count.0, 0, "no capture row should be written when there was nothing to resolve");
+    }
+
+    /// `Commit` never resolves a pending proposal — only `Stage` (and,
+    /// post-fast-follow, `Discard`) are resolution points. Proposing then
+    /// committing without staging must leave the pending-proposal entry
+    /// present afterward. Accepted bounded side effect for slice 1: the
+    /// entry is left dangling in memory until process restart or a future
+    /// `Propose`/`Discard` for the same session — no persistence, no
+    /// cross-session leak.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    async fn commit_never_resolves_pending_proposal() {
+        let (pool, _subject, session_id, mut workbooks, mut pending_proposals, principal, as_of) =
+            open_test_workbook().await;
+
+        let (embedding,): (pgvector::Vector,) = sqlx::query_as(
+            r#"SELECT embedding FROM "ob-poc".verb_pattern_embeddings
+               WHERE verb_name = 'kyc.subject.register' AND embedding IS NOT NULL LIMIT 1"#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("kyc.subject.register must have at least one populated embedding");
+
+        dispatch(
+            KycWorkbookCommand::Propose { utterance: "commit-guard-utterance".to_string() },
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            Some(embedding.as_slice()),
+        )
+        .await
+        .expect("propose");
+        assert!(pending_proposals.contains_key(&session_id));
+
+        dispatch(
+            KycWorkbookCommand::Commit,
+            &mut workbooks,
+            &mut pending_proposals,
+            session_id,
+            &pool,
+            &principal,
+            as_of,
+            None,
+        )
+        .await
+        .expect("commit with nothing staged");
+
+        assert!(
+            pending_proposals.contains_key(&session_id),
+            "Commit must never silently resolve a pending proposal — only Stage/Discard may"
+        );
+
+        pending_proposals.remove(&session_id);
     }
 
     fn assert_no_inference_imports(source: &str, allowlist: &[&str]) {

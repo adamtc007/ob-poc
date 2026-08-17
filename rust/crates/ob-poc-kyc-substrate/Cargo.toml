@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2021"
 description = "KYC/UBO W1 substrate: event contract, lexicon, control fold, obligation fold, determination. In-memory; no schema."
 
-# No sqlx. No sem_os_core (git dep). No DB. Pure semantic model.
+# No sqlx. No sem_os_core (git dep — heavy/DB-adjacent). No DB. Pure semantic
+# model. semantic-decision-contracts is an explicit exception: same upstream
+# repo (github.com/adamtc007/dsl), but a bare host-neutral vocabulary crate
+# (hex/serde/sha2/thiserror only, no DB) — see
+# docs/todo/EOP-PLAN-KYCUBO-KIT-T7_Plain-English-Ramp_v0.1.md §7/§8 for the
+# shared-vocabulary rationale.
 [dependencies]
 anyhow      = "1.0"
 chrono      = { version = "0.4", features = ["serde"] }
@@ -15,6 +20,7 @@ hex         = "0.4"
 thiserror   = "1.0"
 uuid        = { version = "1.4", features = ["v4", "v5", "serde"] }
 smallvec    = { version = "1.11", features = ["serde"] }
+semantic-decision-contracts.workspace = true
 
 [dev-dependencies]
 # dsl-parser: T1 round-trip equivalence gate (parse(render(event)) ≡ event).
