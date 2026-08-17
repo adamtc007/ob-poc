@@ -170,7 +170,12 @@ async fn session_roundtrip() {
     // test (assert-control -> attach-evidence -> verify) is unchanged, it
     // now has a realistic 4th predecessor move instead of 3.
     workbook
-        .stage("(kyc.subject.register)", &principal, AuthorityRef("analyst.register".into()), as_of)
+        .stage(
+            "(kyc.subject.register)",
+            &principal,
+            AuthorityRef("analyst.register".into()),
+            as_of,
+        )
         .expect("move 0 (register) must recognise against the empty-committed frontier");
 
     // GENUINE T6.2 FINDING (2026-08-12, reported per the plan's own B3
@@ -290,7 +295,10 @@ async fn new_ubo_from_baseplate() {
     let mut conn = pool.acquire().await.unwrap();
     let workbook = open_workbook(&mut conn, subject).await.unwrap();
     drop(conn);
-    assert!(workbook.committed.is_empty(), "never-appended subject has no committed history");
+    assert!(
+        workbook.committed.is_empty(),
+        "never-appended subject has no committed history"
+    );
     let (empty_state, _empty_obligation) = workbook.validate().unwrap();
     assert_eq!(empty_state.edges.len(), 0);
     assert!(!empty_state.registered);
@@ -299,7 +307,12 @@ async fn new_ubo_from_baseplate() {
     let mut workbook = open_workbook(&mut conn, subject).await.unwrap();
     drop(conn);
     workbook
-        .stage("(kyc.subject.register)", &principal, AuthorityRef("analyst.register".into()), as_of)
+        .stage(
+            "(kyc.subject.register)",
+            &principal,
+            AuthorityRef("analyst.register".into()),
+            as_of,
+        )
         .expect("register has no preconditions — legal against the empty baseplate");
 
     let mut scope = TestScope::begin(&pool).await;
@@ -309,7 +322,10 @@ async fn new_ubo_from_baseplate() {
     let mut conn2 = pool.acquire().await.unwrap();
     let reopened = open_workbook(&mut conn2, subject).await.unwrap();
     let (state, _obligation) = reopened.validate().unwrap();
-    assert!(state.registered, "committed register must fold true on re-open");
+    assert!(
+        state.registered,
+        "committed register must fold true on re-open"
+    );
 
     cleanup(&pool, subject).await;
 }
@@ -358,12 +374,18 @@ async fn invalid_workbook_blocks_commit() {
         &lexicon,
     ));
 
-    assert!(workbook.validate().is_err(), "validate() must reject before any commit attempt");
+    assert!(
+        workbook.validate().is_err(),
+        "validate() must reject before any commit attempt"
+    );
 
     // Directly call commit() too — simulating a caller that skipped validate().
     let mut scope = TestScope::begin(&pool).await;
     let result = workbook.commit(&mut scope, &registry).await;
-    assert!(result.is_err(), "commit() must independently reject via its own fail-fast preview");
+    assert!(
+        result.is_err(),
+        "commit() must independently reject via its own fail-fast preview"
+    );
     scope.rollback().await;
 
     assert_eq!(
@@ -402,7 +424,9 @@ fn zero_inference_assertion() {
     let mut violations = Vec::new();
     for line in source.lines() {
         let trimmed = line.trim();
-        let Some(rest) = trimmed.strip_prefix("use ") else { continue };
+        let Some(rest) = trimmed.strip_prefix("use ") else {
+            continue;
+        };
         let root = rest
             .split(|c: char| c == ':' || c == ';' || c == '{' || c.is_whitespace())
             .next()
@@ -420,6 +444,51 @@ fn zero_inference_assertion() {
         "kyc_workbook.rs has imports outside the zero-inference allowlist {ALLOWLIST:?} \
          (extend the allowlist deliberately, in this test, if the import is genuinely \
          zero-inference — never silently): {violations:#?}"
+    );
+}
+
+/// EOP-PLAN-KYCUBO-KIT-T7 v0.1 §0.3 / I-5: `zero_inference_assertion` above scans
+/// external-crate imports only — it explicitly skips `crate`/`super`/`self` roots
+/// (see the `continue` above), so a crate-internal `use crate::mcp::...` or
+/// `use crate::agent::...` inside the workbook module family would compile today
+/// without tripping the gate. This tooth closes that blind spot directly: no
+/// `use` line in `kyc_workbook.rs` or `kyc_workbook_surface.rs` may reference the
+/// ob-poc inference/discovery surface (`crate::mcp`, `crate::agent`) or any
+/// plain-English ramp module (`crate::repl::kyc_ramp`, indicative name per T7
+/// §1 I-5). Direction of dependency stays ramp → workbook, never workbook → ramp.
+#[test]
+fn workbook_module_remains_ramp_free() {
+    const FORBIDDEN_PREFIXES: &[&str] = &["crate::mcp", "crate::agent", "crate::repl::kyc_ramp"];
+
+    const SOURCES: &[(&str, &str)] = &[
+        (
+            "kyc_workbook.rs",
+            include_str!("../src/domain_ops/kyc_workbook.rs"),
+        ),
+        (
+            "kyc_workbook_surface.rs",
+            include_str!("../src/repl/kyc_workbook_surface.rs"),
+        ),
+    ];
+
+    let mut violations = Vec::new();
+    for (file, source) in SOURCES {
+        for line in source.lines() {
+            let trimmed = line.trim();
+            let Some(rest) = trimmed.strip_prefix("use ") else {
+                continue;
+            };
+            if FORBIDDEN_PREFIXES.iter().any(|p| rest.starts_with(p)) {
+                violations.push(format!("{file}: {line}"));
+            }
+        }
+    }
+
+    assert!(
+        violations.is_empty(),
+        "workbook module family must stay ramp-free — found imports from the \
+         forbidden set {FORBIDDEN_PREFIXES:?} (I-5: the ramp depends on workbook \
+         types, never the reverse): {violations:#?}"
     );
 }
 
@@ -448,7 +517,15 @@ async fn stale_snapshot_recovers() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &assert_event, "(setup-assert)", |_, _| Ok(())).await.unwrap();
+        append_in_scope(
+            &mut scope,
+            &registry,
+            &assert_event,
+            "(setup-assert)",
+            |_, _| Ok(()),
+        )
+        .await
+        .unwrap();
 
         let evidence_event = IntentEvent::new(
             subject,
@@ -460,7 +537,15 @@ async fn stale_snapshot_recovers() {
             as_of,
         )
         .with_lexicon_hash(lexicon.hash);
-        append_in_scope(&mut scope, &registry, &evidence_event, "(setup-evidence)", |_, _| Ok(())).await.unwrap();
+        append_in_scope(
+            &mut scope,
+            &registry,
+            &evidence_event,
+            "(setup-evidence)",
+            |_, _| Ok(()),
+        )
+        .await
+        .unwrap();
         scope.commit().await;
     }
 
@@ -476,7 +561,9 @@ async fn stale_snapshot_recovers() {
             AuthorityRef("analyst.verify".into()),
             as_of,
         )
-        .expect("verify must recognise — the edge is Evidenced in this workbook's committed history");
+        .expect(
+            "verify must recognise — the edge is Evidenced in this workbook's committed history",
+        );
 
     // Concurrent connection commits `supersede` on the SAME edge mid-session
     // — a genuine second connection, a real interleave, not a mock.
@@ -504,7 +591,10 @@ async fn stale_snapshot_recovers() {
             .await
             .expect("concurrent supersede must itself succeed (raw append bypasses the checker, same as the setup events above)");
         scope2.commit().await;
-        assert!(!outcome.deduped, "concurrent supersede must be a real new append, not a dedupe no-op");
+        assert!(
+            !outcome.deduped,
+            "concurrent supersede must be a real new append, not a dedupe no-op"
+        );
     }
 
     // Workbook 1 now commits its staged `verify` — the edge it validated
