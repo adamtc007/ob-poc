@@ -3353,6 +3353,46 @@ dependencies = [
 ]
 
 [[patch.unused]]
+name = "dsl-core"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "dsl_types"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "sem_os_core"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "sem_os_ontology"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "sem_os_policy"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "sem_os_types"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "semantic-pack"
+version = "0.4.0"
+
+[[patch.unused]]
+name = "bpmn-lite-analysis"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "bpmn-lite-bus-handler"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "bpmn-lite-compiler"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "bpmn-lite-engine"
 version = "0.1.0"
 
@@ -3365,7 +3405,11 @@ name = "bpmn-lite-ffi-http"
 version = "0.1.0"
 
 [[patch.unused]]
-name = "bpmn-lite-server"
+name = "bpmn-lite-server-designer"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "bpmn-lite-server-runner"
 version = "0.1.0"
 
 [[patch.unused]]
@@ -3373,7 +3417,27 @@ name = "bpmn-lite-store"
 version = "0.1.0"
 
 [[patch.unused]]
+name = "bpmn-lite-types"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "bpmn-lite-vm"
+version = "0.1.0"
+
+[[patch.unused]]
 name = "dmn-lite-bridge"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "dmn-lite-compiler"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "dmn-lite-parser"
+version = "0.1.0"
+
+[[patch.unused]]
+name = "dmn-lite-types"
 version = "0.1.0"
 
 [[patch.unused]]
@@ -3401,25 +3465,9 @@ name = "ffi-catalogue"
 version = "0.1.0"
 
 [[patch.unused]]
-name = "dsl-core"
+name = "ffi-dispatcher"
 version = "0.1.0"
 
 [[patch.unused]]
-name = "dsl_types"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_core"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_ontology"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_policy"
-version = "0.1.0"
-
-[[patch.unused]]
-name = "sem_os_types"
+name = "ffi-types"
 version = "0.1.0"

@@ -18,6 +18,7 @@ mod byok_conformance;
 mod calibration;
 mod catalogue;
 mod dag_test;
+mod dag_to_bpmn;
 mod deal_harness;
 mod entity;
 mod eval_tooling;
@@ -412,6 +413,21 @@ enum Command {
     /// SemOsVerbOp registry / YAML completeness diff (dead-code +
     /// dual-routing static sweep, see xtask/src/registry_graph.rs).
     RegistryGraph,
+
+    /// Compile one dag_taxonomies slot's state machine into a bpmn-lite
+    /// DSL workflow template (see crates/dag-to-bpmn).
+    DagToBpmn {
+        /// Path to the DAG taxonomy YAML file, e.g.
+        /// rust/config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml
+        dag_file: std::path::PathBuf,
+
+        /// Slot id within that DAG to compile, e.g. kyc_case.
+        slot_id: String,
+
+        /// Optional path to write the emitted .dsl source to.
+        #[arg(long)]
+        out: Option<std::path::PathBuf>,
+    },
 
     /// Catalogue authorship commands (Tranche 3 Phase 3.B —
     /// propose / commit / rollback / list).
@@ -1535,6 +1551,11 @@ fn main() -> Result<()> {
             Ok(())
         }
         Command::RegistryGraph => registry_graph::run(),
+        Command::DagToBpmn {
+            dag_file,
+            slot_id,
+            out,
+        } => dag_to_bpmn::run(dag_file, slot_id, out),
         Command::Catalogue { action } => {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(catalogue::run(action))?;

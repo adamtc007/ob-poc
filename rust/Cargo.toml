@@ -399,6 +399,10 @@ members = [
     # Unified DSL v0.2 — Tranche 6: SVG diagram renderer
     "crates/dsl-render",
 
+    # dag_taxonomies YAML -> bpmn-lite DSL template compiler (Option A of the
+    # "shared board" vision — see docs/todo/EOP-DD-DAGBPMN-001_DAG-Taxonomy-to-BPMN-Template-Compiler_v0.1.md)
+    "crates/dag-to-bpmn",
+
 ]
 
 [workspace.dependencies]
@@ -417,18 +421,30 @@ semantic-decision-contracts = { git = "https://github.com/adamtc007/dsl", rev = 
 # BPMN integration family: one exact immutable revision. Keeping the bus,
 # manifest, engine, FFI and runner crates on one commit prevents duplicate wire
 # types and cold-clone API skew.
-bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
-bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "44afb933a1f70e7697163bc07d488867c4d8d846" }
+#
+# 2026-08-17: bumped 44afb93 -> 2843e3b (the exact bpmn-lite commit where its
+# own Cargo.toml re-pinned the dsl repo to rev 1d039d9 above — the same rev
+# this workspace pins directly). Before this bump, ob-poc and bpmn-lite
+# resolved the shared sem_os_ontology/sem_os_policy/semantic-decision-contracts/
+# semantic-pack/semantic-embedder crates from two DIFFERENT dsl revs in their
+# committed manifests (only coincidentally aligned locally via a gitignored
+# [patch] in .cargo/config.toml, which CI/cold-clone never sees). Verified
+# with that local patch temporarily disabled: dsl_types/sem_os_core/etc. now
+# resolve to exactly one version each (source = the single rev=1d039d9 git
+# dependency), not two divergent copies. dsl_types/dsl-core/sem_os_core/
+# sem_os_types remain ob-poc-only — bpmn-lite does not depend on them.
+bpmn-lite-engine   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+bpmn-lite-store    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+bpmn-lite-ffi-http = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+bpmn-lite-ffi-grpc = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+ffi-catalogue      = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+dmn-lite-bridge    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+dsl-bus-client     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+dsl-bus-server     = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+dsl-bus-storage    = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+dsl-bus-protocol   = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+dsl-manifest       = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
+bpmn-lite-server-runner = { git = "https://github.com/adamtc007/bpmn-lite", rev = "2843e3b8366362dd2c2a6e9720590923f17b1e42" }
 
 [lints.rust]
 dead_code = "deny"

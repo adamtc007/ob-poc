@@ -1,0 +1,20 @@
+[package]
+name = "dag-to-bpmn"
+version = "0.1.0"
+edition = "2021"
+description = "Compiles a dag_taxonomies state-machine slot into a bpmn-lite DSL workflow template, validated through the real dsl-bpmn-frontend/dsl-lowering pipeline (dsl-migrate-verify::compile_to_spec)."
+
+[dependencies]
+dsl_types.workspace = true
+dsl-migrate-verify = { path = "../dsl-migrate-verify" }
+dsl-lowering = { path = "../dsl-lowering" }
+serde_yaml = "0.9"
+thiserror = "1.0"
+anyhow = "1"
+
+[dev-dependencies]
+dsl-core.workspace = true
+
+[lints.rust]
+dead_code = "deny"
+unreachable_pub = "deny"

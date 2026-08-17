@@ -36,6 +36,7 @@ sem_os_policy.workspace = true
 sem_os_client = { path = "../crates/sem_os_client" }
 sem_os_postgres = { path = "../crates/sem_os_postgres" }
 dsl-core.workspace = true
+dag-to-bpmn = { path = "../crates/dag-to-bpmn" }
 playbook-core = { path = "../crates/playbook-core" }
 dsl-runtime = { path = "../crates/dsl-runtime" }
 csv = "1.3"
