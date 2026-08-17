@@ -1,11 +1,18 @@
 # EOP-DD-KYCUBO-004: W5 Screening Hook Wiring + W6 Case/Workstream Projection Cutover — Plan v0.1
 
-**Status:** DRAFT — plan only, no implementation. Written per explicit instruction
-("leave 1, do 4, plan 2 and 3") against CLAUDE.md's KYC/UBO "Remaining V&S scope"
-list. Item 1 (economic-axis crossing on `ControlProngStrategy`) is out of scope by
-that instruction and not discussed further here. Item 4 (`kyc_stream` `SourceOfTruth`
-variant) is DONE — commit `1965253` on `github.com/adamtc007/dsl` (pushed,
-`refactor/sem-os-pack-policy`) + ob-poc `fa08c0e0`.
+**Status:** Part 1 (W5) DONE — commit `b028e5b3`. Part 2 (W6) still plan-only.
+Written per explicit instruction ("leave 1, do 4, plan 2 and 3") against
+CLAUDE.md's KYC/UBO "Remaining V&S scope" list. Item 1 (economic-axis crossing on
+`ControlProngStrategy`) is out of scope by that instruction and not discussed
+further here. Item 4 (`kyc_stream` `SourceOfTruth` variant) is DONE — commit
+`1965253` on `github.com/adamtc007/dsl` (pushed, `refactor/sem-os-pack-policy`)
++ ob-poc `fa08c0e0`.
+
+**Part 1 (W5) implemented same session, `b028e5b3`** — the 3 open questions
+below were resolved by direct investigation (not left for a future session)
+and Option B (outbox+drainer) was superseded by a simpler same-transaction
+plugin op once the fan-out requirement was understood: see "What actually
+shipped" at the end of Part 1.
 
 This plan covers the remaining two items:
 - **W5** — wire real `screening.*` outcomes into the `kyc.obligation.update-screening`
@@ -103,18 +110,44 @@ avoids adding a dsl-runtime dependency to the screening ops module.
    obligation track want "screening in progress" visibility, or only
    "screening resolved, clear or not"?)
 
-### Estimated shape (once above is resolved)
+### What actually shipped (commit `b028e5b3`)
 
-- 1 migration: outbox table (or reuse an existing generic outbox if one
-  already exists for this purpose — check before adding a new one).
-- 1 new drainer module in `ob-poc-kyc-store` (or `ob-poc-kyc-seam` per
-  existing drainer placement), mirroring `PgKycObligationDrainer`.
-- Enqueue call added at the end of `screening.complete`/`review-hit`'s
-  existing CRUD path (small, additive; behavior stays `crud`, no new plugin
-  op needed if the enqueue can be done as a trigger — cheapest option, worth
-  checking first).
-- Tests: RED-first (screening completes, obligation fold shows no change
-  until drainer runs), then GREEN after wiring — same discipline as W1/W4/W6.
+All 3 open questions resolved by direct code investigation, not left open:
+
+1. **Subject/obligation linkage** — confirmed via `tests/kyc_w3_w5_w6.rs`:
+   `kyc.obligation.*`/`kyc.person.*` verbs key `subject-id` to the natural
+   person/entity's own real UUID, not a separate synthetic identifier. So
+   `entity_workstreams.entity_id` (reached via `screenings.workstream_id`)
+   **is** the obligation subject-id directly — no new linkage table needed.
+2. **`entity_workstreams.screening_cleared`** — confirmed dead (no writer
+   anywhere in the codebase). Left untouched; not this change's problem to
+   solve.
+3. **`review-hit`'s distinct semantics** — confirmed real: `HIT_CONFIRMED`
+   fails the screening track outright (`rejected`, does not go back to
+   `in_progress`); `HIT_DISMISSED` clears it (`satisfied`). Handled as two
+   separate status→`TrackState` mappings, both fail-closed on any value
+   outside the verb YAML's declared `valid_values` (mirrors the
+   `STRUCTURE_CLASS_WIRE_VALUES` precedent).
+
+**Option B (outbox+drainer) was reconsidered and dropped once #1 was
+resolved.** The fan-out ("which obligations does this screening result
+apply to") needs a transactional read of the subject's current obligation
+fold at write time — an async drainer would just duplicate that same read
+later, adding latency for no correctness benefit. Shipped as **Option A**
+instead: `screening.complete`/`review-hit` moved from `behavior: crud` to
+`behavior: plugin` (`ScreeningComplete`/`ScreeningReviewHit` in
+`kyc_stream_ops.rs`), preserving the original UPDATE semantics exactly
+(`COALESCE` for optional args, same columns), then in the same transaction:
+resolve the screened entity → `PgKycEventStore::load_events` +
+`fold_obligations_versioned` for that subject → fan out one
+`kyc.obligation.update-screening` event per currently-registered obligation.
+Zero obligations yet raised is a no-op, not an error.
+
+Tests: `rust/tests/kyc_w5_screening_hook.rs`, 3 cases (CLEAR→satisfied
+happy path, HIT_CONFIRMED→rejected, fail-closed unrecognized status writes
+nothing). RED-proof: temporarily removing the fan-out call didn't just fail
+a test, it failed to **compile** (`dead_code = "deny"` caught the now-unused
+helper) — stronger evidence of real wiring than a runtime assertion.
 
 ---
 
@@ -194,7 +227,7 @@ consistently rejected elsewhere.
 
 ## Summary
 
-| Item | Size | Next concrete step |
-|------|------|---------------------|
-| W5 screening hook | Small — 1 drainer + 1 outbox, verb already exists | Resolve the 3 open questions above, then implement Option B |
-| W6 case/workstream cutover | Large — new verb/lexicon design + wide consumer migration | Full consumer inventory pass, then a dedicated design doc before any code |
+| Item | Size | Status |
+|------|------|--------|
+| W5 screening hook | Small — 1 plugin op pair, verb already existed | **DONE**, commit `b028e5b3` |
+| W6 case/workstream cutover | Large — new verb/lexicon design + wide consumer migration | Plan only. Next: full consumer inventory pass, then a dedicated design doc before any code |
