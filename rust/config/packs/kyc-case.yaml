@@ -201,6 +201,12 @@ allowed_verbs:
   - ubo.edge.verify
   - ubo.edge.supersede
   - ubo.edge.reconcile-conflict
+  # TS.4 (EOP-DD-KYCUBO-KIT-TS0 §2.6, K-8): added after the block above was
+  # first wired — same gap the comment above already describes, just for a
+  # verb that didn't exist yet at the time. `freeze` hard-errors while any
+  # unpierced Nominee edge remains active, so this session-level path is the
+  # only way to actually clear that state from a live KYC workspace.
+  - ubo.edge.pierce-nominee
   - ubo.determination.select-strategy
   - ubo.determination.compute-fold
   - ubo.determination.apply-smo-fallback
