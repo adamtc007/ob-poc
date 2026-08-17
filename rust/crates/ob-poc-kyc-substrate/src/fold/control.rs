@@ -185,6 +185,12 @@ pub struct ControlState {
     /// Subject registration (if `kyc.subject.register` has fired).
     pub registered: bool,
     pub register_event_id: Option<EventId>,
+    /// Entity ids registered so far under this subject_root (T6 row-9 fix,
+    /// 2026-08-17, corrects EOP-DD-KYCUBO-KIT-T6 §5). `registered` alone
+    /// can't distinguish self-registration from the N natural-person
+    /// candidate registrations that share one subject_root — see
+    /// `Precondition::NotAlreadyRegistered`, which is keyed off this set.
+    pub registered_entity_ids: BTreeSet<EntityId>,
 }
 
 impl ControlState {
@@ -323,6 +329,9 @@ pub(crate) fn apply_one_control_event(
         "kyc.subject.register" => {
             state.registered = true;
             state.register_event_id = Some(event.id);
+            if let Some(eid) = entity_id(p, "entity_id") {
+                state.registered_entity_ids.insert(eid);
+            }
         }
 
         "kyc.subject.classify-structure" => {
@@ -599,13 +608,26 @@ pub fn check_preconditions(
                 }
             }
             Precondition::NotAlreadyRegistered => {
-                if control.registered {
-                    return Err(KycError::PreconditionFailed {
-                        verb: lexicon_entry.fqn.clone(),
-                        reason: "subject is already registered; re-registration is not a \
-                                 supported move"
-                            .into(),
-                    });
+                // T6 row-9 fix (2026-08-17, corrects EOP-DD-KYCUBO-KIT-T6
+                // §5): the bare `control.registered` flag can't distinguish
+                // self-registration from the N natural-person candidate
+                // registrations that share one subject_root (real
+                // production shape — `kyc_m3_remediation.rs`'s multi-person
+                // fixture) — key the check off the incoming event's own
+                // `entity_id` instead. Same discipline as
+                // `NoDuplicateActiveEdge` below: a probe with no
+                // `entity_id` (`placement::probe_event`'s payload is always
+                // `Null`) is vacuously satisfied, never vetoed.
+                if let Some(eid) = entity_id(&event.payload, "entity_id") {
+                    if control.registered_entity_ids.contains(&eid) {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!(
+                                "entity {eid:?} is already registered under this subject; \
+                                 re-registration of the same entity is not a supported move"
+                            ),
+                        });
+                    }
                 }
             }
             Precondition::StructureClassified => {

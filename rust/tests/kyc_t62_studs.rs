@@ -20,6 +20,14 @@
 //! - row 5 (`reconcile-conflict`): `SubjectRegistered` alone — block targets
 //!   an unregistered subject; admit succeeds even with zero edges (the
 //!   ratified no-amendment reading).
+//! - row 9 (`kyc.subject.register`, T6.3 fix, 2026-08-17, corrects
+//!   EOP-DD-KYCUBO-KIT-T6 §5 — see its §6 amendment): `NotAlreadyRegistered`,
+//!   now keyed off the event's `entity_id` (`ControlState.registered_entity_ids`)
+//!   rather than the bare per-subject `registered` bool — block targets a
+//!   true duplicate (same subject_root + same entity_id); admit targets
+//!   multi-person registration (same subject_root, distinct entity_id per
+//!   candidate), the real production shape the original bare-boolean
+//!   reading would have broken.
 
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{PgPool, Postgres, Transaction};
@@ -93,7 +101,7 @@ async fn register(scope: &mut Scope, subject: SubjectId) {
             scope,
         )
         .await
-        .expect("register has no preconditions");
+        .expect("first self-registration for a fresh subject must always be admitted");
 }
 
 // ── rows 1/2 — assert-control / assert-economic-interest ───────────────────
@@ -418,6 +426,74 @@ async fn row5_reconcile_conflict_admits_registered_subject_with_zero_edges() {
         "reconcile-conflict must be admitted for a registered subject even with zero edges \
          (ratified without the optional economic-edge amendment): {result:?}"
     );
+    scope.tx.rollback().await.unwrap();
+    cleanup(&pool, subject).await;
+}
+
+// ── row 9 — kyc.subject.register (T6.3 fix, 2026-08-17) ────────────────────
+
+#[tokio::test]
+async fn row9_register_blocks_true_duplicate_entity_id() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let mut scope = Scope::begin(&pool).await;
+    let entity = Uuid::new_v4();
+    KycSubjectRegister
+        .execute(
+            &serde_json::json!({
+                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true
+            }),
+            &mut VerbExecutionContext::default(),
+            &mut scope,
+        )
+        .await
+        .expect("first registration of a fresh (subject, entity) pair must be admitted");
+
+    let result = KycSubjectRegister
+        .execute(
+            &serde_json::json!({
+                "subject-id": subject.0, "entity-id": entity, "is_natural_person": true
+            }),
+            &mut VerbExecutionContext::default(),
+            &mut scope,
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "re-registering the SAME (subject_root, entity_id) pair must be blocked: {result:?}"
+    );
+    scope.tx.rollback().await.unwrap();
+    cleanup(&pool, subject).await;
+}
+
+#[tokio::test]
+async fn row9_register_admits_multi_person_distinct_entity_ids() {
+    let pool = pool().await;
+    let subject = SubjectId(Uuid::new_v4());
+    let mut scope = Scope::begin(&pool).await;
+
+    // The self-registration (no entity-id -> defaults to subject-id).
+    register(&mut scope, subject).await;
+
+    // Three DISTINCT natural-person candidates sharing the same subject_root
+    // — the real production shape (kyc_m3_remediation.rs) that a bare
+    // per-subject `registered` boolean would have wrongly blocked.
+    for candidate in [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()] {
+        let result = KycSubjectRegister
+            .execute(
+                &serde_json::json!({
+                    "subject-id": subject.0, "entity-id": candidate, "is_natural_person": true
+                }),
+                &mut VerbExecutionContext::default(),
+                &mut scope,
+            )
+            .await;
+        assert!(
+            result.is_ok(),
+            "registering a distinct entity_id under an already-registered subject_root \
+             must be admitted (multi-person registration): {result:?}"
+        );
+    }
     scope.tx.rollback().await.unwrap();
     cleanup(&pool, subject).await;
 }

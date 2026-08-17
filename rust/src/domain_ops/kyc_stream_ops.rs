@@ -950,17 +950,19 @@ impl SemOsVerbOp for KycSubjectRegister {
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let payload = normalize_register_payload(args, ctx, subject);
-        // T6.3 row 9 HALTED (not shipped) — see the lexicon entry's own
-        // comment for why `NotAlreadyRegistered` is incompatible with this
-        // verb's real multi-call-per-stream usage. `validate_entry_fqn`
-        // stays `None`; there is nothing to check.
+        // T6 row 9 CLOSED (2026-08-17, corrects EOP-DD-KYCUBO-KIT-T6 §5 —
+        // see the lexicon entry's own comment): `NotAlreadyRegistered` is
+        // now keyed off `entity_id`, not the bare per-subject `registered`
+        // bool, so it no longer conflicts with this verb's real
+        // multi-call-per-stream usage (one call per entity under a shared
+        // subject_root).
         let outcome = stream_append(
             "kyc.subject.register",
             subject,
             TargetBinding::for_subject(subject),
             payload,
             "analyst.register",
-            None,
+            Some("kyc.subject.register"),
             ctx,
             scope,
         )

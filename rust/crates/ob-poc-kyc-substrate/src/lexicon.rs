@@ -253,26 +253,23 @@ pub fn phase1_lexicon() -> LexiconManifest {
             "Bring a subject into KYC scope, recording the basis for obligation",
             Taxonomy::Subject,
             smallvec![FoldId::ObligationGraph],
-            // T6.3 row 9 HALTED (2026-08-12), not shipped: the ratified
-            // matrix's `NotAlreadyRegistered` (`!state.registered`, a bare
-            // stream-level boolean) is incompatible with `register`'s real
-            // production usage — `kyc_stream_ops.rs`'s own
-            // `UboDeterminationFreeze` resolves natural-person candidates
-            // via `natural_persons_from_events`, which scans for MULTIPLE
-            // `kyc.subject.register` events sharing one subject_root,
-            // differentiated by payload `entity_id` (one call registers the
-            // subject entity itself, one more per natural-person
-            // candidate — see `kyc_m3_remediation.rs`'s
-            // `m3_1_freeze_differential_matches_ownership_prong_strategy` /
-            // `m4_control_prong_strategy_resolves_gp_statutory_control`,
-            // both real production-shaped fixtures, not test-only
-            // workarounds). Attaching this stud as ratified would block
-            // every multi-person determination. Left geometry-free pending
-            // a matrix amendment (row 9 needs a KEYED check — "this
-            // (subject_root, entity_id) pair must not already be
-            // registered" — not the niladic boolean the matrix's own §2
-            // inventory claims suffices; out of this tranche's scope).
-            vec![],
+            // T6 row 9 CLOSED (2026-08-17, corrects EOP-DD-KYCUBO-KIT-T6
+            // §5, see its §6 amendment): the ratified bare
+            // `NotAlreadyRegistered` (`!state.registered`) would have
+            // blocked every multi-person determination — `register`'s real
+            // production usage fires MULTIPLE `kyc.subject.register`
+            // events sharing one subject_root, differentiated by payload
+            // `entity_id` (one call registers the subject entity itself,
+            // one more per natural-person candidate — see
+            // `kyc_m3_remediation.rs`'s real production-shaped fixtures).
+            // §5 rejected a keyed-check amendment on the assumption it
+            // would need a new parameterised `Precondition` variant,
+            // breaking the matrix's niladic-variant property; it doesn't —
+            // `NotAlreadyRegistered` stays a bare unit variant and the
+            // check reads `event.payload`'s `entity_id` against
+            // `ControlState.registered_entity_ids`, the same pattern
+            // `NoDuplicateActiveEdge` already uses (`fold/control.rs`).
+            vec![Precondition::NotAlreadyRegistered],
             AuthoritySpec::analyst(),
             vec![],
         ),

@@ -361,9 +361,10 @@ fn structure_class_valid_values() -> Vec<String> {
     inner.split(',').map(|s| s.trim().to_string()).collect()
 }
 
-/// Pin (K-G5): as of TS.4 the map is fully studded (only `kyc.subject.register`
-/// remains geometry-free — row 9 HALTED, see its lexicon comment) and ALL 11
-/// structure classes have a strategy behind them (the guard set is total).
+/// Pin (K-G5): as of the T6 row-9 fix (2026-08-17) the map is fully studded —
+/// every one of the 21 dsl.kyc verbs, including `kyc.subject.register`, now
+/// carries a stud — and ALL 11 structure classes have a strategy behind them
+/// (the guard set is total).
 /// Authoring a precondition, or a new `DeterminationStrategy`, is a CONSCIOUS
 /// edit here, not a silent pass or a silent break.
 #[test]
@@ -468,13 +469,16 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
             Precondition::StrategySelected,
         ],
     );
-    // row 9 (`kyc.subject.register`) HALTED, not shipped (see the lexicon
-    // entry's own comment): `NotAlreadyRegistered` is incompatible with
-    // this verb's real multi-call-per-stream usage (one call per
-    // natural-person candidate under one subject_root). Stays at its
-    // pre-T6.3 empty precondition list — the ONE of the 20 dsl.kyc verbs
-    // that remains geometry-free after T6.4.
-    expected.insert("kyc.subject.register".to_string(), vec![]);
+    // row 9 (`kyc.subject.register`) CLOSED (2026-08-17, corrects
+    // EOP-DD-KYCUBO-KIT-T6 §5 — see its §6 amendment and the lexicon
+    // entry's own comment): `NotAlreadyRegistered` is now keyed off the
+    // event's `entity_id` (`ControlState.registered_entity_ids`), so it no
+    // longer conflicts with this verb's real multi-call-per-stream usage
+    // (one call per natural-person candidate under one subject_root).
+    expected.insert(
+        "kyc.subject.register".to_string(),
+        vec![Precondition::NotAlreadyRegistered],
+    );
     expected.insert(
         "kyc.subject.classify-structure".to_string(),
         vec![Precondition::SubjectRegistered],
@@ -521,11 +525,11 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
     );
     assert_eq!(
         actual, expected,
-        "K-G5 precondition map changed — as of TS.4, every one of the 21 dsl.kyc verbs except \
-         register carries a stud (verify, compute-fold, select-strategy, freeze, the 5 \
-         edge-family verbs, pierce-nominee, apply-smo-fallback, classify-structure, and all \
-         8 obligation/person verbs); any other change is either matrix progress (update the \
-         T0.3 audit) or a regression"
+        "K-G5 precondition map changed — as of the T6 row-9 fix (2026-08-17), every one of the \
+         21 dsl.kyc verbs carries a stud (verify, compute-fold, select-strategy, freeze, the 5 \
+         edge-family verbs, pierce-nominee, apply-smo-fallback, register, classify-structure, \
+         and all 8 obligation/person verbs); any other change is either matrix progress (update \
+         the T0.3 audit) or a regression"
     );
 
     let classes = structure_class_valid_values();

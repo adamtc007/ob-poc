@@ -81,8 +81,46 @@ a new keyed (parameterised) precondition primitive, breaking the all-niladic pro
 for zero behavioral benefit. Idempotent/duplicate registration is accepted downstream behavior.
 Row 9 stands exactly as ratified.
 
+## §6 Row-9 technical correction (2026-08-17)
+
+§5 (2026-08-14) evaluated a "keyed `(subject_root, entity_id)`" amendment to row 9 and
+ruled NO CHANGE, reasoning that the stream is append-only and the fold convergent, so a
+duplicate `kyc.subject.register` for the *same pair* folds to the same state — harmless
+by construction — and that a keyed check would need a new parameterised `Precondition`
+variant, breaking the §2 all-niladic property for no behavioral benefit.
+
+That ruling is correct on its own question but **answers a different question than the
+one blocking row 9 in code.** The 2026-08-12 lexicon comment's concern was never about
+exact duplicates — it was that `ControlState.registered` is a single boolean per
+`subject_root` (`fold/control.rs`), set `true` by the *first* `kyc.subject.register`
+event regardless of `entity_id`. Real production usage fires *multiple*, *distinct*
+registrations under one `subject_root` — self plus one per natural-person candidate
+(`kyc_m3_remediation.rs`'s fixtures). Attaching the ratified bare `NotAlreadyRegistered`
+(`!state.registered`) as literally specified would have rejected the *second* legitimate
+registration outright — confirmed by direct trace of the fold and a RED-first test
+against the pre-fix code (`row9_register_blocks_true_duplicate_entity_id` failed as
+expected; `row9_register_admits_multi_person_distinct_entity_ids` already passed,
+proving the code comment's worry was real, not stale).
+
+**Correction:** the check can be genuinely keyed off `entity_id` *without* the
+parameterised-enum-variant cost §5 was avoiding. `NotAlreadyRegistered` stays a bare unit
+variant (the §2 niladic property is preserved exactly as recorded); `ControlState` gained
+a `registered_entity_ids: BTreeSet<EntityId>` field, populated by the `register` fold arm,
+and the checker reads the *incoming event's* `entity_id` against that set — the identical
+pattern `NoDuplicateActiveEdge` already uses (reads `event.payload`, not just `state`,
+while remaining a bare variant). Row 9 is now genuinely closed: true duplicates
+(same `subject_root` + same `entity_id`) are blocked; distinct entities under one
+`subject_root` remain legal. Landed in `fold/control.rs`, `lexicon.rs`, and the
+`kyc_stream_ops.rs` call site (which had been left wired to `validate_entry_fqn: None`
+from the pre-fix HALT and needed flipping to `Some("kyc.subject.register")` for the
+lexicon's precondition to actually reach the write path — the fix was silently inert
+until this was caught by the same RED-first test staying red after the lexicon/fold
+change alone). Proven via `rust/tests/kyc_t62_studs.rs`'s two new row-9 gate tests plus
+the full existing T6.1–T6.4/T0.3/M3-M4 regression suite (unchanged, all green).
+
 ## Change Log
 | Version | Date | Note |
 |---|---|---|
 | 0.1 | 2026-08-12 | Initial matrix: 17 verbs, 18 rows (freeze appears twice: existing studs + 8a guard), 10 new niladic variants, zero new fold outputs, zero parameterised variants needed. The two silently-wrong holes (strategy guard 6a/8a; K-23 gate row 17) called out as the highest-value rows. |
 | 0.1.1 | 2026-08-14 | §5 added: row-9 keyed-registration amendment RULED NO CHANGE (idempotent duplicates accepted; niladic property preserved). |
+| 0.1.2 | 2026-08-17 | §6 added: row-9 technical correction — §5 answered exact-duplicate idempotency, not the real multi-entity-per-subject_root concern. Fixed by keying `NotAlreadyRegistered`'s check off `event.entity_id` via a new `ControlState.registered_entity_ids` set, preserving the niladic-variant property. Row 9 closed in code. |
