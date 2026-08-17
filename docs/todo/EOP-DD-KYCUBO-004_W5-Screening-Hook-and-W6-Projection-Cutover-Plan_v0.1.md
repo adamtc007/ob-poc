@@ -186,11 +186,61 @@ have `ob-workflow` crate consumers outside the kyc-stack proper.
 
 ### Recommended phasing (mirrors the W1→W4→W6 discipline already used)
 
-1. **Inventory pass** (not yet done): full read/write consumer list for
-   `cases` and `entity_workstreams` across `src/` + all `crates/` (the grep in
-   this doc is a starting point, not exhaustive — `ob-workflow`,
-   `agent/composite_state_loader.rs`, and the tollgate evaluator are known
-   readers not yet enumerated in full).
+1. **Inventory pass — DONE (2026-08-17).** Full grep sweep of `src/` + every
+   `crates/*` for `"ob-poc".cases`/`"ob-poc".entity_workstreams`, classified
+   by SQL verb (`INSERT`/`UPDATE`/`DELETE` vs `SELECT`/`JOIN`) per file.
+
+   **Real production writers (3 modules, all outside the kyc-stack proper):**
+   - `crates/sem_os_postgres/src/ops/kyc_case.rs` — the actual case lifecycle
+     verb domain today: `kyc-case.{create,update-status,close,approve,reject,
+     refer,approve-with-conditions,escalate,summarize,workstream-state}`.
+     Every case-level state transition lives here. This is the module a
+     W6 fold would need to absorb or front — the biggest single piece of
+     the cutover.
+   - `crates/sem_os_postgres/src/ops/red_flag.rs` — on raising a red flag,
+     force-transitions the linked workstream to `ENHANCED_DD` (`status`,
+     `requires_enhanced_dd`). A second, independent domain (red-flag) that
+     mutates workstream state as a side effect of its own verb.
+   - `src/domain_ops/request_ops.rs` — on raising/resolving an outstanding
+     document/information request, blocks/unblocks the linked workstream
+     (`status ⇄ BLOCKED`/`COLLECT`, `blocker_type`, `blocker_request_id`,
+     `blocker_message`, `blocked_at`). A third independent domain
+     (outstanding-requests) with the same side-effect-write pattern.
+
+   This is the real shape of the problem: **case/workstream state isn't
+   written by one cohesive domain that a single new verb set could replace —
+   it's written by three unrelated domains (KYC case ops, red-flag, document
+   requests) each reaching in and mutating it as a side effect.** Any W6 fold
+   design has to either (a) make all three call through new dsl.kyc verbs
+   instead of direct SQL, or (b) keep them as direct writers and have the
+   fold merely observe/replay them — (a) is the architecturally consistent
+   choice (matches how W1/W4 eliminated direct writes elsewhere) but is a
+   3-domain migration, not a 1-domain one.
+
+   **Real production readers (~20 modules, read-only — writes=0):** heaviest
+   by volume, `crates/ob-workflow/src/requirements.rs` (20 read sites) and
+   `crates/ob-workflow/src/guards.rs` (precondition/gate checks — this is
+   the `ob-workflow` crate CLAUDE.md's own W6 note already flagged as being
+   outside the kyc-stack). Also: `crates/sem_os_postgres/src/ops/
+   {tollgate,tollgate_evaluate,skeleton_build,discovery,graph_validate,
+   coverage_compute,deal,outreach_plan,screening}.rs`,
+   `crates/sem_os_postgres/src/constellation_hydration.rs`,
+   `crates/dsl-runtime/src/{crud_executor.rs,state_reducer/{fetch,verbs}.rs}`,
+   `crates/dsl-analysis/src/verification/evasion.rs`,
+   `crates/ob-poc-sage/src/session_context.rs`,
+   `src/agent/composite_state_loader.rs`, `src/api/constellation_routes.rs`,
+   `src/database/{context_discovery_service,semantic_state_service,
+   visualization_repository}.rs`, `src/acp_state_anchor.rs`,
+   `src/services/session_service_impl.rs`. `src/domain_ops/kyc_stream_ops.rs`
+   also now reads `entity_workstreams` (1 site) — the W5 hook's own
+   `entity_id` resolution, added this session; any W6 read-path change must
+   keep that lookup working.
+
+   Excluded as non-production (test fixtures, no migration burden):
+   `crates/ob-poc-taxonomy/{src/integration_tests,tests}/support/
+   semtaxonomy_seed.rs`, `src/integration_tests/generic_lifecycle_guard_db.rs`,
+   `src/sage/valid_verb_set.rs` (writes are inside its own `mod tests`,
+   line 831 on).
 2. **Define the fold.** What dsl.kyc verbs, if any, currently exist that
    *should* drive case/workstream state, vs. what new verbs are needed? (Case
    open/close/escalate, workstream status transitions — none of these appear
@@ -230,4 +280,4 @@ consistently rejected elsewhere.
 | Item | Size | Status |
 |------|------|--------|
 | W5 screening hook | Small — 1 plugin op pair, verb already existed | **DONE**, commit `b028e5b3` |
-| W6 case/workstream cutover | Large — new verb/lexicon design + wide consumer migration | Plan only. Next: full consumer inventory pass, then a dedicated design doc before any code |
+| W6 case/workstream cutover | Large — new verb/lexicon design + a 3-domain writer migration (kyc-case, red-flag, outstanding-requests) + ~20-module read consumer surface | Plan only, inventory done. Next: a dedicated design doc (step 2, "define the fold") before any code |
