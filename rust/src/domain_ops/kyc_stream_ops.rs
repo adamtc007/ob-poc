@@ -28,7 +28,7 @@ use ob_poc_kyc_substrate::{
     FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId, Prong,
     ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, SubjectOverallState, TargetBinding,
     TrustRoleStrategy, V1FoldImpl,
-    EDGE_KIND_WIRE_VALUES,
+    EDGE_KIND_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
 #[allow(unused_imports)]
@@ -987,7 +987,20 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
-        let _class = json_extract_string(args, "structure-class")?;
+        let class = json_extract_string(args, "structure-class")?;
+        // EOP-FUZZ-KYCUBO-001 §5 finding #2: `structure-class` previously had
+        // no op-side fail-closed gate, unlike `kind` (`normalize_assert_control_payload`
+        // below) — an unrecognized class silently folded to `structure_class: None`
+        // instead of being rejected before append. Same discipline as TS.1 §1b.
+        if !STRUCTURE_CLASS_WIRE_VALUES.contains(&class.as_str()) {
+            return Err(anyhow!(
+                "kyc.subject.classify-structure: unrecognized structure-class '{class}' — \
+                 rejected fail-closed (same discipline as ubo.edge.assert-control's kind \
+                 gate; an unknown class previously collapsed silently to \
+                 structure_class: None). Valid wire values: {}",
+                STRUCTURE_CLASS_WIRE_VALUES.join(", ")
+            ));
+        }
         let payload = normalize_classify_structure_payload(args, ctx, subject);
         // T6.3 row 10 finding: `validate_entry_fqn` was `None`, so the
         // newly-declared SubjectRegistered precondition would be dead at
@@ -1137,8 +1150,7 @@ impl SemOsVerbOp for KycObligationUpdateIdentity {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let subject =
-            SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 12 finding: `validate_entry_fqn` was `None` —
         // ObligationExists / SubjectNotDecided were dead at the real write
         // path.
@@ -1172,8 +1184,7 @@ impl SemOsVerbOp for KycObligationUpdateScreening {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let subject =
-            SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 13 finding: `validate_entry_fqn` was `None` —
         // ObligationExists / SubjectNotDecided were dead at the real write
         // path.
@@ -1207,8 +1218,7 @@ impl SemOsVerbOp for KycObligationUpdateRisk {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let subject =
-            SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 14 finding: `validate_entry_fqn` was `None` —
         // ObligationExists / SubjectNotDecided were dead at the real write
         // path.
@@ -1242,8 +1252,7 @@ impl SemOsVerbOp for KycObligationSatisfy {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let subject =
-            SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         // T6.4 row 15 finding: `validate_entry_fqn` was `None` —
         // ObligationExists / SubjectNotDecided were dead at the real write
         // path.
@@ -1277,8 +1286,7 @@ impl SemOsVerbOp for KycObligationWaive {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let subject =
-            SubjectId(json_extract_uuid(args, ctx, "subject-id").unwrap_or_else(|_| Uuid::nil()));
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
         let _reason = json_extract_string(args, "reason")?;
         // T6.4 row 16 finding: `validate_entry_fqn` was `None` —
         // ObligationExists / SubjectNotDecided were dead at the real write

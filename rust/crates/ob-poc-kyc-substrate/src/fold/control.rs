@@ -299,6 +299,28 @@ fn edge_kind_from_payload(payload: &serde_json::Value) -> EdgeKind {
     }
 }
 
+/// The canonical `structure-class` wire-string set for
+/// `kyc.subject.classify-structure` — exactly the strings
+/// `structure_class_from_payload` recognizes with a dedicated arm, mirroring
+/// `EDGE_KIND_WIRE_VALUES` (EOP-FUZZ-KYCUBO-001 §5 finding #2: this table
+/// didn't exist before, so `structure-class` had no op-side fail-closed gate
+/// the way `kind` does — the op-normalizer now rejects any `structure-class`
+/// outside this set BEFORE append, closing the same defect class TS.1 closed
+/// for `EdgeKind`).
+pub const STRUCTURE_CLASS_WIRE_VALUES: &[&str] = &[
+    "private_company",
+    "multi_tier_holding",
+    "listed_entity",
+    "lp_fund",
+    "llp",
+    "trust",
+    "foundation",
+    "investment_fund",
+    "state_owned",
+    "cooperative",
+    "nominee",
+];
+
 fn structure_class_from_payload(payload: &serde_json::Value) -> Option<StructureClass> {
     match payload.get("structure_class")?.as_str()? {
         "private_company" => Some(StructureClass::PrivateCompany),

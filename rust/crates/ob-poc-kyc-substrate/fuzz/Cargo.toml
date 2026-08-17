@@ -1,0 +1,50 @@
+[package]
+name = "ob-poc-kyc-substrate-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "v5"] }
+chrono = "0.4"
+
+[dependencies.ob-poc-kyc-substrate]
+path = ".."
+
+[dependencies.dsl-parser]
+path = "../../dsl-parser"
+
+[[bin]]
+name = "hash_roundtrip"
+path = "fuzz_targets/hash_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fold_replay"
+path = "fuzz_targets/fold_replay.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "determination_resolve"
+path = "fuzz_targets/determination_resolve.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sexpr_roundtrip"
+path = "fuzz_targets/sexpr_roundtrip.rs"
+test = false
+doc = false
+bench = false

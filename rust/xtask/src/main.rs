@@ -18,6 +18,7 @@ mod byok_conformance;
 mod calibration;
 mod catalogue;
 mod dag_test;
+mod fuzz;
 mod dag_to_bpmn;
 mod deal_harness;
 mod entity;
@@ -748,6 +749,13 @@ enum Command {
         action: BpmnLiteAction,
     },
 
+    /// cargo-fuzz runner over rust/crates/<crate>/fuzz/ projects
+    /// (EOP-FUZZ-KYCUBO-001)
+    Fuzz {
+        #[command(subcommand)]
+        action: FuzzAction,
+    },
+
     /// Live utterance -> Sem OS -> DSL round-trip harness
     UtteranceRoundtrip {
         /// API base URL hosting the ob-poc server
@@ -847,6 +855,28 @@ enum BpmnLiteAction {
         #[arg(long)]
         skip_build: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum FuzzAction {
+    /// List discovered rust/crates/<crate>/fuzz/ projects and targets
+    List {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Time-boxed fuzz run (default 300s/target)
+    Run {
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        time: Option<u64>,
+    },
+    /// Build all targets + regress + brief (60s/target) run — CI/pre-push
+    Smoke,
+    /// Replay only the committed rust/crates/<crate>/fuzz/regressions/ inputs
+    Regress,
+    /// Delete fuzz target/corpus/coverage dirs (keeps regressions/ + artifacts/)
+    Clean,
 }
 
 #[derive(Subcommand)]
@@ -1897,6 +1927,34 @@ fn main() -> Result<()> {
             BpmnLiteAction::DockerBuild => bpmn_lite::docker_build(&sh),
             BpmnLiteAction::Deploy { skip_build } => bpmn_lite::deploy(&sh, !skip_build),
         },
+        Command::Fuzz { action } => {
+            let rust_dir = project_root()?.join("rust");
+            let fuzz_args: Vec<String> = match action {
+                FuzzAction::List { json } => {
+                    let mut a = vec!["list".to_string()];
+                    if json {
+                        a.push("--json".to_string());
+                    }
+                    a
+                }
+                FuzzAction::Run { target, time } => {
+                    let mut a = vec!["run".to_string()];
+                    if let Some(t) = target {
+                        a.push("--target".to_string());
+                        a.push(t);
+                    }
+                    if let Some(t) = time {
+                        a.push("--time".to_string());
+                        a.push(t.to_string());
+                    }
+                    a
+                }
+                FuzzAction::Smoke => vec!["smoke".to_string()],
+                FuzzAction::Regress => vec!["regress".to_string()],
+                FuzzAction::Clean => vec!["clean".to_string()],
+            };
+            fuzz::fuzz_command(&rust_dir, &fuzz_args)
+        }
         Command::UtteranceRoundtrip {
             base_url,
             fixture,

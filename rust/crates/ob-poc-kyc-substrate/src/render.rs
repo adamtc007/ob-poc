@@ -39,6 +39,19 @@ pub fn render_intent_event_to_sexpr(
             "render_intent_event_to_sexpr: lexicon_entry does not govern this event's verb"
         );
     }
+    // EOP-FUZZ-KYCUBO-001 §5 finding #1: an empty verb_fqn renders to a bare
+    // `(` with no atom-kind symbol, which the real DSL parser correctly
+    // rejects — silently violating this function's own KIT-1 guarantee ("a
+    // real, re-parseable DSL statement"). Every real op stamps `verb_fqn`
+    // from a hardcoded string literal (`stream_append`'s first arg), so this
+    // is unreachable via any live write path — a debug-only assert, matching
+    // the lexicon_entry check above, rather than a `Result` return that
+    // would ripple through every production caller for a case that can't
+    // actually occur there.
+    debug_assert!(
+        !event.verb_fqn.0.is_empty(),
+        "render_intent_event_to_sexpr: empty verb_fqn cannot render to valid re-parseable DSL"
+    );
 
     let mut slots: Vec<(String, Value)> = Vec::new();
 

@@ -37,7 +37,7 @@ pub use fold::control::{
     reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
     EdgeKind, EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge,
     ReconciledTrustEdge, StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
-    IMPLEMENTED_STRATEGY_CLASSES,
+    IMPLEMENTED_STRATEGY_CLASSES, STRUCTURE_CLASS_WIRE_VALUES,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,
