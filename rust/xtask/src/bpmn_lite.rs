@@ -1,16 +1,37 @@
 //! BPMN-Lite service build/test/deploy automation
 //!
-//! The bpmn-lite service is a standalone workspace at `bpmn-lite/` (repo root),
-//! NOT inside the `rust/` workspace. Commands change directory accordingly.
+//! bpmn-lite is a separate repo (github.com/adamtc007/bpmn-lite), not a
+//! subdirectory of ob-poc. Every command here operates against a local
+//! checkout located via the `BPMN_LITE_DIR` env var — see
+//! `resolve_bpmn_lite_dir`.
 
 use anyhow::{Context, Result};
 use xshell::{cmd, Shell};
 
 use super::project_root;
 
+/// Locate the local bpmn-lite checkout via `BPMN_LITE_DIR`. Fails loud
+/// (never guesses a path) since bpmn-lite is an external sibling repo with
+/// no fixed location relative to ob-poc.
+fn resolve_bpmn_lite_dir() -> Result<std::path::PathBuf> {
+    let dir = std::env::var("BPMN_LITE_DIR").context(
+        "BPMN_LITE_DIR is not set. bpmn-lite is a separate repo \
+         (github.com/adamtc007/bpmn-lite) — clone it, then \
+         `export BPMN_LITE_DIR=/path/to/your/bpmn-lite/checkout`.",
+    )?;
+    let path = std::path::PathBuf::from(dir);
+    if !path.join("Cargo.toml").is_file() {
+        anyhow::bail!(
+            "BPMN_LITE_DIR={:?} does not look like a bpmn-lite checkout (no Cargo.toml there).",
+            path
+        );
+    }
+    Ok(path)
+}
+
 /// Build the bpmn-lite workspace.
 pub(crate) fn build(sh: &Shell, release: bool) -> Result<()> {
-    let bpmn_dir = project_root()?.join("bpmn-lite");
+    let bpmn_dir = resolve_bpmn_lite_dir()?;
     sh.change_dir(&bpmn_dir);
 
     println!("Building bpmn-lite...");
@@ -29,7 +50,7 @@ pub(crate) fn build(sh: &Shell, release: bool) -> Result<()> {
 
 /// Run all tests in the bpmn-lite workspace.
 pub(crate) fn test(sh: &Shell, filter: Option<&str>) -> Result<()> {
-    let bpmn_dir = project_root()?.join("bpmn-lite");
+    let bpmn_dir = resolve_bpmn_lite_dir()?;
     sh.change_dir(&bpmn_dir);
 
     println!("Running bpmn-lite tests...");
@@ -48,7 +69,7 @@ pub(crate) fn test(sh: &Shell, filter: Option<&str>) -> Result<()> {
 
 /// Run clippy on the bpmn-lite workspace.
 pub(crate) fn clippy(sh: &Shell) -> Result<()> {
-    let bpmn_dir = project_root()?.join("bpmn-lite");
+    let bpmn_dir = resolve_bpmn_lite_dir()?;
     sh.change_dir(&bpmn_dir);
 
     println!("Running clippy on bpmn-lite...");
@@ -61,19 +82,25 @@ pub(crate) fn clippy(sh: &Shell) -> Result<()> {
 
 /// Build the Docker image for bpmn-lite.
 pub(crate) fn docker_build(sh: &Shell) -> Result<()> {
+    let bpmn_dir = resolve_bpmn_lite_dir()?;
     let root = project_root()?;
     sh.change_dir(&root);
 
-    println!("Building bpmn-lite Docker image...");
-    cmd!(sh, "docker build -t bpmn-lite ./bpmn-lite")
+    println!("Building bpmn-lite Docker image from {:?}...", bpmn_dir);
+    let bpmn_dir_str = bpmn_dir.to_string_lossy().to_string();
+    cmd!(sh, "docker build -t bpmn-lite {bpmn_dir_str}")
         .run()
         .context("Failed to build bpmn-lite Docker image")?;
     println!("bpmn-lite Docker image built successfully.");
     Ok(())
 }
 
-/// Deploy bpmn-lite via docker compose.
+/// Deploy bpmn-lite via docker compose. Requires `BPMN_LITE_DIR` — passed
+/// through to docker-compose.yml's `bpmn-lite` service, whose build context
+/// is `${BPMN_LITE_DIR}` (it can no longer be a fixed relative path since
+/// bpmn-lite isn't a subdirectory of this repo).
 pub(crate) fn deploy(sh: &Shell, build_image: bool) -> Result<()> {
+    let bpmn_dir = resolve_bpmn_lite_dir()?;
     let root = project_root()?;
     sh.change_dir(&root);
 
@@ -82,7 +109,9 @@ pub(crate) fn deploy(sh: &Shell, build_image: bool) -> Result<()> {
     }
 
     println!("Starting bpmn-lite via docker compose...");
-    cmd!(sh, "docker compose up -d bpmn-lite")
+    let bpmn_dir_str = bpmn_dir.to_string_lossy().to_string();
+    let bash_cmd = format!("BPMN_LITE_DIR={bpmn_dir_str} docker compose up -d bpmn-lite");
+    cmd!(sh, "bash -c {bash_cmd}")
         .run()
         .context("Failed to start bpmn-lite via docker compose")?;
     println!("bpmn-lite is running on port 50053 (gRPC).");
@@ -91,17 +120,18 @@ pub(crate) fn deploy(sh: &Shell, build_image: bool) -> Result<()> {
 
 /// Start the bpmn-lite gRPC server natively (release build, background process).
 pub(crate) fn start(sh: &Shell, port: u16) -> Result<()> {
-    let bpmn_dir = project_root()?.join("bpmn-lite");
+    let bpmn_dir = resolve_bpmn_lite_dir()?;
 
     // Stop any existing instance first
     stop_inner(sh, port);
 
-    // Build release
+    // Build release. Package is `bpmn-lite-server-runner`; it produces the
+    // `bpmn-lite-server` binary this function starts below.
     sh.change_dir(&bpmn_dir);
     println!("Building bpmn-lite (release)...");
-    cmd!(sh, "cargo build --release -p bpmn-lite-server")
+    cmd!(sh, "cargo build --release -p bpmn-lite-server-runner")
         .run()
-        .context("Failed to build bpmn-lite-server")?;
+        .context("Failed to build bpmn-lite-server-runner")?;
 
     let binary = bpmn_dir.join("target/release/bpmn-lite-server");
     if !binary.exists() {

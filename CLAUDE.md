@@ -58,13 +58,24 @@ DATABASE_URL="postgresql:///data_designer" cargo run -p ob-poc-web
 # React development (hot reload)
 cd ob-poc-ui-react && npm run dev  # Runs on port 5173, proxies API to :3000
 
-# BPMN-Lite service (standalone workspace at bpmn-lite/)
-cargo x bpmn-lite build            # Build
-cargo x bpmn-lite test             # Run all tests
+# BPMN-Lite service — a SEPARATE repo (github.com/adamtc007/bpmn-lite), not a
+# subdirectory of ob-poc. Clone it wherever you keep sibling checkouts, then
+# point BPMN_LITE_DIR at it — `cargo x bpmn-lite ...` shells out to plain
+# cargo commands inside that checkout (rust/xtask/src/bpmn_lite.rs).
+export BPMN_LITE_DIR=/path/to/your/bpmn-lite/checkout
+cargo x bpmn-lite build            # Build (--release for release mode)
+cargo x bpmn-lite test             # Run all tests (bpmn-lite's own Postgres
+                                    # integration tests need a live DB and
+                                    # are known to contend under full
+                                    # workspace parallelism — run a single
+                                    # crate/test with `cargo test -p
+                                    # bpmn-lite-store-postgres --lib <name>`
+                                    # from inside the checkout if the
+                                    # workspace-wide run flakes)
 cargo x bpmn-lite start            # Build release + start (port 50051)
-cargo x bpmn-lite start --database-url postgresql:///data_designer  # With PostgresProcessStore
-cd bpmn-lite && cargo run -p xtask -- smoke --spawn-server
-cd bpmn-lite && cargo run -p xtask -- stress --spawn-server --instances 300 --workers 16
+cargo x bpmn-lite stop             # Stop the native server
+cargo x bpmn-lite status           # Check native + Docker status
+cargo x bpmn-lite deploy           # Build image + docker compose up (also needs BPMN_LITE_DIR)
 
 # Schema overview (living doc with mermaid ER diagrams)
 npx md-to-pdf migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md
@@ -100,7 +111,7 @@ The unified workspace (edition 2024, resolver "3", rust-version "1.95") ships bo
 
 **B-phase complete (2026-05-16, tag `v0.1.0-heterogeneous-ffi`):** B1 (Dockerfile, cargo-chef), B5 (`docker-ffi-smoke` dmn-lite proof), B6 (HTTP FFI contract), B7 (`docker-http-smoke` HTTP proof), B8 (inline with B7), B9 (`docker-heterogeneous-smoke` — both HTTP and dmn-lite in one BPMN process, shared Flag bridge). V&S Claims 1 and 2 substantiated against the deployed containerised stack.
 
-The local `bpmn-lite/` directory remains inside ob-poc for monorepo development convenience (has its own `.git`; ob-poc does not track it as a submodule). bpmn-lite consumes `ob-poc-types` as a rev-pinned git dep (currently `397470cb`); ob-poc consumes bpmn-lite over gRPC (`bpmn_integration/` — 12 files). See `docs/annex-bpmn-lite.md` for the integration pattern.
+bpmn-lite is a fully separate repo (github.com/adamtc007/bpmn-lite) — the earlier local-subdirectory-inside-ob-poc convention this section used to describe is gone (part of the "four separate repos: ob-poc, dsl, sem-os, bpmn-lite" split, each now owning its own checkout and `./target/`). bpmn-lite's `ob-poc-types` git dependency was removed entirely (Phase 4 extraction, 2026-05-22) — it no longer consumes ob-poc-types at all. ob-poc consumes bpmn-lite two ways: as rev-pinned git library dependencies for `bpmn-lite-engine`/`bpmn-lite-store`/FFI/bus/manifest crates (`rust/Cargo.toml` `[workspace.dependencies]`, consumed by `ob-poc-web`/`ob-poc-bus-handler`/`ob-poc-manifest-export`), and over gRPC for runtime process dispatch (`bpmn_integration/` — 15 files). `rust/xtask/src/bpmn_lite.rs` (`cargo x bpmn-lite build/test/start/stop/status/deploy`) now resolves the checkout via `BPMN_LITE_DIR` instead of a hardcoded local path (fixed 2026-08-17). See `docs/annex-bpmn-lite.md` for the integration pattern and current crate map.
 
 For internals of both vocabularies, see `bpmn-lite/CLAUDE.md`.
 
@@ -601,7 +612,7 @@ ob-poc/
 │   │   ├── domain_ops/         # Pattern B SemOsVerbOp ops that bridge to ob-poc internals (9 files, 119 ops: onboarding, bpmn_lite, template, source_loader, request, gleif, trading_profile + rule_evaluator utility). Registered via `extend_registry()`.
 │   │   ├── sem_reg/            # Semantic Registry + stewardship (39 files)
 │   │   ├── mcp/                # MCP tools, handlers, verb search, intent pipeline
-│   │   ├── bpmn_integration/   # ob-poc ↔ bpmn-lite wiring (12 files)
+│   │   ├── bpmn_integration/   # ob-poc ↔ bpmn-lite wiring (15 files)
 │   │   ├── calibration/        # Loopback calibration (11 modules)
 │   │   ├── cross_workspace/   # Cross-workspace state consistency (10 modules)
 │   │   └── api/                # REST routes

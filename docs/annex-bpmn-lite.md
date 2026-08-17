@@ -19,37 +19,57 @@ BPMN-Lite is a lightweight durable workflow orchestration engine. It executes lo
 
 ### Workspace Structure
 
-```
-bpmn-lite/                              # Standalone Rust workspace
-├── bpmn-lite-core/
-│   ├── src/
-│   │   ├── vm.rs                       # Fiber execution engine (batched event emission)
-│   │   ├── engine.rs                   # BpmnLiteEngine facade (tick, compile, start, signal)
-│   │   ├── store.rs                    # ProcessStore trait (tenant-aware + batch append)
-│   │   ├── store_memory.rs             # In-memory implementation (testing)
-│   │   ├── store_postgres.rs           # PostgreSQL backend (production)
-│   │   ├── types.rs                    # Fiber, ProcessInstance, 18 Instr variants
-│   │   ├── events.rs                   # RuntimeEvent enum
-│   │   └── authoring/                  # YAML → DTO → IR → Bytecode pipeline
-│   │       ├── dto.rs                  # WorkflowGraphDto
-│   │       ├── validate.rs             # DTO contract enforcement
-│   │       ├── yaml.rs                 # YAML deserialization
-│   │       ├── publish.rs              # Atomic compile + persist
-│   │       ├── lints.rs                # Structural warnings
-│   │       └── registry.rs             # TemplateStore trait
-│   └── migrations/                     # 15 SQL migrations (001–015)
-├── bpmn-lite-server/
-│   ├── src/
-│   │   ├── grpc.rs                     # BpmnLiteService impl
-│   │   ├── load_harness.rs             # Reusable concurrent workflow stress harness
-│   │   └── main.rs                     # Server bootstrap with configurable bind address
-│   └── proto/bpmn_lite/v1/bpmn_lite.proto
-├── xtask/
-│   └── src/main.rs                     # smoke/stress orchestration, optional server spawn
-└── Cargo.toml
+bpmn-lite (github.com/adamtc007/bpmn-lite) is a separate repo, 33 workspace
+members as of the B0 consolidation + T7 federated-bus work — not the
+two-crate `bpmn-lite-core`/`bpmn-lite-server` layout this section used to
+show. Grouped by role (verified against the live checkout, 2026-08-17):
 
-rust/src/bpmn_integration/              # ob-poc ↔ bpmn-lite bridge (12 modules)
+**bpmn process runtime** (was `bpmn-lite-core`):
+- `bpmn-lite-types/` — `Fiber`, `ProcessInstance`, `Instr` (18-opcode ISA), `RuntimeEvent`, session-stack/canonical/persistence/integrity types
+- `bpmn-lite-vm/` — fiber execution, json_path evaluator
+- `bpmn-lite-engine/` — `BpmnLiteEngine` facade (tick, compile, start, signal), replay binary
+- `bpmn-lite-store/` — `ProcessStore` trait, in-memory impl, pending-dispatch queue
+- `bpmn-lite-store-postgres/` — Postgres backend (production), FFI template store, pending-dispatch store
+
+**Compiler & authoring pipeline:**
+- `bpmn-lite-compiler/` — DSL parser/lexer/AST → IR → bytecode, RPST decomposition, linter, macro/pack/manifest registry
+- `bpmn-lite-authoring/` — YAML → DTO → IR → Bytecode (dto.rs, validate.rs, publish.rs, lints.rs, registry.rs), BPMN import/export
+- `designer-graph/` — canonical Designer DAG schema + deterministic graph productions (WS-A, EOP-PLAN-BPMN-DESIGN-003); structural derivation delegates to bpmn-lite-compiler's post-dominance oracle, never reimplements it
+- `utterance-engine/` — board construction, SLM contract, disposition policy (WS-C, EOP-PLAN-BPMN-DESIGN-003)
+- `bpmn-lite-analysis/` — static analysis over compiled programs (constant-condition branches, FFI coverage)
+
+**Servers:**
+- `bpmn-lite-server-runner/` — gRPC/HTTP/REST server (`main.rs`), demo runner + proof binaries (grpc_proof, http_proof, heterogeneous_proof, load_harness). Package `bpmn-lite-server-runner`, binary `bpmn-lite-server`.
+- `bpmn-lite-server-designer/` — Designer-facing REST surface
+
+**FFI catalogue (vocabulary-neutral, A2 contract):**
+- `ffi-types/` — protocol types, no bpmn-lite/dmn-lite deps
+- `ffi-catalogue/` — `FfiTemplateStore` trait + in-memory/cache-front impls
+- `ffi-dispatcher/` — routes `FfiCall` to the registered owner by `owner_type`
+- `bpmn-lite-ffi-http/`, `bpmn-lite-ffi-grpc/` — HTTP/gRPC execution owners
+
+**dmn-lite (decision vocabulary, consolidated into this workspace at B0):**
+- `dmn-lite-types/`, `dmn-lite-parser/`, `dmn-lite-compiler/`, `dmn-lite-engine/`, `dmn-lite-analysis/` — s-expression DSL → typed predicate IR → bytecode → stack VM
+- `dmn-lite-bridge/` — FFI execution owner registering compiled decisions into the FFI catalogue
+- `dmn-lite-server/`, `dmn-lite-manifest-export/`, `dmn-lite-bus-handler/` — federated DSL bus server, catalogue manifest export, bus-side decision dispatch
+
+**Federated DSL bus** (T7 — cross-domain invocation over gRPC for the ob-poc/bpmn-lite/dmn-lite three-domain deployment):
+- `dsl-bus-protocol/` — protobuf v3 schema + tonic stubs (InvocationService, ResultService)
+- `dsl-bus-client/` — sender-side outbox + dispatch task
+- `dsl-bus-server/` — receiver-side tonic services, inbox idempotency gate
+- `dsl-bus-storage/` — outbox/inbox Postgres tables
+- `dsl-manifest/` — published catalogue manifest types, loader/validator
+- `bpmn-lite-bus-handler/`, `dmn-lite-bus-handler/` — per-domain `InvocationDispatcher`/`ResultDispatcher` impls
+
+`xtask/` here is bpmn-lite's own internal smoke/stress/demo tooling —
+separate from ob-poc's `cargo x bpmn-lite ...`, which shells into this
+checkout from the outside (see "Run standalone" below).
+
+ob-poc side, same shape as before, grown from 12 to 15 modules:
+```
+rust/src/bpmn_integration/              # ob-poc ↔ bpmn-lite bridge
 ├── types.rs                            # ExecutionRoute, CorrelationRecord, JobFrame, ParkedToken
+├── canonical.rs                        # canonical payload hashing
 ├── config.rs                           # WorkflowBinding registry
 ├── client.rs                           # BpmnLiteConnection gRPC client
 ├── dispatcher.rs                       # WorkflowDispatcher: DslExecutorV2 impl
@@ -60,17 +80,24 @@ rust/src/bpmn_integration/              # ob-poc ↔ bpmn-lite bridge (12 module
 ├── parked_tokens.rs                    # ParkedTokenStore
 ├── job_frames.rs                       # JobFrameStore (dedupe + retry)
 ├── pending_dispatches.rs               # PendingDispatchStore (resilience queue)
-└── pending_dispatch_worker.rs          # Background retry task (50 max attempts)
+├── pending_dispatch_worker.rs          # Background retry task (50 max attempts)
+├── request_state.rs                    # Request-scoped dispatch state
+└── saga_reaper.rs                      # Stalled-saga reclaim
 ```
 
-**Run standalone:**
+**Run standalone:** bpmn-lite is a separate repo — clone it, then point
+`cargo x bpmn-lite ...` (`rust/xtask/src/bpmn_lite.rs`) at it via
+`BPMN_LITE_DIR` (fixed 2026-08-17; previously hardcoded a local `bpmn-lite/`
+subdirectory that no longer exists):
 ```bash
+export BPMN_LITE_DIR=/path/to/your/bpmn-lite/checkout
 cargo x bpmn-lite build
 cargo x bpmn-lite test
-cargo x bpmn-lite start --database-url postgresql:///data_designer
-cd bpmn-lite && cargo run -p xtask -- smoke --spawn-server
-cd bpmn-lite && cargo run -p xtask -- stress --spawn-server --instances 300 --workers 16
+cargo x bpmn-lite start
 ```
+See `CLAUDE.md`'s Quick Start for the full subcommand list (`stop`,
+`status`, `deploy`) and a note on bpmn-lite's own Postgres integration
+tests contending under full-workspace parallelism.
 
 ### 2026-04 Integration Status
 

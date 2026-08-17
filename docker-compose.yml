@@ -36,8 +36,12 @@ services:
     restart: unless-stopped
 
   bpmn-lite:
+    # bpmn-lite is a separate repo (github.com/adamtc007/bpmn-lite), not a
+    # subdirectory here. Set BPMN_LITE_DIR to your local checkout before
+    # running `docker compose up bpmn-lite` (cargo x bpmn-lite deploy does
+    # this for you).
     build:
-      context: ./bpmn-lite
+      context: ${BPMN_LITE_DIR:?Set BPMN_LITE_DIR to your bpmn-lite checkout path}
       dockerfile: Dockerfile
     container_name: bpmn-lite
     ports:
