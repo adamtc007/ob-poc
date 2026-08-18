@@ -107,7 +107,11 @@ domains:
         lifecycle:
           entity_arg: changeset-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [active, reviewing, submitted, suspended]
+          # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18): active,
+          # suspended are not real changeset_lifecycle states (real states:
+          # composing, submitted, reviewing, approved, published, rejected)
+          # — dropped.
+          requires_states: [submitted, reviewing]
         flavour: discretionary
         effect_class: read_modify_write
         role_guard:
@@ -273,7 +277,12 @@ domains:
         lifecycle:
           entity_arg: changeset-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [approved, draft]
+          # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18): draft is not
+          # a real changeset_lifecycle state (real states: composing,
+          # submitted, reviewing, approved, published, rejected) — looks
+          # like cross-contamination from a different SemOS lifecycle that
+          # does use "draft" as its entry state. Dropped.
+          requires_states: [approved]
         flavour: discretionary
         effect_class: admin_override
         role_guard:

@@ -224,7 +224,10 @@ domains:
         lifecycle:
           entity_arg: workstream-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [ASSESS, verified]
+          # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18): lowercase
+          # "verified" is not a real entity_workstream state (this slot has
+          # no lowercase states at all) — dropped.
+          requires_states: [ASSESS]
         flavour: attribute_mutating
         description: Mark workstream as complete
         effect_class: read_modify_write

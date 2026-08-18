@@ -208,7 +208,11 @@ domains:
         lifecycle:
           entity_arg: case-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [PENDING_REVIEW, REVIEW]
+          # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18): PENDING_REVIEW
+          # is not a real kyc_case state (real states: INTAKE, DISCOVERY,
+          # ASSESSMENT, REVIEW, APPROVED, REJECTED, BLOCKED, WITHDRAWN,
+          # DO_NOT_ONBOARD, EXPIRED, REFER_TO_REGULATOR) — dropped.
+          requires_states: [REVIEW]
         flavour: discretionary
         effect_class: admin_override
         role_guard:
@@ -259,7 +263,12 @@ domains:
         lifecycle:
           entity_arg: case-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [PENDING_REVIEW, REVIEW, any non-terminal]
+          # R3 partial correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18):
+          # PENDING_REVIEW dropped (not a real kyc_case state). "any
+          # non-terminal" is STILL a free-text placeholder the gate cannot
+          # literally match — needs a ruling on the concrete terminal-state
+          # set before this is fully fixed (see the R3 register doc).
+          requires_states: [REVIEW, any non-terminal]
         flavour: discretionary
         effect_class: admin_override
         role_guard:

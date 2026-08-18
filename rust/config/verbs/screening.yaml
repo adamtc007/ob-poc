@@ -208,7 +208,14 @@ domains:
         lifecycle:
           entity_arg: workstream-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [PENDING, VERIFY, workstream_open]
+          # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18): VERIFY and
+          # workstream_open were incidental contamination from OTHER slots
+          # (entity_workstream's VERIFY->SCREEN and entity_kyc's
+          # workstream_open->screening_complete, both also named
+          # `screening.run` as `via:`) — this verb's real target
+          # (kyc.screening, per its own transition_args below) has exactly
+          # one transition, PENDING -> RUNNING. Dropped.
+          requires_states: [PENDING]
         flavour: attribute_mutating
         description: Initiate a workstream screening. Idempotent by (workstream_id, screening_type).
         effect_class: idempotent_ensure

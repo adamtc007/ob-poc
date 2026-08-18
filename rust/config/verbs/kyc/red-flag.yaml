@@ -113,7 +113,15 @@ domains:
         lifecycle:
           entity_arg: red-flag-id
           # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [OPEN, any non-terminal]
+          # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-18): "any
+          # non-terminal" is free-text, never a real red_flag.status value
+          # — the precondition evaluator checks THIS entity's own state
+          # (entity_arg: red-flag-id, scoped to kyc.red_flag per this
+          # verb's own transition_args below), which is unaffected by
+          # entity_workstream's separate "any non-terminal" cascade this
+          # verb's description also performs. The DAG's real transition is
+          # OPEN -> UNDER_REVIEW. Dropped.
+          requires_states: [OPEN]
         flavour: discretionary
         effect_class: admin_override
         role_guard:

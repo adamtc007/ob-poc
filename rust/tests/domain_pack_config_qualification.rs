@@ -376,6 +376,40 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
 
     // Declared side: verb FQN -> requires_states from config/verbs/**.
     let mut declared: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    // Verb FQN -> (target_workspace, target_slot), from the verb's own
+    // `transition_args` when declared. R3 (EOP-PLAN-GAMEBOARD-001,
+    // 2026-08-18) found this test's original "union every from-state across
+    // every DAG slot that happens to name this verb as `via:`" derivation
+    // silently mixes in incidental transitions from OTHER slots — e.g.
+    // `entity-workstream.complete` is also `via:` on a transition inside
+    // `entity_kyc` (a *derived* rollup slot, `state_column: "(derived from
+    // entity_workstreams.status + stream projections)"`, no real backing
+    // column), whose `verified`/`approved` states have nothing to do with
+    // this verb's REAL target slot (`kyc.entity_workstream`, confirmed via
+    // its own `transition_args`). Scoping the derivation to the verb's own
+    // declared target slot (falling back to the old any-slot union only for
+    // the minority of verbs with no `transition_args` at all) is what R3's
+    // register-verified corrections are consistent with; the un-scoped
+    // union is what let the original WS-2.D batch 1 pass silently encode
+    // states from the wrong slot in the first place.
+    let mut verb_target: BTreeMap<String, (String, String)> = BTreeMap::new();
+    // Manual overrides for verbs with no `transition_args` block at all —
+    // same targets `gameboard_r3_declaration_register.rs`'s
+    // `manual_target_overrides()` derived (domain-name/sibling-verb
+    // context; no mechanical derivation exists for these). Without this,
+    // `entity-workstream.complete`, `governance.record-review`, and
+    // `service-resource.decommission` fall through the scoping guard below
+    // unfiltered, re-polluting their derived sets with incidental
+    // transitions from unrelated slots (e.g. `entity_kyc`'s derived-rollup
+    // `verified -> approved via: entity-workstream.complete`).
+    for (fqn, ws, slot) in [
+        ("entity-workstream.complete", "kyc", "entity_workstream"),
+        ("entity-workstream.update-status", "kyc", "entity_workstream"),
+        ("governance.record-review", "semos_maintenance", "changeset"),
+        ("service-resource.decommission", "instrument_matrix", "service_resource"),
+    ] {
+        verb_target.insert(fqn.to_string(), (ws.to_string(), slot.to_string()));
+    }
     let mut all_verbs: BTreeSet<String> = BTreeSet::new();
     let mut stack = vec![config_root().join("verbs")];
     while let Some(dir) = stack.pop() {
@@ -416,7 +450,14 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
                         })
                         .unwrap_or_default();
                     if !states.is_empty() {
-                        declared.insert(fqn, states);
+                        declared.insert(fqn.clone(), states);
+                    }
+                    if let Some((ws, slot)) = spec.get("transition_args").and_then(|ta| {
+                        let ws = ta.get("target_workspace")?.as_str()?.to_owned();
+                        let slot = ta.get("target_slot")?.as_str()?.to_owned();
+                        Some((ws, slot))
+                    }) {
+                        verb_target.insert(fqn, (ws, slot));
                     }
                 }
             }
@@ -433,10 +474,12 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
         }
         let dag: serde_yaml::Value =
             serde_yaml::from_str(&fs::read_to_string(&path).expect("read dag")).expect("parse dag");
+        let workspace = dag.get("workspace").and_then(|w| w.as_str()).unwrap_or_default();
         let Some(slots) = dag.get("slots").and_then(|s| s.as_sequence()) else {
             continue;
         };
         for slot in slots {
+            let slot_id = slot.get("id").and_then(|s| s.as_str()).unwrap_or_default();
             let Some(transitions) = slot
                 .get("state_machine")
                 .and_then(|m| m.get("transitions"))
@@ -451,6 +494,16 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
                 let via = via.trim();
                 if !all_verbs.contains(via) {
                     continue; // macro prose / table names — not verbs
+                }
+                // Scope to the verb's own declared target slot when known
+                // (see verb_target's doc above) — a verb incidentally named
+                // as `via:` on some OTHER slot's transition (e.g. a derived
+                // rollup slot sharing verb names with its source slot) must
+                // not pollute this verb's real from-state set.
+                if let Some((target_ws, target_slot)) = verb_target.get(via) {
+                    if target_ws != workspace || target_slot != slot_id {
+                        continue;
+                    }
                 }
                 // Some DAGs author multi-state froms as one
                 // parenthesized string: "(DRAFT, ACTIVE)". Expand.
@@ -504,11 +557,35 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
         drift.join("\n")
     );
 
-    // 2. RATCHET — floors only rise. Recorded 2026-08-06.
+    // 2. RATCHET — floors only rise. Recorded 2026-08-06, universe floor
+    // consciously lowered 2026-08-18 (EOP-PLAN-GAMEBOARD-001 R3 scoping
+    // fix — see verb_target's doc comment above): the un-scoped "union
+    // every from-state across every slot naming this verb as `via:`"
+    // derivation didn't just mix in the entity_kyc rollup-slot pollution
+    // R3 was built to fix — it also silently counted 27 verbs as
+    // "DAG-derivable" whose OWN declared `transition_args` target doesn't
+    // match where their transition actually lives in the DAG:
+    //   - 26 (investor.*, holding.*, manco.*, entity.{identify,verify},
+    //     kyc-case.approve-with-conditions) still declare
+    //     `target_workspace: cbu` (or a stale `target_slot`) even though
+    //     their slots (investor, investor_kyc, holding, manco,
+    //     entity_proper_person) were relocated from cbu_dag.yaml into
+    //     kyc_dag.yaml by the CBU⊥KYC decoupling "Cluster 4" move (see
+    //     CLAUDE.md's CBU⊥KYC Domain Decoupling section) — the verb YAML's
+    //     own `transition_args` was never updated to follow that move.
+    //   - 1 (trading-profile.retire-template) has a target_slot mismatch
+    //     unrelated to the Cluster 4 move.
+    // These are real, live findings (transition_args feeds the v1.3
+    // GateChecker enforcement path, not just this test) — NOT encoded here
+    // because fixing them changes live gate-check behavior and needs its
+    // own ruling, same discipline as R2 Stage 2. Scoping correctly drops
+    // them from `derived` rather than crediting them on the strength of an
+    // incidental, wrong-slot transition; the floor moves with the more
+    // correct measurement instead of hiding it behind stale unscoped counts.
     let universe = derived.len();
     let covered = derived.keys().filter(|v| declared.contains_key(*v)).count();
     assert!(
-        universe >= 200,
+        universe >= 191,
         "DAG-derivable verb universe shrank unexpectedly: {universe}"
     );
     assert!(

@@ -67,7 +67,14 @@ fn manual_target_overrides() -> BTreeMap<&'static str, (&'static str, &'static s
         ("governance.submit-for-review", ("semos_maintenance", "changeset")),
         ("governance.record-review", ("semos_maintenance", "changeset")),
         ("service-resource.decommission", ("instrument_matrix", "service_resource")),
-        ("trading-profile.create-draft", ("instrument_matrix", "trading_profile")),
+        // trading-profile.create-draft deliberately NOT resolved: its own
+        // `lifecycle.entity_arg` is `cbu-id`, not a trading-profile id — the
+        // register's original domain-name-heuristic guess
+        // (instrument_matrix.trading_profile) was wrong, found while
+        // encoding R3's other corrections (2026-08-18). Its declared values
+        // (REJECTED, parties_assigned) don't match cbu.cbu's real states
+        // either, so this is left genuinely UNKNOWN pending a ruling, not
+        // guessed at twice.
     ]
     .into_iter()
     .collect()
@@ -187,25 +194,34 @@ fn declared_states_are_real_states() {
     free_text_escape.sort();
     free_text_escape.dedup();
 
-    let expected_wrong_vocabulary = vec![
-        "entity-workstream.complete",
-        "evidence.mark-verified",
-        "governance.publish",
-        "governance.record-review",
-        "kyc-case.approve",
-        "kyc-case.reject",
-        "screening.run",
-        "service-resource.decommission",
-        "service-resource.suspend",
-        "trading-profile.create-draft",
-    ];
+    // R3 encoding (EOP-PLAN-GAMEBOARD-001, 2026-08-18): all 10 original
+    // WRONG_VOCABULARY rows now corrected in config/verbs/**/*.yaml
+    // (mechanical, unambiguous 1:1 substitutions — see each verb's own new
+    // comment for the real-vocabulary citation). kyc-case.reject's
+    // WRONG_VOCABULARY component (PENDING_REVIEW) is also fixed — it stays
+    // in `free_text_escape` below for its separate, still-open "any
+    // non-terminal" problem. trading-profile.create-draft is no longer
+    // resolved at all (see `manual_target_overrides`'s comment — the
+    // register's original target guess was itself wrong) and so no longer
+    // appears in either list. screening.run's original "structural, wrong
+    // slot entirely" assessment was itself wrong: it correctly targets
+    // kyc.screening; VERIFY/workstream_open were contamination from
+    // OTHER slots sharing its verb name as `via:`, found while fixing the
+    // `domain_pack_config_qualification.rs` ratchet test's own scoping bug
+    // (verbs with no `transition_args` fell through unfiltered) — corrected
+    // to [PENDING] like every other mechanical fix. red-flag.escalate's
+    // "any non-terminal" was the same free-text-escape class as the other
+    // 5 below, but its scoped DAG derivation ([OPEN] only, on ITS OWN
+    // target slot kyc.red_flag) makes the correction mechanical rather than
+    // needing a ruling — moved out of free_text_escape into the corrected
+    // set.
+    let expected_wrong_vocabulary: Vec<&str> = vec![];
     let expected_free_text_escape = vec![
         "entity-workstream.update-status",
         "kyc-case.close",
         "kyc-case.escalate",
         "kyc-case.refer",
         "kyc-case.reject",
-        "red-flag.escalate",
     ];
 
     assert_eq!(
