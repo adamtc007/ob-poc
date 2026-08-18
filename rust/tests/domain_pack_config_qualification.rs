@@ -517,3 +517,374 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
          (batch 1 applied 2026-08-06): {covered} of {universe}"
     );
 }
+
+// ── Verification-pass closure teeth (execution-confirmed, 2026-08-18) ──────
+//
+// Both defects below were CONFIRMED by live execution against the real
+// production `runtime_registry()` and the real `data_designer` dev DB
+// (`enforce_requires_states_precondition` called through a rolled-back
+// `PgTransactionScope`, with `config/slot_state_table.yaml` seeded the SAME
+// way `ob-poc-web::main` seeds it at startup — not inferred from source
+// alone). Neither tooth below CLOSES its defect — both pin the EXACT
+// currently-broken/dead set so the drift class this repo already tracks
+// (K-G7-style "declared but not enforced") gets a fifth and sixth instance
+// with real regression coverage instead of zero. Wiring either gap up for
+// real is a separate, ratified change; when that happens, these assertions
+// must shrink deliberately, not silently pass.
+
+/// KNOWN GAP #5, R2 STAGE 1 CONSCIOUS EDIT (EOP-PLAN-GAMEBOARD-001,
+/// 2026-08-18) — was `cross_slot_constraints_declared_but_zero_consumers_
+/// is_the_known_gap`, RED (asserted zero consumers existed anywhere).
+/// R2 Stage 1 landed a real, report-only evaluator
+/// (`src/cross_slot_census.rs`) — this flips the test to pin the NEW
+/// state: a consumer now exists and is evaluated, but two things are
+/// still deliberately true and must stay true until their own separate,
+/// ratified changes land:
+///   1. `DagRegistry` (`crates/dsl-runtime/src/cross_workspace/dag_registry.rs`)
+///      still does NOT index `cross_slot_constraints` — Stage 1 is
+///      report-only and standalone by design (see that module's own doc:
+///      wiring it into live per-transition dispatch shares a call site
+///      with the in-flight Control-Plane Graduation program, paused
+///      pending reconciliation, not bundled in here).
+///   2. Only 3 of the 49 declared rules have a real hand-verified
+///      Clean/Violated check (`cbu_validated_requires_evidence_set_verified`,
+///      `cbu_validated_requires_commercial_client_entity`,
+///      `deal_contracted_requires_bac_approved`); the rest are honestly
+///      `NotYetImplemented`/`SchemaMismatch`, never silently dropped.
+///
+/// Live consequence, confirmed by the census this session (raw output
+/// pasted in the R2 Stage 1 report, not reproduced here): the exact
+/// `cbu_validated_requires_evidence_set_verified` /
+/// `cbu_validated_requires_commercial_client_entity` blockers this
+/// comment used to cite as unchecked are now REAL, LOGGED violations —
+/// 93 and 78 VALIDATED CBUs respectively, live in the dev DB today.
+/// Nothing refuses them (Stage 1 is report-only); Stage 2 (ratified
+/// separately, after Adam reads the census) is what would start refusing.
+///
+/// RED→GREEN evidence for this conscious edit: before this change, `cargo
+/// test --lib cross_slot_census` did not exist (no such module); after,
+/// `cross_slot_census::tests::every_declared_cross_slot_constraint_is_evaluated`
+/// passes and prints a 49-row census with 3 real verdicts, 2 schema
+/// mismatches, 44 not-yet-implemented — pasted in this session's R2 Stage
+/// 1 report.
+#[test]
+fn cross_slot_constraints_have_a_report_only_evaluator_not_yet_wired_to_dispatch() {
+    let dag_dir = config_root().join("sem_os_seeds/dag_taxonomies");
+    let mut declared_ids: Vec<String> = Vec::new();
+    let mut paths: Vec<_> = fs::read_dir(&dag_dir)
+        .expect("read dag_taxonomies dir")
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| matches!(p.extension().and_then(|e| e.to_str()), Some("yaml" | "yml")))
+        .collect();
+    paths.sort();
+    for path in &paths {
+        let doc: serde_yaml::Value =
+            serde_yaml::from_str(&fs::read_to_string(path).expect("read dag file"))
+                .expect("parse dag file");
+        let Some(entries) = doc.get("cross_slot_constraints").and_then(|v| v.as_sequence())
+        else {
+            continue;
+        };
+        for entry in entries {
+            let id = entry
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_else(|| panic!("cross_slot_constraints entry missing id in {path:?}"));
+            declared_ids.push(id.to_string());
+        }
+    }
+    declared_ids.sort();
+
+    let expected: Vec<&str> = vec![
+        // book_setup_dag.yaml (5)
+        "book_cbus_scaffolded_requires_entities",
+        "book_entities_provisioned_requires_structure_chosen",
+        "book_mandates_defined_requires_trading_profiles",
+        "book_parties_assigned_requires_all_cbus_have_required_roles",
+        "book_ready_requires_all_cbus_validated",
+        // cbu_dag.yaml (9)
+        "cbu_update_pending_proof_blocks_new_subscriptions",
+        "cbu_validated_requires_commercial_client_entity",
+        "cbu_validated_requires_evidence_set_verified",
+        "cbu_validated_requires_uboes_in_terminal_state",
+        "entity_verified_required_for_ubo_role",
+        "holding_active_requires_investor_active",
+        "holding_suspended_cascades_from_investor",
+        "investor_active_requires_kyc_approved",
+        "investor_offboarded_requires_all_holdings_closed",
+        // deal_dag.yaml (12)
+        "agreed_rate_card_lines_are_immutable",
+        "billing_period_creation_requires_active_profile",
+        "billing_profile_activation_requires_agreed_rate_card",
+        "deal_active_requires_active_billing_profile",
+        "deal_active_requires_all_onboarding_complete",
+        "deal_contracted_requires_agreed_rate_card",
+        "deal_contracted_requires_bac_approved",
+        "deal_contracted_requires_primary_clearance",
+        "deal_offboarded_requires_all_billing_closed",
+        "deal_ubo_assessment_blocked_halts_deal",
+        "onboarding_request_requires_kyc_clearance",
+        "rate_card_agreed_uniqueness",
+        // instrument_matrix_dag.yaml (10)
+        "archived_mandate_cascades_dependents",
+        "cbu_archived_requires_mandate_archived",
+        "cbu_suspended_implies_mandate_suspended",
+        "collateral_management_active_requires_isda",
+        "deactivated_chain_requires_universe_recheck",
+        "decommissioned_resource_cascades_intent",
+        "isda_coverage_required_for_derivative_trading",
+        "mandate_active_requires_live_settlement",
+        "mandate_requires_validated_cbu",
+        "retired_gateway_prunes_routing_rules",
+        // kyc_dag.yaml (4)
+        "case_cannot_approve_with_unresolved_red_flags",
+        "case_cannot_approve_with_unresolved_screening_hits",
+        "case_cannot_approve_without_workstreams_complete",
+        "doc_request_verified_triggers_workstream_advance",
+        // lifecycle_resources_dag.yaml (2)
+        "binding_live_requires_instance_active",
+        "binding_pilot_requires_instance_serving",
+        // onboarding_request_dag.yaml (2)
+        "onboarding_request_requires_contracted_deal",
+        "onboarding_request_requires_validated_cbu",
+        // semos_maintenance_dag.yaml (5)
+        "derivation_active_requires_active_upstream",
+        "published_changeset_propagates_items",
+        "published_phrase_requires_collision_clean",
+        "retired_attribute_blocks_active_derivations",
+        "srdef_complete_requires_no_gaps",
+    ];
+    let mut expected: Vec<String> = expected.into_iter().map(String::from).collect();
+    expected.sort();
+
+    assert_eq!(
+        declared_ids, expected,
+        "cross_slot_constraints declared-id set changed — update both this \
+         list and cross_slot_census.rs's per-rule dispatch deliberately"
+    );
+
+    // Still true, deliberately: DagRegistry (the v1.3 dispatch-time index
+    // GateChecker/GatePipeline read) does not index cross_slot_constraints.
+    // R2 Stage 1's evaluator is a separate, standalone, report-only module
+    // by design — see cross_slot_census.rs's own doc for why wiring this
+    // into live dispatch is deferred, not bundled into Stage 1.
+    let dag_registry_src = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("crates/dsl-runtime/src/cross_workspace/dag_registry.rs"),
+    )
+    .expect("read dag_registry.rs");
+    assert!(
+        !dag_registry_src.contains("cross_slot_constraints"),
+        "DagRegistry now references cross_slot_constraints — if this is a \
+         deliberate Stage 2 (or R0-convergence) change, update this test's \
+         doc consciously; it is no longer describing 'zero consumers \
+         anywhere', only 'not indexed by DagRegistry specifically'."
+    );
+
+    // Now true: a real, standalone, report-only evaluator exists.
+    // `every_declared_cross_slot_constraint_is_evaluated` (in
+    // `src/cross_slot_census.rs`'s own test module, DB-gated, `#[ignore]`)
+    // is the authoritative runtime proof that all 49 dispatch to a real
+    // outcome (asserts `reports.len() == declared.len()`, i.e. no id is
+    // silently dropped by `evaluate_all`'s loop) — a source-text
+    // containment check here would be weaker AND wrong (unhandled ids
+    // fall through a wildcard match arm, so their id strings don't
+    // literally appear in the source at all; that's fine, the loop still
+    // calls `evaluate_one` for each one).
+    let census_src = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("src/cross_slot_census.rs"),
+    )
+    .expect("read cross_slot_census.rs — R2 Stage 1's evaluator should exist");
+    assert!(
+        census_src.contains("pub async fn evaluate_all"),
+        "cross_slot_census::evaluate_all should exist as the real per-declared-id \
+         dispatch entry point"
+    );
+    assert!(
+        census_src.contains("fn every_declared_cross_slot_constraint_is_evaluated"),
+        "cross_slot_census.rs should carry its own runtime proof test for \
+         'no id silently dropped' — this file only re-checks the declared-id \
+         inventory and the module's existence, not the dispatch-completeness \
+         claim itself"
+    );
+}
+
+/// KNOWN GAP #6 — `enforce_requires_states_precondition_with_mode`
+/// (`src/dsl_v2/executor.rs`) derives its `SlotStateProvider` lookup key from
+/// the verb's own YAML domain string (e.g. `kyc-case`, `entity-workstream`,
+/// `screening`), not from `slot_state_table.yaml`'s registered workspace key
+/// (`kyc`). For every hyphenated/multi-word domain this produces a key that
+/// can never match a registered entry, so the FailClosed default (production)
+/// refuses the verb outright with `no_slot_mapping` — REGARDLESS of the
+/// entity's real state. `cbu`/`deal` verbs are unaffected only because those
+/// domain strings happen to equal their own registered `workspace.workspace`
+/// self-slot (`cbu.cbu`, `deal.deal`).
+///
+/// Execution-confirmed against the real dev DB (workstream
+/// `89d8fd8e-9809-454d-9ff2-b064cd555d77` in SCREEN, case
+/// `eb70b1df-c307-4da6-866a-a816351d9422` in INTAKE, real
+/// `runtime_registry()`, real `slot_state_table.yaml` loaded exactly as
+/// `ob-poc-web::main` loads it): `entity-workstream.update-status`,
+/// `screening.run`, `kyc-case.escalate`, `kyc-case.close`, and
+/// `kyc-case.refer` all refused with `no_slot_mapping` — not a business-rule
+/// refusal — and all five passed unconditionally under
+/// `OB_POC_LIFECYCLE_GATE_MODE=fail-open`, including `screening.run` whose
+/// OWN declared `requires_states` (`[PENDING, VERIFY, workstream_open]`)
+/// does not even include the entity's real state (`SCREEN`) — proving the
+/// gate never reaches its own precondition logic in either mode.
+///
+/// This test statically re-derives the SAME lookup key
+/// `enforce_requires_states_precondition_with_mode` computes (mirroring
+/// executor.rs's `derived_slot`/fallback logic exactly) for every verb
+/// declaring both `requires_states` and `entity_arg`, and pins the exact set
+/// that fails to resolve against the real `slot_state_table.yaml`. This does
+/// NOT close the gap — it pins it so the fix (and it is one fix: derive the
+/// lookup key from a real workspace, not the verb's own domain string) must
+/// touch this file consciously.
+#[test]
+fn requires_states_domain_key_resolution_gap_is_exactly_known() {
+    let slot_table_raw =
+        fs::read_to_string(config_root().join("slot_state_table.yaml")).expect("read slot table");
+    let slot_table: std::collections::HashMap<String, Vec<String>> =
+        serde_yaml::from_str(&slot_table_raw).expect("parse slot table");
+    let slot_keys: HashSet<String> = slot_table.into_keys().collect();
+
+    let mut unresolved: Vec<String> = Vec::new();
+    let mut stack = vec![config_root().join("verbs")];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir).expect("read verbs dir").filter_map(Result::ok) {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if !matches!(path.extension().and_then(|e| e.to_str()), Some("yaml" | "yml")) {
+                continue;
+            }
+            let value: serde_yaml::Value =
+                serde_yaml::from_str(&fs::read_to_string(&path).expect("read verb file"))
+                    .expect("parse verb file");
+            let Some(domains) = value.get("domains").and_then(|d| d.as_mapping()) else {
+                continue;
+            };
+            for (domain, body) in domains {
+                let domain = domain.as_str().unwrap_or_default();
+                let Some(verbs) = body.get("verbs").and_then(|v| v.as_mapping()) else {
+                    continue;
+                };
+                for (verb, spec) in verbs {
+                    let verb = verb.as_str().unwrap_or_default();
+                    let Some(lifecycle) = spec.get("lifecycle") else {
+                        continue;
+                    };
+                    let requires_states_nonempty = lifecycle
+                        .get("requires_states")
+                        .and_then(|r| r.as_sequence())
+                        .is_some_and(|seq| !seq.is_empty());
+                    let Some(entity_arg) =
+                        lifecycle.get("entity_arg").and_then(|e| e.as_str())
+                    else {
+                        continue;
+                    };
+                    if !requires_states_nonempty {
+                        continue;
+                    }
+                    // Mirrors executor.rs:2166-2173 EXACTLY: derived_slot
+                    // strips a trailing "-id", kebab->snake, prefixed by the
+                    // verb's own domain string; fallback tries domain.domain.
+                    let derived_slot = entity_arg
+                        .strip_suffix("-id")
+                        .map(|stem| format!("{}_{}", domain, stem.replace('-', "_")));
+                    let key1 = derived_slot.as_ref().map(|s| format!("{domain}.{s}"));
+                    let key2 = format!("{domain}.{domain}");
+                    let resolved = key1.as_ref().is_some_and(|k| slot_keys.contains(k))
+                        || slot_keys.contains(&key2);
+                    if !resolved {
+                        unresolved.push(format!("{domain}.{verb}"));
+                    }
+                }
+            }
+        }
+    }
+    unresolved.sort();
+    unresolved.dedup();
+
+    let expected: Vec<&str> = vec![
+        "application-instance.activate",
+        "application-instance.bring-online",
+        "application-instance.decommission",
+        "application-instance.enter-maintenance",
+        "application-instance.exit-maintenance",
+        "application-instance.take-offline",
+        "billing.activate-profile",
+        "billing.approve-period",
+        "billing.calculate-period",
+        "billing.close-profile",
+        "billing.dispute-period",
+        "billing.generate-invoice",
+        "billing.review-period",
+        "billing.suspend-profile",
+        "capability-binding.abort-pilot",
+        "capability-binding.deprecate",
+        "capability-binding.promote-live",
+        "capability-binding.retire",
+        "capability-binding.start-pilot",
+        "entity-workstream.complete",
+        "entity-workstream.update-status",
+        "evidence.mark-verified",
+        "governance.publish",
+        "governance.record-review",
+        "governance.rollback",
+        "governance.submit-for-review",
+        "kyc-case.approve",
+        "kyc-case.close",
+        "kyc-case.escalate",
+        "kyc-case.refer",
+        "kyc-case.reject",
+        "kyc-case.update-status",
+        "red-flag.escalate",
+        "screening.bulk-refresh",
+        "screening.complete",
+        "screening.run",
+        "service-consumption.activate",
+        "service-consumption.begin-winddown",
+        "service-consumption.provision",
+        "service-consumption.reinstate",
+        "service-consumption.retire",
+        "service-consumption.suspend",
+        "service-resource.activate",
+        "service-resource.decommission",
+        "service-resource.suspend",
+        "service-version.publish",
+        "service-version.retire",
+        "service-version.submit-for-review",
+        "service.define",
+        "service.deprecate",
+        "service.propose-revision",
+        "service.retire",
+        "settlement-chain.deactivate-chain",
+        "trade-gateway.activate-gateway",
+        "trade-gateway.suspend-gateway",
+        "trading-profile.approve",
+        "trading-profile.archive",
+        "trading-profile.create-draft",
+        "trading-profile.reject",
+        "trading-profile.submit",
+    ];
+    let mut expected: Vec<String> = expected.into_iter().map(String::from).collect();
+    expected.sort();
+    expected.dedup();
+
+    assert_eq!(
+        unresolved, expected,
+        "requires_states domain-key resolution gap changed — this is a KNOWN \
+         GAP pin (60 verbs whose gate always refuses with no_slot_mapping \
+         regardless of real state), not a closure; update deliberately. A \
+         verb moving OUT of this set without a corresponding \
+         slot_state_table.yaml fix is a regression (it means the verb quietly \
+         stopped declaring requires_states, not that the gap closed); a verb \
+         moving IN means a newly-authored requires_states block is silently \
+         dead on arrival."
+    );
+}

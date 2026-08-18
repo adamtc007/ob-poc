@@ -152,6 +152,13 @@ pub mod bpmn_integration;
 // Journey module - Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
 pub mod journey;
 
+// EOP-PLAN-GAMEBOARD-001 R2 Stage 1 — cross_slot_constraints report-only census.
+// Indexes all declared cross_slot_constraints (dead config, §1 fact 1) and
+// evaluates a hand-verified subset against real data. Refuses nothing —
+// report-only by construction (no caller consumes its output as a gate).
+#[cfg(feature = "database")]
+pub mod cross_slot_census;
+
 // Plan Builder — compilation pipeline decomposition (verb classifier, constraint gate, plan assembler)
 pub(crate) mod plan_builder;
 
