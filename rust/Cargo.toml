@@ -408,15 +408,15 @@ members = [
 [workspace.dependencies]
 # Library repos extracted to GitHub — local [patch] in rust/.cargo/config.toml
 # overrides these with ~/dev/ paths during development.
-dsl_types    = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-dsl-core     = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-sem_os_types    = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-sem_os_core     = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-sem_os_ontology = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-sem_os_policy   = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-semantic-embedder = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy", features = ["huggingface-download"] }
-semantic-pack = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
-semantic-decision-contracts = { git = "https://github.com/adamtc007/dsl", branch = "refactor/sem-os-pack-policy" }
+dsl_types    = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+dsl-core     = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+sem_os_types    = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+sem_os_core     = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+sem_os_ontology = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+sem_os_policy   = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+semantic-embedder = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745", features = ["huggingface-download"] }
+semantic-pack = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
+semantic-decision-contracts = { git = "https://github.com/adamtc007/dsl", rev = "c3570828d87789cb8fe3c04afba8a9ecbb61c745" }
 
 # BPMN integration family: one exact immutable revision. Keeping the bus,
 # manifest, engine, FFI and runner crates on one commit prevents duplicate wire

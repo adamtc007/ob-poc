@@ -529,9 +529,10 @@ async fn e2e_03_full_happy_path_choreography() {
     let runbook_id = Uuid::new_v4();
 
     // 1. Start process via dispatcher
+    let case_id = "test-case-003";
     let outcome = dispatcher
         .execute_v2(
-            "(kyc-case.create :entity-id \"test-entity-003\")",
+            "(kyc-case.create :case-id \"test-case-003\")",
             entry_id,
             runbook_id,
             None,
@@ -570,7 +571,12 @@ async fn e2e_03_full_happy_path_choreography() {
 
     // 3. Signal docs_received
     rig.client
-        .signal(process_instance_id, "docs_received", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "docs_received",
+            Some(case_id.to_string()),
+            None,
+        )
         .await
         .expect("Signal failed");
     eprintln!("Step 3: Signal docs_received sent");
@@ -578,7 +584,12 @@ async fn e2e_03_full_happy_path_choreography() {
     // 4. Signal reviewer_decision (UserTask compiles to a message wait)
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     rig.client
-        .signal(process_instance_id, "Reviewer Decision", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "Reviewer Decision",
+            Some(case_id.to_string()),
+            None,
+        )
         .await
         .expect("Reviewer decision signal failed");
     eprintln!("Step 4: Signal reviewer_decision sent");
@@ -697,7 +708,7 @@ async fn e2e_04_runbook_park_and_resume() {
         sentence: "Open KYC case for test entity".to_string(),
         labels: Default::default(),
         verb: "kyc-case.create".to_string(),
-        dsl: "(kyc-case.create :entity-id \"test-entity-004\")".to_string(),
+        dsl: "(kyc-case.create :case-id \"test-case-004\")".to_string(),
         args: Default::default(),
         slot_provenance: SlotProvenance {
             slots: Default::default(),
@@ -761,14 +772,24 @@ async fn e2e_04_runbook_park_and_resume() {
 
     // Signal docs_received (intermediate catch event)
     rig.client
-        .signal(process_instance_id, "docs_received", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "docs_received",
+            Some("test-case-004".to_string()),
+            None,
+        )
         .await
         .expect("Signal failed");
 
     // Signal reviewer_decision (user task = message wait)
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     rig.client
-        .signal(process_instance_id, "Reviewer Decision", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "Reviewer Decision",
+            Some("test-case-004".to_string()),
+            None,
+        )
         .await
         .expect("Reviewer decision signal failed");
 
@@ -832,7 +853,7 @@ async fn e2e_05_job_worker_background_loop() {
     // Start process
     let outcome = dispatcher
         .execute_v2(
-            "(kyc-case.create :entity-id \"test-entity-005\")",
+            "(kyc-case.create :case-id \"test-case-005\")",
             entry_id,
             runbook_id,
             None,
@@ -852,7 +873,12 @@ async fn e2e_05_job_worker_background_loop() {
 
     // Signal docs_received
     rig.client
-        .signal(process_instance_id, "docs_received", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "docs_received",
+            Some("test-case-005".to_string()),
+            None,
+        )
         .await
         .expect("Signal failed");
     eprintln!("Signal docs_received sent");
@@ -860,7 +886,12 @@ async fn e2e_05_job_worker_background_loop() {
     // Signal reviewer_decision (user task = message wait)
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     rig.client
-        .signal(process_instance_id, "Reviewer Decision", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "Reviewer Decision",
+            Some("test-case-005".to_string()),
+            None,
+        )
         .await
         .expect("Reviewer decision signal failed");
     eprintln!("Signal reviewer_decision sent");
@@ -1045,7 +1076,7 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
             sentence: "Open KYC case for test entity".to_string(),
             labels: Default::default(),
             verb: "kyc-case.create".to_string(),
-            dsl: "(kyc-case.create :entity-id \"test-entity-008\")".to_string(),
+            dsl: "(kyc-case.create :case-id \"test-case-008\")".to_string(),
             args: Default::default(),
             slot_provenance: SlotProvenance {
                 slots: Default::default(),
@@ -1156,7 +1187,12 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
 
     // 7. Signal docs_received (intermediate catch event).
     rig.client
-        .signal(process_instance_id, "docs_received", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "docs_received",
+            Some("test-case-008".to_string()),
+            None,
+        )
         .await
         .expect("Signal docs_received failed");
     eprintln!("Step 7: Signal docs_received sent");
@@ -1164,7 +1200,12 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
     // 8. Signal reviewer_decision (user task = message wait).
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     rig.client
-        .signal(process_instance_id, "Reviewer Decision", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "Reviewer Decision",
+            Some("test-case-008".to_string()),
+            None,
+        )
         .await
         .expect("Reviewer decision signal failed");
     eprintln!("Step 8: Signal reviewer_decision sent");
@@ -1827,7 +1868,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
     .expect("DB error");
 
     let row = row.expect("Expected at least one job frame");
-    let job_key: i64 = row.try_get("job_key").expect("job_key should be present");
+    let job_key: String = row.try_get("job_key").expect("job_key should be present");
     let status: String = row.try_get("status").expect("status should be present");
     let attempts: i32 = row.try_get("attempts").expect("attempts should be present");
     eprintln!(
@@ -1876,7 +1917,7 @@ async fn e2e_14_event_bridge_reconnect_dedup() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc-case.create :entity-id \"test-entity-014\")",
+            "(kyc-case.create :case-id \"test-case-014\")",
             entry_id,
             runbook_id,
             None,
@@ -1907,14 +1948,24 @@ async fn e2e_14_event_bridge_reconnect_dedup() {
 
     // Signal docs_received.
     rig.client
-        .signal(process_instance_id, "docs_received", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "docs_received",
+            Some("test-case-014".to_string()),
+            None,
+        )
         .await
         .expect("Signal docs_received failed");
 
     // Signal reviewer_decision.
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     rig.client
-        .signal(process_instance_id, "Reviewer Decision", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "Reviewer Decision",
+            Some("test-case-014".to_string()),
+            None,
+        )
         .await
         .expect("Reviewer decision signal failed");
 
@@ -1985,7 +2036,7 @@ async fn e2e_15_crash_recovery_event_log_replay() {
     // 1. Start process.
     let outcome = dispatcher
         .execute_v2(
-            "(kyc-case.create :entity-id \"test-entity-015\")",
+            "(kyc-case.create :case-id \"test-case-015\")",
             entry_id,
             runbook_id,
             None,
@@ -2001,13 +2052,23 @@ async fn e2e_15_crash_recovery_event_log_replay() {
     }
 
     rig.client
-        .signal(process_instance_id, "docs_received", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "docs_received",
+            Some("test-case-015".to_string()),
+            None,
+        )
         .await
         .expect("Signal failed");
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     rig.client
-        .signal(process_instance_id, "Reviewer Decision", None)
+        .signal_with_correlation(
+            process_instance_id,
+            "Reviewer Decision",
+            Some("test-case-015".to_string()),
+            None,
+        )
         .await
         .expect("Reviewer decision signal failed");
 
