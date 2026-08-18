@@ -1,0 +1,34 @@
+# EOP-PLAN-GAMEBOARD-001 R4 — Provider Interface Design (DRAFT, for sign-off)
+
+| | |
+|---|---|
+| **Status** | DRAFT — half-page design, for Adam's sign-off before any code. |
+| **Grounded in** | R6 (`EOP-PLAN-KYCUBO-KIT-001 v0.6`'s own Appendix A research task), run this session, raw facts below. |
+
+## R6 findings (the grounding — every claim is a direct source/schema read)
+
+1. **T5 (bitemporal replay) is already landed, tested, and correct — for the KIT's folded-event-stream side only.** `recover_determination_bitemporal` (`ob-poc-kyc-substrate/src/determination.rs:853-869`) takes explicit `valid_at`/`known_at` timestamps, filters events on `e.as_of <= valid_at && e.committed_at <= known_at`, and delegates to `recover_determination_at` unchanged. `IntentEvent` carries both `as_of` (line 78) and `committed_at` (line 85) on every event, confirmed live at the schema level too: `"ob-poc".kyc_intent_events.as_of`/`.committed_at` are both real `NOT NULL timestamptz` columns, `committed_at DEFAULT clock_timestamp()`, indexed (`kyc_intent_events_committed_idx`). A third, DB-native sibling exists — `PgKycEventStore::recover_control_at` (`ob-poc-kyc-store/src/store.rs:108-117`) — but it's single-axis (transaction-time only, no `valid_at` filter).
+2. **All three recovery functions have zero production callers.** Every call site is a test or fuzz target (`kyc_slice.rs`, `recovery.rs`, `fold_replay.rs`). The capability is proven correct in isolation; nothing in the live system (no verb, no API route, no MCP tool) lets anyone actually ask "what was the legal move set as of time T" today.
+3. **Pin-set gap, named exactly as R6 asked:** comparing `RecoveryPin`/`DeterminationPin` (`determination.rs:642-655,756-761`) against the KIT-6 pin set (`viewer`/`axis`/`kit-version`/`constructor-version`):
+   - `axis` — **not missing**, deliberately generalized: passing explicit `valid_at`+`known_at` is a documented, reasoned superset of a single axis-selector (the function's own doc comment explains this as a design judgment call already made).
+   - `viewer` — **missing**. No field records who/what is asking; the pin can't yet answer "was this replay authorized for this actor's clearance."
+   - `kit-version` — **missing**. `lexicon_manifest_hash` pins the lexicon's *data* (which preconditions were declared), not which *code* (which `DeterminationStrategy` impl, which fold-registry version) computed the result.
+   - `constructor-version` — **missing**, same gap as `kit-version` from a different angle: nothing pins which strategy implementation resolved the candidates. `policy_version` (a bare `String`) is the closest existing field, but its semantics were never defined as "constructor version" specifically.
+4. **The DAG-YAML/Postgres-slot-state side (R0's E1/E2, `GateChecker`/`enforce_requires_states_precondition`) has NO temporal capability at all, and cannot get one cheaply.** Its target tables (`cases`, `cbus`, `fee_billing_profiles`, `application_instances`, ...) are plain mutable-column tables — no event log, no `as_of`/`committed_at`, no way to reconstruct "what was `cbus.status` at time T" once it's been overwritten, short of point-in-time WAL/backup restoration (not a queryable provider). This is the load-bearing fact for R4's scope decision below.
+
+## Design decision
+
+**R4's "one interface, two implementations" (`current` / `at(T, axis)`) is realistic for the KIT/KYC determination side, and NOT realistic for the DAG-YAML/GateChecker/requires_states side without first building an event-sourcing layer under its target tables — a distinct, much larger, unscoped tranche.** Claiming a single provider abstraction spanning both today would either (a) be dishonest about the DAG-YAML side's `at(T, axis)` arm (it would have to fabricate history it doesn't have), or (b) quietly scope R4 down to "provider trait with one real implementation and one that always errors," which doesn't buy anything C7 needs.
+
+**Scoped design for sign-off:**
+
+1. **Provider trait lives where the real capability already is** — the KIT/KYC determination side (`ob-poc-kyc-substrate`), not a cross-cutting trait spanning `dsl-runtime::cross_workspace` too. `SlotStateProvider` (the DAG-YAML side's existing `current`-only interface, `crates/dsl-runtime/src/cross_workspace/slot_state.rs`) stays exactly as-is; unifying it with a bitemporal provider is explicitly **out of scope** for this design, for the reason in finding 4.
+2. **Complete the pin, don't redesign it.** Add `viewer: Option<ActorRef>` (or the existing `sem_os_core::principal::Principal`, already used elsewhere in this codebase for actor identity — reuse, don't invent a new type), `kit_version: String` (the fold-registry/strategy-crate build version — `env!("CARGO_PKG_VERSION")` of `ob-poc-kyc-substrate`, same pattern `build_version_pinning_input` already uses for `compiler_version`), and rename/repurpose `policy_version` explicitly as `constructor_version` (documenting which `DeterminationStrategy::name()` produced the result — it already carries `control.selected_strategy`, just needs to flow into the pin under an honest name) onto `DeterminationPin`/`RecoveryPin`.
+3. **Wire one real, live query surface** before claiming "replayable" is more than a proven-in-tests capability: a single read-only verb or MCP tool (e.g. `ubo.determination.recover-at`) that calls `recover_determination_bitemporal` against the real `PgKycEventStore`-loaded event slice. This is the smallest change that turns finding 2 from "dead code, tested" into "a real capability."
+4. **Gate tests, unchanged from the plan text, now buildable on real code:** `legal_set_at_past_time_is_reproducible` (call the new verb/tool twice at the same pin, same events, assert bit-identical — trivial given `recover_determination_bitemporal`'s existing determinism, per `FrozenDetermination.determination_hash`), `legality_pins_its_ruleset` (bump `kit_version`, re-replay, assert the pin now differs and is flagged, not silently accepted), `provider_swap_is_transparent` — **this one needs re-scoping**: there is no second provider to swap against per the design decision above; either drop it or reinterpret it as "the DB-backed `recover_control_at` and the pure `recover_determination_at`/`_bitemporal` agree on the same events" (a real, checkable claim, just not "two axis implementations of one trait").
+
+## What this design explicitly does NOT do
+
+- Does not touch `execute_verb_in_scope`, `GateChecker`, or any R0-paused production dispatch code.
+- Does not attempt event-sourcing for the DAG-YAML side's target tables — flagged as a real, separate, much larger tranche if C7 is ever wanted there too.
+- Does not implement anything yet — this is the sign-off artifact; R4's actual code (pin fields + one query verb) is a small, well-bounded follow-up once this scope is confirmed.
