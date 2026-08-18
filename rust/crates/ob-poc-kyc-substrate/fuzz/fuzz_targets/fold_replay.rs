@@ -76,6 +76,7 @@ fuzz_target!(|data: &[u8]| {
         lexicon_manifest_hash: Hash::of(b"fuzz-manifest"),
         reference_snapshot_id: Uuid::nil(),
         import_run_ids: BTreeSet::new(),
+        viewer: None,
     };
     let _ = recover_determination_at(&refs, &strategy, &natural_persons, threshold_pct, pin);
 });

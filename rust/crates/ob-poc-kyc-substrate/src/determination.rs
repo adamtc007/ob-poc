@@ -28,7 +28,7 @@ use crate::fold::control::{
     reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
     ReconciledEconomicEdge, TrustRoleKind,
 };
-use crate::types::{EntityId, EventId, Hash, PersonId};
+use crate::types::{EntityId, EventId, Hash, PersonId, Principal};
 
 // ── Prong ─────────────────────────────────────────────────────────────────────
 
@@ -638,7 +638,14 @@ pub enum SmoResult {
 /// - import run ids
 /// - content hash of the reconciled control graph
 /// - frozen `as_of` timestamp (Q6 — never a live wall-clock read)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// - who asked (`viewer`), which build resolved it (`kit_version`), and
+///   which strategy produced it (`constructor_version`) — R4
+///   (`EOP-PLAN-GAMEBOARD-001`, closing the KIT-6 pin-set gap the KIT plan's
+///   own T5/R6 named: "viewer/axis/kit-version/constructor-version").
+///   `axis` is deliberately not a field here — see
+///   `recover_determination_bitemporal`'s own doc for why passing explicit
+///   `valid_at`/`known_at` is a strict generalisation of an axis selector.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DeterminationPin {
     pub policy_version: String,
     /// Whole-lexicon manifest hash (Q7).
@@ -652,6 +659,24 @@ pub struct DeterminationPin {
     pub graph_content_hash: Hash,
     /// Frozen point in time (Q6: NOT now(); passed in from the event's `as_of`).
     pub as_of: DateTime<Utc>,
+    /// R4: who requested this determination/replay. `None` for the common
+    /// case where no actor context is threaded through yet (this is
+    /// additive metadata, not a new access-control gate).
+    #[serde(default)]
+    pub viewer: Option<Principal>,
+    /// R4: this crate's own build version at freeze/recovery time
+    /// (`env!("CARGO_PKG_VERSION")`) — pins which fold-registry/strategy
+    /// code computed the result, distinct from `lexicon_manifest_hash`
+    /// (which pins the lexicon *data*, not the code that reads it).
+    #[serde(default)]
+    pub kit_version: String,
+    /// R4: the `DeterminationStrategy::name()` that actually resolved
+    /// candidates (`det.strategy` at freeze time) — was previously only
+    /// implicit in `policy_version`'s ambiguous semantics; now recorded
+    /// explicitly and honestly, `None` when no strategy had been selected
+    /// yet (e.g. a determination that only ran the SMO fallback).
+    #[serde(default)]
+    pub constructor_version: Option<String>,
 }
 
 impl DeterminationPin {
@@ -708,6 +733,7 @@ pub struct DeterminationInProgress {
 /// - Pins policy + lexicon + reference + import runs + graph hash + as_of.
 /// - Returns `FrozenDetermination` (immutable).
 /// - K-5: if candidates is empty AND no SMO was applied, returns Err.
+#[allow(clippy::too_many_arguments)]
 pub fn freeze_determination(
     det: &DeterminationInProgress,
     control_state: &ControlState,
@@ -716,6 +742,7 @@ pub fn freeze_determination(
     lexicon_manifest_hash: Hash,
     reference_snapshot_id: Uuid,
     import_run_ids: BTreeSet<Uuid>,
+    viewer: Option<Principal>,
 ) -> Result<FrozenDetermination, KycError> {
     // K-5: determination must not be silent.
     if det.candidates.is_empty() && det.smo_result.is_none() {
@@ -732,6 +759,9 @@ pub fn freeze_determination(
         import_run_ids,
         graph_content_hash: graph_hash,
         as_of: freeze_event.as_of, // frozen clock from the event (Q6)
+        viewer,
+        kit_version: env!("CARGO_PKG_VERSION").to_string(),
+        constructor_version: det.strategy.clone(),
     };
 
     // Determination hash covers pin + candidates.
@@ -752,12 +782,17 @@ pub fn freeze_determination(
 // ── Replay / point-in-time recovery ──────────────────────────────────────────
 
 /// Pin parameters required to freeze/recover a determination (K-18).
-/// Groups the 4 reference-plane inputs so `recover_determination_at` stays under 8 args.
+/// Groups the reference-plane inputs so `recover_determination_at` stays under 8 args.
+/// `viewer` (R4): who is asking for this replay — threaded straight into the
+/// resulting `DeterminationPin`, not otherwise interpreted here (this crate
+/// stays "no sem_os_core — heavy/DB-adjacent" per its own Cargo.toml; access
+/// control on `viewer` is a caller/higher-layer concern).
 pub struct RecoveryPin<'a> {
     pub policy_version: &'a str,
     pub lexicon_manifest_hash: Hash,
     pub reference_snapshot_id: Uuid,
     pub import_run_ids: BTreeSet<Uuid>,
+    pub viewer: Option<Principal>,
 }
 
 /// Replay the determination from an event stream filtered to `up_to_seq`
@@ -822,6 +857,7 @@ pub fn recover_determination_at(
         pin.lexicon_manifest_hash,
         pin.reference_snapshot_id,
         pin.import_run_ids,
+        pin.viewer,
     )
     .ok()
 }

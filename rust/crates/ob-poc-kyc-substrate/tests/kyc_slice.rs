@@ -61,6 +61,7 @@ fn test_pin<'a>(policy: &'a str, lex_hash: Hash, ref_snap: Uuid) -> RecoveryPin<
         lexicon_manifest_hash: lex_hash,
         reference_snapshot_id: ref_snap,
         import_run_ids: std::collections::BTreeSet::new(),
+        viewer: None,
     }
 }
 
@@ -775,6 +776,7 @@ fn ec4_smo_fallback_when_no_ubos_found() {
         dummy_hash(),
         Uuid::new_v4(),
         BTreeSet::new(),
+        None,
     );
     let frozen = result.expect("freeze with SMO must succeed");
     assert!(
@@ -886,6 +888,7 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
         dummy_hash(),
         Uuid::new_v4(),
         BTreeSet::new(),
+        None,
     );
     assert!(
         result.is_err(),
@@ -2148,5 +2151,208 @@ fn bitemporal_matches_txtime_when_axes_align() {
     assert_eq!(
         det_txtime.candidates[0].person_id,
         det_bitemporal.candidates[0].person_id
+    );
+}
+
+/// R4 (`EOP-PLAN-GAMEBOARD-001`) gate: `legal_set_at_past_time_is_reproducible`.
+/// Same fixture as `bitemporal_matches_txtime_when_axes_align` (same events,
+/// same pin, same axes) — two independent replays must be bit-identical,
+/// including the two new R4 pin fields, not just the pre-existing
+/// `determination_hash`.
+#[test]
+fn r4_legal_set_at_past_time_is_reproducible() {
+    let subject = fixture_subject_id();
+    let h = dummy_hash();
+    let a = entity_subject();
+    let b = entity_b();
+    let t1 = ts(2026, 1, 1);
+    let far_future = ts(2027, 1, 1);
+
+    let edge_b_a = eid("b_a");
+    let p1 = person_p1();
+    let p1_entity = EntityId(p1.0);
+    let natural_persons: BTreeSet<PersonId> = [p1].into();
+
+    let events: Vec<IntentEvent> = vec![
+        te(
+            0, subject, "kyc.subject.register", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
+            idem("r4-reg-a"), t1,
+        ),
+        te(
+            1, subject, "kyc.subject.classify-structure", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
+            idem("r4-cls"), t1,
+        ),
+        te(
+            2, subject, "kyc.subject.register", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
+            idem("r4-reg-p1"), t1,
+        ),
+        te(
+            3, subject, "ubo.edge.assert-economic-interest", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": edge_b_a.0, "from_entity_id": b.0, "to_entity_id": a.0, "percentage": 60.0}),
+            idem("r4-edge-b-a"), t1,
+        ),
+        te(
+            4, subject, "ubo.edge.assert-economic-interest", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": eid("r4_p1_b").0, "from_entity_id": p1_entity.0, "to_entity_id": b.0, "percentage": 100.0}),
+            idem("r4-edge-p1-b"), t1,
+        ),
+        te(
+            5, subject, "ubo.edge.reconcile-conflict", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}), idem("r4-reconcile1"), t1,
+        ),
+        te(
+            6, subject, "ubo.determination.select-strategy", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"strategy": "ownership_prong_strategy"}),
+            idem("r4-strategy"), t1,
+        ),
+        te(
+            7, subject, "ubo.determination.freeze", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}), idem("r4-freeze1"), t1,
+        ),
+    ];
+
+    let refs: Vec<&IntentEvent> = events.iter().collect();
+    let strategy = OwnershipProngStrategy;
+    let lexicon_hash = dummy_hash();
+    let ref_snap = Uuid::new_v4();
+
+    let replay = || {
+        recover_determination_bitemporal(
+            &refs,
+            &strategy,
+            &natural_persons,
+            25.0,
+            test_pin("v1.0", lexicon_hash, ref_snap),
+            far_future,
+            far_future,
+        )
+        .expect("recover_determination_bitemporal must succeed on this fixture")
+    };
+
+    let det1 = replay();
+    let det2 = replay();
+
+    assert_eq!(
+        det1.determination_hash, det2.determination_hash,
+        "two independent replays of the same (events, pin, axes) must be bit-identical"
+    );
+    assert_eq!(
+        det1.pin.kit_version, det2.pin.kit_version,
+        "kit_version must be identical across replays of the same build"
+    );
+    assert_eq!(
+        det1.pin.constructor_version, det2.pin.constructor_version,
+        "constructor_version must be identical across replays of the same strategy"
+    );
+}
+
+/// R4 gate: `legality_pins_its_ruleset`. The pin must honestly name which
+/// build (`kit_version`) and which strategy (`constructor_version`) produced
+/// the determination — this is the KIT-6 pin-set gap R6 found missing
+/// (viewer/kit-version/constructor-version; `axis` was already handled by
+/// `recover_determination_bitemporal`'s explicit valid_at/known_at params).
+#[test]
+fn r4_legality_pins_its_ruleset() {
+    let subject = fixture_subject_id();
+    let h = dummy_hash();
+    let a = entity_subject();
+    let t1 = ts(2026, 1, 1);
+    let p1 = person_p1();
+    let natural_persons: BTreeSet<PersonId> = [p1].into();
+
+    let events: Vec<IntentEvent> = vec![
+        te(
+            0, subject, "kyc.subject.register", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "is_natural_person": false}),
+            idem("r4b-reg-a"), t1,
+        ),
+        te(
+            1, subject, "kyc.subject.classify-structure", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": a.0, "structure_class": "private_company"}),
+            idem("r4b-cls"), t1,
+        ),
+        te(
+            2, subject, "kyc.subject.register", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"entity_id": p1.0, "is_natural_person": true}),
+            idem("r4b-reg-p1"), t1,
+        ),
+        te(
+            3, subject, "ubo.edge.assert-economic-interest", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"edge_id": eid("r4b_p1_a").0, "from_entity_id": p1.0, "to_entity_id": a.0, "percentage": 100.0}),
+            idem("r4b-edge"), t1,
+        ),
+        te(
+            4, subject, "ubo.edge.reconcile-conflict", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}), idem("r4b-reconcile"), t1,
+        ),
+        te(
+            5, subject, "ubo.determination.select-strategy", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({"strategy": "ownership_prong_strategy"}),
+            idem("r4b-strategy"), t1,
+        ),
+        te(
+            6, subject, "ubo.determination.freeze", h, analyst(), authority(),
+            TargetBinding::for_subject(subject),
+            serde_json::json!({}), idem("r4b-freeze"), t1,
+        ),
+    ];
+
+    let refs: Vec<&IntentEvent> = events.iter().collect();
+    let strategy = OwnershipProngStrategy;
+
+    let det = recover_determination_at(
+        &refs,
+        &strategy,
+        &natural_persons,
+        25.0,
+        test_pin("v1.0", dummy_hash(), Uuid::new_v4()),
+    )
+    .expect("recover_determination_at must succeed on this fixture");
+
+    assert_eq!(
+        det.pin.kit_version,
+        env!("CARGO_PKG_VERSION"),
+        "kit_version must name the real build that computed this determination"
+    );
+    assert_eq!(
+        det.pin.constructor_version.as_deref(),
+        Some("ownership_prong_strategy"),
+        "constructor_version must honestly name the strategy that actually resolved candidates, \
+         not leave it implicit in policy_version's ambiguous semantics"
+    );
+    assert!(
+        det.pin.viewer.is_none(),
+        "viewer is additive metadata, not a new required field — None is a legitimate, \
+         honest answer when no actor context was threaded through (as here)"
+    );
+
+    // A pin from a DIFFERENT kit_version must not silently compare equal —
+    // this is what makes a future ruleset drift detectable rather than
+    // silently accepted (the mechanism half of `legality_pins_its_ruleset`;
+    // this crate has no live version-bump to exercise within one test run,
+    // so this proves the field is load-bearing in equality, not decorative).
+    let mut drifted_pin = det.pin.clone();
+    drifted_pin.kit_version = "0.0.0-simulated-drift".to_string();
+    assert_ne!(
+        det.pin, drifted_pin,
+        "a pin with a different kit_version must not compare equal to the original — \
+         drift must be visible, not silently absorbed"
     );
 }
