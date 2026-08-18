@@ -263,7 +263,7 @@ overall_lifecycle:
         all_of:
           - "cases.status = 'INTAKE'"
           - "COUNT entity_workstreams WHERE case_id = this.case_id = 0"
-      progression_verbs: [kyc-case.create, case-event.record]
+      progression_verbs: [kyc-case.create, case-event.log]
       next_phase: discovery
 
     - name: discovery
@@ -278,7 +278,10 @@ overall_lifecycle:
         - kyc-case.update-status
         - entity-workstream.update-status
         - document.create-request
-        - ubo-registry.discover
+        # UBO discovery here is backend-pipeline-driven (see
+        # entity_limited_company_ubo's DISCOVERED entry_via), not a callable
+        # verb — a "ubo-registry.discover" verb never existed. Removed
+        # rather than left as a phantom reference (2026-08-18 hygiene fix).
       next_phase: screening_in_flight
 
     - name: screening_in_flight
@@ -290,10 +293,13 @@ overall_lifecycle:
           - "cases.status IN ('DISCOVERY', 'ASSESSMENT')"
           - "EXISTS screenings WHERE status IN ('RUNNING', 'HIT_PENDING_REVIEW')"
       progression_verbs:
-        - screening.record-hit
+        # screening.record-hit / screening.confirm / screening.dismiss were
+        # never real verbs — the actual verb is screening.review-hit,
+        # dispatched with status HIT_CONFIRMED / HIT_DISMISSED (see
+        # ScreeningReviewHit, W5 screening hook). Collapsed to the one real
+        # verb rather than 3 phantom near-duplicates (2026-08-18 hygiene fix).
+        - screening.review-hit
         - red-flag.raise
-        - screening.confirm
-        - screening.dismiss
       next_phase: assessment
 
     - name: assessment
@@ -307,7 +313,11 @@ overall_lifecycle:
           - "ALL entity_workstreams.status IN ('ASSESS', 'COMPLETE', 'ENHANCED_DD')"
       progression_verbs:
         - kyc-case.set-risk-rating
-        - ubo-registry.promote
+        # "ubo-registry.promote" was never a real verb — no ubo-registry
+        # domain exists. UBO chain finalization here is
+        # ubo.determination.freeze's job (see EOP-DD-KYCUBO-003), not a
+        # separate promote step. Removed rather than left phantom
+        # (2026-08-18 hygiene fix).
         - red-flag.close
       next_phase: review
 
@@ -475,13 +485,30 @@ slots:
           via: kyc-case.close
         - from: "(any non-terminal)"
           to: DO_NOT_ONBOARD
-          via: kyc-case.reject (with do-not-onboard flag)
+          via: kyc-case.reject
+          args:
+            do-not-onboard: true
+        # Two real, independent (OR, not joint) verbs both drive this
+        # transition: kyc-case.refer always sets REFER_TO_REGULATOR;
+        # kyc-case.escalate does too when escalation-level=BOARD (verified
+        # against Escalate::execute — a genuine, existing alternative move,
+        # not something to collapse to one verb). Split from the
+        # compiler-rejected list-valued via into two real rows, same shape
+        # as red_flag's UNDER_REVIEW -> CLOSED (2026-08-18 triage fix).
         - from: "(any non-terminal)"
           to: REFER_TO_REGULATOR
-          via: [kyc-case.escalate, kyc-case.refer]
+          via: kyc-case.escalate
+          args:
+            escalation-level: BOARD
+        - from: "(any non-terminal)"
+          to: REFER_TO_REGULATOR
+          via: kyc-case.refer
+        # was "kyc-case.reopen (for periodic review)" — prose annotation,
+        # same defect class as W1's #9 fix; "for periodic review" is
+        # descriptive only, reopen takes no such arg (2026-08-18 fix).
         - from: APPROVED
           to: DISCOVERY
-          via: kyc-case.reopen (for periodic review)
+          via: kyc-case.reopen
       terminal_states: [APPROVED, REJECTED, WITHDRAWN, DO_NOT_ONBOARD, EXPIRED, REFER_TO_REGULATOR]
 
   - id: entity_kyc
@@ -500,6 +527,9 @@ slots:
           entry: true
           description: "Entity exists in skeleton form; no investigation yet."
         - id: empty
+          entry_via:
+            signal:
+              source: gleif_import
           description: "Entity identified but no data beyond basic identifiers."
         - id: filled
           description: "Entity data captured; workstream opened."
@@ -514,9 +544,9 @@ slots:
         - id: approved
           description: "Entity cleared as part of a case."
       transitions:
-        - from: placeholder
-          to: empty
-          via: "(backend: entity lookup / GLEIF import)"
+        # placeholder -> empty is backend-driven (GLEIF import), not a
+        # callable verb — expressed via empty's entry_via above, not a
+        # transition row (2026-08-18 W1 shape fix).
         - from: empty
           to: filled
           via: skeleton.build
@@ -560,6 +590,26 @@ slots:
           description: "Verifying collected data."
         - id: SCREEN
           description: "Running screenings."
+          # v1.5 EOP-PLAN-DAG-AWAITS-001 Phase 5: waits (indefinitely, via a
+          # correlated BPMN message — config/bpmn/entity-workstream-screen.bpmn)
+          # for every screening sibling row to reach a terminal status, then
+          # switches on the worst-of outcome. Fired by kyc_stream_ops.rs's
+          # ScreeningComplete/ScreeningReviewHit via
+          # bpmn_integration::signal_outbox::queue_bpmn_signal. Replaces the
+          # former screenings_cleared entry_via trigger on ASSESS below.
+          awaits:
+            source:
+              kind: slot_terminal_state_aggregate
+              slot: screening
+              scope: "attached_to this entity_workstream"
+              reduce: worst_of
+            cases:
+              - outcome: HIT_CONFIRMED
+                to: ENHANCED_DD
+              - outcome: HIT_DISMISSED
+                to: ASSESS
+              - outcome: CLEAR
+                to: ASSESS
         - id: ASSESS
           description: "Risk assessment in progress."
         - id: COMPLETE
@@ -582,9 +632,9 @@ slots:
         - from: VERIFY
           to: SCREEN
           via: screening.run
-        - from: SCREEN
-          to: ASSESS
-          via: "(backend: screenings cleared)"
+        # SCREEN has no outgoing transition row — it exits via its own
+        # `awaits` block above (EOP-PLAN-DAG-AWAITS-001 Phase 5), not a
+        # callable verb.
         - from: ASSESS
           to: COMPLETE
           via: entity-workstream.complete
@@ -623,6 +673,9 @@ slots:
         - id: RUNNING
           description: "Provider call in flight."
         - id: CLEAR
+          entry_via:
+            trigger:
+              name: screenings_cleared
           description: "No hit."
         - id: HIT_PENDING_REVIEW
           description: "Hit found; awaiting analyst review."
@@ -631,16 +684,22 @@ slots:
         - id: HIT_DISMISSED
           description: "Hit reviewed and dismissed — false positive."
         - id: ERROR
+          entry_via:
+            trigger:
+              name: screening_provider_error
           description: "Provider error; needs retry."
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: screening-expiry
           description: "Stale; needs re-running."
       transitions:
         - from: PENDING
           to: RUNNING
           via: screening.run
-        - from: RUNNING
-          to: CLEAR
-          via: "(backend: no hits)"
+        # RUNNING -> CLEAR is derived (no hits found), not a callable verb
+        # — expressed via CLEAR's entry_via above, not a transition row
+        # (2026-08-18 W1 shape fix).
         - from: RUNNING
           to: HIT_PENDING_REVIEW
           via: screening.complete
@@ -650,19 +709,24 @@ slots:
         - from: HIT_PENDING_REVIEW
           to: HIT_DISMISSED
           via: screening.review-hit
-        - from: RUNNING
-          to: ERROR
-          via: "(backend: provider error)"
+        # RUNNING -> ERROR is a provider-side failure, not a callable verb
+        # — expressed via ERROR's entry_via above (2026-08-18 W1 shape fix,
+        # found adjacent to the audited CLEAR fix, same defect class).
         - from: ERROR
           to: PENDING
           via: screening.bulk-refresh
-        - from: "(CLEAR, HIT_DISMISSED)"
-          to: EXPIRED
-          via: "(time-decay trigger)"
+        # (CLEAR, HIT_DISMISSED) -> EXPIRED is a time-decay scheduler, not
+        # a callable verb — expressed via EXPIRED's entry_via above
+        # (2026-08-18 W1 shape fix, same class as ubo_evidence.EXPIRED).
         - from: EXPIRED
           to: PENDING
           via: screening.bulk-refresh
-      terminal_states: [HIT_CONFIRMED]  # needs red_flag escalation
+      # CLEAR/HIT_DISMISSED added to terminal_states (2026-08-18): this
+      # screening_run entity is a predicate_bindings semaphore read by
+      # kyc_case's own green_when ("every screening_run.status = CLEAN")
+      # — its own local resolution IS the terminal state; it isn't a board
+      # node the taxonomy itself needs to progress further.
+      terminal_states: [HIT_CONFIRMED, CLEAR, HIT_DISMISSED]  # needs red_flag escalation
 
   - id: ubo_evidence
     stateless: false
@@ -676,7 +740,12 @@ slots:
           entry: true
         - id: VERIFIED
         - id: REJECTED
+        # wire-later: no time-decay job exists; VERIFIED never expires
+        # today (same as kyc_ubo_evidence.EXPIRED, sibling slot).
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: evidence-expiry
       transitions:
         - from: PENDING
           to: VERIFIED
@@ -684,10 +753,15 @@ slots:
         - from: PENDING
           to: REJECTED
           via: evidence.mark-rejected
-        - from: VERIFIED
-          to: EXPIRED
-          via: "(time-decay)"
-      terminal_states: [REJECTED]
+        # from: VERIFIED to: EXPIRED (via: "(time-decay)") row deleted
+        # (2026-08-18 W1 shape fix, mirrors kyc_ubo_evidence's existing
+        # remediation): no time-decay job exists in this codebase.
+      # VERIFIED/EXPIRED added to terminal_states (2026-08-18): this
+      # evidence_requirement entity is a predicate_bindings semaphore read
+      # by kyc_case's own green_when ("every evidence_requirement
+      # .verification_status = VERIFIED") — VERIFIED is its own settled
+      # local resolution, not a board node needing further progression.
+      terminal_states: [REJECTED, VERIFIED, EXPIRED]
 
   # kyc_ubo_registry slot DELETED (state-graph remediation Phase 6a): the
   # entire ubo.registry.* verb family it depended on (promote/advance/
@@ -775,27 +849,56 @@ slots:
         - id: BLOCKING
           description: "Unresolved blocker — case cannot proceed."
         - id: CLOSED
+          entry_via:
+            cascade:
+              parent: kyc-case.update-status
           description: "Terminal — resolved or no-longer-applicable."
       transitions:
         - from: OPEN
           to: UNDER_REVIEW
           via: red-flag.escalate
+        # was "via: red-flag.close" — close sets status=CLOSED, not
+        # MITIGATED (verified against its crud set_values). The verb that
+        # actually sets MITIGATED is red-flag.mitigate, previously never
+        # cited by this DAG at all (2026-08-18 triage fix).
         - from: UNDER_REVIEW
           to: MITIGATED
-          via: red-flag.close
+          via: red-flag.mitigate
         - from: UNDER_REVIEW
           to: WAIVED
           via: red-flag.waive
+        # was "via: red-flag.update-rating" — that verb's own description
+        # says it explicitly does NOT change lifecycle state (severity-only
+        # re-rate). The real "set blocking" verb is red-flag.set-blocking,
+        # previously never cited by this DAG at all (2026-08-18 triage fix).
         - from: UNDER_REVIEW
           to: BLOCKING
-          via: red-flag.update-rating
-        - from: "(MITIGATED, WAIVED)"
-          to: CLOSED
-          via: "(case progression)"
+          via: red-flag.set-blocking
+        # (MITIGATED, WAIVED) -> CLOSED is a case-progression cascade, not
+        # a callable verb — expressed via CLOSED's entry_via above
+        # (2026-08-18 W1 shape fix).
         - from: BLOCKING
           to: MITIGATED
+          via: red-flag.mitigate
+        # red-flag.close (senior direct-closure, generic resolution) and
+        # red-flag.dismiss (close as false-positive) were never cited by
+        # this DAG at all despite being real, distinct, role-guarded verbs
+        # — added as direct UNDER_REVIEW -> CLOSED authorised bypasses,
+        # alongside the mitigate/waive path (2026-08-18 triage fix).
+        - from: UNDER_REVIEW
+          to: CLOSED
           via: red-flag.close
-      terminal_states: [CLOSED]
+        - from: UNDER_REVIEW
+          to: CLOSED
+          via: red-flag.dismiss
+      # MITIGATED/WAIVED added to terminal_states (2026-08-18): red_flag is
+      # a predicate_bindings semaphore read by kyc_case's own green_when
+      # ("count(red_flag where red_flag.status = OPEN) = 0") — reaching
+      # MITIGATED/WAIVED IS this token's own settled resolution; the
+      # eventual CLOSED cascade (entry_via above) is case-progression
+      # bookkeeping on top, not a further board-shape transition this
+      # entity itself drives.
+      terminal_states: [CLOSED, MITIGATED, WAIVED]
 
   - id: doc_request
     stateless: false
@@ -810,11 +913,26 @@ slots:
         - id: REQUIRED
         - id: REQUESTED
         - id: RECEIVED
+        # wire-later: no compliance-review-start verb or trigger exists in
+        # this codebase today (audited 2026-08-18 — document.start-qa
+        # operates on a different table, document_versions, not
+        # doc_requests). Genuine verb gap, not silently mapped to something
+        # else; entry_via documents the gap rather than leaving a phantom
+        # `via:` reference.
         - id: UNDER_REVIEW
+          entry_via:
+            trigger:
+              name: compliance_review_started
         - id: VERIFIED
         - id: REJECTED
         - id: WAIVED
+        # wire-later: no time-decay job exists; VERIFIED/REJECTED never
+        # expire today (same pattern as ubo_evidence.EXPIRED,
+        # screening.EXPIRED).
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: doc-request-expiry
       transitions:
         - from: DRAFT
           to: REQUIRED
@@ -825,9 +943,9 @@ slots:
         - from: REQUESTED
           to: RECEIVED
           via: document.mark-received
-        - from: RECEIVED
-          to: UNDER_REVIEW
-          via: "(compliance review)"
+        # RECEIVED -> UNDER_REVIEW has no real verb today — expressed via
+        # UNDER_REVIEW's entry_via above (2026-08-18 W1 shape fix; open
+        # gap, see comment on UNDER_REVIEW).
         - from: UNDER_REVIEW
           to: VERIFIED
           via: document.verify-request
@@ -837,9 +955,9 @@ slots:
         - from: "(any non-terminal)"
           to: WAIVED
           via: evidence.mark-waived
-        - from: "(VERIFIED, REJECTED)"
-          to: EXPIRED
-          via: "(time-decay)"
+        # (VERIFIED, REJECTED) -> EXPIRED row deleted (2026-08-18 W1 shape
+        # fix, same class as ubo_evidence/screening EXPIRED): no
+        # time-decay job exists.
       terminal_states: [REJECTED, WAIVED]
 
   - id: outreach_request
@@ -857,7 +975,11 @@ slots:
         - id: REMINDED
         - id: RESPONDED
         - id: CLOSED
+        # wire-later: no outreach-cutoff scheduler exists today.
         - id: EXPIRED
+          entry_via:
+            scheduler:
+              name: outreach-cutoff
       transitions:
         - from: DRAFT
           to: PENDING
@@ -868,15 +990,20 @@ slots:
         - from: SENT
           to: REMINDED
           via: request.remind
-        - from: "(SENT, REMINDED)"
+        # was a parenthesized string "(SENT, REMINDED)" — real YAML list
+        # form (2026-08-18 W1 shape fix; the list mechanism itself already
+        # works, e.g. holding.FROZEN uses it correctly).
+        - from: [SENT, REMINDED]
           to: RESPONDED
           via: request.fulfill
-        - from: "(RESPONDED, REMINDED)"
+        # was "(RESPONDED, REMINDED)" — same fix, found adjacent to the
+        # audited SENT/REMINDED case.
+        - from: [RESPONDED, REMINDED]
           to: CLOSED
           via: request.fulfill
-        - from: "(SENT, REMINDED)"
-          to: EXPIRED
-          via: "(cutoff passed)"
+        # (SENT, REMINDED) -> EXPIRED row deleted (2026-08-18 W1 shape
+        # fix): cutoff is scheduler-driven, not a callable verb —
+        # expressed via EXPIRED's entry_via above.
       terminal_states: [CLOSED, EXPIRED]
 
   - id: kyc_decision
@@ -932,16 +1059,26 @@ slots:
       transitions:
         - from: DRAFT
           to: ACTIVE
-          via: kyc-agreement.update-status (status=ACTIVE)
+          via: kyc-agreement.update-status
+          args:
+            status: ACTIVE
         - from: ACTIVE
           to: SUSPENDED
-          via: kyc-agreement.update-status (status=SUSPENDED)
+          via: kyc-agreement.update-status
+          args:
+            status: SUSPENDED
         - from: SUSPENDED
           to: ACTIVE
-          via: kyc-agreement.update-status (status=ACTIVE)
-        - from: "(ACTIVE, SUSPENDED)"
+          via: kyc-agreement.update-status
+          args:
+            status: ACTIVE
+        # was a parenthesized string "(ACTIVE, SUSPENDED)" — real YAML
+        # list form (2026-08-18 W1 shape fix).
+        - from: [ACTIVE, SUSPENDED]
           to: TERMINATED
           via: kyc-agreement.update-status
+          args:
+            status: TERMINATED
       terminal_states: [TERMINATED]
     product_gates:
       activated_by: [product.kyc_service]
@@ -1079,32 +1216,39 @@ slots:
           entry: true
           description: "UBO discovery not yet attempted."
         - id: DISCOVERED
+          entry_via:
+            trigger:
+              name: ubo_discovery_pipeline
           description: "Beneficial owners identified via research."
         - id: PUBLIC_FLOAT
+          entry_via:
+            trigger:
+              name: listed_company_check
           description: "Widely-held public company; no UBO lookup required."
         - id: EXEMPT
+          entry_via:
+            trigger:
+              name: exemption_classifier
           description: "Regulator-exempt (state-owned, sovereign, etc.)."
         - id: MANUAL_REQUIRED
+          entry_via:
+            trigger:
+              name: pipeline_failure
           description: "Automated discovery failed; manual investigation needed."
-      transitions:
-        - from: PENDING
-          to: DISCOVERED
-          via: "(backend: UBO discovery pipeline)"
-        - from: PENDING
-          to: PUBLIC_FLOAT
-          via: "(backend: listed-company check)"
-        - from: PENDING
-          to: EXEMPT
-          via: "(backend: exemption classifier)"
-        - from: PENDING
-          to: MANUAL_REQUIRED
-          via: "(backend: pipeline failure)"
-        # from: MANUAL_REQUIRED to: DISCOVERED row deleted (state-graph
-        # remediation Phase 6a, POLICY): the promotion verb no longer
-        # exists (the whole ubo.registry.* family was deleted --
-        # phantom-writing ops that never successfully executed). wire-later:
-        # no verb currently resolves a manual UBO-discovery override.
-      terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT]
+      # All four PENDING -> * transitions were backend-pipeline driven, not
+      # callable verbs — expressed via each destination state's entry_via
+      # above, not transition rows (2026-08-18 W1 shape fix). No
+      # transitions remain: the from: MANUAL_REQUIRED to: DISCOVERED row
+      # was already deleted earlier (state-graph remediation Phase 6a,
+      # POLICY — the promotion verb no longer exists; wire-later: no verb
+      # currently resolves a manual UBO-discovery override).
+      transitions: []
+      # MANUAL_REQUIRED added to terminal_states (2026-08-18): same
+      # semaphore reasoning as red_flag/screening/evidence — this is the
+      # settled local resolution when automated discovery can't proceed,
+      # not a board-shape state awaiting further progression (no verb
+      # today resolves it further; see comment above).
+      terminal_states: [DISCOVERED, PUBLIC_FLOAT, EXEMPT, MANUAL_REQUIRED]
 
   - id: investor
     stateless: false
@@ -1149,7 +1293,9 @@ slots:
         - from: SUSPENDED
           to: ACTIVE
           via: investor.reinstate
-        - from: "(ACTIVE, SUSPENDED)"
+        # was a parenthesized string "(ACTIVE, SUSPENDED)" — real YAML
+        # list form (2026-08-18 W1 shape fix).
+        - from: [ACTIVE, SUSPENDED]
           to: OFFBOARDED
           via: investor.offboard
       terminal_states: [OFFBOARDED]
@@ -1206,13 +1352,17 @@ slots:
         - from: IN_PROGRESS
           to: REJECTED
           via: investor.reject-kyc
-        - from: APPROVED
-          to: EXPIRED
-          via: "(backend: kyc_expires_at trigger)"
+        # from: APPROVED to: EXPIRED row deleted (2026-08-18 W1 shape fix):
+        # EXPIRED's entry_via (trigger: kyc_expires_at, above) already
+        # fully expresses this — the free-text via here was a live
+        # duplicate of a mechanism the destination state already declares
+        # typed.
         - from: APPROVED
           to: REFRESH_REQUIRED
           via: investor.request-documents
-        - from: "(EXPIRED, REFRESH_REQUIRED)"
+        # was a parenthesized string "(EXPIRED, REFRESH_REQUIRED)" — real
+        # YAML list form (2026-08-18 W1 shape fix).
+        - from: [EXPIRED, REFRESH_REQUIRED]
           to: IN_PROGRESS
           via: investor.start-kyc
       terminal_states: [REJECTED]
@@ -1244,6 +1394,9 @@ slots:
         - id: PLEDGED
           description: "Pledged as collateral against a loan/derivative; cannot redeem freely."
         - id: FROZEN
+          entry_via:
+            signal:
+              source: sanctions_hit
           description: "Sanctions exposure on investor; regulatory freeze."
         - id: CLOSED
           description: "Redemption complete; zero units."
@@ -1272,16 +1425,24 @@ slots:
         - from: PLEDGED
           to: ACTIVE
           via: holding.release-pledge
-        - from: [ACTIVE, SUSPENDED, RESTRICTED, PLEDGED]
-          to: FROZEN
-          via: "(backend: sanctions hit)"
-        - from: FROZEN
-          to: ACTIVE
-          via: "(backend: sanctions cleared)"
+        # ACTIVE/SUSPENDED/RESTRICTED/PLEDGED -> FROZEN is a sanctions-hit
+        # signal, not a callable verb — expressed via FROZEN's entry_via
+        # above (2026-08-18 W1 shape fix).
+        #
+        # FROZEN -> ACTIVE ("sanctions cleared") row deleted — not a
+        # callable verb, and unlike FROZEN itself ACTIVE already has 4 real
+        # verb-driven incoming transitions above, so no entry_via is
+        # structurally required. Genuine gap (no verb currently reinstates
+        # a holding after sanctions clear), not silently mapped to
+        # something else.
         - from: [ACTIVE, SUSPENDED, PENDING, RESTRICTED]
           to: CLOSED
           via: holding.close
-      terminal_states: [CLOSED]
+      # FROZEN added to terminal_states (2026-08-18): sanctions-hold is a
+      # settled local resolution for this holding token, not a board-shape
+      # state awaiting further progression — no real "unfreeze" verb exists
+      # today (genuine gap, see FROZEN -> ACTIVE comment above).
+      terminal_states: [CLOSED, FROZEN]
 
   # R-6 G-3: manco promoted to stateful. Regulatory-action cascade
   # applies to ALL CBUs managed by this manco. Schema landed in
@@ -1517,7 +1678,12 @@ prune_cascade_rules:
 prune_pre_validation:
   required_verbs:
     - kyc-case.summarize  # read-only impact preview
-    - ubo-registry.compute-impact  # assess UBO-chain impact
+    # "ubo-registry.compute-impact" was never a real verb — no ubo-registry
+    # domain exists anywhere in config/verbs/. No real verb currently
+    # computes UBO-chain prune impact; the second abort_condition below
+    # (last-UBO-in-chain) is unenforceable until one is built. Removed the
+    # phantom reference rather than leaving it (2026-08-18 hygiene fix) —
+    # this is a genuine verb gap, tracked here, not silently fixed.
   abort_conditions:
     - "prune would leave case in APPROVED state without any active workstreams"
     - "prune would remove the last UBO in the chain (case cannot be UBO-less)"

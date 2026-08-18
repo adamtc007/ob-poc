@@ -193,6 +193,7 @@ async fn register_bpmn_models(
             Ok(bpmn_xml) => match client.compile(&bpmn_xml).await {
                 Ok(result) => {
                     config_index.register_bytecode(&process_key, result.bytecode_version.clone());
+                    config_index.register_flag_symbols(&process_key, &result.flag_symbol_table);
                     tracing::info!(
                         verb_fqn = %verb_fqn,
                         process_key = %process_key,

@@ -115,7 +115,9 @@ impl ParkedTokenStore {
     /// Resolve all waiting tokens for a process instance.
     ///
     /// Used when a process completes or is cancelled — all outstanding
-    /// wait states are resolved in bulk.
+    /// wait states are resolved in bulk. Does not touch `result_payload` —
+    /// a step's typed result (if any) is written earlier by
+    /// [`Self::record_step_result`] as it arrives, not clobbered here.
     /// Returns the number of tokens resolved.
     pub async fn resolve_all_for_instance(&self, process_instance_id: Uuid) -> Result<u64> {
         let result = sqlx::query!(
@@ -131,5 +133,79 @@ impl ParkedTokenStore {
         .context("Failed to resolve all bpmn_parked_tokens for instance")?;
 
         Ok(result.rows_affected())
+    }
+
+    /// Record a step's typed result on a still-waiting token, without
+    /// resolving it.
+    ///
+    /// The real BPMN engine's terminal `Completed` event carries no domain
+    /// payload of its own (confirmed against a live server,
+    /// EOP-PLAN-DAG-AWAITS-001 Phase 0) — the typed switch value the
+    /// `awaits` mechanism needs lives on the `JobCompleted` event for the
+    /// task that ran before it. This writes that value onto the token row
+    /// as soon as it arrives, so it's already present by the time
+    /// [`Self::resolve_all_for_instance`] flips the token to resolved and
+    /// `SignalRelay` reads it back for `signal_completion`.
+    /// Returns the number of tokens updated.
+    pub async fn record_step_result(
+        &self,
+        process_instance_id: Uuid,
+        result_payload: &serde_json::Value,
+    ) -> Result<u64> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".bpmn_parked_tokens
+            SET result_payload = $2
+            WHERE process_instance_id = $1 AND status = 'waiting'
+            "#,
+            process_instance_id,
+            result_payload,
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to record step result on bpmn_parked_tokens for instance")?;
+
+        Ok(result.rows_affected())
+    }
+
+    /// Find a parked token by process instance, regardless of status.
+    ///
+    /// Used by `SignalRelay` to read back a token's `result_payload` after
+    /// `EventBridge` has already resolved it (status flips to 'resolved'
+    /// before the terminal event reaches the relay's channel) — unlike
+    /// [`Self::find_by_correlation_key`], which is scoped to `status =
+    /// 'waiting'` and intentionally cannot see a token in that state.
+    pub async fn find_by_process_instance(
+        &self,
+        process_instance_id: Uuid,
+    ) -> Result<Option<ParkedToken>> {
+        let row = sqlx::query!(
+            r#"
+            SELECT token_id, correlation_key, session_id, entry_id,
+                   process_instance_id, expected_signal, status,
+                   created_at, resolved_at, result_payload
+            FROM "ob-poc".bpmn_parked_tokens
+            WHERE process_instance_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1
+            "#,
+            process_instance_id,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to query bpmn_parked_token by process_instance_id")?;
+
+        Ok(row.map(|r| ParkedToken {
+            token_id: r.token_id,
+            correlation_key: r.correlation_key,
+            session_id: r.session_id,
+            entry_id: r.entry_id,
+            process_instance_id: r.process_instance_id,
+            expected_signal: r.expected_signal,
+            status: ParkedTokenStatus::parse(&r.status).unwrap_or(ParkedTokenStatus::Waiting),
+            created_at: r.created_at,
+            resolved_at: r.resolved_at,
+            result_payload: r.result_payload,
+        }))
     }
 }

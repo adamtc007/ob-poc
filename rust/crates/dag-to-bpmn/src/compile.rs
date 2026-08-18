@@ -54,7 +54,7 @@ pub fn compile_slot(
         Some(SlotStateMachine::Structured(sm)) => sm.as_ref(),
     };
 
-    let dsl_source = emit_dsl_source(slot_id, state_machine)?;
+    let dsl_source = emit_dsl_source(slot_id, dag, state_machine)?;
 
     let spec = dsl_migrate_verify::compile_to_spec(&dsl_source, process_name)
         .map_err(DagToBpmnError::Pipeline)?;

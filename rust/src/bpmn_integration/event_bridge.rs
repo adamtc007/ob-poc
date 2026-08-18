@@ -229,38 +229,70 @@ impl EventBridge {
     pub fn translate_event(event: &BpmnLifecycleEvent) -> Option<OutcomeEvent> {
         let process_instance_id = Uuid::parse_str(&event.process_instance_id).unwrap_or_default();
 
-        // Try to extract structured fields from payload_json.
+        // Try to extract structured fields from payload_json. The real
+        // engine serializes `payload_json` as `serde_json::to_string(&event)`
+        // against an externally-tagged Rust enum
+        // (`bpmn-lite-server-runner/src/event_fanout.rs::lifecycle_event`) —
+        // i.e. `{"<Variant>": {<fields>}}`, not a flat object. Unwrap that
+        // one level before reading fields; fall back to the raw payload for
+        // test fixtures that pass a flat `{}`/pre-unwrapped shape.
         let payload: serde_json::Value =
             serde_json::from_str(&event.payload_json).unwrap_or_default();
+        let fields = payload.get(&event.event_type).unwrap_or(&payload);
 
         match event.event_type.as_str() {
-            "JobCompleted" => Some(OutcomeEvent::StepCompleted {
-                process_instance_id,
-                job_key: payload
+            "JobCompleted" => {
+                let job_key = fields
                     .get("job_key")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
-                    .to_string(),
-                task_type: payload
-                    .get("task_type")
-                    .and_then(|v| v.as_str())
+                    .to_string();
+                // JobCompleted carries no task_type field of its own — the
+                // real engine's job_key is
+                // "{instance}:{task_type}:{n}:{idx}" (confirmed against a
+                // live server, EOP-PLAN-DAG-AWAITS-001 Phase 0), so recover
+                // it from there rather than a non-existent payload key.
+                let task_type = job_key
+                    .split(':')
+                    .nth(1)
                     .unwrap_or_default()
-                    .to_string(),
-                result: payload.get("result").cloned().unwrap_or_default(),
-            }),
+                    .to_string();
+                Some(OutcomeEvent::StepCompleted {
+                    process_instance_id,
+                    job_key,
+                    task_type,
+                    // The typed switch value the `awaits` mechanism depends
+                    // on: `orch_flags_out` is the map of boolean flags a
+                    // job's `CompleteJob` call supplied (Phase 0 confirmed
+                    // this flows through live) — there is no separate
+                    // "result" field on the real event.
+                    result: fields
+                        .get("orch_flags_out")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                })
+            }
+            // No "JobFailed" variant exists on the real engine
+            // (bpmn-lite-types::events::RuntimeEvent has JobActivated/
+            // JobClaimed/JobCompleted/JobReclaimed/JobRetryScheduled/
+            // JobDeadLettered, no JobFailed) — this arm is unreachable
+            // against the real server today. Left as dead-but-harmless
+            // pending a real mapping (JobDeadLettered vs IncidentCreated),
+            // which is a job-retry/failure concern separate from the
+            // `awaits` switch mechanism this pass is scoped to.
             "JobFailed" => Some(OutcomeEvent::StepFailed {
                 process_instance_id,
-                job_key: payload
+                job_key: fields
                     .get("job_key")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_string(),
-                task_type: payload
+                task_type: fields
                     .get("task_type")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_string(),
-                error: payload
+                error: fields
                     .get("error")
                     .and_then(|v| v.as_str())
                     .unwrap_or(&event.payload_json)
@@ -271,7 +303,7 @@ impl EventBridge {
             }),
             "Cancelled" => Some(OutcomeEvent::ProcessCancelled {
                 process_instance_id,
-                reason: payload
+                reason: fields
                     .get("reason")
                     .and_then(|v| v.as_str())
                     .unwrap_or("cancelled")
@@ -279,12 +311,16 @@ impl EventBridge {
             }),
             "IncidentCreated" => Some(OutcomeEvent::IncidentCreated {
                 process_instance_id,
-                service_task_id: payload
+                service_task_id: fields
                     .get("service_task_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_string(),
-                error: payload
+                // The real IncidentCreated event carries incident_id/
+                // service_task_id/job_key, no error message — fall back to
+                // the raw payload for diagnostics rather than inventing a
+                // field that doesn't exist.
+                error: fields
                     .get("error")
                     .and_then(|v| v.as_str())
                     .unwrap_or(&event.payload_json)
@@ -325,7 +361,24 @@ impl EventBridge {
                 self.mark_request_failed(process_instance_id, Some(error))
                     .await;
             }
-            OutcomeEvent::StepCompleted { .. } | OutcomeEvent::StepFailed { .. } => {
+            OutcomeEvent::StepCompleted { result, .. } => {
+                // Not terminal — record the typed result on the still-
+                // waiting token so it's already present when the process's
+                // later `Completed` event resolves it (that event carries
+                // no domain payload of its own; see `record_step_result`).
+                if let Err(e) = self
+                    .parked_tokens
+                    .record_step_result(process_instance_id, result)
+                    .await
+                {
+                    tracing::error!(
+                        process_instance_id = %process_instance_id,
+                        error = %e,
+                        "Failed to record step result on parked token"
+                    );
+                }
+            }
+            OutcomeEvent::StepFailed { .. } => {
                 // Informational — no store updates needed.
             }
         }
@@ -504,6 +557,54 @@ mod tests {
         let event = make_event("JobCompleted");
         let outcome = EventBridge::translate_event(&event);
         assert!(matches!(outcome, Some(OutcomeEvent::StepCompleted { .. })));
+    }
+
+    /// Regression test for the real engine's actual wire format — an
+    /// externally-tagged `{"<Variant>": {<fields>}}` JSON, confirmed
+    /// against a live server (EOP-PLAN-DAG-AWAITS-001 Phase 0), not the
+    /// flat shape `make_event`'s `"{}"` fixture leaves untested. Job keys
+    /// are "{instance}:{task_type}:{n}:{idx}" and there is no top-level
+    /// "result" field — the typed switch value is `orch_flags_out`.
+    #[test]
+    fn test_translate_job_completed_real_wire_format() {
+        let mut event = make_event("JobCompleted");
+        event.payload_json = r#"{"JobCompleted":{"job_key":"01a0149c-0000-0000-0000-000000000000:await_screening:1:0","payload_hash_before":[1,2,3],"payload_hash_after":[1,2,3],"orch_flags_out":{"flag_0":{"Bool":true},"flag_1":{"Bool":false}},"pc_next":2}}"#.to_string();
+
+        let outcome = EventBridge::translate_event(&event);
+        match outcome {
+            Some(OutcomeEvent::StepCompleted {
+                job_key,
+                task_type,
+                result,
+                ..
+            }) => {
+                assert_eq!(
+                    job_key,
+                    "01a0149c-0000-0000-0000-000000000000:await_screening:1:0"
+                );
+                assert_eq!(task_type, "await_screening");
+                assert_eq!(
+                    result,
+                    serde_json::json!({"flag_0": {"Bool": true}, "flag_1": {"Bool": false}})
+                );
+            }
+            other => panic!("expected StepCompleted, got {other:?}"),
+        }
+    }
+
+    /// The real `Completed` event carries no domain payload (`{"Completed":
+    /// {"at": <timestamp>}}`) — confirms the nesting-unwrap doesn't choke
+    /// on a real payload even though there's nothing for it to extract.
+    #[test]
+    fn test_translate_completed_real_wire_format() {
+        let mut event = make_event("Completed");
+        event.payload_json = r#"{"Completed":{"at":1787052212972}}"#.to_string();
+
+        let outcome = EventBridge::translate_event(&event);
+        assert!(matches!(
+            outcome,
+            Some(OutcomeEvent::ProcessCompleted { .. })
+        ));
     }
 
     #[test]

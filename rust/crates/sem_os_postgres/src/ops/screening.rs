@@ -18,6 +18,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -225,5 +226,164 @@ impl SemOsVerbOp for BulkRefresh {
         }
 
         Ok(VerbExecutionOutcome::Affected(inserted))
+    }
+}
+
+// ── screening.await-aggregate-outcome ───────────────────────────────────────
+
+/// Terminal `screenings.status` values a workstream's screening set must
+/// all reach before this verb can compute a real answer. Matches the
+/// `screening` DAG slot's own authoritative `terminal_states` (kyc_dag.yaml)
+/// exactly — `ERROR`/`EXPIRED` are deliberately excluded: both loop back to
+/// `PENDING` via `screening.bulk-refresh` (real transitions `ERROR ->
+/// PENDING`, `EXPIRED -> PENDING`), i.e. they're recoverable, not terminal.
+/// A screening sitting in `ERROR`/`EXPIRED` falls into the same "not all
+/// siblings terminal yet" retry path as `PENDING`/`RUNNING`.
+const TERMINAL_STATUSES: &[&str] = &["CLEAR", "HIT_CONFIRMED", "HIT_DISMISSED"];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AwaitAggregateOutcomeResult {
+    /// True if any sibling screening reached HIT_CONFIRMED.
+    pub is_confirmed: bool,
+    /// True if the worst outcome present is HIT_DISMISSED (no HIT_CONFIRMED
+    /// among the siblings).
+    pub is_dismissed: bool,
+}
+
+/// The `SlotTerminalStateAggregate` / `worst_of` reduction for the KYC
+/// `entity_workstream.SCREEN → ASSESS/ENHANCED_DD` await
+/// (EOP-PLAN-DAG-AWAITS-001 Phase 4/5): reads every `screenings` row for a
+/// workstream (one per `screening_type` — SANCTIONS/PEP/ADVERSE_MEDIA/...),
+/// and reduces them to the two boolean flags the compiled BPMN gateway
+/// cascade reads. Runs as the `await_screening` task in
+/// `config/bpmn/entity-workstream-screen.bpmn`, *after* the process's own
+/// `screening_settled` message catch — by the time this executes, whatever
+/// fired that signal (`ScreeningComplete`/`ScreeningReviewHit` in
+/// `kyc_stream_ops.rs`) already confirmed every sibling was terminal. The
+/// "not all siblings terminal yet" error below is a safety net for a race
+/// (e.g. a new screening added between the signal firing and this running),
+/// not the primary wait mechanism — `JobWorker`'s flat, non-backing-off
+/// retry (see Phase 5 design addendum) can't absorb a multi-hour wait, so
+/// the message catch does the actual waiting.
+pub struct AwaitAggregateOutcome;
+
+#[async_trait]
+impl SemOsVerbOp for AwaitAggregateOutcome {
+    fn fqn(&self) -> &str {
+        "screening.await-aggregate-outcome"
+    }
+
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let workstream_id = json_extract_uuid(args, ctx, "workstream-id")?;
+
+        let statuses: Vec<String> = sqlx::query_scalar(
+            r#"SELECT status FROM "ob-poc".screenings WHERE workstream_id = $1"#,
+        )
+        .bind(workstream_id)
+        .fetch_all(scope.executor())
+        .await?;
+
+        let result = reduce_screening_statuses(workstream_id, &statuses)?;
+        Ok(VerbExecutionOutcome::Record(serde_json::to_value(result)?))
+    }
+}
+
+/// Pure worst-of reduction over a workstream's screening statuses — see
+/// `AwaitAggregateOutcome`'s doc comment for the precedence rules.
+fn reduce_screening_statuses(
+    workstream_id: Uuid,
+    statuses: &[String],
+) -> Result<AwaitAggregateOutcomeResult> {
+    if statuses.is_empty() {
+        return Err(anyhow!(
+            "No screenings found for workstream {workstream_id} — nothing to reduce"
+        ));
+    }
+
+    if let Some(pending) = statuses.iter().find(|s| !TERMINAL_STATUSES.contains(&s.as_str())) {
+        return Err(anyhow!(
+            "Screening for workstream {workstream_id} still in progress (status '{pending}') \
+             — not all siblings are terminal yet"
+        ));
+    }
+
+    let is_confirmed = statuses.iter().any(|s| s == "HIT_CONFIRMED");
+    let is_dismissed = !is_confirmed && statuses.iter().any(|s| s == "HIT_DISMISSED");
+
+    Ok(AwaitAggregateOutcomeResult {
+        is_confirmed,
+        is_dismissed,
+    })
+}
+
+#[cfg(test)]
+mod await_aggregate_outcome_tests {
+    use super::*;
+
+    fn wid() -> Uuid {
+        Uuid::nil()
+    }
+
+    fn statuses(strs: &[&str]) -> Vec<String> {
+        strs.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn all_clear_yields_clear() {
+        let r = reduce_screening_statuses(wid(), &statuses(&["CLEAR", "CLEAR"])).unwrap();
+        assert!(!r.is_confirmed);
+        assert!(!r.is_dismissed);
+    }
+
+    #[test]
+    fn any_hit_confirmed_wins_over_everything() {
+        let r = reduce_screening_statuses(
+            wid(),
+            &statuses(&["CLEAR", "HIT_DISMISSED", "HIT_CONFIRMED"]),
+        )
+        .unwrap();
+        assert!(r.is_confirmed);
+        assert!(!r.is_dismissed);
+    }
+
+    #[test]
+    fn error_status_is_not_terminal_yet() {
+        // ERROR loops back to PENDING via screening.bulk-refresh — it is
+        // not in the screening slot's terminal_states, so a sibling sitting
+        // in ERROR means the set isn't ready to reduce yet.
+        assert!(reduce_screening_statuses(wid(), &statuses(&["CLEAR", "ERROR"])).is_err());
+    }
+
+    #[test]
+    fn expired_status_is_not_terminal_yet() {
+        assert!(
+            reduce_screening_statuses(wid(), &statuses(&["HIT_DISMISSED", "EXPIRED"])).is_err()
+        );
+    }
+
+    #[test]
+    fn hit_dismissed_wins_over_clear_when_no_confirmed() {
+        let r = reduce_screening_statuses(wid(), &statuses(&["CLEAR", "HIT_DISMISSED"])).unwrap();
+        assert!(!r.is_confirmed);
+        assert!(r.is_dismissed);
+    }
+
+    #[test]
+    fn empty_set_is_an_error() {
+        assert!(reduce_screening_statuses(wid(), &[]).is_err());
+    }
+
+    #[test]
+    fn non_terminal_status_is_an_error() {
+        assert!(reduce_screening_statuses(wid(), &statuses(&["CLEAR", "PENDING"])).is_err());
+        assert!(reduce_screening_statuses(wid(), &statuses(&["RUNNING"])).is_err());
+        assert!(
+            reduce_screening_statuses(wid(), &statuses(&["HIT_PENDING_REVIEW"])).is_err()
+        );
     }
 }

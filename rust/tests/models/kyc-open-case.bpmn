@@ -20,6 +20,17 @@
                   xmlns:zeebe="http://camunda.org/schema/zeebe/1.0">
   <bpmn:process id="kyc_open_case" isExecutable="true">
 
+    <!-- ===== Data objects ===== -->
+    <!-- case_id: the correlation key, set from kyc-case.create's domain
+         payload at StartProcess (config/workflows.yaml's
+         correlation_field) and read by wait_docs / reviewer_decision's
+         zeebe:subscription below. -->
+    <bpmn:dataObject id="case_id">
+      <bpmn:extensionElements>
+        <bpmn:dataType primitive="string" role="input" />
+      </bpmn:extensionElements>
+    </bpmn:dataObject>
+
     <!-- ===== Nodes ===== -->
     <bpmn:startEvent id="start" />
 

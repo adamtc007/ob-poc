@@ -256,7 +256,10 @@ overall_lifecycle:
       progression_verbs:
         - changeset.compose
         - attribute.define
-        - derivation.define
+        # DerivationSpecs are authored via attribute.define-derived, not a
+        # standalone "derivation.define" — the derivation domain only has
+        # recompute-stale (2026-08-18 hygiene fix; was a phantom ref).
+        - attribute.define-derived
         - phrase.propose
       next_phase: validating
 
@@ -272,9 +275,15 @@ overall_lifecycle:
           - "attribute_def.dry_run_in_progress = true"
       progression_verbs:
         - changeset.validate-edit
-        - changeset.dry-run
-        - phrase.check-collision
-        - phrase.check-quality
+        # changeset has no dry-run of its own — dry-run is the cross-cutting
+        # governance ceremony verb (governance.dry-run is real; changeset
+        # domain only has compose/add-item/.../diff). 2026-08-18 hygiene fix.
+        - governance.dry-run
+        # was "phrase.check-collision" (singular) — real verb is plural.
+        - phrase.check-collisions
+        # "phrase.check-quality" was never a real verb; phrase's 9-verb
+        # surface has no dedicated quality check today — genuine gap, not
+        # silently mapped to something else (2026-08-18 hygiene fix).
       next_phase: under_review
 
     - name: under_review
@@ -286,11 +295,16 @@ overall_lifecycle:
           - "changeset.status = 'reviewing'"
           - "phrase.authoring_status = 'reviewed'"
       progression_verbs:
-        - governance.review
-        - changeset.approve
-        - changeset.reject
-        - phrase.approve-proposal
-        - phrase.reject-proposal
+        # "governance.review" / "changeset.approve" / "changeset.reject"
+        # were never real verbs — changeset has no approve/reject of its
+        # own; the review ceremony for ALL governance-item kinds is
+        # governance.record-review (real). Collapsed 3 phantoms to the one
+        # real cross-cutting verb (2026-08-18 hygiene fix).
+        - governance.record-review
+        # was "phrase.approve-proposal" / "phrase.reject-proposal" —
+        # real verb names are approve / reject (2026-08-18 hygiene fix).
+        - phrase.approve
+        - phrase.reject
       next_phase: "(approved | rejected)"
 
     - name: approved
@@ -304,9 +318,10 @@ overall_lifecycle:
           - "changeset.status = 'approved'"
           - "phrase.authoring_status = 'approved'"
       progression_verbs:
-        - changeset.publish
-        - attribute.publish
-        - phrase.publish
+        # "changeset.publish" / "attribute.publish" / "phrase.publish" were
+        # never real per-kind verbs — publish is a single cross-cutting
+        # governance ceremony verb (governance.publish, real, kept below).
+        # Removed the 3 phantom near-duplicates (2026-08-18 hygiene fix).
         - governance.publish
       next_phase: published
 
@@ -324,8 +339,10 @@ overall_lifecycle:
           - "phrase.authoring_status = 'published'"
       progression_verbs:
         - attribute.deprecate
-        - derivation.retire
-        - phrase.deprecate
+        # "derivation.retire" / "phrase.deprecate" were never real verbs —
+        # the derivation domain has only recompute-stale, and phrase's
+        # 9-verb surface has no deprecate. Genuine gaps, not silently
+        # mapped to something else (2026-08-18 hygiene fix).
         - governance.rollback
       next_phase: "(deprecated | rolled_back | retired)"
 
@@ -350,10 +367,14 @@ overall_lifecycle:
           - "attribute_def.lifecycle_status = 'deprecated'"
           - "derivation_spec.lifecycle_status = 'stale'"
           - "phrase.authoring_status = 'deprecated'"
-      progression_verbs:
-        - attribute.retire
-        - derivation.retire
-        - phrase.retire
+      progression_verbs: []
+      # "attribute.retire" / "derivation.retire" / "phrase.retire" were
+      # never real verbs — attribute's only exit-lifecycle verb is
+      # deprecate (already used one phase earlier), and neither derivation
+      # nor phrase has a retire verb at all. No real verb currently drives
+      # deprecated -> retired for any governance-item kind; consistent with
+      # the empty progression_verbs already used for the rejected/retired
+      # phases in this same file (2026-08-18 hygiene fix).
       next_phase: retired
 
     - name: retired
@@ -890,9 +911,14 @@ prune_cascade_rules:
 
 prune_pre_validation:
   required_verbs:
-    - governance.impact-analysis       # downstream consumer impact preview
+    # was "governance.impact-analysis" — impact-analysis is a changeset
+    # verb, not a governance one (2026-08-18 hygiene fix).
+    - changeset.impact-analysis        # downstream consumer impact preview
     - changeset.cross-reference        # which changesets reference the target
-    - attribute.list-usage             # who uses this attribute today
+    # was "attribute.list-usage" (never a real verb) — trace-lineage is the
+    # real verb that shows sources/sinks/resources for an attribute
+    # (2026-08-18 hygiene fix).
+    - attribute.trace-lineage          # who uses this attribute today
   abort_conditions:
     - "attribute.retire when active derivation_spec references this attribute"
     - "changeset.delete-composing when any item has been approved (must reject instead)"

@@ -36,6 +36,16 @@ pub struct WorkflowConfigIndex {
     /// process_key → compiled bytecode version (32 bytes).
     /// Populated via `register_bytecode()` after compiling BPMN models.
     bytecode_registry: HashMap<String, Vec<u8>>,
+    /// process_key → { data-object name → compiler-assigned FlagKey }.
+    ///
+    /// Inverted from the `Compile` RPC's `flag_symbol_table` (FlagKey →
+    /// name) for O(1) lookup by name — `JobWorker` needs to translate a
+    /// verb's named boolean result fields into the `"flag_<N>"` orch_flags
+    /// keys the real engine's gateway conditions actually read (confirmed
+    /// against a live server, EOP-PLAN-DAG-AWAITS-001 Phase 0; the wire
+    /// protocol's own comment: "Use 'flag_<N>' as orch_flags keys").
+    /// Populated via `register_flag_symbols()` alongside `register_bytecode()`.
+    flag_symbol_registry: HashMap<String, HashMap<String, u32>>,
 }
 
 impl WorkflowConfigIndex {
@@ -65,6 +75,7 @@ impl WorkflowConfigIndex {
             by_task_type,
             all_task_types,
             bytecode_registry: HashMap::new(),
+            flag_symbol_registry: HashMap::new(),
         }
     }
 
@@ -137,6 +148,32 @@ impl WorkflowConfigIndex {
         self.bytecode_registry
             .get(process_key)
             .map(|v| v.as_slice())
+    }
+
+    /// Register the flag symbol table for a process key, from the
+    /// `Compile` RPC's `flag_symbol_table` (FlagKey → data-object name).
+    /// Stored inverted (name → FlagKey) for `flag_key_for`'s lookup
+    /// direction. Called alongside `register_bytecode()`.
+    pub fn register_flag_symbols(
+        &mut self,
+        process_key: &str,
+        flag_symbol_table: &std::collections::HashMap<u32, String>,
+    ) {
+        let inverted: HashMap<String, u32> = flag_symbol_table
+            .iter()
+            .map(|(key, name)| (name.clone(), *key))
+            .collect();
+        self.flag_symbol_registry
+            .insert(process_key.to_string(), inverted);
+    }
+
+    /// Resolve a data-object name to its compiler-assigned FlagKey for a
+    /// given process, if that process has been compiled/registered.
+    pub fn flag_key_for(&self, process_key: &str, data_object_name: &str) -> Option<u32> {
+        self.flag_symbol_registry
+            .get(process_key)?
+            .get(data_object_name)
+            .copied()
     }
 
     /// Register a durable verb from its YAML `DurableConfig`.
@@ -304,6 +341,39 @@ mod tests {
         let parsed: WorkflowConfig = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(parsed.workflows.len(), 2);
         assert_eq!(parsed.workflows[0].verb_fqn, "kyc-case.create");
+    }
+
+    /// Real `config/workflows.yaml` parses and the entity-workstream-screen
+    /// binding (EOP-PLAN-DAG-AWAITS-001 Phase 5) resolves as expected — no
+    /// DB/gRPC needed, pure config load.
+    #[test]
+    fn test_load_real_workflows_yaml() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let path = std::path::Path::new(manifest_dir).join("config/workflows.yaml");
+        let index = WorkflowConfigIndex::load_from_file(&path)
+            .expect("real config/workflows.yaml must parse");
+
+        assert_eq!(
+            index.route_for_verb("screening.run"),
+            ExecutionRoute::Orchestrated
+        );
+        let binding = index
+            .binding_for_verb("screening.run")
+            .expect("screening.run must have a binding");
+        assert_eq!(binding.process_key.as_deref(), Some("entity-workstream-screen"));
+        assert_eq!(binding.correlation_field.as_deref(), Some("workstream_id"));
+
+        let (verb_fqn, run_task) = index
+            .binding_for_task_type("run_screenings")
+            .expect("run_screenings task binding must exist");
+        assert_eq!(verb_fqn, "screening.run");
+        assert_eq!(run_task.verb_fqn, "screening.run");
+
+        let (verb_fqn, await_task) = index
+            .binding_for_task_type("await_screening")
+            .expect("await_screening task binding must exist");
+        assert_eq!(verb_fqn, "screening.run");
+        assert_eq!(await_task.verb_fqn, "screening.await-aggregate-outcome");
     }
 
     // =========================================================================

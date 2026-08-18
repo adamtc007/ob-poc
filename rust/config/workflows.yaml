@@ -73,3 +73,25 @@ workflows:
         verb_fqn: requirement.create
         timeout_ms: 30000
         max_retries: 3
+
+  # Entity Workstream Screen — screening.run waits (indefinitely, via a
+  # correlated BPMN message) for the workstream's screening rows to all
+  # reach a terminal status, then switches on the worst-of outcome
+  # (EOP-PLAN-DAG-AWAITS-001 Phase 5). The message is fired by
+  # kyc_stream_ops.rs's ScreeningComplete/ScreeningReviewHit handlers via
+  # bpmn_integration::signal_outbox::queue_bpmn_signal once every screening
+  # row for the workstream is CLEAR/HIT_CONFIRMED/HIT_DISMISSED.
+  - verb_fqn: screening.run
+    route: orchestrated
+    process_key: entity-workstream-screen
+    correlation_field: workstream_id
+    task_bindings:
+      - task_type: run_screenings
+        verb_fqn: screening.run
+        timeout_ms: 30000
+        max_retries: 3
+
+      - task_type: await_screening
+        verb_fqn: screening.await-aggregate-outcome
+        timeout_ms: 30000
+        max_retries: 3

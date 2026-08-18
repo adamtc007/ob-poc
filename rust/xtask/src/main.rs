@@ -2538,6 +2538,21 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     println!("\n=== BYOK conformance — stub provider (Phase 5.4) ===");
     byok_conformance::run("stub")?;
 
+    // DB-free catalogue/DAG reconciliation gate (2026-08-18). Was built and
+    // run manually (`cargo x reconcile validate`) but never wired into
+    // pre-commit — the reason phantom DAG verb references (22 confirmed
+    // real, e.g. `case-event.record`, `screening.confirm`) could sit
+    // undetected for a long time despite the checker existing. It's the
+    // same kind of drift-detector as the other pre-commit gates below, so
+    // it belongs here, not as a manually-remembered extra step.
+    println!("\n=== Catalogue/DAG Reconciliation ===");
+    {
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(reconcile::run(reconcile::ReconcileAction::Validate {
+            strict_warnings: false,
+        }))?;
+    }
+
     println!("\n=== Clippy (workspace) ===");
     cmd!(
         sh,

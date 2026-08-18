@@ -15,6 +15,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::correlation::CorrelationStore;
+use super::parked_tokens::ParkedTokenStore;
 use super::types::OutcomeEvent;
 use crate::sequencer::ReplOrchestratorV2;
 
@@ -27,13 +28,19 @@ use crate::sequencer::ReplOrchestratorV2;
 pub struct SignalRelay {
     orchestrator: Arc<ReplOrchestratorV2>,
     correlations: CorrelationStore,
+    parked_tokens: ParkedTokenStore,
 }
 
 impl SignalRelay {
-    pub fn new(orchestrator: Arc<ReplOrchestratorV2>, correlations: CorrelationStore) -> Self {
+    pub fn new(
+        orchestrator: Arc<ReplOrchestratorV2>,
+        correlations: CorrelationStore,
+        parked_tokens: ParkedTokenStore,
+    ) -> Self {
         Self {
             orchestrator,
             correlations,
+            parked_tokens,
         }
     }
 
@@ -113,10 +120,38 @@ impl SignalRelay {
             correlation.runbook_id, correlation.entry_id, correlation.correlation_id
         );
 
+        // 2b. For a clean completion, thread the typed result through.
+        //     EventBridge already wrote it onto the token's result_payload
+        //     when the driving JobCompleted event arrived (before this
+        //     process's own Completed event, which carries no domain
+        //     payload of its own) and has since flipped the token to
+        //     'resolved' — read it back by process_instance_id, not
+        //     find_by_correlation_key, which is scoped to 'waiting' only.
+        let result = if status == "completed" {
+            match self
+                .parked_tokens
+                .find_by_process_instance(process_instance_id)
+                .await
+            {
+                Ok(Some(token)) => token.result_payload,
+                Ok(None) => None,
+                Err(e) => {
+                    tracing::error!(
+                        process_instance_id = %process_instance_id,
+                        error = %e,
+                        "SignalRelay: failed to look up parked token result"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         // 3. Signal the orchestrator.
         match self
             .orchestrator
-            .signal_completion(&correlation_key, status, None, error)
+            .signal_completion(&correlation_key, status, result, error)
             .await
         {
             Ok(Some(_)) => {

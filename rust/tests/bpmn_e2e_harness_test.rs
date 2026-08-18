@@ -188,6 +188,7 @@ impl BpmnTestRig {
 
         // Register bytecode so the dispatcher can pass it to start_process
         config.register_bytecode("kyc-open-case", compile_result.bytecode_version.clone());
+        config.register_flag_symbols("kyc-open-case", &compile_result.flag_symbol_table);
 
         Self {
             engine,
@@ -1144,7 +1145,7 @@ async fn e2e_08_signal_relay_bounces_to_orchestrator() {
             .expect("EventBridge subscribe failed");
     });
 
-    let relay = SignalRelay::new(orchestrator.clone(), rig.correlations());
+    let relay = SignalRelay::new(orchestrator.clone(), rig.correlations(), rig.parked_tokens());
     let relay_handle = tokio::spawn(async move {
         relay.run(outcome_rx).await;
     });
@@ -1322,7 +1323,7 @@ async fn e2e_09_cancellation_bounces_to_orchestrator() {
             .expect("EventBridge subscribe failed");
     });
 
-    let relay = SignalRelay::new(orchestrator.clone(), rig.correlations());
+    let relay = SignalRelay::new(orchestrator.clone(), rig.correlations(), rig.parked_tokens());
     let relay_handle = tokio::spawn(async move {
         relay.run(outcome_rx).await;
     });
@@ -1764,6 +1765,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
     let compile_result = rig.client.compile(KYC_BPMN).await.expect("Compile failed");
     let mut dlq_config_index = WorkflowConfigIndex::from_config(&dlq_config);
     dlq_config_index.register_bytecode("kyc-open-case", compile_result.bytecode_version);
+    dlq_config_index.register_flag_symbols("kyc-open-case", &compile_result.flag_symbol_table);
     let dlq_config_arc = Arc::new(dlq_config_index);
 
     // Create dispatcher and worker using FailingStubExecutor.
@@ -2088,4 +2090,292 @@ async fn e2e_15_crash_recovery_event_log_replay() {
     );
 
     eprintln!("e2e_15 PASSED: Crash recovery via event log replay reconstructs state");
+}
+
+// ---------------------------------------------------------------------------
+// Test 16: awaits — screening message-wait + gateway switch
+// (EOP-PLAN-DAG-AWAITS-001 Phase 5)
+// ---------------------------------------------------------------------------
+
+const ENTITY_WORKSTREAM_SCREEN_BPMN: &str =
+    include_str!("../config/bpmn/entity-workstream-screen.bpmn");
+
+/// Workflow config mirroring config/workflows.yaml's real
+/// entity-workstream-screen entry.
+fn build_screening_config() -> WorkflowConfig {
+    WorkflowConfig {
+        workflows: vec![WorkflowBinding {
+            verb_fqn: "screening.run".to_string(),
+            route: ExecutionRoute::Orchestrated,
+            process_key: Some("entity-workstream-screen".to_string()),
+            task_bindings: vec![
+                TaskBinding {
+                    task_type: "run_screenings".to_string(),
+                    verb_fqn: "screening.run".to_string(),
+                    timeout_ms: None,
+                    max_retries: 3,
+                },
+                TaskBinding {
+                    task_type: "await_screening".to_string(),
+                    verb_fqn: "screening.await-aggregate-outcome".to_string(),
+                    timeout_ms: None,
+                    max_retries: 3,
+                },
+            ],
+            correlation_field: Some("workstream_id".to_string()),
+        }],
+    }
+}
+
+/// Test executor keyed by verb FQN substring match. `run_screenings` always
+/// succeeds with a stub payload — its real business logic (writing a
+/// `screenings` row) has its own coverage in `kyc_w5_screening_hook.rs` and
+/// isn't re-tested here. `await_screening` returns the canned
+/// `AwaitAggregateOutcomeResult` shape the test controls per scenario,
+/// driving the compiled gateway's boolean-flag conditions.
+struct AwaitsStubExecutor {
+    await_screening_result: serde_json::Value,
+}
+
+#[async_trait::async_trait]
+impl DslExecutorV2 for AwaitsStubExecutor {
+    async fn execute_v2(
+        &self,
+        dsl: &str,
+        _entry_id: Uuid,
+        _runbook_id: Uuid,
+        _session_stack: Option<SessionStackState>,
+    ) -> DslExecutionOutcome {
+        if dsl.contains("screening.await-aggregate-outcome") {
+            DslExecutionOutcome::Completed(self.await_screening_result.clone())
+        } else {
+            DslExecutionOutcome::Completed(serde_json::json!({"status": "stub_success"}))
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore]
+async fn e2e_16_awaits_screening_message_wait_and_gateway_switch() {
+    let rig = BpmnTestRig::setup().await;
+
+    // Compile the real, committed entity-workstream-screen.bpmn — the same
+    // file config/workflows.yaml points production dispatch at, not a
+    // reduced test fixture.
+    let compile_result = rig
+        .client
+        .compile(ENTITY_WORKSTREAM_SCREEN_BPMN)
+        .await
+        .expect("Failed to compile entity-workstream-screen.bpmn");
+    assert!(
+        compile_result
+            .diagnostics
+            .iter()
+            .all(|d| d.severity != "error"),
+        "Compile produced errors: {:?}",
+        compile_result.diagnostics
+    );
+
+    let mut screening_config = WorkflowConfigIndex::from_config(&build_screening_config());
+    screening_config.register_bytecode(
+        "entity-workstream-screen",
+        compile_result.bytecode_version.clone(),
+    );
+    screening_config
+        .register_flag_symbols("entity-workstream-screen", &compile_result.flag_symbol_table);
+    let screening_config = Arc::new(screening_config);
+
+    // Two scenarios sharing one rig: the default (no flags set) resolves to
+    // CLEAR; a stub returning is_confirmed=true resolves to ENHANCED_DD.
+    // Both exercise the identical message-wait -> signal -> resume ->
+    // gateway path — only the await_screening task's stubbed result differs.
+    for (scenario, await_result) in [
+        (
+            "clear",
+            serde_json::json!({"is_confirmed": false, "is_dismissed": false}),
+        ),
+        (
+            "confirmed",
+            serde_json::json!({"is_confirmed": true, "is_dismissed": false}),
+        ),
+    ] {
+        let workstream_id = Uuid::new_v4();
+
+        let dispatcher = WorkflowDispatcher::new(
+            Arc::new(NullDslExecutor),
+            screening_config.clone(),
+            rig.client.clone(),
+            CorrelationStore::new(rig.pool.clone()),
+            ParkedTokenStore::new(rig.pool.clone()),
+            PendingDispatchStore::new(rig.pool.clone()),
+            RequestStateStore::new(rig.pool.clone()),
+        );
+        let worker = JobWorker::new(
+            format!("test-worker-{scenario}"),
+            rig.client.clone(),
+            screening_config.clone(),
+            JobFrameStore::new(rig.pool.clone()),
+            Arc::new(AwaitsStubExecutor {
+                await_screening_result: await_result,
+            }),
+        );
+
+        // 1. Dispatch screening.run with its real arg name (`:workstream-id`,
+        //    matching config/verbs/screening.yaml) so the dispatcher's
+        //    correlation-field extraction (dispatcher.rs's
+        //    execute_orchestrated) finds it and folds it into the JSON
+        //    object domain_payload the compiled process's `workstream_id`
+        //    data object resolves at the message catch below.
+        let dsl = format!("(screening.run :workstream-id \"{workstream_id}\")");
+        let outcome = dispatcher
+            .execute_v2(&dsl, Uuid::new_v4(), Uuid::new_v4(), None)
+            .await;
+        let (process_instance_id, _correlation_key) = extract_parked(&outcome);
+        eprintln!("[{scenario}] Step 1: process started, pid={process_instance_id}");
+
+        // 2. JobWorker processes run_screenings — a real StartProcess ->
+        //    ActivateJobs -> CompleteJob round trip against the in-process
+        //    engine, not a raw CompleteJob call.
+        let mut jobs = 0;
+        for _ in 0..10 {
+            jobs += worker.poll_and_execute().await.expect("poll cycle failed");
+            if jobs >= 1 {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        assert!(
+            jobs >= 1,
+            "[{scenario}] expected run_screenings job to be processed"
+        );
+
+        // 3. Process should now be parked at the message catch, waiting on
+        //    "screening_settled" correlated on workstream_id.
+        let inspection = rig
+            .client
+            .inspect(process_instance_id)
+            .await
+            .expect("inspect failed");
+        assert_eq!(
+            inspection.state, "RUNNING",
+            "[{scenario}] process should be waiting at the screening_settled message catch"
+        );
+        eprintln!("[{scenario}] Step 3: process waiting at message catch");
+
+        // 4. Queue the bpmn_signal outbox row. Mirrors
+        //    bpmn_integration::signal_outbox::queue_bpmn_signal's INSERT —
+        //    that fn is pub(crate) and not reachable from this external test
+        //    crate (test boundary rule), so this reproduces its shape using
+        //    only public API: CorrelationStore::find_active_by_domain_key +
+        //    a direct write to the real public.outbox table.
+        let correlation = rig
+            .correlations()
+            .find_active_by_domain_key("entity-workstream-screen", &workstream_id.to_string())
+            .await
+            .expect("correlation lookup failed")
+            .expect(
+                "[BUG] no active correlation for this workstream_id — \
+                 dispatcher's structured domain_payload isn't wired",
+            );
+        assert_eq!(correlation.process_instance_id, process_instance_id);
+
+        let outbox_id = Uuid::new_v4();
+        let outbox_payload = serde_json::json!({
+            "instance_id": correlation.process_instance_id,
+            "message_name": "screening_settled",
+            "payload": "{}",
+            "correlation_key": workstream_id.to_string(),
+        });
+        sqlx::query(
+            r#"
+            INSERT INTO public.outbox
+                (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
+            VALUES
+                ($1, $2, $3, 'bpmn_signal', $4, $5, 'pending')
+            "#,
+        )
+        .bind(outbox_id)
+        .bind(Uuid::new_v4())
+        .bind(1i16)
+        .bind(&outbox_payload)
+        .bind(format!("test:awaits:{scenario}:{outbox_id}"))
+        .execute(&rig.pool)
+        .await
+        .expect("outbox insert failed");
+        eprintln!("[{scenario}] Step 4: bpmn_signal outbox row queued");
+
+        // 5. Drain it via the real BpmnSignalConsumer, pointed at the rig's
+        //    in-process gRPC server via BPMN_LITE_GRPC_URL (the consumer
+        //    builds its own client via BpmnLiteConnection::from_env()).
+        std::env::set_var(
+            "BPMN_LITE_GRPC_URL",
+            format!("http://[::1]:{}", rig.bpmn_addr.port()),
+        );
+        let mut drainer = ob_poc::outbox::OutboxDrainerImpl::new(
+            rig.pool.clone(),
+            ob_poc::outbox::OutboxDrainerConfig {
+                poll_interval: std::time::Duration::from_millis(50),
+                ..Default::default()
+            },
+        );
+        drainer
+            .register(Arc::new(ob_poc::outbox::BpmnSignalConsumer::new()))
+            .expect("register consumer failed");
+        let _drainer_handle = drainer.spawn();
+
+        let mut drained = false;
+        for _ in 0..50 {
+            let status: String = sqlx::query_scalar("SELECT status FROM public.outbox WHERE id = $1")
+                .bind(outbox_id)
+                .fetch_one(&rig.pool)
+                .await
+                .expect("outbox status query failed");
+            if status == "done" {
+                drained = true;
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        assert!(
+            drained,
+            "[{scenario}] bpmn_signal outbox row did not drain to 'done'"
+        );
+        eprintln!("[{scenario}] Step 5: outbox row drained, signal delivered");
+
+        // 6. Process should have resumed past the message catch. Poll for
+        //    the await_screening job.
+        let mut jobs2 = 0;
+        for _ in 0..10 {
+            jobs2 += worker.poll_and_execute().await.expect("poll cycle failed");
+            if jobs2 >= 1 {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        }
+        assert!(
+            jobs2 >= 1,
+            "[{scenario}] expected await_screening job to be processed"
+        );
+
+        // 7. Gateway should have switched and the process reached COMPLETED.
+        //    Which exact end-node is structurally proven elsewhere (the
+        //    dag-to-bpmn fixture tests, the Phase 0 live spike, and the
+        //    flag_symbol_table check against this exact file) — this step
+        //    proves the real message-wait -> signal -> resume -> gateway
+        //    round trip, driven through the actual verb-dispatch machinery,
+        //    reaches a terminal state for both outcome combinations rather
+        //    than hanging.
+        let final_inspection = rig
+            .client
+            .inspect(process_instance_id)
+            .await
+            .expect("inspect failed");
+        assert_eq!(
+            final_inspection.state, "COMPLETED",
+            "[{scenario}] process should complete after await_screening resolves the gateway"
+        );
+        eprintln!("[{scenario}] e2e_16 scenario PASSED");
+    }
+
+    eprintln!("e2e_16 PASSED: awaits message-wait + gateway switch (CLEAR + HIT_CONFIRMED)");
 }

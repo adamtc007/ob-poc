@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Entity Workstream — Screen await/switch. BPMN model for the KYC
+  entity_workstream.SCREEN "awaits" move (EOP-PLAN-DAG-AWAITS-001 Phase 5).
+
+  Flow:
+    Start
+      → run_screenings       (ServiceTask -> screening.run)
+      → WAIT_MSG(screening_settled), correlated on workstream_id
+          fired by kyc_stream_ops.rs's ScreeningComplete/ScreeningReviewHit
+          once every screenings row for the workstream is terminal
+          (CLEAR/HIT_CONFIRMED/HIT_DISMISSED)
+      → await_screening      (ServiceTask -> screening.await-aggregate-outcome)
+      → gw_confirmed          do_is_confirmed == true -> end_enhanced_dd
+                               (default)               -> gw_dismissed
+      → gw_dismissed          do_is_dismissed == true -> end_assess_dismissed
+                               (default)               -> end_assess_clear
+
+  Boolean-cascade gateway shape proven live against a local
+  bpmn-lite-server-runner instance (Phase 0 spike,
+  bpmn-lite-server-runner/src/bin/awaits_spike.rs, not committed) —
+  bpmn-lite-compiler's condition grammar only supports boolean flag
+  equality, so an N-ary switch compiles as chained exclusive gateways,
+  not a single N-arm gateway.
+
+  Task types map to ob-poc verbs via config/workflows.yaml:
+    run_screenings   → screening.run
+    await_screening  → screening.await-aggregate-outcome
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0">
+  <bpmn:process id="entity_workstream_screen" isExecutable="true">
+
+    <!-- ===== Data objects ===== -->
+    <!-- workstream_id: the correlation key. Set from screening.run's
+         domain payload at StartProcess (config/workflows.yaml's
+         correlation_field) and read by wait_screening_settled's
+         zeebe:subscription below. -->
+    <bpmn:dataObject id="workstream_id">
+      <bpmn:extensionElements>
+        <bpmn:dataType primitive="string" role="input" />
+      </bpmn:extensionElements>
+    </bpmn:dataObject>
+    <bpmn:dataObject id="do_is_confirmed">
+      <bpmn:extensionElements>
+        <bpmn:dataType primitive="bool" role="output" />
+      </bpmn:extensionElements>
+    </bpmn:dataObject>
+    <bpmn:dataObject id="do_is_dismissed">
+      <bpmn:extensionElements>
+        <bpmn:dataType primitive="bool" role="output" />
+      </bpmn:extensionElements>
+    </bpmn:dataObject>
+
+    <!-- ===== Nodes ===== -->
+    <bpmn:startEvent id="start" />
+
+    <bpmn:serviceTask id="run_screenings" name="Run Screenings">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="run_screenings" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:intermediateCatchEvent id="wait_screening_settled" name="screening_settled">
+      <bpmn:messageEventDefinition messageRef="msg_screening_settled" />
+      <bpmn:extensionElements>
+        <zeebe:subscription correlationKey="=workstream_id" />
+      </bpmn:extensionElements>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:serviceTask id="await_screening" name="Await Screening Outcome">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="await_screening" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="gw_confirmed" name="Confirmed?" />
+    <bpmn:exclusiveGateway id="gw_dismissed" name="Dismissed?" />
+
+    <bpmn:endEvent id="end_enhanced_dd" name="Enhanced DD" />
+    <bpmn:endEvent id="end_assess_dismissed" name="Assess (dismissed)" />
+    <bpmn:endEvent id="end_assess_clear" name="Assess (clear)" />
+
+    <!-- ===== Flows ===== -->
+    <bpmn:sequenceFlow id="f1" sourceRef="start"                  targetRef="run_screenings" />
+    <bpmn:sequenceFlow id="f2" sourceRef="run_screenings"         targetRef="wait_screening_settled" />
+    <bpmn:sequenceFlow id="f3" sourceRef="wait_screening_settled" targetRef="await_screening" />
+    <bpmn:sequenceFlow id="f4" sourceRef="await_screening"        targetRef="gw_confirmed" />
+
+    <bpmn:sequenceFlow id="f5" sourceRef="gw_confirmed" targetRef="end_enhanced_dd">
+      <bpmn:conditionExpression>= do_is_confirmed == true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f6" sourceRef="gw_confirmed" targetRef="gw_dismissed" />
+
+    <bpmn:sequenceFlow id="f7" sourceRef="gw_dismissed" targetRef="end_assess_dismissed">
+      <bpmn:conditionExpression>= do_is_dismissed == true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f8" sourceRef="gw_dismissed" targetRef="end_assess_clear" />
+
+  </bpmn:process>
+</bpmn:definitions>

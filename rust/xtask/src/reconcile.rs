@@ -397,6 +397,28 @@ async fn hygiene_report() -> Result<()> {
     plugin_missing.sort();
     print_limited(&plugin_missing, 100);
 
+    println!("\nVerb <-> DAG domain-pack coverage gaps (owned_verb_prefixes vs owned_dags):");
+    let packs = load_domain_pack_ownership()?;
+    let refs_by_dag = collect_dag_verb_refs_by_dag()?;
+    let coverage_gaps = verb_domain_coverage_findings(&cfg, &refs_by_dag, &packs);
+    print_limited(&coverage_gaps, 200);
+
+    println!("\nDomain packs with no owned_verb_prefixes or no owned_dags declared:");
+    let mut ownerless_packs: Vec<_> = packs
+        .iter()
+        .filter(|p| p.owned_verb_prefixes.is_empty() || p.owned_dags.is_empty())
+        .map(|p| {
+            format!(
+                "{}: {} owned_verb_prefixes, {} owned_dags",
+                p.pack_id,
+                p.owned_verb_prefixes.len(),
+                p.owned_dags.len()
+            )
+        })
+        .collect();
+    ownerless_packs.sort();
+    print_limited(&ownerless_packs, 50);
+
     println!("\nDeal substate closure:");
     let deal_required_writes = [
         ("deals", "bac_status", "in_review"),
@@ -427,6 +449,8 @@ async fn hygiene_report() -> Result<()> {
     println!("  DAG refs missing YAML:        {}", missing_yaml.len());
     println!("  DAG refs missing runtime:     {}", missing_runtime.len());
     println!("  plugin YAML missing runtime:  {}", plugin_missing.len());
+    println!("  verb/DAG coverage gaps:       {}", coverage_gaps.len());
+    println!("  packs w/ incomplete ownership: {}", ownerless_packs.len());
     println!(
         "  deal substate closure gaps:   {}",
         deal_closure_missing.len()
@@ -478,6 +502,13 @@ fn collect_writer_index(
 fn hygiene_failure_summary() -> Result<Vec<String>> {
     let cfg = load_catalogue()?;
     let declared = collect_declared_fqns(&cfg);
+    // DAG references now cover progression_verbs / dsl_verb_reconciliation
+    // (see collect_dag_verb_refs_by_dag), not just `via:` transitions — and
+    // those two fields legitimately cite macro FQNs (e.g. `structure.setup`),
+    // not just plain verbs. Without this union, every macro reference in
+    // that broader scan would misreport as "no YAML declaration".
+    let macros = collect_macro_fqns();
+    let declared_or_macro: HashSet<_> = declared.union(&macros).cloned().collect();
     let mut registry = sem_os_postgres::ops::build_registry();
     ob_poc::domain_ops::extend_registry(&mut registry);
     let registered: HashSet<String> = registry.manifest().into_iter().collect();
@@ -490,7 +521,7 @@ fn hygiene_failure_summary() -> Result<Vec<String>> {
 
     failures.extend(simple_status_drift_failures(&simple_status, &schema));
 
-    for fqn in dag_refs.iter().filter(|fqn| !declared.contains(*fqn)) {
+    for fqn in dag_refs.iter().filter(|fqn| !declared_or_macro.contains(*fqn)) {
         failures.push(format!("{fqn}: DAG reference has no YAML declaration"));
     }
 
@@ -598,6 +629,16 @@ fn entry_via_consistency_failures() -> Result<Vec<String>> {
             let mut incoming = std::collections::HashSet::new();
             for transition in &machine.transitions {
                 incoming.insert(transition.to.clone());
+            }
+            // A state reached only via another state's `awaits` arm (the
+            // call-out + switch move, EOP-PLAN-DAG-AWAITS-001) has a real
+            // incoming path even though it's not a `TransitionDef` row.
+            for state in &machine.states {
+                if let Some(awaits) = &state.awaits {
+                    for case in &awaits.cases {
+                        incoming.insert(case.to.clone());
+                    }
+                }
             }
             for state in &machine.states {
                 let location = format!("{}.{}.{}", dag.workspace, slot.id, state.id);
@@ -868,12 +909,52 @@ fn parse_schema_sql(
     }
 }
 
-fn collect_dag_verb_refs() -> Result<HashSet<String>> {
-    let mut refs = HashSet::new();
-    let path = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
-    let verb_re = regex::Regex::new(r#"\b[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+\b"#)?;
+/// Recursively pushes every FQN-shaped string out of a YAML value that is
+/// a bare string, a sequence of strings, or (for `dsl_verb_reconciliation`)
+/// a mapping of group name -> sequence of strings. Free-text values (e.g.
+/// `"kyc-case.reject (with do-not-onboard flag)"` or a `"(backend: ...)"`
+/// trigger annotation) don't match the strict FQN shape and are silently
+/// skipped here — reclassifying those is W1 (DAG shape fixes), not this
+/// hygiene scan's job.
+fn collect_verb_tokens(value: Option<&serde_yaml::Value>, fqn_re: &regex::Regex, out: &mut HashSet<String>) {
+    let Some(value) = value else { return };
+    match value {
+        serde_yaml::Value::String(s) => {
+            if fqn_re.is_match(s.trim()) {
+                out.insert(s.trim().to_string());
+            }
+        }
+        serde_yaml::Value::Sequence(seq) => {
+            for item in seq {
+                collect_verb_tokens(Some(item), fqn_re, out);
+            }
+        }
+        serde_yaml::Value::Mapping(map) => {
+            for (_key, val) in map {
+                collect_verb_tokens(Some(val), fqn_re, out);
+            }
+        }
+        _ => {}
+    }
+}
 
-    for entry in std::fs::read_dir(&path).with_context(|| format!("reading {path:?}"))? {
+/// Structural (not regex-over-raw-lines) scan of every DAG taxonomy file,
+/// keyed by `dag_id`. Walks the four places a DAG can carry a verb
+/// reference: each slot's `state_machine.transitions[].via`, each
+/// `overall_lifecycle.phases[].progression_verbs`, the whole
+/// `dsl_verb_reconciliation` map, and `prune_pre_validation.required_verbs`.
+/// The line-scoped regex predecessor of this function only ever looked at
+/// lines containing the literal substring `via:` — it could never see a
+/// `progression_verbs:` or `required_verbs:` entry, which is exactly how
+/// two phantom references (`case-event.record` and
+/// `ubo-registry.compute-impact` — neither exists; no `ubo-registry`
+/// domain exists at all) went undetected in `kyc_dag.yaml`.
+fn collect_dag_verb_refs_by_dag() -> Result<BTreeMap<String, HashSet<String>>> {
+    let dir = PathBuf::from("config/sem_os_seeds/dag_taxonomies");
+    let fqn_re = regex::Regex::new(r#"^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$"#)?;
+    let mut out: BTreeMap<String, HashSet<String>> = BTreeMap::new();
+
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {dir:?}"))? {
         let entry = entry?;
         let file_path = entry.path();
         if file_path.extension().and_then(|ext| ext.to_str()) != Some("yaml") {
@@ -881,17 +962,169 @@ fn collect_dag_verb_refs() -> Result<HashSet<String>> {
         }
         let raw = std::fs::read_to_string(&file_path)
             .with_context(|| format!("reading DAG taxonomy {file_path:?}"))?;
-        for line in raw.lines() {
-            if !line.contains("via:") {
-                continue;
+        let value: serde_yaml::Value = serde_yaml::from_str(&raw)
+            .with_context(|| format!("parsing DAG taxonomy {file_path:?}"))?;
+
+        let dag_id = value
+            .get("dag_id")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                file_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string()
+            });
+
+        let mut refs = HashSet::new();
+        collect_verb_tokens(value.get("dsl_verb_reconciliation"), &fqn_re, &mut refs);
+
+        if let Some(slots) = value.get("slots").and_then(|v| v.as_sequence()) {
+            for slot in slots {
+                let transitions = slot
+                    .get("state_machine")
+                    .and_then(|sm| sm.get("transitions"))
+                    .and_then(|v| v.as_sequence());
+                for transition in transitions.into_iter().flatten() {
+                    collect_verb_tokens(transition.get("via"), &fqn_re, &mut refs);
+                }
             }
-            for cap in verb_re.captures_iter(line) {
-                refs.insert(cap[0].to_string());
+        }
+
+        if let Some(phases) = value
+            .get("overall_lifecycle")
+            .and_then(|v| v.get("phases"))
+            .and_then(|v| v.as_sequence())
+        {
+            for phase in phases {
+                collect_verb_tokens(phase.get("progression_verbs"), &fqn_re, &mut refs);
+            }
+        }
+
+        collect_verb_tokens(
+            value
+                .get("prune_pre_validation")
+                .and_then(|v| v.get("required_verbs")),
+            &fqn_re,
+            &mut refs,
+        );
+
+        out.entry(dag_id).or_default().extend(refs);
+    }
+
+    Ok(out)
+}
+
+fn collect_dag_verb_refs() -> Result<HashSet<String>> {
+    Ok(collect_dag_verb_refs_by_dag()?
+        .into_values()
+        .flatten()
+        .collect())
+}
+
+/// A Domain Pack's declared verb-ownership boundary — `owned_verb_prefixes`
+/// (e.g. `kyc.`, `kyc-case.`) and `owned_dags` (e.g. `kyc_dag`), read
+/// straight off `config/sem_os_seeds/domain_packs/*.yaml`. This is the
+/// same ownership mechanism CLAUDE.md documents as already canonical
+/// elsewhere (the CBU verb-surface re-grounding used exactly this field) —
+/// deliberately not a new, parallel ownership concept.
+#[derive(Debug, Clone, Default)]
+struct DomainPackOwnership {
+    pack_id: String,
+    owned_verb_prefixes: Vec<String>,
+    owned_dags: Vec<String>,
+}
+
+fn load_domain_pack_ownership() -> Result<Vec<DomainPackOwnership>> {
+    let dir = PathBuf::from("config/sem_os_seeds/domain_packs");
+    let mut out = Vec::new();
+    if !dir.exists() {
+        return Ok(out);
+    }
+    for entry in std::fs::read_dir(&dir).with_context(|| format!("reading {dir:?}"))? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
+            continue;
+        }
+        let raw =
+            std::fs::read_to_string(&path).with_context(|| format!("reading domain pack {path:?}"))?;
+        let value: serde_yaml::Value = serde_yaml::from_str(&raw)
+            .with_context(|| format!("parsing domain pack {path:?}"))?;
+        let pack_id = value
+            .get("pack_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let owned_verb_prefixes = value
+            .get("owned_verb_prefixes")
+            .and_then(|v| v.as_sequence())
+            .map(|seq| {
+                seq.iter()
+                    .filter_map(|e| e.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let owned_dags = value
+            .get("owned_dags")
+            .and_then(|v| v.as_sequence())
+            .map(|seq| {
+                seq.iter()
+                    .filter_map(|e| e.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        out.push(DomainPackOwnership {
+            pack_id,
+            owned_verb_prefixes,
+            owned_dags,
+        });
+    }
+    Ok(out)
+}
+
+/// Every real verb whose FQN matches a pack's `owned_verb_prefixes` must
+/// be represented somewhere in one of that pack's `owned_dags` — as a real
+/// `via:` transition, an `overall_lifecycle` progression verb, or a
+/// `dsl_verb_reconciliation` declaration. A verb matching zero packs'
+/// prefixes is out of scope for this specific check (unclaimed-prefix is a
+/// softer, separate finding, reported alongside but not counted here).
+fn verb_domain_coverage_findings(
+    cfg: &VerbsConfig,
+    refs_by_dag: &BTreeMap<String, HashSet<String>>,
+    packs: &[DomainPackOwnership],
+) -> Vec<String> {
+    let mut findings = Vec::new();
+
+    for (domain, dblock) in &cfg.domains {
+        for verb in dblock.verbs.keys() {
+            let fqn = format!("{domain}.{verb}");
+            for pack in packs {
+                let Some(prefix) = pack
+                    .owned_verb_prefixes
+                    .iter()
+                    .find(|p| fqn.starts_with(p.as_str()))
+                else {
+                    continue;
+                };
+                let covered = pack.owned_dags.iter().any(|dag_id| {
+                    refs_by_dag
+                        .get(dag_id)
+                        .is_some_and(|refs| refs.contains(&fqn))
+                });
+                if !covered {
+                    findings.push(format!(
+                        "{fqn}: owned by pack '{}' (prefix '{prefix}') but absent from its owned_dags {:?}",
+                        pack.pack_id, pack.owned_dags
+                    ));
+                }
             }
         }
     }
 
-    Ok(refs)
+    findings.sort();
+    findings
 }
 
 fn sorted_set(values: &HashSet<String>) -> Vec<String> {

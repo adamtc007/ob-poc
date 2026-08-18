@@ -84,6 +84,55 @@ pub enum ShapeError {
         to: String,
         via: String,
     },
+
+    #[error(
+        "state '{state_id}' in slot '{slot_id}' declares `awaits` AND has outgoing transitions \
+         — a state resolves via exactly one mechanism"
+    )]
+    AwaitsAndTransitionsBothPresent { slot_id: String, state_id: String },
+
+    #[error(
+        "state '{state_id}' in slot '{slot_id}' awaits slot '{await_slot}', which is not \
+         declared in this DAG"
+    )]
+    AwaitTargetSlotNotFound {
+        slot_id: String,
+        state_id: String,
+        await_slot: String,
+    },
+
+    #[error(
+        "state '{state_id}' in slot '{slot_id}' awaits case outcome '{outcome}', which is not \
+         a declared terminal state of slot '{await_slot}'"
+    )]
+    AwaitCaseNotATerminalState {
+        slot_id: String,
+        state_id: String,
+        await_slot: String,
+        outcome: String,
+    },
+
+    #[error(
+        "state '{state_id}' in slot '{slot_id}' awaits slot '{await_slot}', whose terminal \
+         state(s) {missing} have no matching arm in `cases` — the switch is not exhaustive"
+    )]
+    AwaitCasesNotExhaustive {
+        slot_id: String,
+        state_id: String,
+        await_slot: String,
+        missing: String,
+    },
+
+    #[error(
+        "state '{state_id}' in slot '{slot_id}' has an awaits case (outcome '{outcome}') whose \
+         `to` names unknown state '{to}' — not declared in state_machine.states"
+    )]
+    AwaitCaseTargetUnknown {
+        slot_id: String,
+        state_id: String,
+        outcome: String,
+        to: String,
+    },
 }
 
 /// Top-level compile failure: either the source shape was rejected before

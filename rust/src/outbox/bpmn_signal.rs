@@ -39,6 +39,15 @@ struct BpmnSignalPayload {
     message_name: String,
     #[serde(default)]
     payload: Option<String>,
+    /// Domain correlation key value (e.g. a workstream_id UUID string) for
+    /// a `zeebe:subscription correlationKey="=..."`-gated message wait.
+    /// Without this, `client.signal()`'s `correlation_key: None` gets
+    /// coerced server-side to the literal string `"false"`
+    /// (`grpc.rs::proto_to_correlation_value`), which never matches a real
+    /// wait's resolved correlation key — the `Signal` RPC returns `Ok`
+    /// but silently buffers the message instead of waking any fiber.
+    #[serde(default)]
+    correlation_key: Option<String>,
 }
 
 pub struct BpmnSignalConsumer;
@@ -96,9 +105,10 @@ impl AsyncOutboxConsumer for BpmnSignalConsumer {
         );
 
         let result = client
-            .signal(
+            .signal_with_correlation(
                 payload.instance_id,
                 &payload.message_name,
+                payload.correlation_key.clone(),
                 payload.payload.as_ref().map(|p| p.as_bytes()),
             )
             .await;

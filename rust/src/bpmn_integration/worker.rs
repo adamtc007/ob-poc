@@ -28,7 +28,7 @@ use tokio::sync::watch;
 use uuid::Uuid;
 
 use super::canonical::canonical_json_with_hash;
-use super::client::{BpmnLiteConnection, CompleteJobRequest, JobActivation};
+use super::client::{BpmnLiteConnection, CompleteJobRequest, JobActivation, OrchestratorFlag};
 use super::config::WorkflowConfigIndex;
 use super::job_frames::JobFrameStore;
 use super::types::{JobFrame, JobFrameStatus};
@@ -196,7 +196,7 @@ impl JobWorker {
         }
 
         // 2. Look up task_type → verb_fqn.
-        let (_, task_binding) = match self.config.binding_for_task_type(task_type) {
+        let (workflow_fqn, task_binding) = match self.config.binding_for_task_type(task_type) {
             Some(binding) => binding,
             None => {
                 tracing::error!(job_key, task_type, "No task binding found, failing job");
@@ -212,6 +212,12 @@ impl JobWorker {
         };
 
         let verb_fqn = &task_binding.verb_fqn;
+        // The process this job's task belongs to — needed to resolve named
+        // boolean result fields to `flag_<N>` orch_flags below.
+        let process_key = self
+            .config
+            .binding_for_verb(workflow_fqn)
+            .and_then(|b| b.process_key.clone());
 
         // 3. Build DSL from domain payload.
         let dsl = build_dsl_from_payload(verb_fqn, &job.domain_payload);
@@ -228,7 +234,26 @@ impl JobWorker {
             crate::sequencer::DslExecutionOutcome::Completed(result) => {
                 // 5a. Success — complete the job via gRPC.
                 let result_json = completion_payload_from_result(result);
-                let (canonical, _) = canonical_json_with_hash(&result_json);
+                let orch_flags = orch_flags_from_result(
+                    &self.config,
+                    process_key.as_deref(),
+                    &result_json,
+                );
+                // Merge this job's result INTO the instance's existing
+                // domain payload (job.domain_payload) rather than replacing
+                // it outright — a later message-catch's correlationKey (or
+                // any other data object elsewhere in the process) may need
+                // a field set at StartProcess time or by an earlier job,
+                // and CompleteJob's domain_payload is a full-instance
+                // snapshot, not a per-job delta. Found migrating
+                // entity_workstream.SCREEN (EOP-PLAN-DAG-AWAITS-001 Phase
+                // 5) — a first task's Completed result was silently
+                // wiping out `workstream_id`, breaking every later
+                // correlationKey resolution in the same instance
+                // (including this file's own pre-existing kyc-open-case
+                // `case_id` message waits).
+                let merged_payload = merge_domain_payload(&job.domain_payload, &result_json);
+                let (canonical, _) = canonical_json_with_hash(&merged_payload);
 
                 if let Err(e) = self
                     .bpmn_client
@@ -238,7 +263,7 @@ impl JobWorker {
                         // The engine expects the hash of the current instance
                         // payload snapshot, not the new completion payload.
                         domain_payload_hash: job.domain_payload_hash.clone(),
-                        orch_flags: std::collections::HashMap::new(),
+                        orch_flags,
                         worker_id: job.worker_id.clone(),
                         claim_token: job.claim_token.clone(),
                     })
@@ -415,6 +440,58 @@ fn completion_payload_from_result(result: serde_json::Value) -> serde_json::Valu
     }
 }
 
+/// Merge a job's completion payload into the instance's existing domain
+/// payload — `current`'s fields survive except where `completion` names the
+/// same key, which wins (last-write). Falls back to `completion` alone if
+/// `current` isn't a JSON object (e.g. the raw-DSL-string shape a verb with
+/// no `correlation_field` binding produces).
+fn merge_domain_payload(current: &str, completion: &serde_json::Value) -> serde_json::Value {
+    let mut merged = match serde_json::from_str::<serde_json::Value>(current) {
+        Ok(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    if let serde_json::Value::Object(completion_map) = completion {
+        for (k, v) in completion_map {
+            merged.insert(k.clone(), v.clone());
+        }
+    }
+    serde_json::Value::Object(merged)
+}
+
+/// Translate the completion payload's top-level boolean fields into
+/// `orch_flags`, for whichever ones name a real data-object on the process
+/// this job's task belongs to.
+///
+/// The real engine's gateway conditions can only read `orch_flags` (never
+/// `domain_payload`), and the wire protocol requires the compiler-assigned
+/// `"flag_<N>"` key form, not the data-object's own name — both confirmed
+/// against a live server (EOP-PLAN-DAG-AWAITS-001 Phase 0). A verb author
+/// doesn't need to know any of this: they just name a boolean result field
+/// after the `awaits` BPMN template's data-object (e.g. `is_confirmed`),
+/// and this resolves it via `WorkflowConfigIndex::flag_key_for`. Boolean
+/// fields that don't match any data-object on this process are left alone
+/// — most verbs' booleans have nothing to do with a gateway.
+fn orch_flags_from_result(
+    config: &WorkflowConfigIndex,
+    process_key: Option<&str>,
+    result_json: &serde_json::Value,
+) -> std::collections::HashMap<String, OrchestratorFlag> {
+    let mut flags = std::collections::HashMap::new();
+    let Some(process_key) = process_key else {
+        return flags;
+    };
+    let Some(map) = result_json.as_object() else {
+        return flags;
+    };
+    for (key, value) in map {
+        let Some(b) = value.as_bool() else { continue };
+        if let Some(flag_key) = config.flag_key_for(process_key, key) {
+            flags.insert(format!("flag_{}", flag_key), OrchestratorFlag::Bool(b));
+        }
+    }
+    flags
+}
+
 fn unwrap_singleton_dsl_result(
     map: &serde_json::Map<String, serde_json::Value>,
 ) -> Option<serde_json::Value> {
@@ -444,6 +521,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_orch_flags_from_result_maps_matching_booleans_only() {
+        use super::super::config::{WorkflowConfig, WorkflowConfigIndex};
+        let mut config = WorkflowConfigIndex::from_config(&WorkflowConfig { workflows: vec![] });
+        config.register_flag_symbols(
+            "entity-workstream-screen",
+            &std::collections::HashMap::from([
+                (0u32, "do_is_confirmed".to_string()),
+                (1u32, "do_is_dismissed".to_string()),
+            ]),
+        );
+
+        let result = serde_json::json!({
+            "do_is_confirmed": true,
+            "do_is_dismissed": false,
+            "unrelated_active": true,
+            "case_id": "abc-123"
+        });
+
+        let flags = orch_flags_from_result(&config, Some("entity-workstream-screen"), &result);
+
+        assert_eq!(flags.len(), 2);
+        assert!(matches!(
+            flags.get("flag_0"),
+            Some(OrchestratorFlag::Bool(true))
+        ));
+        assert!(matches!(
+            flags.get("flag_1"),
+            Some(OrchestratorFlag::Bool(false))
+        ));
+        assert!(!flags.contains_key("unrelated_active"));
+    }
+
+    #[test]
+    fn test_orch_flags_from_result_empty_without_process_key() {
+        use super::super::config::{WorkflowConfig, WorkflowConfigIndex};
+        let config = WorkflowConfigIndex::from_config(&WorkflowConfig { workflows: vec![] });
+        let result = serde_json::json!({"do_is_confirmed": true});
+        assert!(orch_flags_from_result(&config, None, &result).is_empty());
+    }
+
+    #[test]
     fn test_build_dsl_flat_object() {
         let dsl = build_dsl_from_payload(
             "kyc.create-case",
@@ -466,6 +584,36 @@ mod tests {
     fn test_build_dsl_empty_object() {
         let dsl = build_dsl_from_payload("session.info", "{}");
         assert_eq!(dsl, "(session.info)");
+    }
+
+    #[test]
+    fn test_merge_domain_payload_preserves_existing_fields() {
+        // A field set at StartProcess (e.g. a correlation key) must survive
+        // a later job's completion, not be wiped out by it — the bug found
+        // migrating entity_workstream.SCREEN (EOP-PLAN-DAG-AWAITS-001 Phase
+        // 5): a first task's Completed result was replacing the entire
+        // instance domain_payload, destroying `workstream_id` before a
+        // later message-catch could resolve its correlationKey.
+        let current = r#"{"workstream_id":"abc-123","dsl":"(screening.run :workstream-id \"abc-123\")"}"#;
+        let completion = serde_json::json!({"status": "stub_success"});
+        let merged = merge_domain_payload(current, &completion);
+        assert_eq!(merged["workstream_id"], "abc-123");
+        assert_eq!(merged["status"], "stub_success");
+    }
+
+    #[test]
+    fn test_merge_domain_payload_completion_overwrites_same_key() {
+        let current = r#"{"is_confirmed": false}"#;
+        let completion = serde_json::json!({"is_confirmed": true});
+        let merged = merge_domain_payload(current, &completion);
+        assert_eq!(merged["is_confirmed"], true);
+    }
+
+    #[test]
+    fn test_merge_domain_payload_falls_back_to_completion_for_non_object_current() {
+        let merged = merge_domain_payload("\"raw string\"", &serde_json::json!({"a": 1}));
+        assert_eq!(merged["a"], 1);
+        assert!(merged.get("raw string").is_none());
     }
 
     #[test]

@@ -596,3 +596,46 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+
+      await-aggregate-outcome:
+        flavour: attribute_mutating
+        description: >-
+          Reduce a workstream's screening set to the boolean switch a
+          compiled `awaits` BPMN gateway reads (worst-of: any HIT_CONFIRMED
+          or ERROR/EXPIRED sibling wins, else HIT_DISMISSED, else CLEAR).
+          Fails (job retries) if any sibling screening has not yet reached
+          a terminal status — EOP-PLAN-DAG-AWAITS-001 Phase 4.
+        effect_class: read_snapshot
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
+          noun: screening
+          tags: [kyc]
+          subject_kinds: [entity-workstream]
+          phase_tags: [kyc]
+          side_effects: facts_only
+        invocation_phrases:
+          - "reduce screening outcomes for workstream"
+          - "compute screening switch outcome"
+          - "aggregate screening results for workstream"
+        behavior: plugin
+        plugin:
+          handler: AwaitAggregateOutcome
+        args:
+          - name: workstream-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_workstreams
+              entity_type: entity_workstream
+              schema: ob-poc
+              search_key: workstream_id
+              primary_key: workstream_id
+        returns:
+          type: record
+        three_axis:
+          state_effect: preserving
+          external_effects: [observational]
+          consequence:
+            baseline: benign

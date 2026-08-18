@@ -454,7 +454,6 @@ impl SemOsVerbOp for RequestCancel {
             &pool,
         )
         .await;
-
         Ok(VerbExecutionOutcome::Affected(1))
     }
 }
@@ -924,95 +923,17 @@ async fn try_send_bpmn_signal(
     payload: &serde_json::Value,
     pool: &PgPool,
 ) {
-    use crate::bpmn_integration::correlation::CorrelationStore;
+    use crate::bpmn_integration::signal_outbox::queue_bpmn_signal;
 
     let Some(case_id) = case_id else {
         return; // No case context, skip BPMN lookup
     };
 
-    let store = CorrelationStore::new(pool.clone());
-    let correlation = match store
-        .find_active_by_domain_key("kyc-open-case", &case_id.to_string())
-        .await
-    {
-        Ok(Some(c)) => c,
-        Ok(None) => {
-            tracing::debug!(
-                case_id = %case_id,
-                signal = signal_name,
-                "No active BPMN correlation for case, skipping signal"
-            );
-            return;
-        }
-        Err(e) => {
-            tracing::warn!(
-                case_id = %case_id,
-                signal = signal_name,
-                error = %e,
-                "Failed to query BPMN correlation, skipping signal"
-            );
-            return;
-        }
+    let Some(queued) =
+        queue_bpmn_signal(pool, "kyc-open-case", &case_id.to_string(), signal_name, payload).await
+    else {
+        return;
     };
-
-    // Defer the actual signal via public.outbox — same pattern as
-    // `BpmnSignal::execute` uses. Idempotency key collapses duplicate
-    // signals from a single txn.
-    let outbox_id = uuid::Uuid::new_v4();
-    let trace_id = uuid::Uuid::new_v4();
-    let payload_bytes = serde_json::to_vec(payload).unwrap_or_default();
-
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(signal_name.as_bytes());
-    hasher.update(b"\x00");
-    hasher.update(&payload_bytes);
-    let payload_hash = hasher.finalize().to_hex().to_string();
-    let idempotency_key = format!(
-        "bpmn_signal:{}:{}:{}",
-        correlation.process_instance_id,
-        signal_name,
-        &payload_hash[..16]
-    );
-
-    let outbox_payload = serde_json::json!({
-        "instance_id": correlation.process_instance_id,
-        "message_name": signal_name,
-        "payload": serde_json::to_string(payload).unwrap_or_default(),
-    });
-
-    if let Err(e) = sqlx::query(
-        r#"
-        INSERT INTO public.outbox
-            (id, trace_id, envelope_version, effect_kind, payload, idempotency_key, status)
-        VALUES
-            ($1, $2, $3, $4, $5, $6, 'pending')
-        ON CONFLICT (idempotency_key, effect_kind) DO NOTHING
-        "#,
-    )
-    .bind(outbox_id)
-    .bind(trace_id)
-    .bind(1i16)
-    .bind("bpmn_signal")
-    .bind(&outbox_payload)
-    .bind(&idempotency_key)
-    .execute(pool)
-    .await
-    {
-        tracing::warn!(
-            case_id = %case_id,
-            signal = signal_name,
-            error = %e,
-            "Failed to queue bpmn_signal in public.outbox (non-blocking)"
-        );
-    } else {
-        tracing::info!(
-            case_id = %case_id,
-            process_instance_id = %correlation.process_instance_id,
-            signal = signal_name,
-            %idempotency_key,
-            "bpmn.signal queued to public.outbox for request lifecycle event"
-        );
-    }
 
     // Record the signal in the communication_log for audit regardless
     // of outbox status. This is the same pre-F.1c audit trail, now
@@ -1022,10 +943,10 @@ async fn try_send_bpmn_signal(
         "timestamp": chrono::Utc::now(),
         "type": "BPMN_SIGNAL_QUEUED",
         "signal_name": signal_name,
-        "process_instance_id": correlation.process_instance_id,
-        "correlation_id": correlation.correlation_id,
-        "outbox_id": outbox_id,
-        "idempotency_key": idempotency_key,
+        "process_instance_id": queued.process_instance_id,
+        "correlation_id": queued.correlation_id,
+        "outbox_id": queued.outbox_id,
+        "idempotency_key": queued.idempotency_key,
         "payload": payload,
     });
 

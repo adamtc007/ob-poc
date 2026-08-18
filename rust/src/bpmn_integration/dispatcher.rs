@@ -272,12 +272,46 @@ impl WorkflowDispatcher {
             }
         };
 
-        // 1. Canonical JSON + hash of the DSL payload.
-        //    For now, wrap the raw DSL as a JSON string value.
-        let payload_value = serde_json::Value::String(dsl.to_string());
+        // 1. Extract domain_correlation_key from DSL args using the binding's
+        //    correlation_field (e.g., "case_id" → `:case-id "uuid..."` → "uuid...").
+        //    Extracted before payload construction below — the field/value
+        //    pair is folded into the JSON object payload so the compiled
+        //    process's `DomainPayloadRef([correlation_field])` data object
+        //    (e.g. a `zeebe:subscription correlationKey="=case_id"`) has a
+        //    real value to resolve at runtime, not just internal bookkeeping.
+        let domain_correlation_key = binding
+            .correlation_field
+            .as_deref()
+            .and_then(|field| Self::extract_arg_value(dsl, field));
+
+        if domain_correlation_key.is_some() {
+            tracing::debug!(
+                verb = verb_fqn,
+                field = binding.correlation_field.as_deref().unwrap_or(""),
+                key = domain_correlation_key.as_deref().unwrap_or(""),
+                "Extracted domain correlation key from DSL args"
+            );
+        }
+
+        // 2. Canonical JSON + hash of the domain payload. A JSON OBJECT, not
+        //    a wrapped DSL string — the engine's DomainPayloadRef resolution
+        //    (bpmn-lite-types::ffi_bindings::resolve_binding_scalar_with_domain)
+        //    does `serde_json::Value::get(field)` against this root, which
+        //    returns None for any non-object root. `dsl` is preserved under
+        //    a reserved key for audit/debugging; it is never read by the
+        //    compiled process itself (no data object is ever named `dsl`).
+        let mut payload_map = serde_json::Map::new();
+        payload_map.insert("dsl".to_string(), serde_json::Value::String(dsl.to_string()));
+        if let (Some(field), Some(value)) = (
+            binding.correlation_field.as_deref(),
+            domain_correlation_key.as_deref(),
+        ) {
+            payload_map.insert(field.to_string(), serde_json::Value::String(value.to_string()));
+        }
+        let payload_value = serde_json::Value::Object(payload_map);
         let (canonical_json, hash) = canonical_json_with_hash(&payload_value);
 
-        // 2. Look up pre-compiled bytecode version from the config registry.
+        // 3. Look up pre-compiled bytecode version from the config registry.
         let bytecode_version = self
             .config
             .bytecode_for_process(&process_key)
@@ -307,22 +341,6 @@ impl WorkflowDispatcher {
                 correlation_key = %correlation_key,
                 error = %e,
                 "Failed to persist initial requester state"
-            );
-        }
-
-        // 3. Extract domain_correlation_key from DSL args using the binding's
-        //    correlation_field (e.g., "case_id" → `:case-id "uuid..."` → "uuid...").
-        let domain_correlation_key = binding
-            .correlation_field
-            .as_deref()
-            .and_then(|field| Self::extract_arg_value(dsl, field));
-
-        if domain_correlation_key.is_some() {
-            tracing::debug!(
-                verb = verb_fqn,
-                field = binding.correlation_field.as_deref().unwrap_or(""),
-                key = domain_correlation_key.as_deref().unwrap_or(""),
-                "Extracted domain correlation key from DSL args"
             );
         }
 
@@ -471,7 +489,11 @@ impl WorkflowDispatcher {
                     self.parked_tokens.clone(),
                     self.request_states.clone(),
                 );
-                let relay = SignalRelay::new(orchestrator, self.correlations.clone());
+                let relay = SignalRelay::new(
+                    orchestrator,
+                    self.correlations.clone(),
+                    self.parked_tokens.clone(),
+                );
                 let (outcome_tx, outcome_rx) = tokio::sync::mpsc::channel(32);
                 tokio::spawn(async move {
                     relay.run(outcome_rx).await;

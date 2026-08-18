@@ -1494,6 +1494,57 @@ async fn apply_screening_outcome_to_obligations(
     Ok(())
 }
 
+/// EOP-PLAN-DAG-AWAITS-001 Phase 5: if every `screenings` row for this
+/// workstream has now reached a real terminal status (the `screening` DAG
+/// slot's own authoritative `terminal_states` —
+/// `CLEAR`/`HIT_CONFIRMED`/`HIT_DISMISSED`, matching
+/// `sem_os_postgres::ops::screening::TERMINAL_STATUSES`; `ERROR`/`EXPIRED`
+/// are recoverable, not terminal, and correctly keep this a no-op), notify
+/// any BPMN process instance waiting on `entity-workstream.SCREEN`'s await
+/// (`config/bpmn/entity-workstream-screen.bpmn`'s `screening_settled`
+/// message catch). Best-effort: `screening.run` not having been routed
+/// through BPMN yet (no active correlation) is the common case today and
+/// is silently a no-op inside `queue_bpmn_signal`, same as every other
+/// caller of that helper.
+async fn signal_if_workstream_screenings_settled(
+    workstream_id: Uuid,
+    scope: &mut dyn TransactionScope,
+) {
+    let statuses: Result<Vec<String>, sqlx::Error> = sqlx::query_scalar(
+        r#"SELECT status FROM "ob-poc".screenings WHERE workstream_id = $1"#,
+    )
+    .bind(workstream_id)
+    .fetch_all(scope.executor())
+    .await;
+
+    let statuses = match statuses {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(
+                workstream_id = %workstream_id,
+                error = %e,
+                "Failed to check screening statuses for settled signal"
+            );
+            return;
+        }
+    };
+
+    const TERMINAL: &[&str] = &["CLEAR", "HIT_CONFIRMED", "HIT_DISMISSED"];
+    let all_settled = !statuses.is_empty() && statuses.iter().all(|s| TERMINAL.contains(&s.as_str()));
+    if !all_settled {
+        return;
+    }
+
+    crate::bpmn_integration::signal_outbox::queue_bpmn_signal(
+        scope.pool(),
+        "entity-workstream-screen",
+        &workstream_id.to_string(),
+        "screening_settled",
+        &serde_json::json!({}),
+    )
+    .await;
+}
+
 /// `screening.complete` — was `behavior: crud`; now `plugin` so completion
 /// also fans out to the dsl.kyc obligation stream (EOP-DD-KYCUBO-004 Part 1,
 /// closing the previously-unwired W5 hook: `kyc.obligation.update-screening`
@@ -1541,6 +1592,7 @@ impl SemOsVerbOp for ScreeningComplete {
         .map_err(|e| anyhow!("screening.complete: update failed: {e}"))?;
 
         apply_screening_outcome_to_obligations(row.0, state, ctx, scope).await?;
+        signal_if_workstream_screenings_settled(row.0, scope).await;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }
@@ -1584,6 +1636,7 @@ impl SemOsVerbOp for ScreeningReviewHit {
         .map_err(|e| anyhow!("screening.review-hit: update failed: {e}"))?;
 
         apply_screening_outcome_to_obligations(row.0, state, ctx, scope).await?;
+        signal_if_workstream_screenings_settled(row.0, scope).await;
 
         Ok(VerbExecutionOutcome::Affected(1))
     }

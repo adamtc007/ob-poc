@@ -357,6 +357,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(screening::Sanctions));
     registry.register(Arc::new(screening::AdverseMedia));
     registry.register(Arc::new(screening::BulkRefresh));
+    registry.register(Arc::new(screening::AwaitAggregateOutcome));
 
     // Phase B slice #20: matrix-overlay domain (3 plugin verbs —
     // effective-matrix, unified-gaps, compare-products).

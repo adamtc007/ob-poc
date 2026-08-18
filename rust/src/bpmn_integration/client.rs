@@ -34,6 +34,12 @@ const ENV_GRPC_URL: &str = "BPMN_LITE_GRPC_URL";
 pub struct CompileResult {
     pub bytecode_version: Vec<u8>,
     pub diagnostics: Vec<CompileDiagnostic>,
+    /// Maps compiler-assigned FlagKey → data-object name — the wire
+    /// protocol's own comment: "Use 'flag_<N>' as orch_flags keys." Needed
+    /// by `WorkflowConfigIndex::register_flag_symbols` so `JobWorker` can
+    /// translate a verb's named boolean result fields into orch_flags a
+    /// compiled gateway condition can actually read.
+    pub flag_symbol_table: HashMap<u32, String>,
 }
 
 /// Single diagnostic from compilation.
@@ -219,6 +225,7 @@ impl BpmnLiteConnection {
                     element_id: d.element_id,
                 })
                 .collect(),
+            flag_symbol_table: resp.flag_symbol_table,
         })
     }
 
