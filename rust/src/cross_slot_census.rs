@@ -143,8 +143,10 @@ pub async fn evaluate_all(
     Ok(out)
 }
 
-/// Per-rule dispatch. Hand-verified subset (3 of 49, this pass) return a
-/// real `Clean`/`Violated` verdict; the confirmed-broken subset returns
+/// Per-rule dispatch. Hand-verified subset (6 of 49 — cbu_validated_*/2 +
+/// deal_contracted_requires_bac_approved from the first pass, plus the 3
+/// KYC case-approval cluster rules added 2026-08-18) return a real
+/// `Clean`/`Violated` verdict; the confirmed-broken subset returns
 /// `SchemaMismatch` with the specific mismatch named; everything else is
 /// honestly `NotYetImplemented`.
 async fn evaluate_one(rule_id: &str, pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
@@ -161,20 +163,41 @@ async fn evaluate_one(rule_id: &str, pool: &PgPool) -> anyhow::Result<Constraint
         // --- Confirmed schema mismatches (found while verifying the
         // subset above; not guessed into a different meaning) -------------
         "investor_active_requires_kyc_approved" => Ok(ConstraintOutcome::SchemaMismatch {
-            detail: "rule text reads `investors.status = 'ACTIVE'`, but `investors` has no \
-                     `status` column — the real lifecycle column is `lifecycle_state`. Not \
-                     reinterpreted; the rule as declared cannot be evaluated."
+            detail: "rule text reads `investors.status = 'ACTIVE'`; the column is really \
+                     `lifecycle_state`, but a rename alone would be misleading — `investors` \
+                     has ZERO rows in production (confirmed live, EOP-PLAN-GAMEBOARD-001 R2 \
+                     Stage 1, 2026-08-18) despite investor.* verbs writing to it. `holdings` \
+                     (51 live rows) links its investor 100% via `investor_entity_id` (-> \
+                     entities), never via `investor_id` (-> investors, always NULL). The real \
+                     economic-holder relationship bypasses the `investors` register entirely \
+                     in this data. Renaming the column would make the rule syntactically valid \
+                     but vacuously Clean forever, not a meaningful check — holding off pending \
+                     a ruling on what 'investor active' should mean against the live join \
+                     shape, not reinterpreting it here."
                 .to_string(),
         }),
         "holding_active_requires_investor_active" => Ok(ConstraintOutcome::SchemaMismatch {
-            detail: "same `investors.status` mismatch as investor_active_requires_kyc_approved \
-                     (real column: lifecycle_state); `holdings` also carries two distinct \
-                     investor-linking columns (investor_id, nullable; investor_entity_id, not \
-                     null) the rule text doesn't disambiguate between."
+            detail: "same root cause as investor_active_requires_kyc_approved: `holdings` \
+                     joins to `investors` only via `investor_id`, which is NULL on all 51 live \
+                     holdings rows; the live FK is `investor_entity_id` (-> entities), which \
+                     `investors` (0 rows) cannot resolve. Not reinterpreted to join through \
+                     entities instead — that changes what 'investor active' means, a ruling \
+                     this module doesn't make unilaterally."
                 .to_string(),
         }),
 
-        // --- Declared, indexed, not yet hand-translated (44) ---------------
+        // --- KYC case-approval cluster (3), hand-translated 2026-08-18 ------
+        "case_cannot_approve_without_workstreams_complete" => {
+            case_workstreams_complete(pool).await
+        }
+        "case_cannot_approve_with_unresolved_red_flags" => {
+            case_no_blocking_red_flags(pool).await
+        }
+        "case_cannot_approve_with_unresolved_screening_hits" => {
+            case_screenings_resolved(pool).await
+        }
+
+        // --- Declared, indexed, not yet hand-translated (41) ----------------
         _ => Ok(ConstraintOutcome::NotYetImplemented),
     }
 }
@@ -262,6 +285,109 @@ async fn bac_approved(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
         .map(|(deal_id,)| ViolationExample {
             entity_id: deal_id,
             detail: "CONTRACTED with bac_status not 'approved'".to_string(),
+        })
+        .collect();
+    Ok(ConstraintOutcome::Violated { entities })
+}
+
+/// `case_cannot_approve_without_workstreams_complete` — same vacuous-ALL
+/// discipline as `evidence_set_verified`: a case with ZERO entity_workstreams
+/// reaching APPROVED must count as a violation (nothing was ever completed),
+/// not vacuous compliance.
+async fn case_workstreams_complete(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
+    let rows: Vec<(Uuid, i64, i64)> = sqlx::query_as(
+        r#"
+        SELECT c.case_id,
+               COUNT(w.workstream_id) AS total,
+               COUNT(w.workstream_id) FILTER (WHERE w.status = 'COMPLETE') AS complete
+        FROM "ob-poc".cases c
+        LEFT JOIN "ob-poc".entity_workstreams w ON w.case_id = c.case_id
+        WHERE c.status = 'APPROVED'
+        GROUP BY c.case_id
+        HAVING COUNT(w.workstream_id) = 0
+            OR COUNT(w.workstream_id) FILTER (WHERE w.status = 'COMPLETE') < COUNT(w.workstream_id)
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    if rows.is_empty() {
+        return Ok(ConstraintOutcome::Clean);
+    }
+    let entities = rows
+        .into_iter()
+        .map(|(case_id, total, complete)| ViolationExample {
+            entity_id: case_id,
+            detail: format!("APPROVED with {complete}/{total} entity_workstreams COMPLETE"),
+        })
+        .collect();
+    Ok(ConstraintOutcome::Violated { entities })
+}
+
+/// `case_cannot_approve_with_unresolved_red_flags` — a plain COUNT=0 check,
+/// no vacuous-ALL trap (a case with zero red_flags naturally has zero
+/// BLOCKING ones).
+async fn case_no_blocking_red_flags(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
+    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+        r#"
+        SELECT c.case_id, COUNT(r.*) AS blocking_count
+        FROM "ob-poc".cases c
+        JOIN "ob-poc".red_flags r ON r.case_id = c.case_id AND r.status = 'BLOCKING'
+        WHERE c.status = 'APPROVED'
+        GROUP BY c.case_id
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    if rows.is_empty() {
+        return Ok(ConstraintOutcome::Clean);
+    }
+    let entities = rows
+        .into_iter()
+        .map(|(case_id, blocking_count)| ViolationExample {
+            entity_id: case_id,
+            detail: format!("APPROVED with {blocking_count} BLOCKING red_flags"),
+        })
+        .collect();
+    Ok(ConstraintOutcome::Violated { entities })
+}
+
+/// `case_cannot_approve_with_unresolved_screening_hits` — per the rule's own
+/// text: a case violates if any of its workstreams' screenings sit outside
+/// the terminal-clean set (CLEAR, HIT_DISMISSED, EXPIRED) AND the case has
+/// no MITIGATED red_flag sourced from screening to cover it. `screenings`
+/// has no `case_id` column — joined via `entity_workstreams.workstream_id`
+/// (confirmed live, `\d "ob-poc".screenings`).
+async fn case_screenings_resolved(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
+    let rows: Vec<(Uuid, i64)> = sqlx::query_as(
+        r#"
+        SELECT c.case_id, COUNT(s.*) AS unresolved_count
+        FROM "ob-poc".cases c
+        JOIN "ob-poc".entity_workstreams w ON w.case_id = c.case_id
+        JOIN "ob-poc".screenings s ON s.workstream_id = w.workstream_id
+            AND s.status NOT IN ('CLEAR', 'HIT_DISMISSED', 'EXPIRED')
+        WHERE c.status = 'APPROVED'
+          AND NOT EXISTS (
+              SELECT 1 FROM "ob-poc".red_flags rf
+              WHERE rf.case_id = c.case_id
+                AND rf.source = 'screening'
+                AND rf.status = 'MITIGATED'
+          )
+        GROUP BY c.case_id
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    if rows.is_empty() {
+        return Ok(ConstraintOutcome::Clean);
+    }
+    let entities = rows
+        .into_iter()
+        .map(|(case_id, unresolved_count)| ViolationExample {
+            entity_id: case_id,
+            detail: format!(
+                "APPROVED with {unresolved_count} unresolved screenings, no MITIGATED \
+                 screening red_flag"
+            ),
         })
         .collect();
     Ok(ConstraintOutcome::Violated { entities })
