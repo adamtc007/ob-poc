@@ -265,13 +265,23 @@ Given the size gap between W5 (one drainer, one outbox, verb already exists)
 and W6 (new verb+lexicon design, wide consumer inventory, phased view-based
 cutover), **do not bundle these into one work item**. W5 is a scoped,
 mechanical follow-on to the existing drainer pattern and could reasonably be
-picked up next. W6 needs its own design doc (`EOP-DD-KYCUBO-005` or similar)
-once the full consumer inventory (step 1 above) is done — this plan
-deliberately stops at "here is the shape and the phasing," not a committed
-schema, because the consumer surface hasn't been fully mapped yet and
-guessing at it here would be exactly the kind of unauthorised/undersubstantiated
-claim this program's own discipline (K-16/K-33, RED→GREEN receipts) has
-consistently rejected elsewhere.
+picked up next. W6 needs its own design doc once the full consumer inventory
+(step 1 above) is done — this plan deliberately stops at "here is the shape
+and the phasing," not a committed schema, because the consumer surface
+hadn't been fully mapped yet and guessing at it here would be exactly the
+kind of unauthorised/undersubstantiated claim this program's own discipline
+(K-16/K-33, RED→GREEN receipts) has consistently rejected elsewhere.
+
+**Design doc written: `EOP-DD-KYCUBO-005_W6-Case-Workstream-Fold-Design_v0.1.md`.**
+It corrects this plan's writer inventory (the `crud`-behavior verbs in
+`kyc-case.yaml`/`entity-workstream.yaml` are real direct writers too, missed
+here because they have no hand-written SQL to grep for — 14 write verbs
+total, not the 3 modules named above) and overturns this plan's step-3
+recommendation: `cases`/`entity_workstreams` are FK-referenced by ~25 other
+tables, so a compatibility view over new projection tables is not viable —
+the drainer must UPSERT the existing tables in place instead. See that doc
+for the full fold shape, event mapping, and revised phased cutover. Still
+plan-only; no code written.
 
 ---
 
@@ -280,4 +290,4 @@ consistently rejected elsewhere.
 | Item | Size | Status |
 |------|------|--------|
 | W5 screening hook | Small — 1 plugin op pair, verb already existed | **DONE**, commit `b028e5b3` |
-| W6 case/workstream cutover | Large — new verb/lexicon design + a 3-domain writer migration (kyc-case, red-flag, outstanding-requests) + ~20-module read consumer surface | Plan only, inventory done. Next: a dedicated design doc (step 2, "define the fold") before any code |
+| W6 case/workstream cutover | Large — 14-verb/3-domain writer migration (kyc-case, entity-workstream, request, +red-flag cascade) into FK-anchored tables (~25 dependents) + ~20-module read consumer surface | Plan + design doc done (`EOP-DD-KYCUBO-005`). Next: implement per the revised phased cutover (dual-write burn-in before any direct writer is retired) |
