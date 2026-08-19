@@ -264,56 +264,12 @@ domains:
           consequence:
             baseline: benign
 
-      issue-shares:
-        flavour: attribute_mutating
-        description: Issue additional shares (increases issued_shares)
-        effect_class: read_modify_write
-        metadata:
-          tier: intent
-          source_of_truth: register
-          scope: cbu
-          noun: capital
-          tags: [kyc]
-          phase_tags: [onboarding]
-          side_effects: state_write
-        invocation_phrases:
-        - "issue new shares"
-        - "increase issued share capital"
-        - "add more shares to class"
-        - "record new share issuance"
-        - "expand authorized capital"
-        - "dilute existing shareholders"
-        - "allot additional shares"
-        - "register share issuance event"
-        behavior: plugin
-        plugin:
-          handler: CapitalIssueSharesOp
-        args:
-        - name: share-class-id
-          type: uuid
-          required: true
-          lookup:
-            table: share_classes
-            entity_type: share_class
-            schema: ob-poc
-            search_key: name
-            primary_key: id
-        - name: additional-shares
-          type: integer
-          required: true
-        - name: issue-date
-          type: date
-          required: true
-        - name: reason
-          type: string
-          required: false
-        returns:
-          type: affected
-        three_axis:
-          state_effect: preserving
-          external_effects: []
-          consequence:
-            baseline: reviewable
+      # issue-shares deleted 2026-08-19 (EOP-PLAN capital/share-class
+      # consolidation): its CapitalIssueSharesOp referenced
+      # share_classes.issued_shares/authorized_shares, neither of which
+      # exists live -- would have errored at runtime, and it bypassed the
+      # issuance_events ledger entirely unlike issue.initial/issue.new
+      # (config/verbs/capital.yaml), which are the real issuance path.
 
       cancel-shares:
         flavour: attribute_mutating

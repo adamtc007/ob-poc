@@ -12,104 +12,17 @@ domains:
       # --------------------------------------------------------------------------
       # Share Class Management
       # --------------------------------------------------------------------------
+      #
+      # capital.share-class.create and capital.share-class.get-supply were
+      # deleted 2026-08-19 (EOP-PLAN capital/share-class consolidation):
+      # both referenced schema that never existed live
+      # (share_classes.authorized_shares / .issued_shares,
+      # fn_share_class_supply_at()) and would have errored at runtime; ops
+      # were unreachable anyway (no Domain Pack ever owned `capital.`). The
+      # create step is now `share-class.create`
+      # (config/verbs/registry/share-class.yaml, CRUD), extended with
+      # issuer-entity-id/instrument-kind/votes-per-unit/economic-per-unit.
 
-      share-class.create:
-        flavour: attribute_mutating
-        description: Create a new share class for an issuer
-        effect_class: read_modify_write
-        invocation_phrases:
-          - "create share class"
-          - "add share class"
-          - "new share class"
-          - "create equity class"
-          - "set up share class"
-          - "register share class"
-          - "set up a new class of shares"
-          - "add an institutional share class"
-          - "create a retail share class"
-          - "new class of units"
-        metadata:
-          tier: intent
-          source_of_truth: register
-          scope: cbu
-          noun: capital
-          phase_tags: [onboarding]
-          side_effects: state_write
-        behavior: plugin
-        plugin:
-          handler: CapitalShareClassCreateOp
-        args:
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-            description: The issuing entity
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-          - name: name
-            type: string
-            required: true
-            description: Share class name (e.g., "Series A Preferred")
-          - name: instrument-kind
-            type: string
-            required: true
-            description: Type of instrument
-            validation:
-              enum:
-                - ORDINARY_EQUITY
-                - PREFERENCE_EQUITY
-                - DEFERRED_EQUITY
-                - FUND_UNIT
-                - FUND_SHARE
-                - LP_INTEREST
-                - GP_INTEREST
-                - DEBT
-                - CONVERTIBLE
-                - WARRANT
-                - OTHER
-          - name: votes-per-unit
-            type: decimal
-            required: false
-            default: "1.0"
-            description: "0 = non-voting, 1 = standard, >1 = super-voting"
-          - name: economic-per-unit
-            type: decimal
-            required: false
-            default: "1.0"
-          - name: currency
-            type: string
-            required: false
-            default: "EUR"
-          - name: authorized-units
-            type: decimal
-            required: false
-            description: Maximum units that can be issued
-          - name: cbu-id
-            type: uuid
-            required: false
-            description: Optional CBU association
-            lookup:
-              table: cbus
-              schema: ob-poc
-              entity_type: cbu
-              search_key: name
-              primary_key: cbu_id
-        returns:
-          type: uuid
-          name: share_class_id
-          capture: true
-        produces:
-          type: share_class
-
-        three_axis:
-          state_effect: preserving
-          external_effects: &id001
-            - emitting
-          consequence:
-            baseline: requires_confirmation
       share-class.add-identifier:
         flavour: instance_adding
         description: Add an identifier (ISIN, SEDOL, etc.) to a share class
@@ -224,53 +137,10 @@ domains:
             - observational
           consequence:
             baseline: benign
-      share-class.get-supply:
-        flavour: attribute_mutating
-        description: Get current supply state for a share class
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "get share supply"
-          - "show share supply"
-          - "how many shares issued"
-          - "share class supply"
-          - "check share supply"
-        metadata:
-          tier: reference
-          source_of_truth: register
-          scope: cbu
-          noun: capital
-          phase_tags: [onboarding]
-          side_effects: facts_only
-        behavior: plugin
-        plugin:
-          handler: CapitalShareClassGetSupplyOp
-        args:
-          - name: share-class-id
-            type: uuid
-            required: true
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: ob-poc
-              search_key: name
-              primary_key: id
-          - name: as-of
-            type: date
-            required: false
-            description: Date for as-of query (defaults to today)
-        returns:
-          type: record
-
       # --------------------------------------------------------------------------
       # Issuance Events
       # --------------------------------------------------------------------------
 
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
       issue.initial:
         flavour: attribute_mutating
         description: Initial issuance of shares (incorporation/fund launch)
@@ -323,7 +193,8 @@ domains:
 
         three_axis:
           state_effect: preserving
-          external_effects: *id001
+          external_effects: &id001
+            - emitting
           consequence:
             baseline: requires_confirmation
       issue.new:

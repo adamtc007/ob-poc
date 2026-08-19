@@ -748,10 +748,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(capital::Transfer));
     registry.register(Arc::new(capital::Reconcile));
     registry.register(Arc::new(capital::GetOwnershipChain));
-    registry.register(Arc::new(capital::IssueShares));
     registry.register(Arc::new(capital::CancelShares));
-    registry.register(Arc::new(capital::ShareClassCreate));
-    registry.register(Arc::new(capital::ShareClassGetSupply));
     registry.register(Arc::new(capital::IssueInitial));
     registry.register(Arc::new(capital::IssueNew));
     registry.register(Arc::new(capital::Split));

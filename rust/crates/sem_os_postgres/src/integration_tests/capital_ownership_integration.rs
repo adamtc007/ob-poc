@@ -697,4 +697,155 @@ mod capital_tests {
         db.cleanup().await?;
         Ok(())
     }
+
+    // =========================================================================
+    // CREATE -> ISSUE.INITIAL -> ISSUE.NEW (EOP-PLAN capital/share-class
+    // consolidation, 2026-08-19)
+    //
+    // Exercises the fixed path end-to-end through the real SemOsVerbOp
+    // dispatch layer (not raw SQL, unlike the tests above): the share class
+    // is created with the 4 fields `share-class.create` gained
+    // (issuer_entity_id/instrument_kind/votes_per_unit/economic_per_unit —
+    // same columns `capital.share-class.create` used to write before it was
+    // deleted for referencing the nonexistent `authorized_shares` column),
+    // then `IssueInitial`/`IssueNew` run for real, proving IssueInitial no
+    // longer errors on its removed dead-column UPDATE and that both events
+    // fold correctly into share_class_supply.
+    // =========================================================================
+
+    struct RollbackScope {
+        id: ob_poc_types::TransactionScopeId,
+        tx: sqlx::Transaction<'static, sqlx::Postgres>,
+        pool: PgPool,
+    }
+
+    impl dsl_runtime::TransactionScope for RollbackScope {
+        fn scope_id(&self) -> ob_poc_types::TransactionScopeId {
+            self.id
+        }
+        fn transaction(&mut self) -> &mut sqlx::Transaction<'static, sqlx::Postgres> {
+            &mut self.tx
+        }
+        fn pool(&self) -> &PgPool {
+            &self.pool
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_issue_initial_issue_new_via_ops() -> Result<()> {
+        use crate::ops::capital::{IssueInitial, IssueNew};
+        use crate::ops::SemOsVerbOp;
+        use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
+        use sem_os_core::principal::Principal;
+
+        let db = TestDb::new().await?;
+        let issuer_name = db.name("consolidation_issuer");
+        let class_name = db.name("consolidation_class");
+
+        let cbu_id = db.get_or_create_cbu().await?;
+        let issuer_id = db.create_company(&issuer_name).await?;
+
+        // Create the share class the way the extended `share-class.create`
+        // CRUD verb now maps its args (issuer-entity-id/instrument-kind/
+        // votes-per-unit/economic-per-unit) -- proves those columns accept
+        // real values via the only reachable creation path.
+        let share_class_id: Uuid = sqlx::query_scalar!(
+            r#"
+            INSERT INTO "ob-poc".share_classes (
+                cbu_id, issuer_entity_id, name, instrument_kind,
+                votes_per_unit, economic_per_unit, status
+            ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 1.0, 1.0, 'active')
+            RETURNING id
+            "#,
+            cbu_id,
+            issuer_id,
+            class_name
+        )
+        .fetch_one(&db.pool)
+        .await?;
+
+        let tx = db.pool.begin().await?;
+        let mut scope = RollbackScope {
+            id: ob_poc_types::TransactionScopeId::new(),
+            tx,
+            pool: db.pool.clone(),
+        };
+        let mut ctx = VerbExecutionContext::new(Principal::system());
+
+        // capital.issue.initial -- first issuance for this class. Prior to
+        // this pass this errored: its final statement was
+        // `UPDATE share_classes SET issued_shares = ...`, a column that
+        // doesn't exist. That statement is now deleted; this call proves
+        // the fix by actually succeeding.
+        let outcome = IssueInitial
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "units": "1000",
+                    "price-per-unit": "10.00",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        assert!(matches!(outcome, VerbExecutionOutcome::Uuid(_)));
+
+        // A second capital.issue.initial on the same class must be refused
+        // (prior_exists guard) -- this is the real distinct job issue.initial
+        // does that issue.new doesn't, the reason it survived as its own verb.
+        let second_initial = IssueInitial
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "units": "1",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await;
+        assert!(second_initial.is_err());
+
+        // capital.issue.new -- subsequent issuance, running supply rollup.
+        let outcome = IssueNew
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "units": "500",
+                    "price-per-unit": "12.00",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        assert!(matches!(outcome, VerbExecutionOutcome::Uuid(_)));
+
+        // Read-your-own-writes inside the still-open (uncommitted) scope:
+        // 2 issuance_events rows (INITIAL_ISSUE + NEW_ISSUE, the failed
+        // second-initial attempt never wrote anything), and
+        // share_class_supply's latest row reflects both issuances summed.
+        let event_count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".issuance_events WHERE share_class_id = $1"#,
+        )
+        .bind(share_class_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(event_count, 2);
+
+        let issued: rust_decimal::Decimal = sqlx::query_scalar(
+            r#"SELECT issued_units FROM "ob-poc".share_class_supply
+               WHERE share_class_id = $1 ORDER BY as_of_date DESC, updated_at DESC LIMIT 1"#,
+        )
+        .bind(share_class_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(issued, rust_decimal::Decimal::from(1500));
+
+        // Scope drops here without commit -- the two issuance_events/
+        // share_class_supply writes above roll back. Only the share_classes/
+        // entities/cbu setup rows (committed via db.pool directly) need
+        // explicit cleanup.
+        drop(scope);
+        db.cleanup().await?;
+        Ok(())
+    }
 }

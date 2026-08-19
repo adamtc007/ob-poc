@@ -1,4 +1,4 @@
-//! Capital structure verbs (14 plugin verbs) — YAML-first re-implementation of
+//! Capital structure verbs (11 plugin verbs) — YAML-first re-implementation of
 //! `capital.*` from `rust/config/verbs/capital.yaml`.
 //!
 //! Ops:
@@ -8,11 +8,7 @@
 //!   voting + economic percentages per shareholder
 //! - `capital.get-ownership-chain` — recursive CTE over
 //!   `entity_relationships` with multiplicative cumulative percentages
-//! - `capital.issue-shares` — raise issued count against authorized cap
 //! - `capital.cancel-shares` — reduce issued count within unallocated headroom
-//! - `capital.share-class.create` — multi-table share class setup
-//!   (share_classes + share_class_identifiers + share_class_supply)
-//! - `capital.share-class.get-supply` — SQL-function-backed as-of supply
 //! - `capital.issue.initial` — first issuance event + supply row for a share
 //!   class (rejects if a prior EFFECTIVE event exists)
 //! - `capital.issue.new` — subsequent issuance with running supply rollup
@@ -22,6 +18,18 @@
 //! - `capital.cancel` — permanent issued-supply reduction
 //! - `capital.cap-table` — aggregated per-share-class + per-holder positions
 //! - `capital.holders` — control-position listing with optional pct floor
+//!
+//! `capital.share-class.create` (`ShareClassCreate`), `capital.share-class.get-supply`
+//! (`ShareClassGetSupply`), and `capital.issue-shares` (`IssueShares`) were
+//! deleted 2026-08-19 (EOP-PLAN capital/share-class consolidation): all three
+//! referenced schema that never existed live (`share_classes.authorized_shares`,
+//! `share_classes.issued_shares`, `fn_share_class_supply_at()`) and would have
+//! errored at runtime; none were reachable anyway (no Domain Pack ever owned
+//! `capital.`). The create step is now `share-class.create`
+//! (`config/verbs/registry/share-class.yaml`, CRUD, extended with
+//! issuer-entity-id/instrument-kind/votes-per-unit/economic-per-unit); the
+//! issue step is `capital.issue.initial`/`capital.issue.new` below, the only
+//! two members of the original family confirmed to write real columns.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -34,7 +42,7 @@ use uuid::Uuid;
 use dsl_runtime::TransactionScope;
 use dsl_runtime::{
     self, json_extract_int, json_extract_string, json_extract_string_opt, json_extract_uuid,
-    json_extract_uuid_opt, json_get_required_uuid,
+    json_get_required_uuid,
 };
 use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
 
@@ -43,20 +51,6 @@ use super::SemOsVerbOp;
 // ============================================================================
 // Row Structs (replacing anonymous tuples for FromRow)
 // ============================================================================
-
-/// Row struct for share class supply query results
-#[derive(Debug, sqlx::FromRow)]
-#[allow(dead_code)] // Fields required by FromRow derive
-struct ShareClassSupplyRow {
-    share_class_id: Uuid,
-    authorized_units: Option<rust_decimal::Decimal>,
-    issued_units: rust_decimal::Decimal,
-    outstanding_units: rust_decimal::Decimal,
-    treasury_units: rust_decimal::Decimal,
-    total_votes: rust_decimal::Decimal,
-    total_economic: rust_decimal::Decimal,
-    as_of_date: chrono::NaiveDate,
-}
 
 #[derive(Debug)]
 struct ShareholderInfo {
@@ -425,72 +419,6 @@ impl SemOsVerbOp for GetOwnershipChain {
 }
 
 // ============================================================================
-// capital.issue-shares
-// ============================================================================
-
-pub struct IssueShares;
-
-#[async_trait]
-impl SemOsVerbOp for IssueShares {
-    fn fqn(&self) -> &str {
-        "capital.issue-shares"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let share_class_id = json_get_required_uuid(args, "share-class-id")?;
-        let additional_shares: i64 = json_extract_string(args, "additional-shares")?
-            .parse()
-            .map_err(|_| anyhow!("additional-shares must be an integer"))?;
-
-        let share_class: Option<(i64, Option<i64>)> = sqlx::query_as(
-            r#"SELECT issued_shares, authorized_shares FROM "ob-poc".share_classes WHERE id = $1"#,
-        )
-        .bind(share_class_id)
-        .fetch_optional(scope.executor())
-        .await?;
-
-        let (current_issued, authorized) =
-            share_class.ok_or_else(|| anyhow!("Share class not found"))?;
-
-        let new_issued = current_issued + additional_shares;
-
-        if let Some(auth) = authorized {
-            if new_issued > auth {
-                return Err(anyhow!(
-                    "Cannot issue {} shares: would exceed authorized {} (current: {})",
-                    additional_shares,
-                    auth,
-                    current_issued
-                ));
-            }
-        }
-
-        let result = sqlx::query(
-            r#"UPDATE "ob-poc".share_classes SET issued_shares = $1, updated_at = now() WHERE id = $2"#,
-        )
-        .bind(new_issued)
-        .bind(share_class_id)
-        .execute(scope.executor())
-        .await?;
-
-        dsl_runtime::emit_pending_state_advance(
-            ctx,
-            share_class_id,
-            "capital:issued",
-            "capital/share-class",
-            "capital.issue-shares",
-        );
-
-        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
-    }
-}
-
-// ============================================================================
 // capital.cancel-shares
 // ============================================================================
 
@@ -564,160 +492,6 @@ impl SemOsVerbOp for CancelShares {
         );
 
         Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
-    }
-}
-
-// ============================================================================
-// capital.share-class.create
-// ============================================================================
-
-pub struct ShareClassCreate;
-
-#[async_trait]
-impl SemOsVerbOp for ShareClassCreate {
-    fn fqn(&self) -> &str {
-        "capital.share-class.create"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let name = json_extract_string(args, "name")?;
-        let instrument_kind = json_extract_string(args, "instrument-kind")?;
-
-        let votes_per_unit: rust_decimal::Decimal = json_extract_string_opt(args, "votes-per-unit")
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(rust_decimal::Decimal::ONE);
-
-        let economic_per_unit: rust_decimal::Decimal =
-            json_extract_string_opt(args, "economic-per-unit")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(rust_decimal::Decimal::ONE);
-
-        let currency =
-            json_extract_string_opt(args, "currency").unwrap_or_else(|| "EUR".to_string());
-
-        let authorized_units: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "authorized-units").and_then(|s| s.parse().ok());
-
-        let cbu_id = json_extract_uuid_opt(args, ctx, "cbu-id");
-
-        let issuer_exists: bool = sqlx::query_scalar(
-            r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL)"#,
-        )
-        .bind(issuer_entity_id)
-        .fetch_one(scope.executor())
-        .await?;
-
-        if !issuer_exists {
-            return Err(anyhow!("Issuer entity {} not found", issuer_entity_id));
-        }
-
-        let share_class_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".share_classes (
-                issuer_entity_id, cbu_id, name, instrument_kind,
-                votes_per_unit, economic_per_unit, currency,
-                authorized_shares, class_category
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'CORPORATE')
-            RETURNING id
-            "#,
-        )
-        .bind(issuer_entity_id)
-        .bind(cbu_id)
-        .bind(&name)
-        .bind(&instrument_kind)
-        .bind(votes_per_unit)
-        .bind(economic_per_unit)
-        .bind(&currency)
-        .bind(authorized_units)
-        .fetch_one(scope.executor())
-        .await?;
-
-        let internal_ref = format!("SC-{}", &share_class_id.to_string()[..8]);
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".share_class_identifiers (
-                share_class_id, scheme_code, identifier_value, is_primary
-            ) VALUES ($1, 'INTERNAL', $2, true)
-            "#,
-        )
-        .bind(share_class_id)
-        .bind(&internal_ref)
-        .execute(scope.executor())
-        .await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".share_class_supply (
-                share_class_id, authorized_units, issued_units, outstanding_units, as_of_date
-            ) VALUES ($1, $2, 0, 0, CURRENT_DATE)
-            "#,
-        )
-        .bind(share_class_id)
-        .bind(authorized_units)
-        .execute(scope.executor())
-        .await?;
-
-        dsl_runtime::emit_pending_state_advance(
-            ctx,
-            issuer_entity_id,
-            "capital:share_class_created",
-            "capital/share-class",
-            "capital.share-class.create",
-        );
-
-        Ok(VerbExecutionOutcome::Uuid(share_class_id))
-    }
-}
-
-// ============================================================================
-// capital.share-class.get-supply
-// ============================================================================
-
-pub struct ShareClassGetSupply;
-
-#[async_trait]
-impl SemOsVerbOp for ShareClassGetSupply {
-    fn fqn(&self) -> &str {
-        "capital.share-class.get-supply"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
-        let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
-            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-
-        let supply: Option<ShareClassSupplyRow> =
-            sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_share_class_supply_at($1, $2)"#)
-                .bind(share_class_id)
-                .bind(as_of)
-                .fetch_optional(scope.executor())
-                .await?;
-
-        match supply {
-            Some(row) => Ok(VerbExecutionOutcome::Record(json!({
-                "share_class_id": share_class_id,
-                "authorized_units": row.authorized_units.map(|d| d.to_string()),
-                "issued_units": row.issued_units.to_string(),
-                "outstanding_units": row.outstanding_units.to_string(),
-                "treasury_units": row.treasury_units.to_string(),
-                "total_votes": row.total_votes.to_string(),
-                "total_economic": row.total_economic.to_string(),
-                "as_of_date": row.as_of_date.to_string()
-            }))),
-            None => Err(anyhow!("Share class {} not found", share_class_id)),
-        }
     }
 }
 
@@ -808,12 +582,6 @@ impl SemOsVerbOp for IssueInitial {
         .bind(event_id)
         .execute(scope.executor())
         .await?;
-
-        sqlx::query(r#"UPDATE "ob-poc".share_classes SET issued_shares = $2 WHERE id = $1"#)
-            .bind(share_class_id)
-            .bind(units)
-            .execute(scope.executor())
-            .await?;
 
         dsl_runtime::emit_pending_state_advance(
             ctx,

@@ -53,6 +53,53 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
+          # EOP-PLAN capital/share-class consolidation (2026-08-19): these 4
+          # args were previously only reachable via the orphaned (no domain
+          # pack, no journey pack) and partly broken capital.share-class.create
+          # verb. issuer_entity_id is what issuance_events, holding_control_links
+          # and issuer_control_config all key off; votes_per_unit/economic_per_unit
+          # are the voting-vs-economic divergence the control determination
+          # strategies (FundControlStrategy/ControlProngStrategy) need. Without
+          # them, every share class created through this (the only reachable)
+          # path had no way to record either.
+          - name: issuer-entity-id
+            type: uuid
+            required: false
+            maps_to: issuer_entity_id
+            description: The legal issuer of this share class (control/economic-edge anchor)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: instrument-kind
+            type: string
+            required: false
+            maps_to: instrument_kind
+            valid_values:
+              - ORDINARY_EQUITY
+              - PREFERENCE_EQUITY
+              - DEFERRED_EQUITY
+              - FUND_UNIT
+              - FUND_SHARE
+              - LP_INTEREST
+              - GP_INTEREST
+              - DEBT
+              - CONVERTIBLE
+              - WARRANT
+              - OTHER
+          - name: votes-per-unit
+            type: decimal
+            required: false
+            maps_to: votes_per_unit
+            default: "1.0"
+            description: "0 = non-voting, 1 = standard, >1 = super-voting"
+          - name: economic-per-unit
+            type: decimal
+            required: false
+            maps_to: economic_per_unit
+            default: "1.0"
           - name: name
             type: string
             required: true
