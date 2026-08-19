@@ -271,56 +271,12 @@ domains:
       # issuance_events ledger entirely unlike issue.initial/issue.new
       # (config/verbs/capital.yaml), which are the real issuance path.
 
-      cancel-shares:
-        flavour: attribute_mutating
-        description: Cancel/buyback shares (decreases issued_shares)
-        effect_class: read_modify_write
-        metadata:
-          tier: intent
-          source_of_truth: register
-          scope: cbu
-          noun: capital
-          tags: [kyc]
-          phase_tags: [onboarding]
-          side_effects: state_write
-        invocation_phrases:
-        - "cancel shares from register"
-        - "record share buyback"
-        - "reduce issued share capital"
-        - "retire shares from class"
-        - "process share cancellation"
-        - "remove shares from issuance"
-        - "record capital reduction"
-        - "buy back and cancel shares"
-        behavior: plugin
-        plugin:
-          handler: CapitalCancelSharesOp
-        args:
-        - name: share-class-id
-          type: uuid
-          required: true
-          lookup:
-            table: share_classes
-            entity_type: share_class
-            schema: ob-poc
-            search_key: name
-            primary_key: id
-        - name: shares-to-cancel
-          type: integer
-          required: true
-        - name: cancel-date
-          type: date
-          required: true
-        - name: reason
-          type: string
-          required: false
-        returns:
-          type: affected
-        three_axis:
-          state_effect: preserving
-          external_effects: [emitting]
-          consequence:
-            baseline: requires_confirmation
+      # cancel-shares deleted 2026-08-19 (EOP-PLAN share-register board
+      # design pass): its CapitalCancelSharesOp referenced
+      # share_classes.issued_shares, which doesn't exist live -- would
+      # have errored at runtime -- and duplicated capital.cancel
+      # (config/verbs/capital.yaml), which already does the same job
+      # correctly via the real issuance_events/share_class_supply path.
 
       list-by-issuer:
         flavour: attribute_mutating

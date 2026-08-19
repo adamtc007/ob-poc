@@ -1,4 +1,4 @@
-//! Capital structure verbs (11 plugin verbs) — YAML-first re-implementation of
+//! Capital structure verbs (8 plugin verbs) — YAML-first re-implementation of
 //! `capital.*` from `rust/config/verbs/capital.yaml`.
 //!
 //! Ops:
@@ -8,7 +8,6 @@
 //!   voting + economic percentages per shareholder
 //! - `capital.get-ownership-chain` — recursive CTE over
 //!   `entity_relationships` with multiplicative cumulative percentages
-//! - `capital.cancel-shares` — reduce issued count within unallocated headroom
 //! - `capital.issue.initial` — first issuance event + supply row for a share
 //!   class (rejects if a prior EFFECTIVE event exists)
 //! - `capital.issue.new` — subsequent issuance with running supply rollup
@@ -16,8 +15,6 @@
 //!   key, adjusting supply, holdings, and dilution instruments atomically
 //! - `capital.buyback` — move units from outstanding to treasury
 //! - `capital.cancel` — permanent issued-supply reduction
-//! - `capital.cap-table` — aggregated per-share-class + per-holder positions
-//! - `capital.holders` — control-position listing with optional pct floor
 //!
 //! `capital.share-class.create` (`ShareClassCreate`), `capital.share-class.get-supply`
 //! (`ShareClassGetSupply`), and `capital.issue-shares` (`IssueShares`) were
@@ -30,12 +27,25 @@
 //! issuer-entity-id/instrument-kind/votes-per-unit/economic-per-unit); the
 //! issue step is `capital.issue.initial`/`capital.issue.new` below, the only
 //! two members of the original family confirmed to write real columns.
+//!
+//! `capital.cancel-shares` (`CancelShares`), `capital.cap-table` (`CapTable`),
+//! and `capital.holders` (`Holders`) were deleted 2026-08-19 (EOP-PLAN
+//! share-register board design pass): `cancel-shares` was broken
+//! (nonexistent `share_classes.issued_shares`) and a straight duplicate of
+//! `capital.cancel`, which already does the same job correctly.
+//! `cap-table`/`holders` were broken (`fn_holder_control_position()` never
+//! existed) **and**, fixing them properly would mean re-deriving
+//! voting/economic control from company-share data in parallel to the
+//! `ob-poc-kyc-substrate` determination engine (`FundControlStrategy`/
+//! `ControlProngStrategy`/`EdgeKind`) — the ratified control_interest
+//! register. A share register's job is bookkeeping (`reconcile` — does our
+//! own ledger add up), not a second way to answer "who controls this
+//! entity."
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use serde_json::{json, Value};
-use sqlx::Row;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -418,82 +428,6 @@ impl SemOsVerbOp for GetOwnershipChain {
     }
 }
 
-// ============================================================================
-// capital.cancel-shares
-// ============================================================================
-
-pub struct CancelShares;
-
-#[async_trait]
-impl SemOsVerbOp for CancelShares {
-    fn fqn(&self) -> &str {
-        "capital.cancel-shares"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let share_class_id = json_get_required_uuid(args, "share-class-id")?;
-        let shares_to_cancel: i64 = json_extract_string(args, "shares-to-cancel")?
-            .parse()
-            .map_err(|_| anyhow!("shares-to-cancel must be an integer"))?;
-
-        let share_class: Option<(i64,)> =
-            sqlx::query_as(r#"SELECT issued_shares FROM "ob-poc".share_classes WHERE id = $1"#)
-                .bind(share_class_id)
-                .fetch_optional(scope.executor())
-                .await?;
-
-        let (current_issued,) = share_class.ok_or_else(|| anyhow!("Share class not found"))?;
-
-        let allocated: (rust_decimal::Decimal,) = sqlx::query_as(
-            r#"SELECT COALESCE(SUM(units), 0) FROM "ob-poc".holdings WHERE share_class_id = $1 AND status = 'active'"#,
-        )
-        .bind(share_class_id)
-        .fetch_one(scope.executor())
-        .await?;
-
-        let allocated_i64: i64 = allocated
-            .0
-            .to_string()
-            .parse()
-            .unwrap_or(current_issued + 1);
-        let unallocated = current_issued - allocated_i64;
-
-        if shares_to_cancel > unallocated {
-            return Err(anyhow!(
-                "Cannot cancel {} shares: only {} unallocated (issued: {}, allocated: {})",
-                shares_to_cancel,
-                unallocated,
-                current_issued,
-                allocated_i64
-            ));
-        }
-
-        let new_issued = current_issued - shares_to_cancel;
-
-        let result = sqlx::query(
-            r#"UPDATE "ob-poc".share_classes SET issued_shares = $1, updated_at = now() WHERE id = $2"#,
-        )
-        .bind(new_issued)
-        .bind(share_class_id)
-        .execute(scope.executor())
-        .await?;
-
-        dsl_runtime::emit_pending_state_advance(
-            ctx,
-            share_class_id,
-            "capital:cancelled",
-            "capital/share-class",
-            "capital.cancel-shares",
-        );
-
-        Ok(VerbExecutionOutcome::Affected(result.rows_affected()))
-    }
-}
 
 // ============================================================================
 // capital.issue.initial
@@ -1036,178 +970,3 @@ impl SemOsVerbOp for Cancel {
     }
 }
 
-// ============================================================================
-// capital.cap-table
-// ============================================================================
-
-pub struct CapTable;
-
-#[async_trait]
-impl SemOsVerbOp for CapTable {
-    fn fqn(&self) -> &str {
-        "capital.cap-table"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
-            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-        let basis =
-            json_extract_string_opt(args, "basis").unwrap_or_else(|| "OUTSTANDING".to_string());
-
-        let issuer_name: String = sqlx::query_scalar(
-            r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
-        )
-        .bind(issuer_entity_id)
-        .fetch_optional(scope.executor())
-        .await?
-        .ok_or_else(|| anyhow!("Issuer entity {} not found", issuer_entity_id))?;
-
-        let share_classes: Vec<(Uuid, String, String, rust_decimal::Decimal, rust_decimal::Decimal)> = sqlx::query_as(
-            r#"
-            SELECT sc.id, sc.name, COALESCE(sc.instrument_kind, 'FUND_UNIT'),
-                   COALESCE(scs.issued_units, sc.issued_shares, 0),
-                   COALESCE(sc.votes_per_unit, sc.voting_rights_per_share, 1)
-            FROM "ob-poc".share_classes sc
-            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
-                AND scs.as_of_date = (SELECT MAX(as_of_date) FROM "ob-poc".share_class_supply WHERE share_class_id = sc.id AND as_of_date <= $2)
-            WHERE sc.issuer_entity_id = $1
-            "#
-        )
-        .bind(issuer_entity_id)
-        .bind(as_of)
-        .fetch_all(scope.executor())
-        .await?;
-
-        let holder_rows =
-            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, $3)"#)
-                .bind(issuer_entity_id)
-                .bind(as_of)
-                .bind(&basis)
-                .fetch_all(scope.executor())
-                .await?;
-
-        let total_votes: rust_decimal::Decimal = share_classes
-            .iter()
-            .map(|(_, _, _, issued, votes_per)| issued * votes_per)
-            .sum();
-        let total_economic: rust_decimal::Decimal = share_classes
-            .iter()
-            .map(|(_, _, _, issued, _)| *issued)
-            .sum();
-
-        let share_class_data: Vec<Value> = share_classes.iter()
-            .map(|(id, name, kind, issued, votes_per)| {
-                let class_votes = issued * votes_per;
-                json!({
-                    "share_class_id": id,
-                    "name": name,
-                    "instrument_kind": kind,
-                    "issued_units": issued.to_string(),
-                    "votes_per_unit": votes_per.to_string(),
-                    "total_votes": class_votes.to_string(),
-                    "voting_weight_pct": if total_votes > rust_decimal::Decimal::ZERO {
-                        (class_votes / total_votes * rust_decimal::Decimal::from(100)).round_dp(2).to_string()
-                    } else { "0".to_string() }
-                })
-            })
-            .collect();
-
-        let holder_data: Vec<Value> = holder_rows
-            .iter()
-            .map(|row| {
-                json!({
-                    "holder_entity_id": row.get::<Uuid, _>("holder_entity_id"),
-                    "holder_name": row.get::<String, _>("holder_name"),
-                    "holder_type": row.get::<String, _>("holder_type"),
-                    "units": row.get::<rust_decimal::Decimal, _>("holder_units").to_string(),
-                    "votes": row.get::<rust_decimal::Decimal, _>("holder_votes").to_string(),
-                    "economic": row.get::<rust_decimal::Decimal, _>("holder_economic").to_string(),
-                    "voting_pct": row.get::<rust_decimal::Decimal, _>("voting_pct").to_string(),
-                    "economic_pct": row.get::<rust_decimal::Decimal, _>("economic_pct").to_string(),
-                    "has_control": row.get::<bool, _>("has_control"),
-                    "has_significant_influence": row.get::<bool, _>("has_significant_influence"),
-                    "has_board_rights": row.get::<bool, _>("has_board_rights"),
-                    "board_seats": row.get::<i32, _>("board_seats")
-                })
-            })
-            .collect();
-
-        Ok(VerbExecutionOutcome::Record(json!({
-            "issuer_entity_id": issuer_entity_id,
-            "issuer_name": issuer_name,
-            "as_of_date": as_of.to_string(),
-            "basis": basis,
-            "share_classes": share_class_data,
-            "holders": holder_data,
-            "total_votes": total_votes.to_string(),
-            "total_economic": total_economic.to_string()
-        })))
-    }
-}
-
-// ============================================================================
-// capital.holders
-// ============================================================================
-
-pub struct Holders;
-
-#[async_trait]
-impl SemOsVerbOp for Holders {
-    fn fqn(&self) -> &str {
-        "capital.holders"
-    }
-
-    async fn execute(
-        &self,
-        args: &Value,
-        ctx: &mut VerbExecutionContext,
-        scope: &mut dyn TransactionScope,
-    ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of: NaiveDate = json_extract_string_opt(args, "as-of")
-            .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
-            .unwrap_or_else(|| chrono::Utc::now().date_naive());
-        let min_pct: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "min-pct").and_then(|s| s.parse().ok());
-
-        let holder_rows =
-            sqlx::query(r#"SELECT * FROM "ob-poc".fn_holder_control_position($1, $2, 'VOTES')"#)
-                .bind(issuer_entity_id)
-                .bind(as_of)
-                .fetch_all(scope.executor())
-                .await?;
-
-        let filtered: Vec<Value> = holder_rows
-            .iter()
-            .filter(|row| {
-                let voting_pct: rust_decimal::Decimal = row.get("voting_pct");
-                min_pct.is_none_or(|min| voting_pct >= min)
-            })
-            .map(|row| {
-                json!({
-                    "holder_entity_id": row.get::<Uuid, _>("holder_entity_id"),
-                    "holder_name": row.get::<String, _>("holder_name"),
-                    "holder_type": row.get::<String, _>("holder_type"),
-                    "units": row.get::<rust_decimal::Decimal, _>("holder_units").to_string(),
-                    "votes": row.get::<rust_decimal::Decimal, _>("holder_votes").to_string(),
-                    "economic": row.get::<rust_decimal::Decimal, _>("holder_economic").to_string(),
-                    "voting_pct": row.get::<rust_decimal::Decimal, _>("voting_pct").to_string(),
-                    "economic_pct": row.get::<rust_decimal::Decimal, _>("economic_pct").to_string(),
-                    "has_control": row.get::<bool, _>("has_control"),
-                    "has_significant_influence": row.get::<bool, _>("has_significant_influence"),
-                    "has_board_rights": row.get::<bool, _>("has_board_rights"),
-                    "board_seats": row.get::<i32, _>("board_seats")
-                })
-            })
-            .collect();
-
-        Ok(VerbExecutionOutcome::RecordSet(filtered))
-    }
-}

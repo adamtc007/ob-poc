@@ -1064,126 +1064,13 @@ domains:
         returns:
           type: record
 
-      # --------------------------------------------------------------------------
-      # Cap Table Queries
-      # --------------------------------------------------------------------------
-
-        three_axis:
-          state_effect: preserving
-          external_effects:
-            - observational
-          consequence:
-            baseline: benign
-      cap-table:
-        flavour: attribute_mutating
-        description: Get full cap table for an issuer
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "show cap table"
-          - "capitalization table"
-          - "get cap table"
-          - "display cap table"
-          - "view capitalization"
-          - "who owns what shares"
-          - "pull the cap table"
-          - "show me the shareholding breakdown"
-          - "what does the equity structure look like"
-          - "cap table for this entity"
-          - "fully diluted cap table"
-        metadata:
-          tier: intent
-          source_of_truth: register
-          scope: cbu
-          noun: capital
-          phase_tags: [onboarding]
-          side_effects: state_write
-        behavior: plugin
-        plugin:
-          handler: CapitalCapTableOp
-        args:
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-          - name: as-of
-            type: date
-            required: false
-            description: Date for as-of query
-          - name: basis
-            type: string
-            required: false
-            default: "OUTSTANDING"
-            description: Computation basis
-            validation:
-              enum:
-                - ISSUED
-                - OUTSTANDING
-                - FULLY_DILUTED
-                - EXERCISABLE
-          - name: include-dilution
-            type: boolean
-            required: false
-            default: true
-        returns:
-          type: record
-
-        three_axis:
-          state_effect: preserving
-          external_effects: &id002
-            - observational
-          consequence:
-            baseline: benign
-      holders:
-        flavour: attribute_mutating
-        description: List all holders for an issuer with ownership percentages
-        effect_class: read_snapshot
-        invocation_phrases:
-          - "list shareholders"
-          - "show holders"
-          - "who holds shares"
-          - "get shareholder list"
-          - "display shareholders"
-          - "who are the shareholders"
-          - "pull the shareholder register"
-          - "list the investors"
-          - "who holds shares in this entity"
-          - "shareholder register"
-        metadata:
-          tier: intent
-          source_of_truth: register
-          scope: cbu
-          noun: capital
-          phase_tags: [onboarding]
-          side_effects: state_write
-        behavior: plugin
-        plugin:
-          handler: CapitalHoldersOp
-        args:
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-          - name: as-of
-            type: date
-            required: false
-          - name: min-pct
-            type: decimal
-            required: false
-            description: Filter to holdings above this percentage
-        returns:
-          type: record_set
-        three_axis:
-          state_effect: preserving
-          external_effects: *id002
-          consequence:
-            baseline: benign
+      # cap-table and holders deleted 2026-08-19 (EOP-PLAN share-register
+      # board design pass): both called fn_holder_control_position(),
+      # a SQL function that never existed live -- would have errored at
+      # runtime. Fixing them properly would mean re-deriving voting/
+      # economic control from company-share data in parallel to the
+      # ob-poc-kyc-substrate determination engine (FundControlStrategy/
+      # ControlProngStrategy/EdgeKind) -- the ratified control_interest
+      # register. A share register's job is bookkeeping (capital.reconcile
+      # -- does our own ledger add up), not a second way to answer "who
+      # controls this entity."
