@@ -589,7 +589,13 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
         "DAG-derivable verb universe shrank unexpectedly: {universe}"
     );
     assert!(
-        covered >= 80,
+        // Floor consciously lowered 79 (2026-08-19, EOP-PLAN-GAMEBOARD-001):
+        // trading-profile.create-draft's lifecycle block was removed
+        // entirely (it was a broken declaration that could never have
+        // worked — see this file's own dedicated pin comment above and
+        // the verb's own YAML comment). One fewer "covered" verb is
+        // correct, not a regression.
+        covered >= 79,
         "requires_states coverage regressed below the recorded floor \
          (batch 1 applied 2026-08-06): {covered} of {universe}"
     );
@@ -945,7 +951,16 @@ fn requires_states_domain_key_resolution_gap_is_exactly_known() {
         "trade-gateway.suspend-gateway",
         "trading-profile.approve",
         "trading-profile.archive",
-        "trading-profile.create-draft",
+        // trading-profile.create-draft REMOVED from this pin (2026-08-19,
+        // EOP-PLAN-GAMEBOARD-001): its `lifecycle` block was deleted
+        // entirely — the generic requires_states mechanism could never
+        // have worked for a verb that creates a NEW row (no existing
+        // profile-id to check state against). It no longer declares
+        // requires_states at all, so it's no longer in the "always
+        // no_slot_mapping-refuses" gap set. Real precondition is now a
+        // dedicated check, enforce_trading_profile_no_active_draft
+        // (src/dsl_v2/executor.rs) — a deliberate move OUT of this pin,
+        // not a regression (per this test's own doc comment).
         "trading-profile.reject",
         "trading-profile.submit",
     ];

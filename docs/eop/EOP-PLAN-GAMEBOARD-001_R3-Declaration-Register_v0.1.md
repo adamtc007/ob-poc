@@ -2,10 +2,20 @@
 
 | | |
 |---|---|
-| **Status** | DRAFT — for Adam's ratification. Not encoded. No fixes applied. |
+| **Status** | Original analysis below is a DRAFT snapshot (2026-08-18). See "Encoding status" immediately below for what has since actually been fixed — read that first, the table below it is historical record, not current state. |
 | **Scope** | All 87 verbs declaring a non-empty `lifecycle.requires_states`. |
 | **Method** | For each verb, resolve its real target `(workspace, slot)` — from `transition_args` where declared (87→77 verbs), else from domain knowledge/cross-reference with sibling verbs in the same file (10 verbs) — then diff the declared `requires_states` list against that slot's real `state_machine.states[].id` list (+ `dual_lifecycle` states) from the DAG YAML, the single source of truth. Every non-CORRECT verdict below was spot-checked by reading the real DAG YAML directly (pasted in this session's raw tool output), not inferred. |
 | **Why this matters** | R1's fix (domain-key resolution) is **hard-gated** on this register (§1 fact 3): fixing the key mapping alone would just newly *expose* these 15 verbs' broken value lists instead of the current uniform `no_slot_mapping` refusal — trading one wrong behavior for a different wrong behavior. |
+
+## Encoding status (2026-08-19)
+
+All 10 `WRONG_VOCABULARY` rows are now resolved:
+
+- 8 were straightforward 1:1 value substitutions (`evidence.mark-verified`, `kyc-case.approve`, `entity-workstream.complete`, `governance.publish`, `governance.record-review`, `service-resource.suspend`, `service-resource.decommission`, and `kyc-case.reject`'s `PENDING_REVIEW` component).
+- `screening.run` and `red-flag.escalate` were originally flagged as needing a ruling (the former thought to target the wrong slot entirely) — both turned out to be mechanically resolvable once a real bug in the *ratchet test's own scoping* was found and fixed (it was letting `entity_kyc`'s derived-rollup slot, and other incidental slots, pollute the "real vocabulary" derivation). Corrected to their real, cleanly-scoped single-state values (`[PENDING]`, `[OPEN]`).
+- `trading-profile.create-draft` was resolved architecturally, not by picking a target slot: investigation found it creates a *new* `cbu_trading_profiles` row, so there's no existing profile-id for the generic `requires_states` mechanism to check state against in the first place — the `[REJECTED, parties_assigned]` declaration was cross-contamination (a real `trading_profile` state + a real but unrelated `book.status` value) sitting on a mechanism that could never have worked for this verb. The `lifecycle` block was removed entirely; the real rule ("no existing non-terminal profile blocks a new draft") is now a dedicated fail-closed Rust check, `enforce_trading_profile_no_active_draft` (`src/dsl_v2/executor.rs`).
+
+Still open, unresolved: the 5 `FREE_TEXT_ESCAPE` rows (`kyc-case.close`/`.escalate`/`.refer`/`.reject`, `entity-workstream.update-status`) — each needs a concrete terminal-state-set ruling per §Cross-cutting-finding-1 below, not a mechanical fix.
 
 ## Verdict counts (87 total)
 

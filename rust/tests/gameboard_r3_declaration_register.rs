@@ -67,14 +67,20 @@ fn manual_target_overrides() -> BTreeMap<&'static str, (&'static str, &'static s
         ("governance.submit-for-review", ("semos_maintenance", "changeset")),
         ("governance.record-review", ("semos_maintenance", "changeset")),
         ("service-resource.decommission", ("instrument_matrix", "service_resource")),
-        // trading-profile.create-draft deliberately NOT resolved: its own
-        // `lifecycle.entity_arg` is `cbu-id`, not a trading-profile id — the
-        // register's original domain-name-heuristic guess
-        // (instrument_matrix.trading_profile) was wrong, found while
-        // encoding R3's other corrections (2026-08-18). Its declared values
-        // (REJECTED, parties_assigned) don't match cbu.cbu's real states
-        // either, so this is left genuinely UNKNOWN pending a ruling, not
-        // guessed at twice.
+        // trading-profile.create-draft RESOLVED (2026-08-19), not by target
+        // guessing: investigation found `entity_arg: cbu-id` was checking
+        // the wrong entity's vocabulary on purpose-mismatched grounds — the
+        // verb creates a NEW cbu_trading_profiles row, so there's no
+        // existing profile-id to check state against, and its declared
+        // values (REJECTED from trading_profile, parties_assigned from an
+        // unrelated book.status) were a cross-contamination mash-up, same
+        // defect class as the other 10. The `lifecycle` block was removed
+        // entirely (matching investor.create's precedent — also a
+        // no-existing-row create verb with no lifecycle block); the real
+        // rule ("no existing non-terminal profile blocks a new draft") is
+        // now a dedicated fail-closed check,
+        // `enforce_trading_profile_no_active_draft` in
+        // `src/dsl_v2/executor.rs`. No longer appears in this scan at all.
     ]
     .into_iter()
     .collect()

@@ -396,10 +396,21 @@ domains:
             baseline: benign
 
       create-draft:
-        lifecycle:
-          entity_arg: cbu-id
-          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [REJECTED, parties_assigned]
+        # R3/investigation correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19):
+        # the WS-2.D batch 1 `requires_states: [REJECTED, parties_assigned]`
+        # mashed together two unrelated slots' vocabularies — REJECTED is a
+        # real instrument_matrix.trading_profile state, parties_assigned is
+        # a real but unrelated book_setup.book status — against
+        # entity_arg: cbu-id, which resolves cbus.status (matching
+        # neither). This verb creates a NEW cbu_trading_profiles row, so
+        # there's no existing profile-id to check state against — the
+        # generic single-entity requires_states mechanism can't express
+        # the real rule anyway ("no existing non-terminal profile already
+        # blocks a new draft for this CBU"). Removed; the real gate is
+        # enforce_trading_profile_no_active_draft in dsl_v2/executor.rs
+        # (same pattern as cbu.confirm's/investor.activate's dedicated
+        # checks). Matches investor.create's precedent (also a
+        # no-existing-row create verb with no lifecycle block at all).
         flavour: instance_adding
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
         effect_class: read_modify_write

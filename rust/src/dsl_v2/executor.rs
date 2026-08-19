@@ -1909,6 +1909,10 @@ impl DslExecutor {
             let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
             enforce_investor_kyc_approved(&json_args, scope).await?;
         }
+        if runtime_verb.full_name == "trading-profile.create-draft" {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_trading_profile_no_active_draft(&json_args, scope).await?;
+        }
 
         // Durable verbs: normally routed through WorkflowDispatcher. The
         // BPMN worker path sets `ctx.allow_durable_direct` so internal
@@ -2331,6 +2335,61 @@ async fn enforce_investor_kyc_approved(
              APPROVED (EOP-PLAN-GAMEBOARD-001 R2 KYC gate — ELIGIBLE -> ACTIVE requires \
              investor_kyc.status = APPROVED, matching kyc_dag.yaml's own declared \
              precondition for this transition)"
+        );
+    }
+    Ok(())
+}
+
+/// EOP-PLAN-GAMEBOARD-001 follow-on (2026-08-19):
+/// `trading-profile.create-draft` real precondition. Replaces the removed,
+/// contaminated `requires_states: [REJECTED, parties_assigned]` (see this
+/// verb's own YAML comment). `cbu_trading_profiles` is versioned — this
+/// verb creates a NEW row, so the real rule isn't "the entity is in state
+/// X" (the generic `requires_states` shape), it's "no EXISTING row for
+/// this CBU is still non-terminal." REJECTED/SUPERSEDED/ARCHIVED don't
+/// block a fresh draft (REJECTED explicitly didn't block under the old,
+/// contaminated declaration either — that part of the original intent is
+/// preserved); DRAFT/SUBMITTED/APPROVED/PARALLEL_RUN/ACTIVE/SUSPENDED do.
+/// Fail-closed, same posture as the other EOP-PLAN-GAMEBOARD-001 gates.
+#[cfg(feature = "database")]
+async fn enforce_trading_profile_no_active_draft(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let cbu_id = json_args
+        .get("cbu-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "trading-profile.create-draft: 'cbu-id' did not resolve to a uuid; refusing \
+                 under the fail-closed no-active-draft gate (EOP-PLAN-GAMEBOARD-001)"
+            )
+        })?;
+    let blocking: Option<(Uuid, String)> = sqlx::query_as(
+        r#"
+        SELECT profile_id, status FROM "ob-poc".cbu_trading_profiles
+        WHERE cbu_id = $1
+          AND status IN ('DRAFT', 'SUBMITTED', 'APPROVED', 'PARALLEL_RUN', 'ACTIVE', 'SUSPENDED')
+        LIMIT 1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_optional(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "trading-profile.create-draft: failed to read cbu_trading_profiles for {cbu_id}; \
+             refusing under the fail-closed no-active-draft gate \
+             (EOP-PLAN-GAMEBOARD-001): {e}"
+        )
+    })?;
+    if let Some((profile_id, status)) = blocking {
+        bail!(
+            "trading-profile.create-draft refused: {cbu_id} already has trading profile \
+             {profile_id} in non-terminal status '{status}' (EOP-PLAN-GAMEBOARD-001 — a new \
+             draft cannot be created while an existing profile is still in play; reject or \
+             let it reach a terminal status first)"
         );
     }
     Ok(())
@@ -3447,6 +3506,81 @@ mod tests {
         enforce_investor_kyc_approved(&args(investor_id), &mut scope)
             .await
             .expect("kyc_status APPROVED must pass");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// EOP-PLAN-GAMEBOARD-001 follow-on (2026-08-19): live-DB proof for
+    /// `enforce_trading_profile_no_active_draft`. Inserts a throwaway
+    /// `cbu_trading_profiles` row inside a transaction that always rolls
+    /// back on drop. RED before this pass: `create-draft` had no
+    /// non-terminal-conflict check at all (its old `requires_states` was
+    /// contaminated and checked the wrong entity — see this verb's own
+    /// YAML comment).
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_trading_profile_no_active_draft_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one cbu must exist");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("cbu-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // Clear any pre-existing profiles for this cbu inside the (rolled
+        // back) transaction so the test controls the exact starting state.
+        sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(scope.executor())
+            .await
+            .expect("clear profiles");
+
+        // PASS: no existing profile at all.
+        enforce_trading_profile_no_active_draft(&args(cbu_id), &mut scope)
+            .await
+            .expect("no existing profile must pass");
+
+        // BLOCK: a DRAFT profile already exists.
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbu_trading_profiles
+               (cbu_id, status, document, document_hash)
+               VALUES ($1, 'DRAFT', '{}'::jsonb, 'gameboard-test-hash')"#,
+        )
+        .bind(cbu_id)
+        .execute(scope.executor())
+        .await
+        .expect("insert draft profile");
+        let blocked = enforce_trading_profile_no_active_draft(&args(cbu_id), &mut scope).await;
+        let bmsg = blocked
+            .expect_err("existing DRAFT profile must block a new draft")
+            .to_string();
+        assert!(
+            bmsg.contains("create-draft") && bmsg.contains("DRAFT"),
+            "refusal must name the verb and the blocking status: {bmsg}"
+        );
+
+        // PASS: the profile is REJECTED — a new draft may be created.
+        sqlx::query(
+            r#"UPDATE "ob-poc".cbu_trading_profiles SET status = 'REJECTED' WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .execute(scope.executor())
+        .await
+        .expect("reject profile");
+        enforce_trading_profile_no_active_draft(&args(cbu_id), &mut scope)
+            .await
+            .expect("REJECTED profile must not block a new draft");
 
         // scope drops here → rollback; no rows mutated anyway.
     }
