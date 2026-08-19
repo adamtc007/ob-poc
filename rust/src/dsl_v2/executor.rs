@@ -1909,6 +1909,10 @@ impl DslExecutor {
             let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
             enforce_investor_kyc_approved(&json_args, scope).await?;
         }
+        if runtime_verb.full_name == "investor.reinstate" {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_investor_reinstate_kyc_approved(&json_args, scope).await?;
+        }
         if runtime_verb.full_name == "trading-profile.create-draft" {
             let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
             enforce_trading_profile_no_active_draft(&json_args, scope).await?;
@@ -2336,6 +2340,53 @@ async fn enforce_investor_kyc_approved(
              investor_kyc.status = APPROVED, matching kyc_dag.yaml's own declared \
              precondition for this transition)"
         );
+    }
+    Ok(())
+}
+
+/// R2 Stage 2 Phase 1 (2026-08-19): `investor.reinstate`'s KYC gate.
+///
+/// `investor.reinstate` is a second, previously-ungated path to
+/// `lifecycle_state = 'ACTIVE_HOLDER'` — the same state
+/// `investor.activate` guards via [`enforce_investor_kyc_approved`].
+/// Unlike `activate`, `reinstate`'s YAML declares a `reinstate-to-state`
+/// arg but the plugin op (`crates/sem_os_postgres/src/ops/investor.rs`
+/// `Reinstate::execute`) never reads it — it restores to whatever
+/// `investors.pre_suspension_state` was captured by `investor.suspend`
+/// (the investor's own lifecycle_state at the moment it was suspended).
+/// So this gate must read that column, not an arg, to know the real
+/// restore target: only when it equals `ACTIVE_HOLDER` does the KYC
+/// precondition apply (reinstating to e.g. `SUBSCRIBED` needs no check).
+async fn enforce_investor_reinstate_kyc_approved(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let investor_id = json_args
+        .get("investor-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "investor.reinstate: 'investor-id' did not resolve to a uuid; refusing under \
+                 the fail-closed KYC gate (EOP-PLAN-GAMEBOARD-001 R2 Stage 2)"
+            )
+        })?;
+    let pre_suspension_state: Option<String> = sqlx::query_scalar(
+        r#"SELECT pre_suspension_state FROM "ob-poc".investors WHERE investor_id = $1"#,
+    )
+    .bind(investor_id)
+    .fetch_optional(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "investor.reinstate: failed to read investors.pre_suspension_state for \
+             {investor_id}; refusing under the fail-closed KYC gate \
+             (EOP-PLAN-GAMEBOARD-001 R2 Stage 2): {e}"
+        )
+    })?
+    .flatten();
+    if pre_suspension_state.as_deref() == Some("ACTIVE_HOLDER") {
+        enforce_investor_kyc_approved(json_args, scope).await?;
     }
     Ok(())
 }
@@ -3506,6 +3557,85 @@ mod tests {
         enforce_investor_kyc_approved(&args(investor_id), &mut scope)
             .await
             .expect("kyc_status APPROVED must pass");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// R2 Stage 2 Phase 1 (2026-08-19): live-DB proof for
+    /// `enforce_investor_reinstate_kyc_approved`. RED before this pass:
+    /// `investor.reinstate` was a second, ungated path to
+    /// `lifecycle_state = 'ACTIVE_HOLDER'` — `investor.activate`'s gate
+    /// only covered the first path.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_investor_reinstate_kyc_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let entity_id: Uuid = sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one entity must exist");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("investor-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // BLOCK: pre_suspension_state = ACTIVE_HOLDER, kyc_status not APPROVED.
+        let blocked_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".investors
+               (entity_id, investor_type, kyc_status, lifecycle_state,
+                pre_suspension_state, suspended_reason, suspended_at)
+               VALUES ($1, 'INDIVIDUAL', 'IN_PROGRESS', 'SUSPENDED', 'ACTIVE_HOLDER',
+                       'aml_concern', NOW())
+               RETURNING investor_id"#,
+        )
+        .bind(entity_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway suspended investor (was active_holder)");
+        let blocked = enforce_investor_reinstate_kyc_approved(&args(blocked_id), &mut scope).await;
+        let bmsg = blocked
+            .expect_err("reinstate to ACTIVE_HOLDER with unapproved KYC must be refused")
+            .to_string();
+        assert!(
+            bmsg.contains("IN_PROGRESS"),
+            "refusal must name the actual kyc_status: {bmsg}"
+        );
+
+        // PASS: pre_suspension_state = ACTIVE_HOLDER, kyc_status APPROVED.
+        sqlx::query(r#"UPDATE "ob-poc".investors SET kyc_status = 'APPROVED' WHERE investor_id = $1"#)
+            .bind(blocked_id)
+            .execute(scope.executor())
+            .await
+            .expect("approve kyc");
+        enforce_investor_reinstate_kyc_approved(&args(blocked_id), &mut scope)
+            .await
+            .expect("reinstate to ACTIVE_HOLDER with APPROVED kyc must pass");
+
+        // PASS regardless of kyc_status: pre_suspension_state is NOT
+        // ACTIVE_HOLDER, so the gate must not even check kyc_status.
+        let non_active_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".investors
+               (entity_id, investor_type, kyc_status, lifecycle_state,
+                pre_suspension_state, suspended_reason, suspended_at)
+               VALUES ($1, 'INDIVIDUAL', 'IN_PROGRESS', 'SUSPENDED', 'SUBSCRIBED',
+                       'aml_concern', NOW())
+               RETURNING investor_id"#,
+        )
+        .bind(entity_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway suspended investor (was subscribed)");
+        enforce_investor_reinstate_kyc_approved(&args(non_active_id), &mut scope)
+            .await
+            .expect("reinstate to a non-active state must not be gated by KYC at all");
 
         // scope drops here → rollback; no rows mutated anyway.
     }
