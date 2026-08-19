@@ -1097,6 +1097,87 @@ entities:
       canonical_verb: monitoring.record-event
       required_args: [cbu-id, event-type]
 
+  # ===========================================================================
+  # Share Class (EOP-PLAN share-register board design pass, Phase 6, 2026-08-19)
+  # ===========================================================================
+  share_class:
+    description: "Issuer-side share class: subscription-availability lifecycle"
+    category: capital
+
+    db:
+      schema: ob-poc
+      table: share_classes
+      pk: id
+
+    search_keys:
+      - columns: [cbu_id, name]
+        unique: true
+
+    lifecycle:
+      status_column: lifecycle_status
+      states:
+        - DRAFT
+        - OPEN
+        - SOFT_CLOSED
+        - HARD_CLOSED
+        - WINDING_DOWN
+        - LIQUIDATED
+      transitions:
+        - from: DRAFT
+          to: [OPEN]
+        - from: OPEN
+          to: [SOFT_CLOSED, HARD_CLOSED, WINDING_DOWN]
+        - from: SOFT_CLOSED
+          to: [OPEN, HARD_CLOSED, WINDING_DOWN]
+        - from: HARD_CLOSED
+          to: [SOFT_CLOSED, WINDING_DOWN]
+        - from: WINDING_DOWN
+          to: [LIQUIDATED]
+        - from: LIQUIDATED
+          to: []
+      initial_state: DRAFT
+
+    implicit_create:
+      allowed: true
+      canonical_verb: share-class.create
+      required_args: [cbu-id, name]
+
+  # ===========================================================================
+  # Dilution Instrument (EOP-PLAN share-register board design pass, Phase 6)
+  # ===========================================================================
+  dilution_instrument:
+    description: "Option/warrant/SAFE/convertible note against an issuer's share classes"
+    category: capital
+
+    db:
+      schema: ob-poc
+      table: dilution_instruments
+      pk: instrument_id
+
+    search_keys:
+      - columns: [issuer_entity_id, instrument_type]
+        unique: false
+
+    lifecycle:
+      status_column: status
+      states:
+        - ACTIVE
+        - EXERCISED
+        - FORFEITED
+      transitions:
+        - from: ACTIVE
+          to: [EXERCISED, FORFEITED]
+        - from: EXERCISED
+          to: []
+        - from: FORFEITED
+          to: []
+      initial_state: ACTIVE
+
+    implicit_create:
+      allowed: true
+      canonical_verb: capital.dilution.grant-options
+      required_args: [issuer-entity-id, holder-entity-id, units, exercise-price, expiration-date]
+
 # =============================================================================
 # FK RELATIONSHIPS
 # =============================================================================

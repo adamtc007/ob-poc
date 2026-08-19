@@ -1,0 +1,88 @@
+# Share Register Journey Pack (EOP-PLAN share-register board design
+# pass, Phase 6, 2026-08-19)
+#
+# Issuer-side capital structure bookkeeping: share classes, issuance/
+# supply, dilution instruments (options/warrants/SAFEs/convertible
+# notes), and the cap-table holdings that make them up. NOT the KYC/UBO
+# control-determination register — see capital.rs module doc.
+#
+# Bound to the EXISTING cbu session workspace (no new WorkspaceKind),
+# same pattern as book-setup.yaml sharing cbu.workspace/onboarding_request
+# without owning its own workspace.
+
+id: share-register
+name: Share Register
+version: "1.0"
+description: >
+  Create and manage an issuer's share classes, issue/split/buyback/cancel
+  supply, author dilution instruments (options, warrants, SAFEs,
+  convertible notes) and exercise/forfeit them, and reconcile the
+  cap-table against issued supply.
+
+invocation_phrases:
+  - "manage share register"
+  - "set up share classes"
+  - "issue shares"
+  - "grant stock options"
+  - "reconcile cap table"
+  - "manage dilution instruments"
+
+required_context: []
+optional_context:
+  - default_cbu
+
+workspaces: [cbu]
+
+allowed_verbs:
+  - share-class.create
+  - share-class.ensure
+  - share-class.launch
+  - share-class.soft-close
+  - share-class.reopen
+  - share-class.hard-close
+  - share-class.lift-hard-close
+  - share-class.begin-winddown
+  - share-class.close
+  - capital.allocate
+  - capital.transfer
+  - capital.reconcile
+  - capital.get-ownership-chain
+  - capital.issue.initial
+  - capital.issue.new
+  - capital.split
+  - capital.buyback
+  - capital.cancel
+  - capital.close-holding
+  - capital.list-by-issuer
+  - capital.list-shareholders
+  - capital.control-config.set
+  - capital.control-config.get
+  - capital.share-class.add-identifier
+  - capital.dilution.grant-options
+  - capital.dilution.issue-warrant
+  - capital.dilution.create-safe
+  - capital.dilution.create-convertible-note
+  - capital.dilution.exercise
+  - capital.dilution.forfeit
+  - capital.dilution.list
+  - capital.dilution.get-summary
+
+forbidden_verbs: []
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+required_questions: []
+optional_questions: []
+stop_rules: []
+templates: []
+section_layout:
+  - title: "Share Classes"
+    verb_prefixes: ["share-class."]
+  - title: "Issuance & Supply"
+    verb_prefixes: ["capital.issue.", "capital.split", "capital.buyback", "capital.cancel"]
+  - title: "Cap Table"
+    verb_prefixes: ["capital.allocate", "capital.transfer", "capital.reconcile", "capital.close-holding", "capital.list-", "capital.get-ownership-chain"]
+  - title: "Dilution"
+    verb_prefixes: ["capital.dilution."]
+definition_of_done: []
+progress_signals: []

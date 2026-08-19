@@ -173,8 +173,20 @@ fn application_verb_catalogue_is_complete_and_well_formed() {
         .values()
         .map(|domain| domain.verbs.len())
         .sum::<usize>();
+    // Floor consciously lowered 2026-08-19 (EOP-PLAN share-register board
+    // design pass): net -5 from the 1253 baseline this floor was set
+    // against -- Phase 0 killed 3 broken/duplicate capital.* verbs
+    // (cancel-shares, cap-table, holders: none referenced live schema
+    // correctly, cancel-shares duplicated capital.cancel, cap-table/holders
+    // duplicated the KYC substrate's control determination) plus the
+    // earlier capital/share-class consolidation killed 3 more
+    // (share-class.create, share-class.get-supply, issue-shares: all
+    // referenced columns/functions that never existed live), offset by +1
+    // new verb (capital.close-holding, Phase 4 -- the missing exit move
+    // for a zero-balance holding). Intentional sprawl reduction, not a
+    // regression.
     assert!(
-        total >= 1_250,
+        total >= 1_248,
         "verb count regressed below baseline: {total}"
     );
 
@@ -259,8 +271,15 @@ fn application_dag_predicates_and_green_when_coverage_are_qualified() {
         summary.total_states >= 332,
         "state count regressed: {summary:?}"
     );
+    // Floor consciously lowered 2026-08-19 (EOP-PLAN share-register board
+    // design pass) -- same root cause as the verb-count floor above: fewer
+    // discretionary verbs after killing 3 broken/duplicate capital.* verbs
+    // (+3 from the earlier consolidation) means fewer candidate states,
+    // independent of the +11 states the new share_register_dag.yaml slots
+    // (share_class relocated, dilution_instrument + holding new) add on
+    // the other side of the ledger.
     assert!(
-        summary.candidate_states >= 196,
+        summary.candidate_states >= 189,
         "candidate count regressed: {summary:?}"
     );
     assert!(

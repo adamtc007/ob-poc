@@ -1,0 +1,310 @@
+# Share Register — DAG Taxonomy (EOP-PLAN share-register board design
+# pass, Phase 5, 2026-08-19)
+#
+# ============================================================================
+# WORKSPACE PURPOSE:
+#
+# The Share Register is the issuer-anchored bookkeeping surface for a
+# company's own capital structure: share classes, dilution instruments
+# (options/warrants/SAFEs/convertible notes), and the holdings that make
+# up its cap table. It is NOT the KYC/UBO control-determination register
+# (ob-poc-kyc-substrate's FundControlStrategy/ControlProngStrategy/
+# EdgeKind) — a share register's job is ledger bookkeeping (does our own
+# SUM(holdings) == issued_units, via capital.reconcile), not a second way
+# to answer "who controls this entity." See capital.rs module doc for
+# the full sprawl-avoidance rationale (cap-table/holders were deleted
+# rather than fixed for exactly this reason).
+#
+# A share class is issuer-anchored, not CBU-owned — a private company
+# that never becomes a CBU still issues shares. This DAG was split out
+# of cbu_dag.yaml (share_class slot relocated here) following the same
+# domain-isolation pattern as the 2026-06-22 CBU⊥KYC Cluster-4 move
+# (foreign-domain FSM slots relocated out of cbu_dag.yaml into their
+# owning packs, with a read-only reference stub left behind).
+#
+# Reachable through the EXISTING CBU workspace/tollgate (Domain Pack
+# owned_constellations: [cbu.workspace]) — deliberately not a new
+# top-level session workspace, matching how book_setup shares
+# cbu.workspace/onboarding.workspace without owning its own workspace.
+# The DAG's own `workspace:` namespace below (share_register) is
+# separate from session WorkspaceKind — it only scopes this file's
+# (workspace, slot) SlotKeys so `holding` here (generic status column,
+# usage_type != 'TA') cannot collide with kyc_dag.yaml's `holding` slot
+# (holding_status column, TA/investor-linked axis) even though both
+# slots share a table and an id.
+#
+# ============================================================================
+
+version: "1.0"
+workspace: share_register
+dag_id: share_register_dag
+
+dsl_verb_reconciliation:
+  share_class_surface:
+    - share-class.create
+    - share-class.ensure
+    - share-class.launch
+    - share-class.soft-close
+    - share-class.reopen
+    - share-class.hard-close
+    - share-class.lift-hard-close
+    - share-class.begin-winddown
+    - share-class.close
+  capital_surface:
+    - capital.allocate
+    - capital.transfer
+    - capital.reconcile
+    - capital.get-ownership-chain
+    - capital.issue.initial
+    - capital.issue.new
+    - capital.split
+    - capital.buyback
+    - capital.cancel
+    - capital.close-holding
+    - capital.list-by-issuer
+    - capital.list-shareholders
+    - capital.control-config.set
+    - capital.control-config.get
+    - capital.share-class.add-identifier
+    - capital.dilution.grant-options
+    - capital.dilution.issue-warrant
+    - capital.dilution.create-safe
+    - capital.dilution.create-convertible-note
+    - capital.dilution.exercise
+    - capital.dilution.forfeit
+    - capital.dilution.list
+    - capital.dilution.get-summary
+
+# =============================================================================
+# 1. PER-SLOT STATE MACHINES
+# =============================================================================
+
+slots:
+
+  # ---------------------------------------------------------------------------
+  # 1.1 Share class — relocated 2026-08-19 from cbu_dag.yaml (unchanged
+  # shape; only ownership moved). One terminal-move correction alongside
+  # the relocation: share-class.close previously wrote the legacy
+  # `share_classes.status` column (not `lifecycle_status`, the column
+  # this state machine actually governs) — fixed in the same pass
+  # (share-class.close converted to a SimpleStatusOp targeting
+  # lifecycle_status → LIQUIDATED).
+  # ---------------------------------------------------------------------------
+
+  - id: share_class
+    stateless: false
+    closure: closed_unbounded
+    entry_state: DRAFT
+    # HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics for share
+    # classes — generic SUSPENDED doesn't apply.
+    suspended_state_exempt: true
+    state_machine:
+      id: share_class_lifecycle
+      owner: "ops+fund-admin"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".share_classes'
+      state_column: lifecycle_status
+      scope: per_share_class
+      description: |
+        Share-class subscription-availability lifecycle. 6 states
+        capturing DRAFT (pre-launch) through to liquidation. A class
+        typically lives in OPEN or SOFT_CLOSED for most of its life;
+        HARD_CLOSED blocks redemptions too (rare — regulatory or
+        wind-down).
+      states:
+        - id: DRAFT
+          entry: true
+          description: "Class authored but not yet launched. No supply."
+        - id: OPEN
+          description: "Accepting new subscriptions; existing holders transact freely."
+        - id: SOFT_CLOSED
+          description: "No new subscribers; existing holders still transact."
+        - id: HARD_CLOSED
+          description: "No subs AND no redemptions (regulatory hold or wind-down)."
+        - id: WINDING_DOWN
+          description: "Redemptions being processed; no new activity. Pre-liquidation."
+        - id: LIQUIDATED
+          description: "Terminal. All holders redeemed; class retired."
+      transitions:
+        - from: DRAFT
+          to: OPEN
+          via: share-class.launch
+        - from: OPEN
+          to: SOFT_CLOSED
+          via: share-class.soft-close
+        - from: SOFT_CLOSED
+          to: OPEN
+          via: share-class.reopen
+        - from: [OPEN, SOFT_CLOSED]
+          to: HARD_CLOSED
+          via: share-class.hard-close
+        - from: HARD_CLOSED
+          to: SOFT_CLOSED
+          via: share-class.lift-hard-close
+        - from: [OPEN, SOFT_CLOSED, HARD_CLOSED]
+          to: WINDING_DOWN
+          via: share-class.begin-winddown
+        - from: WINDING_DOWN
+          to: LIQUIDATED
+          via: share-class.close
+      terminal_states: [LIQUIDATED]
+
+  # ---------------------------------------------------------------------------
+  # 1.2 Dilution instrument — NEW slot (2026-08-19). Zero DAG governance
+  # existed before this pass despite dilution_instruments having a real
+  # lifecycle; drawing this slot surfaced the 3-way status vocabulary bug
+  # fixed in Phase 3 (grant-options/issue-warrant/create-safe/
+  # create-convertible-note wrote 'OUTSTANDING', a value the live CHECK
+  # constraint rejects outright — the real, only-ever-live vocabulary is
+  # ACTIVE/EXERCISED/EXPIRED/FORFEITED/CANCELLED, taken from `exercise`,
+  # the one op that was already correct).
+  # ---------------------------------------------------------------------------
+
+  - id: dilution_instrument
+    stateless: false
+    closure: closed_unbounded
+    entry_state: ACTIVE
+    suspended_state_exempt: true
+    state_machine:
+      id: dilution_instrument_lifecycle
+      owner: "ops+fund-admin"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".dilution_instruments'
+      state_column: status
+      scope: per_instrument
+      description: |
+        Per-instrument lifecycle for options/warrants/SAFEs/convertible
+        notes. Entry is ACTIVE (units_granted may be 0 for SAFEs/notes,
+        which have no defined share count until a priced-round
+        conversion — a capability not built yet). Partial exercise or
+        forfeiture leaves the instrument ACTIVE; only full consumption
+        (units_exercised + units_forfeited >= units_granted) reaches a
+        terminal state.
+
+        The live CHECK constraint (dilution_instruments_chk_dilution_status)
+        also permits EXPIRED and CANCELLED, but neither is declared as a
+        formal state here: no verb or signal currently drives either
+        transition (no expiry scheduler, no admin-cancel verb) — a real,
+        undeclared gap, not silently mapped onto EXERCISED/FORFEITED.
+      states:
+        - id: ACTIVE
+          entry: true
+          description: "Granted/issued; units_outstanding = units_granted - units_exercised - units_forfeited."
+        - id: EXERCISED
+          description: "Terminal. Fully exercised/converted (options, warrants)."
+        - id: FORFEITED
+          description: "Terminal. Fully forfeited (cancelled unvested/unexercised units)."
+      transitions:
+        - from: ACTIVE
+          to: EXERCISED
+          via: capital.dilution.exercise
+          description: "Only on full consumption; partial exercise stays ACTIVE."
+        - from: ACTIVE
+          to: FORFEITED
+          via: capital.dilution.forfeit
+          description: "Only on full consumption; partial forfeiture stays ACTIVE."
+      terminal_states: [EXERCISED, FORFEITED]
+
+  # ---------------------------------------------------------------------------
+  # 1.3 Holding — NEW slot (2026-08-19), share-register axis. Scoped to
+  # usage_type != 'TA': this governs the share register's own cap-table
+  # holdings via the generic `status` column. The TA/investor-linked axis
+  # (`holding_status`) is a DIFFERENT slot, KYC-domain-owned, already
+  # declared in kyc_dag.yaml §2.5 (relocated there 2026-06-22, CBU⊥KYC
+  # Cluster-4) — same table, same `id: holding`, disjoint column and
+  # disjoint (workspace, slot) SlotKey (kyc vs share_register), so no
+  # collision. Gap found drawing this slot: nothing previously closed a
+  # holding once its balance drained to zero — it sat 'active' forever, a
+  # ghost row for capital.reconcile / list-shareholders. capital.close-
+  # holding (Phase 4) is the fix.
+  # ---------------------------------------------------------------------------
+
+  - id: holding
+    stateless: false
+    closure: closed_unbounded
+    entry_state: active
+    suspended_state_exempt: true
+    state_machine:
+      id: share_register_holding_lifecycle
+      owner: "ops+fund-admin"
+      expected_lifetime: long_lived
+      source_entity: '"ob-poc".holdings'
+      state_column: status
+      scope: per_holding
+      description: |
+        Share-register cap-table holding lifecycle (usage_type != 'TA').
+        2-state: active (units held, possibly zero after a full
+        transfer-out) → closed (terminal, units = 0 required).
+      states:
+        - id: active
+          entry: true
+          description: "Units held (capital.allocate entry point; capital.dilution.exercise also creates/tops-up a holding on conversion)."
+        - id: closed
+          description: "Terminal. Zero units; position fully divested."
+      transitions:
+        - from: active
+          to: closed
+          via: capital.close-holding
+          description: "Guarded: refuses unless units = 0 (Rust-enforced in the CloseHolding op; see Phase 4)."
+      terminal_states: [closed]
+
+# =============================================================================
+# 2. CROSS-SLOT CONSTRAINTS
+# =============================================================================
+# None yet. The natural candidate — capital.issue.initial/.issue.new/
+# .split/.buyback/.cancel refused when the target share_class is
+# HARD_CLOSED/LIQUIDATED — is Phase 6 of this same design pass, not yet
+# landed as of this file. Documented here so the gap is visible, not
+# silently absent.
+
+cross_slot_constraints: []
+
+cross_workspace_constraints: []
+
+derived_cross_workspace_state: []
+
+# =============================================================================
+# 3. PRODUCT-MODULE GATES
+# =============================================================================
+# Share register applies to any issuer entity, independent of CBU
+# category — no conditional gating.
+
+product_module_gates:
+
+  always_on:
+    - share_class
+    - dilution_instrument
+    - holding
+
+  conditionally_on: []
+
+# =============================================================================
+# 4. OUT OF SCOPE
+# =============================================================================
+
+out_of_scope:
+
+  # Deliberately not board-governed (see capital.rs module doc)
+  - "capital.get-ownership-chain — recursive entity_relationships CTE; may overlap economic-exposure.compute / ownership.trace-chain, flagged not resolved (docs/migrations/INVESTMENT_REGISTERS_THREE_LENSES.md §6.7/6.8)"
+  - "cap-table / holders control-position determination — deleted 2026-08-19, not rebuilt; that's the KYC substrate's job (FundControlStrategy / ControlProngStrategy / EdgeKind)"
+  - "SAFE / convertible-note priced-round conversion — units_granted = 0 at creation is correct (no defined share count yet), but no verb converts them into real units; capital.dilution.exercise only handles instruments that already carry a real units_granted (options/warrants)"
+
+  # Cross-workspace / not yet landed
+  - "The HARD_CLOSED/LIQUIDATED issuance gate on capital.issue.*/.split/.buyback/.cancel — Phase 6 of this design pass, not yet implemented"
+
+  # Layer 3 operational
+  - "Corporate-action processing (dividends, bonus issues beyond capital.split) — Layer 2/3 operational, not DAG-modelled here"
+
+# =============================================================================
+# 5. PRUNE SEMANTICS
+# =============================================================================
+
+prune_cascade_rules:
+
+  - id: share_class_delete_cascade
+    when: "share_class deleted (administrative; rare — LIQUIDATED classes are normally retained for audit)"
+    cascades_to:
+      - target: dilution_instrument
+        rule: "dilution_instruments WHERE converts_to_share_class_id = this.id → converts_to_share_class_id set NULL (FK is nullable) or blocked if any ACTIVE instrument references it"
+      - target: holding
+        rule: "holdings WHERE share_class_id = this.id → deleted if all CLOSED; ACTIVE holdings block delete"

@@ -1,0 +1,38 @@
+pack_id: ob-poc.share-register
+name: ob-poc Share Register Domain Pack
+version: 0.1.0
+implementation_mode: native_compiled
+compatibility_tier: dry_run_only
+owned_dags: [share_register_dag]
+owned_packs: [share-register]
+owned_state_machines: []
+owned_constellation_maps: []
+owned_constellation_families: []
+owned_universes: []
+owned_verb_prefixes:
+  - share-class.
+  - capital.
+# Deliberately NOT `holding` -- the KYC domain owns that entity kind via
+# its `holding_status` axis (kyc_dag.yaml §2.5, relocated there
+# 2026-06-22). This pack owns the `status` axis's one new move
+# (capital.close-holding) without claiming the entity kind itself.
+owned_entity_kinds:
+  - share_class
+  - dilution_instrument
+business_crates: []
+owned_constellations:
+  - cbu.workspace
+allowed_transitions: []
+discovery_probes: []
+projection_catalog: []
+mention_namespaces: []
+declared_modes: []
+workflow_phases: []
+acp_personas: []
+resource_uri_schemes: []
+external_mcp_transports: []
+typed_extension_points: []
+classification_policy:
+  max_prompt_classification: internal
+  allow_external_llm: false
+  required_redactions: [pii]

@@ -1234,66 +1234,15 @@ slots:
       Categorical link data; no lifecycle per edge. Links are added /
       removed as the structure evolves.
 
-  # R-6 G-7: share_class promoted to stateful. Full subscription-
-  # availability lifecycle. Schema migration (share_classes.lifecycle_
-  # status column + CHECK) deferred to Tranche 3 per D-2.
+  # Relocated 2026-08-19 (EOP-PLAN share-register board design pass,
+  # Phase 5) to share_register_dag.yaml — a share class is issuer-anchored,
+  # not CBU-owned (a private company that never becomes a CBU still
+  # issues shares). Same pattern as the 2026-06-22 CBU⊥KYC Cluster-4
+  # relocations (manco/holding stubs above). CBU reads this state
+  # read-only; no cbu.* verb transitions it.
   - id: share_class
     stateless: false
-    closure: closed_unbounded
-    entry_state: DRAFT
-    # V1.3-4: HARD_CLOSED + WINDING_DOWN cover the pause/hold semantics
-    # for share classes — generic SUSPENDED doesn't apply.
-    suspended_state_exempt: true
-    state_machine:
-      id: share_class_lifecycle
-      owner: "ops+fund-admin"
-      expected_lifetime: long_lived
-      source_entity: '"ob-poc".share_classes'
-      state_column: lifecycle_status     # DAG-first; column added Tranche 3
-      scope: per_share_class
-      description: |
-        Share-class subscription-availability lifecycle. 6 states
-        capturing DRAFT (pre-launch) through to liquidation. A class
-        typically lives in OPEN or SOFT_CLOSED for most of its life;
-        HARD_CLOSED blocks redemptions too (rare — regulatory or
-        wind-down).
-      states:
-        - id: DRAFT
-          entry: true
-          description: "Class authored but not yet launched. No supply."
-        - id: OPEN
-          description: "Accepting new subscriptions; existing holders transact freely."
-        - id: SOFT_CLOSED
-          description: "No new subscribers; existing holders still transact."
-        - id: HARD_CLOSED
-          description: "No subs AND no redemptions (regulatory hold or wind-down)."
-        - id: WINDING_DOWN
-          description: "Redemptions being processed; no new activity. Pre-liquidation."
-        - id: LIQUIDATED
-          description: "Terminal. All holders redeemed; class retired."
-      transitions:
-        - from: DRAFT
-          to: OPEN
-          via: share-class.launch
-        - from: OPEN
-          to: SOFT_CLOSED
-          via: share-class.soft-close
-        - from: SOFT_CLOSED
-          to: OPEN
-          via: share-class.reopen
-        - from: [OPEN, SOFT_CLOSED]
-          to: HARD_CLOSED
-          via: share-class.hard-close
-        - from: HARD_CLOSED
-          to: SOFT_CLOSED
-          via: share-class.lift-hard-close
-        - from: [OPEN, SOFT_CLOSED, HARD_CLOSED]
-          to: WINDING_DOWN
-          via: share-class.begin-winddown
-        - from: WINDING_DOWN
-          to: LIQUIDATED
-          via: share-class.close     # existing verb
-      terminal_states: [LIQUIDATED]
+    state_machine: "(reference — relocated 2026-08-19 to share_register_dag.yaml; share-class.* verbs own the lifecycle. CBU workspace reaches it via owned_constellations: [cbu.workspace], not by owning the state machine.)"
 
   # R-6 G-3: manco promoted to stateful. Regulatory-action cascade
   # applies to ALL CBUs managed by this manco. Schema landed in
