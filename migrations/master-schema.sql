@@ -11399,7 +11399,7 @@ CREATE TABLE "ob-poc".dilution_instruments (
     CONSTRAINT dilution_instruments_chk_dilution_status CHECK (((status)::text = ANY (ARRAY[('ACTIVE'::character varying)::text, ('EXERCISED'::character varying)::text, ('EXPIRED'::character varying)::text, ('FORFEITED'::character varying)::text, ('CANCELLED'::character varying)::text]))),
     CONSTRAINT dilution_instruments_chk_exercised_lte_granted CHECK ((units_exercised <= units_granted)),
     CONSTRAINT dilution_instruments_chk_instrument_type CHECK (((instrument_type)::text = ANY (ARRAY[('STOCK_OPTION'::character varying)::text, ('WARRANT'::character varying)::text, ('CONVERTIBLE_NOTE'::character varying)::text, ('SAFE'::character varying)::text, ('CONVERTIBLE_PREFERRED'::character varying)::text, ('RSU'::character varying)::text, ('PHANTOM_STOCK'::character varying)::text, ('SAR'::character varying)::text, ('OTHER'::character varying)::text]))),
-    CONSTRAINT dilution_instruments_chk_units_positive CHECK ((units_granted > (0)::numeric))
+    CONSTRAINT dilution_instruments_chk_units_positive CHECK ((units_granted >= (0)::numeric))
 );
 
 

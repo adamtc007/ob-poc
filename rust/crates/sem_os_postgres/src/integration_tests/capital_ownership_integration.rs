@@ -1075,4 +1075,242 @@ mod capital_tests {
         db.cleanup().await?;
         Ok(())
     }
+
+    // =========================================================================
+    // DILUTION REWRITE (EOP-PLAN share-register board design pass, Phase 3,
+    // 2026-08-19) -- every create/list/forfeit op previously referenced
+    // schema that never existed live and wrote status='OUTSTANDING', a
+    // value the live CHECK constraint rejects outright. Exercises the real
+    // grant -> partial exercise -> forfeit round trip through the actual
+    // SemOsVerbOp layer, proving the unified ACTIVE/EXERCISED/FORFEITED
+    // vocabulary, plus create-safe/create-convertible-note (units_granted=0,
+    // proving the relaxed CHECK constraint), list, and get-summary.
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_dilution_grant_exercise_forfeit_roundtrip() -> Result<()> {
+        use crate::ops::dilution::{
+            CreateConvertibleNote, CreateSafe, GetSummary, GrantOptions, IssueWarrant, List,
+        };
+        use crate::ops::SemOsVerbOp;
+        use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
+        use sem_os_core::principal::Principal;
+
+        let db = TestDb::new().await?;
+        let issuer_name = db.name("dilution_issuer");
+        let holder_name = db.name("dilution_holder");
+        let class_name = db.name("dilution_class");
+
+        let cbu_id = db.get_or_create_cbu().await?;
+        let issuer_id = db.create_company(&issuer_name).await?;
+        let holder_id = db.create_entity(&holder_name, "PROPER_PERSON_NATURAL").await?;
+
+        let share_class_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".share_classes (cbu_id, issuer_entity_id, name, instrument_kind)
+            VALUES ($1, $2, $3, 'ORDINARY_EQUITY')
+            RETURNING id
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(issuer_id)
+        .bind(&class_name)
+        .fetch_one(&db.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".share_class_supply (
+                share_class_id, issued_units, outstanding_units, as_of_date
+            ) VALUES ($1, 10000, 10000, CURRENT_DATE)
+            "#,
+        )
+        .bind(share_class_id)
+        .execute(&db.pool)
+        .await?;
+
+        let tx = db.pool.begin().await?;
+        let mut scope = RollbackScope {
+            id: ob_poc_types::TransactionScopeId::new(),
+            tx,
+            pool: db.pool.clone(),
+        };
+        let mut ctx = VerbExecutionContext::new(Principal::system());
+
+        // grant-options: 1000 STOCK_OPTION units. Previously errored on the
+        // CHECK constraint (status='OUTSTANDING' is not a legal value).
+        let option_outcome = GrantOptions
+            .execute(
+                &serde_json::json!({
+                    "issuer-entity-id": issuer_id,
+                    "converts-to-share-class-id": share_class_id,
+                    "holder-entity-id": holder_id,
+                    "units": "1000",
+                    "exercise-price": "1.50",
+                    "expiration-date": "2035-01-01",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        let option_id = match option_outcome {
+            VerbExecutionOutcome::Uuid(u) => u,
+            other => panic!("expected Uuid, got {other:?}"),
+        };
+
+        // issue-warrant: 500 WARRANT units, left ACTIVE (never exercised) --
+        // exercises get-summary's ACTIVE-only aggregation below.
+        let warrant_outcome = IssueWarrant
+            .execute(
+                &serde_json::json!({
+                    "issuer-entity-id": issuer_id,
+                    "converts-to-share-class-id": share_class_id,
+                    "holder-entity-id": holder_id,
+                    "units": "500",
+                    "exercise-price": "2.00",
+                    "expiration-date": "2035-01-01",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        assert!(matches!(warrant_outcome, VerbExecutionOutcome::Uuid(_)));
+
+        // create-safe / create-convertible-note: units_granted=0 -- would
+        // have violated the pre-fix CHECK (units_granted > 0).
+        let safe_outcome = CreateSafe
+            .execute(
+                &serde_json::json!({
+                    "issuer-entity-id": issuer_id,
+                    "holder-entity-id": holder_id,
+                    "principal-amount": "50000",
+                    "valuation-cap": "5000000",
+                    "discount-pct": "20",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        assert!(matches!(safe_outcome, VerbExecutionOutcome::Uuid(_)));
+
+        let note_outcome = CreateConvertibleNote
+            .execute(
+                &serde_json::json!({
+                    "issuer-entity-id": issuer_id,
+                    "holder-entity-id": holder_id,
+                    "principal-amount": "25000",
+                    "expiration-date": "2028-01-01",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        assert!(matches!(note_outcome, VerbExecutionOutcome::Uuid(_)));
+
+        // exercise 400 of the 1000 option units -- partial, stays ACTIVE.
+        let exercise_outcome = crate::ops::dilution::Exercise
+            .execute(
+                &serde_json::json!({
+                    "instrument-id": option_id,
+                    "units": "400",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        assert!(matches!(exercise_outcome, VerbExecutionOutcome::Uuid(_)));
+
+        let (units_exercised, status): (rust_decimal::Decimal, String) = sqlx::query_as(
+            r#"SELECT units_exercised, status FROM "ob-poc".dilution_instruments WHERE instrument_id = $1"#,
+        )
+        .bind(option_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(units_exercised, rust_decimal::Decimal::from(400));
+        assert_eq!(status, "ACTIVE");
+
+        let holding_units: rust_decimal::Decimal = sqlx::query_scalar(
+            r#"SELECT units FROM "ob-poc".holdings WHERE share_class_id = $1 AND investor_entity_id = $2"#,
+        )
+        .bind(share_class_id)
+        .bind(holder_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(holding_units, rust_decimal::Decimal::from(400));
+
+        // forfeit the remaining 600 -- full consumption (400 exercised + 600
+        // forfeited == 1000 granted), terminal FORFEITED status.
+        let forfeit_outcome = crate::ops::dilution::Forfeit
+            .execute(
+                &serde_json::json!({
+                    "instrument-id": option_id,
+                    "units": "600",
+                    "reason": "employee departure",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        match forfeit_outcome {
+            VerbExecutionOutcome::Affected(n) => assert_eq!(n, 1),
+            other => panic!("expected Affected, got {other:?}"),
+        }
+
+        let (units_forfeited, status, notes): (rust_decimal::Decimal, String, Option<String>) =
+            sqlx::query_as(
+                r#"SELECT units_forfeited, status, notes FROM "ob-poc".dilution_instruments WHERE instrument_id = $1"#,
+            )
+            .bind(option_id)
+            .fetch_one(scope.executor())
+            .await?;
+        assert_eq!(units_forfeited, rust_decimal::Decimal::from(600));
+        assert_eq!(status, "FORFEITED");
+        assert!(notes.unwrap_or_default().contains("employee departure"));
+
+        // list ALL: 4 instruments (option forfeited, warrant + safe + note active).
+        let list_outcome = List
+            .execute(
+                &serde_json::json!({ "issuer-entity-id": issuer_id, "status": "ALL" }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        let records = match list_outcome {
+            VerbExecutionOutcome::RecordSet(v) => v,
+            other => panic!("expected RecordSet, got {other:?}"),
+        };
+        assert_eq!(records.len(), 4);
+
+        // get-summary: ACTIVE-only aggregation -- the forfeited option is
+        // excluded, the warrant (still ACTIVE) is included with a real
+        // weighted_avg_strike.
+        let summary_outcome = GetSummary
+            .execute(
+                &serde_json::json!({ "issuer-entity-id": issuer_id }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        let summary = match summary_outcome {
+            VerbExecutionOutcome::Record(v) => v,
+            other => panic!("expected Record, got {other:?}"),
+        };
+        let by_type = summary["by_instrument_type"].as_array().expect("by_instrument_type array");
+        let types: Vec<&str> = by_type
+            .iter()
+            .map(|e| e["instrument_type"].as_str().unwrap())
+            .collect();
+        assert!(types.contains(&"WARRANT"));
+        assert!(!types.contains(&"STOCK_OPTION"));
+        let warrant_entry = by_type
+            .iter()
+            .find(|e| e["instrument_type"] == "WARRANT")
+            .unwrap();
+        assert_eq!(warrant_entry["units_outstanding"], "500.000000");
+        assert!(warrant_entry["weighted_avg_strike"].is_string());
+
+        drop(scope);
+        db.cleanup().await?;
+        Ok(())
+    }
 }

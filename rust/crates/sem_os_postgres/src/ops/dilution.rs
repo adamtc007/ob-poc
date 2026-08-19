@@ -2,20 +2,49 @@
 //! re-implementation of `capital.dilution.*` from
 //! `rust/config/verbs/capital.yaml`.
 //!
+//! Rewritten 2026-08-19 (EOP-PLAN share-register board design pass, Phase 3):
+//! every create/list/forfeit op referenced schema that never existed live
+//! on `"ob-poc".dilution_instruments` (`share_class_id`, `units_authorized`/
+//! `units_outstanding`, `strike_price`, `grant_date`, `expiry_date`,
+//! `warrant_series`, `safe_type`, `interest_rate`, `maturity_date` — none of
+//! these columns exist; the real names are `converts_to_share_class_id`,
+//! `units_granted`, `exercise_price`, `expiration_date`, and there is no
+//! grant/issue-date column at all) and wrote `status = 'OUTSTANDING'`, a
+//! value the live `dilution_instruments_chk_dilution_status` CHECK
+//! constraint rejects outright (valid values: ACTIVE, EXERCISED, EXPIRED,
+//! FORFEITED, CANCELLED) -- every create call and `forfeit` would have
+//! errored on the CHECK, every time. `exercise` was the one op already
+//! correct against the live schema (including the ACTIVE/EXERCISED
+//! vocabulary), so it was the reference used to correct the rest, not the
+//! outlier that needed fixing. The verb YAML's args
+//! (`config/verbs/capital.yaml`) were already aligned to the real column
+//! names; only the Rust bodies were stale.
+//!
 //! Ops:
-//! - `grant-options` — insert OPTION instrument with vesting schedule
+//! - `grant-options` — insert STOCK_OPTION instrument with vesting schedule
 //! - `issue-warrant` — insert WARRANT instrument
-//! - `create-safe` — insert SAFE (cap + discount)
-//! - `create-convertible-note` — insert CONVERTIBLE_NOTE
+//! - `create-safe` — insert SAFE (cap + discount, units_granted = 0 until a
+//!   priced-round conversion -- SAFEs have no defined unit count at
+//!   creation; see the migration note on `create-safe`/
+//!   `create-convertible-note` below)
+//! - `create-convertible-note` — insert CONVERTIBLE_NOTE (units_granted = 0,
+//!   same reasoning)
 //! - `exercise` — atomically convert instrument → shares with
 //!   FOR UPDATE lock + optimistic check + idempotency key. The retry
 //!   loop present in the legacy impl is dropped: under the Sequencer
 //!   scope, the surrounding transaction owns retry semantics, and a
 //!   serialization conflict simply aborts the verb step (which the
 //!   runbook compiler can replay).
-//! - `forfeit` — cancel unvested units (audit event + supply update)
+//! - `forfeit` — reduce outstanding units (units_forfeited), terminal
+//!   FORFEITED status on full consumption; the forfeiture reason is
+//!   recorded on the instrument's own `notes` column -- there is no
+//!   separate forfeiture-event table, and `dilution_exercise_events`'
+//!   NOT NULL `units_exercised`/`shares_issued` columns don't fit a
+//!   zero-conversion event without fabricating misleading rows in a table
+//!   named for a different kind of event.
 //! - `list` — filter by instrument_type + status
-//! - `get-summary` — aggregate dilution % against supply
+//! - `get-summary` — aggregate dilution % against supply (direct query;
+//!   the `v_dilution_summary` view this used to read never existed live)
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -40,6 +69,22 @@ fn date_arg(args: &Value, arg_name: &str) -> NaiveDate {
         .unwrap_or_else(|| chrono::Utc::now().date_naive())
 }
 
+fn opt_date_arg(args: &Value, arg_name: &str) -> Option<NaiveDate> {
+    json_extract_string_opt(args, arg_name)
+        .as_deref()
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+}
+
+fn decimal_arg(args: &Value, arg_name: &str) -> Result<rust_decimal::Decimal> {
+    json_extract_string_opt(args, arg_name)
+        .and_then(|s| s.parse().ok())
+        .ok_or_else(|| anyhow!("{} is required", arg_name))
+}
+
+fn opt_decimal_arg(args: &Value, arg_name: &str) -> Option<rust_decimal::Decimal> {
+    json_extract_string_opt(args, arg_name).and_then(|s| s.parse().ok())
+}
+
 pub struct GrantOptions;
 
 #[async_trait]
@@ -53,54 +98,43 @@ impl SemOsVerbOp for GrantOptions {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let converts_to_share_class_id =
+            json_extract_uuid(args, ctx, "converts-to-share-class-id")?;
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("units is required"))?;
-        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("strike-price is required"))?;
-        let grant_date = date_arg(args, "grant-date");
-        let vesting_start_date = json_extract_string_opt(args, "vesting-start-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let expiry_date = json_extract_string_opt(args, "expiry-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let vesting_months = json_extract_int_opt(args, "vesting-months").map(|i| i as i32);
-        let cliff_months = json_extract_int_opt(args, "cliff-months").map(|i| i as i32);
+        let units = decimal_arg(args, "units")?;
+        let exercise_price = decimal_arg(args, "exercise-price")?;
+        let exercise_currency =
+            json_extract_string_opt(args, "exercise-currency").unwrap_or_else(|| "USD".into());
+        let vesting_start_date = opt_date_arg(args, "vesting-start-date");
+        let vesting_end_date = opt_date_arg(args, "vesting-end-date");
+        let vesting_cliff_months = json_extract_int_opt(args, "vesting-cliff-months")
+            .map(|i| i as i32)
+            .unwrap_or(12);
+        let expiration_date = date_arg(args, "expiration-date");
         let plan_name = json_extract_string_opt(args, "plan-name");
-
-        let issuer_entity_id: Uuid = sqlx::query_scalar(
-            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
-        )
-        .bind(share_class_id)
-        .fetch_optional(scope.executor())
-        .await?
-        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                units_authorized, units_outstanding, strike_price, grant_date,
-                vesting_start_date, expiry_date, vesting_months, cliff_months,
-                status, plan_name
-            ) VALUES ($1, $2, $3, 'OPTION', $4, $4, $5, $6, $7, $8, $9, $10, 'OUTSTANDING', $11)
+                issuer_entity_id, converts_to_share_class_id, holder_entity_id,
+                instrument_type, units_granted, exercise_price, exercise_currency,
+                vesting_start_date, vesting_end_date, vesting_cliff_months,
+                expiration_date, plan_name
+            ) VALUES ($1, $2, $3, 'STOCK_OPTION', $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING instrument_id
             "#,
         )
         .bind(issuer_entity_id)
-        .bind(share_class_id)
+        .bind(converts_to_share_class_id)
         .bind(holder_entity_id)
         .bind(units)
-        .bind(strike_price)
-        .bind(grant_date)
+        .bind(exercise_price)
+        .bind(&exercise_currency)
         .bind(vesting_start_date)
-        .bind(expiry_date)
-        .bind(vesting_months)
-        .bind(cliff_months)
+        .bind(vesting_end_date)
+        .bind(vesting_cliff_months)
+        .bind(expiration_date)
         .bind(&plan_name)
         .fetch_one(scope.executor())
         .await?;
@@ -122,46 +156,32 @@ impl SemOsVerbOp for IssueWarrant {
         ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
+        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let converts_to_share_class_id =
+            json_extract_uuid(args, ctx, "converts-to-share-class-id")?;
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let units: rust_decimal::Decimal = json_extract_string_opt(args, "units")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("units is required"))?;
-        let strike_price: rust_decimal::Decimal = json_extract_string_opt(args, "strike-price")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("strike-price is required"))?;
-        let grant_date = date_arg(args, "grant-date");
-        let expiry_date = json_extract_string_opt(args, "expiry-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let warrant_series = json_extract_string_opt(args, "warrant-series");
-
-        let issuer_entity_id: Uuid = sqlx::query_scalar(
-            r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
-        )
-        .bind(share_class_id)
-        .fetch_optional(scope.executor())
-        .await?
-        .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
+        let units = decimal_arg(args, "units")?;
+        let exercise_price = decimal_arg(args, "exercise-price")?;
+        let exercisable_from = opt_date_arg(args, "exercisable-from");
+        let expiration_date = date_arg(args, "expiration-date");
 
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                units_authorized, units_outstanding, strike_price, grant_date,
-                expiry_date, status, warrant_series
-            ) VALUES ($1, $2, $3, 'WARRANT', $4, $4, $5, $6, $7, 'OUTSTANDING', $8)
+                issuer_entity_id, converts_to_share_class_id, holder_entity_id,
+                instrument_type, units_granted, exercise_price, exercisable_from,
+                expiration_date
+            ) VALUES ($1, $2, $3, 'WARRANT', $4, $5, $6, $7)
             RETURNING instrument_id
             "#,
         )
         .bind(issuer_entity_id)
-        .bind(share_class_id)
+        .bind(converts_to_share_class_id)
         .bind(holder_entity_id)
         .bind(units)
-        .bind(strike_price)
-        .bind(grant_date)
-        .bind(expiry_date)
-        .bind(&warrant_series)
+        .bind(exercise_price)
+        .bind(exercisable_from)
+        .bind(expiration_date)
         .fetch_one(scope.executor())
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
@@ -183,37 +203,35 @@ impl SemOsVerbOp for CreateSafe {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let converts_to_share_class_id =
+            json_extract_uuid_opt(args, ctx, "converts-to-share-class-id");
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("principal is required"))?;
-        let valuation_cap: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "valuation-cap").and_then(|s| s.parse().ok());
-        let discount_pct: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
-        let grant_date = date_arg(args, "investment-date");
-        let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
-        let safe_type =
-            json_extract_string_opt(args, "safe-type").unwrap_or_else(|| "POST_MONEY".to_string());
+        let principal_amount = decimal_arg(args, "principal-amount")?;
+        let valuation_cap = opt_decimal_arg(args, "valuation-cap");
+        let discount_pct = opt_decimal_arg(args, "discount-pct");
 
+        // units_granted is NOT NULL with a CHECK (>= 0) on the live table --
+        // a SAFE has no defined share count until it converts in a priced
+        // round, so 0 is the correct "not yet determined" value, not a
+        // placeholder. No conversion capability for SAFEs/notes exists yet
+        // (out of scope this pass); `exercise` only handles instruments
+        // that already carry a real units_granted (options/warrants).
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                principal_amount, valuation_cap, discount_pct, grant_date,
-                status, safe_type
-            ) VALUES ($1, $2, $3, 'SAFE', $4, $5, $6, $7, 'OUTSTANDING', $8)
+                issuer_entity_id, converts_to_share_class_id, holder_entity_id,
+                instrument_type, units_granted, principal_amount, valuation_cap,
+                discount_pct
+            ) VALUES ($1, $2, $3, 'SAFE', 0, $4, $5, $6)
             RETURNING instrument_id
             "#,
         )
         .bind(issuer_entity_id)
-        .bind(target_share_class_id)
+        .bind(converts_to_share_class_id)
         .bind(holder_entity_id)
-        .bind(principal)
+        .bind(principal_amount)
         .bind(valuation_cap)
         .bind(discount_pct)
-        .bind(grant_date)
-        .bind(&safe_type)
         .fetch_one(scope.executor())
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
@@ -235,41 +253,33 @@ impl SemOsVerbOp for CreateConvertibleNote {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
+        let converts_to_share_class_id =
+            json_extract_uuid_opt(args, ctx, "converts-to-share-class-id");
         let holder_entity_id = json_extract_uuid(args, ctx, "holder-entity-id")?;
-        let principal: rust_decimal::Decimal = json_extract_string_opt(args, "principal")
-            .and_then(|s| s.parse().ok())
-            .ok_or_else(|| anyhow!("principal is required"))?;
-        let interest_rate: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "interest-rate").and_then(|s| s.parse().ok());
-        let valuation_cap: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "valuation-cap").and_then(|s| s.parse().ok());
-        let discount_pct: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "discount-pct").and_then(|s| s.parse().ok());
-        let grant_date = date_arg(args, "issue-date");
-        let maturity_date = json_extract_string_opt(args, "maturity-date")
-            .as_deref()
-            .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
-        let target_share_class_id = json_extract_uuid_opt(args, ctx, "target-share-class-id");
+        let principal_amount = decimal_arg(args, "principal-amount")?;
+        let valuation_cap = opt_decimal_arg(args, "valuation-cap");
+        let discount_pct = opt_decimal_arg(args, "discount-pct");
+        let expiration_date = date_arg(args, "expiration-date");
 
+        // units_granted = 0: same reasoning as create-safe above -- a
+        // convertible note has no defined share count until conversion.
         let instrument_id: Uuid = sqlx::query_scalar(
             r#"
             INSERT INTO "ob-poc".dilution_instruments (
-                issuer_entity_id, share_class_id, holder_entity_id, instrument_type,
-                principal_amount, interest_rate, valuation_cap, discount_pct,
-                grant_date, maturity_date, status
-            ) VALUES ($1, $2, $3, 'CONVERTIBLE_NOTE', $4, $5, $6, $7, $8, $9, 'OUTSTANDING')
+                issuer_entity_id, converts_to_share_class_id, holder_entity_id,
+                instrument_type, units_granted, principal_amount, valuation_cap,
+                discount_pct, expiration_date
+            ) VALUES ($1, $2, $3, 'CONVERTIBLE_NOTE', 0, $4, $5, $6, $7)
             RETURNING instrument_id
             "#,
         )
         .bind(issuer_entity_id)
-        .bind(target_share_class_id)
+        .bind(converts_to_share_class_id)
         .bind(holder_entity_id)
-        .bind(principal)
-        .bind(interest_rate)
+        .bind(principal_amount)
         .bind(valuation_cap)
         .bind(discount_pct)
-        .bind(grant_date)
-        .bind(maturity_date)
+        .bind(expiration_date)
         .fetch_one(scope.executor())
         .await?;
         ctx.bind("dilution_instrument", instrument_id);
@@ -505,24 +515,41 @@ impl SemOsVerbOp for Forfeit {
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
         let instrument_id = json_extract_uuid(args, ctx, "instrument-id")?;
-        let units: Option<rust_decimal::Decimal> =
-            json_extract_string_opt(args, "units").and_then(|s| s.parse().ok());
+        let units_to_forfeit = decimal_arg(args, "units")?;
         let forfeit_date = date_arg(args, "forfeit-date");
         let reason = json_extract_string_opt(args, "reason");
 
-        let instrument: Option<(rust_decimal::Decimal,)> = sqlx::query_as(
+        if units_to_forfeit <= rust_decimal::Decimal::ZERO {
+            return Err(anyhow!("units must be positive"));
+        }
+
+        let row = sqlx::query(
             r#"
-            SELECT units_outstanding
+            SELECT units_granted, units_exercised, units_forfeited, status
             FROM "ob-poc".dilution_instruments
-            WHERE instrument_id = $1 AND status = 'OUTSTANDING'
+            WHERE instrument_id = $1
+            FOR UPDATE
             "#,
         )
         .bind(instrument_id)
         .fetch_optional(scope.executor())
-        .await?;
-        let (outstanding,) = instrument
-            .ok_or_else(|| anyhow!("Instrument {} not found or not outstanding", instrument_id))?;
-        let units_to_forfeit = units.unwrap_or(outstanding);
+        .await?
+        .ok_or_else(|| anyhow!("Instrument {} not found", instrument_id))?;
+
+        let units_granted: rust_decimal::Decimal = row.get("units_granted");
+        let units_exercised: rust_decimal::Decimal = row.get("units_exercised");
+        let units_forfeited: rust_decimal::Decimal = row.get("units_forfeited");
+        let status: String = row.get("status");
+
+        if status != "ACTIVE" {
+            return Err(anyhow!(
+                "Instrument {} is not active (status={})",
+                instrument_id,
+                status
+            ));
+        }
+
+        let outstanding = units_granted - units_exercised - units_forfeited;
         if units_to_forfeit > outstanding {
             return Err(anyhow!(
                 "Cannot forfeit {} units: only {} outstanding",
@@ -531,42 +558,51 @@ impl SemOsVerbOp for Forfeit {
             ));
         }
 
-        let event_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".dilution_exercise_events (
-                instrument_id, exercise_type, units, exercise_date, notes, status
-            ) VALUES ($1, 'FORFEIT', $2, $3, $4, 'COMPLETED')
-            RETURNING event_id
-            "#,
-        )
-        .bind(instrument_id)
-        .bind(units_to_forfeit)
-        .bind(forfeit_date)
-        .bind(&reason)
-        .fetch_one(scope.executor())
-        .await?;
-
-        let remaining = outstanding - units_to_forfeit;
-        let new_status = if remaining == rust_decimal::Decimal::ZERO {
+        let new_units_forfeited = units_forfeited + units_to_forfeit;
+        let new_status = if units_exercised + new_units_forfeited >= units_granted {
             "FORFEITED"
         } else {
-            "OUTSTANDING"
+            "ACTIVE"
         };
-        sqlx::query(
+        let note = format!(
+            "FORFEIT {} units on {}{}",
+            units_to_forfeit,
+            forfeit_date,
+            reason
+                .map(|r| format!(": {r}"))
+                .unwrap_or_default()
+        );
+
+        // No dedicated forfeiture-event table exists -- dilution_exercise_events'
+        // NOT NULL units_exercised/shares_issued columns describe a real
+        // conversion, not a forfeiture, so a synthetic zero-value row there
+        // would misrepresent the instrument's history. The reason is
+        // recorded on the instrument's own notes column instead.
+        let rows = sqlx::query(
             r#"
             UPDATE "ob-poc".dilution_instruments
-            SET units_outstanding = $2, status = $3, updated_at = now()
+            SET units_forfeited = $2,
+                status = $3,
+                notes = COALESCE(notes || E'\n', '') || $4,
+                updated_at = now()
             WHERE instrument_id = $1
+              AND units_forfeited = $5
             "#,
         )
         .bind(instrument_id)
-        .bind(remaining)
+        .bind(new_units_forfeited)
         .bind(new_status)
+        .bind(&note)
+        .bind(units_forfeited)
         .execute(scope.executor())
-        .await?;
+        .await?
+        .rows_affected();
+        if rows == 0 {
+            return Err(anyhow!("Concurrent modification detected"));
+        }
 
-        ctx.bind("dilution_exercise", event_id);
-        Ok(VerbExecutionOutcome::Uuid(event_id))
+        ctx.bind("dilution_instrument", instrument_id);
+        Ok(VerbExecutionOutcome::Affected(rows))
     }
 }
 
@@ -580,39 +616,39 @@ impl SemOsVerbOp for List {
     async fn execute(
         &self,
         args: &Value,
-        ctx: &mut VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let instrument_type = json_extract_string_opt(args, "instrument-type");
+        let issuer_entity_id = json_extract_uuid(args, _ctx, "issuer-entity-id")?;
+        let instrument_type = json_extract_string_opt(args, "instrument-type")
+            .filter(|t| t != "ALL");
         let status =
-            json_extract_string_opt(args, "status").unwrap_or_else(|| "OUTSTANDING".to_string());
+            json_extract_string_opt(args, "status").unwrap_or_else(|| "ACTIVE".to_string());
 
-        type Row13 = (
+        type Row12 = (
             Uuid,
             Uuid,
             Option<Uuid>,
-            Uuid,
+            Option<Uuid>,
             String,
             rust_decimal::Decimal,
             rust_decimal::Decimal,
+            rust_decimal::Decimal,
             Option<rust_decimal::Decimal>,
             Option<rust_decimal::Decimal>,
-            Option<rust_decimal::Decimal>,
-            NaiveDate,
             Option<NaiveDate>,
             String,
         );
-        let instruments: Vec<Row13> = if let Some(ref itype) = instrument_type {
+        let instruments: Vec<Row12> = if let Some(ref itype) = instrument_type {
             sqlx::query_as(
                 r#"
-                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
-                       instrument_type, units_authorized, units_outstanding,
-                       strike_price, principal_amount, valuation_cap,
-                       grant_date, expiry_date, status
+                SELECT instrument_id, issuer_entity_id, converts_to_share_class_id,
+                       holder_entity_id, instrument_type, units_granted, units_exercised,
+                       units_forfeited, exercise_price, principal_amount,
+                       expiration_date, status
                 FROM "ob-poc".dilution_instruments
                 WHERE issuer_entity_id = $1 AND instrument_type = $2 AND status = $3
-                ORDER BY grant_date DESC
+                ORDER BY created_at DESC
                 "#,
             )
             .bind(issuer_entity_id)
@@ -623,13 +659,13 @@ impl SemOsVerbOp for List {
         } else if status == "ALL" {
             sqlx::query_as(
                 r#"
-                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
-                       instrument_type, units_authorized, units_outstanding,
-                       strike_price, principal_amount, valuation_cap,
-                       grant_date, expiry_date, status
+                SELECT instrument_id, issuer_entity_id, converts_to_share_class_id,
+                       holder_entity_id, instrument_type, units_granted, units_exercised,
+                       units_forfeited, exercise_price, principal_amount,
+                       expiration_date, status
                 FROM "ob-poc".dilution_instruments
                 WHERE issuer_entity_id = $1
-                ORDER BY grant_date DESC
+                ORDER BY created_at DESC
                 "#,
             )
             .bind(issuer_entity_id)
@@ -638,13 +674,13 @@ impl SemOsVerbOp for List {
         } else {
             sqlx::query_as(
                 r#"
-                SELECT instrument_id, issuer_entity_id, share_class_id, holder_entity_id,
-                       instrument_type, units_authorized, units_outstanding,
-                       strike_price, principal_amount, valuation_cap,
-                       grant_date, expiry_date, status
+                SELECT instrument_id, issuer_entity_id, converts_to_share_class_id,
+                       holder_entity_id, instrument_type, units_granted, units_exercised,
+                       units_forfeited, exercise_price, principal_amount,
+                       expiration_date, status
                 FROM "ob-poc".dilution_instruments
                 WHERE issuer_entity_id = $1 AND status = $2
-                ORDER BY grant_date DESC
+                ORDER BY created_at DESC
                 "#,
             )
             .bind(issuer_entity_id)
@@ -655,12 +691,17 @@ impl SemOsVerbOp for List {
 
         let mut out: Vec<Value> = Vec::with_capacity(instruments.len());
         for i in &instruments {
-            let holder_name: Option<String> = sqlx::query_scalar(
-                r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
-            )
-            .bind(i.3)
-            .fetch_optional(scope.executor())
-            .await?;
+            let holder_name: Option<String> = match i.3 {
+                Some(holder_id) => {
+                    sqlx::query_scalar(
+                        r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1 AND deleted_at IS NULL"#,
+                    )
+                    .bind(holder_id)
+                    .fetch_optional(scope.executor())
+                    .await?
+                }
+                None => None,
+            };
             let share_class_name: Option<String> = if let Some(sc_id) = i.2 {
                 sqlx::query_scalar(r#"SELECT name FROM "ob-poc".share_classes WHERE id = $1"#)
                     .bind(sc_id)
@@ -669,6 +710,7 @@ impl SemOsVerbOp for List {
             } else {
                 None
             };
+            let units_outstanding = i.5 - i.6 - i.7;
             out.push(json!({
                 "instrument_id": i.0,
                 "share_class_id": i.2,
@@ -676,14 +718,12 @@ impl SemOsVerbOp for List {
                 "holder_entity_id": i.3,
                 "holder_name": holder_name,
                 "instrument_type": i.4,
-                "units_authorized": i.5.to_string(),
-                "units_outstanding": i.6.to_string(),
-                "strike_price": i.7.map(|d| d.to_string()),
-                "principal_amount": i.8.map(|d| d.to_string()),
-                "valuation_cap": i.9.map(|d| d.to_string()),
-                "grant_date": i.10.to_string(),
-                "expiry_date": i.11.map(|d| d.to_string()),
-                "status": i.12
+                "units_granted": i.5.to_string(),
+                "units_outstanding": units_outstanding.to_string(),
+                "exercise_price": i.8.map(|d| d.to_string()),
+                "principal_amount": i.9.map(|d| d.to_string()),
+                "expiration_date": i.10.map(|d| d.to_string()),
+                "status": i.11
             }));
         }
         Ok(VerbExecutionOutcome::RecordSet(out))
@@ -700,18 +740,19 @@ impl SemOsVerbOp for GetSummary {
     async fn execute(
         &self,
         args: &Value,
-        ctx: &mut VerbExecutionContext,
+        _ctx: &mut VerbExecutionContext,
         scope: &mut dyn TransactionScope,
     ) -> Result<VerbExecutionOutcome> {
-        let issuer_entity_id = json_extract_uuid(args, ctx, "issuer-entity-id")?;
-        let as_of = date_arg(args, "as-of");
-        let basis =
-            json_extract_string_opt(args, "basis").unwrap_or_else(|| "EXERCISABLE".to_string());
+        let issuer_entity_id = json_extract_uuid(args, _ctx, "issuer-entity-id")?;
 
+        // Direct aggregate query -- "ob-poc".v_dilution_summary never
+        // existed live (the historical migration defined it under the old
+        // kyc. schema, referencing share_classes.issued_shares, a column
+        // that also never existed; it was never carried over the schema
+        // rename).
         type SumRow = (
-            Uuid,
             String,
-            String,
+            Option<String>,
             rust_decimal::Decimal,
             rust_decimal::Decimal,
             rust_decimal::Decimal,
@@ -719,11 +760,19 @@ impl SemOsVerbOp for GetSummary {
         );
         let summary: Vec<SumRow> = sqlx::query_as(
             r#"
-            SELECT issuer_entity_id, share_class_name, instrument_type,
-                   units_authorized, units_outstanding, units_exercised, weighted_avg_strike
-            FROM "ob-poc".v_dilution_summary
-            WHERE issuer_entity_id = $1
-            ORDER BY instrument_type
+            SELECT di.instrument_type,
+                   sc.name AS share_class_name,
+                   SUM(di.units_granted) AS units_granted,
+                   SUM(di.units_exercised) AS units_exercised,
+                   SUM(di.units_granted - di.units_exercised - di.units_forfeited) AS units_outstanding,
+                   (SUM(di.exercise_price * di.units_granted) FILTER (WHERE di.exercise_price IS NOT NULL))
+                     / NULLIF(SUM(di.units_granted) FILTER (WHERE di.exercise_price IS NOT NULL), 0)
+                     AS weighted_avg_strike
+            FROM "ob-poc".dilution_instruments di
+            LEFT JOIN "ob-poc".share_classes sc ON sc.id = di.converts_to_share_class_id
+            WHERE di.issuer_entity_id = $1 AND di.status = 'ACTIVE'
+            GROUP BY di.instrument_type, sc.name
+            ORDER BY di.instrument_type
             "#,
         )
         .bind(issuer_entity_id)
@@ -731,19 +780,17 @@ impl SemOsVerbOp for GetSummary {
         .await?;
 
         let mut total_outstanding = rust_decimal::Decimal::ZERO;
-        let mut total_potential_shares = rust_decimal::Decimal::ZERO;
         let summary_data: Vec<Value> = summary
             .iter()
             .map(
-                |(_, class_name, itype, authorized, outstanding, exercised, avg_strike)| {
+                |(itype, class_name, granted, exercised, outstanding, avg_strike)| {
                     total_outstanding += outstanding;
-                    total_potential_shares += outstanding;
                     json!({
-                        "share_class_name": class_name,
                         "instrument_type": itype,
-                        "units_authorized": authorized.to_string(),
-                        "units_outstanding": outstanding.to_string(),
+                        "share_class_name": class_name,
+                        "units_granted": granted.to_string(),
                         "units_exercised": exercised.to_string(),
+                        "units_outstanding": outstanding.to_string(),
                         "weighted_avg_strike": avg_strike.map(|d| d.to_string())
                     })
                 },
@@ -754,25 +801,28 @@ impl SemOsVerbOp for GetSummary {
             r#"
             SELECT COALESCE(SUM(scs.outstanding_units), 0)
             FROM "ob-poc".share_classes sc
-            LEFT JOIN "ob-poc".share_class_supply scs ON scs.share_class_id = sc.id
-            WHERE sc.issuer_entity_id = $1
+            LEFT JOIN LATERAL (
+                SELECT outstanding_units FROM "ob-poc".share_class_supply
+                WHERE share_class_id = sc.id
+                ORDER BY as_of_date DESC
+                LIMIT 1
+            ) scs ON true
+            WHERE sc.issuer_entity_id = $1 AND sc.lifecycle_status <> 'LIQUIDATED'
             "#,
         )
         .bind(issuer_entity_id)
         .fetch_one(scope.executor())
         .await?;
 
-        let fully_diluted = outstanding_shares + total_potential_shares;
+        let fully_diluted = outstanding_shares + total_outstanding;
         let dilution_pct = if fully_diluted > rust_decimal::Decimal::ZERO {
-            (total_potential_shares / fully_diluted * rust_decimal::Decimal::from(100)).round_dp(4)
+            (total_outstanding / fully_diluted * rust_decimal::Decimal::from(100)).round_dp(4)
         } else {
             rust_decimal::Decimal::ZERO
         };
 
         Ok(VerbExecutionOutcome::Record(json!({
             "issuer_entity_id": issuer_entity_id,
-            "as_of_date": as_of.to_string(),
-            "basis": basis,
             "current_outstanding_shares": outstanding_shares.to_string(),
             "total_dilution_instruments_outstanding": total_outstanding.to_string(),
             "fully_diluted_shares": fully_diluted.to_string(),
