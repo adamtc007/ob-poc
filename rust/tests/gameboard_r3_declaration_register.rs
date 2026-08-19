@@ -1,25 +1,23 @@
-//! EOP-PLAN-GAMEBOARD-001 R3 — `declared_states_are_real_states` (RED first).
+//! EOP-PLAN-GAMEBOARD-001 R3 — `declared_states_are_real_states`.
 //!
 //! §1 fact 3: the declarations themselves are unvalidated. This test
 //! computes, for every verb declaring a non-empty `lifecycle.requires_states`,
 //! whether every declared value is a real state in its target slot's real
 //! `state_machine` vocabulary (read from the DAG YAML, the single source of
 //! truth for what a slot's states actually are — not re-derived, not
-//! guessed). It is RED today by design: 15 of 87 verbs fail this check
-//! (10 reference a state that doesn't exist on the target slot at all —
-//! `WRONG_VOCABULARY`; 5 use the free-text placeholder `"any non-terminal"`,
-//! which can never equal a real column value — `FREE_TEXT_ESCAPE`). Full
-//! detail, per-verb proposed corrections, and cross-cutting findings (in
-//! particular `screening.run`, which appears to target the wrong slot's
-//! vocabulary entirely, not just contain a typo) are drafted in
-//! `docs/eop/EOP-PLAN-GAMEBOARD-001_R3-Declaration-Register_v0.1.md` — a
-//! DRAFT awaiting ratification, not yet encoded.
+//! guessed). It was RED by design at first: 15 of 87 verbs failed this check
+//! (10 referenced a state that doesn't exist on the target slot at all —
+//! `WRONG_VOCABULARY`; 5 used the free-text placeholder `"any non-terminal"`,
+//! which can never equal a real column value — `FREE_TEXT_ESCAPE`). All 15
+//! are now resolved (2026-08-19) — see the register doc's "Encoding status"
+//! section for what changed and why:
+//! `docs/eop/EOP-PLAN-GAMEBOARD-001_R3-Declaration-Register_v0.1.md`.
 //!
-//! This test's own assertion pins the exact known-bad set so R3's eventual
-//! correction is a conscious, verifiable edit (same discipline as the two
-//! existing teeth in `domain_pack_config_qualification.rs`), not a silent
-//! flip. Target-slot resolution mirrors `resolve_transition_probe`'s own
-//! source of truth for 77/87 verbs (`transition_args.target_workspace`/
+//! This test's own assertion pins the exact known-bad set (now empty) so
+//! any future regression is a conscious, verifiable edit (same discipline
+//! as the two existing teeth in `domain_pack_config_qualification.rs`), not
+//! a silent flip. Target-slot resolution mirrors `resolve_transition_probe`'s
+//! own source of truth for 77/87 verbs (`transition_args.target_workspace`/
 //! `target_slot`, the field already confirmed correct in this session's R1
 //! trace); the remaining 10 (no `transition_args` declared at all) are
 //! resolved by the same manual/sibling-verb method the register doc used,
@@ -61,7 +59,9 @@ fn manual_target_overrides() -> BTreeMap<&'static str, (&'static str, &'static s
         ("cbu.add-product", ("cbu", "cbu")),
         ("trade-gateway.activate-gateway", ("instrument_matrix", "trade_gateway")),
         ("trade-gateway.suspend-gateway", ("instrument_matrix", "trade_gateway")),
-        ("entity-workstream.update-status", ("kyc", "entity_workstream")),
+        // entity-workstream.update-status: no longer has a `lifecycle` block
+        // at all (removed 2026-08-19 — states move back/forth freely, no
+        // restriction applies), so it no longer needs a target override.
         ("entity-workstream.complete", ("kyc", "entity_workstream")),
         ("screening.bulk-refresh", ("kyc", "screening")),
         ("governance.submit-for-review", ("semos_maintenance", "changeset")),
@@ -222,13 +222,15 @@ fn declared_states_are_real_states() {
     // needing a ruling — moved out of free_text_escape into the corrected
     // set.
     let expected_wrong_vocabulary: Vec<&str> = vec![];
-    let expected_free_text_escape = vec![
-        "entity-workstream.update-status",
-        "kyc-case.close",
-        "kyc-case.escalate",
-        "kyc-case.refer",
-        "kyc-case.reject",
-    ];
+    // R3 encoding complete (EOP-PLAN-GAMEBOARD-001, 2026-08-19): the 5
+    // remaining FREE_TEXT_ESCAPE rows are resolved per Adam's ruling —
+    // kyc_case terminal = APPROVED, REJECTED, WITHDRAWN, DO_NOT_ONBOARD,
+    // EXPIRED, BLOCKED (close/escalate/refer/reject now declare the
+    // concrete non-terminal complement); entity_workstream states move back
+    // and forth freely by design ("we need to be able to move back and
+    // forward between these states"), so update-status's lifecycle block
+    // was removed entirely rather than given a state list.
+    let expected_free_text_escape: Vec<&str> = vec![];
 
     assert_eq!(
         wrong_vocabulary, expected_wrong_vocabulary,
@@ -241,17 +243,14 @@ fn declared_states_are_real_states() {
         "FREE_TEXT_ESCAPE set changed — same register, same discipline"
     );
 
-    // The RED assertion: the plan's real target. Currently false for 15 of
-    // 87 verbs (10 WRONG_VOCABULARY ∪ 6 FREE_TEXT_ESCAPE, kyc-case.reject
-    // in both) — left failing on purpose until R3 is ratified and encoded.
+    // The plan's real target, now GREEN: R3 is fully ratified and encoded
+    // (2026-08-19) — all 15 originally-flagged verbs corrected.
     assert!(
         wrong_vocabulary.is_empty() && free_text_escape.is_empty(),
-        "R3 not yet ratified/encoded: {} verbs declare requires_states values \
-         that are not real states in their target slot's vocabulary \
+        "R3 regression: {} verbs declare requires_states values that are not \
+         real states in their target slot's vocabulary \
          (wrong_vocabulary={wrong_vocabulary:?}, free_text_escape={free_text_escape:?}). \
-         See the R3 register doc for per-verb proposed corrections — this \
-         assertion should flip only after Adam ratifies and Sonnet encodes \
-         those corrections, not before."
+         See the R3 register doc for the corrected values these should match."
         , wrong_vocabulary.len() + free_text_escape.len()
     );
 }

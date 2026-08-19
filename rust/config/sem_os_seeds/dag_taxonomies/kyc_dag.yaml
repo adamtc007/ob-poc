@@ -477,13 +477,20 @@ slots:
         - from: REVIEW
           to: REJECTED
           via: kyc-case.reject
-        - from: "(any non-terminal)"
+        # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): "(any
+        # non-terminal)" was a free-text placeholder no runtime evaluator
+        # could match. Replaced with the concrete non-terminal set per
+        # Adam's ruling — terminal = APPROVED, REJECTED, WITHDRAWN,
+        # DO_NOT_ONBOARD, EXPIRED, BLOCKED; this is everything else. Matches
+        # the requires_states now declared on close/escalate/refer/reject in
+        # config/verbs/kyc/kyc-case.yaml.
+        - from: "(INTAKE, DISCOVERY, ASSESSMENT, REVIEW, REFER_TO_REGULATOR)"
           to: BLOCKED
           via: kyc-case.escalate
-        - from: "(any non-terminal)"
+        - from: "(INTAKE, DISCOVERY, ASSESSMENT, REVIEW, REFER_TO_REGULATOR)"
           to: WITHDRAWN
           via: kyc-case.close
-        - from: "(any non-terminal)"
+        - from: "(INTAKE, DISCOVERY, ASSESSMENT, REVIEW, REFER_TO_REGULATOR)"
           to: DO_NOT_ONBOARD
           via: kyc-case.reject
           args:
@@ -495,12 +502,12 @@ slots:
         # not something to collapse to one verb). Split from the
         # compiler-rejected list-valued via into two real rows, same shape
         # as red_flag's UNDER_REVIEW -> CLOSED (2026-08-18 triage fix).
-        - from: "(any non-terminal)"
+        - from: "(INTAKE, DISCOVERY, ASSESSMENT, REVIEW, REFER_TO_REGULATOR)"
           to: REFER_TO_REGULATOR
           via: kyc-case.escalate
           args:
             escalation-level: BOARD
-        - from: "(any non-terminal)"
+        - from: "(INTAKE, DISCOVERY, ASSESSMENT, REVIEW, REFER_TO_REGULATOR)"
           to: REFER_TO_REGULATOR
           via: kyc-case.refer
         # was "kyc-case.reopen (for periodic review)" — prose annotation,

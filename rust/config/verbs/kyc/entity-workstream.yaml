@@ -104,10 +104,14 @@ domains:
           consequence:
             baseline: reviewable
       update-status:
-        lifecycle:
-          entity_arg: workstream-id
-          # WS-2.D batch 1 (2026-08-06): derived from the normative DAG.
-          requires_states: [any non-terminal]
+        # R3 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): the prior
+        # `lifecycle.requires_states: [any non-terminal]` was a free-text
+        # placeholder the gate could never literally match. Adam's ruling:
+        # entity_workstream states move back and forth freely (workstreams
+        # can be revisited, e.g. re-screened after a hit review) — no
+        # restriction is correct here, not a terminal-state list. Removed
+        # entirely, matching entity-workstream.complete's sibling precedent
+        # of dropping a bad declaration rather than patching it in place.
         flavour: attribute_mutating
         description: Update workstream status
         effect_class: read_modify_write

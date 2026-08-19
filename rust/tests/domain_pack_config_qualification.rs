@@ -589,13 +589,16 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
         "DAG-derivable verb universe shrank unexpectedly: {universe}"
     );
     assert!(
-        // Floor consciously lowered 79 (2026-08-19, EOP-PLAN-GAMEBOARD-001):
-        // trading-profile.create-draft's lifecycle block was removed
-        // entirely (it was a broken declaration that could never have
-        // worked — see this file's own dedicated pin comment above and
-        // the verb's own YAML comment). One fewer "covered" verb is
-        // correct, not a regression.
-        covered >= 79,
+        // Floor consciously lowered twice on 2026-08-19
+        // (EOP-PLAN-GAMEBOARD-001): 79 after trading-profile.create-draft's
+        // lifecycle block was removed entirely (broken declaration that
+        // could never have worked), then 78 after
+        // entity-workstream.update-status's was also removed entirely per
+        // Adam's ruling — entity_workstream states move back and forth
+        // freely, so no requires_states restriction applies (see the R3
+        // register doc and the verb's own YAML comment). Two fewer
+        // "covered" verbs, both correct, not regressions.
+        covered >= 78,
         "requires_states coverage regressed below the recorded floor \
          (batch 1 applied 2026-08-06): {covered} of {universe}"
     );
@@ -914,7 +917,14 @@ fn requires_states_domain_key_resolution_gap_is_exactly_known() {
         "capability-binding.retire",
         "capability-binding.start-pilot",
         "entity-workstream.complete",
-        "entity-workstream.update-status",
+        // entity-workstream.update-status REMOVED from this pin (2026-08-19,
+        // EOP-PLAN-GAMEBOARD-001): its `lifecycle` block was deleted
+        // entirely per Adam's ruling — entity_workstream states move back
+        // and forth freely, so no requires_states restriction applies. It
+        // no longer declares requires_states at all, so it's no longer in
+        // the "always no_slot_mapping-refuses" gap set — a deliberate move
+        // OUT of this pin, not a regression (per this test's own doc
+        // comment).
         "evidence.mark-verified",
         "governance.publish",
         "governance.record-review",
