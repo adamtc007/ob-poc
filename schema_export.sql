@@ -13833,7 +13833,7 @@ CREATE TABLE "ob-poc".holdings (
     provider character varying(50) DEFAULT 'MANUAL'::character varying,
     provider_reference character varying(100),
     provider_sync_at timestamp with time zone,
-    usage_type character varying(20) DEFAULT 'TA'::character varying
+    usage_type character varying(20) DEFAULT 'UBO'::character varying
 );
 
 
@@ -24962,6 +24962,21 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 ALTER TABLE ONLY "ob-poc".cbus
     ADD CONSTRAINT cbus_pkey PRIMARY KEY (cbu_id);
+
+
+--
+-- Name: holdings chk_holdings_ta_requires_investor_id; Type: CHECK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE "ob-poc".holdings
+    ADD CONSTRAINT chk_holdings_ta_requires_investor_id CHECK ((((usage_type)::text IS DISTINCT FROM 'TA'::text) OR (investor_id IS NOT NULL))) NOT VALID;
+
+
+--
+-- Name: CONSTRAINT chk_holdings_ta_requires_investor_id ON holdings; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON CONSTRAINT chk_holdings_ta_requires_investor_id ON "ob-poc".holdings IS 'A usage_type=TA holding must be linked to a real "ob-poc".investors row via investor_id -- TA is the Transfer Agency / KYC-as-a-Service register, not a free-text label. Added NOT VALID 2026-08-19; 4 pre-existing captest_*_majority_holder test rows are grandfathered exceptions, not validated.';
 
 
 --

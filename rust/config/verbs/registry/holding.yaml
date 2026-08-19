@@ -11,7 +11,19 @@ domains:
     verbs:
       create:
         flavour: instance_adding
-        description: Create a new investor holding in a share class (idempotent by share_class+investor)
+        # usage_type restriction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): this
+        # verb has no investor-id/usage-type args -- it cannot reference the
+        # investors register at all, so TA (Transfer Agency) was never a
+        # correct default for it. "ob-poc".holdings.usage_type's DB default
+        # was flipped TA -> UBO (migration 20260819_holdings_ta_requires_
+        # investor.sql), which is what this verb's rows silently pick up
+        # since it never lists usage_type in its own args. A CHECK
+        # constraint (chk_holdings_ta_requires_investor_id) enforces this
+        # for any future write path, not just this verb: a TA holding must
+        # carry a real investor_id. Real TA holdings must go through
+        # holding.create-for-investor (requires investor-id + usage-type) or
+        # holding.ensure (optional investor-id/usage-type).
+        description: Create a new investor holding in a share class (idempotent by share_class+investor) -- UBO/generic path only; use create-for-investor for TA
         effect_class: idempotent_ensure
         metadata:
           tier: intent
