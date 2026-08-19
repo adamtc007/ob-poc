@@ -143,12 +143,14 @@ pub async fn evaluate_all(
     Ok(out)
 }
 
-/// Per-rule dispatch. Hand-verified subset (6 of 49 — cbu_validated_*/2 +
-/// deal_contracted_requires_bac_approved from the first pass, plus the 3
-/// KYC case-approval cluster rules added 2026-08-18) return a real
-/// `Clean`/`Violated` verdict; the confirmed-broken subset returns
-/// `SchemaMismatch` with the specific mismatch named; everything else is
-/// honestly `NotYetImplemented`.
+/// Per-rule dispatch. Hand-verified subset (8 of 49 — cbu_validated_*/2 +
+/// deal_contracted_requires_bac_approved from the first pass, the 3 KYC
+/// case-approval cluster rules added 2026-08-18, and the 2 investor-register
+/// rules added 2026-08-19 once the register was actually populated) return a
+/// real `Clean`/`Violated` verdict; everything else is honestly
+/// `NotYetImplemented`. No rule is currently `SchemaMismatch` — the 2 that
+/// were (investor_active_requires_kyc_approved,
+/// holding_active_requires_investor_active) are fixed as of 2026-08-19.
 async fn evaluate_one(rule_id: &str, pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
     match rule_id {
         // --- Hand-verified, real checks (3) ---------------------------------
@@ -160,31 +162,13 @@ async fn evaluate_one(rule_id: &str, pool: &PgPool) -> anyhow::Result<Constraint
         }
         "deal_contracted_requires_bac_approved" => bac_approved(pool).await,
 
-        // --- Confirmed schema mismatches (found while verifying the
-        // subset above; not guessed into a different meaning) -------------
-        "investor_active_requires_kyc_approved" => Ok(ConstraintOutcome::SchemaMismatch {
-            detail: "rule text reads `investors.status = 'ACTIVE'`; the column is really \
-                     `lifecycle_state`, but a rename alone would be misleading — `investors` \
-                     has ZERO rows in production (confirmed live, EOP-PLAN-GAMEBOARD-001 R2 \
-                     Stage 1, 2026-08-18) despite investor.* verbs writing to it. `holdings` \
-                     (51 live rows) links its investor 100% via `investor_entity_id` (-> \
-                     entities), never via `investor_id` (-> investors, always NULL). The real \
-                     economic-holder relationship bypasses the `investors` register entirely \
-                     in this data. Renaming the column would make the rule syntactically valid \
-                     but vacuously Clean forever, not a meaningful check — holding off pending \
-                     a ruling on what 'investor active' should mean against the live join \
-                     shape, not reinterpreting it here."
-                .to_string(),
-        }),
-        "holding_active_requires_investor_active" => Ok(ConstraintOutcome::SchemaMismatch {
-            detail: "same root cause as investor_active_requires_kyc_approved: `holdings` \
-                     joins to `investors` only via `investor_id`, which is NULL on all 51 live \
-                     holdings rows; the live FK is `investor_entity_id` (-> entities), which \
-                     `investors` (0 rows) cannot resolve. Not reinterpreted to join through \
-                     entities instead — that changes what 'investor active' means, a ruling \
-                     this module doesn't make unilaterally."
-                .to_string(),
-        }),
+        // --- Investor register (2), hand-translated 2026-08-19 after the
+        // register was actually populated for the first time
+        // (20260819_backfill_investors_register_allianz.sql) — see that
+        // migration's own comment for why only 1 of 5 candidate investor
+        // entities was backfilled (the other 4 are captest_* fixture data).
+        "investor_active_requires_kyc_approved" => investor_kyc_approved(pool).await,
+        "holding_active_requires_investor_active" => holding_investor_active(pool).await,
 
         // --- KYC case-approval cluster (3), hand-translated 2026-08-18 ------
         "case_cannot_approve_without_workstreams_complete" => {
@@ -388,6 +372,58 @@ async fn case_screenings_resolved(pool: &PgPool) -> anyhow::Result<ConstraintOut
                 "APPROVED with {unresolved_count} unresolved screenings, no MITIGATED \
                  screening red_flag"
             ),
+        })
+        .collect();
+    Ok(ConstraintOutcome::Violated { entities })
+}
+
+/// `investor_active_requires_kyc_approved` — exact match to the corrected
+/// rule text (`investors.lifecycle_state`, not `status`; see
+/// `cbu_dag.yaml`'s own 2026-08-19 correction comment).
+async fn investor_kyc_approved(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
+    let rows: Vec<(Uuid,)> = sqlx::query_as(
+        r#"SELECT investor_id FROM "ob-poc".investors
+           WHERE lifecycle_state = 'ACTIVE' AND kyc_status IS DISTINCT FROM 'APPROVED'"#,
+    )
+    .fetch_all(pool)
+    .await?;
+    if rows.is_empty() {
+        return Ok(ConstraintOutcome::Clean);
+    }
+    let entities = rows
+        .into_iter()
+        .map(|(investor_id,)| ViolationExample {
+            entity_id: investor_id,
+            detail: "lifecycle_state=ACTIVE with kyc_status not APPROVED".to_string(),
+        })
+        .collect();
+    Ok(ConstraintOutcome::Violated { entities })
+}
+
+/// `holding_active_requires_investor_active` — scoped to `usage_type = 'TA'`
+/// per `cbu_dag.yaml`'s 2026-08-19 correction (the `UBO`-usage rows are a
+/// different register, never linked via `investor_id`).
+async fn holding_investor_active(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
+    let rows: Vec<(Uuid,)> = sqlx::query_as(
+        r#"
+        SELECT h.id FROM "ob-poc".holdings h
+        JOIN "ob-poc".investors i ON i.investor_id = h.investor_id
+        WHERE h.holding_status = 'ACTIVE'
+          AND h.usage_type = 'TA'
+          AND i.lifecycle_state IS DISTINCT FROM 'ACTIVE'
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+    if rows.is_empty() {
+        return Ok(ConstraintOutcome::Clean);
+    }
+    let entities = rows
+        .into_iter()
+        .map(|(holding_id,)| ViolationExample {
+            entity_id: holding_id,
+            detail: "holding_status=ACTIVE with parent investor not lifecycle_state=ACTIVE"
+                .to_string(),
         })
         .collect();
     Ok(ConstraintOutcome::Violated { entities })

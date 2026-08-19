@@ -1896,6 +1896,20 @@ impl DslExecutor {
             }
         }
 
+        // EOP-PLAN-GAMEBOARD-001 R2 follow-on (2026-08-19): narrow,
+        // verb-specific, fail-closed gates. Unlike the requires_states
+        // check above (which fail-opens if arg resolution fails), these
+        // refuse the transition — propagated via `?` — if their own arg
+        // can't be resolved. See each function's own doc comment for why.
+        if runtime_verb.full_name == "cbu.confirm" {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_cbu_evidence_verified(&json_args, scope).await?;
+        }
+        if runtime_verb.full_name == "investor.activate" {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_investor_kyc_approved(&json_args, scope).await?;
+        }
+
         // Durable verbs: normally routed through WorkflowDispatcher. The
         // BPMN worker path sets `ctx.allow_durable_direct` so internal
         // service tasks can invoke durable verb implementations directly —
@@ -2212,6 +2226,114 @@ async fn enforce_requires_states_precondition_with_mode(
         lifecycle.requires_states,
         current_state
     );
+}
+
+/// EOP-PLAN-GAMEBOARD-001 R2 follow-on (2026-08-19): `cbu.confirm`
+/// evidence-verification gate. `cbu_dag.yaml`'s `VALIDATED` state declares
+/// a `green_when` requiring `every cbu_evidence.verification_status =
+/// VERIFIED` — but `green_when` has zero runtime evaluators anywhere in
+/// this codebase (confirmed by direct search); `cbu.confirm` itself is a
+/// bare `crud` status flip with no evidence check at all. Live census
+/// (R2 Stage 1) found 93/93 VALIDATED CBUs violate this. This is a narrow,
+/// verb-specific, fail-closed gate — NOT a generalization of
+/// `green_when`/`precondition_checks` into a new dispatch mechanism (that
+/// is separate, larger follow-on work) and NOT the other 5 `green_when`
+/// conditions (mandates, disqualifying flags, investment_managers —
+/// deferred until each is independently verified against live data).
+///
+/// Same vacuous-ALL discipline as `cross_slot_census::evidence_set_verified`:
+/// zero evidence rows counts as a violation, not vacuous compliance.
+/// Unlike `enforce_requires_states_precondition`'s `LifecycleGateMode`
+/// fail-open classes, this is a compliance gate — any DB error, missing
+/// arg, or unparseable UUID fails closed (refuses the transition), it
+/// never silently waves the transition through.
+#[cfg(feature = "database")]
+async fn enforce_cbu_evidence_verified(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let cbu_id = json_args
+        .get("cbu-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "cbu.confirm: 'cbu-id' did not resolve to a uuid; refusing under the \
+                 fail-closed evidence-verification gate (EOP-PLAN-GAMEBOARD-001 R2)"
+            )
+        })?;
+    let (total, verified): (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE verification_status = 'VERIFIED') AS verified
+        FROM "ob-poc".cbu_evidence WHERE cbu_id = $1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_one(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "cbu.confirm: failed to read cbu_evidence for {cbu_id}; refusing under the \
+             fail-closed evidence-verification gate (EOP-PLAN-GAMEBOARD-001 R2): {e}"
+        )
+    })?;
+    if total == 0 || verified < total {
+        bail!(
+            "cbu.confirm refused: {cbu_id} has {verified}/{total} cbu_evidence rows VERIFIED \
+             (EOP-PLAN-GAMEBOARD-001 R2 evidence-verification gate — VALIDATED requires all \
+             evidence VERIFIED, matching cbu_dag.yaml's own green_when for this state)"
+        );
+    }
+    Ok(())
+}
+
+/// EOP-PLAN-GAMEBOARD-001 R2 follow-on (2026-08-19): `investor.activate`
+/// KYC-approval gate. The DAG transition `ELIGIBLE -> ACTIVE via:
+/// investor.activate` declares `precondition: "investor_kyc.status =
+/// APPROVED"` (`kyc_dag.yaml`), but `TransitionDef.precondition` has zero
+/// runtime evaluators anywhere in this codebase (same defect class as
+/// `green_when` — confirmed by direct search) — `investor.activate` is a
+/// bare `crud` status flip. Fail-closed for the same reason as
+/// `enforce_cbu_evidence_verified`: this is a compliance gate, not a
+/// metadata-completeness heuristic.
+#[cfg(feature = "database")]
+async fn enforce_investor_kyc_approved(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let investor_id = json_args
+        .get("investor-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "investor.activate: 'investor-id' did not resolve to a uuid; refusing under \
+                 the fail-closed KYC gate (EOP-PLAN-GAMEBOARD-001 R2)"
+            )
+        })?;
+    let kyc_status: Option<String> =
+        sqlx::query_scalar(r#"SELECT kyc_status FROM "ob-poc".investors WHERE investor_id = $1"#)
+            .bind(investor_id)
+            .fetch_optional(scope.executor())
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "investor.activate: failed to read investors.kyc_status for \
+                     {investor_id}; refusing under the fail-closed KYC gate \
+                     (EOP-PLAN-GAMEBOARD-001 R2): {e}"
+                )
+            })?
+            .flatten();
+    if kyc_status.as_deref() != Some("APPROVED") {
+        bail!(
+            "investor.activate refused: {investor_id} has kyc_status {kyc_status:?}, not \
+             APPROVED (EOP-PLAN-GAMEBOARD-001 R2 KYC gate — ELIGIBLE -> ACTIVE requires \
+             investor_kyc.status = APPROVED, matching kyc_dag.yaml's own declared \
+             precondition for this transition)"
+        );
+    }
+    Ok(())
 }
 
 // ============================================================================
@@ -3187,6 +3309,144 @@ mod tests {
             ghost_blocked.is_err(),
             "T0.2: absent row must block under FailClosed (closes C-027)"
         );
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// EOP-PLAN-GAMEBOARD-001 R2 follow-on (2026-08-19): live-DB proof that
+    /// `enforce_cbu_evidence_verified` actually blocks/passes. Inserts
+    /// `cbu_evidence` rows scoped to a real, existing cbu_id inside a
+    /// transaction that always rolls back on drop — never mutates real
+    /// data. RED before this pass: no such function existed; `cbu.confirm`
+    /// had no evidence check at all (the R2 census's own finding: 93/93
+    /// live VALIDATED CBUs violate this).
+    ///
+    /// Run: `DATABASE_URL=… cargo test --features database -p ob-poc \
+    ///   --lib -- dsl_v2::executor::tests::gameboard_r2_cbu_evidence_gate --ignored --nocapture`
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_cbu_evidence_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let cbu_id: Uuid = sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one cbu must exist");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("cbu-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // Wipe any pre-existing evidence for this cbu inside the (rolled
+        // back) transaction so the test controls the exact starting state.
+        sqlx::query(r#"DELETE FROM "ob-poc".cbu_evidence WHERE cbu_id = $1"#)
+            .bind(cbu_id)
+            .execute(scope.executor())
+            .await
+            .expect("clear evidence");
+
+        // BLOCK: zero evidence rows — the vacuous-ALL trap, same discipline
+        // as cross_slot_census::evidence_set_verified.
+        let zero_rows = enforce_cbu_evidence_verified(&args(cbu_id), &mut scope).await;
+        let zmsg = zero_rows.expect_err("zero evidence rows must be refused").to_string();
+        assert!(
+            zmsg.contains("0/0") && zmsg.contains("cbu.confirm"),
+            "zero-evidence refusal must name the verb and the 0/0 count: {zmsg}"
+        );
+
+        // BLOCK: one VERIFIED, one PENDING.
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbu_evidence
+               (cbu_id, evidence_type, evidence_category, verification_status, attestation_ref)
+               VALUES ($1, 'ATTESTATION', 'IDENTITY', 'VERIFIED', 'gameboard-r2-test-1'),
+                      ($1, 'ATTESTATION', 'IDENTITY', 'PENDING', 'gameboard-r2-test-2')"#,
+        )
+        .bind(cbu_id)
+        .execute(scope.executor())
+        .await
+        .expect("insert mixed evidence");
+        let mixed = enforce_cbu_evidence_verified(&args(cbu_id), &mut scope).await;
+        let mmsg = mixed.expect_err("mixed verified/pending evidence must be refused").to_string();
+        assert!(
+            mmsg.contains("1/2"),
+            "mixed-evidence refusal must name the count: {mmsg}"
+        );
+
+        // PASS: all VERIFIED.
+        sqlx::query(
+            r#"UPDATE "ob-poc".cbu_evidence SET verification_status = 'VERIFIED' WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .execute(scope.executor())
+        .await
+        .expect("verify remaining evidence");
+        enforce_cbu_evidence_verified(&args(cbu_id), &mut scope)
+            .await
+            .expect("all evidence VERIFIED must pass");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// EOP-PLAN-GAMEBOARD-001 R2 follow-on (2026-08-19): live-DB proof for
+    /// `enforce_investor_kyc_approved`. Inserts a throwaway `investors` row
+    /// inside a transaction that always rolls back on drop. RED before this
+    /// pass: `investor.activate`'s DAG-declared precondition
+    /// (`investor_kyc.status = APPROVED`) had zero runtime evaluators.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_investor_kyc_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let entity_id: Uuid = sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one entity must exist");
+        let investor_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".investors (entity_id, investor_type, kyc_status)
+               VALUES ($1, 'INDIVIDUAL', 'IN_PROGRESS') RETURNING investor_id"#,
+        )
+        .bind(entity_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway investor");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("investor-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // BLOCK: kyc_status = IN_PROGRESS.
+        let blocked = enforce_investor_kyc_approved(&args(investor_id), &mut scope).await;
+        let bmsg = blocked
+            .expect_err("kyc_status IN_PROGRESS must be refused")
+            .to_string();
+        assert!(
+            bmsg.contains("investor.activate") && bmsg.contains("IN_PROGRESS"),
+            "refusal must name the verb and the actual status: {bmsg}"
+        );
+
+        // PASS: kyc_status = APPROVED.
+        sqlx::query(r#"UPDATE "ob-poc".investors SET kyc_status = 'APPROVED' WHERE investor_id = $1"#)
+            .bind(investor_id)
+            .execute(scope.executor())
+            .await
+            .expect("approve kyc");
+        enforce_investor_kyc_approved(&args(investor_id), &mut scope)
+            .await
+            .expect("kyc_status APPROVED must pass");
 
         // scope drops here → rollback; no rows mutated anyway.
     }

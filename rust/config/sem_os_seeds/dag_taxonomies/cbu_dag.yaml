@@ -1365,18 +1365,28 @@ cross_slot_constraints:
     severity: error
 
   - id: investor_active_requires_kyc_approved
-    description: "investor.status = ACTIVE requires investor_kyc.status = APPROVED."
+    description: "investor.lifecycle_state = ACTIVE requires investor_kyc.status = APPROVED."
+    # R2 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): `status` was never
+    # a real column (real column: lifecycle_state) — found live when the
+    # register was actually populated for the first time
+    # (20260819_backfill_investors_register_allianz.sql).
     rule: |
-      investors.status = 'ACTIVE'
+      investors.lifecycle_state = 'ACTIVE'
         → investors.kyc_status = 'APPROVED'
     severity: error
 
   - id: holding_active_requires_investor_active
-    description: "holding.status = ACTIVE requires parent investor.status = ACTIVE."
+    description: "holding.status = ACTIVE (usage_type = TA) requires parent investor.lifecycle_state = ACTIVE."
+    # R2 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): same
+    # `status`->`lifecycle_state` fix, plus explicit `usage_type = 'TA'`
+    # scoping — `holdings.usage_type = 'UBO'` rows are ownership/control
+    # axis (a different register per CLAUDE.md's "Three Investment
+    # Registers"), never linked via investor_id, and out of scope for this
+    # rule.
     rule: |
-      holdings.holding_status = 'ACTIVE'
+      holdings.holding_status = 'ACTIVE' AND holdings.usage_type = 'TA'
         → investors WHERE investor_id = holdings.investor_id
-            .status = 'ACTIVE'
+            .lifecycle_state = 'ACTIVE'
     severity: error
 
   - id: holding_suspended_cascades_from_investor
