@@ -1928,6 +1928,11 @@ impl DslExecutor {
             let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
             enforce_holding_update_status_requires_investor_active(&json_args, scope).await?;
         }
+        if runtime_verb.full_name == "kyc-case.approve" {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_case_no_blocking_red_flags(&json_args, scope).await?;
+            enforce_case_screenings_resolved(&json_args, scope).await?;
+        }
 
         // Durable verbs: normally routed through WorkflowDispatcher. The
         // BPMN worker path sets `ctx.allow_durable_direct` so internal
@@ -2529,6 +2534,97 @@ async fn enforce_holding_update_status_requires_investor_active(
         return Ok(());
     };
     check_investor_is_active_holder(investor_id, scope).await
+}
+
+/// R2 Stage 2 Phase 3 (2026-08-19): `case_cannot_approve_with_unresolved_red_flags`
+/// for `kyc-case.approve`. `cross_slot_census.rs`'s `case_no_blocking_red_flags`
+/// is a **retrospective** audit (`WHERE c.status = 'APPROVED'` — finds
+/// cases that already got approved wrongly). This is the **prospective**
+/// version: check the case *being* approved, before the status flip.
+#[cfg(feature = "database")]
+async fn enforce_case_no_blocking_red_flags(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let case_id = json_args
+        .get("case-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "kyc-case.approve: 'case-id' did not resolve to a uuid; refusing under the \
+                 fail-closed gate (EOP-PLAN-GAMEBOARD-001 R2 Stage 2)"
+            )
+        })?;
+    let blocking_count: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM "ob-poc".red_flags WHERE case_id = $1 AND status = 'BLOCKING'"#,
+    )
+    .bind(case_id)
+    .fetch_one(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "kyc-case.approve: failed to read red_flags for {case_id}; refusing under the \
+             fail-closed gate (EOP-PLAN-GAMEBOARD-001 R2 Stage 2): {e}"
+        )
+    })?;
+    if blocking_count > 0 {
+        bail!(
+            "kyc-case.approve refused: case {case_id} has {blocking_count} BLOCKING red_flags \
+             (EOP-PLAN-GAMEBOARD-001 R2 Stage 2 — case_cannot_approve_with_unresolved_red_flags)"
+        );
+    }
+    Ok(())
+}
+
+/// R2 Stage 2 Phase 3 (2026-08-19): `case_cannot_approve_with_unresolved_screening_hits`
+/// for `kyc-case.approve`. Prospective version of `cross_slot_census.rs`'s
+/// `case_screenings_resolved` — same MITIGATED-red-flag override, scoped
+/// to the case being approved rather than a retrospective audit.
+#[cfg(feature = "database")]
+async fn enforce_case_screenings_resolved(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let case_id = json_args
+        .get("case-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .ok_or_else(|| {
+            anyhow!(
+                "kyc-case.approve: 'case-id' did not resolve to a uuid; refusing under the \
+                 fail-closed gate (EOP-PLAN-GAMEBOARD-001 R2 Stage 2)"
+            )
+        })?;
+    let unresolved_count: i64 = sqlx::query_scalar(
+        r#"
+        SELECT COUNT(*) FROM "ob-poc".entity_workstreams w
+        JOIN "ob-poc".screenings s ON s.workstream_id = w.workstream_id
+            AND s.status NOT IN ('CLEAR', 'HIT_DISMISSED', 'EXPIRED')
+        WHERE w.case_id = $1
+          AND NOT EXISTS (
+              SELECT 1 FROM "ob-poc".red_flags rf
+              WHERE rf.case_id = $1 AND rf.source = 'screening' AND rf.status = 'MITIGATED'
+          )
+        "#,
+    )
+    .bind(case_id)
+    .fetch_one(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "kyc-case.approve: failed to read screenings for {case_id}; refusing under the \
+             fail-closed gate (EOP-PLAN-GAMEBOARD-001 R2 Stage 2): {e}"
+        )
+    })?;
+    if unresolved_count > 0 {
+        bail!(
+            "kyc-case.approve refused: case {case_id} has {unresolved_count} unresolved \
+             screening hits with no MITIGATED override (EOP-PLAN-GAMEBOARD-001 R2 Stage 2 — \
+             case_cannot_approve_with_unresolved_screening_hits)"
+        );
+    }
+    Ok(())
 }
 
 /// EOP-PLAN-GAMEBOARD-001 follow-on (2026-08-19):
@@ -3943,6 +4039,155 @@ mod tests {
         enforce_holding_update_status_requires_investor_active(&args(holding_id, "ACTIVE"), &mut scope)
             .await
             .expect("TA holding going ACTIVE with an ACTIVE_HOLDER investor must pass");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// R2 Stage 2 Phase 3 (2026-08-19): live-DB proof for
+    /// `enforce_case_no_blocking_red_flags`. RED before this pass:
+    /// `kyc-case.approve` never checked for a live BLOCKING red flag at
+    /// all -- only `cross_slot_census.rs`'s retrospective audit could ever
+    /// find one, after the fact.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_case_no_blocking_red_flags_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let case_id: Uuid = sqlx::query_scalar(r#"SELECT case_id FROM "ob-poc".cases LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one case must exist");
+
+        // Clear any pre-existing red_flags for this case inside the
+        // (rolled-back) transaction so the test controls the exact
+        // starting state.
+        sqlx::query(r#"DELETE FROM "ob-poc".red_flags WHERE case_id = $1"#)
+            .bind(case_id)
+            .execute(scope.executor())
+            .await
+            .expect("clear red_flags");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("case-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // PASS: zero red_flags at all.
+        enforce_case_no_blocking_red_flags(&args(case_id), &mut scope)
+            .await
+            .expect("no red_flags at all must pass");
+
+        // BLOCK: one BLOCKING red flag.
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".red_flags (case_id, flag_type, severity, status, description)
+               VALUES ($1, 'sanctions_match', 'HARD_STOP', 'BLOCKING', 'gameboard-r2-test')"#,
+        )
+        .bind(case_id)
+        .execute(scope.executor())
+        .await
+        .expect("insert blocking red flag");
+        let blocked = enforce_case_no_blocking_red_flags(&args(case_id), &mut scope).await;
+        let bmsg = blocked
+            .expect_err("a live BLOCKING red flag must refuse approval")
+            .to_string();
+        assert!(
+            bmsg.contains('1'),
+            "refusal must name the blocking count: {bmsg}"
+        );
+
+        // PASS: flag resolved to CLOSED.
+        sqlx::query(r#"UPDATE "ob-poc".red_flags SET status = 'CLOSED' WHERE case_id = $1"#)
+            .bind(case_id)
+            .execute(scope.executor())
+            .await
+            .expect("close red flag");
+        enforce_case_no_blocking_red_flags(&args(case_id), &mut scope)
+            .await
+            .expect("no remaining BLOCKING red_flags must pass");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// R2 Stage 2 Phase 3 (2026-08-19): live-DB proof for
+    /// `enforce_case_screenings_resolved`. RED before this pass:
+    /// `kyc-case.approve` never checked for an unresolved screening hit at
+    /// all.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_case_screenings_resolved_gate() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let case_id: Uuid = sqlx::query_scalar(r#"SELECT case_id FROM "ob-poc".cases LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one case must exist");
+        let entity_id: Uuid = sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one entity must exist");
+
+        sqlx::query(r#"DELETE FROM "ob-poc".red_flags WHERE case_id = $1"#)
+            .bind(case_id)
+            .execute(scope.executor())
+            .await
+            .expect("clear red_flags");
+
+        let workstream_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".entity_workstreams (case_id, entity_id, status)
+               VALUES ($1, $2, 'SCREEN') RETURNING workstream_id"#,
+        )
+        .bind(case_id)
+        .bind(entity_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway workstream");
+
+        let args = |id: Uuid| -> HashMap<String, JsonValue> {
+            [("case-id".to_string(), JsonValue::String(id.to_string()))]
+                .into_iter()
+                .collect()
+        };
+
+        // PASS: no screenings at all.
+        enforce_case_screenings_resolved(&args(case_id), &mut scope)
+            .await
+            .expect("no screenings at all must pass");
+
+        // BLOCK: one unresolved screening hit, no mitigating red flag.
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".screenings (workstream_id, screening_type, status)
+               VALUES ($1, 'SANCTIONS', 'HIT_PENDING_REVIEW')"#,
+        )
+        .bind(workstream_id)
+        .execute(scope.executor())
+        .await
+        .expect("insert unresolved screening hit");
+        let blocked = enforce_case_screenings_resolved(&args(case_id), &mut scope).await;
+        blocked.expect_err("an unresolved screening hit with no mitigation must refuse approval");
+
+        // PASS: a MITIGATED red flag overrides the unresolved hit.
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".red_flags (case_id, flag_type, severity, status, description, source)
+               VALUES ($1, 'screening_hit', 'ESCALATE', 'MITIGATED', 'gameboard-r2-test', 'screening')"#,
+        )
+        .bind(case_id)
+        .execute(scope.executor())
+        .await
+        .expect("insert mitigating red flag");
+        enforce_case_screenings_resolved(&args(case_id), &mut scope)
+            .await
+            .expect("a MITIGATED screening-source red flag must override the unresolved hit");
 
         // scope drops here → rollback; no rows mutated anyway.
     }
