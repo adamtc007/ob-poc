@@ -1365,28 +1365,35 @@ cross_slot_constraints:
     severity: error
 
   - id: investor_active_requires_kyc_approved
-    description: "investor.lifecycle_state = ACTIVE requires investor_kyc.status = APPROVED."
+    description: "investor.lifecycle_state = ACTIVE_HOLDER requires investor_kyc.status = APPROVED."
     # R2 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): `status` was never
     # a real column (real column: lifecycle_state) — found live when the
     # register was actually populated for the first time
-    # (20260819_backfill_investors_register_allianz.sql).
+    # (20260819_backfill_investors_register_allianz.sql). R2 Stage 2 Phase 0
+    # correction (2026-08-19): the real "active" value is `ACTIVE_HOLDER`,
+    # not `ACTIVE` — confirmed against investor.activate's plugin op
+    # (crates/sem_os_postgres/src/ops/investor.rs); the prior 'ACTIVE'
+    # literal never matched a real row, making this rule vacuously (not
+    # genuinely) "clean".
     rule: |
-      investors.lifecycle_state = 'ACTIVE'
+      investors.lifecycle_state = 'ACTIVE_HOLDER'
         → investors.kyc_status = 'APPROVED'
     severity: error
 
   - id: holding_active_requires_investor_active
-    description: "holding.status = ACTIVE (usage_type = TA) requires parent investor.lifecycle_state = ACTIVE."
+    description: "holding.status = ACTIVE (usage_type = TA) requires parent investor.lifecycle_state = ACTIVE_HOLDER."
     # R2 correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19): same
     # `status`->`lifecycle_state` fix, plus explicit `usage_type = 'TA'`
     # scoping — `holdings.usage_type = 'UBO'` rows are ownership/control
     # axis (a different register per CLAUDE.md's "Three Investment
     # Registers"), never linked via investor_id, and out of scope for this
-    # rule.
+    # rule. R2 Stage 2 Phase 0 correction (2026-08-19): same ACTIVE ->
+    # ACTIVE_HOLDER fix as the rule above — `holdings.holding_status =
+    # 'ACTIVE'` is a separate, genuinely-correct column/value, untouched.
     rule: |
       holdings.holding_status = 'ACTIVE' AND holdings.usage_type = 'TA'
         → investors WHERE investor_id = holdings.investor_id
-            .lifecycle_state = 'ACTIVE'
+            .lifecycle_state = 'ACTIVE_HOLDER'
     severity: error
 
   - id: holding_suspended_cascades_from_investor

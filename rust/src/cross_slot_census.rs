@@ -381,9 +381,16 @@ async fn case_screenings_resolved(pool: &PgPool) -> anyhow::Result<ConstraintOut
 /// rule text (`investors.lifecycle_state`, not `status`; see
 /// `cbu_dag.yaml`'s own 2026-08-19 correction comment).
 async fn investor_kyc_approved(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
+    // R2 Stage 2 Phase 0 correction (2026-08-19): the real "active" value
+    // written by investor.activate's plugin op
+    // (crates/sem_os_postgres/src/ops/investor.rs `Activate`) is
+    // 'ACTIVE_HOLDER', not 'ACTIVE' -- confirmed against the op's own SQL
+    // and re-confirmed live post-fix. The prior 'ACTIVE' literal here
+    // never matched a real row, making this rule vacuously "clean" rather
+    // than genuinely verified.
     let rows: Vec<(Uuid,)> = sqlx::query_as(
         r#"SELECT investor_id FROM "ob-poc".investors
-           WHERE lifecycle_state = 'ACTIVE' AND kyc_status IS DISTINCT FROM 'APPROVED'"#,
+           WHERE lifecycle_state = 'ACTIVE_HOLDER' AND kyc_status IS DISTINCT FROM 'APPROVED'"#,
     )
     .fetch_all(pool)
     .await?;
@@ -394,7 +401,7 @@ async fn investor_kyc_approved(pool: &PgPool) -> anyhow::Result<ConstraintOutcom
         .into_iter()
         .map(|(investor_id,)| ViolationExample {
             entity_id: investor_id,
-            detail: "lifecycle_state=ACTIVE with kyc_status not APPROVED".to_string(),
+            detail: "lifecycle_state=ACTIVE_HOLDER with kyc_status not APPROVED".to_string(),
         })
         .collect();
     Ok(ConstraintOutcome::Violated { entities })
@@ -402,7 +409,11 @@ async fn investor_kyc_approved(pool: &PgPool) -> anyhow::Result<ConstraintOutcom
 
 /// `holding_active_requires_investor_active` — scoped to `usage_type = 'TA'`
 /// per `cbu_dag.yaml`'s 2026-08-19 correction (the `UBO`-usage rows are a
-/// different register, never linked via `investor_id`).
+/// different register, never linked via `investor_id`). R2 Stage 2 Phase 0
+/// correction (2026-08-19): `investors.lifecycle_state`'s real "active"
+/// value is `ACTIVE_HOLDER`, not `ACTIVE` (same fix as
+/// `investor_kyc_approved` above) -- `holdings.holding_status = 'ACTIVE'`
+/// is a separate, genuinely-correct column/value and is untouched.
 async fn holding_investor_active(pool: &PgPool) -> anyhow::Result<ConstraintOutcome> {
     let rows: Vec<(Uuid,)> = sqlx::query_as(
         r#"
@@ -410,7 +421,7 @@ async fn holding_investor_active(pool: &PgPool) -> anyhow::Result<ConstraintOutc
         JOIN "ob-poc".investors i ON i.investor_id = h.investor_id
         WHERE h.holding_status = 'ACTIVE'
           AND h.usage_type = 'TA'
-          AND i.lifecycle_state IS DISTINCT FROM 'ACTIVE'
+          AND i.lifecycle_state IS DISTINCT FROM 'ACTIVE_HOLDER'
         "#,
     )
     .fetch_all(pool)
@@ -422,7 +433,7 @@ async fn holding_investor_active(pool: &PgPool) -> anyhow::Result<ConstraintOutc
         .into_iter()
         .map(|(holding_id,)| ViolationExample {
             entity_id: holding_id,
-            detail: "holding_status=ACTIVE with parent investor not lifecycle_state=ACTIVE"
+            detail: "holding_status=ACTIVE with parent investor not lifecycle_state=ACTIVE_HOLDER"
                 .to_string(),
         })
         .collect();
