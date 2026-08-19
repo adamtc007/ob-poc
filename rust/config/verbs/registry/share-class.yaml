@@ -501,44 +501,41 @@ domains:
             baseline: benign
       close:
         flavour: attribute_mutating
-        description: Close a share class to new subscriptions
-        behavior: crud
+        # EOP-PLAN share-register board design pass (2026-08-19): the board
+        # (share_register_dag.yaml) has always declared
+        # `WINDING_DOWN -> LIQUIDATED via share-class.close` as the
+        # lifecycle's terminal move, but this verb only ever wrote the
+        # legacy `status` column (`closed`), never `lifecycle_status` --
+        # the move never actually worked. Converted from CRUD to plugin,
+        # matching launch/soft-close/reopen/hard-close/lift-hard-close/
+        # begin-winddown's SimpleStatusOp shape
+        # (src/domain_ops/simple_status_op.rs) -- writes
+        # `lifecycle_status = LIQUIDATED`, which is what the DAG has
+        # always meant this verb to do.
+        description: "Close share class permanently -- WINDING_DOWN to LIQUIDATED (terminal)"
+        behavior: plugin
         effect_class: read_modify_write
         metadata:
           tier: intent
-          source_of_truth: register
+          source_of_truth: operational
           scope: cbu
-          noun: share_class
-          tags: [fund, share_class, lifecycle, close]
-          phase_tags: [onboarding]
+          noun: share-class
+          subject_kinds: [share-class]
+          phase_tags: [share-class]
           side_effects: state_write
+          harm_class: reversible
         invocation_phrases:
-          - "close share class to subscriptions"
-          - "shut down share class"
-          - "stop accepting new investors"
-          - "close fund class to new money"
-          - "soft close this share class"
+          - "close share class permanently"
+          - "liquidate share class"
+          - "finalize share class wind-down"
+          - "retire share class"
           - "how do I close a share class"
           - "mark share class as closed"
-          - "suspend subscriptions for share class"
-        crud:
-          operation: update
-          table: share_classes
-          schema: ob-poc
-          key: id
-          set_values:
-            status: closed
         args:
           - name: share-class-id
             type: uuid
             required: true
             maps_to: id
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: ob-poc
-              search_key: name
-              primary_key: id
         returns:
           type: affected
         three_axis:

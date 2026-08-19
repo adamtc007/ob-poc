@@ -27716,6 +27716,14 @@ ALTER TABLE ONLY "ob-poc".share_classes
 
 
 --
+-- Name: share_classes share_classes_cbu_id_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".share_classes
+    ADD CONSTRAINT share_classes_cbu_id_name_key UNIQUE (cbu_id, name);
+
+
+--
 -- Name: share_classes share_classes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 

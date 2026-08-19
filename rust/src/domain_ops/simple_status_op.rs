@@ -578,7 +578,7 @@ pub(super) const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
             column: "retired_at",
         }),
     },
-    // ── share-class.* (6) ────────────────────────────────────────────────────
+    // ── share-class.* (7) ────────────────────────────────────────────────────
     SimpleStatusConfig {
         fqn: "share-class.launch",
         table: "share_classes",
@@ -630,6 +630,15 @@ pub(super) const STATUS_FLIP_VERBS: &[SimpleStatusConfig] = &[
         pk_col: "id",
         state_col: "lifecycle_status",
         target_state: "WINDING_DOWN",
+        entity_arg: "share-class-id",
+        timestamp: None,
+    },
+    SimpleStatusConfig {
+        fqn: "share-class.close",
+        table: "share_classes",
+        pk_col: "id",
+        state_col: "lifecycle_status",
+        target_state: "LIQUIDATED",
         entity_arg: "share-class-id",
         timestamp: None,
     },
