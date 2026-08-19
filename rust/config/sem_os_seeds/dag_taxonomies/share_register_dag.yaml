@@ -251,11 +251,16 @@ slots:
 # =============================================================================
 # 2. CROSS-SLOT CONSTRAINTS
 # =============================================================================
-# None yet. The natural candidate — capital.issue.initial/.issue.new/
-# .split/.buyback/.cancel refused when the target share_class is
-# HARD_CLOSED/LIQUIDATED — is Phase 6 of this same design pass, not yet
-# landed as of this file. Documented here so the gap is visible, not
-# silently absent.
+# The HARD_CLOSED/LIQUIDATED issuance gate (Phase 6) is enforced but NOT
+# expressed here as a declarative cross_slot_constraint: it's a
+# same-workspace, cross-domain check (capital.* verbs gating on the
+# share_class slot's own state, not a transition of a DIFFERENT slot
+# depending on this one) that the declarative requires_states/entity_arg
+# mechanism resolves by the CALLING verb's domain, not the gated slot's
+# domain -- a mismatch here that would silently fail-open. Enforced
+# instead by a small explicit Rust guard
+# (capital.rs::guard_share_class_open_for_issuance), called at the top of
+# capital.issue.initial/.issue.new/.split/.buyback/.cancel.
 
 cross_slot_constraints: []
 
@@ -288,9 +293,6 @@ out_of_scope:
   - "capital.get-ownership-chain — recursive entity_relationships CTE; may overlap economic-exposure.compute / ownership.trace-chain, flagged not resolved (docs/migrations/INVESTMENT_REGISTERS_THREE_LENSES.md §6.7/6.8)"
   - "cap-table / holders control-position determination — deleted 2026-08-19, not rebuilt; that's the KYC substrate's job (FundControlStrategy / ControlProngStrategy / EdgeKind)"
   - "SAFE / convertible-note priced-round conversion — units_granted = 0 at creation is correct (no defined share count yet), but no verb converts them into real units; capital.dilution.exercise only handles instruments that already carry a real units_granted (options/warrants)"
-
-  # Cross-workspace / not yet landed
-  - "The HARD_CLOSED/LIQUIDATED issuance gate on capital.issue.*/.split/.buyback/.cancel — Phase 6 of this design pass, not yet implemented"
 
   # Layer 3 operational
   - "Corporate-action processing (dividends, bonus issues beyond capital.split) — Layer 2/3 operational, not DAG-modelled here"

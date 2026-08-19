@@ -71,6 +71,42 @@ struct ShareholderInfo {
     share_classes: Vec<Value>,
 }
 
+/// Refuses issuance moves against a share class that is HARD_CLOSED or
+/// LIQUIDATED (EOP-PLAN share-register board design pass, Phase 6 —
+/// share_register_dag.yaml's `share_class` slot has always declared these
+/// as "no subs AND no redemptions" / terminal, but nothing enforced it
+/// against the issuance side; only the subscription-availability verbs
+/// checked it, implicitly, by being the only things that changed it).
+///
+/// Not expressed via the declarative `requires_states`/`entity_arg`
+/// lifecycle-gate mechanism (`dsl_v2::executor::enforce_requires_states_precondition`):
+/// that mechanism derives its slot lookup from the CALLING verb's own
+/// domain (`capital`), not the domain that actually owns the gated slot
+/// (`share_class`, via the `share-class.*` verbs) — a cross-domain check
+/// like this one would silently fail-open (`gate_lifecycle_fail_open`)
+/// rather than enforce, the same silent-non-enforcement defect class this
+/// whole design pass has been hunting down elsewhere. A small explicit
+/// Rust guard is the reliably fail-closed option here.
+async fn guard_share_class_open_for_issuance(
+    share_class_id: Uuid,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let lifecycle_status: Option<String> = sqlx::query_scalar(
+        r#"SELECT lifecycle_status FROM "ob-poc".share_classes WHERE id = $1"#,
+    )
+    .bind(share_class_id)
+    .fetch_optional(scope.executor())
+    .await?;
+    match lifecycle_status.as_deref() {
+        Some("HARD_CLOSED") | Some("LIQUIDATED") => Err(anyhow!(
+            "Share class {} is {} — no issuance moves permitted",
+            share_class_id,
+            lifecycle_status.unwrap()
+        )),
+        _ => Ok(()),
+    }
+}
+
 // ============================================================================
 // capital.transfer
 // ============================================================================
@@ -482,6 +518,8 @@ impl SemOsVerbOp for IssueInitial {
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let board_resolution_ref = json_extract_string_opt(args, "board-resolution-ref");
 
+        guard_share_class_open_for_issuance(share_class_id, scope).await?;
+
         let issuer_entity_id: Uuid = sqlx::query_scalar(
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
         )
@@ -582,6 +620,8 @@ impl SemOsVerbOp for IssueNew {
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let board_resolution_ref = json_extract_string_opt(args, "board-resolution-ref");
+
+        guard_share_class_open_for_issuance(share_class_id, scope).await?;
 
         let share_info: Option<(Uuid, Option<rust_decimal::Decimal>)> = sqlx::query_as(
             r#"
@@ -714,6 +754,8 @@ impl SemOsVerbOp for Split {
         if let Some(event_id) = existing {
             return Ok(VerbExecutionOutcome::Uuid(event_id));
         }
+
+        guard_share_class_open_for_issuance(share_class_id, scope).await?;
 
         let issuer_entity_id: Uuid = sqlx::query_scalar(
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
@@ -865,6 +907,8 @@ impl SemOsVerbOp for Buyback {
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
+        guard_share_class_open_for_issuance(share_class_id, scope).await?;
+
         let issuer_entity_id: Uuid = sqlx::query_scalar(
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,
         )
@@ -948,6 +992,8 @@ impl SemOsVerbOp for Cancel {
             .and_then(|s| NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
         let reason = json_extract_string_opt(args, "reason");
+
+        guard_share_class_open_for_issuance(share_class_id, scope).await?;
 
         let issuer_entity_id: Uuid = sqlx::query_scalar(
             r#"SELECT issuer_entity_id FROM "ob-poc".share_classes WHERE id = $1"#,

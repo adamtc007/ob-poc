@@ -1430,4 +1430,122 @@ mod capital_tests {
         db.cleanup().await?;
         Ok(())
     }
+
+    // =========================================================================
+    // HARD_CLOSED/LIQUIDATED ISSUANCE GATE (EOP-PLAN share-register board
+    // design pass, Phase 6) -- the DAG has always declared these as "no
+    // subs AND no redemptions" / terminal, but nothing enforced it against
+    // the issuance side until this pass.
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_issuance_gate_refuses_hard_closed_and_liquidated() -> Result<()> {
+        use crate::ops::capital::{Cancel, IssueNew};
+        use crate::ops::SemOsVerbOp;
+        use dsl_runtime::{TransactionScope, VerbExecutionContext};
+        use sem_os_core::principal::Principal;
+
+        let db = TestDb::new().await?;
+        let issuer_name = db.name("gate_issuer");
+        let class_name = db.name("gate_class");
+
+        let cbu_id = db.get_or_create_cbu().await?;
+        let issuer_id = db.create_company(&issuer_name).await?;
+
+        let share_class_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".share_classes (cbu_id, issuer_entity_id, name, instrument_kind)
+            VALUES ($1, $2, $3, 'ORDINARY_EQUITY')
+            RETURNING id
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(issuer_id)
+        .bind(&class_name)
+        .fetch_one(&db.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".share_class_supply (
+                share_class_id, issued_units, outstanding_units, as_of_date
+            ) VALUES ($1, 1000, 1000, CURRENT_DATE)
+            "#,
+        )
+        .bind(share_class_id)
+        .execute(&db.pool)
+        .await?;
+
+        let tx = db.pool.begin().await?;
+        let mut scope = RollbackScope {
+            id: ob_poc_types::TransactionScopeId::new(),
+            tx,
+            pool: db.pool.clone(),
+        };
+        let mut ctx = VerbExecutionContext::new(Principal::system());
+
+        // DRAFT (the real DEFAULT lifecycle_status) -- issuance succeeds;
+        // the gate only refuses HARD_CLOSED/LIQUIDATED.
+        let ok = IssueNew
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "units": "100",
+                    "price-per-unit": "1.00",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await;
+        assert!(ok.is_ok());
+
+        sqlx::query(r#"UPDATE "ob-poc".share_classes SET lifecycle_status = 'HARD_CLOSED' WHERE id = $1"#)
+            .bind(share_class_id)
+            .execute(scope.executor())
+            .await?;
+
+        let refused_hard_closed = IssueNew
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "units": "100",
+                    "price-per-unit": "1.00",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await;
+        assert!(refused_hard_closed.is_err());
+
+        sqlx::query(r#"UPDATE "ob-poc".share_classes SET lifecycle_status = 'LIQUIDATED' WHERE id = $1"#)
+            .bind(share_class_id)
+            .execute(scope.executor())
+            .await?;
+
+        let refused_liquidated = Cancel
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "units": "50",
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await;
+        assert!(refused_liquidated.is_err());
+
+        // Confirm supply is untouched by the refused calls (no partial writes).
+        let issued: rust_decimal::Decimal = sqlx::query_scalar(
+            r#"SELECT issued_units FROM "ob-poc".share_class_supply
+               WHERE share_class_id = $1 ORDER BY as_of_date DESC, updated_at DESC LIMIT 1"#,
+        )
+        .bind(share_class_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(issued, rust_decimal::Decimal::from(1100));
+
+        drop(scope);
+        db.cleanup().await?;
+        Ok(())
+    }
 }
