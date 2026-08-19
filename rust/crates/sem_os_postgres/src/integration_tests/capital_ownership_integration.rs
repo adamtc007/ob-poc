@@ -1313,4 +1313,121 @@ mod capital_tests {
         db.cleanup().await?;
         Ok(())
     }
+
+    // =========================================================================
+    // CLOSE-HOLDING (EOP-PLAN share-register board design pass, Phase 4) --
+    // nothing previously closed a holding once its balance drained to zero;
+    // it sat 'active' forever as a ghost row. New exit move, guarded to
+    // require units = 0.
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_close_holding_guards_nonzero_then_succeeds_at_zero() -> Result<()> {
+        use crate::ops::capital::CloseHolding;
+        use crate::ops::SemOsVerbOp;
+        use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
+        use sem_os_core::principal::Principal;
+
+        let db = TestDb::new().await?;
+        let issuer_name = db.name("close_holding_issuer");
+        let holder_name = db.name("close_holding_holder");
+        let class_name = db.name("close_holding_class");
+
+        let cbu_id = db.get_or_create_cbu().await?;
+        let issuer_id = db.create_company(&issuer_name).await?;
+        let holder_id = db.create_entity(&holder_name, "PROPER_PERSON_NATURAL").await?;
+
+        let share_class_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".share_classes (cbu_id, issuer_entity_id, name, instrument_kind)
+            VALUES ($1, $2, $3, 'ORDINARY_EQUITY')
+            RETURNING id
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(issuer_id)
+        .bind(&class_name)
+        .fetch_one(&db.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, status)
+            VALUES ($1, $2, 300, 'active')
+            "#,
+        )
+        .bind(share_class_id)
+        .bind(holder_id)
+        .execute(&db.pool)
+        .await?;
+
+        let tx = db.pool.begin().await?;
+        let mut scope = RollbackScope {
+            id: ob_poc_types::TransactionScopeId::new(),
+            tx,
+            pool: db.pool.clone(),
+        };
+        let mut ctx = VerbExecutionContext::new(Principal::system());
+
+        // guard: 300 units still outstanding -- must refuse.
+        let refused = CloseHolding
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "shareholder-entity-id": holder_id,
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await;
+        assert!(refused.is_err());
+
+        // drain the holding to zero, then close should succeed.
+        sqlx::query(r#"UPDATE "ob-poc".holdings SET units = 0 WHERE share_class_id = $1 AND investor_entity_id = $2"#)
+            .bind(share_class_id)
+            .bind(holder_id)
+            .execute(scope.executor())
+            .await?;
+
+        let outcome = CloseHolding
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "shareholder-entity-id": holder_id,
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        match outcome {
+            VerbExecutionOutcome::Affected(n) => assert_eq!(n, 1),
+            other => panic!("expected Affected, got {other:?}"),
+        }
+
+        let status: String = sqlx::query_scalar(
+            r#"SELECT status FROM "ob-poc".holdings WHERE share_class_id = $1 AND investor_entity_id = $2"#,
+        )
+        .bind(share_class_id)
+        .bind(holder_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(status, "closed");
+
+        // idempotency guard: closing an already-closed holding must refuse.
+        let already_closed = CloseHolding
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "shareholder-entity-id": holder_id,
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await;
+        assert!(already_closed.is_err());
+
+        drop(scope);
+        db.cleanup().await?;
+        Ok(())
+    }
 }

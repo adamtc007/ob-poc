@@ -46,6 +46,7 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
 use serde_json::{json, Value};
+use sqlx::Row;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -999,6 +1000,82 @@ impl SemOsVerbOp for Cancel {
         );
 
         Ok(VerbExecutionOutcome::Uuid(event_id))
+    }
+}
+
+// ============================================================================
+// capital.close-holding
+// ============================================================================
+
+/// Close a fully-divested holding (EOP-PLAN share-register board design
+/// pass, Phase 4). Nothing previously closed a holding once its balance
+/// was transferred away or otherwise drained to zero -- it sat 'active'
+/// forever, a ghost row for `reconcile`/`list-shareholders`. Guarded to
+/// require units = 0; this is the exit move for the new `holding` slot
+/// (`share_register_dag.yaml`, scoped to `usage_type != 'TA'` -- the
+/// share register's own cap-table holdings, not the KYC-domain
+/// investor-register axis on `holding_status`).
+pub struct CloseHolding;
+
+#[async_trait]
+impl SemOsVerbOp for CloseHolding {
+    fn fqn(&self) -> &str {
+        "capital.close-holding"
+    }
+    async fn execute(
+        &self,
+        args: &Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let share_class_id = json_extract_uuid(args, ctx, "share-class-id")?;
+        let shareholder_entity_id = json_extract_uuid(args, ctx, "shareholder-entity-id")?;
+
+        let row = sqlx::query(
+            r#"
+            SELECT id, units, status
+            FROM "ob-poc".holdings
+            WHERE share_class_id = $1 AND investor_entity_id = $2
+            FOR UPDATE
+            "#,
+        )
+        .bind(share_class_id)
+        .bind(shareholder_entity_id)
+        .fetch_optional(scope.executor())
+        .await?
+        .ok_or_else(|| anyhow!("Holding not found for entity {}", shareholder_entity_id))?;
+
+        let holding_id: Uuid = row.get("id");
+        let units: rust_decimal::Decimal = row.get("units");
+        let status: String = row.get("status");
+
+        if status == "closed" {
+            return Err(anyhow!("Holding {} is already closed", holding_id));
+        }
+        if units != rust_decimal::Decimal::ZERO {
+            return Err(anyhow!(
+                "Cannot close holding {}: {} units still outstanding",
+                holding_id,
+                units
+            ));
+        }
+
+        let rows = sqlx::query(
+            r#"
+            UPDATE "ob-poc".holdings
+            SET status = 'closed', updated_at = now()
+            WHERE id = $1 AND units = 0
+            "#,
+        )
+        .bind(holding_id)
+        .execute(scope.executor())
+        .await?
+        .rows_affected();
+        if rows == 0 {
+            return Err(anyhow!("Concurrent modification detected"));
+        }
+
+        Ok(VerbExecutionOutcome::Affected(rows))
     }
 }
 

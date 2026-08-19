@@ -370,3 +370,55 @@ domains:
           external_effects: [observational]
           consequence:
             baseline: benign
+
+      close-holding:
+        flavour: attribute_mutating
+        description: |
+          Close a fully-divested holding (units must already be zero,
+          e.g. after a transfer drains it). The missing exit move for a
+          holding that would otherwise sit 'active' forever as a
+          zero-balance ghost row.
+        effect_class: idempotent_ensure
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: capital
+          tags: [kyc]
+          phase_tags: [onboarding]
+          side_effects: state_write
+        invocation_phrases:
+        - "close holding"
+        - "close out zero-balance holding"
+        - "close empty share position"
+        - "retire fully divested holding"
+        - "remove closed shareholder position"
+        behavior: plugin
+        plugin:
+          handler: CapitalCloseHoldingOp
+        args:
+        - name: share-class-id
+          type: uuid
+          required: true
+          lookup:
+            table: share_classes
+            entity_type: share_class
+            schema: ob-poc
+            search_key: name
+            primary_key: id
+        - name: shareholder-entity-id
+          type: uuid
+          required: true
+          lookup:
+            table: entities
+            entity_type: entity
+            schema: ob-poc
+            search_key: name
+            primary_key: entity_id
+        returns:
+          type: affected
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable

@@ -753,6 +753,7 @@ pub fn build_registry() -> SemOsVerbOpRegistry {
     registry.register(Arc::new(capital::Split));
     registry.register(Arc::new(capital::Buyback));
     registry.register(Arc::new(capital::Cancel));
+    registry.register(Arc::new(capital::CloseHolding));
 
     // Phase B slice #64: agent.* (20 plugin verbs — lifecycle
     // (start/pause/resume/stop), checkpoints (confirm/reject/select),
