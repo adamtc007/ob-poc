@@ -2178,7 +2178,14 @@ domains:
         transition_args:
           entity_id_arg: template
           target_workspace: instrument_matrix
-          target_slot: trading_profile
+          # target_slot correction (EOP-PLAN-GAMEBOARD-001, 2026-08-19):
+          # was `trading_profile` (states DRAFT/SUBMITTED/.../ARCHIVED,
+          # uppercase, live CBU trading profiles) -- wrong slot entirely.
+          # retire-template operates on the template's own available ->
+          # unavailable state machine, a separate slot in
+          # instrument_matrix_dag.yaml (`trading_profile_template`,
+          # lowercase states).
+          target_slot: trading_profile_template
       add-instrument-class:
         flavour: instance_adding
         description: "Add instrument class to trading profile / template"

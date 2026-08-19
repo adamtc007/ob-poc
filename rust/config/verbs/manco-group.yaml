@@ -1,3 +1,10 @@
+# transition_args target_workspace fix (EOP-PLAN-GAMEBOARD-001, 2026-08-19):
+# these verbs previously declared target_workspace: cbu, a stale reference
+# from before the CBU-KYC decoupling "Cluster 4" relocation moved manco's
+# real state machine out of cbu_dag.yaml into kyc_dag.yaml (cbu_dag.yaml
+# keeps only a read-only reference stub). Corrected to target_workspace:
+# kyc to match where the real DAG transitions live -- feeds the v1.3
+# GateChecker (pre_dispatch_gate_check) enforcement path.
 domains:
   manco:
     description: Governance controller group management and control chain operations
@@ -552,7 +559,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       reject:
@@ -593,7 +600,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       flag-regulatory:
@@ -632,7 +639,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       clear-regulatory:
@@ -667,7 +674,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       suspend:
@@ -709,7 +716,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       partial-reinstate:
@@ -744,7 +751,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       begin-sunset:
@@ -782,7 +789,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
 
       terminate:
@@ -820,7 +827,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: manco-entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: manco
   ownership:
     description: Ownership control link operations

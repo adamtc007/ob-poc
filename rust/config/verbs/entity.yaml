@@ -1,3 +1,11 @@
+# transition_args target_workspace fix (EOP-PLAN-GAMEBOARD-001, 2026-08-19):
+# entity.identify/verify previously declared target_workspace: cbu, a stale
+# reference from before the CBU-KYC decoupling "Cluster 4" relocation moved
+# entity_proper_person's real state machine out of cbu_dag.yaml into
+# kyc_dag.yaml (cbu_dag.yaml keeps only a read-only reference stub).
+# Corrected to target_workspace: kyc to match where the real DAG transitions
+# live -- feeds the v1.3 GateChecker (pre_dispatch_gate_check) enforcement
+# path.
 domains:
   entity:
     description: Entity management operations
@@ -765,7 +773,7 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: entity_proper_person
 
       verify:
@@ -820,7 +828,7 @@ domains:
             baseline: benign
         transition_args:
           entity_id_arg: entity-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: entity_proper_person
 
       list-ghosts:

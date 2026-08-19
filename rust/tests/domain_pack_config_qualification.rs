@@ -564,28 +564,34 @@ fn dag_transition_verbs_requires_states_drift_and_ratchet() {
     // derivation didn't just mix in the entity_kyc rollup-slot pollution
     // R3 was built to fix — it also silently counted 27 verbs as
     // "DAG-derivable" whose OWN declared `transition_args` target doesn't
-    // match where their transition actually lives in the DAG:
-    //   - 26 (investor.*, holding.*, manco.*, entity.{identify,verify},
-    //     kyc-case.approve-with-conditions) still declare
-    //     `target_workspace: cbu` (or a stale `target_slot`) even though
-    //     their slots (investor, investor_kyc, holding, manco,
-    //     entity_proper_person) were relocated from cbu_dag.yaml into
-    //     kyc_dag.yaml by the CBU⊥KYC decoupling "Cluster 4" move (see
-    //     CLAUDE.md's CBU⊥KYC Domain Decoupling section) — the verb YAML's
-    //     own `transition_args` was never updated to follow that move.
-    //   - 1 (trading-profile.retire-template) has a target_slot mismatch
-    //     unrelated to the Cluster 4 move.
-    // These are real, live findings (transition_args feeds the v1.3
-    // GateChecker enforcement path, not just this test) — NOT encoded here
-    // because fixing them changes live gate-check behavior and needs its
-    // own ruling, same discipline as R2 Stage 2. Scoping correctly drops
-    // them from `derived` rather than crediting them on the strength of an
-    // incidental, wrong-slot transition; the floor moves with the more
-    // correct measurement instead of hiding it behind stale unscoped counts.
+    // match where their transition actually lives in the DAG (26
+    // investor.*/holding.*/manco.*/entity.{identify,verify} still
+    // declaring `target_workspace: cbu` after the CBU⊥KYC decoupling
+    // "Cluster 4" move relocated their real state machines to
+    // kyc_dag.yaml; 1 trading-profile.retire-template with an unrelated
+    // target_slot mismatch). Scoping correctly dropped them from `derived`
+    // at the time rather than crediting them on the strength of an
+    // incidental, wrong-slot transition, so the floor moved down to the
+    // more correct (lower) measurement.
+    //
+    // Raised back up 2026-08-19 (EOP-PLAN-GAMEBOARD-001): all 27 fixed —
+    // the 26 corrected to `target_workspace: kyc` (config/verbs/entity.yaml,
+    // manco-group.yaml, registry/holding.yaml, registry/investor.yaml),
+    // trading-profile.retire-template corrected to
+    // `target_slot: trading_profile_template`. Confirmed inert on live
+    // GateChecker behavior before fixing: neither cbu_dag.yaml nor
+    // kyc_dag.yaml declares any `cross_workspace_constraints` entry keyed
+    // to these slots today, so `pre_dispatch_gate_check` found zero
+    // matching constraints either way — this was latent metadata drift,
+    // not a live blocking-behavior change, but it would have silently
+    // no-op'd any future R2 Stage 2 constraint authored against the
+    // correct (kyc, investor/holding/manco/entity_proper_person) keys.
+    // Universe rose 191 -> 217 (+26, exactly the newly-correctly-scoped
+    // verbs); covered stayed 78 (none of the 26 declare requires_states).
     let universe = derived.len();
     let covered = derived.keys().filter(|v| declared.contains_key(*v)).count();
     assert!(
-        universe >= 191,
+        universe >= 217,
         "DAG-derivable verb universe shrank unexpectedly: {universe}"
     );
     assert!(

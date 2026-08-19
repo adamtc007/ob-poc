@@ -1,3 +1,10 @@
+# transition_args target_workspace fix (EOP-PLAN-GAMEBOARD-001, 2026-08-19):
+# these verbs previously declared target_workspace: cbu, a stale reference
+# from before the CBU-KYC decoupling "Cluster 4" relocation moved holding's
+# real state machine out of cbu_dag.yaml into kyc_dag.yaml (cbu_dag.yaml
+# keeps only a read-only reference stub). Corrected to target_workspace:
+# kyc to match where the real DAG transitions live -- feeds the v1.3
+# GateChecker (pre_dispatch_gate_check) enforcement path.
 domains:
   holding:
     description: Investor position management in share classes (supports both TA KYC-as-a-Service and UBO intra-group holdings)
@@ -403,7 +410,7 @@ domains:
         transition_args:
           entity_id_arg: holding-id
           target_state_arg: status
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: holding
 
       read:
@@ -642,7 +649,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: holding-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: holding
 
       restrict:
@@ -683,7 +690,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: holding-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: holding
 
       lift-restriction:
@@ -718,7 +725,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: holding-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: holding
 
       pledge:
@@ -758,7 +765,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: holding-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: holding
 
       release-pledge:
@@ -793,5 +800,5 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: holding-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: holding

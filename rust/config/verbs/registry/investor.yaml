@@ -1,3 +1,11 @@
+# transition_args target_workspace fix (EOP-PLAN-GAMEBOARD-001, 2026-08-19):
+# these verbs previously declared target_workspace: cbu, a stale reference
+# from before the CBU-KYC decoupling "Cluster 4" relocation moved
+# investor/investor_kyc's real state machines out of cbu_dag.yaml into
+# kyc_dag.yaml (cbu_dag.yaml keeps only a read-only reference stub).
+# Corrected to target_workspace: kyc to match where the real DAG
+# transitions live -- feeds the v1.3 GateChecker (pre_dispatch_gate_check)
+# enforcement path.
 domains:
   investor:
     description: |
@@ -386,7 +394,7 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor_kyc
         writes:
           - table: investors
@@ -448,7 +456,7 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor_kyc
         writes:
           - table: investors
@@ -519,7 +527,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor_kyc
         writes:
           - table: investors
@@ -579,7 +587,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor_kyc
         writes:
           - table: investors
@@ -634,7 +642,7 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor
         writes:
           - table: investors
@@ -739,7 +747,7 @@ domains:
             baseline: reviewable
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor
 
       start-redemption:
@@ -839,7 +847,7 @@ domains:
 
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor
       offboard:
         flavour: discretionary
@@ -901,7 +909,7 @@ domains:
             baseline: requires_explicit_authorisation
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor
 
       suspend:
@@ -964,7 +972,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor
 
       reinstate:
@@ -1026,7 +1034,7 @@ domains:
             baseline: requires_confirmation
         transition_args:
           entity_id_arg: investor-id
-          target_workspace: cbu
+          target_workspace: kyc
           target_slot: investor
 
       # ============================================
