@@ -246,29 +246,52 @@ impl SemOsVerbOp for Reconcile {
     ) -> Result<VerbExecutionOutcome> {
         let entity_id = json_get_required_uuid(args, "entity-id")?;
 
-        let share_classes: Vec<(Uuid, String, i64, rust_decimal::Decimal)> = sqlx::query_as(
-            r#"
-            SELECT id, name, issued_shares, voting_rights_per_share
-            FROM "ob-poc".share_classes
-            WHERE issuer_entity_id = $1 AND status = 'active'
-            "#,
-        )
-        .bind(entity_id)
-        .fetch_all(scope.executor())
-        .await?;
+        // Real columns (fixed 2026-08-19, EOP-PLAN share-register board
+        // design pass): `share_classes.issued_shares`/`.voting_rights_per_share`
+        // never existed live. Issued supply lives in `share_class_supply`
+        // (latest row per class, LATERAL join); voting weight lives in
+        // `share_classes.votes_per_unit` (nullable -- defaults to 1, same
+        // default `capital.share-class.create` used before it was
+        // deleted). `lifecycle_status <> 'LIQUIDATED'` replaces the
+        // deprecated `status` column as the "still a going concern" filter
+        // -- no verb writes `status` anymore after this pass.
+        let share_classes: Vec<(Uuid, String, rust_decimal::Decimal, rust_decimal::Decimal)> =
+            sqlx::query_as(
+                r#"
+                SELECT sc.id, sc.name,
+                       COALESCE(scs.issued_units, 0),
+                       COALESCE(sc.votes_per_unit, 1)
+                FROM "ob-poc".share_classes sc
+                LEFT JOIN LATERAL (
+                    SELECT issued_units FROM "ob-poc".share_class_supply
+                    WHERE share_class_id = sc.id
+                    ORDER BY as_of_date DESC
+                    LIMIT 1
+                ) scs ON true
+                WHERE sc.issuer_entity_id = $1 AND sc.lifecycle_status <> 'LIQUIDATED'
+                "#,
+            )
+            .bind(entity_id)
+            .fetch_all(scope.executor())
+            .await?;
 
-        let mut total_issued: i64 = 0;
+        let mut total_issued: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
         let mut total_allocated: rust_decimal::Decimal = rust_decimal::Decimal::ZERO;
         let mut shareholders_map: HashMap<Uuid, ShareholderInfo> = HashMap::new();
 
         for (class_id, class_name, issued, voting_per_share) in &share_classes {
             total_issued += issued;
 
+            // usage_type != 'TA': this reconciles the share register's own
+            // cap-table holdings, not TA/investor-linked holdings (those
+            // are KYC-domain-owned, reconciled via their own investor
+            // register lifecycle).
             let holdings: Vec<(Uuid, rust_decimal::Decimal)> = sqlx::query_as(
                 r#"
                 SELECT investor_entity_id, units
                 FROM "ob-poc".holdings
                 WHERE share_class_id = $1 AND status = 'active' AND units > 0
+                  AND usage_type IS DISTINCT FROM 'TA'
                 "#,
             )
             .bind(class_id)
@@ -298,10 +321,10 @@ impl SemOsVerbOp for Reconcile {
             }
         }
 
-        let total_issued_dec = rust_decimal::Decimal::from(total_issued);
+        let total_issued_dec = total_issued;
         let total_voting: rust_decimal::Decimal = share_classes
             .iter()
-            .map(|(_, _, issued, voting)| rust_decimal::Decimal::from(*issued) * voting)
+            .map(|(_, _, issued, voting)| issued * voting)
             .sum();
 
         let shareholders: Vec<Value> = shareholders_map
@@ -335,7 +358,7 @@ impl SemOsVerbOp for Reconcile {
 
         Ok(VerbExecutionOutcome::Record(json!({
             "is_reconciled": is_reconciled,
-            "issued_shares": total_issued,
+            "issued_shares": total_issued.to_string(),
             "allocated_shares": total_allocated.to_string(),
             "unallocated_shares": unallocated.to_string(),
             "shareholders": shareholders
@@ -670,6 +693,16 @@ impl SemOsVerbOp for Split {
             share_class_id, ratio_from, ratio_to, effective_date
         );
 
+        // Fixed 2026-08-19 (EOP-PLAN share-register board design pass):
+        // Postgres requires SET TRANSACTION ISOLATION LEVEL to be the first
+        // statement of the transaction -- it was previously issued after
+        // the idempotency-check and issuer-lookup SELECTs below, so every
+        // call (not just idempotent retries) errored with "SET TRANSACTION
+        // ISOLATION LEVEL must be called before any query". Must run first.
+        sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+            .execute(scope.executor())
+            .await?;
+
         let existing: Option<Uuid> = sqlx::query_scalar(
             r#"SELECT event_id FROM "ob-poc".issuance_events WHERE idempotency_key = $1"#,
         )
@@ -689,14 +722,13 @@ impl SemOsVerbOp for Split {
         .await?
         .ok_or_else(|| anyhow!("Share class {} not found", share_class_id))?;
 
-        sqlx::query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
-            .execute(scope.executor())
-            .await?;
-
-        let lock_id: i64 = sqlx::query_scalar(r#"SELECT "ob-poc".uuid_to_lock_id($1)"#)
-            .bind(share_class_id)
-            .fetch_one(scope.executor())
-            .await?;
+        // Fixed 2026-08-19 (EOP-PLAN share-register board design pass):
+        // "ob-poc".uuid_to_lock_id() never existed live -- this call
+        // would have errored every time. pg_advisory_xact_lock takes a
+        // plain bigint; XOR-fold the UUID's two 64-bit halves in Rust
+        // instead of calling out to a nonexistent SQL function.
+        let uuid_bits = share_class_id.as_u128();
+        let lock_id = (uuid_bits as i64) ^ ((uuid_bits >> 64) as i64);
         sqlx::query("SELECT pg_advisory_xact_lock($1)")
             .bind(lock_id)
             .execute(scope.executor())

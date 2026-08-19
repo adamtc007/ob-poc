@@ -848,4 +848,231 @@ mod capital_tests {
         db.cleanup().await?;
         Ok(())
     }
+
+    // =========================================================================
+    // RECONCILE + SPLIT (EOP-PLAN share-register board design pass, 2026-08-19)
+    //
+    // Both were broken: Reconcile referenced share_classes.issued_shares/
+    // .voting_rights_per_share (neither column exists); Split called
+    // "ob-poc".uuid_to_lock_id() (never existed). Both fixed to use real
+    // columns/mechanisms; these tests dispatch through the real SemOsVerbOp
+    // layer to prove it.
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_reconcile_against_real_holdings() -> Result<()> {
+        use crate::ops::capital::Reconcile;
+        use crate::ops::SemOsVerbOp;
+        use dsl_runtime::{VerbExecutionContext, VerbExecutionOutcome};
+        use sem_os_core::principal::Principal;
+        use serde_json::Value;
+
+        let db = TestDb::new().await?;
+        let issuer_name = db.name("reconcile_issuer");
+        let class_name = db.name("reconcile_class");
+        let holder_a = db.name("reconcile_holder_a");
+        let holder_b = db.name("reconcile_holder_b");
+
+        let cbu_id = db.get_or_create_cbu().await?;
+        let issuer_id = db.create_company(&issuer_name).await?;
+        let holder_a_id = db.create_company(&holder_a).await?;
+        let holder_b_id = db.create_company(&holder_b).await?;
+
+        let share_class_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".share_classes (
+                cbu_id, issuer_entity_id, name, instrument_kind, votes_per_unit
+            ) VALUES ($1, $2, $3, 'ORDINARY_EQUITY', 1.0)
+            RETURNING id
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(issuer_id)
+        .bind(&class_name)
+        .fetch_one(&db.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".share_class_supply (
+                share_class_id, issued_units, outstanding_units, as_of_date
+            ) VALUES ($1, 1000, 1000, CURRENT_DATE)
+            "#,
+        )
+        .bind(share_class_id)
+        .execute(&db.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, status)
+            VALUES ($1, $2, 600, 'active')
+            "#,
+        )
+        .bind(share_class_id)
+        .bind(holder_a_id)
+        .execute(&db.pool)
+        .await?;
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".holdings (share_class_id, investor_entity_id, units, status)
+            VALUES ($1, $2, 400, 'active')
+            "#,
+        )
+        .bind(share_class_id)
+        .bind(holder_b_id)
+        .execute(&db.pool)
+        .await?;
+
+        let tx = db.pool.begin().await?;
+        let mut scope = RollbackScope {
+            id: ob_poc_types::TransactionScopeId::new(),
+            tx,
+            pool: db.pool.clone(),
+        };
+        let mut ctx = VerbExecutionContext::new(Principal::system());
+
+        let outcome = Reconcile
+            .execute(
+                &serde_json::json!({ "entity-id": issuer_id }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        let record = match outcome {
+            VerbExecutionOutcome::Record(v) => v,
+            other => panic!("expected Record, got {other:?}"),
+        };
+
+        let parse_dec = |v: &Value| -> rust_decimal::Decimal {
+            v.as_str().unwrap().parse().unwrap()
+        };
+
+        assert_eq!(record["is_reconciled"], true);
+        assert_eq!(parse_dec(&record["issued_shares"]), rust_decimal::Decimal::from(1000));
+        assert_eq!(parse_dec(&record["allocated_shares"]), rust_decimal::Decimal::from(1000));
+        let shareholders = record["shareholders"].as_array().expect("shareholders array");
+        assert_eq!(shareholders.len(), 2);
+        for sh in shareholders {
+            let units = parse_dec(&sh["total_units"]);
+            let pct: f64 = sh["ownership_pct"].as_str().unwrap().parse().unwrap();
+            if units == rust_decimal::Decimal::from(600) {
+                assert!((pct - 60.0).abs() < 0.01);
+            } else if units == rust_decimal::Decimal::from(400) {
+                assert!((pct - 40.0).abs() < 0.01);
+            } else {
+                panic!("unexpected holding units {units}");
+            }
+        }
+
+        drop(scope);
+        db.cleanup().await?;
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_split_advisory_lock_and_supply_doubling() -> Result<()> {
+        use crate::ops::capital::Split;
+        use crate::ops::SemOsVerbOp;
+        use dsl_runtime::{TransactionScope, VerbExecutionContext, VerbExecutionOutcome};
+        use sem_os_core::principal::Principal;
+
+        let db = TestDb::new().await?;
+        let issuer_name = db.name("split_issuer");
+        let class_name = db.name("split_class");
+
+        let cbu_id = db.get_or_create_cbu().await?;
+        let issuer_id = db.create_company(&issuer_name).await?;
+
+        let share_class_id: Uuid = sqlx::query_scalar(
+            r#"
+            INSERT INTO "ob-poc".share_classes (cbu_id, issuer_entity_id, name, instrument_kind)
+            VALUES ($1, $2, $3, 'ORDINARY_EQUITY')
+            RETURNING id
+            "#,
+        )
+        .bind(cbu_id)
+        .bind(issuer_id)
+        .bind(&class_name)
+        .fetch_one(&db.pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".share_class_supply (
+                share_class_id, issued_units, outstanding_units, as_of_date
+            ) VALUES ($1, 1000, 1000, CURRENT_DATE)
+            "#,
+        )
+        .bind(share_class_id)
+        .execute(&db.pool)
+        .await?;
+
+        let tx = db.pool.begin().await?;
+        let mut scope = RollbackScope {
+            id: ob_poc_types::TransactionScopeId::new(),
+            tx,
+            pool: db.pool.clone(),
+        };
+        let mut ctx = VerbExecutionContext::new(Principal::system());
+
+        // 2-for-1 split -- proves the advisory lock call itself no longer
+        // errors (the dead uuid_to_lock_id() SQL function is gone) and the
+        // supply doubles correctly.
+        let outcome = Split
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "ratio-from": 1,
+                    "ratio-to": 2,
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        let event_id = match outcome {
+            VerbExecutionOutcome::Uuid(u) => u,
+            other => panic!("expected Uuid, got {other:?}"),
+        };
+
+        let issued: rust_decimal::Decimal = sqlx::query_scalar(
+            r#"SELECT issued_units FROM "ob-poc".share_class_supply
+               WHERE share_class_id = $1 ORDER BY as_of_date DESC, updated_at DESC LIMIT 1"#,
+        )
+        .bind(share_class_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(issued, rust_decimal::Decimal::from(2000));
+
+        // Idempotency: same share-class/ratio/date must return the same
+        // event, not double the supply again.
+        let outcome2 = Split
+            .execute(
+                &serde_json::json!({
+                    "share-class-id": share_class_id,
+                    "ratio-from": 1,
+                    "ratio-to": 2,
+                }),
+                &mut ctx,
+                &mut scope,
+            )
+            .await?;
+        match outcome2 {
+            VerbExecutionOutcome::Uuid(id) => assert_eq!(id, event_id),
+            other => panic!("expected Uuid, got {other:?}"),
+        }
+
+        let issued_after_retry: rust_decimal::Decimal = sqlx::query_scalar(
+            r#"SELECT issued_units FROM "ob-poc".share_class_supply
+               WHERE share_class_id = $1 ORDER BY as_of_date DESC, updated_at DESC LIMIT 1"#,
+        )
+        .bind(share_class_id)
+        .fetch_one(scope.executor())
+        .await?;
+        assert_eq!(issued_after_retry, rust_decimal::Decimal::from(2000));
+
+        drop(scope);
+        db.cleanup().await?;
+        Ok(())
+    }
 }
