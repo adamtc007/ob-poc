@@ -1917,6 +1917,17 @@ impl DslExecutor {
             let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
             enforce_trading_profile_no_active_draft(&json_args, scope).await?;
         }
+        if matches!(
+            runtime_verb.full_name.as_str(),
+            "holding.create-for-investor" | "holding.ensure"
+        ) {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_holding_active_requires_investor_active(&json_args, scope).await?;
+        }
+        if runtime_verb.full_name == "holding.update-status" {
+            let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+            enforce_holding_update_status_requires_investor_active(&json_args, scope).await?;
+        }
 
         // Durable verbs: normally routed through WorkflowDispatcher. The
         // BPMN worker path sets `ctx.allow_durable_direct` so internal
@@ -2389,6 +2400,135 @@ async fn enforce_investor_reinstate_kyc_approved(
         enforce_investor_kyc_approved(json_args, scope).await?;
     }
     Ok(())
+}
+
+/// Shared core check for the R2 Stage 2 Phase 2 holding gate: refuse
+/// unless `investor_id` resolves to `investors.lifecycle_state =
+/// 'ACTIVE_HOLDER'`. Fail-closed on any DB error, same posture as every
+/// other EOP-PLAN-GAMEBOARD-001 gate.
+#[cfg(feature = "database")]
+async fn check_investor_is_active_holder(
+    investor_id: Uuid,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let lifecycle_state: Option<String> = sqlx::query_scalar(
+        r#"SELECT lifecycle_state FROM "ob-poc".investors WHERE investor_id = $1"#,
+    )
+    .bind(investor_id)
+    .fetch_optional(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "holding_active_requires_investor_active: failed to read investors.lifecycle_state \
+             for {investor_id}; refusing under the fail-closed gate \
+             (EOP-PLAN-GAMEBOARD-001 R2 Stage 2): {e}"
+        )
+    })?
+    .flatten();
+    if lifecycle_state.as_deref() != Some("ACTIVE_HOLDER") {
+        bail!(
+            "holding refused: linked investor {investor_id} has lifecycle_state \
+             {lifecycle_state:?}, not ACTIVE_HOLDER (EOP-PLAN-GAMEBOARD-001 R2 Stage 2 —  \
+             a usage_type=TA holding cannot be ACTIVE unless its investor is)"
+        );
+    }
+    Ok(())
+}
+
+/// R2 Stage 2 Phase 2 (2026-08-19): `holding_active_requires_investor_active`
+/// for `holding.create-for-investor` / `holding.ensure`. The already-landed
+/// `chk_holdings_ta_requires_investor_id` CHECK constraint guarantees
+/// `investor_id IS NOT NULL` whenever `usage_type = 'TA'` — this gate adds
+/// the one thing that constraint can't express: that the linked investor
+/// is actually active, not just linked.
+///
+/// Both verbs share identical arg semantics for the fields this gate
+/// needs. Missing `usage-type`/`holding-status` are treated as resolving
+/// to the real DB defaults (`UBO` / `ACTIVE` respectively — see
+/// `config/verbs/registry/holding.yaml` and the `holdings` table schema),
+/// not as "nothing to check", since `holding.ensure`'s optional args have
+/// no `default:` in their own YAML declaration. A missing `investor-id`
+/// (only possible on `ensure`) is left to the CHECK constraint — this gate
+/// only fires once there's a real investor to check.
+#[cfg(feature = "database")]
+async fn enforce_holding_active_requires_investor_active(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let usage_type = json_args
+        .get("usage-type")
+        .and_then(JsonValue::as_str)
+        .unwrap_or("UBO");
+    let holding_status = json_args
+        .get("holding-status")
+        .and_then(JsonValue::as_str)
+        .unwrap_or("ACTIVE");
+    if usage_type != "TA" || holding_status != "ACTIVE" {
+        return Ok(());
+    }
+    let Some(investor_id) = json_args
+        .get("investor-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+    else {
+        // No investor-id resolved: chk_holdings_ta_requires_investor_id
+        // refuses this at the DB level for usage_type=TA — not this
+        // gate's job to duplicate that check.
+        return Ok(());
+    };
+    check_investor_is_active_holder(investor_id, scope).await
+}
+
+/// R2 Stage 2 Phase 2 (2026-08-19): `holding_active_requires_investor_active`
+/// for `holding.update-status`. Unlike `create-for-investor`/`ensure`,
+/// this verb carries no `usage-type`/`investor-id` args at all — the gate
+/// must read the *existing* row (via `holding-id`) to know whether the
+/// transition to the requested `holding-status` needs checking.
+#[cfg(feature = "database")]
+async fn enforce_holding_update_status_requires_investor_active(
+    json_args: &HashMap<String, JsonValue>,
+    scope: &mut dyn TransactionScope,
+) -> Result<()> {
+    let target_status = json_args
+        .get("holding-status")
+        .and_then(JsonValue::as_str)
+        .unwrap_or_default();
+    if target_status != "ACTIVE" {
+        return Ok(());
+    }
+    let Some(holding_id) = json_args
+        .get("holding-id")
+        .and_then(JsonValue::as_str)
+        .and_then(|s| Uuid::parse_str(s).ok())
+    else {
+        return Ok(());
+    };
+    let row: Option<(String, Option<Uuid>)> = sqlx::query_as(
+        r#"SELECT usage_type, investor_id FROM "ob-poc".holdings WHERE id = $1"#,
+    )
+    .bind(holding_id)
+    .fetch_optional(scope.executor())
+    .await
+    .map_err(|e| {
+        anyhow!(
+            "holding_active_requires_investor_active: failed to read holding {holding_id}; \
+             refusing under the fail-closed gate (EOP-PLAN-GAMEBOARD-001 R2 Stage 2): {e}"
+        )
+    })?;
+    let Some((usage_type, investor_id)) = row else {
+        return Ok(());
+    };
+    if usage_type != "TA" {
+        return Ok(());
+    }
+    let Some(investor_id) = investor_id else {
+        // Pre-existing legacy row with usage_type=TA and no investor_id
+        // (predates chk_holdings_ta_requires_investor_id, e.g. the 4
+        // grandfathered captest_* rows) -- not this gate's job to
+        // retroactively remediate.
+        return Ok(());
+    };
+    check_investor_is_active_holder(investor_id, scope).await
 }
 
 /// EOP-PLAN-GAMEBOARD-001 follow-on (2026-08-19):
@@ -3636,6 +3776,173 @@ mod tests {
         enforce_investor_reinstate_kyc_approved(&args(non_active_id), &mut scope)
             .await
             .expect("reinstate to a non-active state must not be gated by KYC at all");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// R2 Stage 2 Phase 2 (2026-08-19): live-DB proof for
+    /// `enforce_holding_active_requires_investor_active` (the
+    /// `create-for-investor`/`ensure` shape — args carry `usage-type`/
+    /// `investor-id`/`holding-status` directly, no DB read of an existing
+    /// holding needed). RED before this pass: neither verb checked the
+    /// linked investor's state at all.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_holding_create_active_requires_investor_active() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let entity_id: Uuid = sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one entity must exist");
+        let investor_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".investors (entity_id, investor_type, kyc_status, lifecycle_state)
+               VALUES ($1, 'INDIVIDUAL', 'APPROVED', 'KYC_APPROVED') RETURNING investor_id"#,
+        )
+        .bind(entity_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway not-yet-active investor");
+
+        let args = |investor_id: Uuid, usage_type: &str, holding_status: Option<&str>| {
+            let mut m: HashMap<String, JsonValue> = [
+                (
+                    "investor-id".to_string(),
+                    JsonValue::String(investor_id.to_string()),
+                ),
+                (
+                    "usage-type".to_string(),
+                    JsonValue::String(usage_type.to_string()),
+                ),
+            ]
+            .into_iter()
+            .collect();
+            if let Some(hs) = holding_status {
+                m.insert("holding-status".to_string(), JsonValue::String(hs.to_string()));
+            }
+            m
+        };
+
+        // BLOCK: usage-type=TA, holding-status explicit ACTIVE, investor
+        // not yet ACTIVE_HOLDER.
+        let blocked =
+            enforce_holding_active_requires_investor_active(&args(investor_id, "TA", Some("ACTIVE")), &mut scope)
+                .await;
+        let bmsg = blocked
+            .expect_err("TA holding going ACTIVE with a non-active investor must be refused")
+            .to_string();
+        assert!(
+            bmsg.contains("KYC_APPROVED"),
+            "refusal must name the investor's actual lifecycle_state: {bmsg}"
+        );
+
+        // BLOCK (same reason) when holding-status is OMITTED — must be
+        // treated as the real DB default (ACTIVE), not "nothing to check".
+        enforce_holding_active_requires_investor_active(&args(investor_id, "TA", None), &mut scope)
+            .await
+            .expect_err("omitted holding-status must resolve to ACTIVE, not skip the check");
+
+        // PASS: UBO usage-type is never gated by investor state.
+        enforce_holding_active_requires_investor_active(&args(investor_id, "UBO", Some("ACTIVE")), &mut scope)
+            .await
+            .expect("UBO holdings are not gated by investor lifecycle state");
+
+        // PASS: investor now ACTIVE_HOLDER.
+        sqlx::query(r#"UPDATE "ob-poc".investors SET lifecycle_state = 'ACTIVE_HOLDER' WHERE investor_id = $1"#)
+            .bind(investor_id)
+            .execute(scope.executor())
+            .await
+            .expect("activate investor");
+        enforce_holding_active_requires_investor_active(&args(investor_id, "TA", Some("ACTIVE")), &mut scope)
+            .await
+            .expect("TA holding going ACTIVE with an ACTIVE_HOLDER investor must pass");
+
+        // scope drops here → rollback; no rows mutated anyway.
+    }
+
+    /// R2 Stage 2 Phase 2 (2026-08-19): live-DB proof for
+    /// `enforce_holding_update_status_requires_investor_active` (the
+    /// `update-status` shape — no `usage-type`/`investor-id` args at all,
+    /// the gate must read the existing row). RED before this pass:
+    /// `update-status` could flip any holding to ACTIVE with zero check on
+    /// the linked investor.
+    #[cfg(feature = "database")]
+    #[tokio::test]
+    #[ignore = "requires DATABASE_URL (dev DB)"]
+    async fn gameboard_r2_holding_update_status_requires_investor_active() {
+        let url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+        let pool = sqlx::PgPool::connect(&url).await.expect("connect");
+        let mut scope = crate::sequencer_tx::PgTransactionScope::begin(&pool)
+            .await
+            .expect("begin scope");
+
+        let entity_id: Uuid = sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entities LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one entity must exist");
+        let share_class_id: Uuid = sqlx::query_scalar(r#"SELECT id FROM "ob-poc".share_classes LIMIT 1"#)
+            .fetch_one(scope.executor())
+            .await
+            .expect("at least one share_class must exist");
+        let investor_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".investors (entity_id, investor_type, kyc_status, lifecycle_state)
+               VALUES ($1, 'INDIVIDUAL', 'APPROVED', 'KYC_APPROVED') RETURNING investor_id"#,
+        )
+        .bind(entity_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway not-yet-active investor");
+        let holding_id: Uuid = sqlx::query_scalar(
+            r#"INSERT INTO "ob-poc".holdings
+               (share_class_id, investor_entity_id, investor_id, usage_type, holding_status)
+               VALUES ($1, $2, $3, 'TA', 'PENDING') RETURNING id"#,
+        )
+        .bind(share_class_id)
+        .bind(entity_id)
+        .bind(investor_id)
+        .fetch_one(scope.executor())
+        .await
+        .expect("insert throwaway TA holding");
+
+        let args = |holding_id: Uuid, status: &str| -> HashMap<String, JsonValue> {
+            [
+                ("holding-id".to_string(), JsonValue::String(holding_id.to_string())),
+                ("holding-status".to_string(), JsonValue::String(status.to_string())),
+            ]
+            .into_iter()
+            .collect()
+        };
+
+        // PASS: target status is not ACTIVE — never gated.
+        enforce_holding_update_status_requires_investor_active(&args(holding_id, "SUSPENDED"), &mut scope)
+            .await
+            .expect("non-ACTIVE target status is never gated");
+
+        // BLOCK: target ACTIVE, investor not yet ACTIVE_HOLDER.
+        let blocked =
+            enforce_holding_update_status_requires_investor_active(&args(holding_id, "ACTIVE"), &mut scope).await;
+        let bmsg = blocked
+            .expect_err("TA holding going ACTIVE with a non-active investor must be refused")
+            .to_string();
+        assert!(
+            bmsg.contains("KYC_APPROVED"),
+            "refusal must name the investor's actual lifecycle_state: {bmsg}"
+        );
+
+        // PASS: investor now ACTIVE_HOLDER.
+        sqlx::query(r#"UPDATE "ob-poc".investors SET lifecycle_state = 'ACTIVE_HOLDER' WHERE investor_id = $1"#)
+            .bind(investor_id)
+            .execute(scope.executor())
+            .await
+            .expect("activate investor");
+        enforce_holding_update_status_requires_investor_active(&args(holding_id, "ACTIVE"), &mut scope)
+            .await
+            .expect("TA holding going ACTIVE with an ACTIVE_HOLDER investor must pass");
 
         // scope drops here → rollback; no rows mutated anyway.
     }
