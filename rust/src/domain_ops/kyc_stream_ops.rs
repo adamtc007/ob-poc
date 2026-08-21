@@ -743,6 +743,7 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .map_err(|e| anyhow!("freeze: control fold failed: {e}"))?;
         let _ = fold_obligations_versioned(&refs, &KYC_REGISTRY)
             .map_err(|e| anyhow!("freeze: obligation fold failed: {e}"))?;
+        let type_registry = fold_type_registry(&refs);
 
         // 2. Run the actual determination strategy (EOP-DD-KYCUBO-003 R1/M1.2).
         //    `select-strategy` must have fired (ReconciledProjection/StrategySelected
@@ -844,6 +845,31 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             strategy.resolve(&control, subject_entity_id, &natural_persons, threshold_pct);
         candidates.sort_by_key(|c| c.person_id.0);
 
+        // TS.3 §3: record any statutory-authority stop at the subject —
+        // traversal already excludes it (control_admission ==
+        // ControlAdmission::Stop), this makes the halt non-silent.
+        let stops = ob_poc_kyc_substrate::detect_statutory_stops(&control, subject_entity_id);
+
+        // TS.3 §4a: pull the officer/SMO population on exhaustion — fires
+        // ONLY when ownership+control produced nothing
+        // (`officers_contribute_only_on_exhaustion`); never pushed by edge
+        // admission. Folds directly into `candidates`; the manual
+        // `apply-smo-fallback` route (below) remains the K-5 escape hatch
+        // when nothing is found to pull.
+        let smo_pull = match ob_poc_kyc_substrate::pull_smo_on_exhaustion(
+            &control,
+            subject_entity_id,
+            &natural_persons,
+            &candidates,
+        ) {
+            Some((pulled, record)) => {
+                candidates.extend(pulled);
+                candidates.sort_by_key(|c| c.person_id.0);
+                Some(record)
+            }
+            None => None,
+        };
+
         let smo_result = match (control.smo_person_id, control.smo_event_id) {
             (Some(pid), Some(orig)) => Some(SmoResult::Person(ProngCandidate {
                 person_id: pid,
@@ -884,6 +910,12 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             .await
             .map_err(|e| anyhow!("freeze: prior persons failed: {e}"))?;
 
+        // TS.3 §2a: the assurance surface — empty means fully proved; a
+        // non-empty reason set never blocks the freeze (K-5/§2a: a
+        // determination runs at any board state), it only labels it.
+        let assurance =
+            ob_poc_kyc_substrate::compute_assurance(&candidates, &stops, &control, &type_registry);
+
         // 4. Append the freeze event to the stream (under the per-subject lock).
         //    The payload carries the resolved candidates + basis (K-1, K-35) —
         //    not just a bare person-id list — so the event itself is the audit record.
@@ -896,6 +928,9 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             obj.insert("threshold_pct".into(), json!(threshold_pct));
             obj.insert("candidates".into(), serde_json::to_value(&candidates)?);
             obj.insert("smo_result".into(), serde_json::to_value(&smo_result)?);
+            obj.insert("stops".into(), serde_json::to_value(&stops)?);
+            obj.insert("smo_pull".into(), serde_json::to_value(&smo_pull)?);
+            obj.insert("assurance".into(), serde_json::to_value(&assurance)?);
         }
         //    `Some(fqn)` re-checks ReconciledProjection + StrategySelected against the
         //    freshly-locked state (K-14) — the declared lexicon preconditions were
@@ -932,6 +967,9 @@ impl SemOsVerbOp for UboDeterminationFreeze {
             "resolved_persons": resolved_persons.len(),
             "candidates": candidates,
             "smo_result": smo_result,
+            "stops": stops,
+            "smo_pull": smo_pull,
+            "assurance": assurance,
             "retracted_persons": prior_persons.len().saturating_sub(resolved_persons.len()),
         })))
     }

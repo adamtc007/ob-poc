@@ -169,6 +169,16 @@ impl TypeRegistryState {
     pub fn is_withdrawn(&self, entity: EntityId) -> bool {
         self.withdrawn_members.contains(&entity)
     }
+
+    /// `entity`'s type-proof status — `None` if no type has been asserted
+    /// at all (a different, "unresolved" state from `Alleged`; see
+    /// `PipeClassification`'s doc). Used by TS.3 §2a's provisionality
+    /// propagation: a traversal decision resting on an `Alleged` type is
+    /// itself provisional, distinctly from an alleged EDGE
+    /// (`determination::compute_assurance`).
+    pub fn proof_of(&self, entity: EntityId) -> Option<TypeProofStatus> {
+        self.types.get(&entity).map(|r| r.proof)
+    }
 }
 
 fn entity_id(v: &serde_json::Value, field: &str) -> Option<EntityId> {

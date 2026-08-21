@@ -25,20 +25,23 @@ pub(crate) mod types;
 // ── Convenience re-exports ────────────────────────────────────────────────────
 
 pub use determination::{
-    find_subject_entity, freeze_determination, recover_determination_at,
-    recover_determination_bitemporal, ControlProngStrategy, CooperativeMemberStrategy,
+    compute_assurance, detect_statutory_stops, find_subject_entity, freeze_determination,
+    pull_smo_on_exhaustion, recover_determination_at, recover_determination_bitemporal,
+    ControlProngStrategy, CooperativeMemberStrategy, DeterminationAssurance,
     DeterminationInProgress, DeterminationPin, DeterminationStrategy, FoundationCouncilStrategy,
     FrozenDetermination, FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy,
-    Prong, ProngCandidate, RecoveryPin, SmoResult, StateOwnedStrategy, TrustRoleStrategy,
+    Prong, ProngCandidate, ProvisionalityReason, RecoveryPin, SmoPullRecord, SmoResult,
+    StateOwnedStrategy, TraversalStop, TrustRoleStrategy,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};
 pub use fold::control::{
-    check_control_preconditions, check_preconditions, fold_control, natural_persons_from_events,
-    reconciled_control_edges, reconciled_economic_edges, reconciled_trust_edges, ControlState,
-    EdgeKind, EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge,
-    ReconciledTrustEdge, StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES,
-    IMPLEMENTED_STRATEGY_CLASSES, STRUCTURE_CLASS_WIRE_VALUES,
+    check_control_preconditions, check_preconditions, control_admission, edges_of_kind_into,
+    fold_control, natural_persons_from_events, reconciled_control_edges,
+    reconciled_economic_edges, reconciled_trust_edges, ControlAdmission, ControlState, EdgeKind,
+    EdgeState, EdgeStatus, ReconciledControlEdge, ReconciledEconomicEdge, ReconciledTrustEdge,
+    StructureClass, TrustRoleKind, EDGE_KIND_WIRE_VALUES, IMPLEMENTED_STRATEGY_CLASSES,
+    STRUCTURE_CLASS_WIRE_VALUES,
 };
 pub use fold::obligation::{
     fold_obligations, ObligationBasis, ObligationState, ObligationTracks, SubjectOverallState,

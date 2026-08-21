@@ -956,57 +956,117 @@ pub struct ReconciledControlEdge {
     pub originating_event_id: EventId,
 }
 
-/// The exact set of `EdgeKind` variants admitted as "control" by
-/// `reconciled_control_edges` today (EOP-STATE-KYCUBO-D1 §4, Phase 1 of the
-/// tree-cleanup follow-up tranche, 2026-08-21).
+/// The four-way admission class a control-kind edge falls into
+/// (EOP-DD-KYCUBO-TS.3 §4, RATIFIED 2026-08-21).
+///
+/// Supersedes the boolean `is_admitted_as_control` (landed `c7ef69ca`) — TS.3
+/// found that boolean one distinction short: `Stop` (traversal halts,
+/// recording why — `StatutoryAuthority`) is not the same thing as
+/// `NotControl` (never part of the walk — `OfficerAppointment` et al.), and
+/// neither is a `bool`'s "false" arm strong enough to say which. `Pierce`
+/// (`Nominee`) is listed for completeness (TS.3 §4) — it is a traversal rule
+/// available during any strategy (TS.0 §5), not a member of the admission
+/// set `reconciled_control_edges` filters to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ControlAdmission {
+    /// Walk through; continue to the next node.
+    Traverse,
+    /// Traversal halts here; the caller must record why (K-8-style
+    /// discipline — not a silent halt). See `detect_statutory_stops`
+    /// (`determination.rs`).
+    Stop,
+    /// Never part of the control walk. May still be a terminal/population
+    /// source pulled by a strategy on exhaustion (§4a — `OfficerAppointment`),
+    /// never by admission.
+    NotControl,
+    /// Substitute the underlying holder and continue (K-8). Not filtered by
+    /// `reconciled_control_edges` — pierce-and-substitute is handled at the
+    /// `ubo.edge.pierce-nominee` op layer, before any strategy ever runs.
+    Pierce,
+}
+
+/// The TS.3 §3/§4 admission ruling, per `EdgeKind`.
 ///
 /// **This is a SAFETY guard, not a semantics ruling.** Before this function
-/// existed, the filter was an EXCLUSION list — everything except
+/// existed (as the boolean `is_admitted_as_control`, landed `c7ef69ca`), the
+/// filter was an EXCLUSION list — everything except
 /// `EconomicInterest`/`Nominee` passed — which silently admitted every
 /// *future* `EdgeKind` variant as generic control the moment it became
-/// assertable, with no domain ruling behind the admission. The six TS.2
-/// vocabulary-convergence variants (`OfficerAppointment`,
-/// `ManagementMandate`, `MembershipRights`, `StatutoryAuthority`,
-/// `Employment`, `Containment`) became assertable after this filter was
-/// first written and were swept in undifferentiated — a live hazard, not a
-/// latent one. This whitelist freezes TODAY's behaviour deliberately:
-/// admitting one of the six (or any future variant) is a conscious TS
-/// ratification, never a maintenance side-effect of adding an `EdgeKind`
-/// variant elsewhere. `EconomicInterest` is out because that's the
-/// ownership prong's job (`reconciled_economic_edges`); `Nominee` is out
-/// because nominee arrangements require piercing first (K-8,
-/// `ubo.edge.pierce-nominee`) — treating a bare nominee edge as direct
-/// control would attribute control to the nominee itself, exactly the
-/// wrong answer K-8 exists to prevent. The match is exhaustive with NO
-/// catch-all arm: adding a new `EdgeKind` variant anywhere in this enum is
-/// a compile error here, never a silent admission.
-fn is_admitted_as_control(kind: &EdgeKind) -> bool {
+/// assertable, with no domain ruling behind the admission. TS.3 closes the
+/// semantics question the whitelist tranche deliberately left open,
+/// reconciling to V&S v0.6 §6.4's control-axis column rather than inventing:
+/// `ManagementMandate` and `MembershipRights` are named as control axes for
+/// funds and cooperatives respectively and move to `Traverse`;
+/// `StatutoryAuthority` routes to SMO/special-handling per §6.4's
+/// state-owned row, so it `Stop`s rather than being walked or silently
+/// dropped; `OfficerAppointment` stays out of the WALK (ruled 2026-08-21 —
+/// "may not be needed or relevant") but is available for the §4a pull on
+/// exhaustion; `Employment`/`Containment` stay out (obligation basis /
+/// structural scoping, not control, per §3); `EconomicInterest` is out
+/// because that's the ownership prong's job (`reconciled_economic_edges`);
+/// `Nominee` is `Pierce`, never a plain admission. The match is exhaustive
+/// with NO catch-all arm: adding a new `EdgeKind` variant anywhere in this
+/// enum is a compile error here, never a silent admission.
+pub fn control_admission(kind: &EdgeKind) -> ControlAdmission {
+    use ControlAdmission::*;
     match kind {
         EdgeKind::VotingRights
         | EdgeKind::BoardAppointment
         | EdgeKind::GpStatutory
         | EdgeKind::DesignatedMember
         | EdgeKind::TrustRole(_)
-        | EdgeKind::DominantInfluence => true,
-        EdgeKind::EconomicInterest
-        | EdgeKind::Nominee
-        | EdgeKind::OfficerAppointment
+        | EdgeKind::DominantInfluence
         | EdgeKind::ManagementMandate
-        | EdgeKind::MembershipRights
-        | EdgeKind::StatutoryAuthority
+        | EdgeKind::MembershipRights => Traverse,
+        EdgeKind::StatutoryAuthority => Stop,
+        EdgeKind::EconomicInterest
+        | EdgeKind::OfficerAppointment
         | EdgeKind::Employment
-        | EdgeKind::Containment => false,
+        | EdgeKind::Containment => NotControl,
+        EdgeKind::Nominee => Pierce,
     }
 }
 
-/// Extract the reconciled (active, verified) control edges from the control
-/// state — the whitelisted control-kind edges (see `is_admitted_as_control`),
-/// active. Used by `ControlProngStrategy` (M4) and its delegates/siblings.
+/// Extract the reconciled (active) control edges from the control state —
+/// the `Traverse`-classified edges (`control_admission`), active. Used by
+/// `ControlProngStrategy` (M4) and its delegates/siblings. Nothing here
+/// gates on `EdgeStatus::Verified` — a merely-`Asserted` edge still
+/// traverses (TS.3 §2a: a determination runs at any board state; what
+/// changes is not whether it is produced but how well it is known).
 pub fn reconciled_control_edges(state: &ControlState) -> Vec<ReconciledControlEdge> {
     state
         .edges
         .values()
-        .filter(|e| is_admitted_as_control(&e.kind) && e.is_active())
+        .filter(|e| control_admission(&e.kind) == ControlAdmission::Traverse && e.is_active())
+        .map(|e| ReconciledControlEdge {
+            id: e.id,
+            from: e.from,
+            to: e.to,
+            kind: e.kind.clone(),
+            verified_by: if e.is_verified() {
+                e.evidence_event_id
+            } else {
+                None
+            },
+            originating_event_id: e.originating_event_id,
+        })
+        .collect()
+}
+
+/// Active edges of `kind`, active, pointed at `target` — the shared shape
+/// `detect_statutory_stops`/`pull_smo_on_exhaustion` (`determination.rs`,
+/// TS.3 §3/§4a) both need: a `Stop`- or `NotControl`-classified kind is by
+/// definition excluded from `reconciled_control_edges`, so those two
+/// call sites need their own direct scan rather than the Traverse-only set.
+pub fn edges_of_kind_into(
+    state: &ControlState,
+    kind: EdgeKind,
+    target: EntityId,
+) -> Vec<ReconciledControlEdge> {
+    state
+        .edges
+        .values()
+        .filter(|e| e.kind == kind && e.to == target && e.is_active())
         .map(|e| ReconciledControlEdge {
             id: e.id,
             from: e.from,

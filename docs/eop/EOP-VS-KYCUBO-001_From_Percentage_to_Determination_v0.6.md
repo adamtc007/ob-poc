@@ -180,16 +180,20 @@ The subject's **structure class** selects the strategy, recorded on the determin
 | **Private company** | shareholding % | voting / board appointment | Ownership → Control → SMO | Axes coincide; today's model. |
 | **Multi-tier holding group** | indirect % (multiplied) | dominant-chain (propagated) | Ownership and Control parallel | Chains can diverge in length/terminus. |
 | **Listed entity (regulated market)** | shareholders above threshold | board / voting | Carve-out → Ownership/SMO | Exemption; qualifying markets are reference-plane data; directors/officers may still be in scope. |
-| **Limited partnership / PE fund** | LP capital commitments | GP statutory; delegated IM; LPAC veto | **Control primary** | Investors route out; GP/manager line traced to persons. |
+| **Limited partnership / PE fund** | LP capital commitments | GP statutory; LPAC veto (delegated IM: recorded, not traversed — see note) | **Control primary** | Investors route out; GP/manager line traced to persons. |
 | **LLP** | member capital/profit (from agreement) | designated members; members' agreement; voting | **Control primary** | No shares; economic from instrument; low share ≠ excluded. |
 | **Trust** | n/a | settlor, trustee, protector, beneficiaries, controller | **Role-based** | No percentage; persons by role and trust deed. |
 | **Foundation (Stiftung / SPF)** | n/a | founder, council/board, beneficiaries | **Role-based** | Governed by founding instrument. |
-| **Investment fund / SICAV / UCITS / AIF** | unit / shareholders | ManCo / AIFM; delegate IM | **Control primary** | Sub-fund/compartment, depositary, fund directors in role map; investors route out. |
+| **Investment fund / SICAV / UCITS / AIF** | unit / shareholders | ManCo / AIFM (delegate IM: recorded, not traversed — see note) | **Control primary** | Sub-fund/compartment, depositary, fund directors in role map; investors route out. |
 | **State-owned / government body** | the state | public officials | SMO / special-handling | Exempt or special-handled per policy; recorded. |
 | **Cooperative / mutual** | members | board; voting (often one-member-one-vote) | **Control primary** | Economic % often meaningless. |
 | **Nominee / bearer** | nominal vs beneficial | beneficial controller behind nominee | Pierce to beneficial | Resolves *through* the nominee; never terminates at it. |
 
 A class is **data**, so new classes are added without re-architecting the engine.
+
+> **Note on delegated IM (amendment, ratified 2026-08-21).** The investment-manager relationship is **contractual — an investment mandate — and is never a control basis for determination**. It remains in the control taxonomy (§9.2): it is recorded, evidenced, screened, and matters for risk, conflicts and CBU membership. It is **not traversed**. Control sits with the holder of the *governing* mandate — ManCo, AIFM, GP, or an adviser holding the governing mandate — and a delegate under that mandate is not a controller of the vehicle.
+> The apparent exception is not one: where the asset owner *is* the IM, that entity is already in the chain via ownership and ordinary traversal finds it, with no IM-specific path. This holds for split hedge-fund structures too — one LLP executing the derivatives strategy, another managing investors: the executing manager holds a mandate to trade, not control of the vehicle.
+> "GP/manager line traced to persons" above is satisfied by the governing mandate, not by the delegate. Design detail: EOP-DD-KYCUBO-TS.3 §3/§5.1.
 
 ---
 

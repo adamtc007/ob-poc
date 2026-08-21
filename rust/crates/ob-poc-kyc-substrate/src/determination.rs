@@ -513,22 +513,35 @@ impl DeterminationStrategy for StateOwnedStrategy {
 
 /// Resolves natural persons controlling a Cooperative-classified subject —
 /// one-member-one-vote: by construction no member holds ≥25% of votes
-/// through membership alone, so membership per se NEVER yields a UBO;
-/// control arises only from **office** (board/management edges) or an
-/// anomalous concentrated voting arrangement (EOP-DD-KYCUBO-KIT-TS0 §2.5,
-/// ratified 2026-08-12).
+/// through membership alone, so membership per se NEVER yields a UBO via
+/// its ECONOMIC weight; control arises from **office** (board/management
+/// edges), an anomalous concentrated voting arrangement, OR the membership
+/// relationship itself construed as the co-op's own control axis
+/// (EOP-DD-KYCUBO-KIT-TS0 §2.5, ratified 2026-08-12, **superseded in part
+/// by EOP-DD-KYCUBO-TS.3 §3, ratified 2026-08-21**: V&S §6.4 names
+/// "board; voting (often one-member-one-vote)" as the co-op control axis
+/// and notes "economic % often meaningless" — TS.3 reads this as ruling
+/// membership-rights edges INTO the control walk, not only office; the two
+/// documents are reconciled, not contradictory — TS.0's "membership alone
+/// never yields a UBO by ECONOMIC weight" stands, TS.3 adds that a
+/// membership-rights edge is nonetheless a real, admitted control-kind
+/// pipe (pipe 11) when economic % is meaningless).
 ///
 /// Traverses ONLY active reconciled `EdgeKind::VotingRights` +
-/// `EdgeKind::BoardAppointment` + `EdgeKind::DominantInfluence` edges —
-/// kind-filtered like `FoundationCouncilStrategy` (its 2-kind filter plus
-/// voting_rights for the anomalous-concentration case). Any other
-/// control-kind edge on a Cooperative subject is IGNORED by this strategy —
-/// deliberate, mirroring the TrustRole/FoundationCouncil stance: if the
-/// structure genuinely mixes, classification is wrong, and reclassification
-/// is legal (matrix row 10). Expected COMMON outcome is zero candidates →
-/// SMO fallback, same route as `StateOwnedStrategy` (§2.4). Every candidate
-/// is `Prong::ControlByOtherMeans`; `effective_ownership_pct` is always
-/// `None`; `threshold_pct` is accepted for signature parity but unused.
+/// `EdgeKind::BoardAppointment` + `EdgeKind::DominantInfluence` +
+/// **`EdgeKind::MembershipRights` (TS.3 — new)** edges — kind-filtered like
+/// `FoundationCouncilStrategy` (its 2-kind filter plus voting_rights for the
+/// anomalous-concentration case, plus membership_rights for the co-op axis
+/// itself). Any other control-kind edge on a Cooperative subject is IGNORED
+/// by this strategy — deliberate, mirroring the TrustRole/FoundationCouncil
+/// stance: if the structure genuinely mixes, classification is wrong, and
+/// reclassification is legal (matrix row 10). Before TS.3, expected COMMON
+/// outcome was zero candidates → SMO fallback, same route as
+/// `StateOwnedStrategy` (§2.4); TS.3 makes a co-op WITH membership-rights
+/// edges resolve directly (`cooperative_resolves_via_membership`, TS.3 §7).
+/// Every candidate is `Prong::ControlByOtherMeans`; `effective_ownership_pct`
+/// is always `None`; `threshold_pct` is accepted for signature parity but
+/// unused.
 ///
 /// **Scope (TS.3 v1):** same natural-person chain resolution and v1
 /// boundary as the other control-axis strategies — an intermediate legal
@@ -550,14 +563,17 @@ impl DeterminationStrategy for CooperativeMemberStrategy {
     ) -> Vec<ProngCandidate> {
         use crate::fold::control::EdgeKind;
 
-        // Admitted kinds only (§2.5): voting_rights + board_appointment +
-        // dominant_influence.
+        // Admitted kinds (§2.5, widened by TS.3 §3): voting_rights +
+        // board_appointment + dominant_influence + membership_rights.
         let edges = reconciled_control_edges(state);
         let mut adj: BTreeMap<EntityId, Vec<(EntityId, EventId)>> = BTreeMap::new();
         for e in &edges {
             if matches!(
                 e.kind,
-                EdgeKind::VotingRights | EdgeKind::BoardAppointment | EdgeKind::DominantInfluence
+                EdgeKind::VotingRights
+                    | EdgeKind::BoardAppointment
+                    | EdgeKind::DominantInfluence
+                    | EdgeKind::MembershipRights
             ) {
                 adj.entry(e.to).or_default().push((e.from, e.originating_event_id));
             }
@@ -627,6 +643,290 @@ impl DeterminationStrategy for NomineePierceStrategy {
 pub enum SmoResult {
     Person(ProngCandidate),
     AuthorisedWaiver { reason: String, by_event: EventId },
+}
+
+// ── Statutory-authority stop (TS.3 §3/§4a — "Stop must record why") ─────────
+
+/// One recorded halt: a `StatutoryAuthority`-kind edge reached `stopped_at`,
+/// and the walk did NOT continue onward (`ControlAdmission::Stop`,
+/// `fold::control::control_admission`). Not a silent exclusion — the entity
+/// asserting the authority and the reason are both recorded (K-8-style
+/// discipline extended to this admission class).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraversalStop {
+    /// The entity the walk was AT when it hit the stop (typically the
+    /// determination subject itself — see scope note on
+    /// `detect_statutory_stops`).
+    pub stopped_at: EntityId,
+    /// The government/sovereign entity asserting statutory authority.
+    pub authority_entity: EntityId,
+    pub reason: String,
+    pub originating_event_id: EventId,
+}
+
+/// TS.3 §3/§4a: scan for active `StatutoryAuthority` edges pointed at
+/// `subject_entity_id` and record why the walk halted there instead of
+/// continuing onward or silently dropping the edge (the pre-TS.3
+/// behaviour — `StatutoryAuthority` was already excluded from
+/// `reconciled_control_edges`, but nothing recorded that fact).
+///
+/// **Scope (v1):** direct-to-subject edges only, mirroring every other
+/// control-axis strategy's documented v1 boundary in this file (no
+/// crossing further into the graph for an intermediate entity's own
+/// statutory relationships — v2).
+pub fn detect_statutory_stops(
+    state: &ControlState,
+    subject_entity_id: EntityId,
+) -> Vec<TraversalStop> {
+    crate::fold::control::edges_of_kind_into(
+        state,
+        crate::fold::control::EdgeKind::StatutoryAuthority,
+        subject_entity_id,
+    )
+    .into_iter()
+    .map(|e| TraversalStop {
+        stopped_at: subject_entity_id,
+        authority_entity: e.from,
+        reason: "target reached via statutory authority — routes to SMO/special-handling, \
+                 not further traversal (V&S §6.4 state-owned row; TS.3 §3 pipe 12)"
+            .to_string(),
+        originating_event_id: e.originating_event_id,
+    })
+    .collect()
+}
+
+// ── SMO pull on exhaustion (TS.3 §4a) ────────────────────────────────────────
+
+/// TS.3 §4a: the audit record that the SMO/officer population was PULLED by
+/// the strategy on exhaustion, never PUSHED by edge admission. Never the
+/// sole carrier of the pulled candidates — those are ordinary
+/// `ProngCandidate`s (`Prong::SmoFallback`) folded into the same candidate
+/// list `pull_smo_on_exhaustion` returns alongside this record; this struct
+/// exists so the pull is never silent (K-8 discipline).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SmoPullRecord {
+    /// The entity/entities the walk exhausted at (TS.2 Ruling 2a — the
+    /// mandate holder, not the fund, when a chain is involved). More than
+    /// one only in the (currently untested) case of a genuinely
+    /// multi-branch exhaustion.
+    pub exhausted_at: Vec<EntityId>,
+    pub reason: String,
+    pub pulled_officer_count: usize,
+}
+
+/// TS.3 §4a: ownership and control have exhausted (`prior_candidates` is
+/// empty) — ask for the officer/SMO population of the entity/entities the
+/// walk actually exhausted at, not the subject blindly. Returns `None` if
+/// `prior_candidates` is non-empty (§4a: pull fires ONLY on exhaustion,
+/// never pushed — `officers_contribute_only_on_exhaustion`) or if no
+/// `OfficerAppointment` edge exists at the exhaustion frontier (the
+/// existing manual `apply-smo-fallback` / authorised-waiver route remains
+/// the K-5 escape hatch in that case).
+///
+/// **Frontier, independently derived:** re-walks `reconciled_control_edges`
+/// from `subject_entity_id` (the SAME admitted-edge set every control-axis
+/// strategy shares) to find the exact set of non-person nodes the walk
+/// reached and could go no further from — this reconstructs the frontier a
+/// strategy's own DFS would have stopped at, without requiring
+/// `DeterminationStrategy::resolve()`'s signature to expose its internal
+/// walk state (kept out of scope — see `docs/todo/EOP-DD-KYCUBO-TS.3...
+/// §6`, which names only the admission function as the code surface this
+/// tranche changes). **v1 boundary:** uses the FULL `reconciled_control_
+/// edges` set uniformly, not each strategy's own narrower kind filter
+/// (`TrustRoleStrategy`/`FoundationCouncilStrategy`/`CooperativeMember
+/// Strategy` each additionally restrict beyond the shared set) — for every
+/// fixture this tranche's gates construct, the narrower strategies have no
+/// OTHER kind of edge present, so the frontier coincides; a stricter
+/// per-strategy-aware pull is v2.
+pub fn pull_smo_on_exhaustion(
+    state: &ControlState,
+    subject_entity_id: EntityId,
+    natural_persons: &BTreeSet<PersonId>,
+    prior_candidates: &[ProngCandidate],
+) -> Option<(Vec<ProngCandidate>, SmoPullRecord)> {
+    if !prior_candidates.is_empty() {
+        return None;
+    }
+
+    let edges = reconciled_control_edges(state);
+    let mut adj: BTreeMap<EntityId, Vec<EntityId>> = BTreeMap::new();
+    for e in &edges {
+        adj.entry(e.to).or_default().push(e.from);
+    }
+    for parents in adj.values_mut() {
+        parents.sort();
+    }
+
+    // Re-derive the frontier: nodes the walk reached (from subject_entity_id,
+    // over the same adjacency every control strategy shares) that have NO
+    // further admitted parent edges — a dead end, i.e. where the walk
+    // actually exhausted. Cycle-guarded like `resolve_chain_candidates`.
+    let mut visited: BTreeSet<EntityId> = BTreeSet::new();
+    let mut frontier: BTreeSet<EntityId> = BTreeSet::new();
+    let mut stack = vec![subject_entity_id];
+    while let Some(node) = stack.pop() {
+        if !visited.insert(node) {
+            continue;
+        }
+        match adj.get(&node) {
+            None => {
+                frontier.insert(node);
+            }
+            Some(parents) if parents.is_empty() => {
+                frontier.insert(node);
+            }
+            Some(parents) => {
+                for &parent in parents {
+                    // A natural-person parent would already be a candidate —
+                    // if prior_candidates is empty, none of the admitted
+                    // edges reach one (consistency guard, not expected to
+                    // trigger in well-formed input).
+                    if !natural_persons.contains(&PersonId(parent.0)) {
+                        stack.push(parent);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut pulled: Vec<ProngCandidate> = Vec::new();
+    for &entity in &frontier {
+        for e in crate::fold::control::edges_of_kind_into(
+            state,
+            crate::fold::control::EdgeKind::OfficerAppointment,
+            entity,
+        ) {
+            let candidate_person = PersonId(e.from.0);
+            if natural_persons.contains(&candidate_person) {
+                pulled.push(ProngCandidate {
+                    person_id: candidate_person,
+                    prong: Prong::SmoFallback,
+                    effective_ownership_pct: None,
+                    ownership_chain: vec![subject_entity_id, entity],
+                    originating_event_id: e.originating_event_id,
+                });
+            }
+        }
+    }
+    if pulled.is_empty() {
+        return None;
+    }
+    pulled.sort_by_key(|c| c.person_id.0);
+
+    let exhausted_at: Vec<EntityId> = pulled
+        .iter()
+        .map(|c| *c.ownership_chain.last().expect("pull chain always has >=2 entries"))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let record = SmoPullRecord {
+        pulled_officer_count: pulled.len(),
+        reason: "ownership and control exhausted with no natural-person candidate — officer/SMO \
+                 population pulled from the entity the walk exhausted at (TS.3 §4a); never \
+                 pushed by edge admission"
+            .to_string(),
+        exhausted_at,
+    };
+    Some((pulled, record))
+}
+
+// ── Provisionality through traversal decisions (TS.3 §2a) ───────────────────
+
+/// TS.3 §2a: WHY a determination is provisional — three distinct
+/// remediation tasks, never collapsed into one flag.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum ProvisionalityReason {
+    /// A control-kind edge touching the determination is not yet
+    /// `EdgeStatus::Verified`.
+    AllegedEdge { entity: EntityId, edge_kind_label: String },
+    /// A participant entity's own type assertion
+    /// (`TypeRegistryState::proof_of`) is `TypeProofStatus::Alleged`, not
+    /// yet `Proved`.
+    AllegedType { entity: EntityId },
+    /// An admission/stop decision (`control_admission`) was taken while the
+    /// entity that decision turned on carries only an alleged type — the
+    /// narrow case §2a calls out by name: a `Stop` at a believed-but-
+    /// unproven state body.
+    AdmissionOnAllegedType { entity: EntityId, edge_kind_label: String },
+}
+
+/// The assurance surface for one determination: empty means fully proved
+/// (every implicated edge Verified, every implicated entity's type Proved);
+/// non-empty means provisional, with each reason distinct (§2a: "different
+/// remediation tasks... must not collapse into one flag").
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeterminationAssurance {
+    pub reasons: Vec<ProvisionalityReason>,
+}
+
+impl DeterminationAssurance {
+    pub fn is_provisional(&self) -> bool {
+        !self.reasons.is_empty()
+    }
+}
+
+/// TS.3 §2a: propagate provisionality through the traversal DECISIONS, not
+/// only the edges. Walks every entity implicated in the final answer —
+/// every candidate's `ownership_chain`, every stop's `stopped_at`/
+/// `authority_entity` — and checks two independent signals:
+/// 1. is any control-kind edge touching an implicated entity pair still
+///    only `Asserted`/`Evidenced` (not yet `Verified`)? → `AllegedEdge`.
+/// 2. is any implicated entity's own type assertion still `Alleged`
+///    (not yet `Proved`)? → `AllegedType`; additionally, for a `Stop`
+///    specifically, `AdmissionOnAllegedType` — the STOP decision itself
+///    rested on believing (not yet proving) that entity is a state body.
+///
+/// Deterministic by construction: iterates only `BTreeMap`/`BTreeSet`
+/// collections (Q6, K-16/18/33 — no `HashMap`/`HashSet` in this module).
+pub fn compute_assurance(
+    candidates: &[ProngCandidate],
+    stops: &[TraversalStop],
+    control_state: &ControlState,
+    type_registry: &crate::fold::type_registry::TypeRegistryState,
+) -> DeterminationAssurance {
+    use crate::fold::type_registry::TypeProofStatus;
+
+    let mut touched: BTreeSet<EntityId> = BTreeSet::new();
+    for c in candidates {
+        touched.extend(c.ownership_chain.iter().copied());
+    }
+    for s in stops {
+        touched.insert(s.stopped_at);
+        touched.insert(s.authority_entity);
+    }
+
+    let mut reasons: BTreeSet<ProvisionalityReason> = BTreeSet::new();
+
+    for edge in control_state.edges.values() {
+        if !edge.is_active() {
+            continue;
+        }
+        if !matches!(edge.status, crate::fold::control::EdgeStatus::Verified)
+            && (touched.contains(&edge.from) || touched.contains(&edge.to))
+        {
+            reasons.insert(ProvisionalityReason::AllegedEdge {
+                entity: edge.to,
+                edge_kind_label: format!("{:?}", edge.kind),
+            });
+        }
+    }
+
+    for &entity in &touched {
+        if type_registry.proof_of(entity) == Some(TypeProofStatus::Alleged) {
+            reasons.insert(ProvisionalityReason::AllegedType { entity });
+        }
+    }
+
+    for s in stops {
+        if type_registry.proof_of(s.stopped_at) == Some(TypeProofStatus::Alleged) {
+            reasons.insert(ProvisionalityReason::AdmissionOnAllegedType {
+                entity: s.stopped_at,
+                edge_kind_label: "statutory_authority".to_string(),
+            });
+        }
+    }
+
+    DeterminationAssurance { reasons: reasons.into_iter().collect() }
 }
 
 // ── Frozen determination (K-18) ───────────────────────────────────────────────
@@ -701,10 +1001,24 @@ pub struct FrozenDetermination {
     pub pin: DeterminationPin,
     /// The event that triggered this freeze (K-35 chain).
     pub freeze_event_id: EventId,
-    /// Resolved UBO persons with basis (K-1: basis mandatory).
+    /// Resolved UBO persons with basis (K-1: basis mandatory). Includes any
+    /// SMO-pulled officers (`Prong::SmoFallback`, TS.3 §4a) — the pull
+    /// folds directly into this list; `smo_pull` (below) is the separate
+    /// audit record that a pull happened, never candidates' sole carrier.
     pub candidates: Vec<ProngCandidate>,
     /// SMO fallback result (K-5: present if no candidates, or if SMO was required).
     pub smo_result: Option<SmoResult>,
+    /// TS.3 §3/§4a: recorded statutory-authority stops (empty if none).
+    #[serde(default)]
+    pub stops: Vec<TraversalStop>,
+    /// TS.3 §4a: the audit record that the SMO population was pulled on
+    /// exhaustion (`None` if no pull occurred — either candidates were
+    /// non-empty, or nothing was found to pull).
+    #[serde(default)]
+    pub smo_pull: Option<SmoPullRecord>,
+    /// TS.3 §2a: why (if at all) this determination is provisional.
+    #[serde(default)]
+    pub assurance: DeterminationAssurance,
     /// Content hash of this determination (for replay integrity).
     pub determination_hash: Hash,
 }
@@ -724,6 +1038,13 @@ pub struct DeterminationInProgress {
     pub candidates: Vec<ProngCandidate>,
     pub smo_result: Option<SmoResult>,
     pub compute_event_id: Option<EventId>,
+    /// TS.3 §3 (`detect_statutory_stops`) — populated by the caller
+    /// alongside `candidates`, before `freeze_determination` runs.
+    pub stops: Vec<TraversalStop>,
+    /// TS.3 §4a (`pull_smo_on_exhaustion`) — populated by the caller when
+    /// the pull fired; the pulled candidates themselves are already folded
+    /// into `candidates` by the time this is set.
+    pub smo_pull: Option<SmoPullRecord>,
 }
 
 // ── freeze_determination ──────────────────────────────────────────────────────
@@ -733,10 +1054,15 @@ pub struct DeterminationInProgress {
 /// - Pins policy + lexicon + reference + import runs + graph hash + as_of.
 /// - Returns `FrozenDetermination` (immutable).
 /// - K-5: if candidates is empty AND no SMO was applied, returns Err.
+/// - TS.3 §2a: computes `assurance` from `det.candidates`/`det.stops`
+///   against `type_registry` — never gates on it (`determination_
+///   runs_at_any_board_state`); a fully-alleged board still freezes,
+///   labelled provisional.
 #[allow(clippy::too_many_arguments)]
 pub fn freeze_determination(
     det: &DeterminationInProgress,
     control_state: &ControlState,
+    type_registry: &crate::fold::type_registry::TypeRegistryState,
     freeze_event: &IntentEvent,
     policy_version: &str,
     lexicon_manifest_hash: Hash,
@@ -770,11 +1096,16 @@ pub fn freeze_determination(
     let combined = serde_json::json!({ "pin": pin_json, "candidates": cands_json });
     let determination_hash = Hash::of_json(&combined);
 
+    let assurance = compute_assurance(&det.candidates, &det.stops, control_state, type_registry);
+
     Ok(FrozenDetermination {
         pin,
         freeze_event_id: freeze_event.id,
         candidates: det.candidates.clone(),
         smo_result: det.smo_result.clone(),
+        stops: det.stops.clone(),
+        smo_pull: det.smo_pull.clone(),
+        assurance,
         determination_hash,
     })
 }
@@ -806,16 +1137,32 @@ pub fn recover_determination_at(
     pin: RecoveryPin<'_>,
 ) -> Option<FrozenDetermination> {
     use crate::fold::control::fold_control;
+    use crate::fold::type_registry::fold_type_registry;
 
     let control = fold_control(events);
     if !control.is_reconciled() || !control.has_strategy() {
         return None;
     }
+    let type_registry = fold_type_registry(events);
 
     // Find the subject entity from the first classify event.
     let subject_entity = find_subject_entity(events)?;
 
-    let candidates = strategy.resolve(&control, subject_entity, natural_persons, threshold_pct);
+    let mut candidates =
+        strategy.resolve(&control, subject_entity, natural_persons, threshold_pct);
+
+    // TS.3 §3: record any statutory-authority stop at the subject.
+    let stops = detect_statutory_stops(&control, subject_entity);
+
+    // TS.3 §4a: pull the officer/SMO population on exhaustion — ONLY fires
+    // when the strategy's own walk produced nothing (never pushes).
+    let smo_pull = match pull_smo_on_exhaustion(&control, subject_entity, natural_persons, &candidates) {
+        Some((pulled, record)) => {
+            candidates.extend(pulled);
+            Some(record)
+        }
+        None => None,
+    };
 
     // Find SMO from control state.
     // smo_event_id is ALWAYS Some when smo_person_id is Some (set together in fold_control).
@@ -847,11 +1194,14 @@ pub fn recover_determination_at(
         candidates,
         smo_result,
         compute_event_id: control.strategy_event_id,
+        stops,
+        smo_pull,
     };
 
     freeze_determination(
         &det,
         &control,
+        &type_registry,
         freeze_event,
         pin.policy_version,
         pin.lexicon_manifest_hash,

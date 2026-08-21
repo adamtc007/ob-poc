@@ -1341,11 +1341,14 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         }
     }
 
-    // Phase 1 of the tree-cleanup follow-up tranche (EOP-STATE-KYCUBO-D1 §4,
-    // 2026-08-21) converted `reconciled_control_edges` from an exclusion
-    // filter to an explicit whitelist (`is_admitted_as_control`, fold/control.rs).
-    // `broad_control` now pins the whitelisted 9 — the 6 TS.2 vocabulary-
-    // convergence kinds are deliberately excluded, not silently swept in.
+    // EOP-DD-KYCUBO-TS.3 (RATIFIED 2026-08-21) reconciled the whitelist
+    // against V&S v0.6 §6.4's control-axis column: `management_mandate`
+    // and `membership_rights` are named control axes for funds/cooperatives
+    // respectively and move from excluded to admitted (`Traverse`,
+    // `control_admission`, fold/control.rs). `broad_control` now pins the
+    // 11-kind Traverse set the full-walk strategies share; `cooperative_
+    // member_strategy` additionally gains `membership_rights` on top of its
+    // own narrower 3-kind filter (TS.3 §3: the co-op control axis).
     let broad_control: BTreeSet<&str> = [
         "voting_rights",
         "board_appointment",
@@ -1356,6 +1359,8 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         "trust_protector",
         "trust_beneficiary",
         "dominant_influence",
+        "management_mandate",
+        "membership_rights",
     ]
     .into_iter()
     .collect();
@@ -1375,22 +1380,27 @@ fn edge_kind_strategy_admission_is_exactly_known() {
     );
     expected.insert(
         "cooperative_member_strategy",
-        ["voting_rights", "board_appointment", "dominant_influence"].into_iter().collect(),
+        ["voting_rights", "board_appointment", "dominant_influence", "membership_rights"]
+            .into_iter()
+            .collect(),
     );
 
     assert_eq!(
         actual, expected,
         "strategy edge-kind admission drifted — a strategy started (or stopped) \
          traversing a kind it didn't (or did) before; this is a conscious-edit \
-         pin, not a guess (D1 corrective tranche Item 2)"
+         pin, not a guess (TS.3 four-way classification)"
     );
 
-    // Phase 1 flips this assertion's story: before the whitelist, the 6
-    // TS.2 kinds were swept into 4 strategies' generic control walk
-    // undifferentiated (silent over-admission, the corrective tranche's
-    // Item 2 finding). After the whitelist, they join `nominee` as
-    // deliberately, consciously untraversed — pending a TS ratification
-    // that has not happened. This is now a SAFETY property, not a gap.
+    // TS.3 §4: the admission function is now a four-way class
+    // (`Traverse | Stop | NotControl | Pierce`), not a boolean. `nominee`
+    // (Pierce) and `statutory_authority` (Stop — recorded via
+    // `detect_statutory_stops`, not walked) are excluded from every
+    // strategy's WALK by design, same as before. `officer_appointment`
+    // (NotControl — pulled on exhaustion by `pull_smo_on_exhaustion`,
+    // §4a, never pushed by admission), `employment`, `containment` stay
+    // NotControl per §3's citations. This is a deliberate admission
+    // boundary, not a gap.
     let all_traversed_by_someone: BTreeSet<&str> =
         actual.values().flat_map(|s| s.iter().copied()).collect();
     let untraversed_by_anyone: BTreeSet<&str> = kinds
@@ -1400,32 +1410,35 @@ fn edge_kind_strategy_admission_is_exactly_known() {
         .collect();
     assert_eq!(
         untraversed_by_anyone,
-        [
-            "nominee",
-            "officer_appointment",
-            "management_mandate",
-            "membership_rights",
-            "statutory_authority",
-            "employment",
-            "containment",
-        ]
-        .into_iter()
-        .collect::<BTreeSet<_>>(),
-        "the whitelist (fold/control.rs::is_admitted_as_control) must exclude \
-         exactly these 7 kinds — `nominee` by K-8 design, the 6 TS.2 variants \
-         pending a TS ratification that has not happened; if this set grew or \
-         shrank, that is a real admission-boundary change and must be reported, \
-         not silently re-absorbed"
+        ["nominee", "officer_appointment", "statutory_authority", "employment", "containment"]
+            .into_iter()
+            .collect::<BTreeSet<_>>(),
+        "control_admission's non-Traverse set must be exactly these 5 kinds — `nominee` \
+         (Pierce, K-8), `statutory_authority` (Stop, TS.3 §3), `officer_appointment` \
+         (NotControl, pulled on exhaustion only), `employment`/`containment` (NotControl, \
+         obligation basis / structural scoping); if this set grew or shrank, that is a \
+         real admission-boundary change and must be reported, not silently re-absorbed"
     );
 }
 
 // ── Phase 1 (whitelist tranche, EOP-STATE-KYCUBO-D1 §4, 2026-08-21) ────────
 
 /// SAFETY proof, not a semantics ruling: for every `EdgeKind` the exclusion
-/// filter admitted BEFORE this tranche and the new whitelist
-/// (`is_admitted_as_control`, fold/control.rs) still admits AFTER it, the
-/// full `ProngCandidate` a lone edge produces — person, prong, effective
-/// ownership %, chain — is bit-identical. The four strategies checked here
+/// filter admitted BEFORE the whitelist tranche (`c7ef69ca`) — and which
+/// TS.3 (RATIFIED 2026-08-21, `control_admission`, fold/control.rs) ALSO
+/// still admits — the full `ProngCandidate` a lone edge produces — person,
+/// prong, effective ownership %, chain — is bit-identical.
+///
+/// **Scope note (TS.3):** this test deliberately covers only the ORIGINAL
+/// 9 kinds, not the 2 TS.3 newly admits (`management_mandate`,
+/// `membership_rights`) — those are exactly where TS.3 intends a real
+/// difference (`fund_with_manco_now_resolves`,
+/// `cooperative_resolves_via_membership`), so pinning them here as
+/// "unchanged" would be the WRONG assertion for this tranche. Equivalence
+/// for the untouched 9, difference for the newly-admitted 2 — both
+/// correct, for different reasons.
+///
+/// The four strategies checked here
 /// (`control_prong_strategy` directly; `fund_control_strategy` and
 /// `nominee_pierce_strategy`, which thin-delegate to it; `state_owned_strategy`,
 /// which re-implements the identical full-admission walk) are exactly the
@@ -1539,25 +1552,30 @@ fn determination_is_unchanged_by_whitelisting() {
 }
 
 /// Companion to `determination_is_unchanged_by_whitelisting`: pins that the
-/// six TS.2 kinds are provably excluded from EVERY strategy's walk, with
-/// the reason recorded inline rather than left to be rediscovered —
-/// awaiting a TS ratification (which structure classes, if any, should
-/// treat officer/mandate/membership/statutory/employment/containment edges
-/// as control), not forgotten or silently dropped.
+/// remaining excluded kinds are provably excluded from EVERY strategy's
+/// walk, with the reason recorded inline rather than left to be
+/// rediscovered. TS.3 (RATIFIED 2026-08-21) closed the ratification
+/// question for `management_mandate`/`membership_rights` (now admitted —
+/// see `edge_kind_strategy_admission_is_exactly_known`,
+/// `fund_with_manco_now_resolves`, `cooperative_resolves_via_membership`);
+/// this test now covers the FOUR kinds TS.3 §3 keeps out of the walk on
+/// separate, distinct grounds: `officer_appointment` (NotControl — pulled
+/// on exhaustion only, `pull_smo_on_exhaustion`), `statutory_authority`
+/// (Stop, not a walk exclusion — see `statutory_authority_stops_with_
+/// reason`; still produces zero *candidates* from any strategy, which is
+/// what this test checks), `employment`/`containment` (NotControl,
+/// obligation basis / structural scoping per V&S citations).
 #[test]
 fn new_edge_kinds_are_not_traversed_as_control() {
     let subject_entity = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0004));
     let person = EntityId(uuid::Uuid::from_u128(0xD1_5E1F_0000_0000_0000_0000_0005));
     let natural_persons: BTreeSet<PersonId> = [PersonId(person.0)].into_iter().collect();
 
-    // The six TS.2 vocabulary-convergence kinds (EOP-DD-KYCUBO-TS.2 §5) —
-    // assertable on the wire (K-30 lexicon coverage), but no TS ratification
-    // has yet judged any of them to BE control. `is_admitted_as_control`
-    // (fold/control.rs) excludes all six deliberately, pending that ruling.
+    // TS.3 §3/§4: `NotControl`- and `Stop`-classified kinds — never part of
+    // the WALK (a `Stop` still produces zero candidates; it just also
+    // records why, tested separately).
     let excluded_kinds: &[(&str, EdgeKind)] = &[
         ("officer_appointment", EdgeKind::OfficerAppointment),
-        ("management_mandate", EdgeKind::ManagementMandate),
-        ("membership_rights", EdgeKind::MembershipRights),
         ("statutory_authority", EdgeKind::StatutoryAuthority),
         ("employment", EdgeKind::Employment),
         ("containment", EdgeKind::Containment),

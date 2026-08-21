@@ -768,12 +768,15 @@ fn ec4_smo_fallback_when_no_ubos_found() {
         candidates,
         smo_result,
         compute_event_id: control.strategy_event_id,
+        stops: vec![],
+        smo_pull: None,
     };
 
     let freeze_event = events.last().unwrap();
     let result = freeze_determination(
         &det,
         &control,
+        &TypeRegistryState::default(),
         freeze_event,
         "v1.0",
         dummy_hash(),
@@ -881,11 +884,14 @@ fn ec4_freeze_without_candidates_or_smo_fails() {
         candidates: vec![], // EMPTY
         smo_result: None,   // NO SMO
         compute_event_id: None,
+        stops: vec![],
+        smo_pull: None,
     };
     let freeze_event = events.last().unwrap();
     let result = freeze_determination(
         &det,
         &control,
+        &TypeRegistryState::default(),
         freeze_event,
         "v1.0",
         dummy_hash(),
