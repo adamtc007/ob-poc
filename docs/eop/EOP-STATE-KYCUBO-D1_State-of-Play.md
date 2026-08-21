@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Document** | EOP-STATE-KYCUBO-D1 |
-| **Updated** | 2026-08-21 (tree cleanup) |
+| **Updated** | 2026-08-21 (D1 complete) |
 | **Purpose** | One place holding what is ratified, what has landed, what is next, and what is deliberately parked — so no session has to reconstruct it from chat history. |
 | **Standing rule** | A tranche is not complete until this file is updated in the same diff. An out-of-date state file has caused real cost on this programme before (`docs/todo/control-plane/INDEX.md` went two versions stale while existing precisely to prevent that). |
 
@@ -40,16 +40,15 @@
   - `PipeClassification.pipe` is `Option<Pipe>` — no fabricated `NonVotingShares`.
   - Teeth: `edge_kind_strategy_admission_is_exactly_known`, `op_layer_only_studs_are_exactly_known`, plus the ten TS.1 geometry gates and seven TS.2 gates.
 - `63b2e2d7 docs: containers V&S, D1 state-of-play, TS design docs` (Stream B, tree cleanup 2026-08-21): `EOP-VS-CONTAINERS-001` and this file added to the tree.
+- `8e468fc0 fix(kyc): scope the declared-verb tooth to every declaring source file` (D1 closure tranche, 2026-08-21): `every_declared_verb_has_a_registered_op` was under-scoped, not wrong — `screening.complete`/`screening.review-hit` are correctly declared (`config/verbs/screening.yaml`) and correctly registered (`kyc_stream_ops.rs`), but the test's const source list never included `screening.yaml`. Added an intersection-based helper (`kyc_stream_ops_declared_universe`) so the check widens precisely, without blind-unioning `screening.yaml` into the verb-universe/`stream_governed` pins that would break under it. RED-proofed by reverting the source list and observing the count mismatch return. Closes the first of the three reds carried since the tree cleanup.
+- `c7ef69ca fix(kyc): whitelist control traversal so new edge kinds fail closed` (D1 closure tranche, 2026-08-21): `reconciled_control_edges` converted from an exclusion filter (excluded only `EconomicInterest`/`Nominee`, silently admitting everything else) to an exhaustive `is_admitted_as_control` match — no catch-all, so a new `EdgeKind` variant is a compile error, not a silent admission. Admitted set is exactly what was traversed before the change (VotingRights, BoardAppointment, GpStatutory, DesignatedMember, all four `TrustRole` sub-kinds, DominantInfluence); the six TS.2 variants (OfficerAppointment, ManagementMandate, MembershipRights, StatutoryAuthority, Employment, Containment) are now deliberately excluded, awaiting a semantics ruling rather than swept in by omission. `determination_is_unchanged_by_whitelisting` (bit-identical determinations before/after, across every fixture and strategy) and `new_edge_kinds_are_not_traversed_as_control` gate it; both RED-proofed by perturbing the whitelist.
+- `adc7db17 refactor(kyc): promote op-layer studs to preconditions over the type registry` (D1 closure tranche, 2026-08-21): `withdraw-member`'s "not already withdrawn" and `correct-type`'s "prior type must exist" were hand-duplicated in the op layer (`kyc_stream_ops.rs`) and the board preview (`placement.rs`). `check_preconditions`/`check_control_preconditions` widened to a third fold (`&TypeRegistryState`, mirroring T6.1's ObligationState widening); two new `Precondition` variants (`MembershipActive`, `PriorTypeAsserted`) promote both studs into the single checker, and both hand-rolled copies are deleted — enforcement now happens once, inside the append-lock (TOCTOU-safer than the pre-fetch hand checks it replaces). Cascade touched 23 files (store/seam `append`/`append_in_scope` signature widening, every caller, every test fixture). `no_stud_is_duplicated` (structural — no hand-rolled precondition text survives in the op layer or preview) and the updated `op_layer_only_studs_are_exactly_known` (now asserts both studs are lexicon-declared, not op-layer-only) gate it; both RED-proofed. Closes the last open D1 item.
 
 **Still uncommitted, working tree** — Streams C and D (see §5), not ours; held pending separate ownership decision.
 
-## 4. Next — one tranche, prompt written, verified not started
+## 4. Next — none open
 
-**The whitelist guard and third-fold stud promotion.** Verified absent from the tree on 2026-08-21: `check_preconditions` still takes only control and obligation state; `reconciled_control_edges` still filters by exclusion; none of `determination_is_unchanged_by_whitelisting`, `new_edge_kinds_are_not_traversed_as_control`, `no_stud_is_duplicated` exist.
-
-**Why it matters:** `reconciled_control_edges` excludes only `EconomicInterest` and `Nominee`, so four strategies sweep in all six new `EdgeKind` variants undifferentiated. Containment (a scoping boundary), Employment, MembershipRights and StatutoryAuthority would be walked as generic control. Those kinds became assertable in the convergence tranche, so this is a **live hazard**, not a latent one: silent over-admission producing wrong determinations.
-
-**Shape:** convert the exclusion filter to an explicit whitelist of exactly the kinds traversed today (exhaustive match, no catch-all, so a new variant is a compile error rather than a silent admission); widen `check_preconditions` to take `&TypeRegistryState` and promote the two hand-duplicated studs, deleting both copies. **The central gate is a before/after determination equivalence proof with a perturbation showing it can fail** — which requires a stable tree (§5).
+D1's last open item — the whitelist guard and third-fold stud promotion tracked here since the 2026-08-21 tree cleanup — is closed as of `adc7db17`. No D1 tranche is currently queued. The next work in this programme is D2 (§6 "Parked": assurance profile, policy versioning, clearance, the 49 `cross_slot_constraints`, the nine `enforce_*` predicates).
 
 ## 5. Tree cleanup — executed 2026-08-21
 
@@ -78,6 +77,10 @@ Recommendation (not executed): regenerate the 6 process_registry/forms entries v
 
 kyc-scoped regression, exactly the 20 named `rust/tests/kyc_*.rs` binaries: **17/20 clean, 3 failing** — `every_declared_verb_has_a_registered_op`, `select_strategy_blocked_end_to_end`, `w3_w5_w6_obligation_lifecycle_end_to_end`. Identical to the previously-carried set; none new, none healed by the Stream A/B commits. `ob-poc-kyc-substrate`'s own crate suite (11 TS.1 + 7 TS.2 tests): 18/18 green.
 
+## 5b. Regression baseline with the D1-closure tranche committed (`8e468fc0`, `c7ef69ca`, `adc7db17`; Streams C/D untouched)
+
+kyc-scoped regression, all 21 `rust/tests/kyc_*.rs` binaries now present (one grew since §5a — `kyc_w5_screening_hook.rs` and others landed in the interim on this branch, outside this tranche): **19/21 clean, 2 failing** — `select_strategy_blocked_end_to_end`, `w3_w5_w6_obligation_lifecycle_end_to_end`, both confirmed pre-existing (§7). `every_declared_verb_has_a_registered_op` now green. TS.1 geometry gates (`ts1_assembly_board.rs`): 11/11. TS.2 gates (`ts2_pipe_convergence.rs`): 7/7. `check_kyc_substrate_deps.sh` dep-gate: PASS. Scoped clippy (`ob-poc-kyc-substrate`, `ob-poc-kyc-store`, `ob-poc-kyc-seam`, `ob-poc` tests/all-targets): clean — only pre-existing warnings outside this tranche's touched files (`determination.rs` doc-list formatting, `gameboard_r3_declaration_register.rs` `&PathBuf` lint, `kyc_pack_closure.rs`'s pre-existing `BTreeMap` type-complexity warning on the untouched-shape coverage map).
+
 ## 6. Parked (not forgotten; each has a home)
 
 | Item | Where it lives | Gate |
@@ -92,17 +95,18 @@ kyc-scoped regression, exactly the 20 named `rust/tests/kyc_*.rs` binaries: **17
 
 ## 7. Known open items inside D1
 
-- Six new `EdgeKind` variants are assertable but not consumed by any determination traversal — pinned by `edge_kind_strategy_admission_is_exactly_known`; §4 converts this from silent over-admission to deliberate exclusion.
-- Two studs hand-duplicated in the op layer and the board preview — pinned by `op_layer_only_studs_are_exactly_known`; §4 retires the duplication.
-- The differential oracle in `tests/placement.rs` excludes the four new moves — documented, mirrors the `is_edge_scoped` precedent, still a coverage hole.
-- **True red set (verified 2026-08-21 with only Stream A+B committed, §5a): exactly 3, unchanged from every prior tranche.**
-  - `every_declared_verb_has_a_registered_op` — **confirmed genuinely unrelated to Stream C** (§5): a pre-existing `kyc_pack_closure.rs` scoping gap (`screening.*` ops declared in `config/verbs/screening.yaml`, outside the test's const source list) compounded by Stream A's own stale count pin (25, now 27). Not caused by verb-YAML deletion.
-  - `select_strategy_blocked_end_to_end` — cause not yet localized this tranche; still open.
-  - `w3_w5_w6_obligation_lifecycle_end_to_end` — cause not yet localized this tranche; still open.
-  - Streams C and D remain uncommitted and are no longer suspected causes of the first red; whether either contributes to the second or third is still unverified.
+- ~~Six new `EdgeKind` variants are assertable but not consumed by any determination traversal~~ — **CLOSED by `c7ef69ca`.** Now a deliberate, gated exclusion (`new_edge_kinds_are_not_traversed_as_control`), not silent over-admission.
+- ~~Two studs hand-duplicated in the op layer and the board preview~~ — **CLOSED by `adc7db17`.** Promoted to `Precondition`s over `TypeRegistryState`; both hand copies deleted; `no_stud_is_duplicated` gates it structurally.
+- The differential oracle in `tests/placement.rs` excludes the four new moves — documented, mirrors the `is_edge_scoped` precedent, still a coverage hole. Out of scope for the D1-closure tranche; not touched.
+- **True red set (verified 2026-08-21, D1-closure tranche complete, Streams C/D still untouched throughout): exactly 2, down from 3.**
+  - `every_declared_verb_has_a_registered_op` — **CLOSED by `8e468fc0`.**
+  - `select_strategy_blocked_end_to_end` — pre-existing, confirmed unaffected by any of this tranche's three commits (`git stash` of all Phase 2 files reproduced the identical failure on the pre-Phase-2 tree). Panics on a `not_a_real_class` structure-class fixture; the fail-closed rejection message it hits doesn't match what the test expects — a stale test expectation, not a substrate defect. Not localized further; out of scope for this tranche.
+  - `w3_w5_w6_obligation_lifecycle_end_to_end` — pre-existing, unaffected. Fails with `Rejected(UnregisteredLexiconHash(...))` — a stale lexicon-hash pin in the test fixture (T6.0's lexicon-manifest coverage work postdates this fixture). Not localized further; out of scope for this tranche.
+  - Streams C and D remain uncommitted and untouched by every commit in this tranche (`8e468fc0`, `c7ef69ca`, `adc7db17`).
 
 ## Change Log
 | Date | Note |
 |---|---|
 | 2026-08-21 | Created after a sync failure: the same tranche receipts were pasted three times and neither side could say from chat alone what had landed. Records the D1/D2 frame, the four ratified documents, what is committed versus working-tree, the one outstanding tranche (verified not started against the tree, not against recollection), a four-stream tree cleanup plan, and the parked set with each item's home. Standing rule established: a tranche closes by updating this file in the same diff. |
 | 2026-08-21 (tree cleanup) | Executed the §5 plan: Stream A committed (`b3000a61`), Stream B committed (`63b2e2d7`), Streams C and D investigated and left uncommitted pending separate ownership decisions. Closed the open question on the 27-vs-25 red: confirmed genuinely unrelated to Stream C's verb-YAML deletions, root-caused to a pre-existing `kyc_pack_closure.rs` scoping gap plus Stream A's own stale count pin. Recorded the true post-cleanup red set (§7, §5a) — same 3 as before, none new, none healed. Backup branch `backup/pre-cleanup-2026-08-21` cut before any staging. |
+| 2026-08-21 (D1 complete) | Closed §4, the last open D1 item, in three phases: `8e468fc0` fixed the under-scoped declared-verb tooth (closes red #1 of 3); `c7ef69ca` converted `reconciled_control_edges`'s implicit blacklist to an explicit exhaustive whitelist (safety guard, not a semantics ruling — the six TS.2 variants stay excluded pending a domain ruling); `adc7db17` widened `check_preconditions` to a third fold over `TypeRegistryState` and promoted both op-layer/board-preview hand-duplicated studs into it, deleting both copies. Every new gate RED-proofed (perturb → observe red → restore → observe green) before landing. True red set now 2, both pre-existing and confirmed unaffected by this tranche (§7, §5b): `select_strategy_blocked_end_to_end` (stale test expectation against a fail-closed rejection message) and `w3_w5_w6_obligation_lifecycle_end_to_end` (stale lexicon-hash fixture pin). Dep-gate PASS, scoped clippy clean. Streams C and D untouched throughout — confirmed via `git status --porcelain` before and after each commit. No push. |
