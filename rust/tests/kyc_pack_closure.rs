@@ -60,6 +60,7 @@ use ob_poc_kyc_substrate::{
 
 const DSL_KYC_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc.yaml");
 const DSL_KYC_OBLIGATION_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc-obligation.yaml");
+const SCREENING_YAML: &str = include_str!("../config/verbs/screening.yaml");
 const KYC_DAG_YAML: &str = include_str!("../config/sem_os_seeds/dag_taxonomies/kyc_dag.yaml");
 const KYC_STREAM_OPS_SRC: &str = include_str!("../src/domain_ops/kyc_stream_ops.rs");
 const CONTROL_FOLD_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/fold/control.rs");
@@ -100,6 +101,35 @@ fn extract_verb_fqns(yaml: &str) -> BTreeSet<String> {
 fn declared_verb_universe() -> BTreeSet<String> {
     let mut fqns = extract_verb_fqns(DSL_KYC_YAML);
     fqns.extend(extract_verb_fqns(DSL_KYC_OBLIGATION_YAML));
+    fqns
+}
+
+/// The dsl.kyc verb family (`declared_verb_universe()`) widened by whichever
+/// `screening.yaml` verbs are ALSO registered as `SemOsVerbOp`s inside
+/// `kyc_stream_ops.rs` (today: `screening.complete`, `screening.review-hit`
+/// — the W5 screening hook, which fans out `kyc.obligation.update-screening`
+/// events from inside the same file). Deliberately NOT a blind union of all
+/// of `screening.yaml`: most of its verbs (`pep`, `sanctions`,
+/// `adverse-media`, `bulk-refresh`, `await-aggregate-outcome`) are also
+/// `behavior: plugin`, but registered elsewhere, outside this file's
+/// visibility — unioning them in would manufacture false K-G4 "missing_ops"
+/// reds for ops this test never claims to see. The intersection with
+/// `registered_op_fqns()` is not circular: it only restricts WHICH
+/// screening.yaml declarations are eligible to satisfy K-G4, it does not
+/// assume they are correct — a rogue registered fqn with no matching
+/// declaration anywhere still surfaces as `phantom_ops` below, and a
+/// declaration whose op is deleted from `kyc_stream_ops.rs` still surfaces
+/// too (the entry drops out of the intersection, `declared_verb_universe()`'s
+/// base 25 is untouched, so it becomes a `phantom_ops` orphan). K-G3
+/// (`stream_governed_family_covers_every_declared_verb`) and
+/// `verb_universe_is_exactly_25` intentionally keep using the narrower
+/// `declared_verb_universe()` — they measure the dsl.kyc stream-governed
+/// family specifically, not "every op this file happens to host".
+fn kyc_stream_ops_declared_universe() -> BTreeSet<String> {
+    let mut fqns = declared_verb_universe();
+    let screening_declared = extract_verb_fqns(SCREENING_YAML);
+    let registered = registered_op_fqns();
+    fqns.extend(screening_declared.intersection(&registered).cloned());
     fqns
 }
 
@@ -211,12 +241,18 @@ fn stream_governed_family_covers_every_declared_verb() {
 
 #[test]
 fn every_declared_verb_has_a_registered_op() {
-    let declared = declared_verb_universe();
+    // Tree-cleanup tranche (2026-08-21) traced the prior "27 vs 25" red to an
+    // under-scoped tooth, not a real defect: `screening.complete` and
+    // `screening.review-hit` are correctly declared (`screening.yaml`) and
+    // correctly registered (`kyc_stream_ops.rs`), but this test's declared
+    // side never read `screening.yaml`. See `kyc_stream_ops_declared_universe`.
+    let declared = kyc_stream_ops_declared_universe();
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        25,
-        "registered dsl.kyc op count drifted from the post-D1 25: {registered:#?}"
+        27,
+        "registered dsl.kyc-adjacent op count (incl. the 2 W5 screening-hook \
+         ops co-hosted in kyc_stream_ops.rs) drifted from 27: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
