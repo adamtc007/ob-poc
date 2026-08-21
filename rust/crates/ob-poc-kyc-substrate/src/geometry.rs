@@ -26,19 +26,24 @@
 //! `EdgeKind` onto the nearest `Pipe` for the geometry check only. See the
 //! P1 recon note (EOP-PLAN's D1 tranche) for the reasoning.
 //!
-//! **Two found gaps in the ratified §2 grid, transcribed literally, not
-//! silently resolved:**
-//! - Pipe 14 (employment / delegated authority) appears in ZERO target
-//!   rows in §2, even though §2a's ratified source rule for it says
-//!   "into a corporate or fund." The grid as ratified therefore admits no
-//!   target for pipe 14 today; this looks like an editorial omission
-//!   (§2a's employment-pipe ruling landed the same day as §2 but §2's
-//!   per-row pipe lists were not updated), not an intentional exclusion.
-//!   Transcribed as-ratified (`target_permits` returns `false` for every
-//!   type on pipe 14) and flagged here and in the tranche receipts as an
-//!   open question for a TS.1 amendment.
-//! - Pipe 17 (nominee holding) likewise appears in ZERO target rows in
-//!   §2. Unlike pipe 14 this is *not* treated as a gap: TS.0 §5 already
+//! **One corrective fix, one confirmed-consistent absence, both transcribed
+//! literally, not silently resolved:**
+//! - Pipe 14 (employment / delegated authority) was **found and fixed in
+//!   the corrective D1 tranche** (2026-08-21): the doc's own "§2 v0.3
+//!   corrections" block (dated 2026-08-19, i.e. landed the same day as the
+//!   ratified grid but missed by this crate's first transcription) states
+//!   pipe 14 was omitted from every target row "in v0.2" — an editorial
+//!   defect, not a ruling — and has since been added to the eight
+//!   operating types that have employees: private limited company, public
+//!   listed company, LLC (US), general partnership, LLP, cooperative/
+//!   mutual, charity/not-for-profit, government dept/statutory
+//!   corporation. **Deliberately NOT added to funds** (externally managed,
+//!   via pipe 7 — a fund does not employ) or to limited partnership
+//!   (fund-like, GP-managed). `target_permits` now transcribes the
+//!   corrected 8-row set; see `matrix_is_exactly_known` (`ts1_assembly_
+//!   board.rs`) for the re-pinned count, derived from TS.1 §2 v0.3.
+//! - Pipe 17 (nominee holding) appears in ZERO target rows in §2. This
+//!   *is* consistent with the ratified design, not a gap: TS.0 §5 already
 //!   characterises nominee as "a capacity held in a particular edge...
 //!   available during any strategy," not an ordinary typed linkage — its
 //!   traversal (pierce-and-substitute) is governed by the separate,
@@ -189,9 +194,10 @@ pub enum GeometryError {
 // ── The matrix ───────────────────────────────────────────────────────────────
 
 /// §2 — permitted incoming pipes for `target`. Transcribed literally,
-/// row by row; see the module doc for the two found grid gaps (pipes 14
-/// and 17, both absent from every row here by ratified-text fidelity, for
-/// different reasons).
+/// row by row, against TS.1 §2 v0.3 (the "§2 v0.3 corrections" block,
+/// which added pipe 14 to 8 target rows). Pipe 17 is absent from every row
+/// here by ratified-text fidelity — see the module doc for why that is
+/// consistent with the design, not a gap.
 ///
 /// Sovereign wealth vehicle (TS.0 §4.6: "whatever vehicle it actually is
 /// ... plus 12") is not compositional in this D1 model — `EntityType` has
@@ -203,12 +209,12 @@ fn target_permits(target: EntityType, pipe: Pipe) -> bool {
     use EntityType::*;
     use Pipe::*;
     let permitted: &[Pipe] = match target {
-        PrivateLimitedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl],
-        PublicListedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl],
-        LlcUs => &[VotingShares, BoardAppointment, OfficerAppointment, ContractualControl],
-        GeneralPartnership => &[GpDesignation, BoardAppointment, ContractualControl],
+        PrivateLimitedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl, EmploymentDelegatedAuthority],
+        PublicListedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl, EmploymentDelegatedAuthority],
+        LlcUs => &[VotingShares, BoardAppointment, OfficerAppointment, ContractualControl, EmploymentDelegatedAuthority],
+        GeneralPartnership => &[GpDesignation, BoardAppointment, ContractualControl, EmploymentDelegatedAuthority],
         LimitedPartnership => &[GpDesignation, LimitedPartnershipInterest, ManagementMandate, ContractualControl],
-        Llp => &[GpDesignation, BoardAppointment, ContractualControl],
+        Llp => &[GpDesignation, BoardAppointment, ContractualControl, EmploymentDelegatedAuthority],
         OeicIcvc => &[BoardAppointment, ManagementMandate, UnitIssuance, PooledAssetContainment],
         Sicav => &[BoardAppointment, ManagementMandate, UnitIssuance, PooledAssetContainment],
         UnitTrust => &[ManagementMandate, TrusteePowers, UnitIssuance, PooledAssetContainment],
@@ -219,9 +225,9 @@ fn target_permits(target: EntityType, pipe: Pipe) -> bool {
         FixedBareTrust => &[TrusteePowers, BeneficiaryEntitlement],
         Foundation => &[TrusteePowers, ReservedPowers, BeneficiaryEntitlement],
         PensionScheme => &[TrusteePowers, BeneficiaryEntitlement],
-        CooperativeMutual => &[BoardAppointment, OfficerAppointment, MembershipRights],
-        CharityNotForProfit => &[BoardAppointment, OfficerAppointment, TrusteePowers],
-        GovernmentDeptStatutoryCorporation => &[BoardAppointment, OfficerAppointment, StatutoryAuthority],
+        CooperativeMutual => &[BoardAppointment, OfficerAppointment, MembershipRights, EmploymentDelegatedAuthority],
+        CharityNotForProfit => &[BoardAppointment, OfficerAppointment, TrusteePowers, EmploymentDelegatedAuthority],
+        GovernmentDeptStatutoryCorporation => &[BoardAppointment, OfficerAppointment, StatutoryAuthority, EmploymentDelegatedAuthority],
         SovereignWealthVehicle => &[StatutoryAuthority],
         NaturalPerson | SoleTrader => &[],
     };
@@ -294,10 +300,11 @@ fn source_permits(pipe: Pipe, source: LinkageSource) -> bool {
         }
         // 13: "any type."
         ContractualControl => true,
-        // 14: "natural persons only (ruled 2026-08-19)." (Target side is a
-        // known grid gap — see module doc; `target_permits` refuses every
-        // target for this pipe today, so this arm is currently unreachable
-        // from `is_move`, kept faithful to the ratified source rule.)
+        // 14: "natural persons only (ruled 2026-08-19)." Target side was a
+        // grid gap in this crate's first transcription, corrected in the
+        // D1 corrective tranche (2026-08-21) — see module doc and
+        // `target_permits`. This arm is reachable now for the 8 operating
+        // types with employees.
         EmploymentDelegatedAuthority => NATURAL.contains(&source_type),
         // 15: "any investor type."
         UnitIssuance => true,
@@ -325,6 +332,109 @@ pub fn check_type_geometry(
         Ok(())
     } else {
         Err(GeometryError::NotAMove { source, pipe, target })
+    }
+}
+
+// ── Pipe derivation (TS.2 §3) ───────────────────────────────────────────────
+//
+// **Pulled forward from the D1-Part-B tranche.** `kyc.subject.correct-type`'s
+// §4 cascade (`fold::type_registry::edges_invalidated_by_correction`) needs a
+// `Pipe` classification for each edge touching the corrected entity — that is
+// exactly TS.2's `pipe_of(edge_kind, target_entity_type) -> Pipe` deliverable.
+// Built here, now, against TODAY's 11-variant `EdgeKind` so Part A's
+// `correct-type` op is genuinely real rather than stubbed; Part B's B2 step
+// widens the match for the 6 `EdgeKind` variants it adds and does not need to
+// invent this function fresh.
+
+/// A `Pipe` classification derived from a stored edge. `provisional: true`
+/// means the classification is genuinely UNRESOLVED — `pipe` is `None`, not
+/// a best-effort guess dressed up as a flagged value (D1 corrective
+/// tranche Item 4, 2026-08-21: the prior shape always carried a concrete
+/// `Pipe` even when provisional, defaulting to `NonVotingShares` for
+/// exactly the case this doc now calls out as wrong — "unknown is
+/// alleged, not silently classified"). Unresolved when the target's
+/// entity type is not definitively known — either because no type has
+/// been asserted at all (`target_type: None`) or because the known type
+/// falls outside the three buckets TS.2 §3 ratifies for `EconomicInterest`
+/// (corporate → 2, LP/LP-fund → 4, fund → 15). The second case is a
+/// genuine open question this function does not silently resolve: flagged
+/// here and in the tranche receipts as a candidate for a TS.2 amendment,
+/// not guessed away. `provisional == false` iff `pipe.is_some()` — the
+/// two fields are redundant by construction, kept both for call-site
+/// clarity (`.provisional` reads better in an `if`; `.pipe` is what a
+/// caller actually needs).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PipeClassification {
+    pub pipe: Option<Pipe>,
+    pub provisional: bool,
+}
+
+/// TS.2 §3 — derive the `Pipe` a stored `EdgeKind` represents, given the
+/// target entity's type where known. Total: every `(EdgeKind, Option<EntityType>)`
+/// pair classifies, never panics — but classification is not always
+/// resolved to a concrete `Pipe`; ambiguity is expressed via
+/// `provisional: true` + `pipe: None`, never a silent default masquerading
+/// as certain (TS.2 §6 `pipe_of_is_total`).
+pub fn pipe_of(
+    kind: &crate::fold::control::EdgeKind,
+    target_type: Option<EntityType>,
+) -> PipeClassification {
+    use crate::fold::control::{EdgeKind::*, TrustRoleKind::*};
+
+    let certain = |pipe: Pipe| PipeClassification { pipe: Some(pipe), provisional: false };
+    match kind {
+        VotingRights => certain(Pipe::VotingShares),
+        BoardAppointment => certain(Pipe::BoardAppointment),
+        GpStatutory => certain(Pipe::GpDesignation),
+        // TS.2 §7 Q2 (RATIFIED): DesignatedMember (LLP) shares the GP
+        // designation pipe — statutory naming for the same control shape,
+        // not a distinct mechanism.
+        DesignatedMember => certain(Pipe::GpDesignation),
+        TrustRole(Trustee) => certain(Pipe::TrusteePowers),
+        TrustRole(Settlor) | TrustRole(Protector) => certain(Pipe::ReservedPowers),
+        TrustRole(Beneficiary) => certain(Pipe::BeneficiaryEntitlement),
+        // Capacity overlay (TS.0 §5, TS.1 §2 v0.3) — recorded for
+        // completeness; pierce-and-substitute governs its real traversal.
+        Nominee => certain(Pipe::NomineeHolding),
+        // TS.2 §2 defect: only "genuine dominant influence, deliberately
+        // asserted" reaches the fold as this variant on the live append
+        // path post-B3 (Part B splits the parse-failure fallback that used
+        // to also land here) — classified as contractual control.
+        DominantInfluence => certain(Pipe::ContractualControl),
+        EconomicInterest => classify_economic_interest(target_type),
+        // TS.2 §5 growth — direct 1:1 mappings, no target-type dependence.
+        OfficerAppointment => certain(Pipe::OfficerAppointment),
+        ManagementMandate => certain(Pipe::ManagementMandate),
+        MembershipRights => certain(Pipe::MembershipRights),
+        StatutoryAuthority => certain(Pipe::StatutoryAuthority),
+        Employment => certain(Pipe::EmploymentDelegatedAuthority),
+        Containment => certain(Pipe::PooledAssetContainment),
+    }
+}
+
+/// TS.2 §3: `EconomicInterest` alone cannot say which pipe it is; the
+/// target's entity type can, but only for the three ratified buckets.
+fn classify_economic_interest(target_type: Option<EntityType>) -> PipeClassification {
+    use EntityType::*;
+    match target_type {
+        Some(PrivateLimitedCompany | PublicListedCompany | LlcUs) => {
+            PipeClassification { pipe: Some(Pipe::NonVotingShares), provisional: false }
+        }
+        Some(LimitedPartnership | LpFund) => {
+            PipeClassification { pipe: Some(Pipe::LimitedPartnershipInterest), provisional: false }
+        }
+        Some(OeicIcvc | Sicav | UnitTrust | FortyActFund | UmbrellaWithSubFunds) => {
+            PipeClassification { pipe: Some(Pipe::UnitIssuance), provisional: false }
+        }
+        // `None` (type still alleged, CTN-2h weakest-link) or a known type
+        // outside the ratified three buckets (TS.2 §3 does not name a pipe
+        // for, e.g., an EconomicInterest edge into a GeneralPartnership —
+        // an open question, not silently resolved). D1 corrective tranche
+        // Item 4 (2026-08-21): this used to default to `NonVotingShares`
+        // marked provisional — a guess dressed up as a flagged value,
+        // contradicting the ratified "unknown is alleged, not silently
+        // classified". Now genuinely unresolved: no pipe is invented.
+        _ => PipeClassification { pipe: None, provisional: true },
     }
 }
 

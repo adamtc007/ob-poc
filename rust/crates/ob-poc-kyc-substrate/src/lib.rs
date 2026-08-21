@@ -53,8 +53,8 @@ pub use fold::type_registry::{
     ENTITY_TYPE_WIRE_VALUES,
 };
 pub use geometry::{
-    check_type_geometry, EntityType, GeometryError, LinkageSource, Pipe, ALL_ENTITY_TYPES,
-    ALL_PIPES,
+    check_type_geometry, pipe_of, EntityType, GeometryError, LinkageSource, Pipe,
+    PipeClassification, ALL_ENTITY_TYPES, ALL_PIPES,
 };
 pub use lexicon::{phase1_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition, Taxonomy};
 pub use placement::{enumerate_placement_set, LegalMove, MoveId, PlacementSet, NONE_OF_THE_ABOVE};

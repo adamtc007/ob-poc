@@ -51,8 +51,11 @@ use chrono::{TimeZone, Utc};
 
 use ob_poc_kyc_substrate::{
     check_control_preconditions, check_preconditions, fold_control_versioned, phase1_lexicon,
-    AuthorityRef, ControlState, EdgeId, EdgeStatus, EntityId, FoldRegistry, Hash, IntentEvent,
-    ObligationState, Precondition, Principal, StructureClass, SubjectId, TargetBinding, V1FoldImpl,
+    AuthorityRef, ControlProngStrategy, ControlState, CooperativeMemberStrategy,
+    DeterminationStrategy, EdgeId, EdgeKind, EdgeStatus, EntityId, EventId, FoldRegistry,
+    FoundationCouncilStrategy, FundControlStrategy, Hash, IntentEvent, NomineePierceStrategy,
+    ObligationState, OwnershipProngStrategy, PersonId, Precondition, Principal, StateOwnedStrategy,
+    StructureClass, SubjectId, TargetBinding, TrustRoleKind, TrustRoleStrategy, V1FoldImpl,
 };
 
 const DSL_KYC_YAML: &str = include_str!("../config/verbs/kyc/dsl-kyc.yaml");
@@ -62,17 +65,21 @@ const KYC_STREAM_OPS_SRC: &str = include_str!("../src/domain_ops/kyc_stream_ops.
 const CONTROL_FOLD_SRC: &str = include_str!("../crates/ob-poc-kyc-substrate/src/fold/control.rs");
 const OBLIGATION_FOLD_SRC: &str =
     include_str!("../crates/ob-poc-kyc-substrate/src/fold/obligation.rs");
+const TYPE_REGISTRY_FOLD_SRC: &str =
+    include_str!("../crates/ob-poc-kyc-substrate/src/fold/type_registry.rs");
 
 // ── Declaration extraction ──────────────────────────────────────────────────
 
 /// Parse `domains: { <domain>: { verbs: { <verb>: ... } } }` from a dsl.kyc
 /// verb YAML file — a plain line-scan (2-space domain keys, 6-space verb
 /// keys) rather than a full YAML parse, matching the fixed hand-authored
-/// indentation of these two files (verified: exactly 2 domain lines + 13 verb
+/// indentation of these two files (verified: exactly 2 domain lines + 17 verb
 /// lines in dsl-kyc.yaml, 1 domain line + 8 verb lines in
-/// dsl-kyc-obligation.yaml — 21 total, post K-G7 retirement of
-/// kyc.role.assign/withdraw (2026-08-12) and the TS.4 `ubo.edge.pierce-nominee`
-/// addition (K-8, full-kit-citizenship reintroduction discipline)).
+/// dsl-kyc-obligation.yaml — 25 total, post K-G7 retirement of
+/// kyc.role.assign/withdraw (2026-08-12), the TS.4 `ubo.edge.pierce-nominee`
+/// addition (K-8, full-kit-citizenship reintroduction discipline), and the D1
+/// `kyc.subject.{assert-type,correct-type,withdraw-member,record-enquiry}`
+/// addition (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8)).
 fn extract_verb_fqns(yaml: &str) -> BTreeSet<String> {
     let mut fqns = BTreeSet::new();
     let mut domain: Option<&str> = None;
@@ -161,15 +168,15 @@ fn fold_match_arms(src: &str) -> BTreeSet<String> {
 // ── §0 scope ─────────────────────────────────────────────────────────────
 
 #[test]
-fn verb_universe_is_exactly_21() {
+fn verb_universe_is_exactly_25() {
     let fqns = declared_verb_universe();
     assert_eq!(
         fqns.len(),
-        21,
-        "dsl.kyc verb count drifted from the post-TS.4 21 (20 post-K-G7 \
-         retirement + ubo.edge.pierce-nominee, TS.4 = K-8) — update the \
-         T0.3 audit and every other pinned test in this file, not just this \
-         assertion: {fqns:#?}"
+        25,
+        "dsl.kyc verb count drifted from the post-D1 25 (21 post-TS.4 + the \
+         4 D1 type-registry moves, EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8) — \
+         update the T0.3 audit and every other pinned test in this file, not \
+         just this assertion: {fqns:#?}"
     );
 }
 
@@ -208,8 +215,8 @@ fn every_declared_verb_has_a_registered_op() {
     let registered = registered_op_fqns();
     assert_eq!(
         registered.len(),
-        21,
-        "registered dsl.kyc op count drifted from the post-TS.4 21: {registered:#?}"
+        25,
+        "registered dsl.kyc op count drifted from the post-D1 25: {registered:#?}"
     );
 
     let missing_ops: Vec<_> = declared.difference(&registered).collect();
@@ -294,10 +301,19 @@ fn newly_covered_entries_are_fqn_correct_and_render_safe() {
 fn fold_blind_verbs_are_exactly_known() {
     let control_arms = fold_match_arms(CONTROL_FOLD_SRC);
     let obligation_arms = fold_match_arms(OBLIGATION_FOLD_SRC);
+    // D1 (EOP-DD-KYCUBO-TS.1): a THIRD fold axis exists
+    // (`fold::type_registry::TypeRegistryState`) — the 4 new type-registry
+    // moves fold there, not in control.rs/obligation.rs, so this scan must
+    // include it or they'd be misreported as fold-blind when they are not.
+    let type_registry_arms = fold_match_arms(TYPE_REGISTRY_FOLD_SRC);
 
     let fold_blind: BTreeSet<String> = declared_verb_universe()
         .into_iter()
-        .filter(|fqn| !control_arms.contains(fqn) && !obligation_arms.contains(fqn))
+        .filter(|fqn| {
+            !control_arms.contains(fqn)
+                && !obligation_arms.contains(fqn)
+                && !type_registry_arms.contains(fqn)
+        })
         .collect();
 
     // kyc.role.assign/withdraw (the K-G7 finding) were retired 2026-08-12
@@ -517,11 +533,23 @@ fn precondition_and_strategy_coverage_is_exactly_known() {
         vec![Precondition::SubjectNotDecided],
     );
 
+    // D1 (EOP-DD-KYCUBO-TS.1 §3, moves 2/6/7/8): all three lexicon-studded
+    // moves carry EntityRegistered; record-enquiry carries none (row 8:
+    // "group exists" is true by construction).
+    for fqn in [
+        "kyc.subject.assert-type",
+        "kyc.subject.correct-type",
+        "kyc.subject.withdraw-member",
+    ] {
+        expected.insert(fqn.to_string(), vec![Precondition::EntityRegistered]);
+    }
+    expected.insert("kyc.subject.record-enquiry".to_string(), vec![]);
+
     assert_eq!(
         actual.len(),
-        21,
-        "phase1_lexicon() entry count drifted from the post-TS.4 21 \
-         lexicon-covered verbs (20 post-T6.0 + ubo.edge.pierce-nominee)"
+        25,
+        "phase1_lexicon() entry count drifted from the post-D1 25 \
+         lexicon-covered verbs (21 post-TS.4 + the 4 D1 type-registry moves)"
     );
     assert_eq!(
         actual, expected,
@@ -593,6 +621,13 @@ fn edge_kind_wire_values_are_exactly_known() {
         "trust_beneficiary",
         "nominee",
         "dominant_influence",
+        // TS.2 §5 growth (D1 Part B) — closes `every_geometry_pipe_is_assertable`.
+        "officer_appointment",
+        "management_mandate",
+        "membership_rights",
+        "statutory_authority",
+        "employment",
+        "containment",
     ]
     .into_iter()
     .map(String::from)
@@ -1134,4 +1169,314 @@ fn precondition_carrying_verbs_actually_enforce_their_stud() {
         .is_ok(),
         "compute-fold must admit once reconcile-conflict + select-strategy have fired"
     );
+}
+
+// ── D1 corrective tranche Item 2 — traversal-blind tooth (TS.2 EdgeKind growth) ─
+
+/// TS.2 §5 grew `EdgeKind` by 6 variants (`OfficerAppointment`,
+/// `ManagementMandate`, `MembershipRights`, `StatutoryAuthority`,
+/// `Employment`, `Containment`) so every geometry-declared pipe became
+/// assertable (`every_geometry_pipe_is_assertable`,
+/// `ts2_pipe_convergence.rs`). Assertable is not the same question as
+/// consumed by a *determination* — this tooth answers that second
+/// question directly and behaviorally, driving every real
+/// `DeterminationStrategy::resolve()` impl with a synthetic lone edge,
+/// rather than trusting doc comments (several of which — `ControlProng
+/// Strategy`'s in particular — name a CLOSED list of kinds it "traverses"
+/// that is, in fact, stale: the real code has no kind filter at all
+/// beyond excluding `EconomicInterest`/`Nominee`).
+///
+/// **Finding, reported rather than silently absorbed: the corrective
+/// tranche's own brief — "no determination traversal consumes them" — is
+/// FALSE for half the strategy set.** `control_prong_strategy`,
+/// `fund_control_strategy` (a thin delegate), `state_owned_strategy`, and
+/// `nominee_pierce_strategy` (also a thin delegate) all build their
+/// adjacency from `reconciled_control_edges()`, which admits every active
+/// non-economic, non-nominee edge with NO kind filter — so an
+/// `Employment` or `MembershipRights` edge is walked exactly like a
+/// `VotingRights` edge, undifferentiated, and surfaces a
+/// `Prong::ControlByOtherMeans` candidate from it today. The premise IS
+/// true for the three structure-class-specific strategies that DO
+/// kind-filter (`trust_role_strategy`, `foundation_council_strategy`,
+/// `cooperative_member_strategy`, each a closed `matches!` list) and for
+/// `ownership_prong_strategy` (economic axis only, by construction).
+/// `Nominee` is the one kind traversed by NOTHING — by design, guarded
+/// away before any strategy runs (K-8 pierce-first, at the freeze
+/// dispatch site).
+///
+/// This is arguably a WORSE gap than blindness — 4 of 8 strategies
+/// silently over-admit rather than silently ignore — but wiring a fix
+/// touches `DeterminationStrategy` selection/traversal, which the D1
+/// corrective tranche's own SCOPE FENCE excludes. This tooth exists so
+/// the true shape cannot be forgotten or silently narrowed back to the
+/// false "just unconsumed" framing: assertable does not mean
+/// *deliberately* consumed — for 4 of 8 strategies it means
+/// *accidentally* consumed, undifferentiated from every other control
+/// kind.
+#[test]
+fn edge_kind_strategy_admission_is_exactly_known() {
+    let kinds: &[(&str, EdgeKind)] = &[
+        ("economic_interest", EdgeKind::EconomicInterest),
+        ("voting_rights", EdgeKind::VotingRights),
+        ("board_appointment", EdgeKind::BoardAppointment),
+        ("gp_statutory", EdgeKind::GpStatutory),
+        ("designated_member", EdgeKind::DesignatedMember),
+        ("trust_settlor", EdgeKind::TrustRole(TrustRoleKind::Settlor)),
+        ("trust_trustee", EdgeKind::TrustRole(TrustRoleKind::Trustee)),
+        ("trust_protector", EdgeKind::TrustRole(TrustRoleKind::Protector)),
+        ("trust_beneficiary", EdgeKind::TrustRole(TrustRoleKind::Beneficiary)),
+        ("nominee", EdgeKind::Nominee),
+        ("dominant_influence", EdgeKind::DominantInfluence),
+        ("officer_appointment", EdgeKind::OfficerAppointment),
+        ("management_mandate", EdgeKind::ManagementMandate),
+        ("membership_rights", EdgeKind::MembershipRights),
+        ("statutory_authority", EdgeKind::StatutoryAuthority),
+        ("employment", EdgeKind::Employment),
+        ("containment", EdgeKind::Containment),
+    ];
+    assert_eq!(
+        kinds.len(),
+        17,
+        "TS.0 §3's pipe vocabulary is 17-wide; EdgeKind mirrors it 1:1 including \
+         all 4 TrustRole sub-kinds"
+    );
+
+    let strategies: &[(&str, &dyn DeterminationStrategy)] = &[
+        ("ownership_prong_strategy", &OwnershipProngStrategy),
+        ("control_prong_strategy", &ControlProngStrategy),
+        ("trust_role_strategy", &TrustRoleStrategy),
+        ("fund_control_strategy", &FundControlStrategy),
+        ("foundation_council_strategy", &FoundationCouncilStrategy),
+        ("state_owned_strategy", &StateOwnedStrategy),
+        ("cooperative_member_strategy", &CooperativeMemberStrategy),
+        ("nominee_pierce_strategy", &NomineePierceStrategy),
+    ];
+    // Not 1:1 with `IMPLEMENTED_STRATEGY_CLASSES` (11 classes) — several
+    // classes share a strategy (e.g. the ownership-axis classes all use
+    // `ownership_prong_strategy`); 8 is the count of distinct
+    // `DeterminationStrategy` impls (`determination.rs`), independently
+    // re-verified here.
+    assert_eq!(strategies.len(), 8, "8 distinct DeterminationStrategy impls exist today");
+
+    let subject_entity = EntityId(uuid::Uuid::new_v4());
+    let person = EntityId(uuid::Uuid::new_v4());
+    let natural_persons: BTreeSet<PersonId> = [PersonId(person.0)].into_iter().collect();
+
+    // Behaviorally computed, not asserted from a doc read: for every
+    // (kind, strategy) pair, does a LONE such edge (natural person ->
+    // subject) surface a candidate?
+    let mut actual: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    for (kind_name, kind) in kinds {
+        let mut state = ControlState::default();
+        let edge_id = EdgeId(uuid::Uuid::new_v4());
+        state.edges.insert(
+            edge_id,
+            ob_poc_kyc_substrate::EdgeState {
+                id: edge_id,
+                kind: kind.clone(),
+                from: person,
+                to: subject_entity,
+                percentage: matches!(kind, EdgeKind::EconomicInterest).then_some(100.0),
+                status: EdgeStatus::Asserted,
+                evidence_event_id: None,
+                originating_event_id: EventId::new(),
+                trust_revocable: None,
+                superseded_by: None,
+                pierced_from: None,
+            },
+        );
+        for (strategy_name, strategy) in strategies {
+            let candidates = strategy.resolve(&state, subject_entity, &natural_persons, 25.0);
+            if !candidates.is_empty() {
+                actual.entry(*strategy_name).or_default().insert(*kind_name);
+            }
+        }
+    }
+
+    let broad_control: BTreeSet<&str> = [
+        "voting_rights",
+        "board_appointment",
+        "gp_statutory",
+        "designated_member",
+        "trust_settlor",
+        "trust_trustee",
+        "trust_protector",
+        "trust_beneficiary",
+        "dominant_influence",
+        "officer_appointment",
+        "management_mandate",
+        "membership_rights",
+        "statutory_authority",
+        "employment",
+        "containment",
+    ]
+    .into_iter()
+    .collect();
+    let mut expected: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    expected.insert("ownership_prong_strategy", ["economic_interest"].into_iter().collect());
+    expected.insert("control_prong_strategy", broad_control.clone());
+    expected.insert("fund_control_strategy", broad_control.clone());
+    expected.insert("state_owned_strategy", broad_control.clone());
+    expected.insert("nominee_pierce_strategy", broad_control);
+    expected.insert(
+        "trust_role_strategy",
+        ["trust_settlor", "trust_trustee", "trust_protector"].into_iter().collect(),
+    );
+    expected.insert(
+        "foundation_council_strategy",
+        ["board_appointment", "dominant_influence"].into_iter().collect(),
+    );
+    expected.insert(
+        "cooperative_member_strategy",
+        ["voting_rights", "board_appointment", "dominant_influence"].into_iter().collect(),
+    );
+
+    assert_eq!(
+        actual, expected,
+        "strategy edge-kind admission drifted — a strategy started (or stopped) \
+         traversing a kind it didn't (or did) before; this is a conscious-edit \
+         pin, not a guess (D1 corrective tranche Item 2)"
+    );
+
+    // The tranche brief's literal premise, checked directly: is there any
+    // kind that NO strategy traverses (excluding `nominee`, which is
+    // excluded by design, not by gap)? Per the finding above, no — every
+    // one of the 6 new kinds is swept into 4 strategies' generic control
+    // walk. `nominee` is the sole universally-untraversed kind, and it is
+    // NOT one of TS.2's 6 new variants.
+    let all_traversed_by_someone: BTreeSet<&str> =
+        actual.values().flat_map(|s| s.iter().copied()).collect();
+    let untraversed_by_anyone: BTreeSet<&str> = kinds
+        .iter()
+        .map(|(name, _)| *name)
+        .filter(|name| !all_traversed_by_someone.contains(name))
+        .collect();
+    assert_eq!(
+        untraversed_by_anyone,
+        ["nominee"].into_iter().collect::<BTreeSet<_>>(),
+        "the only EdgeKind traversed by NO strategy must be `nominee` (excluded by \
+         design — K-8 pierce-first, guarded at the freeze dispatch site before any \
+         strategy runs); if this set grew or shrank, the corrective tranche's \
+         Item 2 finding needs re-reporting, not silently re-absorbing"
+    );
+}
+
+// ── D1 corrective tranche Item 3 — op-layer-only studs ──────────────────────
+
+/// Two positional studs on the D1 type-registry moves have no `Precondition`
+/// primitive and are enforced as hand-rolled `TypeRegistryState` checks
+/// instead of through the unified `check_preconditions`/`check_control_
+/// preconditions` oracle:
+///
+/// 1. `kyc.subject.withdraw-member` — "membership must be active (not
+///    already withdrawn)" (TS.1 §3 row 6's positional half; `EntityRegistered`
+///    covers "membership exists" but not "and is still active").
+/// 2. `kyc.subject.correct-type` — "a type was already asserted" (TS.1 §3
+///    row 7's implicit positional constraint — "nothing to correct
+///    otherwise, that is assert-type's job").
+///
+/// **Assessed (Item 3b), not acted on:** could either be expressed as a
+/// `Precondition` the unified checker evaluates? NO for both — the checker's
+/// signature, `check_preconditions(entry, &ControlState, &ObligationState,
+/// event)` (T6.1(a)), does not accept `&TypeRegistryState` at all. Both
+/// studs read `TypeRegistryState` (`is_withdrawn`/`type_of`), which is
+/// simply not in scope for the checker as it stands. Promoting either to a
+/// real `Precondition` variant requires widening the checker to a third
+/// state axis — a signature change to a function every existing
+/// lexicon-declared stud already depends on — which is exactly the kind of
+/// checker rewrite the D1 tranche's own discipline (T6.1(a) extended via a
+/// new `ControlState`-only `Precondition::EntityRegistered` variant, NOT a
+/// signature change) chose to avoid and report rather than do silently.
+/// Not a small ratified change to wave through inline; flagged here for a
+/// separate decision, per the instruction not to act on it unilaterally.
+///
+/// **The consequence today:** each stud is duplicated by hand in two
+/// places that must be kept in sync by a human, not by the type system —
+/// the exact defect class `every_precondition_carrying_verb_is_reached_by_
+/// the_checker`/`precondition_carrying_verbs_actually_enforce_their_stud`
+/// exist to prevent for lexicon-declared studs, but cannot reach these two
+/// because they are not lexicon-declared at all:
+/// - the op (`src/domain_ops/kyc_stream_ops.rs`,
+///   `KycSubjectWithdrawMember`/`KycSubjectCorrectType::execute`)
+/// - the board preview (`crates/ob-poc-kyc-substrate/src/placement.rs`,
+///   `type_registry_candidates`)
+///
+/// This tooth pins the exact set (source-scanned in both files, plus the
+/// checker's own signature) so the divergence is visible and load-bearing,
+/// not folklore a future edit can silently break by touching only one side.
+#[test]
+fn op_layer_only_studs_are_exactly_known() {
+    // (a) Neither verb's lexicon entry declares more than EntityRegistered
+    // — the two positional studs are NOT lexicon/Precondition-declared.
+    let lexicon = phase1_lexicon();
+    for fqn in ["kyc.subject.withdraw-member", "kyc.subject.correct-type"] {
+        let entry = lexicon.get(fqn).unwrap_or_else(|| panic!("{fqn} must be in phase1_lexicon()"));
+        assert_eq!(
+            entry.preconditions,
+            vec![Precondition::EntityRegistered],
+            "{fqn}: lexicon-declared preconditions changed — if a stud was promoted \
+             into a real Precondition variant here, this tooth's whole premise \
+             (\"two op-layer-only studs\") needs re-deriving, not just re-pinning"
+        );
+    }
+
+    // (b) The checker's own signature does not accept TypeRegistryState —
+    // the structural reason neither stud CAN be expressed as a
+    // Precondition today (Item 3b's "NO" answer, pinned so it can't
+    // silently become stale if the signature is ever widened).
+    let sig_marker = "pub fn check_preconditions(";
+    let sig_start = CONTROL_FOLD_SRC
+        .find(sig_marker)
+        .expect("check_preconditions signature must exist in fold/control.rs");
+    let sig_end = CONTROL_FOLD_SRC[sig_start..]
+        .find(") -> Result<(), KycError> {")
+        .map(|i| sig_start + i)
+        .expect("check_preconditions signature must close with its return type");
+    let signature = &CONTROL_FOLD_SRC[sig_start..sig_end];
+    assert!(
+        !signature.contains("TypeRegistryState"),
+        "check_preconditions now accepts TypeRegistryState — Item 3's two op-layer-\
+         only studs may be promotable to real Preconditions; this tooth's \"NO\" \
+         finding is stale and must be re-assessed, not left as dead commentary. \
+         Signature was: {signature}"
+    );
+
+    // (c) Both hand-rolled op-layer checks exist, in both files, doing the
+    // SAME thing — the actual duplication this tooth exists to keep
+    // visible. Textual, not semantic: a rewrite that changes wording but
+    // keeps the TypeRegistryState-direct-check shape should NOT need to
+    // touch this tooth; a rewrite that removes the duplication (e.g. by
+    // deleting one side, or by promoting the stud to a real Precondition)
+    // SHOULD, and will fail here first.
+    let op_markers = [
+        ("kyc_stream_ops.rs::KycSubjectWithdrawMember", KYC_STREAM_OPS_SRC, "type_registry.is_withdrawn(entity)"),
+        ("kyc_stream_ops.rs::KycSubjectCorrectType", KYC_STREAM_OPS_SRC, "type_registry.type_of(entity).is_none()"),
+    ];
+    for (label, src, marker) in op_markers {
+        assert!(
+            src.contains(marker),
+            "{label}: expected op-layer hand-rolled check {marker:?} not found — \
+             either the duplication was resolved (update this tooth consciously) \
+             or the check moved/renamed unexpectedly"
+        );
+    }
+
+    let placement_src = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/ob-poc-kyc-substrate/src/placement.rs"
+    ))
+    .expect("read placement.rs");
+    let placement_markers = [
+        "!type_registry.is_withdrawn(entity)",
+        "type_registry.type_of(entity).is_some()",
+    ];
+    for marker in placement_markers {
+        assert!(
+            placement_src.contains(marker),
+            "placement.rs::type_registry_candidates: expected board-preview \
+             hand-rolled check {marker:?} not found — either the duplication was \
+             resolved (update this tooth consciously) or the check moved/renamed \
+             unexpectedly"
+        );
+    }
 }

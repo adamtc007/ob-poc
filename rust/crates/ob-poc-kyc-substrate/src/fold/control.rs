@@ -47,6 +47,21 @@ pub enum EdgeKind {
     Nominee,
     /// Dominant influence (catch-all control).
     DominantInfluence,
+    // ── TS.2 §5 — vocabulary convergence growth ─────────────────────────
+    /// Officer / senior management appointment (TS.0 §3 pipe 6).
+    OfficerAppointment,
+    /// Management mandate — ManCo/AIFM/adviser with a governing mandate
+    /// (TS.0 §3 pipe 7).
+    ManagementMandate,
+    /// Membership rights — cooperative/mutual (TS.0 §3 pipe 11).
+    MembershipRights,
+    /// Statutory authority — control by law, not ownership (TS.0 §3 pipe 12).
+    StatutoryAuthority,
+    /// Employment / delegated authority, natural-person-sourced (TS.0 §3
+    /// pipe 14).
+    Employment,
+    /// Pooled-asset containment — umbrella → sub-fund (TS.0 §3 pipe 16).
+    Containment,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -276,6 +291,14 @@ pub const EDGE_KIND_WIRE_VALUES: &[&str] = &[
     "trust_beneficiary",
     "nominee",
     "dominant_influence",
+    // TS.2 §5 growth — closes `every_geometry_pipe_is_assertable` for the
+    // six pipes previously declared in geometry but unassertable.
+    "officer_appointment",
+    "management_mandate",
+    "membership_rights",
+    "statutory_authority",
+    "employment",
+    "containment",
 ];
 
 fn edge_kind_from_payload(payload: &serde_json::Value) -> EdgeKind {
@@ -290,6 +313,12 @@ fn edge_kind_from_payload(payload: &serde_json::Value) -> EdgeKind {
         Some("trust_protector") => EdgeKind::TrustRole(TrustRoleKind::Protector),
         Some("trust_beneficiary") => EdgeKind::TrustRole(TrustRoleKind::Beneficiary),
         Some("nominee") => EdgeKind::Nominee,
+        Some("officer_appointment") => EdgeKind::OfficerAppointment,
+        Some("management_mandate") => EdgeKind::ManagementMandate,
+        Some("membership_rights") => EdgeKind::MembershipRights,
+        Some("statutory_authority") => EdgeKind::StatutoryAuthority,
+        Some("employment") => EdgeKind::Employment,
+        Some("containment") => EdgeKind::Containment,
         // Total-dispatch backstop for HISTORICAL events only (the fold must
         // stay infallible — D2). The live append path can no longer reach
         // this with an unknown/absent kind: the op-normalizer rejects
@@ -776,6 +805,26 @@ pub fn check_preconditions(
                                  decision is final (K-23)"
                             .into(),
                     });
+                }
+            }
+            Precondition::EntityRegistered => {
+                // TS.1 §3 rows 2/6/7 ("entity exists"). Vacuous when the
+                // probe carries no `entity_id` — same convention as
+                // `NoDuplicateActiveEdge`/`NotAlreadyRegistered` above: a
+                // real call site always supplies `target.entity_id`
+                // (declared required on assert-type/correct-type/
+                // withdraw-member); absence only ever means an abstract
+                // subject-scoped probe, never a real candidate.
+                if let Some(EntityId(eid)) = event.target.entity_id {
+                    if !control.registered_entity_ids.contains(&EntityId(eid)) {
+                        return Err(KycError::PreconditionFailed {
+                            verb: lexicon_entry.fqn.clone(),
+                            reason: format!(
+                                "entity {eid:?} is not a registered group member \
+                                 (kyc.subject.register) — TS.1 §3 rows 2/6/7"
+                            ),
+                        });
+                    }
                 }
             }
             Precondition::SubjectAllTerminal => {

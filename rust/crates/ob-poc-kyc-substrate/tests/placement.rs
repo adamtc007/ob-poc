@@ -141,6 +141,22 @@ fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &Lexico
 
     for entry in lexicon.entries.values() {
         let fqn = entry.fqn.as_str();
+        // D1 (EOP-DD-KYCUBO-TS.1 §3): the four type-registry moves are
+        // entity-scoped (`TargetBinding.entity_id`), not subject-scoped —
+        // this helper's generic per-entry probing only ever tries a single
+        // bare-subject target, which `enumerate_placement_set` deliberately
+        // never admits them against (`is_type_registry_move`,
+        // `placement.rs`). Their real oracle/set equivalence is covered by
+        // `ts1_assembly_board.rs`'s dedicated entity-scoped test instead.
+        if matches!(
+            fqn,
+            "kyc.subject.assert-type"
+                | "kyc.subject.correct-type"
+                | "kyc.subject.withdraw-member"
+                | "kyc.subject.record-enquiry"
+        ) {
+            continue;
+        }
         let is_edge_scoped = matches!(
             fqn,
             "ubo.edge.verify"

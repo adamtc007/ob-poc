@@ -79,13 +79,20 @@ fn attach_evidence_for_entity(subject: SubjectId, entity: EntityId) -> IntentEve
 fn expected_target_pipes(target: EntityType) -> &'static [Pipe] {
     use EntityType::*;
     use Pipe::*;
+    // TS.1 §2 v0.3 ("§2 v0.3 corrections", 2026-08-19): pipe 14 (employment)
+    // is present on the 8 operating types with employees below — corporates,
+    // general partnership, LLP, cooperative, charity, statutory corporation.
+    // Deliberately absent from funds and limited partnership (externally
+    // managed via pipe 7, does not employ). Re-derived independently from
+    // the doc text during the D1 corrective tranche (2026-08-21), not
+    // copied from `geometry.rs`'s own table.
     match target {
-        PrivateLimitedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl],
-        PublicListedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl],
-        LlcUs => &[VotingShares, BoardAppointment, OfficerAppointment, ContractualControl],
-        GeneralPartnership => &[GpDesignation, BoardAppointment, ContractualControl],
+        PrivateLimitedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl, EmploymentDelegatedAuthority],
+        PublicListedCompany => &[VotingShares, NonVotingShares, BoardAppointment, OfficerAppointment, ContractualControl, EmploymentDelegatedAuthority],
+        LlcUs => &[VotingShares, BoardAppointment, OfficerAppointment, ContractualControl, EmploymentDelegatedAuthority],
+        GeneralPartnership => &[GpDesignation, BoardAppointment, ContractualControl, EmploymentDelegatedAuthority],
         LimitedPartnership => &[GpDesignation, LimitedPartnershipInterest, ManagementMandate, ContractualControl],
-        Llp => &[GpDesignation, BoardAppointment, ContractualControl],
+        Llp => &[GpDesignation, BoardAppointment, ContractualControl, EmploymentDelegatedAuthority],
         OeicIcvc => &[BoardAppointment, ManagementMandate, UnitIssuance, PooledAssetContainment],
         Sicav => &[BoardAppointment, ManagementMandate, UnitIssuance, PooledAssetContainment],
         UnitTrust => &[ManagementMandate, TrusteePowers, UnitIssuance, PooledAssetContainment],
@@ -96,9 +103,9 @@ fn expected_target_pipes(target: EntityType) -> &'static [Pipe] {
         FixedBareTrust => &[TrusteePowers, BeneficiaryEntitlement],
         Foundation => &[TrusteePowers, ReservedPowers, BeneficiaryEntitlement],
         PensionScheme => &[TrusteePowers, BeneficiaryEntitlement],
-        CooperativeMutual => &[BoardAppointment, OfficerAppointment, MembershipRights],
-        CharityNotForProfit => &[BoardAppointment, OfficerAppointment, TrusteePowers],
-        GovernmentDeptStatutoryCorporation => &[BoardAppointment, OfficerAppointment, StatutoryAuthority],
+        CooperativeMutual => &[BoardAppointment, OfficerAppointment, MembershipRights, EmploymentDelegatedAuthority],
+        CharityNotForProfit => &[BoardAppointment, OfficerAppointment, TrusteePowers, EmploymentDelegatedAuthority],
+        GovernmentDeptStatutoryCorporation => &[BoardAppointment, OfficerAppointment, StatutoryAuthority, EmploymentDelegatedAuthority],
         SovereignWealthVehicle => &[StatutoryAuthority],
         NaturalPerson | SoleTrader => &[],
     }
@@ -238,13 +245,20 @@ fn matrix_is_exactly_known() {
     // corresponding change to `geometry.rs`'s tables (or this file's
     // independent re-transcription) means the grid drifted — the point of
     // this gate. Computed once, by running this test, not guessed.
+    //
+    // Pin derived from TS.1 v0.3 (the "§2 v0.3 corrections" block,
+    // 2026-08-19), re-derived in the D1 corrective tranche (2026-08-21):
+    // the prior pin (530) was itself derived from a pre-correction
+    // transcription that omitted pipe 14 from all 8 rows it belongs on.
+    // 530 + (8 targets × 2 admitted sources [NaturalPerson, SoleTrader] ×
+    // 1 pipe [EmploymentDelegatedAuthority]) = 546.
     assert_eq!(count, admitted.len());
     assert_eq!(
-        count, 530,
-        "the ratified §2/§2a grid today admits exactly 530 (source,pipe,target) triples \
-         (counting every admitted EntityType source individually, not by category); \
+        count, 546,
+        "the ratified §2/§2a grid (TS.1 v0.3) today admits exactly 546 (source,pipe,target) \
+         triples (counting every admitted EntityType source individually, not by category); \
          if this number changed, a type/pipe/rule was added or removed — confirm the edit \
-         was conscious before updating this pin"
+         was conscious, name the TS.1 version it was re-derived from, before updating this pin"
     );
 }
 
@@ -286,13 +300,17 @@ fn officer_and_employment_are_person_sourced() {
         }
         // Sanity: the SAME pipe from a natural person into at least one real
         // target is admitted, proving the refusal above is source-specific,
-        // not a blanket refusal of the pipe.
+        // not a blanket refusal of the pipe. Both pipes now have real
+        // target rows (Employment's 8-row grid gap was fixed in the D1
+        // corrective tranche, 2026-08-21) — this must hold for both, not
+        // just OfficerAppointment.
         let admits_from_person = ALL_ENTITY_TYPES.iter().any(|t| {
             check_type_geometry(LinkageSource::Entity(EntityType::NaturalPerson), pipe, *t).is_ok()
         });
-        if pipe == Pipe::OfficerAppointment {
-            assert!(admits_from_person, "OfficerAppointment must admit a natural-person source somewhere");
-        }
+        assert!(
+            admits_from_person,
+            "{pipe:?} must admit a natural-person source somewhere"
+        );
     }
 }
 

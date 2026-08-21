@@ -21,14 +21,15 @@ use sem_os_postgres::ops::SemOsVerbOp;
 use ob_poc_kyc_seam::{append_in_scope, map_principal, IntentEventDraft};
 use ob_poc_kyc_store::{enqueue_cross_stream_obligations, prior_freeze_persons, PgKycEventStore};
 use ob_poc_kyc_substrate::{
-    check_control_preconditions, check_preconditions, find_subject_entity, fold_control_versioned,
-    fold_obligations_versioned, natural_persons_from_events, phase1_lexicon,
+    check_control_preconditions, check_preconditions, edges_invalidated_by_correction,
+    entity_type_from_wire, find_subject_entity, fold_control_versioned, fold_obligations_versioned,
+    fold_type_registry, natural_persons_from_events, phase1_lexicon, pipe_of,
     render_intent_event_to_sexpr, AuthorityRef, ControlProngStrategy, DeterminationStrategy,
-    CooperativeMemberStrategy, EdgeId, EdgeKind, FoldRegistry, FoundationCouncilStrategy,
+    CooperativeMemberStrategy, EdgeId, EdgeKind, EntityId, FoldRegistry, FoundationCouncilStrategy,
     FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy, PersonId, Prong,
     ProngCandidate, SmoResult, StateOwnedStrategy, SubjectId, SubjectOverallState, TargetBinding,
     TrustRoleStrategy, V1FoldImpl,
-    EDGE_KIND_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
+    EDGE_KIND_WIRE_VALUES, ENTITY_TYPE_WIRE_VALUES, STRUCTURE_CLASS_WIRE_VALUES,
 };
 // fold_obligations_versioned is called for its error side-effect (precondition check)
 #[allow(unused_imports)]
@@ -1014,6 +1015,266 @@ impl SemOsVerbOp for KycSubjectClassifyStructure {
             payload,
             "analyst.classify-structure",
             Some("kyc.subject.classify-structure"),
+            ctx,
+            scope,
+        )
+        .await?;
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({ "seq": outcome.seq }),
+        ))
+    }
+}
+
+// ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new type-registry moves ──────────
+
+/// `kyc.subject.assert-type` — TS.1 move 2. Always folds to `Alleged`
+/// (CTN-2f); `Proved` is reachable only via a subsequent type-scoped
+/// `ubo.edge.attach-evidence` (`fold/type_registry.rs`).
+pub struct KycSubjectAssertType;
+
+#[async_trait]
+impl SemOsVerbOp for KycSubjectAssertType {
+    fn fqn(&self) -> &str {
+        "kyc.subject.assert-type"
+    }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let entity = json_extract_uuid(args, ctx, "entity-id")?;
+        let entity_type = json_extract_string(args, "entity-type")?;
+        if !ENTITY_TYPE_WIRE_VALUES.contains(&entity_type.as_str()) {
+            return Err(anyhow!(
+                "kyc.subject.assert-type: unrecognized entity-type '{entity_type}' — rejected \
+                 fail-closed (same discipline as ubo.edge.assert-control's kind gate). Valid \
+                 wire values: {}",
+                ENTITY_TYPE_WIRE_VALUES.join(", ")
+            ));
+        }
+        let payload = serde_json::json!({
+            "entity_id": entity,
+            "entity_type": entity_type,
+        });
+        let outcome = stream_append(
+            "kyc.subject.assert-type",
+            subject,
+            TargetBinding { entity_id: Some(EntityId(entity)), ..TargetBinding::for_subject(subject) },
+            payload,
+            "analyst.assert-type",
+            Some("kyc.subject.assert-type"),
+            ctx,
+            scope,
+        )
+        .await?;
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({ "seq": outcome.seq }),
+        ))
+    }
+}
+
+/// `kyc.subject.correct-type` — TS.1 move 7 (§4 cascade). Op-layer duties,
+/// no primitive exists for either (same "no Precondition, enforced here,
+/// fail-closed" pattern as `ubo.edge.pierce-nominee`'s nominee-kind check):
+///
+/// 1. The entity must already carry a prior type assertion — otherwise
+///    there is nothing to correct (that is `assert-type`'s job).
+/// 2. Compute which active edges touching the entity the geometry matrix no
+///    longer permits under the corrected type (`edges_invalidated_by_correction`),
+///    classifying each via `pipe_of` (TS.2, pulled forward). An edge whose
+///    OTHER end has no recorded type is flagged conservatively — geometry
+///    cannot be certified permitted without a definite type on both ends,
+///    and TS.1 §4 forbids silently passing an uncertain edge through.
+pub struct KycSubjectCorrectType;
+
+#[async_trait]
+impl SemOsVerbOp for KycSubjectCorrectType {
+    fn fqn(&self) -> &str {
+        "kyc.subject.correct-type"
+    }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let entity = EntityId(json_extract_uuid(args, ctx, "entity-id")?);
+        let entity_type_wire = json_extract_string(args, "entity-type")?;
+        let corrected_type = entity_type_from_wire(&entity_type_wire).ok_or_else(|| {
+            anyhow!(
+                "kyc.subject.correct-type: unrecognized entity-type '{entity_type_wire}' — \
+                 rejected fail-closed. Valid wire values: {}",
+                ENTITY_TYPE_WIRE_VALUES.join(", ")
+            )
+        })?;
+
+        let events = PgKycEventStore::load_events(scope.executor(), subject)
+            .await
+            .map_err(|e| anyhow!("correct-type: load events failed: {e}"))?;
+        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+        let control = fold_control_versioned(&refs, &KYC_REGISTRY)
+            .map_err(|e| anyhow!("correct-type: control fold failed: {e}"))?;
+        let type_registry = fold_type_registry(&refs);
+
+        if type_registry.type_of(entity).is_none() {
+            return Err(anyhow!(
+                "kyc.subject.correct-type: entity {} has no prior type assertion to correct — \
+                 use kyc.subject.assert-type instead",
+                entity.0
+            ));
+        }
+
+        let mut invalidated: std::collections::BTreeSet<EdgeId> = std::collections::BTreeSet::new();
+        let mut known_tuples: Vec<(EdgeId, ob_poc_kyc_substrate::Pipe, ob_poc_kyc_substrate::EntityType, bool)> =
+            Vec::new();
+        for edge in control
+            .edges
+            .values()
+            .filter(|e| e.is_active() && (e.from == entity || e.to == entity))
+        {
+            let this_is_source = edge.from == entity;
+            let other = if this_is_source { edge.to } else { edge.from };
+            match type_registry.type_of(other) {
+                Some(other_type) => {
+                    let target_type_for_pipe = if this_is_source { other_type } else { corrected_type };
+                    match pipe_of(&edge.kind, Some(target_type_for_pipe)).pipe {
+                        Some(pipe) => known_tuples.push((edge.id, pipe, other_type, this_is_source)),
+                        None => {
+                            // Classification unresolved (D1 corrective
+                            // tranche Item 4: e.g. an EconomicInterest edge
+                            // whose target type falls outside TS.2 §3's
+                            // three ratified buckets) — cannot certify
+                            // geometry permits it; flag conservatively,
+                            // same discipline as the untyped-other-end case
+                            // below (TS.1 §4 — never silently upgrade an
+                            // unresolved classification to certainty).
+                            invalidated.insert(edge.id);
+                        }
+                    }
+                }
+                None => {
+                    // Other end untyped — cannot certify permitted; flag
+                    // conservatively rather than silently pass (TS.1 §4).
+                    invalidated.insert(edge.id);
+                }
+            }
+        }
+        invalidated.extend(edges_invalidated_by_correction(corrected_type, &known_tuples));
+        let invalidated_edge_ids: Vec<Uuid> = invalidated.iter().map(|e| e.0).collect();
+
+        let payload = serde_json::json!({
+            "entity_id": entity.0,
+            "entity_type": entity_type_wire,
+            "invalidated_edge_ids": invalidated_edge_ids,
+        });
+        let outcome = stream_append(
+            "kyc.subject.correct-type",
+            subject,
+            TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
+            payload,
+            "senior-analyst.correct-type",
+            Some("kyc.subject.correct-type"),
+            ctx,
+            scope,
+        )
+        .await?;
+        Ok(VerbExecutionOutcome::Record(json!({
+            "seq": outcome.seq,
+            "invalidated_edge_count": invalidated_edge_ids.len(),
+        })))
+    }
+}
+
+/// `kyc.subject.withdraw-member` — TS.1 move 6. Op-layer duty (no
+/// Precondition primitive exists for "not already withdrawn" —
+/// `TypeRegistryState`-only, same class as `correct-type`'s prior-type
+/// check above): membership must exist (`EntityRegistered`, lexicon-
+/// declared) AND be active (not already withdrawn).
+pub struct KycSubjectWithdrawMember;
+
+#[async_trait]
+impl SemOsVerbOp for KycSubjectWithdrawMember {
+    fn fqn(&self) -> &str {
+        "kyc.subject.withdraw-member"
+    }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let entity = EntityId(json_extract_uuid(args, ctx, "entity-id")?);
+
+        let events = PgKycEventStore::load_events(scope.executor(), subject)
+            .await
+            .map_err(|e| anyhow!("withdraw-member: load events failed: {e}"))?;
+        let refs: Vec<&ob_poc_kyc_substrate::IntentEvent> = events.iter().collect();
+        let type_registry = fold_type_registry(&refs);
+        if type_registry.is_withdrawn(entity) {
+            return Err(anyhow!(
+                "kyc.subject.withdraw-member: entity {} is already withdrawn — membership must \
+                 be active (TS.1 §3 row 6)",
+                entity.0
+            ));
+        }
+
+        let payload = serde_json::json!({ "entity_id": entity.0 });
+        let outcome = stream_append(
+            "kyc.subject.withdraw-member",
+            subject,
+            TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) },
+            payload,
+            "analyst.withdraw-member",
+            Some("kyc.subject.withdraw-member"),
+            ctx,
+            scope,
+        )
+        .await?;
+        Ok(VerbExecutionOutcome::Record(
+            serde_json::json!({ "seq": outcome.seq }),
+        ))
+    }
+}
+
+/// `kyc.subject.record-enquiry` — TS.1 move 8. No preconditions (group
+/// exists trivially, by construction — the subject stream this workbook is
+/// open against IS the group).
+pub struct KycSubjectRecordEnquiry;
+
+#[async_trait]
+impl SemOsVerbOp for KycSubjectRecordEnquiry {
+    fn fqn(&self) -> &str {
+        "kyc.subject.record-enquiry"
+    }
+    async fn execute(
+        &self,
+        args: &serde_json::Value,
+        ctx: &mut VerbExecutionContext,
+        scope: &mut dyn TransactionScope,
+    ) -> Result<VerbExecutionOutcome> {
+        let subject = SubjectId(json_extract_uuid(args, ctx, "subject-id")?);
+        let mut payload = serde_json::json!({});
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert(
+                "sources_consulted".to_string(),
+                args.get("sources-consulted").cloned().unwrap_or_else(|| json!([])),
+            );
+            obj.insert(
+                "searches_run".to_string(),
+                args.get("searches-run").cloned().unwrap_or_else(|| json!([])),
+            );
+        }
+        let outcome = stream_append(
+            "kyc.subject.record-enquiry",
+            subject,
+            TargetBinding::for_subject(subject),
+            payload,
+            "analyst.record-enquiry",
+            Some("kyc.subject.record-enquiry"),
             ctx,
             scope,
         )

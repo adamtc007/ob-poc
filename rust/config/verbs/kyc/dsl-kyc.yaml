@@ -60,7 +60,7 @@ domains:
             type: string
             required: true
             description: "Control basis (fold::control::EdgeKind, payload key `kind` — control.rs::edge_kind_from_payload; canonical wire set: EDGE_KIND_WIRE_VALUES, TS.1 §1a). Trust roles are sub-kind-explicit: trust_settlor / trust_trustee / trust_protector / trust_beneficiary each map to their EdgeKind::TrustRole sub-kind, so distinct roles between the same (from,to) pair derive distinct edge ids and coexist under NoDuplicateActiveEdge. Unrecognized or omitted values are REJECTED at the op-normalizer before append (TS.1 §1b, fail-closed); the fold itself stays infallible — its dominant_influence catch-all remains only as the total-dispatch backstop for historical events."
-            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, nominee, dominant_influence, economic_interest]
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, nominee, dominant_influence, economic_interest, officer_appointment, management_mandate, membership_rights, statutory_authority, employment, containment]
           - name: edge-id
             type: uuid
             required: false
@@ -326,7 +326,7 @@ domains:
             type: string
             required: true
             description: "The UNDERLYING kind the nominator actually holds (what the pierced arrangement resolves to). Any canonical wire value EXCEPT nominee — a pierce cannot produce another nominee edge (fail-closed at the op-normalizer, TS.4 §2.6). The new edge's id derives from the assert-control scheme with this kind."
-            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, dominant_influence, economic_interest]
+            valid_values: [voting_rights, board_appointment, gp_statutory, designated_member, trust_settlor, trust_trustee, trust_protector, trust_beneficiary, dominant_influence, economic_interest, officer_appointment, management_mandate, membership_rights, statutory_authority, employment, containment]
           - name: percentage
             type: decimal
             required: false
@@ -655,6 +655,188 @@ domains:
             type: uuid
             required: false
             description: The entity being classified, if distinct from subject-id (defaults to subject-id)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      subject.assert-type:
+        flavour: attribute_mutating
+        description: Assert this entity is of this type (EOP-DD-KYCUBO-TS.1 §3 move 2) — always Alleged; supersedes any prior type assertion
+        effect_class: append_fact
+        invocation_phrases:
+          - "assert entity type"
+          - "set the entity type"
+          - "this entity is a"
+          - "classify entity type"
+          - "record the entity's type"
+          - "assert this entity's vehicle type"
+          - "type this entity"
+          - "declare entity type"
+          - "assert this is a private limited company"
+          - "record what this entity is"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: entity_type
+          tags: [kyc, subject, type, ts1, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root (the subject stream)
+          - name: entity-id
+            type: uuid
+            required: true
+            description: The group member entity being typed (must already be registered via kyc.subject.register)
+          - name: entity-type
+            type: string
+            required: true
+            description: "The entity's type (EOP-DD-KYCUBO-TS.0 §4 catalogue). Rejected fail-closed at the op-normalizer if outside the canonical wire set (ENTITY_TYPE_WIRE_VALUES), same discipline as assert-control's kind gate."
+            valid_values: [natural_person, sole_trader, private_limited_company, public_listed_company, llc_us, general_partnership, limited_partnership, llp, oeic_icvc, sicav, unit_trust, forty_act_fund, lp_fund, umbrella_with_sub_funds, discretionary_trust, fixed_bare_trust, foundation, pension_scheme, cooperative_mutual, charity_not_for_profit, government_dept_statutory_corporation, sovereign_wealth_vehicle]
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      subject.correct-type:
+        flavour: attribute_mutating
+        description: Correct a wrongly-asserted entity type (EOP-DD-KYCUBO-TS.1 §3 move 7) — triggers the §4 cascade, demoting affected linkages for re-assertion rather than deleting them
+        effect_class: append_fact
+        invocation_phrases:
+          - "correct the entity type"
+          - "the entity type was wrong"
+          - "fix this entity's type"
+          - "recorrect entity type"
+          - "correct type classification"
+          - "this entity is actually a"
+          - "amend the entity type"
+          - "the type assertion was wrong"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: entity_type
+          tags: [kyc, subject, type, ts1, correction, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: entity-id
+            type: uuid
+            required: true
+            description: The entity whose type is being corrected (must already carry a prior type assertion)
+          - name: entity-type
+            type: string
+            required: true
+            description: The corrected entity type — same canonical wire set as assert-type
+            valid_values: [natural_person, sole_trader, private_limited_company, public_listed_company, llc_us, general_partnership, limited_partnership, llp, oeic_icvc, sicav, unit_trust, forty_act_fund, lp_fund, umbrella_with_sub_funds, discretionary_trust, fixed_bare_trust, foundation, pension_scheme, cooperative_mutual, charity_not_for_profit, government_dept_statutory_corporation, sovereign_wealth_vehicle]
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+            - name: invalidated_edge_count
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      subject.withdraw-member:
+        flavour: attribute_mutating
+        description: This entity is not, or is no longer, a group member (EOP-DD-KYCUBO-TS.1 §3 move 6) — flags membership, never deletes (TS.1 §2c basket-of-references)
+        effect_class: append_fact
+        invocation_phrases:
+          - "withdraw group member"
+          - "remove this entity from the group"
+          - "this entity is no longer a member"
+          - "withdraw membership"
+          - "the entity left the group"
+          - "drop this entity from the board"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: group_member
+          tags: [kyc, subject, membership, ts1, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root
+          - name: entity-id
+            type: uuid
+            required: true
+            description: The group member entity being withdrawn (must be registered and not already withdrawn)
+        returns:
+          type: record
+          fields:
+            - name: seq
+              type: integer
+        three_axis:
+          state_effect: preserving
+          external_effects: []
+          consequence:
+            baseline: reviewable
+
+      subject.record-enquiry:
+        flavour: attribute_mutating
+        description: Record sources consulted and searches run (EOP-DD-KYCUBO-TS.1 §3 move 8) — completeness is a diligence assertion, never a proof (TS.0 §6.3)
+        effect_class: append_fact
+        invocation_phrases:
+          - "record enquiry"
+          - "log sources consulted"
+          - "record the diligence search"
+          - "record group completeness enquiry"
+          - "log the searches run"
+          - "record what sources were checked"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: kyc_stream
+          scope: global
+          noun: enquiry_record
+          tags: [kyc, subject, diligence, ts1, stream-backed, dsl-kyc]
+          phase_tags: [kyc]
+          side_effects: state_write
+        args:
+          - name: subject-id
+            type: uuid
+            required: true
+            description: Determination root (the group)
+          - name: sources-consulted
+            type: string_list
+            required: false
+            description: Sources consulted during the enquiry (e.g. GLEIF, company registry)
+          - name: searches-run
+            type: string_list
+            required: false
+            description: Searches run during the enquiry
         returns:
           type: record
           fields:

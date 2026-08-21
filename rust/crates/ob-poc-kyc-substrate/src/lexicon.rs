@@ -35,6 +35,9 @@ pub enum FoldId {
     ControlGraph,
     ObligationGraph,
     Determination,
+    /// `fold::type_registry::TypeRegistryState` (EOP-DD-KYCUBO-TS.1 §3
+    /// moves 2/6/7/8) — a third, independent fold axis (T6.1(a) extended).
+    TypeRegistry,
 }
 
 // ── Precondition ─────────────────────────────────────────────────────────────
@@ -91,6 +94,15 @@ pub enum Precondition {
     /// The subject's obligation rollup must be `AllTerminal`
     /// (row 17 — the K-23 approval gate).
     SubjectAllTerminal,
+
+    // ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new moves ─────────────────────
+    /// `target.entity_id` must be in `ControlState.registered_entity_ids`
+    /// (TS.1 §3 rows 2/6/7: "entity exists" for assert-type/withdraw-member/
+    /// correct-type). ControlState-only — ONE new ratchet-safe stud, not a
+    /// checker-signature change. A probe with no `entity_id` (placement's
+    /// generic per-entry probing) is vacuously satisfied, mirroring
+    /// `NoDuplicateActiveEdge`/`NotAlreadyRegistered`.
+    EntityRegistered,
 }
 
 // ── Authority spec ────────────────────────────────────────────────────────────
@@ -237,12 +249,14 @@ impl LexiconManifest {
 
 // ── Phase-1/2 verb entries ────────────────────────────────────────────────────
 
-/// Build the canonical `LexiconManifest` for all 21 dsl.kyc verbs: 13
+/// Build the canonical `LexiconManifest` for all 25 dsl.kyc verbs: 13
 /// Phase-1/2 determination verbs (incl. `ubo.edge.pierce-nominee`, TS.4 =
 /// K-8, preconditions from birth per the K-G7 reintroduction discipline)
-/// plus 8 W5 obligation/person verbs (T6.0 closure, 2026-08-12). This is
-/// the normative lexicon for the vertical slice (V&S Appendix A, phases
-/// 1–2) plus the W5 obligation lifecycle.
+/// plus 8 W5 obligation/person verbs (T6.0 closure, 2026-08-12) plus 4 D1
+/// type-registry moves (EOP-DD-KYCUBO-TS.1 §3 moves 2/6/7/8 — assert-type,
+/// withdraw-member, correct-type, record-enquiry). This is the normative
+/// lexicon for the vertical slice (V&S Appendix A, phases 1–2) plus the W5
+/// obligation lifecycle plus the D1 type-registry axis.
 pub fn phase1_lexicon() -> LexiconManifest {
     use smallvec::smallvec;
 
@@ -544,6 +558,48 @@ pub fn phase1_lexicon() -> LexiconManifest {
                 Precondition::SubjectNotDecided,
             ],
             AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        // ── D1 (EOP-DD-KYCUBO-TS.1 §3) — the four new moves ──────────────────
+        LexiconEntry::build(
+            "kyc.subject.assert-type",
+            "Assert this entity is of this type (TS.1 move 2) — always Alleged; \
+             supersedes any prior type assertion (last-wins)",
+            Taxonomy::Subject,
+            smallvec![FoldId::TypeRegistry],
+            vec![Precondition::EntityRegistered],
+            AuthoritySpec::analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.subject.correct-type",
+            "Correct a wrongly-asserted type (TS.1 move 7) — triggers the §4 cascade: \
+             affected linkages demote and flag for re-assertion, determination marked \
+             stale; never silently deletes",
+            Taxonomy::Subject,
+            smallvec![FoldId::TypeRegistry],
+            vec![Precondition::EntityRegistered],
+            AuthoritySpec::senior_analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.subject.withdraw-member",
+            "This entity is not, or is no longer, a group member (TS.1 move 6) — \
+             flags membership, never deletes (TS.1 §2c basket-of-references)",
+            Taxonomy::Subject,
+            smallvec![FoldId::TypeRegistry],
+            vec![Precondition::EntityRegistered],
+            AuthoritySpec::analyst(),
+            vec![],
+        ),
+        LexiconEntry::build(
+            "kyc.subject.record-enquiry",
+            "Record sources consulted and searches run (TS.1 move 8) — completeness \
+             is a diligence assertion, never a proof (TS.0 §6.3)",
+            Taxonomy::Subject,
+            smallvec![FoldId::TypeRegistry],
+            vec![],
+            AuthoritySpec::analyst(),
             vec![],
         ),
         LexiconEntry::build(

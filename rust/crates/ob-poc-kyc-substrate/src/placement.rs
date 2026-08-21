@@ -46,17 +46,22 @@
 //! distinct (TS.1 §6 `type_geometry_refuses_impossible_linkage`).
 //!
 //! **The four genuinely new TS.1 §3 moves** (`assert-type`, `correct-type`,
-//! `withdraw-member`, `record-enquiry` — moves 2, 7, 6, 8) are enumerated
-//! here too, but deliberately NOT folded into `lexicon`/`phase1_lexicon()`:
-//! that manifest is the governed, DB-dispatched 21-verb pack, pinned 1:1
-//! against `config/verbs/kyc/dsl-kyc*.yaml` and `kyc_stream_ops.rs`'s
-//! registered ops by `tests/kyc_pack_closure.rs`'s ratchet teeth
-//! (`verb_universe_is_exactly_21`, `every_declared_verb_has_a_registered_op`).
-//! Wiring these 4 moves into that production surface (YAML + op
-//! registration + DB persistence) is out of this D1, crate-level tranche's
-//! scope — see the tranche receipts. They are admitted here via
-//! `type_registry_candidates`, a small, separate, positional-only check
-//! (group membership / type-already-asserted), not `check_preconditions`.
+//! `withdraw-member`, `record-enquiry` — moves 2, 7, 6, 8) NOW join the
+//! governed 25-verb `phase1_lexicon()` pack (D1 Part A, EOP-DD-KYCUBO-TS.1) —
+//! YAML declaration, op registration, and DB persistence all wired; see
+//! `kyc_stream_ops.rs`. They are still enumerated here via
+//! `type_registry_candidates` rather than the main per-entry loop below,
+//! because they are **entity-scoped** (`TargetBinding.entity_id`), unlike
+//! every other subject-scoped verb the main loop probes with a single
+//! bare-subject target. `type_registry_candidates` now uses the REAL
+//! `LexiconEntry`s (`check_control_preconditions`, the same oracle the
+//! write path uses) for the lexicon-declared studs (`EntityRegistered`),
+//! layering TWO further positional checks that have no `Precondition`
+//! primitive (membership-active for `withdraw-member`; a prior type
+//! assertion for `correct-type`) directly against `TypeRegistryState` —
+//! the same "no primitive exists, enforced op-layer" pattern
+//! `ubo.edge.pierce-nominee`'s nominee-kind check already uses, applied
+//! here at the enumeration layer instead of an op's `execute()`.
 //! Moves 1 (`admit-member`), 4 (`attach-evidence`), 9 (`construct`) needed
 //! no new machinery — P1 recon found them already satisfied by
 //! `kyc.subject.register`, the existing `ubo.edge.attach-evidence` (now
@@ -68,7 +73,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::event::IntentEvent;
-use crate::fold::control::{check_preconditions, ControlState};
+use crate::fold::control::{check_control_preconditions, check_preconditions, ControlState};
 use crate::fold::obligation::ObligationState;
 use crate::fold::type_registry::TypeRegistryState;
 use crate::geometry::{check_type_geometry, LinkageSource, ALL_PIPES};
@@ -218,57 +223,97 @@ const WITHDRAW_MEMBER: &str = "kyc.subject.withdraw-member";
 const RECORD_ENQUIRY: &str = "kyc.subject.record-enquiry";
 const TYPE_SCOPED_ATTACH_EVIDENCE: &str = "ubo.edge.attach-evidence";
 
-/// The four TS.1 §3 moves with no home in `phase1_lexicon()` (module doc),
-/// plus the type-scoped half of `attach-evidence` — the edge-scoped half
-/// stays handled entirely by the main `lexicon.entries` loop, unchanged.
-/// Positional-only admission (group membership / type-already-asserted):
-/// deliberately not routed through `check_preconditions`, which is scoped
-/// to `LexiconEntry`-declared verbs.
+/// Entity-scoped verbs (`TargetBinding.entity_id`) that the main
+/// `enumerate_placement_set` loop below must NOT probe with its generic
+/// bare-subject target — they are enumerated per-entity by
+/// `type_registry_candidates` instead. (`record-enquiry` is subject-scoped,
+/// not entity-scoped, and stays in this exclusion list only so its single
+/// candidate is emitted exactly once, by `type_registry_candidates`, rather
+/// than potentially twice.)
+fn is_type_registry_move(fqn: &str) -> bool {
+    matches!(fqn, ASSERT_TYPE | CORRECT_TYPE | WITHDRAW_MEMBER | RECORD_ENQUIRY)
+}
+
+/// The four D1 TS.1 §3 moves now in `phase1_lexicon()` (module doc), plus
+/// the type-scoped half of `attach-evidence` — the edge-scoped half stays
+/// handled entirely by the main `lexicon.entries` loop, unchanged.
+/// Lexicon-declared studs (`EntityRegistered`) are checked via the REAL
+/// `check_control_preconditions` oracle; the two studs with no
+/// `Precondition` primitive (membership-active, prior-type-exists) are
+/// checked directly against `TypeRegistryState`, op-layer-style.
 fn type_registry_candidates(
     subject: SubjectId,
     state: &ControlState,
     type_registry: &TypeRegistryState,
+    lexicon: &LexiconManifest,
 ) -> Vec<LegalMove> {
     let mut moves = Vec::new();
 
     // record-enquiry (row 8): "group exists" — true by construction, the
-    // subject this workbook is open against IS the group.
-    let subject_target = TargetBinding::for_subject(subject);
-    moves.push(LegalMove {
-        move_id: move_id_for(RECORD_ENQUIRY, &subject_target),
-        verb_fqn: VerbFqn(RECORD_ENQUIRY.to_string()),
-        target: subject_target,
-    });
+    // subject this workbook is open against IS the group. No precondition
+    // declared, so no oracle probe needed.
+    if lexicon.get(RECORD_ENQUIRY).is_some() {
+        let subject_target = TargetBinding::for_subject(subject);
+        moves.push(LegalMove {
+            move_id: move_id_for(RECORD_ENQUIRY, &subject_target),
+            verb_fqn: VerbFqn(RECORD_ENQUIRY.to_string()),
+            target: subject_target,
+        });
+    }
+
+    let assert_type_entry = lexicon.get(ASSERT_TYPE);
+    let withdraw_member_entry = lexicon.get(WITHDRAW_MEMBER);
+    let correct_type_entry = lexicon.get(CORRECT_TYPE);
 
     for &entity in &state.registered_entity_ids {
         let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
 
-        // assert-type (row 2): "entity exists" — a registered group member.
-        // Reclassification stays legal (last-wins, mirrors `structure_class`),
-        // so always admitted once registered, regardless of any prior type.
-        moves.push(LegalMove {
-            move_id: entity_move_id(ASSERT_TYPE, entity),
-            verb_fqn: VerbFqn(ASSERT_TYPE.to_string()),
-            target: target.clone(),
-        });
-
-        // withdraw-member (row 6): "membership exists and is active".
-        if !type_registry.is_withdrawn(entity) {
-            moves.push(LegalMove {
-                move_id: entity_move_id(WITHDRAW_MEMBER, entity),
-                verb_fqn: VerbFqn(WITHDRAW_MEMBER.to_string()),
-                target: target.clone(),
-            });
+        // assert-type (row 2): "entity exists" (EntityRegistered, checked
+        // via the real oracle). Reclassification stays legal (last-wins,
+        // mirrors `structure_class`), so always admitted once registered,
+        // regardless of any prior type.
+        if let Some(entry) = assert_type_entry {
+            let probe = probe_event(subject, ASSERT_TYPE, target.clone());
+            if check_control_preconditions(entry, state, &probe).is_ok() {
+                moves.push(LegalMove {
+                    move_id: entity_move_id(ASSERT_TYPE, entity),
+                    verb_fqn: VerbFqn(ASSERT_TYPE.to_string()),
+                    target: target.clone(),
+                });
+            }
         }
 
-        // correct-type (row 7): presupposes a type was already asserted —
-        // otherwise there is nothing to correct (that is assert-type).
-        if type_registry.type_of(entity).is_some() {
-            moves.push(LegalMove {
-                move_id: entity_move_id(CORRECT_TYPE, entity),
-                verb_fqn: VerbFqn(CORRECT_TYPE.to_string()),
-                target: target.clone(),
-            });
+        // withdraw-member (row 6): "membership exists and is active" —
+        // EntityRegistered via the oracle, plus "not already withdrawn"
+        // (no Precondition primitive; TypeRegistryState-only, checked here
+        // directly, same discipline as pierce-nominee's op-layer kind check).
+        if let Some(entry) = withdraw_member_entry {
+            let probe = probe_event(subject, WITHDRAW_MEMBER, target.clone());
+            if check_control_preconditions(entry, state, &probe).is_ok()
+                && !type_registry.is_withdrawn(entity)
+            {
+                moves.push(LegalMove {
+                    move_id: entity_move_id(WITHDRAW_MEMBER, entity),
+                    verb_fqn: VerbFqn(WITHDRAW_MEMBER.to_string()),
+                    target: target.clone(),
+                });
+            }
+        }
+
+        // correct-type (row 7): EntityRegistered via the oracle, plus "a
+        // type was already asserted" (no Precondition primitive — nothing
+        // to correct otherwise, that is assert-type's job).
+        if let Some(entry) = correct_type_entry {
+            let probe = probe_event(subject, CORRECT_TYPE, target.clone());
+            if check_control_preconditions(entry, state, &probe).is_ok()
+                && type_registry.type_of(entity).is_some()
+            {
+                moves.push(LegalMove {
+                    move_id: entity_move_id(CORRECT_TYPE, entity),
+                    verb_fqn: VerbFqn(CORRECT_TYPE.to_string()),
+                    target: target.clone(),
+                });
+            }
         }
 
         // attach-evidence, type-scoped half (row 4): "target assertion
@@ -311,6 +356,11 @@ pub fn enumerate_placement_set(
 
     for entry in lexicon.entries.values() {
         let fqn = entry.fqn.as_str();
+        if is_type_registry_move(fqn) {
+            // Entity-scoped; enumerated per-entity below, not with this
+            // loop's single bare-subject probe target.
+            continue;
+        }
         if is_geometry_gated(fqn) && !geometrically_possible(state, type_registry) {
             continue;
         }
@@ -340,7 +390,7 @@ pub fn enumerate_placement_set(
         }
     }
 
-    for m in type_registry_candidates(subject, state, type_registry) {
+    for m in type_registry_candidates(subject, state, type_registry, lexicon) {
         candidates.insert(m.move_id.clone(), m);
     }
 
