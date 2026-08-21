@@ -5,3 +5,4 @@
 pub(crate) mod control;
 pub(crate) mod obligation;
 pub(crate) mod registry;
+pub(crate) mod type_registry;

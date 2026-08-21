@@ -15,6 +15,7 @@ pub(crate) mod determination;
 pub(crate) mod error;
 pub(crate) mod event;
 pub(crate) mod fold;
+pub(crate) mod geometry;
 pub(crate) mod lexicon;
 pub(crate) mod placement;
 pub(crate) mod preview;
@@ -45,6 +46,15 @@ pub use fold::obligation::{
 };
 pub use fold::registry::{
     fold_control_versioned, fold_obligations_versioned, FoldImpl, FoldRegistry, V1FoldImpl,
+};
+pub use fold::type_registry::{
+    edges_invalidated_by_correction, entity_type_from_wire, fold_type_registry, EnquiryRecord,
+    EntityTypeRecord, TypeCorrectionRecord, TypeProofStatus, TypeRegistryState,
+    ENTITY_TYPE_WIRE_VALUES,
+};
+pub use geometry::{
+    check_type_geometry, EntityType, GeometryError, LinkageSource, Pipe, ALL_ENTITY_TYPES,
+    ALL_PIPES,
 };
 pub use lexicon::{phase1_lexicon, FoldId, LexiconEntry, LexiconManifest, Precondition, Taxonomy};
 pub use placement::{enumerate_placement_set, LegalMove, MoveId, PlacementSet, NONE_OF_THE_ABOVE};

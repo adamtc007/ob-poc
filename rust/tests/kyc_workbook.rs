@@ -251,7 +251,7 @@ async fn session_roundtrip() {
         );
     }
 
-    let (pre_commit_state, _pre_commit_obligation) =
+    let (pre_commit_state, _pre_commit_obligation, _pre_commit_type_registry) =
         workbook.validate().expect("staged chain must validate");
     let pre_commit_status = pre_commit_state
         .edges
@@ -272,7 +272,7 @@ async fn session_roundtrip() {
     let mut conn2 = pool.acquire().await.unwrap();
     let reopened = open_workbook(&mut conn2, subject).await.unwrap();
     assert_eq!(reopened.committed.len(), 4);
-    let (post_commit_state, _post_commit_obligation) = reopened.validate().unwrap();
+    let (post_commit_state, _post_commit_obligation, _post_commit_type_registry) = reopened.validate().unwrap();
     assert_eq!(
         post_commit_state.edges.get(&EdgeId(edge)).map(|e| e.status),
         Some(pre_commit_status),
@@ -299,7 +299,7 @@ async fn new_ubo_from_baseplate() {
         workbook.committed.is_empty(),
         "never-appended subject has no committed history"
     );
-    let (empty_state, _empty_obligation) = workbook.validate().unwrap();
+    let (empty_state, _empty_obligation, _empty_type_registry) = workbook.validate().unwrap();
     assert_eq!(empty_state.edges.len(), 0);
     assert!(!empty_state.registered);
 
@@ -321,7 +321,7 @@ async fn new_ubo_from_baseplate() {
 
     let mut conn2 = pool.acquire().await.unwrap();
     let reopened = open_workbook(&mut conn2, subject).await.unwrap();
-    let (state, _obligation) = reopened.validate().unwrap();
+    let (state, _obligation, _type_registry) = reopened.validate().unwrap();
     assert!(
         state.registered,
         "committed register must fold true on re-open"

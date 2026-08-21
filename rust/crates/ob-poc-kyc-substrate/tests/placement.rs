@@ -12,7 +12,7 @@ use uuid::Uuid;
 use ob_poc_kyc_substrate::{
     check_control_preconditions, enumerate_placement_set, phase1_lexicon, ControlState, EdgeId,
     EdgeKind, EdgeState, EdgeStatus, EntityId, EventId, LexiconManifest, ObligationState,
-    PlacementSet, SubjectId, TargetBinding,
+    PlacementSet, SubjectId, TargetBinding, TypeRegistryState,
 };
 
 fn subject() -> SubjectId {
@@ -25,6 +25,10 @@ fn empty_state() -> ControlState {
 
 fn empty_obligation() -> ObligationState {
     ObligationState::default()
+}
+
+fn empty_type_registry() -> TypeRegistryState {
+    TypeRegistryState::default()
 }
 
 fn edge(status: EdgeStatus) -> EdgeState {
@@ -73,7 +77,7 @@ fn abstain_always_present() {
         state_with_edge(EdgeStatus::Verified),
         reconciled_and_strategized_state(),
     ] {
-        let set = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
+        let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
         assert!(
             set.moves
                 .iter()
@@ -91,8 +95,8 @@ fn placement_set_deterministic() {
     let lexicon = phase1_lexicon();
     let state = state_with_edge(EdgeStatus::Verified);
 
-    let a = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
-    let b = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
+    let a = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
+    let b = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
 
     assert_eq!(
         a.board_hash, b.board_hash,
@@ -117,7 +121,7 @@ fn canonical_order_stable() {
         state.edges.insert(e.id, e);
     }
 
-    let set = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
+    let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
     let ids: Vec<&str> = set.moves.iter().map(|m| m.move_id.0.as_str()).collect();
     let mut sorted = ids.clone();
     sorted.sort_unstable();
@@ -133,7 +137,7 @@ fn canonical_order_stable() {
 /// probe, the move is in the placement set iff `check_control_preconditions`
 /// (the same oracle the write path enforces) accepts it against the state.
 fn assert_matches_oracle(subj: SubjectId, state: &ControlState, lexicon: &LexiconManifest) {
-    let set = enumerate_placement_set(subj, state, &empty_obligation(), lexicon);
+    let set = enumerate_placement_set(subj, state, &empty_obligation(), &empty_type_registry(), lexicon);
 
     for entry in lexicon.entries.values() {
         let fqn = entry.fqn.as_str();
@@ -231,7 +235,7 @@ fn verify_only_admitted_for_evidenced_or_verified_edges() {
     let lexicon = phase1_lexicon();
 
     let asserted = state_with_edge(EdgeStatus::Asserted);
-    let set = enumerate_placement_set(subj, &asserted, &empty_obligation(), &lexicon);
+    let set = enumerate_placement_set(subj, &asserted, &empty_obligation(), &empty_type_registry(), &lexicon);
     let target = TargetBinding::for_edge(subj, *asserted.edges.keys().next().unwrap());
     assert!(
         !set.admits("ubo.edge.verify", &target),
@@ -239,7 +243,7 @@ fn verify_only_admitted_for_evidenced_or_verified_edges() {
     );
 
     let evidenced = state_with_edge(EdgeStatus::Evidenced);
-    let set = enumerate_placement_set(subj, &evidenced, &empty_obligation(), &lexicon);
+    let set = enumerate_placement_set(subj, &evidenced, &empty_obligation(), &empty_type_registry(), &lexicon);
     let target = TargetBinding::for_edge(subj, *evidenced.edges.keys().next().unwrap());
     assert!(
         set.admits("ubo.edge.verify", &target),
@@ -268,7 +272,7 @@ fn enumerate_placement_set_scales_to_200_edges() {
     }
 
     let start = Instant::now();
-    let set = enumerate_placement_set(subj, &state, &empty_obligation(), &lexicon);
+    let set = enumerate_placement_set(subj, &state, &empty_obligation(), &empty_type_registry(), &lexicon);
     let elapsed = start.elapsed();
 
     assert!(

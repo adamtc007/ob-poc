@@ -28,12 +28,39 @@
 //! `ControlState` (`check_control_preconditions`, the same oracle the write
 //! path uses). Verbs with an empty precondition list are therefore always
 //! admitted — the K-G5 "geometry-free" gap from T0.3's pack-closure audit.
-//! Tightening that geometry (real domain preconditions per verb family) is
-//! T6 scope, gated by T0.3's disposition register, not this generator.
-//! Likewise the universe enumerated here is `lexicon.entries` — the 12
-//! verbs `phase1_lexicon()` declares — not the full 22-verb dsl.kyc pack;
-//! the K-G6 declaration-drift gap (10 undeclared verbs) is a lexicon-closure
-//! problem, not a placement-set problem, and is out of this module's scope.
+//! Likewise the universe enumerated here is `lexicon.entries` — the 21
+//! verbs `phase1_lexicon()` declares — not the full dsl.kyc pack; the K-G6
+//! declaration-drift gap is a lexicon-closure problem, not a placement-set
+//! problem, and is out of this module's scope.
+//!
+//! **TS.1 §5 re-key (D1 tranche, EOP-DD-KYCUBO-TS.1).** The K-G5 gap above
+//! is now closed for the two edge-asserting verbs: `type_geometry_gate`
+//! runs FIRST, ahead of the existing stud probe (`check_preconditions`),
+//! for `ubo.edge.assert-control`/`ubo.edge.assert-economic-interest` only
+//! — TS.1 §1's two constraint layers, in order ("type geometry decides
+//! whether a linkage kind is possible at all... the studs already ratified
+//! then constrain whether a possible move is legal in this position").
+//! `check_type_geometry` (`crate::geometry`) returns `GeometryError`, a
+//! type with no relationship to `KycError` (`check_preconditions`'s error)
+//! — the two constraint layers are structurally, not just textually,
+//! distinct (TS.1 §6 `type_geometry_refuses_impossible_linkage`).
+//!
+//! **The four genuinely new TS.1 §3 moves** (`assert-type`, `correct-type`,
+//! `withdraw-member`, `record-enquiry` — moves 2, 7, 6, 8) are enumerated
+//! here too, but deliberately NOT folded into `lexicon`/`phase1_lexicon()`:
+//! that manifest is the governed, DB-dispatched 21-verb pack, pinned 1:1
+//! against `config/verbs/kyc/dsl-kyc*.yaml` and `kyc_stream_ops.rs`'s
+//! registered ops by `tests/kyc_pack_closure.rs`'s ratchet teeth
+//! (`verb_universe_is_exactly_21`, `every_declared_verb_has_a_registered_op`).
+//! Wiring these 4 moves into that production surface (YAML + op
+//! registration + DB persistence) is out of this D1, crate-level tranche's
+//! scope — see the tranche receipts. They are admitted here via
+//! `type_registry_candidates`, a small, separate, positional-only check
+//! (group membership / type-already-asserted), not `check_preconditions`.
+//! Moves 1 (`admit-member`), 4 (`attach-evidence`), 9 (`construct`) needed
+//! no new machinery — P1 recon found them already satisfied by
+//! `kyc.subject.register`, the existing `ubo.edge.attach-evidence` (now
+//! also type-scoped, `fold/type_registry.rs`), and `preview()` respectively.
 
 use std::collections::BTreeMap;
 
@@ -43,8 +70,12 @@ use serde::{Deserialize, Serialize};
 use crate::event::IntentEvent;
 use crate::fold::control::{check_preconditions, ControlState};
 use crate::fold::obligation::ObligationState;
+use crate::fold::type_registry::TypeRegistryState;
+use crate::geometry::{check_type_geometry, LinkageSource, ALL_PIPES};
 use crate::lexicon::LexiconManifest;
-use crate::types::{AuthorityRef, EdgeId, Hash, Principal, SubjectId, TargetBinding, VerbFqn};
+use crate::types::{
+    AuthorityRef, EdgeId, EntityId, Hash, Principal, SubjectId, TargetBinding, VerbFqn,
+};
 
 /// Canonical candidate id for "none of these moves apply" — always present
 /// in a `PlacementSet`. Re-exported from the shared, domain-agnostic
@@ -143,27 +174,146 @@ fn board_content_hash(moves: &[LegalMove]) -> Hash {
     Hash::of_json(&serde_json::json!({ "moves": ids }))
 }
 
-/// Enumerate the legal placement set for `subject` given its folded control
-/// and obligation `state` and the `lexicon`'s registered verb set. Takes both
-/// folds (T6.1(a) — the unified checker) even though no T6.1-attached
-/// precondition reads `ObligationState` yet; T6.4 attaches obligation-family
-/// studs and this generator must already be able to admit/reject them.
+/// Verbs gated by the type-geometry layer (TS.1 §1/§5) — checked BEFORE
+/// `check_preconditions`, and only for these two. Every other verb's
+/// admission is unchanged from before this tranche.
+fn is_geometry_gated(verb_fqn: &str) -> bool {
+    matches!(verb_fqn, "ubo.edge.assert-control" | "ubo.edge.assert-economic-interest")
+}
+
+/// TS.1 §1's FIRST constraint layer, as an existence check: does there
+/// exist at least one geometrically-possible (source, pipe, target) triple
+/// among the subject's currently-registered, currently-typed group members?
+/// An entity with no type assertion at all has no derivable permitted-pipe
+/// set (TS.0 §2 P3: "the proven type determines pipes") — such an entity
+/// contributes nothing here until `assert-type` has fired for it, which is
+/// a real, intended refusal, not a bug: `enumerate_placement_set` cannot
+/// admit a linkage move it cannot evaluate.
+fn geometrically_possible(state: &ControlState, type_registry: &TypeRegistryState) -> bool {
+    let members: Vec<EntityId> = state.registered_entity_ids.iter().copied().collect();
+    for &from in &members {
+        let Some(from_type) = type_registry.type_of(from) else { continue };
+        for &to in &members {
+            if from == to {
+                continue;
+            }
+            let Some(to_type) = type_registry.type_of(to) else { continue };
+            for pipe in ALL_PIPES {
+                if check_type_geometry(LinkageSource::Entity(from_type), *pipe, to_type).is_ok() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn entity_move_id(verb_fqn: &str, entity: EntityId) -> MoveId {
+    MoveId(format!("{verb_fqn}::entity:{}", entity.0))
+}
+
+const ASSERT_TYPE: &str = "kyc.subject.assert-type";
+const CORRECT_TYPE: &str = "kyc.subject.correct-type";
+const WITHDRAW_MEMBER: &str = "kyc.subject.withdraw-member";
+const RECORD_ENQUIRY: &str = "kyc.subject.record-enquiry";
+const TYPE_SCOPED_ATTACH_EVIDENCE: &str = "ubo.edge.attach-evidence";
+
+/// The four TS.1 §3 moves with no home in `phase1_lexicon()` (module doc),
+/// plus the type-scoped half of `attach-evidence` — the edge-scoped half
+/// stays handled entirely by the main `lexicon.entries` loop, unchanged.
+/// Positional-only admission (group membership / type-already-asserted):
+/// deliberately not routed through `check_preconditions`, which is scoped
+/// to `LexiconEntry`-declared verbs.
+fn type_registry_candidates(
+    subject: SubjectId,
+    state: &ControlState,
+    type_registry: &TypeRegistryState,
+) -> Vec<LegalMove> {
+    let mut moves = Vec::new();
+
+    // record-enquiry (row 8): "group exists" — true by construction, the
+    // subject this workbook is open against IS the group.
+    let subject_target = TargetBinding::for_subject(subject);
+    moves.push(LegalMove {
+        move_id: move_id_for(RECORD_ENQUIRY, &subject_target),
+        verb_fqn: VerbFqn(RECORD_ENQUIRY.to_string()),
+        target: subject_target,
+    });
+
+    for &entity in &state.registered_entity_ids {
+        let target = TargetBinding { entity_id: Some(entity), ..TargetBinding::for_subject(subject) };
+
+        // assert-type (row 2): "entity exists" — a registered group member.
+        // Reclassification stays legal (last-wins, mirrors `structure_class`),
+        // so always admitted once registered, regardless of any prior type.
+        moves.push(LegalMove {
+            move_id: entity_move_id(ASSERT_TYPE, entity),
+            verb_fqn: VerbFqn(ASSERT_TYPE.to_string()),
+            target: target.clone(),
+        });
+
+        // withdraw-member (row 6): "membership exists and is active".
+        if !type_registry.is_withdrawn(entity) {
+            moves.push(LegalMove {
+                move_id: entity_move_id(WITHDRAW_MEMBER, entity),
+                verb_fqn: VerbFqn(WITHDRAW_MEMBER.to_string()),
+                target: target.clone(),
+            });
+        }
+
+        // correct-type (row 7): presupposes a type was already asserted —
+        // otherwise there is nothing to correct (that is assert-type).
+        if type_registry.type_of(entity).is_some() {
+            moves.push(LegalMove {
+                move_id: entity_move_id(CORRECT_TYPE, entity),
+                verb_fqn: VerbFqn(CORRECT_TYPE.to_string()),
+                target: target.clone(),
+            });
+        }
+
+        // attach-evidence, type-scoped half (row 4): "target assertion
+        // exists and is not withdrawn" — a type is asserted, member active.
+        if type_registry.type_of(entity).is_some() && !type_registry.is_withdrawn(entity) {
+            moves.push(LegalMove {
+                move_id: entity_move_id(TYPE_SCOPED_ATTACH_EVIDENCE, entity),
+                verb_fqn: VerbFqn(TYPE_SCOPED_ATTACH_EVIDENCE.to_string()),
+                target,
+            });
+        }
+    }
+
+    moves
+}
+
+/// Enumerate the legal placement set for `subject` given its folded control,
+/// obligation, and type-registry `state` and the `lexicon`'s registered verb
+/// set. Takes all three folds (T6.1(a) extended to the type axis — see
+/// module doc) even though only the two geometry-gated verbs read
+/// `type_registry` today.
 ///
 /// For edge-scoped verbs, one candidate move is probed per edge present in
 /// `state.edges` (including superseded edges — K-13 supersede-never-delete
 /// means they remain addressable targets; precondition checks, not this
 /// enumeration, are what should eventually exclude them, per T6). For all
-/// other verbs, one subject-scoped candidate is probed.
+/// other verbs, one subject-scoped candidate is probed — EXCEPT the two
+/// geometry-gated verbs, which are additionally required to have at least
+/// one geometrically-possible triple among typed group members before the
+/// existing stud probe even runs (TS.1 §1: type geometry first, position
+/// second).
 pub fn enumerate_placement_set(
     subject: SubjectId,
     state: &ControlState,
     obligation: &ObligationState,
+    type_registry: &TypeRegistryState,
     lexicon: &LexiconManifest,
 ) -> PlacementSet {
     let mut candidates: BTreeMap<MoveId, LegalMove> = BTreeMap::new();
 
     for entry in lexicon.entries.values() {
         let fqn = entry.fqn.as_str();
+        if is_geometry_gated(fqn) && !geometrically_possible(state, type_registry) {
+            continue;
+        }
         let targets: Vec<TargetBinding> = if is_edge_scoped(fqn) {
             state
                 .edges
@@ -188,6 +338,10 @@ pub fn enumerate_placement_set(
                 );
             }
         }
+    }
+
+    for m in type_registry_candidates(subject, state, type_registry) {
+        candidates.insert(m.move_id.clone(), m);
     }
 
     let abstain_id = PlacementSet::abstain_move_id();

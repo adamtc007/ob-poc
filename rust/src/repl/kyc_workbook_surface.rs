@@ -289,9 +289,14 @@ pub(crate) async fn dispatch(
         }
         KycWorkbookCommand::Propose { utterance } => {
             let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
-            let (control, obligation) = workbook.validate()?;
-            let board =
-                enumerate_placement_set(workbook.subject, &control, &obligation, &workbook.kit);
+            let (control, obligation, type_registry) = workbook.validate()?;
+            let board = enumerate_placement_set(
+                workbook.subject,
+                &control,
+                &obligation,
+                &type_registry,
+                &workbook.kit,
+            );
 
             let ranked = match utterance_embedding {
                 Some(embedding) => {
@@ -344,7 +349,7 @@ pub(crate) async fn dispatch(
         }
         KycWorkbookCommand::Validate => {
             let workbook = workbooks.get(&session_id).ok_or(SurfaceError::NoWorkbookOpen)?;
-            let (control, obligation) = workbook.validate()?;
+            let (control, obligation, _type_registry) = workbook.validate()?;
             Ok(render_preview(&control, &obligation, workbook))
         }
         KycWorkbookCommand::Show => {

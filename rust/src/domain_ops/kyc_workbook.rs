@@ -53,10 +53,10 @@ use dsl_runtime::TransactionScope;
 use ob_poc_kyc_seam::{append_in_scope, map_principal};
 use ob_poc_kyc_store::{AppendOutcome, PgKycEventStore, StoreError};
 use ob_poc_kyc_substrate::{
-    check_preconditions, enumerate_placement_set, phase1_lexicon, preview,
+    check_preconditions, enumerate_placement_set, fold_type_registry, phase1_lexicon, preview,
     render_intent_event_to_sexpr, AuthorityRef, ControlState, EdgeId, EntityId, FoldRegistry,
     IntentEvent, KycError, LexiconManifest, MoveId, ObligationId, ObligationState, PersonId,
-    SubjectId, TargetBinding, VerbFqn,
+    SubjectId, TargetBinding, TypeRegistryState, VerbFqn,
 };
 use sem_os_core::principal::Principal as RuntimePrincipal;
 
@@ -245,17 +245,27 @@ fn sexpr_to_parsed_move(
 
 /// Fold `committed ++ staged` over the pinned kit — the re-run-whole
 /// reconstruction (KIT-4) shared by `validate()` and `stage()`'s frontier
-/// computation. Pure; no store dependency. Returns both folds (T6.1(a) —
-/// the unified checker): `enumerate_placement_set`'s frontier computation and
-/// `check_preconditions` both need the obligation axis available, even
-/// though no T6.1-attached precondition reads it yet.
+/// computation. Pure; no store dependency. Returns all three folds
+/// (T6.1(a) extended to the type-registry axis, TS.1 D1 tranche):
+/// `enumerate_placement_set`'s frontier computation now also needs
+/// `TypeRegistryState` for the geometry gate. `check_preconditions` itself
+/// is unchanged — it never reads the type-registry axis, so `preview()`'s
+/// own signature stays untouched; the type-registry fold runs alongside it
+/// here, over the same `committed ++ candidates` slice `preview` already
+/// validated (a total, unconditional fold — TS.1 §3 moves carry no
+/// `check_preconditions`-style stud, only the positional checks
+/// `enumerate_placement_set`'s `type_registry_candidates` already applied
+/// before any of them could have been staged).
 fn folded_state(
     committed: &[IntentEvent],
     staged: &[StagedMove],
     kit: &LexiconManifest,
-) -> Result<(ControlState, ObligationState), KycError> {
+) -> Result<(ControlState, ObligationState, TypeRegistryState), KycError> {
     let candidates: Vec<IntentEvent> = staged.iter().map(|m| m.event.clone()).collect();
-    preview(committed, &candidates, kit)
+    let (control, obligation) = preview(committed, &candidates, kit)?;
+    let all_refs: Vec<&IntentEvent> = committed.iter().chain(candidates.iter()).collect();
+    let type_registry = fold_type_registry(&all_refs);
+    Ok((control, obligation, type_registry))
 }
 
 /// Open a workbook: load the committed history and pin the current kit
@@ -283,8 +293,8 @@ pub async fn open_workbook(
 impl KycWorkbook {
     /// The Repl's job: re-run-whole over the staged workbook (T2∘T3
     /// composed). Called after every stage, not just before commit. Returns
-    /// both folds (T6.1(a)).
-    pub fn validate(&self) -> Result<(ControlState, ObligationState), KycError> {
+    /// all three folds (T6.1(a), extended to the type-registry axis).
+    pub fn validate(&self) -> Result<(ControlState, ObligationState, TypeRegistryState), KycError> {
         folded_state(&self.committed, &self.staged, &self.kit)
     }
 
@@ -313,10 +323,15 @@ impl KycWorkbook {
         }
         let parsed = sexpr_to_parsed_move(&source_file.atoms[0], self.subject)?;
 
-        let (frontier, frontier_obligation) =
+        let (frontier, frontier_obligation, frontier_type_registry) =
             folded_state(&self.committed, &self.staged, &self.kit)?;
-        let placement_set =
-            enumerate_placement_set(self.subject, &frontier, &frontier_obligation, &self.kit);
+        let placement_set = enumerate_placement_set(
+            self.subject,
+            &frontier,
+            &frontier_obligation,
+            &frontier_type_registry,
+            &self.kit,
+        );
 
         let legal_move = placement_set
             .moves
