@@ -27,11 +27,11 @@ pub(crate) mod types;
 pub use determination::{
     compute_assurance, detect_statutory_stops, find_subject_entity, freeze_determination,
     pull_smo_on_exhaustion, recover_determination_at, recover_determination_bitemporal,
-    ControlProngStrategy, CooperativeMemberStrategy, DeterminationAssurance,
+    ControlProngStrategy, CooperativeMemberStrategy, DelegationStatus, DeterminationAssurance,
     DeterminationInProgress, DeterminationPin, DeterminationStrategy, FoundationCouncilStrategy,
     FrozenDetermination, FundControlStrategy, NomineePierceStrategy, OwnershipProngStrategy,
     Prong, ProngCandidate, ProvisionalityReason, RecoveryPin, SmoPullRecord, SmoResult,
-    StateOwnedStrategy, TraversalStop, TrustRoleStrategy,
+    StateOwnedStrategy, TraversalStop, TrustRoleStrategy, STRATEGY_DELEGATION_REGISTRY,
 };
 pub use error::KycError;
 pub use event::{CapturedEffect, InMemoryEventStore, IntentEvent, KycEventStore};

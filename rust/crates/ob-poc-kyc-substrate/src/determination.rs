@@ -79,6 +79,56 @@ pub trait DeterminationStrategy: Send + Sync {
     ) -> Vec<ProngCandidate>;
 }
 
+// ── Declared-delegation register (EOP-DD-KYCUBO-TS.4 §4) ────────────────────
+
+/// TS.4 §4: a strategy that names a structure class and forwards verbatim
+/// to another strategy is "indistinguishable from a correct implementation
+/// at every level the tests currently inspect" — the fix is to make the
+/// claim explicit, not to ban delegation. A DECLARED delegate is
+/// legitimate (`nominee_pierce_strategy`, Q1: keep the name as a framing
+/// over the shared walk once its mechanism moves elsewhere); an
+/// UNDECLARED one (`fund_control_strategy`, before this tranche) is the
+/// "claimed-but-delegated" defect this register exists to make visible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DelegationStatus {
+    /// Distinct logic — even if structurally similar to another strategy
+    /// (e.g. `state_owned_strategy` inlines the same walk as
+    /// `control_prong_strategy` but is not a call-through), it is not
+    /// *forwarding* to another named strategy.
+    GenuineImplementation,
+    /// Forwards verbatim to the named strategy — declared, not discovered
+    /// by reading source.
+    DeclaredDelegate { delegates_to: &'static str },
+}
+
+/// TS.4 §4's pin — one entry per `DeterminationStrategy` impl, by
+/// `name()`. `strategy_delegation_is_exactly_known`
+/// (`tests/kyc_ts4_fund_pivot_piercing.rs`) verifies this behaviorally: a
+/// `DeclaredDelegate` must be byte-identical to its named target on shared
+/// fixtures; a `GenuineImplementation` must diverge from a raw
+/// `control_prong_strategy` walk somewhere a real domain difference exists.
+pub const STRATEGY_DELEGATION_REGISTRY: &[(&str, DelegationStatus)] = &[
+    ("ownership_prong_strategy", DelegationStatus::GenuineImplementation),
+    ("control_prong_strategy", DelegationStatus::GenuineImplementation),
+    ("trust_role_strategy", DelegationStatus::GenuineImplementation),
+    // TS.4 §4 finding, Phase 1 (RED-honest pin, BEFORE Ruling A's fix):
+    // `fund_control_strategy` forwards VERBATIM to `control_prong_strategy`
+    // — claimed-but-delegated. Phase 2 makes this `GenuineImplementation`
+    // (the fund pivot: provenance, per-pivot exhaustion, evidence stud) —
+    // a conscious edit here, red/green-proofed in the same tranche.
+    (
+        "fund_control_strategy",
+        DelegationStatus::DeclaredDelegate { delegates_to: "control_prong_strategy" },
+    ),
+    ("foundation_council_strategy", DelegationStatus::GenuineImplementation),
+    ("state_owned_strategy", DelegationStatus::GenuineImplementation),
+    ("cooperative_member_strategy", DelegationStatus::GenuineImplementation),
+    (
+        "nominee_pierce_strategy",
+        DelegationStatus::DeclaredDelegate { delegates_to: "control_prong_strategy" },
+    ),
+];
+
 // ── OwnershipProngStrategy (V&S §12.2 demoted chain) ─────────────────────────
 
 /// Pure Rust re-implementation of the ownership-percentage-multiply logic from
